@@ -170,13 +170,28 @@ body {
   height: fit-content;
 }
 
-/* The two inner floating cards */
+/* --- REVISED Styles for Guest Info Summary Container --- */
+
+/* This is the new main container that will hold the two summary cards */
+.info-summary {
+  background-color: #f7f8fa; /* The backdrop for the cards */
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15);
+  border: 1px solid #212529; /* The black outline for the main container */
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* This creates the space between the two inner cards */
+}
+
+/* The styles for the inner cards remain the same */
 .summary-card-details, .summary-card-price {
   background-color: #ffffff;
   border: 1px solid #212529;
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0; /* Remove any old margin */
 }
 
 /* Add space between the two cards */
@@ -664,34 +679,68 @@ body {
   margin-top: 4px;
 }
 
-/* --- NEW Styles for Card Action Controls --- */
+/* --- REVISED Styles for New Card Action Bar (Figma Design) --- */
 .card-actions {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid var(--border-color);
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #212529; /* Black outline */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Shadow */
+  border-radius: 22px; /* Rounded corners for the container */
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
-  gap: 15px;
 }
 
-.action-group {
+.actions-left {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 10px; /* Space between Guests and Pets rows */
 }
 
-.action-group label {
-  font-size: 0.8em;
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* Space between the label and the dropdown */
+}
+
+/* Style the label to look like the pill button from Figma */
+.action-item-label {
+  background-color: #fff;
+  color: #333;
+  border: 1px solid #212529;
+  border-radius: 999px; /* Pill shape */
+  padding: 6px 16px;
   font-weight: 500;
-  color: #666;
+  font-size: 0.9em;
+  white-space: nowrap; /* Prevent "Guests" from wrapping */
 }
 
-.action-group select {
+/* Keep the select dropdown clean and minimal */
+.action-item select {
   padding: 8px;
   border: 1px solid var(--border-color);
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 1em;
+  background-color: #f7f8fa;
+  min-width: 60px; /* Ensure dropdown has a decent width */
+}
+
+/* Update the Book Now button style */
+.book-now-btn {
+  background-color: var(--primary-color);
+  color: #fff;
+  border-radius: 999px; /* Pill shape */
+  padding: 12px 24px !important; /* Force padding */
+  font-weight: 700 !important;
+  font-size: 1em !important;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.book-now-btn:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
 }
 
 .book-now-btn {
@@ -707,23 +756,38 @@ body {
   padding-bottom: 20px;
   border-bottom: 1px solid var(--border-color);
   position: relative;
+  /* UPDATED: Increased top padding for better vertical spacing */
+  padding-top: 30px; 
 }
+
+/* --- Find and REPLACE this rule --- */
 .guest-info-header h1 {
   margin: 0;
   font-size: 2.5em;
-  line-height: 1.1; /* Add this line to bring the words closer */
+  line-height: 1.1;
+  /* This padding is for DESKTOP screens */
+  padding: 0 120px; 
+  box-sizing: border-box;
 }
+
 .back-button {
   position: absolute;
   left: 0;
-  top: -25px; /* Position from the top instead of the center */
-  background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  padding: 7px 16px;
+  top: -29px;
+  /* UPDATED: New styling for a bigger, filled button */
+  background-color: #212529; /* Black background */
+  color: #ffffff; /* White text */
+  border: 1px solid #212529; /* Matching border */
+  padding: 10px 20px; /* A little bigger */
   border-radius: 999px;
   cursor: pointer;
+  font-weight: 500;
   transition: all 0.2s;
+}
+
+.back-button:hover {
+  background-color: #495057; /* Dark gray on hover */
+  border-color: #495057;
 }
 .back-button:hover {
   background-color: var(--secondary-color);
@@ -740,6 +804,8 @@ body {
   border: 1px solid var(--border-color);
   padding: 30px;
   margin-top: 20px;
+  border: 1px solid #212529;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 .form-grid {
   display: grid;
@@ -848,12 +914,11 @@ body {
   /* --- NEW: Use Flexbox for perfect centering --- */
   display: flex;
   flex-direction: column;
-  align-items: center;
+  text-align: left;
 }
 
 /* --- UPDATED: No longer needs to be an inline-block --- */
 .stay-dates {
-    text-align: left;
     margin-bottom: 24px;
 }
 
@@ -864,7 +929,7 @@ body {
 
 .stay-nights {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px;
   font-size: 1.3em;
@@ -932,4 +997,37 @@ body {
   background-color: #eaf2ff;
   border-color: #0056b3;
   transform: translateY(-1px);
+}
+
+/* --- NEW Styles for Static Banner on Guest Info Page --- */
+.static-banner {
+  background-color: #212529; /* Dark background */
+  color: #ffffff;
+  padding: 12px 20px;
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000; /* Ensure it stays on top of all other content */
+  text-align: center;
+  font-size: 0.95em;
+  box-sizing: border-box; /* Important for full-width sticky banners */
+}
+
+.static-banner strong {
+  font-weight: 700; /* Make sure the bold text is prominent */
+}
+
+@media (max-width: 768px) {
+  .guest-info-header {
+    /* NEW: More top padding on mobile to push title down */
+    padding-top: 40px;
+  }
+  .guest-info-header h1 {
+    padding: 0 15px;
+    font-size: 2em; 
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
