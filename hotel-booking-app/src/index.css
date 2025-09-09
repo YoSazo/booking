@@ -542,31 +542,49 @@ body {
 }
 
 
-/* The footer now holds the centered "Done" button */
+/* --- UPDATED: Revert footer to a simpler state --- */
 .calendar-footer {
-  text-align: center;
-  padding: 0; /* Remove padding as margin will handle spacing */
-  margin: 0;
-  border-top: none;
+  display: flex;
+  justify-content: flex-end; /* Push Done button to the right */
+  align-items: center;
+  padding-top: 15px;
+  margin-top: 20px;
+  border-top: 1px solid var(--border-color);
 }
-
-/* Specific styling for the new "Done" button */
 .calendar-footer .btn {
-  background-color: #ffffff;
-  color: #212529;
-  border: 1px solid #212529; /* Added black outline */
-  border-radius: 999px;
-  padding: 8px 28px;
-  font-weight: 500;
-  font-size: 0.9em;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); /* Added shadow */
-  transition: all 0.2s ease-in-out;
+    background-color: var(--primary-color);
+    color: #fff;
+    border: 1px solid transparent;
+}
+.calendar-footer .btn:hover {
+    background-color: #0056b3;
 }
 
-.calendar-footer .btn:hover {
-  background-color: #f1f1f1;
-  border-color: #000000;
-  transform: translateY(-1px);
+
+/* --- REVISED: Styles for a footer inside the calendar card --- */
+.calendar-card-footer {
+  text-align: center;
+  margin-top: 16px; /* Space above the button */
+  padding-top: 16px; /* More space and separation */
+  border-top: 1px solid var(--border-color); /* A separator line */
+}
+
+.quick-book-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  color: var(--primary-color);
+  font-weight: 700;
+  font-size: 1em;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.quick-book-btn:hover {
+  text-decoration: underline;
+  background-color: #eaf2ff;
 }
 
 
@@ -894,4 +912,24 @@ body {
   font-size: 1.1em;
   font-weight: 500;
   padding: 0 2rem; /* Adds space between the repeating phrases */
+}
+
+.quick-book-btn {
+  background-color: #fff;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  border-radius: 999px; /* Pill shape */
+  padding: 8px 24px;
+  font-weight: 700;
+  font-size: 0.9em;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.07);
+  transition: all 0.2s ease;
+}
+
+.quick-book-btn:hover {
+  background-color: #eaf2ff;
+  border-color: #0056b3;
+  transform: translateY(-1px);
 }

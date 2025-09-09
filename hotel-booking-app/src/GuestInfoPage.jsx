@@ -76,7 +76,7 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
         </div>
         <div className="payment-placeholder">
           <h3>Payment Information</h3>
-          <div className="stripe-area">Stripe Payment Gateway will be integrated here.</div>
+          <div className="stripe-area">Stripe goes here</div>
           <button type="submit" className="btn btn-confirm" style={{width: '100%'}}>Complete Booking</button>
         </div>
       </form>

@@ -11,7 +11,15 @@ const MONTHLY_NIGHTS_THRESHOLD = 30;
 
 const calculateTieredPrice = (nights) => {
   if (nights <= 0) return 0;
-  if (nights < 7) { return nights * NIGHTLY; }
+
+  // --- NEW: Special condition for 28-day "monthly" bookings ---
+  if (nights === 28) {
+    return 950;
+  }
+
+  if (nights < 7) {
+    return nights * NIGHTLY;
+  }
   let discountedTotalRem = nights;
   let discountedTotal = 0;
   discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * MONTHLY;
@@ -23,8 +31,8 @@ const calculateTieredPrice = (nights) => {
 };
 
 const roomData = [
-  { id: 1, name: 'Deluxe Single King', amenities: 'Free WiFi • 55" TV • Mini Fridge • Workstation', description: 'A spacious, modern room featuring a plush king-sized bed, perfect for couples or business travelers.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg' },
-  { id: 2, name: 'Deluxe Double Queen', amenities: 'Free WiFi • Soaking Tub • Balcony Access', description: 'Ideal for families or groups, this room offers two comfortable queen beds and extra space to relax.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg' },
+  { id: 1, name: 'Deluxe Single King', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, modern room featuring a plush king-sized bed, perfect for couples or business travelers.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg' },
+  { id: 2, name: 'Deluxe Double Queen', amenities: 'Free WiFi • 30" TV • Workstation • Fridge • Bath • Free Parking • Weekly Housekeeping', description: 'Ideal for families or groups, this room offers two comfortable queen beds and extra space to relax.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg' },
 ];
 
 function App() {
