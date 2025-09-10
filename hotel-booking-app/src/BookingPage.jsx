@@ -1,6 +1,7 @@
 import React from 'react';
 import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
+import ReviewCard from './ReviewCard.jsx';
 
 function BookingPage({ 
   roomData, selectedRoom, nights, subtotal, taxes,
@@ -12,25 +13,38 @@ function BookingPage({
 
   return (
     <>
-      {/* --- NEW: Sticky Marquee Banner --- */}
       <div className="marquee-banner">
         <div className="marquee-content">
-          {/* The text is duplicated to create a seamless looping effect */}
-          <span>No Fees. No Deposits. No Hidden Costs.</span>
-          <span>No Fees. No Deposits. No Hidden Costs.</span>
-          <span>No Fees. No Deposits. No Hidden Costs.</span>
-          <span>No Fees. No Deposits. No Hidden Costs.</span>
-          <span>No Fees. No Deposits. No Hidden Costs.</span>
+          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
+          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
+          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
+          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
         </div>
       </div>
 
       <div className="container">
         <header className="header">
-          {/* --- UPDATED: Header Text --- */}
           <h1>Guest Lodge Minot</h1>
           <p>No Leases. No Background Checks. No Credit Checks.</p>
         </header>
         
+        <div className="reviews-section">
+          <ReviewCard 
+            text="Best place to stay at in MINOT! They are renovating everything! I mean everything, Literally so clean and nice! Keep it up management and crew."
+            author="Chico"
+            location="ND"
+            rating={5}
+          />
+          <ReviewCard 
+            text="Front desk was helpful and the room was nice. The remodel looks awesome. Zuber was extremely friendly and accommodating. 10/10 would stay here again."
+            author="Harbor Clooten"
+            location="ND"
+            rating={5}
+          />
+          {/* --- NEW: Google logo image added here --- */}
+          <img src="/google.png" alt="Google Reviews" className="reviews-google-logo" />
+        </div>
+
         <div className="booking-form">
           <div className="form-group">
             <label>Check-in / Check-out</label>
@@ -57,7 +71,7 @@ function BookingPage({
       
       <CalendarModal 
         isOpen={isCalendarOpen} onClose={onCalendarClose} onDatesChange={onDatesUpdate}
-        initialCheckin={checkinDate} initialCheckout={checkoutDate} currentRate={59}
+        initialCheckin={checkinDate} checkoutDate={checkoutDate} currentRate={59}
       />
     </>
   );

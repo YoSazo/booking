@@ -2,24 +2,19 @@ import React, { useState, useEffect } from 'react';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPage from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
+// --- UPDATED: Import the remapped tracking functions ---
+import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 
+// ... (Constants and calculator function remain the same) ...
 const NIGHTLY = 59;
 const WEEKLY = 250;
 const MONTHLY = 950;
 const WEEK_N = +(WEEKLY / 7).toFixed(2);
 const MONTHLY_NIGHTS_THRESHOLD = 30;
-
 const calculateTieredPrice = (nights) => {
   if (nights <= 0) return 0;
-
-  // --- NEW: Special condition for 28-day "monthly" bookings ---
-  if (nights === 28) {
-    return 950;
-  }
-
-  if (nights < 7) {
-    return nights * NIGHTLY;
-  }
+  if (nights === 28) { return 950; }
+  if (nights < 7) { return nights * NIGHTLY; }
   let discountedTotalRem = nights;
   let discountedTotal = 0;
   discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * MONTHLY;
@@ -29,10 +24,9 @@ const calculateTieredPrice = (nights) => {
   discountedTotal += discountedTotalRem * WEEK_N;
   return +discountedTotal.toFixed(2);
 };
-
 const roomData = [
-  { id: 1, name: 'Deluxe Single King', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, modern room featuring a plush king-sized bed, perfect for couples or business travelers.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg' },
-  { id: 2, name: 'Deluxe Double Queen', amenities: 'Free WiFi • 30" TV • Workstation • Fridge • Bath • Free Parking • Weekly Housekeeping', description: 'Ideal for families or groups, this room offers two comfortable queen beds and extra space to relax.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg' },
+  { id: 1, name: 'Deluxe Single King', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg' },
+  { id: 2, name: 'Deluxe Double Queen', amenities: 'Free WiFi • 30" TV • Workstation • Fridge • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg' },
 ];
 
 function App() {
@@ -50,7 +44,7 @@ function App() {
     setCheckinDate(today);
     setCheckoutDate(null);
   }, []);
-  
+
   const generateReservationCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -66,9 +60,15 @@ function App() {
       setIsCalendarOpen(true);
       return;
     }
-    setSelectedRoom({ ...room, guests: 1, pets: 0 });
+    const bookingState = { ...room, guests: 1, pets: 0 };
+    setSelectedRoom(bookingState);
+
+    // --- UPDATED: This now triggers the AddToCart event ---
+    const currentNights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+    const currentSubtotal = calculateTieredPrice(currentNights);
+    trackAddToCart({ ...bookingState, nights: currentNights, subtotal: currentSubtotal });
   };
-  
+
   const handleGuestCountChange = (newGuestCount) => {
     if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });
   };
@@ -79,15 +79,11 @@ function App() {
     setCheckinDate(dates.start);
     setCheckoutDate(dates.end);
   };
-
-  // --- THIS IS THE CORRECTED LOGIC ---
-  // The 'nights' calculation now ONLY depends on the dates, not on whether a room has been selected.
-  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-  const subtotal = calculateTieredPrice(nights);
-  const taxes = subtotal * 0.10;
-  const total = subtotal + taxes;
-
+  
   const handleConfirmBooking = () => {
+    // --- UPDATED: This now triggers the InitiateCheckout event ---
+    trackInitiateCheckout({ ...selectedRoom, subtotal });
+    
     setFinalBooking({
       ...selectedRoom,
       checkin: checkinDate, checkout: checkoutDate, nights: nights,
@@ -98,11 +94,21 @@ function App() {
   };
   
   const handleCompleteBooking = (formData) => {
+    const newReservationCode = generateReservationCode();
     setGuestInfo(formData);
-    setReservationCode(generateReservationCode());
+    setReservationCode(newReservationCode);
+    
+    // --- UPDATED: Pass the full formData to trackPurchase ---
+    trackPurchase(finalBooking, formData, newReservationCode);
+
     setCurrentPage('confirmation');
     window.scrollTo(0, 0);
   };
+
+  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+  const subtotal = calculateTieredPrice(nights);
+  const taxes = subtotal * 0.10;
+  const total = subtotal + taxes;
 
   if (currentPage === 'confirmation') {
     return <ConfirmationPage bookingDetails={finalBooking} guestInfo={guestInfo} reservationCode={reservationCode} />;

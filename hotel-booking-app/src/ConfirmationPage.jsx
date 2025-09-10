@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'; // Import useEffect
+import React from 'react';
 
 const formatDateWithSuffix = (date) => {
   const d = new Date(date);
@@ -14,20 +14,10 @@ const formatDateWithSuffix = (date) => {
 
 function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
 
-  // --- NEW: This locks and unlocks page scrolling ---
-  useEffect(() => {
-    // When the page loads, lock the scroll
-    document.body.style.overflow = 'hidden';
-
-    // When the component is unmounted (e.g., user navigates away), restore scrolling
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, []); // The empty array [] means this runs only once when the page loads
+  // The useEffect hook that set overflow:hidden has been completely REMOVED from here.
 
   return (
     <>
-      {/* --- NEW: Added the static sticky banner --- */}
       <div className="static-banner">
         ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call (701) 289-5992 — we're happy to help!
       </div>
@@ -51,7 +41,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
               </div>
             </div>
             <div className="stay-nights">
-              <svg className="moon-icon" xmlns="http://www.w.org/2000/svg" viewBox="0 0 24 24">
+              <svg className="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path d="M21.5,12.5A9.5,9.5,0,0,1,5.2,20.8a9.5,9.5,0,1,0,11.2-15,9.5,9.5,0,0,1,5.1,6.7Z" fill="currentColor"/>
               </svg>
               <strong>{bookingDetails.nights} Nights</strong>

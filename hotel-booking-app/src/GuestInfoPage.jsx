@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Autocomplete } from '@react-google-maps/api';
 
 function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
   const [formData, setFormData] = useState({
@@ -6,6 +7,7 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
     phone: '+1 ', email: '',
   });
   const [formErrors, setFormErrors] = useState({});
+  const [autocomplete, setAutocomplete] = useState(null);
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
@@ -30,6 +32,37 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
       onComplete(formData);
     }
   };
+
+  const onLoad = (autoC) => setAutocomplete(autoC);
+
+  const onPlaceChanged = () => {
+    if (autocomplete !== null) {
+      const place = autocomplete.getPlace();
+      const components = place.address_components;
+      let streetNumber = '';
+      let route = '';
+      let city = '';
+      let state = '';
+      let zip = '';
+      for (const component of components) {
+        const types = component.types;
+        if (types.includes('street_number')) streetNumber = component.long_name;
+        if (types.includes('route')) route = component.long_name;
+        if (types.includes('locality')) city = component.long_name;
+        if (types.includes('administrative_area_level_1')) state = component.short_name;
+        if (types.includes('postal_code')) zip = component.long_name;
+      }
+      setFormData(prev => ({
+        ...prev,
+        address: `${streetNumber} ${route}`.trim(),
+        city: city,
+        state: state,
+        zip: zip,
+      }));
+    } else {
+      console.log('Autocomplete is not loaded yet!');
+    }
+  };
   
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
@@ -39,7 +72,6 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
       <div className="static-banner">
         ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call (701) 289-5992 — we're happy to help!
       </div>
-
       <div className="container">
         <div className="guest-info-header">
           <button onClick={onBack} className="back-button">&lt; Back to Booking</button>
@@ -47,7 +79,7 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
           <p>Please provide your details to complete the booking.</p>
         </div>
 
-        {/* --- UPDATED: The two summary cards are now inside the styled .info-summary container --- */}
+        {/* --- FIXED: The summary card content is now restored --- */}
         <div className="info-summary">
             <div className="summary-card-details">
               <p className="detail-line">{bookingDetails.name}</p>
@@ -69,7 +101,12 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
           <div className="form-grid">
             <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required/></div>
             <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required/></div>
-            <div className="form-field full-width"><label>Address</label><input type="text" name="address" value={formData.address} onChange={handleChange} required/></div>
+            <div className="form-field full-width">
+              <label>Address</label>
+              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
+              </Autocomplete>
+            </div>
             <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
             <div className="form-field"><label>State / Province</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
             <div className="form-field"><label>Zip / Postal Code</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>

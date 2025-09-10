@@ -20,12 +20,19 @@ body {
 
 /* --- Main Container --- */
 .container {
-    max-width: 1100px;
-    margin: 20px auto;
-    padding: 20px;
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 30px;
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 30px;
+}
+
+/* --- ADD this new rule right below it --- */
+.container-single-column {
+  max-width: 800px; /* A good width for single-column content */
+  margin: 20px auto;
+  padding: 20px;
 }
 
 /* --- Header --- */
@@ -174,14 +181,16 @@ body {
 
 /* This is the new main container that will hold the two summary cards */
 .info-summary {
-  background-color: #f7f8fa; /* The backdrop for the cards */
+  /* grid-column has been REMOVED */
+  margin-top: 20px; /* You can now freely adjust this value! */
+  background-color: #f7f8fa;
   border-radius: 24px;
   padding: 16px;
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15);
-  border: 1px solid #212529; /* The black outline for the main container */
+  border: 1px solid #212529;
   display: flex;
   flex-direction: column;
-  gap: 16px; /* This creates the space between the two inner cards */
+  gap: 16px;
 }
 
 /* The styles for the inner cards remain the same */
@@ -321,17 +330,27 @@ body {
   visibility: visible;
 }
 
+/* --- Find and REPLACE this rule --- */
 .calendar-container {
-  background-color: #fff;
-  border-radius: 12px;
-  padding: 25px;
-  width: 90%;
-  max-width: 680px;
-  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
-  
-  /* Animation styles */
-  transform: scale(0.95);
-  transition: transform 0.3s ease;
+  background-color: #f7f8fa;
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 1px solid #212529;
+  width: 95%; /* Use percentage for better mobile fit */
+  max-width: 550px; /* Max width for tablets/desktops */
+
+  /* --- NEW: Flexbox layout to manage scrolling --- */
+  display: flex;
+  flex-direction: column;
+  /* Use 'dvh' (dynamic viewport height) to account for mobile browser bars */
+  max-height: 85dvh; 
+}
+
+/* --- ADD this new rule --- */
+.modal-scroll-content {
+  overflow-y: auto; /* This is the magic that enables vertical scrolling */
+  padding: 0 4px; /* A little padding so scrollbar doesn't touch the edges */
 }
 
 .calendar-modal.open .calendar-container {
@@ -528,42 +547,47 @@ body {
   text-align: center;
 }
 
-/* --- REVISED Styles for Outlines, Shadows & Spacing --- */
+/* --- REVISED Styles for Sticky Footer Calendar Modal --- */
 
-/* The main container is now a visible backdrop */
 .calendar-container {
   background-color: #f7f8fa;
   border-radius: 24px;
+  border: 1px solid #212529;
+  width: 95%;
+  max-width: 550px;
   padding: 16px;
-  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15); /* Added a more prominent shadow */
-  border: 1px solid #212529; /* Added black outline */;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  
+  /* --- Core Resizing Logic --- */
+  max-height: 95dvh; /* Use dynamic viewport height, leaving a 5% margin */
+  overflow-y: auto;  /* Add a scrollbar ONLY if content is still too tall */
+  display: flex;
+  flex-direction: column;
 }
 
-/* The inner cards for content */
+/* The calendar card is now the main scrollable area */
 .calendar-card, .price-card {
   background-color: #ffffff;
-  border: 1px solid #212529; /* Added black outline */
+  border: 1px solid #212529;
   border-radius: 16px;
-  padding: 17px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Added shadow */
+  padding: 20px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
 }
 
-/* Add space between the two cards */
-.calendar-card {
-  margin-bottom: 16px; 
-}
-.price-card {
-    margin-bottom: 16px;
+/* --- NEW: The "Sticky Footer" that holds the price and Done button --- */
+.modal-actions-footer {
+  flex-shrink: 0; /* Prevents this section from shrinking */
+  padding: 16px;
+  padding-top: 8px;
+  background-color: #f7f8fa; /* Match the main container backdrop */
 }
 
-
-/* --- UPDATED: Revert footer to a simpler state --- */
-.calendar-footer {
-  display: flex;
-  justify-content: flex-end; /* Push Done button to the right */
-  align-items: center;
-  padding-top: 15px;
-  margin-top: 20px;
+/* Adjust the calendar footer (Done button container) */
+.calendar-card-footer {
+  text-align: center;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--border-color);
 }
 .calendar-footer .btn {
@@ -585,21 +609,59 @@ body {
 }
 
 .quick-book-btn {
-  background: none;
-  border: none;
-  padding: 8px;
+  background-color: #fff;
   color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  border-radius: 999px;
+  padding: 8px 24px;
   font-weight: 700;
-  font-size: 1em;
+  font-size: 0.9em;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
-  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.07);
   transition: all 0.2s ease;
 }
 
 .quick-book-btn:hover {
-  text-decoration: underline;
   background-color: #eaf2ff;
+  border-color: #0056b3;
+}
+
+.calendar-actions-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* --- NEW: Media Query to shrink content on short screens --- */
+@media (max-height: 740px) {
+  .calendar-card, .price-card {
+    padding: 15px;
+    margin-bottom: 10px;
+  }
+  .calendar-day {
+    min-height: 40px;
+  }
+  .calendar-day-content {
+    min-height: 40px;
+    padding: 2px 0;
+  }
+  /* The .calendar-day-price rule that was here has been DELETED */
+  .upsell-prompt h4 {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  .upsell-prompt p {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .calendar-actions-footer {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
 }
 
 
@@ -858,11 +920,13 @@ body {
 
 /* --- REVISED Styles for Confirmation Page --- */
 .confirmation-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 40px 20px;
-  min-height: 100vh;
+  /* NEW: These two lines fix the horizontal overflow on mobile */
+  width: 100%;
+  box-sizing: border-box;
+
+  max-width: 600px; /* A good width for a confirmation message */
+  margin: 40px auto; /* Margin top/bottom and centered horizontally */
+  padding: 20px;
 }
 
 .confirmation-card {
@@ -874,11 +938,19 @@ body {
   width: 100%;
   max-width: 550px;
   text-align: center;
+  /* NEW: Prevent long words (like codes/emails) from causing overflow */
+  overflow-wrap: break-word;
 }
 
-.confirmation-header {
-  padding: 16px;
+/* Find this rule and add the new line */
+.confirmation-header p {
+  font-size: 1.1em;
+  color: #666;
+  margin: 4px 0;
+  /* NEW: Also apply here for extra safety */
+  overflow-wrap: break-word;
 }
+
 
 /* --- UPDATED: Styles for the logo --- */
 .success-icon {
@@ -1029,5 +1101,63 @@ body {
   }
   .form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* --- NEW Styles for Reviews Section --- */
+.reviews-section {
+  position: relative; /* NEW: This is required for positioning the logo inside */
+  grid-column: 1 / -1;
+  background-color: #ffffff;
+  border: 1px solid #212529;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.1);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: -9px; /* UPDATED: Reduced from 24px to move the section up */
+}
+
+/* --- ADD this new rule --- */
+.reviews-google-logo {
+  position: absolute;
+  bottom: 20px;
+  right: 24px;
+  width: 25px; /* A small but visible size */
+  height: auto;
+  opacity: 0.9;
+}
+
+
+.review-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.review-text {
+  font-style: italic;
+  color: #555;
+  margin: 0 0 16px 0;
+  flex-grow: 1; /* This pushes the author/stars to the bottom, making cards of different text lengths align nicely */
+}
+
+.review-author {
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 8px 0;
+  font-size: 0.9em;
+}
+
+.review-stars {
+  color: #ffc107; /* A gold color for the stars */
+  font-size: 1.1em;
+}
+
+/* --- Add this to your existing @media (max-width: 768px) block --- */
+@media (max-width: 768px) {
+  .reviews-section {
+    grid-template-columns: 1fr; /* Stack reviews on mobile */
+    gap: 24px;
   }
 }
