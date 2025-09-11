@@ -2,15 +2,21 @@ import React, { useState, useEffect } from 'react';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPage from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
-// --- UPDATED: Import the remapped tracking functions ---
+import HelpWidget from './HelpWidget.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
+import { hotelData } from './hotelData.js';
 
-// ... (Constants and calculator function remain the same) ...
+// --- This is the NEW, DYNAMIC way to get the hotel and room data ---
+const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
+const currentHotel = hotelData[hotelId];
+const roomData = currentHotel.rooms; // This is the only roomData definition we need
+
 const NIGHTLY = 59;
 const WEEKLY = 250;
 const MONTHLY = 950;
 const WEEK_N = +(WEEKLY / 7).toFixed(2);
 const MONTHLY_NIGHTS_THRESHOLD = 30;
+
 const calculateTieredPrice = (nights) => {
   if (nights <= 0) return 0;
   if (nights === 28) { return 950; }
@@ -24,10 +30,8 @@ const calculateTieredPrice = (nights) => {
   discountedTotal += discountedTotalRem * WEEK_N;
   return +discountedTotal.toFixed(2);
 };
-const roomData = [
-  { id: 1, name: 'Deluxe Single King', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg' },
-  { id: 2, name: 'Deluxe Double Queen', amenities: 'Free WiFi • 30" TV • Workstation • Fridge • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg' },
-];
+
+// --- DELETED: The old, hardcoded roomData array that was here is now gone. ---
 
 function App() {
   const [currentPage, setCurrentPage] = useState('booking');
@@ -62,8 +66,7 @@ function App() {
     }
     const bookingState = { ...room, guests: 1, pets: 0 };
     setSelectedRoom(bookingState);
-
-    // --- UPDATED: This now triggers the AddToCart event ---
+    
     const currentNights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
     const currentSubtotal = calculateTieredPrice(currentNights);
     trackAddToCart({ ...bookingState, nights: currentNights, subtotal: currentSubtotal });
@@ -81,9 +84,7 @@ function App() {
   };
   
   const handleConfirmBooking = () => {
-    // --- UPDATED: This now triggers the InitiateCheckout event ---
     trackInitiateCheckout({ ...selectedRoom, subtotal });
-    
     setFinalBooking({
       ...selectedRoom,
       checkin: checkinDate, checkout: checkoutDate, nights: nights,
@@ -97,10 +98,7 @@ function App() {
     const newReservationCode = generateReservationCode();
     setGuestInfo(formData);
     setReservationCode(newReservationCode);
-    
-    // --- UPDATED: Pass the full formData to trackPurchase ---
     trackPurchase(finalBooking, formData, newReservationCode);
-
     setCurrentPage('confirmation');
     window.scrollTo(0, 0);
   };
@@ -110,25 +108,49 @@ function App() {
   const taxes = subtotal * 0.10;
   const total = subtotal + taxes;
 
-  if (currentPage === 'confirmation') {
-    return <ConfirmationPage bookingDetails={finalBooking} guestInfo={guestInfo} reservationCode={reservationCode} />;
-  }
-  
-  if (currentPage === 'guest-info') {
-    return <GuestInfoPage bookingDetails={finalBooking} onBack={() => setCurrentPage('booking')} onComplete={handleCompleteBooking} />;
-  }
-
   return (
-    <BookingPage
-      roomData={roomData} selectedRoom={selectedRoom} nights={nights}
-      subtotal={subtotal} taxes={taxes}
-      checkinDate={checkinDate} checkoutDate={checkoutDate} isCalendarOpen={isCalendarOpen}
-      onRoomSelect={handleRoomSelect} onGuestsChange={handleGuestCountChange}
-      onPetsChange={handlePetCountChange}
-      onConfirmBooking={handleConfirmBooking}
-      onCalendarOpen={() => setIsCalendarOpen(true)} onCalendarClose={() => setIsCalendarOpen(false)}
-      onDatesUpdate={handleDatesUpdate}
-    />
+    <>
+      {/* --- FIXED: Cleaned up the rendering logic to prevent duplicates --- */}
+      {currentPage === 'booking' && (
+        <BookingPage
+          hotel={currentHotel}
+          roomData={roomData}
+          selectedRoom={selectedRoom}
+          nights={nights}
+          subtotal={subtotal}
+          taxes={taxes}
+          checkinDate={checkinDate}
+          checkoutDate={checkoutDate}
+          isCalendarOpen={isCalendarOpen}
+          onRoomSelect={handleRoomSelect}
+          onGuestsChange={handleGuestCountChange}
+          onPetsChange={handlePetCountChange}
+          onConfirmBooking={handleConfirmBooking}
+          onCalendarOpen={() => setIsCalendarOpen(true)}
+          onCalendarClose={() => setIsCalendarOpen(false)}
+          onDatesChange={handleDatesUpdate}
+        />
+      )}
+      
+      {currentPage === 'guest-info' && (
+        <GuestInfoPage 
+          hotel={currentHotel}
+          bookingDetails={finalBooking} 
+          onBack={() => setCurrentPage('booking')} 
+          onComplete={handleCompleteBooking} 
+        />
+      )}
+      
+      {currentPage === 'confirmation' && (
+        <ConfirmationPage 
+          bookingDetails={finalBooking} 
+          guestInfo={guestInfo} 
+          reservationCode={reservationCode} 
+        />
+      )}
+      
+      {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget />}
+    </>
   );
 }
 

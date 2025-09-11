@@ -7,13 +7,10 @@ const ZAPIER_WEBHOOKS = {
     Purchase: 'https://hooks.zapier.com/hooks/catch/YOUR_PURCHASE_WEBHOOK_URL/',
 };
 
-// --- UPDATED: This function now accepts an optional custom eventID ---
 const sendEvent = (eventName, pixelEventName, capiPayload, pixelPayload, customEventID = null) => {
-    // Use the custom ID if provided (for Purchases), otherwise generate one.
     const eventID = customEventID || `${eventName.toLowerCase()}.${Date.now()}`;
-
-    // --- 1. Send to Zapier (Server-Side CAPI) ---
     const webhookUrl = ZAPIER_WEBHOOKS[eventName];
+    
     if (!webhookUrl || !webhookUrl.includes('zapier.com')) {
         console.error(`Webhook for ${eventName} not found or is a placeholder.`);
     } else {
@@ -33,7 +30,6 @@ const sendEvent = (eventName, pixelEventName, capiPayload, pixelPayload, customE
         console.log(`Sent ${eventName} CAPI event to Zapier (Event ID: ${eventID}):`, fullCapiPayload);
     }
 
-    // --- 2. Send to Meta Pixel (Browser-Side) ---
     if (typeof fbq === 'function') {
         fbq('track', pixelEventName, pixelPayload, { eventID: eventID });
         console.log(`Sent ${pixelEventName} Pixel event (Event ID: ${eventID}):`, pixelPayload);
@@ -42,11 +38,46 @@ const sendEvent = (eventName, pixelEventName, capiPayload, pixelPayload, customE
     }
 };
 
-// ... (trackSearch, trackAddToCart, trackInitiateCheckout functions are the same)
-export const trackSearch = (checkinDate, checkoutDate) => { /* ... */ };
-export const trackAddToCart = (bookingDetails) => { /* ... */ };
-export const trackInitiateCheckout = (bookingDetails) => { /* ... */ };
+// --- FIXED: Restored the full function body ---
+export const trackSearch = (checkinDate, checkoutDate) => {
+    const searchData = {
+        checkin_date: checkinDate.toISOString().split('T')[0],
+        checkout_date: checkoutDate.toISOString().split('T')[0],
+    };
+    sendEvent('Search', 'Search', 
+        { ...searchData, user_agent: navigator.userAgent, client_ip_address: null },
+        searchData
+    );
+};
 
+// --- FIXED: Restored the full function body ---
+export const trackAddToCart = (bookingDetails) => {
+    const cartData = {
+        value: bookingDetails.subtotal,
+        currency: 'USD',
+        content_name: bookingDetails.name,
+        content_ids: [bookingDetails.id],
+        num_items: bookingDetails.guests,
+    };
+    sendEvent('AddToCart', 'AddToCart', 
+        { ...cartData, user_agent: navigator.userAgent, client_ip_address: null },
+        cartData
+    );
+};
+
+// --- FIXED: Restored the full function body ---
+export const trackInitiateCheckout = (bookingDetails) => {
+    const checkoutData = {
+        value: bookingDetails.subtotal,
+        currency: 'USD',
+        content_name: bookingDetails.name,
+        num_items: bookingDetails.guests,
+    };
+    sendEvent('InitiateCheckout', 'InitiateCheckout', 
+        { ...checkoutData, user_agent: navigator.userAgent, client_ip_address: null },
+        checkoutData
+    );
+};
 
 export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     const capiPayload = {
@@ -58,10 +89,9 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     };
     const pixelPayload = { value: bookingDetails.total, currency: 'USD' };
     
-    // --- UPDATED: We now pass the reservationCode as the customEventID ---
     sendEvent('Purchase', 'Purchase', 
         { ...pixelPayload, ...capiPayload },
         pixelPayload,
-        reservationCode // This will now be used as the event_id
+        reservationCode
     );
 };

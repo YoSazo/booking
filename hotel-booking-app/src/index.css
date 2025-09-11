@@ -547,56 +547,62 @@ body {
   text-align: center;
 }
 
-/* --- REVISED Styles for Sticky Footer Calendar Modal --- */
-
+/* --- FINAL Responsive Calendar Modal Styles with Sticky Footer --- */
 .calendar-container {
   background-color: #f7f8fa;
   border-radius: 24px;
   border: 1px solid #212529;
   width: 95%;
   max-width: 550px;
-  padding: 16px;
+  padding: 8px; /* Reduce main padding */
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   
-  /* --- Core Resizing Logic --- */
-  max-height: 95dvh; /* Use dynamic viewport height, leaving a 5% margin */
-  overflow-y: auto;  /* Add a scrollbar ONLY if content is still too tall */
+  /* Core Flexbox layout */
   display: flex;
   flex-direction: column;
+  max-height: 90vh; /* Use vh for better mobile sizing */
+  overflow: hidden;
 }
 
-/* The calendar card is now the main scrollable area */
+/* This is the area for the calendar grid that will scroll */
+.calendar-scroll-area {
+  flex-grow: 1; /* This makes the scroll area take up all available space */
+  overflow-y: auto; /* Enable vertical scrolling */
+  padding: 10px; /* Give the scrolling content some internal padding */
+}
+
+/* The fixed action bar at the bottom */
+.modal-actions-footer {
+  flex-shrink: 0; /* Prevent this from shrinking */
+  padding: 8px;
+  padding-top: 0;
+}
+
+/* Inner cards no longer need margin, their parents control spacing */
 .calendar-card, .price-card {
   background-color: #ffffff;
-  border: 1px solid #212529;
+  border: 1px solid #ddd;
   border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-  margin-bottom: 16px;
-}
-
-/* --- NEW: The "Sticky Footer" that holds the price and Done button --- */
-.modal-actions-footer {
-  flex-shrink: 0; /* Prevents this section from shrinking */
   padding: 16px;
-  padding-top: 8px;
-  background-color: #f7f8fa; /* Match the main container backdrop */
+  box-shadow: none; /* Shadow is on the main container now */
 }
 
-/* Adjust the calendar footer (Done button container) */
-.calendar-card-footer {
-  text-align: center;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color);
+/* Remove margin from price card to fit in footer */
+.price-card {
+  margin-bottom: 0;
 }
-.calendar-footer .btn {
-    background-color: var(--primary-color);
-    color: #fff;
-    border: 1px solid transparent;
+
+.calendar-header {
+  padding-bottom: 10px;
 }
-.calendar-footer .btn:hover {
-    background-color: #0056b3;
+
+/* The new container for the buttons at the very bottom */
+.calendar-footer-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 0 8px; /* A little padding for the buttons */
 }
 
 
@@ -918,14 +924,12 @@ body {
   }
 }
 
-/* --- REVISED Styles for Confirmation Page --- */
+/* --- FINAL Styles for Confirmation Page (with Mobile Fix) --- */
 .confirmation-container {
-  /* NEW: These two lines fix the horizontal overflow on mobile */
-  width: 100%;
+  width: 80%;
   box-sizing: border-box;
-
-  max-width: 600px; /* A good width for a confirmation message */
-  margin: 40px auto; /* Margin top/bottom and centered horizontally */
+  max-width: 600px;
+  margin: 40px auto;
   padding: 20px;
 }
 
@@ -936,30 +940,21 @@ body {
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15);
   border: 1px solid #212529;
   width: 100%;
-  max-width: 550px;
   text-align: center;
-  /* NEW: Prevent long words (like codes/emails) from causing overflow */
   overflow-wrap: break-word;
 }
 
-/* Find this rule and add the new line */
-.confirmation-header p {
-  font-size: 1.1em;
-  color: #666;
-  margin: 4px 0;
-  /* NEW: Also apply here for extra safety */
-  overflow-wrap: break-word;
+.confirmation-header {
+  padding: 16px;
 }
 
-
-/* --- UPDATED: Styles for the logo --- */
 .success-icon {
-  width: 80px; /* Slightly larger for a logo */
+  width: 80px;
   height: 80px;
   margin-bottom: 24px;
-  border-radius: 50%; /* This makes the image round */
-  object-fit: cover; /* Ensures the image fills the circle without distortion */
-  border: 2px solid #28a745; /* Optional: adds a nice green ring */
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #28a745;
 }
 
 .confirmation-header h2 {
@@ -971,6 +966,7 @@ body {
   font-size: 1.1em;
   color: #666;
   margin: 4px 0;
+  overflow-wrap: break-word;
 }
 .confirmation-header p strong {
     color: #000;
@@ -983,13 +979,9 @@ body {
   padding: 24px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   margin-top: 24px;
-  /* --- NEW: Use Flexbox for perfect centering --- */
-  display: flex;
-  flex-direction: column;
   text-align: left;
 }
 
-/* --- UPDATED: No longer needs to be an inline-block --- */
 .stay-dates {
     margin-bottom: 24px;
 }
@@ -1001,7 +993,7 @@ body {
 
 .stay-nights {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-start; 
   align-items: center;
   gap: 10px;
   font-size: 1.3em;
@@ -1010,6 +1002,32 @@ body {
 .moon-icon {
   width: 28px;
   height: 28px;
+}
+
+/* --- NEW: Media Query to fix mobile overflow on this page --- */
+@media (max-width: 768px) {
+  .confirmation-container {
+    /* On mobile, reduce the outer padding to give the card more space */
+    padding: 10px;
+    margin: 20px auto;
+  }
+
+  .confirmation-card {
+    /* Reduce the padding inside the card on mobile */
+    padding: 16px;
+  }
+
+  .confirmation-header h2 {
+    font-size: 1.5em; /* Make the title a bit smaller */
+  }
+
+  .stay-details-card {
+    padding: 16px; /* Also reduce padding on the inner card */
+  }
+
+  .stay-detail-line {
+    font-size: 1.1em; /* Make the date lines a bit smaller */
+  }
 }
 
 /* --- NEW Style for Form Error Messages --- */
@@ -1160,4 +1178,130 @@ body {
     grid-template-columns: 1fr; /* Stack reviews on mobile */
     gap: 24px;
   }
+}
+
+
+/* --- NEW Styles for Help Widget --- */
+.help-widget-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px; /* UPDATED: Changed from 'left' to 'right' */
+  z-index: 1001;
+}
+
+.help-widget-pill {
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-size: 1em;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+.help-widget-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.help-widget-panel {
+  background-color: #fff;
+  border: 1px solid #212529;
+  border-radius: 24px;
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+  width: 350px;
+  max-width: 90vw;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.faq-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.faq-header h3 {
+  margin: 0;
+  font-size: 1.1em;
+}
+.faq-close-btn {
+  background: none;
+  border: none;
+  font-size: 2em;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  color: #888;
+}
+.faq-list {
+  overflow-y: auto;
+  padding: 8px 20px;
+}
+.faq-item {
+  border-bottom: 1px solid #f0f0f0;
+}
+.faq-item:last-child {
+  border-bottom: none;
+}
+.faq-question {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 16px 0;
+  font-size: 1em;
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.faq-question .indicator {
+  font-size: 1.5em;
+  font-weight: 300;
+  color: var(--primary-color);
+  transition: transform 0.2s;
+}
+.faq-question .indicator.open {
+  transform: rotate(45deg);
+}
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+}
+.faq-answer.open {
+  max-height: 200px; /* Adjust if your answers are longer */
+  padding-bottom: 16px;
+}
+.faq-answer p {
+  margin: 0;
+  color: #555;
+  line-height: 1.5;
+}
+
+.faq-footer {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+  background-color: #f7f8fa;
+  font-size: 0.9em;
+}
+.faq-footer p {
+  margin: 0;
 }

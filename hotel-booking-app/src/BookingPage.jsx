@@ -3,11 +3,24 @@ import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
 import ReviewCard from './ReviewCard.jsx';
 
+// This component just receives data and functions as "props" and displays them.
 function BookingPage({ 
-  roomData, selectedRoom, nights, subtotal, taxes,
-  checkinDate, checkoutDate, isCalendarOpen,
-  onRoomSelect, onGuestsChange, onPetsChange, onConfirmBooking,
-  onCalendarOpen, onCalendarClose, onDatesUpdate
+  hotel,
+  roomData,
+  selectedRoom,
+  nights,
+  subtotal,
+  taxes,
+  checkinDate,
+  checkoutDate,
+  isCalendarOpen,
+  onRoomSelect,
+  onGuestsChange,
+  onPetsChange,
+  onConfirmBooking,
+  onCalendarOpen,
+  onCalendarClose,
+  onDatesChange
 }) {
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
@@ -15,17 +28,17 @@ function BookingPage({
     <>
       <div className="marquee-banner">
         <div className="marquee-content">
-          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
-          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
-          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
-          <span>Pay Only 50% Today. 50% When You Arrive. No Hassle.</span>
+          <span>Only Pay 50% Today. 50% When You Arrive</span>
+          <span>Only Pay 50% Today. 50% When You Arrive</span>
+          <span>Only Pay 50% Today. 50% When You Arrive</span>
+          <span>Only Pay 50% Today. 50% When You Arrive</span>
         </div>
       </div>
 
       <div className="container">
         <header className="header">
-          <h1>Guest Lodge Minot</h1>
-          <p>No Leases. No Background Checks. No Credit Checks.</p>
+          <h1>{hotel.name}</h1>
+          <p>{hotel.subtitle}</p>
         </header>
         
         <div className="reviews-section">
@@ -41,7 +54,6 @@ function BookingPage({
             location="ND"
             rating={5}
           />
-          {/* --- NEW: Google logo image added here --- */}
           <img src="/google.png" alt="Google Reviews" className="reviews-google-logo" />
         </div>
 
@@ -58,20 +70,29 @@ function BookingPage({
         <main className="rooms-list">
           {roomData.map(room => (
             <RoomCard
-              key={room.id} room={room} onSelect={onRoomSelect}
+              key={room.id}
+              room={room}
+              onSelect={onRoomSelect}
               isSelected={selectedRoom?.id === room.id}
               bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
-              onGuestsChange={onGuestsChange} onPetsChange={onPetsChange} 
-              onBookNow={onConfirmBooking} 
-              nights={nights} subtotal={subtotal} taxes={taxes}
+              onGuestsChange={onGuestsChange}
+              onPetsChange={onPetsChange}
+              onBookNow={onConfirmBooking}
+              nights={nights}
+              subtotal={subtotal}
+              taxes={taxes}
             />
           ))}
         </main>
       </div>
       
       <CalendarModal 
-        isOpen={isCalendarOpen} onClose={onCalendarClose} onDatesChange={onDatesUpdate}
-        initialCheckin={checkinDate} checkoutDate={checkoutDate} currentRate={59}
+        isOpen={isCalendarOpen}
+        onClose={onCalendarClose}
+        onDatesChange={onDatesChange}
+        initialCheckin={checkinDate}
+        checkoutDate={checkoutDate}
+        currentRate={59}
       />
     </>
   );

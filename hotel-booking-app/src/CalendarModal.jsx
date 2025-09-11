@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PriceBadge from './PriceBadge.jsx';
 import UpsellPrompt from './UpsellPrompt.jsx';
-import { trackSearch } from './trackingService.js'; // --- NEW: Import the tracking function ---
+import { trackSearch } from './trackingService.js';
 
 const NIGHTLY = 59;
 
@@ -12,9 +12,12 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [upsellDeclined, setUpsellDeclined] = useState(false);
 
   useEffect(() => {
-    setStartDate(initialCheckin);
-    setEndDate(initialCheckout);
-    setUpsellDeclined(false);
+    if (isOpen) {
+      setStartDate(initialCheckin);
+      setEndDate(initialCheckout);
+      setCurrentDate(initialCheckin || new Date());
+      setUpsellDeclined(false);
+    }
   }, [isOpen, initialCheckin, initialCheckout]);
 
   const handleDayClick = (day) => {
@@ -32,19 +35,15 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   
   const handleDone = () => {
     if (startDate && endDate) {
-      // --- NEW: Trigger Search event ---
       trackSearch(startDate, endDate);
-      
       onDatesChange({ start: startDate, end: endDate });
       onClose();
     } else {
-        alert("Please select a check-out date.");
+      alert("Please select a check-out date.");
     }
   };
 
-  const handleUpsellDecline = () => {
-    setUpsellDeclined(true);
-  };
+  const handleUpsellDecline = () => { setUpsellDeclined(true); };
 
   const handleBookMonth = () => {
     const start = startDate || new Date();
@@ -57,11 +56,11 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   };
 
   const handleUpsellConfirm = () => {
-      if (!startDate) return;
-      const newEndDate = new Date(startDate);
-      newEndDate.setDate(newEndDate.getDate() + 7);
-      setEndDate(newEndDate);
-      setUpsellDeclined(false);
+    if (!startDate) return;
+    const newEndDate = new Date(startDate);
+    newEndDate.setDate(newEndDate.getDate() + 7);
+    setEndDate(newEndDate);
+    setUpsellDeclined(false);
   };
 
   const changeMonth = (amount) => {
@@ -73,7 +72,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   };
 
   const renderDays = () => {
-    // ... (renderDays function remains exactly the same)
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -112,7 +110,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   return (
     <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
       <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        <div className="calendar-card">
+        
+        {/* --- This is now the ONLY scrollable part --- */}
+        <div className="calendar-scroll-area">
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
             <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
@@ -122,26 +122,27 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
             <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
           </div>
           <div className="calendar-grid">{renderDays()}</div>
-          <div className="calendar-card-footer">
-              <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
-          </div>
         </div>
         
-        <div className="price-card">
-          <div className="calendar-price-badge">
-            {showUpsell ? (
-              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} />
-            ) : showShortStayPrice ? (
-              <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * NIGHTLY).toFixed(2)}</div>
-                <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * NIGHTLY / 2).toFixed(2)} Today</div>
-              </div>
-            ) : ( <PriceBadge nights={nights} /> )}
+        {/* --- This is the new "Sticky Footer" that is ALWAYS visible --- */}
+        <div className="modal-actions-footer">
+          <div className="price-card">
+            <div className="calendar-price-badge">
+              {showUpsell ? (
+                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} />
+              ) : showShortStayPrice ? (
+                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * NIGHTLY).toFixed(2)}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * NIGHTLY / 2).toFixed(2)} Today</div>
+                </div>
+              ) : ( <PriceBadge nights={nights} /> )}
+            </div>
           </div>
-        </div>
-        
-        <div className="calendar-footer">
+          
+          <div className="calendar-footer-buttons">
+            <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
             <button className="btn" onClick={handleDone}>Done</button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; // useEffect is no longer needed here
 import { Autocomplete } from '@react-google-maps/api';
+// The import for trackAddPaymentInfo has been REMOVED
 
 function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
   const [formData, setFormData] = useState({
@@ -8,6 +9,8 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
   });
   const [formErrors, setFormErrors] = useState({});
   const [autocomplete, setAutocomplete] = useState(null);
+
+  // The useEffect hook that called trackAddPaymentInfo has been completely REMOVED from this component.
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
@@ -72,14 +75,14 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
       <div className="static-banner">
         ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call (701) 289-5992 — we're happy to help!
       </div>
-      <div className="container">
+
+      <div className="container-single-column">
         <div className="guest-info-header">
           <button onClick={onBack} className="back-button">&lt; Back to Booking</button>
           <h1>Guest Information</h1>
           <p>Please provide your details to complete the booking.</p>
         </div>
 
-        {/* --- FIXED: The summary card content is now restored --- */}
         <div className="info-summary">
             <div className="summary-card-details">
               <p className="detail-line">{bookingDetails.name}</p>
