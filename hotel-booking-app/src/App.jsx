@@ -6,32 +6,26 @@ import HelpWidget from './HelpWidget.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
 
-// --- This is the NEW, DYNAMIC way to get the hotel and room data ---
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
-const roomData = currentHotel.rooms; // This is the only roomData definition we need
+const RATES = currentHotel.rates;
 
-const NIGHTLY = 59;
-const WEEKLY = 250;
-const MONTHLY = 950;
-const WEEK_N = +(WEEKLY / 7).toFixed(2);
-const MONTHLY_NIGHTS_THRESHOLD = 30;
-
-const calculateTieredPrice = (nights) => {
-  if (nights <= 0) return 0;
-  if (nights === 28) { return 950; }
-  if (nights < 7) { return nights * NIGHTLY; }
+// We keep this function as a fallback for hotels that don't use a PMS yet
+const calculateTieredPrice = (nights, rates) => {
+  if (nights <= 0 || !rates) return 0;
+  if (nights === 28) { return rates.MONTHLY; }
+  if (nights < 7) { return nights * rates.NIGHTLY; }
+  const WEEK_N = +(rates.WEEKLY / 7).toFixed(2);
+  const MONTHLY_NIGHTS_THRESHOLD = 30;
   let discountedTotalRem = nights;
   let discountedTotal = 0;
-  discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * MONTHLY;
+  discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * rates.MONTHLY;
   discountedTotalRem %= MONTHLY_NIGHTS_THRESHOLD;
-  discountedTotal += Math.floor(discountedTotalRem / 7) * WEEKLY;
+  discountedTotal += Math.floor(discountedTotalRem / 7) * rates.WEEKLY;
   discountedTotalRem %= 7;
   discountedTotal += discountedTotalRem * WEEK_N;
   return +discountedTotal.toFixed(2);
 };
-
-// --- DELETED: The old, hardcoded roomData array that was here is now gone. ---
 
 function App() {
   const [currentPage, setCurrentPage] = useState('booking');
@@ -43,47 +37,112 @@ function App() {
   const [guestInfo, setGuestInfo] = useState(null);
   const [reservationCode, setReservationCode] = useState('');
 
+  // --- NEW: State for live API data ---
+  const [availableRooms, setAvailableRooms] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
     const today = new Date();
     setCheckinDate(today);
     setCheckoutDate(null);
   }, []);
 
-  const generateReservationCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 9; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
-  const handleRoomSelect = (room) => {
-    if (!checkinDate || !checkoutDate) {
-      alert('Please select your check-in and check-out dates.');
-      setIsCalendarOpen(true);
+  // --- NEW: Function to check for availability via our backend ---
+  const checkAvailability = async (start, end) => {
+    if (!start || !end || currentHotel.pms !== 'Cloudbeds') {
+      setAvailableRooms(currentHotel.rooms); // Use static data if not Cloudbeds
       return;
     }
-    const bookingState = { ...room, guests: 1, pets: 0 };
-    setSelectedRoom(bookingState);
-    
-    const currentNights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-    const currentSubtotal = calculateTieredPrice(currentNights);
-    trackAddToCart({ ...bookingState, nights: currentNights, subtotal: currentSubtotal });
+
+    setIsLoading(true);
+    setAvailableRooms([]); // Clear old results
+    try {
+      const response = await fetch('http://localhost:3001/api/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotelId: hotelId,
+          checkin: start.toISOString().split('T')[0],
+          checkout: end.toISOString().split('T')[0],
+        }),
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const mergedRooms = result.data.map(apiRoom => {
+          const staticRoomData = currentHotel.rooms.find(r => r.name === apiRoom.roomName);
+          return { ...staticRoomData, ...apiRoom };
+        });
+        setAvailableRooms(mergedRooms);
+      } else {
+        alert('Error checking availability: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Failed to fetch availability:', error);
+      alert('Could not connect to the booking server. Please try again later.');
+    }
+    setIsLoading(false);
   };
 
-  const handleGuestCountChange = (newGuestCount) => {
-    if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });
-  };
-  const handlePetCountChange = (newPetCount) => {
-    if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount });
-  };
   const handleDatesUpdate = (dates) => {
     setCheckinDate(dates.start);
     setCheckoutDate(dates.end);
+    checkAvailability(dates.start, dates.end);
+  };
+  
+  const handleCompleteBooking = async (formData) => {
+    if (currentHotel.pms !== 'Cloudbeds') {
+        // Handle booking for non-Cloudbeds hotels (e.g., just show confirmation)
+        const newReservationCode = generateReservationCode();
+        setGuestInfo(formData);
+        setReservationCode(newReservationCode);
+        trackPurchase(finalBooking, formData, newReservationCode);
+        setCurrentPage('confirmation');
+        window.scrollTo(0, 0);
+        return;
+    }
+
+    setIsLoading(true);
+    try {
+        const response = await fetch('http://localhost:3001/api/book', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                hotelId: hotelId,
+                bookingDetails: finalBooking,
+                guestInfo: formData,
+            }),
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            setGuestInfo(formData);
+            setReservationCode(result.reservationID); // Use REAL reservation ID
+            trackPurchase(finalBooking, formData, result.reservationID);
+            setCurrentPage('confirmation');
+            window.scrollTo(0, 0);
+        } else {
+            alert('Booking failed: ' + (result.message || 'An unknown error occurred.'));
+        }
+    } catch (error) {
+        console.error('Failed to create booking:', error);
+        alert('Could not connect to the booking server to finalize your reservation.');
+    }
+    setIsLoading(false);
+  };
+
+  const handleRoomSelect = (room) => {
+    const bookingState = { ...room, guests: 1, pets: 0 };
+    setSelectedRoom(bookingState);
+    trackAddToCart({ ...bookingState, subtotal: room.totalRate });
   };
   
   const handleConfirmBooking = () => {
+    const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+    const subtotal = selectedRoom.totalRate || calculateTieredPrice(nights, RATES);
+    const taxes = subtotal * 0.10; // This might be adjusted based on API response
+    const total = subtotal + taxes;
+
     trackInitiateCheckout({ ...selectedRoom, subtotal });
     setFinalBooking({
       ...selectedRoom,
@@ -94,31 +153,19 @@ function App() {
     window.scrollTo(0, 0);
   };
   
-  const handleCompleteBooking = (formData) => {
-    const newReservationCode = generateReservationCode();
-    setGuestInfo(formData);
-    setReservationCode(newReservationCode);
-    trackPurchase(finalBooking, formData, newReservationCode);
-    setCurrentPage('confirmation');
-    window.scrollTo(0, 0);
-  };
-
-  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-  const subtotal = calculateTieredPrice(nights);
-  const taxes = subtotal * 0.10;
-  const total = subtotal + taxes;
+  // Other handlers...
+  const generateReservationCode = () => { /*...*/ };
+  const handleGuestCountChange = (newGuestCount) => {if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });};
+  const handlePetCountChange = (newPetCount) => {if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount });};
 
   return (
     <>
-      {/* --- FIXED: Cleaned up the rendering logic to prevent duplicates --- */}
       {currentPage === 'booking' && (
         <BookingPage
           hotel={currentHotel}
-          roomData={roomData}
+          roomData={availableRooms.length > 0 ? availableRooms : currentHotel.rooms}
+          rates={RATES}
           selectedRoom={selectedRoom}
-          nights={nights}
-          subtotal={subtotal}
-          taxes={taxes}
           checkinDate={checkinDate}
           checkoutDate={checkoutDate}
           isCalendarOpen={isCalendarOpen}
@@ -129,9 +176,9 @@ function App() {
           onCalendarOpen={() => setIsCalendarOpen(true)}
           onCalendarClose={() => setIsCalendarOpen(false)}
           onDatesChange={handleDatesUpdate}
+          isLoading={isLoading}
         />
       )}
-      
       {currentPage === 'guest-info' && (
         <GuestInfoPage 
           hotel={currentHotel}
@@ -140,7 +187,6 @@ function App() {
           onComplete={handleCompleteBooking} 
         />
       )}
-      
       {currentPage === 'confirmation' && (
         <ConfirmationPage 
           bookingDetails={finalBooking} 
@@ -148,10 +194,10 @@ function App() {
           reservationCode={reservationCode} 
         />
       )}
-      
-      {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget />}
+      {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />}
     </>
   );
 }
 
 export default App;
+

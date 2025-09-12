@@ -1,14 +1,16 @@
 import React from 'react';
 
-const NIGHTLY = 59;
-const WEEKLY = 250;
+// This component no longer holds its own constants.
+// It receives them as props.
 
-function UpsellPrompt({ nights, onConfirm, onDecline }) {
+function UpsellPrompt({ nights, onConfirm, onDecline, rates }) {
+  if (!rates) return null; // Don't render if rates aren't available
+
   // Scenario 1: 5 or 6 nights (SAVE Money)
   if (nights >= 5) {
     const nightsToAdd = 7 - nights;
-    const currentCost = nights * NIGHTLY;
-    const savings = (currentCost - WEEKLY).toFixed(2);
+    const currentCost = nights * rates.NIGHTLY;
+    const savings = (currentCost - rates.WEEKLY).toFixed(2);
 
     return (
       <div className="upsell-prompt">
@@ -18,7 +20,7 @@ function UpsellPrompt({ nights, onConfirm, onDecline }) {
           <span className="highlight-green">SAVE ${savings}</span>.
         </p>
         <p>
-          Get a full week for <span className="highlight-green">${WEEKLY.toFixed(2)}</span> instead of paying{' '}
+          Get a full week for <span className="highlight-green">${rates.WEEKLY.toFixed(2)}</span> instead of paying{' '}
           <span className="highlight-gray">${currentCost.toFixed(2)} for {nights} nights</span>.
         </p>
         <div className="upsell-actions">
@@ -32,8 +34,8 @@ function UpsellPrompt({ nights, onConfirm, onDecline }) {
   // Scenario 2: 1 to 4 nights (GREAT VALUE)
   if (nights > 0) {
     const nightsToAdd = 7 - nights;
-    const currentCost = nights * NIGHTLY;
-    const costDifference = WEEKLY - currentCost;
+    const currentCost = nights * rates.NIGHTLY;
+    const costDifference = rates.WEEKLY - currentCost;
     const pricePerExtraNight = (costDifference / nightsToAdd).toFixed(2);
 
     return (
@@ -55,7 +57,7 @@ function UpsellPrompt({ nights, onConfirm, onDecline }) {
     );
   }
 
-  return null; // Don't render anything if nights is 0
+  return null;
 }
 
 export default UpsellPrompt;

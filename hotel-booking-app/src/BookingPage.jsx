@@ -3,14 +3,11 @@ import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
 import ReviewCard from './ReviewCard.jsx';
 
-// This component just receives data and functions as "props" and displays them.
 function BookingPage({ 
   hotel,
   roomData,
+  rates,
   selectedRoom,
-  nights,
-  subtotal,
-  taxes,
   checkinDate,
   checkoutDate,
   isCalendarOpen,
@@ -20,18 +17,22 @@ function BookingPage({
   onConfirmBooking,
   onCalendarOpen,
   onCalendarClose,
-  onDatesChange
+  onDatesChange,
+  isLoading
 }) {
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+
+  // Calculate nights here to pass to the RoomCard for display
+  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
     <>
       <div className="marquee-banner">
         <div className="marquee-content">
-          <span>Only Pay 50% Today. 50% When You Arrive</span>
-          <span>Only Pay 50% Today. 50% When You Arrive</span>
-          <span>Only Pay 50% Today. 50% When You Arrive</span>
-          <span>Only Pay 50% Today. 50% When You Arrive</span>
+          <span>You can stay as long as you'd like</span>
+          <span>You can stay as long as you'd like</span>
+          <span>You can stay as long as you'd like</span>
+          <span>You can stay as long as you'd like</span>
         </div>
       </div>
 
@@ -42,18 +43,15 @@ function BookingPage({
         </header>
         
         <div className="reviews-section">
-          <ReviewCard 
-            text="Best place to stay at in MINOT! They are renovating everything! I mean everything, Literally so clean and nice! Keep it up management and crew."
-            author="Chico"
-            location="ND"
-            rating={5}
-          />
-          <ReviewCard 
-            text="Front desk was helpful and the room was nice. The remodel looks awesome. Zuber was extremely friendly and accommodating. 10/10 would stay here again."
-            author="Harbor Clooten"
-            location="ND"
-            rating={5}
-          />
+          {hotel.reviews.map((review, index) => (
+            <ReviewCard 
+              key={index}
+              text={review.text}
+              author={review.author}
+              location={review.location}
+              rating={review.rating}
+            />
+          ))}
           <img src="/google.png" alt="Google Reviews" className="reviews-google-logo" />
         </div>
 
@@ -68,21 +66,30 @@ function BookingPage({
         </div>
 
         <main className="rooms-list">
-          {roomData.map(room => (
-            <RoomCard
-              key={room.id}
-              room={room}
-              onSelect={onRoomSelect}
-              isSelected={selectedRoom?.id === room.id}
-              bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
-              onGuestsChange={onGuestsChange}
-              onPetsChange={onPetsChange}
-              onBookNow={onConfirmBooking}
-              nights={nights}
-              subtotal={subtotal}
-              taxes={taxes}
-            />
-          ))}
+          {/* Conditional rendering based on loading and availability */}
+          {isLoading ? (
+            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>Checking for available rooms...</strong></p>
+          ) : roomData && roomData.length > 0 ? (
+            roomData.map(room => (
+              <RoomCard
+                key={room.id}
+                room={room}
+                rates={rates}
+                onSelect={onRoomSelect}
+                isSelected={selectedRoom?.id === room.id}
+                bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
+                onGuestsChange={onGuestsChange}
+                onPetsChange={onPetsChange}
+                onBookNow={onConfirmBooking}
+                nights={nights}
+                // Use the real-time rate from the API, or fallback to our tiered calculator
+                subtotal={room.totalRate || calculateTieredPrice(nights, rates)}
+                taxes={0} // The Cloudbeds API rate includes taxes
+              />
+            ))
+          ) : (
+            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
+          )}
         </main>
       </div>
       
@@ -92,10 +99,27 @@ function BookingPage({
         onDatesChange={onDatesChange}
         initialCheckin={checkinDate}
         checkoutDate={checkoutDate}
-        currentRate={59}
+        rates={rates}
       />
     </>
   );
 }
+
+// A local copy of the calculator is needed here for the RoomCard's fallback display
+const calculateTieredPrice = (nights, rates) => {
+  if (nights <= 0 || !rates) return 0;
+  if (nights === 28) { return rates.MONTHLY; }
+  if (nights < 7) { return nights * rates.NIGHTLY; }
+  const WEEK_N = +(rates.WEEKLY / 7).toFixed(2);
+  const MONTHLY_NIGHTS_THRESHOLD = 30;
+  let discountedTotalRem = nights;
+  let discountedTotal = 0;
+  discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * rates.MONTHLY;
+  discountedTotalRem %= MONTHLY_NIGHTS_THRESHOLD;
+  discountedTotal += Math.floor(discountedTotalRem / 7) * rates.WEEKLY;
+  discountedTotalRem %= 7;
+  discountedTotal += discountedTotalRem * WEEK_N;
+  return +discountedTotal.toFixed(2);
+};
 
 export default BookingPage;

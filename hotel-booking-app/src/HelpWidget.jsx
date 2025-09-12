@@ -16,7 +16,7 @@ const faqs = [
   },
 ];
 
-function HelpWidget() {
+function HelpWidget({ phone }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(null);
 
@@ -55,7 +55,7 @@ function HelpWidget() {
           ))}
         </div>
         <div className="faq-footer">
-          <p>Questions? Call us → (701) 289-5992</p>
+           <p>Questions? Call us → {phone}</p>
         </div>
       </div>
     </div>

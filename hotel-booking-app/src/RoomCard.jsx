@@ -1,6 +1,6 @@
 import React from 'react';
 
-function RoomCard({ room, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes }) {
+function RoomCard({ room, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes }) {
 
   const priceToday = subtotal / 2;
   const balanceDue = subtotal / 2;
@@ -22,7 +22,7 @@ function RoomCard({ room, onSelect, isSelected, bookingDetails, onGuestsChange, 
             <div className="price-balance">Balance (${balanceDue.toFixed(2)}) When You Arrive</div>
           </div>
         ) : (
-          <div className="room-price">$59 <span>/ night</span></div>
+          <div className="room-price">${rates?.NIGHTLY || 59} <span>/ night</span></div>
         )}
 
         {isSelected ? (

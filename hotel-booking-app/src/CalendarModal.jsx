@@ -3,9 +3,7 @@ import PriceBadge from './PriceBadge.jsx';
 import UpsellPrompt from './UpsellPrompt.jsx';
 import { trackSearch } from './trackingService.js';
 
-const NIGHTLY = 59;
-
-function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initialCheckout }) {
+function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initialCheckout, rates }) {
   const [startDate, setStartDate] = useState(initialCheckin);
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
@@ -96,7 +94,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       }
       days.push(
         <div key={i} className={className} onClick={() => !className.includes('disabled') && handleDayClick(day)}>
-          <div className="calendar-day-content">{i}<span className="calendar-day-price">${NIGHTLY.toFixed(1)}</span></div>
+          <div className="calendar-day-content">{i}<span className="calendar-day-price">${rates.NIGHTLY.toFixed(1)}</span></div>
         </div>
       );
     }
@@ -110,8 +108,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   return (
     <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
       <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        
-        {/* --- This is now the ONLY scrollable part --- */}
         <div className="calendar-scroll-area">
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
@@ -123,22 +119,19 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </div>
           <div className="calendar-grid">{renderDays()}</div>
         </div>
-        
-        {/* --- This is the new "Sticky Footer" that is ALWAYS visible --- */}
         <div className="modal-actions-footer">
           <div className="price-card">
             <div className="calendar-price-badge">
               {showUpsell ? (
-                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} />
+                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
               ) : showShortStayPrice ? (
                 <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * NIGHTLY).toFixed(2)}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * NIGHTLY / 2).toFixed(2)} Today</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
                 </div>
-              ) : ( <PriceBadge nights={nights} /> )}
+              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
             </div>
           </div>
-          
           <div className="calendar-footer-buttons">
             <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
             <button className="btn" onClick={handleDone}>Done</button>

@@ -2,7 +2,7 @@ import React, { useState } from 'react'; // useEffect is no longer needed here
 import { Autocomplete } from '@react-google-maps/api';
 // The import for trackAddPaymentInfo has been REMOVED
 
-function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', address: '', city: '', state: '', zip: '',
     phone: '+1 ', email: '',
@@ -73,7 +73,7 @@ function GuestInfoPage({ bookingDetails, onBack, onComplete }) {
   return (
     <>
       <div className="static-banner">
-        ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call (701) 289-5992 — we're happy to help!
+        ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
       </div>
 
       <div className="container-single-column">
