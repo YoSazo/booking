@@ -1,6 +1,5 @@
-import React, { useState } from 'react'; // useEffect is no longer needed here
+import React, { useState } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-// The import for trackAddPaymentInfo has been REMOVED
 
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   const [formData, setFormData] = useState({
@@ -9,8 +8,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   });
   const [formErrors, setFormErrors] = useState({});
   const [autocomplete, setAutocomplete] = useState(null);
-
-  // The useEffect hook that called trackAddPaymentInfo has been completely REMOVED from this component.
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
@@ -67,6 +64,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
     }
   };
   
+  // --- UPDATED: Use the definitive pricing from the bookingDetails prop ---
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
 
@@ -91,6 +89,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
             </div>
             <div className="summary-card-price">
               <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
+              {/* --- UPDATED: Display the definitive subtotal and taxes from the API --- */}
               <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
               <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
               <div className="total-breakdown">

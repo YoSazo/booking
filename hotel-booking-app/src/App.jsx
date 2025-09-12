@@ -32,7 +32,10 @@ function App() {
   }, [hotelId]); // Rerun if the hotel changes
 
   const checkAvailability = async (start, end) => {
-    if (!start || !end || currentHotel.pms !== 'Cloudbeds') {
+    if (!start || !end) return;
+
+    // Use static data if the selected hotel is not Cloudbeds-powered
+    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       setAvailableRooms(currentHotel.rooms);
       return;
     }
@@ -54,7 +57,7 @@ function App() {
       if (result.success) {
         const mergedRooms = result.data.map(apiRoom => {
           const staticRoomData = currentHotel.rooms.find(r => r.name === apiRoom.roomName);
-          return { ...staticRoomData, ...apiRoom };
+          return { ...staticRoomData, ...apiRoom }; // Combine API data with our static data
         });
         setAvailableRooms(mergedRooms);
       } else {
@@ -125,32 +128,37 @@ function App() {
       return;
     }
   
-  const generateReservationCode = () => { /* ... */ };
-  const handleGuestCountChange = (newGuestCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount }); };
-  const handlePetCountChange = (newPetCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount }); };
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-  const subtotal = selectedRoom.totalRate || calculateTieredPrice(nights, RATES);
-  const taxes = subtotal * 0.10;
-  const total = subtotal + taxes;
 
-  trackInitiateCheckout({ ...selectedRoom, subtotal });
 
-  setFinalBooking({
+  const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
+    const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
+    const total = selectedRoom.grandTotal || subtotal + taxes;
+
+    trackInitiateCheckout({ ...selectedRoom, subtotal });
+    
+    setFinalBooking({
       ...selectedRoom,
       checkin: checkinDate,
       checkout: checkoutDate,
       nights: nights,
-      subtotal: subtotal, // Use the definitive subtotal
-      taxes: taxes,       // Pass the calculated taxes
-      total: total        // Pass the calculated total
+      subtotal: subtotal,
+      taxes: taxes,
+      total: total,
     });
-
     setCurrentPage('guest-info');
     window.scrollTo(0, 0);
   };
 
 
-  const generateReservationCode = () => { /* ... */ };
+  const generateReservationCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 9; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
   const handleGuestCountChange = (newGuestCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount }); };
   const handlePetCountChange = (newPetCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount }); };
 

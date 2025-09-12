@@ -3,6 +3,7 @@ export const hotelData = {
   'guest-lodge-minot': {
     name: 'Guest Lodge Minot',
     subtitle: 'No Leases. No Background Checks. No Credit Checks.',
+    address: '1937 N Broadway, Minot, ND 58703',
     phone: '(701) 289-5992',
     pms: 'bookingcenter',
     propertyCode: 'Dont know yet',
@@ -37,6 +38,7 @@ export const hotelData = {
     name: 'Home Place Suites',
     subtitle: 'No Leases. No Background Checks. No Credit Checks.',
     phone: '(918) 212-6296',
+    address: '1410 SE Washington Blvd Suite 2, Bartlesville, OK 74006',
     pms: 'Cloudbeds',
     propertyCode: '113548817731712',
     rates: {
@@ -69,6 +71,7 @@ export const hotelData = {
     name: 'Suite Inn',
     subtitle: 'No Leases. No Background Checks. No Credit Checks.',
     phone: '(605) 388-0959',
+    address: '2520 Tower Rd, Rapid City, SD 57701',
     pms: 'bookingcenter',
     propertyCode: 'Dont know yet',
     rates: {

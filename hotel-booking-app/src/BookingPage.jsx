@@ -38,6 +38,7 @@ function BookingPage({
 
       <div className="container">
         <header className="header">
+          <p className="header-address">{hotel.address}</p>
           <h1>{hotel.name}</h1>
           <p>{hotel.subtitle}</p>
         </header>
@@ -83,8 +84,8 @@ function BookingPage({
                 onBookNow={onConfirmBooking}
                 nights={nights}
                 // Use the real-time rate from the API, or fallback to our tiered calculator
-                subtotal={room.totalRate || calculateTieredPrice(nights, rates)}
-                taxes={0} // The Cloudbeds API rate includes taxes
+                subtotal={room.subtotal}
+                taxes={room.taxesAndFees}
               />
             ))
           ) : (

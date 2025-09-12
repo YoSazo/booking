@@ -1305,3 +1305,10 @@ body {
 .faq-footer p {
   margin: 0;
 }
+
+/* --- NEW Style for Header Address --- */
+.header-address {
+  font-size: 0.9em;
+  color: #555;
+  margin-bottom: 8px;
+}
