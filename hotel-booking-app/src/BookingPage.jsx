@@ -29,10 +29,10 @@ function BookingPage({
     <>
       <div className="marquee-banner">
         <div className="marquee-content">
-          <span>You can stay as long as you'd like</span>
-          <span>You can stay as long as you'd like</span>
-          <span>You can stay as long as you'd like</span>
-          <span>You can stay as long as you'd like</span>
+          <span>Only Pay 50% Today!</span>
+          <span>Only Pay 50% Today!</span>
+          <span>Only Pay 50% Today!</span>
+          <span>Only Pay 50% Today!</span>
         </div>
       </div>
 
