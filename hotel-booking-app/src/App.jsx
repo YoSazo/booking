@@ -10,6 +10,24 @@ const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
 
+
+const calculateTieredPrice = (nights, rates) => {
+  if (nights <= 0 || !rates) return 0;
+  if (nights === 28) { return rates.MONTHLY; }
+  if (nights < 7) { return nights * rates.NIGHTLY; }
+  const WEEK_N = +(rates.WEEKLY / 7).toFixed(2);
+  const MONTHLY_NIGHTS_THRESHOLD = 30;
+  let discountedTotalRem = nights;
+  let discountedTotal = 0;
+  discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * rates.MONTHLY;
+  discountedTotalRem %= MONTHLY_NIGHTS_THRESHOLD;
+  discountedTotal += Math.floor(discountedTotalRem / 7) * rates.WEEKLY;
+  discountedTotalRem %= 7;
+  discountedTotal += discountedTotalRem * WEEK_N;
+  return +discountedTotal.toFixed(2);
+};
+
+
 function App() {
   const [currentPage, setCurrentPage] = useState('booking');
   const [checkinDate, setCheckinDate] = useState(null);
@@ -136,6 +154,9 @@ function App() {
     const total = selectedRoom.grandTotal || subtotal + taxes;
 
     trackInitiateCheckout({ ...selectedRoom, subtotal });
+
+    const ourReservationCode = generateReservationCode();
+
     
     setFinalBooking({
       ...selectedRoom,
@@ -145,6 +166,7 @@ function App() {
       subtotal: subtotal,
       taxes: taxes,
       total: total,
+      reservationCode: ourReservationCode
     });
     setCurrentPage('guest-info');
     window.scrollTo(0, 0);

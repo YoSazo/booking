@@ -84,8 +84,8 @@ function BookingPage({
                 onBookNow={onConfirmBooking}
                 nights={nights}
                 // Use the real-time rate from the API, or fallback to our tiered calculator
-                subtotal={room.subtotal}
-                taxes={room.taxesAndFees}
+                subtotal={room.totalRate}
+                taxes={0}
               />
             ))
           ) : (
