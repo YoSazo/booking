@@ -1312,3 +1312,47 @@ body {
   color: #555;
   margin-bottom: 8px;
 }
+
+/* --- Styles for Room Card Image Gallery Arrows --- */
+
+/* This container is the anchor for our buttons */
+.room-image-container {
+  position: relative;
+}
+
+/* This styles the arrow buttons themselves */
+.image-nav-btn {
+  position: absolute;   /* Take the button out of the normal flow */
+  top: 50%;             /* Position it halfway down the container */
+  transform: translateY(-50%); /* Perfectly center it vertically */
+  z-index: 1;           /* Ensure it's on top of the image */
+  
+  /* Appearance */
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 1; /* Make the buttons always visible */
+  transition: background-color 0.2s;
+}
+
+.image-nav-btn:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* Position the "previous" button on the left */
+.image-nav-btn.prev {
+  left: 10px;
+}
+
+/* Position the "next" button on the right */
+.image-nav-btn.next {
+  right: 10px;
+}

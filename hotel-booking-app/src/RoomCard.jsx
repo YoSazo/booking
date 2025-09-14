@@ -1,16 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-function RoomCard({ room, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes }) {
-
-  const priceToday = subtotal / 2;
-  const balanceDue = subtotal / 2;
+function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes }) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  const priceToday = subtotal ? subtotal / 2 : 0;
+  const balanceDue = subtotal ? subtotal / 2 : 0;
 
   const guestOptions = Array.from({ length: room.maxOccupancy }, (_, i) => i + 1);
   const petOptions = [0, 1, 2];
 
+  const handlePrevImage = (e) => {
+    e.stopPropagation();
+    const newIndex = (currentImageIndex - 1 + room.imageUrls.length) % room.imageUrls.length;
+    setCurrentImageIndex(newIndex);
+  };
+  const handleNextImage = (e) => {
+    e.stopPropagation();
+    const newIndex = (currentImageIndex + 1) % room.imageUrls.length;
+    setCurrentImageIndex(newIndex);
+  };
+
   return (
     <div className="room-card">
-      <img src={room.imageUrl} alt={room.name} />
+      <div className="room-image-container">
+        <img src={room.imageUrls[currentImageIndex]} alt={`${room.name} image ${currentImageIndex + 1}`} />
+        <button className="image-nav-btn prev" onClick={handlePrevImage}>&#10094;</button>
+        <button className="image-nav-btn next" onClick={handleNextImage}>&#10095;</button>
+        {/* --- FIXED: The entire .room-thumbnails div has been REMOVED from here --- */}
+      </div>
+
       <div className="room-details">
         <h3>{room.name}</h3>
         <p className="room-amenities">{room.amenities}</p>
@@ -52,9 +70,7 @@ function RoomCard({ room, rates, onSelect, isSelected, bookingDetails, onGuestsC
             <button className="btn book-now-btn" onClick={onBookNow}>Book Now</button>
           </div>
         ) : (
-          <button className="btn btn-select" onClick={() => onSelect(room)}>
-            Select Room
-          </button>
+          <button className="btn btn-select" onClick={() => onSelect(room)}>Select Room</button>
         )}
       </div>
     </div>
