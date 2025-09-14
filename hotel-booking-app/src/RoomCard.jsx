@@ -23,11 +23,17 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
   return (
     <div className="room-card">
       <div className="room-image-container">
-        <img src={room.imageUrls[currentImageIndex]} alt={`${room.name} image ${currentImageIndex + 1}`} />
-        <button className="image-nav-btn prev" onClick={handlePrevImage}>&#10094;</button>
-        <button className="image-nav-btn next" onClick={handleNextImage}>&#10095;</button>
-        {/* --- FIXED: The entire .room-thumbnails div has been REMOVED from here --- */}
+        {/* We now show the FIRST image as the preview */}
+        <img 
+          src={room.imageUrls[0]} 
+          alt={`${room.name} preview`} 
+        />
+        {/* The new button to open the lightbox */}
+        <button className="view-photos-btn" onClick={() => onOpenLightbox(room.imageUrls, 0)}>
+          View Photos
+        </button>
       </div>
+
 
       <div className="room-details">
         <h3>{room.name}</h3>

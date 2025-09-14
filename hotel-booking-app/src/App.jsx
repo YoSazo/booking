@@ -5,6 +5,7 @@ import ConfirmationPage from './ConfirmationPage.jsx';
 import HelpWidget from './HelpWidget.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
+import ImageLightbox from './ImageLightbox.jsx';
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
@@ -37,7 +38,7 @@ function App() {
   const [finalBooking, setFinalBooking] = useState(null);
   const [guestInfo, setGuestInfo] = useState(null);
   const [reservationCode, setReservationCode] = useState('');
-  
+  const [lightboxData, setLightboxData] = useState(null); 
   const [availableRooms, setAvailableRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -135,9 +136,16 @@ function App() {
   };
 
   const handleRoomSelect = (room) => {
+    if (!checkinDate || !checkoutDate) {
+      alert('Please select your check-in and check-out dates first.');
+      setIsCalendarOpen(true);
+      return;
+    }
     const bookingState = { ...room, guests: 1, pets: 0 };
     setSelectedRoom(bookingState);
-    trackAddToCart({ ...bookingState, subtotal: room.totalRate });
+    const nights = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
+    const subtotal = room.subtotal || calculateTieredPrice(nights, RATES);
+    trackAddToCart({ ...bookingState, subtotal });
   };
   
   const handleConfirmBooking = () => {
@@ -183,6 +191,12 @@ function App() {
   };
   const handleGuestCountChange = (newGuestCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount }); };
   const handlePetCountChange = (newPetCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount }); };
+  const handleOpenLightbox = (images, startIndex = 0) => {
+    setLightboxData({ images, startIndex });
+  };
+  const handleCloseLightbox = () => {
+    setLightboxData(null);
+  };
 
 
   return (
@@ -204,6 +218,7 @@ function App() {
           onCalendarClose={() => setIsCalendarOpen(false)}
           onDatesChange={handleDatesUpdate}
           isLoading={isLoading}
+          onOpenLightbox={handleOpenLightbox}
         />
       )}
       {currentPage === 'guest-info' && (
@@ -212,6 +227,14 @@ function App() {
           bookingDetails={finalBooking} 
           onBack={() => setCurrentPage('booking')} 
           onComplete={handleCompleteBooking} 
+        />
+      )}
+
+      {lightboxData && (
+        <ImageLightbox 
+          images={lightboxData.images}
+          startIndex={lightboxData.startIndex}
+          onClose={handleCloseLightbox}
         />
       )}
       {currentPage === 'confirmation' && (

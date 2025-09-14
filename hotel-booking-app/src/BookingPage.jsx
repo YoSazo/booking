@@ -5,6 +5,7 @@ import ReviewCard from './ReviewCard.jsx';
 
 function BookingPage({ 
   hotel,
+  onOpenLightbox,
   roomData,
   rates,
   selectedRoom,
@@ -83,6 +84,7 @@ function BookingPage({
                 onPetsChange={onPetsChange}
                 onBookNow={onConfirmBooking}
                 nights={nights}
+                onOpenLightbox={onOpenLightbox}
                 // Use the real-time rate from the API, or fallback to our tiered calculator
                 subtotal={room.totalRate}
                 taxes={0}
