@@ -1012,6 +1012,8 @@ body {
     /* On mobile, reduce the outer padding to give the card more space */
     padding: 10px;
     margin: 20px auto;
+    position: relative;
+    left: -16px;
   }
 
   .confirmation-card {
@@ -1381,7 +1383,7 @@ body {
   background-color: rgba(255, 255, 255, 0.1);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
+  /* border-radius: 50%; */
   width: 50px;
   height: 50px;
   font-size: 24px;
