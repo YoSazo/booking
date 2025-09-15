@@ -1,0 +1,20 @@
+# This file tells Git which files to ignore.
+
+# Ignore dependency folders
+node_modules/
+**/node_modules/
+
+# Ignore all environment files (which contain secret keys)
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Ignore build output folders
+dist/
+build/
+.next/
+.vercel/
+
+# Ignore system files
+.DS_Store
