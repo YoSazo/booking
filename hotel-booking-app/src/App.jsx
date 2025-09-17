@@ -12,6 +12,8 @@ const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
 const calculateTieredPrice = (nights, rates) => {
   if (nights <= 0 || !rates) return 0;
   if (nights === 28) { return rates.MONTHLY; }
@@ -27,8 +29,6 @@ const calculateTieredPrice = (nights, rates) => {
   discountedTotal += discountedTotalRem * WEEK_N;
   return +discountedTotal.toFixed(2);
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('booking');
@@ -207,6 +207,7 @@ function App() {
           bookingDetails={finalBooking} 
           onBack={() => setCurrentPage('booking')} 
           onComplete={handleCompleteBooking} 
+          apiBaseUrl={API_BASE_URL}
         />
       )}
       {currentPage === 'confirmation' && (

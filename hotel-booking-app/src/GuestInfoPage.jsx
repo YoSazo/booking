@@ -44,7 +44,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     );
 };
 
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl}) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl }) {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', address: '', city: '', state: '', zip: '',
     phone: '+1 ', email: '',
@@ -54,15 +54,26 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl}
   const [clientSecret, setClientSecret] = useState('');
 
   useEffect(() => {
-    // This check prevents an error if bookingDetails isn't ready yet
     if (bookingDetails && bookingDetails.subtotal) {
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
         })
-        .then((res) => res.json())
-        .then((data) => setClientSecret(data.clientSecret));
+        .then((res) => {
+            if (!res.ok) {
+                throw new Error('Failed to create payment intent');
+            }
+            return res.json();
+        })
+        .then((data) => {
+            if (!data.clientSecret) {
+                console.error("Client secret not received from server.");
+                return;
+            }
+            setClientSecret(data.clientSecret)
+        })
+        .catch(error => console.error("Error fetching client secret:", error));
     }
   }, [bookingDetails, apiBaseUrl]);
 
