@@ -1,4 +1,6 @@
 const getCookie = (name) => document.cookie.match(`[; ]?${name}=([^;]*)`)?.[1] || null;
+const TRACKING_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/track`;
+
 
 const ZAPIER_WEBHOOKS = {
     Search: 'https://hooks.zapier.com/hooks/catch/23096608/uu9wu4u/',
@@ -8,7 +10,6 @@ const ZAPIER_WEBHOOKS = {
 };
 
 const sendEventToServer = (eventName, payload) => {
-    const TRACKING_ENDPOINT = 'http://localhost:3001/api/track';
     const fullPayload = {
         event_name: eventName,
         event_source_url: window.location.href,

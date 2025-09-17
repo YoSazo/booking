@@ -58,7 +58,7 @@ function App() {
     setIsLoading(true);
     setAvailableRooms([]);
     try {
-      const response = await fetch('http://localhost:3001/api/availability', {
+      const response = await fetch(`${API_BASE_URL}/api/availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,7 +102,7 @@ function App() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/book', {
+      const response = await fetch(`${API_BASE_URL}/api/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

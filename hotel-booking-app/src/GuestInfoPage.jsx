@@ -44,7 +44,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     );
 };
 
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl}) {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', address: '', city: '', state: '', zip: '',
     phone: '+1 ', email: '',
@@ -56,7 +56,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   useEffect(() => {
     // This check prevents an error if bookingDetails isn't ready yet
     if (bookingDetails && bookingDetails.subtotal) {
-        fetch("http://localhost:3001/api/create-payment-intent", {
+        fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
@@ -64,7 +64,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
         .then((res) => res.json())
         .then((data) => setClientSecret(data.clientSecret));
     }
-  }, [bookingDetails]);
+  }, [bookingDetails, apiBaseUrl]);
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
