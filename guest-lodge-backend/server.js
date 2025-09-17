@@ -17,12 +17,13 @@ const allowedOrigins = [
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // --- NEW: Add this console log for debugging ---
+        // --- This console log will help us debug on Render ---
         console.log("--- CORS CHECK ---");
         console.log("Request Origin:", origin);
         console.log("Allowed Origins:", allowedOrigins);
         // ---------------------------------------------
 
+        // Allow requests with no origin (like mobile apps or curl requests) or from our allowed list
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             console.log("CORS Check Passed.");
             callback(null, true);
@@ -32,6 +33,7 @@ const corsOptions = {
         }
     }
 };
+
 
 
 
