@@ -10,25 +10,24 @@ const app = express();
 const prisma = new PrismaClient();
 
 const allowedOrigins = [
-    process.env.FRONTEND_URL, // Your live URL, e.g., 'https://myhomeplacesuites.com'
-    'https://myhomeplacesuites.com'
-];
+    process.env.FRONTEND_URL,      // Your live URL from the .env file
+    'http://localhost:5173'        // Your local development URL
+].filter(Boolean); // This safely removes any undefined values if FRONTEND_URL isn't set
 
 const corsOptions = {
     origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests) or from our allowed list
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
+            console.error(`CORS Error: The origin '${origin}' was blocked.`);
             callback(new Error('Not allowed by CORS'));
         }
     }
 };
 
+
 app.use(cors(corsOptions));
-
-
-app.use(cors());
-app.use(express.json());
 
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api/stripe-webhook')) {
