@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'; // FIXED: Added useEffect to
 import { Autocomplete } from '@react-google-maps/api';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -43,9 +44,11 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
         }
     };
 
+
     return (
         <form onSubmit={handleSubmit}>
             {/* --- NEW: The Express Checkout button --- */}
+            {/* This will automatically show Apple Pay or Google Pay if available */}
             <ExpressCheckoutElement onConfirm={onConfirmExpressCheckout} />
             
             {/* A divider to separate the two payment options */}
@@ -61,6 +64,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
         </form>
     );
 };
+
 
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl }) {
   const [formData, setFormData] = useState({

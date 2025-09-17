@@ -1420,3 +1420,26 @@ body {
 .payment-divider:not(:empty)::after {
   margin-left: .25em;
 }
+
+/* --- NEW Style for Payment Divider --- */
+.payment-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #888;
+  margin: 20px 0;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+.payment-divider::before,
+.payment-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+.payment-divider:not(:empty)::before {
+  margin-right: .25em;
+}
+.payment-divider:not(:empty)::after {
+  margin-left: .25em;
+}
