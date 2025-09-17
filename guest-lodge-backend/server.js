@@ -8,6 +8,23 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const prisma = new PrismaClient();
+
+const allowedOrigins = [
+    process.env.FRONTEND_URL, // Your live URL, e.g., 'https://myhomeplacesuites.com'
+    'https://myhomeplacesuites.com'
+];
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+};
+
+
 app.use(cors());
 app.use(express.json());
 
