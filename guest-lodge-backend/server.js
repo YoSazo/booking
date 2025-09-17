@@ -10,22 +10,29 @@ const app = express();
 const prisma = new PrismaClient();
 
 const allowedOrigins = [
-    process.env.FRONTEND_URL,      // Your live URL from the .env file
-    'https://www.myhomeplacesuites.com',
-    'http://localhost:5173'        // Your local development URL
-].filter(Boolean); // This safely removes any undefined values if FRONTEND_URL isn't set
+    'https://myhomeplacesuites.com',      // Allow the non-www version
+    'https://www.myhomeplacesuites.com', // Allow the www version
+    'http://localhost:5173'            // Allow local development
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests) or from our allowed list
-        if (!origin || allowedOrigins.includes(origin)) {
+        // --- NEW: Add this console log for debugging ---
+        console.log("--- CORS CHECK ---");
+        console.log("Request Origin:", origin);
+        console.log("Allowed Origins:", allowedOrigins);
+        // ---------------------------------------------
+
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            console.log("CORS Check Passed.");
             callback(null, true);
         } else {
-            console.error(`CORS Error: The origin '${origin}' was blocked.`);
+            console.error("CORS Check FAILED.");
             callback(new Error('Not allowed by CORS'));
         }
     }
 };
+
 
 
 app.use(cors(corsOptions));
