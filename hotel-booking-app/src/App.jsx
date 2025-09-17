@@ -1,4 +1,4 @@
-// Triggering a fresh deployment
+// Hey a fresh deployment
 import React, { useState, useEffect } from 'react';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPage from './GuestInfoPage.jsx';
