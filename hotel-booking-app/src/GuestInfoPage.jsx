@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'; // FIXED: Added useEffect to the import
 import { Autocomplete } from '@react-google-maps/api';
-import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
