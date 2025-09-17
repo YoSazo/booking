@@ -11,6 +11,7 @@ const prisma = new PrismaClient();
 
 const allowedOrigins = [
     process.env.FRONTEND_URL,      // Your live URL from the .env file
+    'https://www.myhomeplacesuites.com',
     'http://localhost:5173'        // Your local development URL
 ].filter(Boolean); // This safely removes any undefined values if FRONTEND_URL isn't set
 
