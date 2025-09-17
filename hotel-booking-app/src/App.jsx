@@ -3,14 +3,13 @@ import BookingPage from './BookingPage.jsx';
 import GuestInfoPage from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
 import HelpWidget from './HelpWidget.jsx';
+import ImageLightbox from './ImageLightbox.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
-import ImageLightbox from './ImageLightbox.jsx';
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
-
 
 const calculateTieredPrice = (nights, rates) => {
   if (nights <= 0 || !rates) return 0;
@@ -28,6 +27,7 @@ const calculateTieredPrice = (nights, rates) => {
   return +discountedTotal.toFixed(2);
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('booking');
@@ -46,19 +46,14 @@ function App() {
     const today = new Date();
     setCheckinDate(today);
     setCheckoutDate(null);
-    // Use static rooms on initial load
     setAvailableRooms(currentHotel.rooms);
-  }, [hotelId]); // Rerun if the hotel changes
+  }, [hotelId]);
 
   const checkAvailability = async (start, end) => {
-    if (!start || !end) return;
-
-    // Use static data if the selected hotel is not Cloudbeds-powered
-    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
+    if (!start || !end || currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       setAvailableRooms(currentHotel.rooms);
       return;
     }
-
     setIsLoading(true);
     setAvailableRooms([]);
     try {
@@ -72,11 +67,10 @@ function App() {
         }),
       });
       const result = await response.json();
-
       if (result.success) {
         const mergedRooms = result.data.map(apiRoom => {
           const staticRoomData = currentHotel.rooms.find(r => r.name === apiRoom.roomName);
-          return { ...staticRoomData, ...apiRoom }; // Combine API data with our static data
+          return { ...staticRoomData, ...apiRoom };
         });
         setAvailableRooms(mergedRooms);
       } else {
@@ -95,8 +89,8 @@ function App() {
     checkAvailability(dates.start, dates.end);
   };
   
-  const handleCompleteBooking = async (formData) => {
-    if (currentHotel.pms !== 'Cloudbeds') {
+  const handleCompleteBooking = async (formData, paymentIntentId) => {
+    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       const newReservationCode = generateReservationCode();
       setGuestInfo(formData);
       setReservationCode(newReservationCode);
@@ -105,7 +99,6 @@ function App() {
       window.scrollTo(0, 0);
       return;
     }
-
     setIsLoading(true);
     try {
       const response = await fetch('http://localhost:3001/api/book', {
@@ -115,10 +108,10 @@ function App() {
           hotelId: hotelId,
           bookingDetails: finalBooking,
           guestInfo: formData,
+          paymentIntentId: paymentIntentId,
         }),
       });
       const result = await response.json();
-
       if (result.success) {
         setGuestInfo(formData);
         setReservationCode(result.reservationID);
@@ -153,19 +146,12 @@ function App() {
       alert("Please select a room first.");
       return;
     }
-  
-  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-
-
-  const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
+    const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+    const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
     const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
     const total = selectedRoom.grandTotal || subtotal + taxes;
-
     trackInitiateCheckout({ ...selectedRoom, subtotal });
-
     const ourReservationCode = generateReservationCode();
-
-    
     setFinalBooking({
       ...selectedRoom,
       checkin: checkinDate,
@@ -180,24 +166,17 @@ function App() {
     window.scrollTo(0, 0);
   };
 
-
   const generateReservationCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
-    for (let i = 0; i < 9; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    for (let i = 0; i < 9; i++) { result += chars.charAt(Math.floor(Math.random() * chars.length)); }
     return result;
   };
+
   const handleGuestCountChange = (newGuestCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount }); };
   const handlePetCountChange = (newPetCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount }); };
-  const handleOpenLightbox = (images, startIndex = 0) => {
-    setLightboxData({ images, startIndex });
-  };
-  const handleCloseLightbox = () => {
-    setLightboxData(null);
-  };
-
+  const handleOpenLightbox = (images, startIndex = 0) => { setLightboxData({ images, startIndex }); };
+  const handleCloseLightbox = () => { setLightboxData(null); };
 
   return (
     <>
@@ -229,19 +208,18 @@ function App() {
           onComplete={handleCompleteBooking} 
         />
       )}
-
-      {lightboxData && (
-        <ImageLightbox 
-          images={lightboxData.images}
-          startIndex={lightboxData.startIndex}
-          onClose={handleCloseLightbox}
-        />
-      )}
       {currentPage === 'confirmation' && (
         <ConfirmationPage 
           bookingDetails={finalBooking} 
           guestInfo={guestInfo} 
           reservationCode={reservationCode} 
+        />
+      )}
+      {lightboxData && (
+        <ImageLightbox 
+          images={lightboxData.images}
+          startIndex={lightboxData.startIndex}
+          onClose={handleCloseLightbox}
         />
       )}
       {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />}
@@ -250,4 +228,3 @@ function App() {
 }
 
 export default App;
-

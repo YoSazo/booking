@@ -994,11 +994,14 @@ body {
 }
 
 .stay-nights {
+  position: relative;
   display: flex;
   justify-content: flex-start; 
   align-items: center;
   gap: 10px;
   font-size: 1.3em;
+  left: -37px;
+  top: -13px;
 }
 
 .moon-icon {
@@ -1314,7 +1317,7 @@ body {
 .header-address {
   font-size: 0.9em;
   color: #555;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
 /* --- Styles for Room Card Image Gallery Arrows --- */

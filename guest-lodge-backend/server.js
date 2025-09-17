@@ -4,10 +4,22 @@ const axios = require('axios');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 const app = express();
 const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
+
+app.use((req, res, next) => {
+    if (req.originalUrl.startsWith('/api/stripe-webhook')) {
+        next();
+    } else {
+        express.json()(req, res, next);
+    }
+});
+
+
 app.use(express.text());
 app.set('trust proxy', true);
 
@@ -51,6 +63,25 @@ const ZAPIER_URLS = {
     InitiateCheckout: process.env.ZAPIER_INITIATECHECKOUT_URL,
     Purchase: process.env.ZAPIER_PURCHASE_URL,
 };
+
+
+app.post('/api/create-payment-intent', async (req, res) => {
+    const { amount } = req.body;
+    const amountInCents = Math.round(amount * 100);
+
+    try {
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amountInCents,
+            currency: 'usd',
+            automatic_payment_methods: { enabled: true },
+        });
+        res.send({ clientSecret: paymentIntent.client_secret });
+    } catch (error) {
+        res.status(400).send({ error: { message: error.message } });
+    }
+});
+
+
 
 // --- API ENDPOINTS ---
 app.post('/api/availability', async (req, res) => {
@@ -131,6 +162,7 @@ app.post('/api/book', async (req, res) => {
             try {
                 const newBooking = await prisma.booking.create({
                     data: {
+                        stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode, // The code from the frontend
                         pmsConfirmationCode: pmsResponse.data.reservationID, // The REAL code from Cloudbeds
                         hotelId: hotelId,

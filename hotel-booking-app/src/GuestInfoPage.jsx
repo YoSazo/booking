@@ -1,5 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // FIXED: Added useEffect to the import
 import { Autocomplete } from '@react-google-maps/api';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
+const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!stripe || !elements) return;
+        setIsProcessing(true);
+
+        const { error, paymentIntent } = await stripe.confirmPayment({
+            elements,
+            confirmParams: { receipt_email: guestInfo.email },
+            redirect: 'if_required' 
+        });
+
+        if (error) {
+            setErrorMessage(error.message);
+            setIsProcessing(false);
+        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+            onComplete(guestInfo, paymentIntent.id);
+        } else {
+             setErrorMessage("An unexpected error occurred.");
+             setIsProcessing(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <PaymentElement />
+            <button disabled={isProcessing || !stripe || !elements} className="btn btn-confirm" style={{ width: '100%', marginTop: '20px' }}>
+                {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
+            </button>
+            {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
+        </form>
+    );
+};
 
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   const [formData, setFormData] = useState({
@@ -8,6 +51,20 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   });
   const [formErrors, setFormErrors] = useState({});
   const [autocomplete, setAutocomplete] = useState(null);
+  const [clientSecret, setClientSecret] = useState('');
+
+  useEffect(() => {
+    // This check prevents an error if bookingDetails isn't ready yet
+    if (bookingDetails && bookingDetails.subtotal) {
+        fetch("http://localhost:3001/api/create-payment-intent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
+        })
+        .then((res) => res.json())
+        .then((data) => setClientSecret(data.clientSecret));
+    }
+  }, [bookingDetails]);
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
@@ -18,19 +75,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const errors = {};
-    const phoneDigits = formData.phone.replace(/\D/g, '');
-    if (phoneDigits.length !== 11) {
-      errors.phone = 'Phone number must be 10 digits.';
-    }
-    setFormErrors(errors);
-    if (Object.keys(errors).length === 0) {
-      onComplete(formData);
-    }
   };
 
   const onLoad = (autoC) => setAutocomplete(autoC);
@@ -64,23 +108,22 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
     }
   };
   
-  // --- UPDATED: Use the definitive pricing from the bookingDetails prop ---
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
+  
+  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' } };
 
   return (
     <>
       <div className="static-banner">
         ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
       </div>
-
       <div className="container-single-column">
         <div className="guest-info-header">
           <button onClick={onBack} className="back-button">&lt; Back to Booking</button>
           <h1>Guest Information</h1>
           <p>Please provide your details to complete the booking.</p>
         </div>
-
         <div className="info-summary">
             <div className="summary-card-details">
               <p className="detail-line">{bookingDetails.name}</p>
@@ -89,7 +132,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
             </div>
             <div className="summary-card-price">
               <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
-              {/* --- UPDATED: Display the definitive subtotal and taxes from the API --- */}
               <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
               <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
               <div className="total-breakdown">
@@ -98,8 +140,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
               </div>
             </div>
         </div>
-
-        <form className="guest-info-form" onSubmit={handleSubmit}>
+        <div className="guest-info-form">
           <div className="form-grid">
             <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required/></div>
             <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required/></div>
@@ -120,10 +161,15 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete }) {
           </div>
           <div className="payment-placeholder">
             <h3>Payment Information</h3>
-            <div className="stripe-area">Stripe Payment Gateway will be integrated here.</div>
-            <button type="submit" className="btn btn-confirm" style={{width: '100%'}}>Complete Booking</button>
+            {clientSecret ? (
+              <Elements options={stripeOptions} stripe={stripePromise}>
+                <CheckoutForm bookingDetails={bookingDetails} guestInfo={formData} onComplete={onComplete} />
+              </Elements>
+            ) : (
+              <p style={{textAlign: 'center'}}>Loading secure payment form...</p>
+            )}
           </div>
-        </form>
+        </div>
       </div>
     </>
   );
