@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'; // FIXED: Added useEffect to the import
 import { Autocomplete } from '@react-google-maps/api';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -23,18 +23,36 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
         });
 
         if (error) {
-            setErrorMessage(error.message);
+            // This error is for card payments. Express checkout errors are handled separately.
+            if (error.type === "card_error" || error.type === "validation_error") {
+                setErrorMessage(error.message);
+            } else {
+                setErrorMessage("An unexpected error occurred.");
+            }
             setIsProcessing(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
             onComplete(guestInfo, paymentIntent.id);
+        }
+    };
+
+    const onConfirmExpressCheckout = ({paymentIntent}) => {
+        if (paymentIntent && paymentIntent.status === 'succeeded') {
+            onComplete(guestInfo, paymentIntent.id);
         } else {
-             setErrorMessage("An unexpected error occurred.");
-             setIsProcessing(false);
+            setErrorMessage("Express payment failed. Please try another method.");
         }
     };
 
     return (
         <form onSubmit={handleSubmit}>
+            {/* --- NEW: The Express Checkout button --- */}
+            <ExpressCheckoutElement onConfirm={onConfirmExpressCheckout} />
+            
+            {/* A divider to separate the two payment options */}
+            <div className="payment-divider">
+                <span>OR PAY WITH CARD</span>
+            </div>
+
             <PaymentElement />
             <button disabled={isProcessing || !stripe || !elements} className="btn btn-confirm" style={{ width: '100%', marginTop: '20px' }}>
                 {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
