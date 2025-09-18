@@ -1445,9 +1445,10 @@ body {
 }
 
 /* --- NEW Style for Stripe Badge Image --- */
+/* --- NEW Style for Stripe Badge Image --- */
 .stripe-badge-image {
-  display: block; /* Allows margin auto to work for centering */
-  margin: 0 auto 20px auto; /* Centers the image horizontally and adds space below */
-  height: 25px; /* Control the height of the badge */
-  width: auto; /* Let the width adjust automatically */
+  display: block;
+  margin: 0 auto 20px auto;
+  height: 35px; /* UPDATED: Increased from 25px for better visibility */
+  width: auto;
 }
