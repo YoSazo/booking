@@ -192,7 +192,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             <div className="form-field full-width"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required/></div>
           </div>
           <div className="payment-placeholder">
-            {/* --- UPDATED: Replaced the h3 tag with the Stripe badge --- */}
+            <h3>Powered by Stripe</h3>
             <div className="stripe-badge-container">
               <svg width="110px" height="25px" viewBox="0 0 110 25" version="1.1" xmlns="http://www.w3.org/2000/svg">
                   <g stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
