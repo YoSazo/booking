@@ -1449,6 +1449,6 @@ body {
 .stripe-badge-image {
   display: block;
   margin: 0 auto 20px auto;
-  height: 35px; /* UPDATED: Increased from 25px for better visibility */
+  height: 200px; /* UPDATED: Increased from 25px for better visibility */
   width: auto;
 }
