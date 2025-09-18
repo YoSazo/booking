@@ -192,9 +192,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             <div className="form-field full-width"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required/></div>
           </div>
           <div className="payment-placeholder">
-            <div className="stripe-badge-container">
-              <StripeBadge />
-            </div>
+            <h3>Payment Information</h3>
             {clientSecret ? (
               <Elements options={stripeOptions} stripe={stripePromise}>
                 <CheckoutForm bookingDetails={bookingDetails} guestInfo={formData} onComplete={onComplete} />
