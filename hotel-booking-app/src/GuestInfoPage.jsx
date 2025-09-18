@@ -192,9 +192,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             <div className="form-field full-width"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required/></div>
           </div>
           <div className="payment-placeholder">
-             <a href="https://stripe.com" target="_blank" rel="noopener noreferrer">
-              <img src="/stripe.svg" alt="Powered by Stripe" className="stripe-badge-image" />
-            </a>
+            <img src="/stripe-checkout.png" alt="Powered by Stripe" className="stripe-badge-image" />
             {clientSecret ? (
               <Elements options={stripeOptions} stripe={stripePromise}>
                 <CheckoutForm bookingDetails={bookingDetails} guestInfo={formData} onComplete={onComplete} />
