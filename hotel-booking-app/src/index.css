@@ -1448,7 +1448,7 @@ body {
 /* --- NEW Style for Stripe Badge Image --- */
 .stripe-badge-image {
   display: block;
-  margin: 0 auto 20px auto;
-  height: 120px; /* UPDATED: Increased from 25px for better visibility */
+  margin: 0 auto 8px auto;
+  height: 100px; /* UPDATED: Increased from 25px for better visibility */
   width: auto;
 }
