@@ -1443,3 +1443,11 @@ body {
 .payment-divider:not(:empty)::after {
   margin-left: .25em;
 }
+
+/* --- NEW Style for Stripe Badge Container --- */
+.stripe-badge-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
