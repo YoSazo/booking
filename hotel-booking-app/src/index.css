@@ -1449,7 +1449,7 @@ body {
 .stripe-badge-image {
   display: block;
   margin-top: -10px;
-  margin: 0 auto 17px auto;
+  margin: -10px auto 17px auto;
   height: 100px; /* UPDATED: Increased from 25px for better visibility */
   width: auto;
 }
