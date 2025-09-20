@@ -75,28 +75,37 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   const [clientSecret, setClientSecret] = useState('');
 
   useEffect(() => {
+    // We check for bookingDetails.subtotal now, not bookingDetails.total
     if (bookingDetails && bookingDetails.subtotal) {
+        
+        // --- THIS IS THE CORRECTED FETCH CALL ---
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url}),
+            // The body now ONLY contains the amount, which is what the server expects.
+            body: JSON.stringify({ 
+                amount: bookingDetails.subtotal / 2,
+            }),
         })
         .then((res) => {
             if (!res.ok) {
+                // This makes the error message more descriptive
                 throw new Error('Failed to create payment intent');
             }
             return res.json();
         })
         .then((data) => {
-            if (!data.clientSecret) {
-                console.error("Client secret not received from server.");
-                return;
-            }
-            setClientSecret(data.clientSecret)
+             if (!data.clientSecret) {
+                throw new Error("Client secret not received from server.");
+             }
+             setClientSecret(data.clientSecret)
         })
-        .catch(error => console.error("Error fetching client secret:", error));
+        .catch(error => {
+            // This will now log the detailed error to your browser console
+            console.error("Error fetching client secret:", error);
+        });
     }
-  }, [bookingDetails, apiBaseUrl]);
+}, [bookingDetails, apiBaseUrl]);
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
