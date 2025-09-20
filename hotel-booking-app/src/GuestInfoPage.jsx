@@ -43,16 +43,15 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
 
     return (
         <form onSubmit={handleSubmit}>
-            {/* --- NEW: The Express Checkout button --- */}
-            {/* This will automatically show Apple Pay or Google Pay if available */}
-            <ExpressCheckoutElement onConfirm={onConfirmExpressCheckout} />
-            
-            {/* A divider to separate the two payment options */}
-            <div className="payment-divider">
-                <span>OR PAY WITH CARD</span>
+            {/* --- UPDATED: The payment elements are now wrapped in the secure frame --- */}
+            <div className="secure-payment-frame">
+                <ExpressCheckoutElement onConfirm={onConfirmExpressCheckout} />
+                <div className="payment-divider">
+                    <span>OR PAY WITH CARD</span>
+                </div>
+                <PaymentElement />
             </div>
-
-            <PaymentElement />
+            
             <button disabled={isProcessing || !stripe || !elements} className="btn btn-confirm" style={{ width: '100%', marginTop: '20px' }}>
                 {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
             </button>

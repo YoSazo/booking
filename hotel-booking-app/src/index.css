@@ -1400,19 +1400,19 @@ body {
 
 /* --- NEW Style for Payment Divider --- */
 .payment-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: #888;
-  margin: 20px 0;
-  font-size: 0.8em;
-  font-weight: 500;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #aaa; /* Slightly lighter than #888 */
+    margin: 20px 0;
+    font-size: 0.8em;
+    font-weight: 500;
 }
 .payment-divider::before,
 .payment-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #ddd;
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #eee; /* Lighter than #ddd */
 }
 .payment-divider:not(:empty)::before {
   margin-right: .25em;
@@ -1426,16 +1426,16 @@ body {
   display: flex;
   align-items: center;
   text-align: center;
-  color: #888;
+  color: #aaa;
   margin: 20px 0;
   font-size: 0.8em;
   font-weight: 500;
 }
 .payment-divider::before,
 .payment-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #ddd;
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #eee; /* Lighter than #ddd */
 }
 .payment-divider:not(:empty)::before {
   margin-right: .25em;
@@ -1452,4 +1452,12 @@ body {
   margin: 0 auto 17px auto;
   height: 25px; /* UPDATED: Increased from 25px for better visibility */
   width: auto;
+}
+
+.secure-payment-frame {
+  background-color: #f9f9f9; /* A very light grey */
+  border: 1px solid #eee;
+  border-radius: 12px; /* Soft rounded corners */
+  padding: 20px;
+  margin-top: 25px;
 }
