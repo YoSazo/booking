@@ -148,7 +148,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
   
-  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' } };
+  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, currency: 'usd' };
 
   return (
     <>

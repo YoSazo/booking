@@ -180,9 +180,13 @@ function App() {
       const result = await response.json();
       if (result.success) {
         setGuestInfo(formData);
-        // Important: Update the finalBooking with the real PMS code for the confirmation page
-        setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationID }));
-        trackPurchase(finalBooking, formData, result.reservationID);
+        // --- START FIX 2C ---
+        // Capture the final reservation code from the server's response
+        setReservationCode(result.reservationCode); 
+        // Update the finalBooking object with the PMS code for storage/session
+        setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationCode }));
+        trackPurchase(finalBooking, formData, result.reservationCode);
+        // --- END FIX 2C ---
         navigate('/final-confirmation');
         window.scrollTo(0, 0);
       } else {
