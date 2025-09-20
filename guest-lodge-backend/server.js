@@ -48,7 +48,7 @@ app.use((req, res, next) => {
 });
 
 
-app.use(express.text());
+
 app.set('trust proxy', true);
 
 const PORT = 3001;
