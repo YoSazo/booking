@@ -165,7 +165,21 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
   
-  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' } };
+  const stripeOptions = { 
+    clientSecret, 
+    appearance: { theme: 'stripe' },
+    // START FIX: Use paymentMethodPreference to explicitly define payment method options
+    paymentMethodPreference: {
+      // This key ensures Express Checkout is fully configured.
+      link: { 
+        currency: 'usd' // Specify currency for link/wallets
+      },
+      // You can also add explicit payment method types here if needed, 
+      // but automatic: { enabled: true } on the backend should handle this.
+      // paymentMethodTypes: ['card', 'link', 'google_pay', 'apple_pay'], 
+    }
+    // END FIX
+  };
 
   return (
     <>
