@@ -23,15 +23,37 @@ function CheckoutReturnPage({ onComplete }) {
             switch (paymentIntent.status) {
                 case 'succeeded':
                     // Payment was successful! Now, get the user data we saved earlier.
-                    const savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
+                    let savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
                     
-                    if (savedGuestInfo) {
+                    // START FIX 2: Fallback for Express Checkout to ensure required data is present
+                    if (!savedGuestInfo || !savedGuestInfo.email || !savedGuestInfo.firstName) {
+                        const name = paymentIntent.shipping?.name || paymentIntent.billing_details?.name || 'Express Guest';
+                        const [firstName, ...lastNameParts] = name.split(' ');
+                        
+                        savedGuestInfo = {
+                            // Extract data from Payment Intent or use placeholder
+                            firstName: firstName || 'Express',
+                            lastName: lastNameParts.join(' ') || 'Guest',
+                            email: paymentIntent.receipt_email || paymentIntent.billing_details?.email || 'unknown@example.com',
+                            phone: paymentIntent.shipping?.phone || 'N/A',
+                            zip: paymentIntent.shipping?.address?.postal_code || paymentIntent.billing_details?.address?.postal_code || 'N/A',
+                            // Add placeholders for other mandatory fields required by your backend
+                            address: 'N/A',
+                            city: 'N/A',
+                            state: 'N/A',
+                        };
+                        // Also clear the session storage to ensure next booking starts fresh
+                        sessionStorage.removeItem('guestInfo');
+                    }
+                    // END FIX 2
+                    
+                    if (savedGuestInfo && savedGuestInfo.email) {
                         // Finalize the booking by calling the main function from App.jsx
                         onComplete(savedGuestInfo, paymentIntent.id);
                     } else {
-                        // This is a fallback in case session storage fails
+                        // If the essential email is still missing, we must error out.
                         setStatus('error');
-                        console.error("Could not retrieve guest info from session storage after payment.");
+                        console.error("Could not retrieve essential guest info after payment.");
                     }
                     break;
                 case 'processing':
