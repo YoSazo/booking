@@ -94,18 +94,22 @@ const ZAPIER_URLS = {
 
 
 app.post('/api/create-payment-intent', async (req, res) => {
-    const { amount, hotelUrl } = req.body;
+    const { amount } = req.body;
     const amountInCents = Math.round(amount * 100);
+
+    // Use the FRONTEND_URL from your .env file for the return URL
+    const returnUrl = `${process.env.FRONTEND_URL}/confirmation`;
 
     try {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
             automatic_payment_methods: { enabled: true },
-            return_url: `${hotelUrl}/confirmation`,
+            return_url: returnUrl,
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
+        console.error("Stripe Error creating payment intent:", error.message);
         res.status(400).send({ error: { message: error.message } });
     }
 });
