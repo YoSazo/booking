@@ -236,7 +236,11 @@ function App() {
           />
         } />
         <Route path="/confirmation" element={
-          <CheckoutReturnPage />
+          <CheckoutReturnPage 
+            onComplete={handleCompleteBooking}
+            apiBaseUrl={API_BASE_URL}
+          
+          />
         } />
       </Routes>
       

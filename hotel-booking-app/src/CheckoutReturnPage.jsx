@@ -21,12 +21,23 @@ function CheckoutReturnPage() {
                     const savedBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
                     const savedGuest = JSON.parse(sessionStorage.getItem('guestInfo'));
                     
-                    setBookingData({
-                        bookingDetails: savedBooking,
-                        guestInfo: savedGuest,
-                        reservationCode: savedBooking.pmsConfirmationCode, // Use the real code
-                    });
-                    setStatus('succeeded');
+                    if (savedBooking && savedGuest) {
+                        // --- THIS IS THE CRUCIAL NEW LINE ---
+                        // Finalize the booking by calling the function from App.jsx
+                        onComplete(savedGuest, paymentIntent.id); 
+                        // ------------------------------------
+
+                        setBookingData({
+                            bookingDetails: savedBooking,
+                            guestInfo: savedGuest,
+                            // Use the code from the saved data for display
+                            reservationCode: savedBooking.reservationCode, 
+                        });
+                        setStatus('succeeded');
+                    } else {
+                        // If session data is missing, something went wrong
+                        setStatus('error');
+                    }
                     break;
                 case 'processing':
                     setStatus('processing');
@@ -36,7 +47,8 @@ function CheckoutReturnPage() {
                     break;
             }
         });
-    }, [stripe]);
+    }, [stripe, onComplete]);
+
 
     if (status === 'loading') {
         return <div style={{textAlign: 'center', padding: '50px'}}>Loading confirmation...</div>;
