@@ -42,15 +42,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
 
-  // State to persist booking data across the Stripe redirect
-  const [finalBooking, setFinalBooking] = useState(() => {
-    const saved = sessionStorage.getItem('finalBooking');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [guestInfo, setGuestInfo] = useState(() => {
-      const saved = sessionStorage.getItem('guestInfo');
-      return saved ? JSON.parse(saved) : null;
-  });
+  const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
+  const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
+
 
   useEffect(() => {
     const today = new Date();
@@ -162,7 +156,7 @@ function App() {
       if (result.success) {
         setGuestInfo(formData);
         // Important: Update the finalBooking with the real PMS code for the confirmation page
-        setFinalBooking(prev => ({...prev, pmsConfirmationCode: result.reservationID}));
+        setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationID }));
         trackPurchase(finalBooking, formData, result.reservationID);
         navigate('/confirmation');
         window.scrollTo(0, 0);

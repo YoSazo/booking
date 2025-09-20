@@ -79,7 +79,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
+            body: JSON.stringify({ amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url}),
         })
         .then((res) => {
             if (!res.ok) {
