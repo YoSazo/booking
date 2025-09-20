@@ -36,13 +36,13 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     };
 
     const expressConfirmParams = {
-        // Crucial: Tells Stripe where to redirect after the Express Checkout payment is authorized
-        return_url: `${window.location.origin}/confirmation`,
-        // Also good practice to pass email for express checkout receipt
+        // This is the CRUCIAL line for the wallet redirect flow
+        return_url: `${window.location.origin}/confirmation`, 
+        // Include email for the receipt after wallet authorization
         payment_method_data: {
-          billing_details: {
-            email: guestInfo.email,
-          }
+            billing_details: {
+                email: guestInfo.email,
+            }
         }
     };
 
@@ -59,9 +59,8 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
             <div className="secure-payment-frame">
                 <ExpressCheckoutElement 
                     onConfirm={onConfirmExpressCheckout}
-                    // START FIX: Pass the confirmation parameters here for the Express Element
+                    // APPLY THE FIX HERE: Pass the confirmation parameters to the element
                     confirmParams={expressConfirmParams}
-                    // END FIX
                 />
                 <div className="payment-divider">
                     <span>OR PAY WITH CARD</span>
