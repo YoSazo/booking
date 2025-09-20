@@ -1450,6 +1450,6 @@ body {
   display: block;
   margin-top: -10px;
   margin: 0 auto 17px auto;
-  height: 95px; /* UPDATED: Increased from 25px for better visibility */
+  height: 25px; /* UPDATED: Increased from 25px for better visibility */
   width: auto;
 }
