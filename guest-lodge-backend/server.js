@@ -47,7 +47,7 @@ app.use((req, res, next) => {
     }
 });
 
-
+app.use(express.json());
 app.use(express.text());
 app.set('trust proxy', true);
 
@@ -96,40 +96,19 @@ const ZAPIER_URLS = {
 // In your server.js
 
 app.post('/api/create-payment-intent', async (req, res) => {
-    // --- START ENHANCED LOGGING ---
-    console.log("--- New Payment Intent Request ---");
-    console.log("Request Body Received:", req.body);
-
     const { amount } = req.body;
-    console.log("Extracted Amount:", amount);
+    const amountInCents = Math.round(amount * 100);
 
-    // Check if amount is a valid number
     if (typeof amount !== 'number' || amount <= 0) {
-        console.error("Validation Error: Amount is invalid.", amount);
         return res.status(400).send({ error: { message: "Invalid amount provided." } });
     }
-
-    const amountInCents = Math.round(amount * 100);
-    console.log("Calculated Amount in Cents:", amountInCents);
-
-    const frontendUrl = process.env.FRONTEND_URL;
-    console.log("FRONTEND_URL from .env:", frontendUrl);
-
-    if (!frontendUrl) {
-        console.error("Configuration Error: FRONTEND_URL is not set in environment variables.");
-        return res.status(500).send({ error: { message: "Server configuration error." } });
-    }
-
-    const returnUrl = `${frontendUrl}/confirmation`;
-    console.log("Final Return URL for Stripe:", returnUrl);
-    // --- END ENHANCED LOGGING ---
 
     try {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
             automatic_payment_methods: { enabled: true },
-            return_url: returnUrl,
+            // The 'return_url' has been REMOVED from this server-side call
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
