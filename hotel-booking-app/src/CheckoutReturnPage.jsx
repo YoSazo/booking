@@ -26,12 +26,14 @@ function CheckoutReturnPage({ onComplete }) {
                     let savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
                     
                     // START FIX 2: Fallback for Express Checkout to ensure required data is present
+                    // Check if essential data is missing (common with wallet payments)
                     if (!savedGuestInfo || !savedGuestInfo.email || !savedGuestInfo.firstName) {
+                        // Extract name and email from the Stripe Payment Intent, which is reliable
                         const name = paymentIntent.shipping?.name || paymentIntent.billing_details?.name || 'Express Guest';
                         const [firstName, ...lastNameParts] = name.split(' ');
                         
                         savedGuestInfo = {
-                            // Extract data from Payment Intent or use placeholder
+                            // Extract data from Payment Intent or use safe placeholders
                             firstName: firstName || 'Express',
                             lastName: lastNameParts.join(' ') || 'Guest',
                             email: paymentIntent.receipt_email || paymentIntent.billing_details?.email || 'unknown@example.com',
@@ -42,7 +44,7 @@ function CheckoutReturnPage({ onComplete }) {
                             city: 'N/A',
                             state: 'N/A',
                         };
-                        // Also clear the session storage to ensure next booking starts fresh
+                        // Clear the local session storage item for this booking (optional but good practice)
                         sessionStorage.removeItem('guestInfo');
                     }
                     // END FIX 2
@@ -56,6 +58,7 @@ function CheckoutReturnPage({ onComplete }) {
                         console.error("Could not retrieve essential guest info after payment.");
                     }
                     break;
+
                 case 'processing':
                     setStatus('processing');
                     break;

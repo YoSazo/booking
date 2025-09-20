@@ -36,14 +36,9 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     };
 
     const expressConfirmParams = {
-        // CRUCIAL: Tells Stripe where to redirect after the Express Checkout payment is authorized
-        return_url: `${window.location.origin}/confirmation`,
-        // Ensures email is included in the PaymentIntent for receipt
-        payment_method_data: {
-          billing_details: {
-            email: guestInfo.email,
-          }
-        }
+        // This is the CRUCIAL line for the wallet redirect flow
+        return_url: `${window.location.origin}/confirmation`, 
+        // Removing email from here, as the element handles it from the wallet popup.
     };
 
 
