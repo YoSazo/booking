@@ -182,7 +182,7 @@ function App() {
         // Important: Update the finalBooking with the real PMS code for the confirmation page
         setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationID }));
         trackPurchase(finalBooking, formData, result.reservationID);
-        navigate('/confirmation');
+        navigate('/final-confirmation');
         window.scrollTo(0, 0);
       } else {
         alert('Booking failed: ' + (result.message || 'An unknown error occurred.'));
@@ -245,6 +245,7 @@ function App() {
           </Elements>
         } />
 
+        {/* This is the final, styled page the user will see */}
         <Route path="/final-confirmation" element={
           <ConfirmationPage 
             bookingDetails={finalBooking}

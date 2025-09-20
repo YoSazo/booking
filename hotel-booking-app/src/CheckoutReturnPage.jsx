@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useStripe } from '@stripe/react-stripe-js';
 
+// This page is now just a temporary loading screen that finalizes the booking
 function CheckoutReturnPage({ onComplete }) {
     const stripe = useStripe();
     const [status, setStatus] = useState('loading');
 
     useEffect(() => {
-        if (!stripe) return;
+        if (!stripe) {
+            // Stripe.js has not yet loaded.
+            return;
+        }
 
         const clientSecret = new URLSearchParams(window.location.search).get('payment_intent_client_secret');
         if (!clientSecret) {
@@ -18,11 +22,14 @@ function CheckoutReturnPage({ onComplete }) {
         stripe.retrievePaymentIntent(clientSecret).then(({ paymentIntent }) => {
             switch (paymentIntent.status) {
                 case 'succeeded':
+                    // Payment was successful! Now, get the user data we saved earlier.
                     const savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
                     
                     if (savedGuestInfo) {
+                        // Finalize the booking by calling the main function from App.jsx
                         onComplete(savedGuestInfo, paymentIntent.id);
                     } else {
+                        // This is a fallback in case session storage fails
                         setStatus('error');
                         console.error("Could not retrieve guest info from session storage after payment.");
                     }
@@ -45,6 +52,7 @@ function CheckoutReturnPage({ onComplete }) {
         return <div style={{textAlign: 'center', padding: '50px'}}>There was an error with your payment. Please return to the booking page or contact us.</div>;
     }
 
+    // Default loading state while we finalize
     return <div style={{textAlign: 'center', padding: '50px'}}>Finalizing your booking...</div>;
 }
 
