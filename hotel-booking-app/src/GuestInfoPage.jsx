@@ -84,7 +84,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             headers: { "Content-Type": "application/json" },
             // The body now ONLY contains the amount, which is what the server expects.
             body: JSON.stringify({ 
-                amount: bookingDetails.subtotal / 2,
+                amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url
             }),
         })
         .then((res) => {

@@ -44,7 +44,7 @@ function App() {
 
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
-
+  const [reservationCode, setReservationCode] = useState(''); // Added this state back in
 
   useEffect(() => {
     const today = new Date();
@@ -112,6 +112,15 @@ function App() {
     trackAddToCart({ ...bookingState, subtotal });
   };
 
+  const generateReservationCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 9; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
   const handleConfirmBooking = () => {
     if (!selectedRoom) {
       alert("Please select a room first.");
@@ -121,9 +130,10 @@ function App() {
     const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
     const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
     const total = selectedRoom.grandTotal || subtotal + taxes;
-    
+    const ourReservationCode = generateReservationCode();
+
     trackInitiateCheckout({ ...selectedRoom, subtotal });
-    
+
     setFinalBooking({
       ...selectedRoom,
       checkin: checkinDate,
@@ -132,6 +142,7 @@ function App() {
       subtotal,
       taxes,
       total,
+      reservationCode: ourReservationCode
     });
 
     navigate('/guest-info');
@@ -139,7 +150,16 @@ function App() {
   };
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
-    // This is now the final step for both regular card and express payments
+    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
+      const newReservationCode = generateReservationCode();
+      setGuestInfo(formData);
+      setReservationCode(newReservationCode);
+      trackPurchase(finalBooking, formData, newReservationCode);
+      navigate('/confirmation');
+      window.scrollTo(0, 0);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/book`, {
@@ -170,10 +190,18 @@ function App() {
     setIsLoading(false);
   };
 
-  const handleGuestCountChange = (newGuestCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount }); };
-  const handlePetCountChange = (newPetCount) => { if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount }); };
-  const handleOpenLightbox = (images, startIndex = 0) => { setLightboxData({ images, startIndex }); };
-  const handleCloseLightbox = () => { setLightboxData(null); };
+  const handleGuestCountChange = (newGuestCount) => {
+    if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });
+  };
+  const handlePetCountChange = (newPetCount) => {
+    if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount });
+  };
+  const handleOpenLightbox = (images, startIndex = 0) => {
+    setLightboxData({ images, startIndex });
+  };
+  const handleCloseLightbox = () => {
+    setLightboxData(null);
+  };
 
   return (
     <>

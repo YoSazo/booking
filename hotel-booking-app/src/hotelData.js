@@ -2,6 +2,7 @@ export const hotelData = {
   // --- First Hotel ---
   'guest-lodge-minot': {
     name: 'Guest Lodge Minot',
+    url: 'https://www.myhomeplacesuites.com',
     subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
     address: '1937 N Broadway, Minot, ND 58703',
     phone: '(701) 289-5992',
@@ -48,6 +49,7 @@ export const hotelData = {
   // --- Second Hotel (Example with different data) ---
   'home-place-suites': {
     name: 'Home Place Suites',
+    url: 'https://www.myhomeplacesuites.com',
     subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
     phone: '(918) 212-6296',
     address: '1410 SE Washington Blvd Suite 2, Bartlesville, OK 74006',
@@ -97,6 +99,7 @@ export const hotelData = {
 // --- Second Hotel (Example with different data) ---
   'suite-inn': {
     name: 'Suite Inn',
+    url: 'https://www.myhomeplacesuites.com',
     subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
     phone: '(605) 388-0959',
     address: '2520 Tower Rd, Rapid City, SD 57701',
