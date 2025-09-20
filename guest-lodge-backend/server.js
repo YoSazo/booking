@@ -94,7 +94,7 @@ const ZAPIER_URLS = {
 
 
 app.post('/api/create-payment-intent', async (req, res) => {
-    const { amount } = req.body;
+    const { amount, hotelUrl } = req.body;
     const amountInCents = Math.round(amount * 100);
 
     try {
@@ -102,6 +102,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
             amount: amountInCents,
             currency: 'usd',
             automatic_payment_methods: { enabled: true },
+            return_url: `${hotelUrl}/confirmation`,
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
