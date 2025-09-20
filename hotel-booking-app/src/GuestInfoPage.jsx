@@ -18,12 +18,11 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
 
         const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
-            confirmParams: { receipt_email: guestInfo.email },
+            confirmParams: { receipt_email: guestInfo.email, return_url: `${window.location.origin}/confirmation`,},
             redirect: 'if_required' 
         });
 
         if (error) {
-            // This error is for card payments. Express checkout errors are handled separately.
             if (error.type === "card_error" || error.type === "validation_error") {
                 setErrorMessage(error.message);
             } else {
@@ -31,16 +30,14 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
             }
             setIsProcessing(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+            // This handles card payments that succeed without a redirect
             onComplete(guestInfo, paymentIntent.id);
         }
     };
 
-    const onConfirmExpressCheckout = ({paymentIntent}) => {
-        if (paymentIntent && paymentIntent.status === 'succeeded') {
-            onComplete(guestInfo, paymentIntent.id);
-        } else {
-            setErrorMessage("Express payment failed. Please try another method.");
-        }
+    const onConfirmExpressCheckout = () => {
+        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+        sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
     };
 
 
