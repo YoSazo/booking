@@ -48,7 +48,7 @@ function App() {
 
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
-  const [reservationCode, setReservationCode] = useState(''); // Added this state back in
+   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
 
   useEffect(() => {
     const today = new Date();
@@ -61,6 +61,7 @@ function App() {
   useEffect(() => {
     if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
     if (guestInfo) sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
+    if (reservationCode) sessionStorage.setItem('reservationCode', reservationCode);
   }, [finalBooking, guestInfo]);
 
   const checkAvailability = async (start, end) => {
