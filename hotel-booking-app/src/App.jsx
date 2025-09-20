@@ -62,7 +62,7 @@ function App() {
     if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
     if (guestInfo) sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
     if (reservationCode) sessionStorage.setItem('reservationCode', reservationCode);
-  }, [finalBooking, guestInfo]);
+  }, [finalBooking, guestInfo, reservationCode]);
 
   const checkAvailability = async (start, end) => {
     if (!start || !end || currentHotel.pms.toLowerCase() !== 'cloudbeds') {
