@@ -159,7 +159,7 @@ app.post('/api/availability', async (req, res) => {
 
 
 app.post('/api/book', async (req, res) => {
-    const { hotelId, bookingDetails, guestInfo } = req.body;
+    const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
     if (hotelId !== 'home-place-suites') {
          return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
     }
@@ -223,7 +223,12 @@ app.post('/api/book', async (req, res) => {
         }
         
         // Step 3: Forward the original success response from the PMS to the frontend
-        res.json(pmsResponse.data);
+        res.json({
+            success: pmsResponse.data.success,
+            message: pmsResponse.data.success ? 'Reservation created successfully.' : pmsResponse.data.message,
+            reservationCode: pmsResponse.data.reservationID,
+            pmsResponse: pmsResponse.data // Keep original response for debug/future use
+        });
 
     } catch (error) {
         console.error("Error creating reservation with Cloudbeds:", error.response?.data || error.message);
