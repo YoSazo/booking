@@ -15,7 +15,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       libraries={libraries}
     >
       <BrowserRouter>
-      <App />
+        <App />
       </BrowserRouter>
     </LoadScript>
   </React.StrictMode>,

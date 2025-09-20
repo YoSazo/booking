@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStripe } from '@stripe/react-stripe-js';
 
-// This page is now just a temporary loading screen that finalizes the booking
 function CheckoutReturnPage({ onComplete }) {
     const stripe = useStripe();
     const [status, setStatus] = useState('loading');
 
     useEffect(() => {
-        if (!stripe) {
-            // Stripe.js has not yet loaded.
-            return;
-        }
+        if (!stripe) return;
 
         const clientSecret = new URLSearchParams(window.location.search).get('payment_intent_client_secret');
         if (!clientSecret) {
@@ -25,7 +21,6 @@ function CheckoutReturnPage({ onComplete }) {
                     const savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
                     
                     if (savedGuestInfo) {
-                        // Finalize the booking by calling the function from App.jsx
                         onComplete(savedGuestInfo, paymentIntent.id);
                     } else {
                         setStatus('error');

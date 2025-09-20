@@ -16,6 +16,8 @@ const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
 const calculateTieredPrice = (nights, rates) => {
   if (nights <= 0 || !rates) return 0;
   if (nights === 28) return rates.MONTHLY;
