@@ -8,6 +8,8 @@ import HelpWidget from './HelpWidget.jsx';
 import ImageLightbox from './ImageLightbox.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
@@ -236,10 +238,16 @@ function App() {
           />
         } />
         <Route path="/confirmation" element={
-          <CheckoutReturnPage 
-            onComplete={handleCompleteBooking}
-            apiBaseUrl={API_BASE_URL}
-          
+          <Elements stripe={stripePromise}>
+            <CheckoutReturnPage onComplete={handleCompleteBooking} />
+          </Elements>
+        } />
+
+        <Route path="/final-confirmation" element={
+          <ConfirmationPage 
+            bookingDetails={finalBooking}
+            guestInfo={guestInfo}
+            reservationCode={reservationCode}
           />
         } />
       </Routes>
