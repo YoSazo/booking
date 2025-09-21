@@ -93,7 +93,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
     // We check for bookingDetails.subtotal now, not bookingDetails.total
     if (bookingDetails && bookingDetails.subtotal) {
 
-        const testAmount = 1.00;
+      
         
         // --- THIS IS THE CORRECTED FETCH CALL ---
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
@@ -101,7 +101,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             headers: { "Content-Type": "application/json" },
             // The body now ONLY contains the amount, which is what the server expects.
             body: JSON.stringify({ 
-                amount: testAmount / 2, hotelUrl: hotel.url, 
+                amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url
             }),
         })
         .then((res) => {
