@@ -42,35 +42,21 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     };
 
 
-    const onConfirmExpressCheckout = async (event) => {
-    // Store data first
+    const onConfirmExpressCheckout = (event) => {
+    // Store data
     sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
     sessionStorage.setItem('guestInfo', JSON.stringify(formData));
     
-    try {
-        // Confirm the payment
-        const { error } = await stripe.confirmPayment({
-            elements,
-            confirmParams: {
-                return_url: `${window.location.origin}/confirmation`,
-            },
-            redirect: 'if_required'
-        });
-        
-        if (error) {
-            // Payment failed - complete with failure
-            event.complete('fail');
-            setErrorMessage(error.message);
-        } else {
-            // Payment succeeded - complete with success
-            event.complete('success');
-        }
-    } catch (err) {
-        // Exception occurred - complete with failure
-        event.complete('fail');
-        setErrorMessage('Payment failed');
-    }
+    // Return the confirmation promise
+    return stripe.confirmPayment({
+        elements,
+        confirmParams: {
+            return_url: `${window.location.origin}/confirmation`,
+        },
+        redirect: 'if_required'
+    });
 };
+
 
 
     return (
