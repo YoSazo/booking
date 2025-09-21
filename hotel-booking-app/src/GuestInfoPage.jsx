@@ -1,16 +1,94 @@
-import React, { useState, useEffect } from 'react'; // FIXED: Added useEffect to the import
+import React, { useState, useEffect } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-import { Elements, PaymentElement, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
+// UPDATED IMPORT: Use PaymentRequestButtonElement
+import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
+// UPDATED PROPS: clientSecret is now required here
+const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
+    // State for the Payment Request object
+    const [paymentRequest, setPaymentRequest] = useState(null);
+    const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+
+    // --- NEW PAYMENT REQUEST API LOGIC ---
+    useEffect(() => {
+        if (!stripe || !clientSecret || !bookingDetails) return;
+
+        // 1. Create the Payment Request object
+        const pr = stripe.paymentRequest({
+            country: 'US',
+            currency: 'usd',
+            total: {
+                label: 'Booking Payment',
+                amount: amountInCents,
+            },
+            requestPayerName: true,
+            requestPayerEmail: true,
+        });
+
+        // 2. Check if Apple Pay/Google Pay is available
+        pr.canMakePayment().then(result => {
+            if (result) {
+                setPaymentRequest(pr);
+            }
+        });
+
+        // 3. Handle the payment confirmation event
+        pr.on('paymentmethod', async (ev) => {
+            setIsProcessing(true);
+            
+            // Store data immediately BEFORE Stripe redirects (CRITICAL FIX)
+            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+            sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
+
+            // CRITICAL: Explicitly confirm the PaymentIntent using the token from the wallet
+            const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                clientSecret,
+                { payment_method: ev.paymentMethod.id },
+                { handleActions: false }
+            );
+
+            if (confirmError) {
+                ev.complete('fail');
+                setErrorMessage(confirmError.message || "Payment authorization failed.");
+                setIsProcessing(false);
+                return;
+            }
+
+            ev.complete('success'); // Signal to the wallet that the payment is authorized
+
+            if (paymentIntent && paymentIntent.status === 'requires_action') {
+                // Handle 3D Secure or other required authentication
+                const { error: actionError } = await stripe.confirmCardPayment(clientSecret);
+                if (actionError) {
+                    setErrorMessage(actionError.message);
+                    setIsProcessing(false);
+                    return;
+                }
+            }
+            
+            // SUCCESS: Redirect to the return page to finalize the booking
+            // Passes client_secret to CheckoutReturnPage.jsx for retrieval
+            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+        });
+
+        // Cleanup function
+        return () => {
+            if (pr) pr.off('paymentmethod');
+        };
+
+    }, [stripe, clientSecret, amountInCents, bookingDetails, guestInfo]);
+    // --- END NEW PAYMENT REQUEST API LOGIC ---
+
+
+    // Standard card submission handling (remains the same)
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
@@ -35,46 +113,27 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
         }
     };
 
-    const expressConfirmParams = {
-        // This is the CRUCIAL line for the wallet redirect flow
-        return_url: `${window.location.origin}/confirmation`, 
-        // Removing email from here, as the element handles it from the wallet popup.
-    };
-
-
-    const onConfirmExpressCheckout = (event) => {
-    // Store data
-    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-    
-    // Return the confirmation promise
-    return stripe.confirmPayment({
-        elements,
-        confirmParams: {
-            return_url: `${window.location.origin}/confirmation`,
-        },
-        redirect: 'if_required'
-    });
-};
-
-
 
     return (
-        // START FIX 2B: Add 'action' and 'method' to enable Express Checkout redirect
-        <form 
-            action="/confirmation" // CRITICAL: Tells the browser where to redirect
-            method="POST" 
-            onSubmit={handleSubmit}
-        > 
-            {/* --- UPDATED: The payment elements are now wrapped in the secure frame --- */}
+        // The form no longer needs action/method="POST" as the PR Button handles its own secure redirect
+        <form onSubmit={handleSubmit}> 
             <div className="secure-payment-frame">
-                <ExpressCheckoutElement 
-                    onConfirm={onConfirmExpressCheckout}
-                    // Re-adding confirmParams for robust handling of the PaymentIntent ID in the URL
-                    confirmParams={{
-                        return_url: `${window.location.origin}/confirmation`
-                    }}
-                />
+                {paymentRequest ? (
+                    // RENDER THE NEW PAYMENT REQUEST BUTTON
+                    <PaymentRequestButtonElement 
+                        options={{
+                            paymentRequest,
+                            style: {
+                                paymentRequestButton: {
+                                    theme: 'dark',
+                                    height: '40px',
+                                },
+                            },
+                        }}
+                    />
+                ) : (
+                    <p style={{textAlign: 'center', padding: '10px 0'}}>Checking wallet availability...</p>
+                )}
                 <div className="payment-divider">
                     <span>OR PAY WITH CARD</span>
                 </div>
@@ -102,8 +161,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   useEffect(() => {
     // We check for bookingDetails.subtotal now, not bookingDetails.total
     if (bookingDetails && bookingDetails.subtotal) {
-
-      
         
         // --- THIS IS THE CORRECTED FETCH CALL ---
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
@@ -179,21 +236,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
   
-  const stripeOptions = { 
-    clientSecret, 
-    appearance: { theme: 'stripe' },
-    // START FIX: Use paymentMethodPreference to explicitly define payment method options
-    paymentMethodPreference: {
-      // This key ensures Express Checkout is fully configured.
-      link: { 
-        currency: 'usd' // Specify currency for link/wallets
-      },
-      // You can also add explicit payment method types here if needed, 
-      // but automatic: { enabled: true } on the backend should handle this.
-      // paymentMethodTypes: ['card', 'link', 'google_pay', 'apple_pay'], 
-    }
-    // END FIX
-  };
+  // Cleaned up Stripe options
+  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' } };
 
   return (
     <>
@@ -245,7 +289,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             <img src="/stripe-checkout.png" alt="Powered by Stripe" className="stripe-badge-image" />
             {clientSecret ? (
               <Elements options={stripeOptions} stripe={stripePromise}>
-                <CheckoutForm bookingDetails={bookingDetails} guestInfo={formData} onComplete={onComplete} />
+                {/* CRITICAL: Pass clientSecret to the refactored CheckoutForm */}
+                <CheckoutForm 
+                    bookingDetails={bookingDetails} 
+                    guestInfo={formData} 
+                    onComplete={onComplete} 
+                    clientSecret={clientSecret}
+                />
               </Elements>
             ) : (
               <p style={{textAlign: 'center'}}>Loading secure payment form...</p>
