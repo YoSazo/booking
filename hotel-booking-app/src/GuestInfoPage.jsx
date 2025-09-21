@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-// UPDATED IMPORT: Added PaymentRequestButtonElement and LinkAuthenticationElement
-import { Elements, PaymentElement, PaymentRequestButtonElement, LinkAuthenticationElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -17,7 +16,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
     const [paymentRequest, setPaymentRequest] = useState(null);
     const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
 
-    // --- NEW PAYMENT REQUEST API LOGIC ---
+    // --- PAYMENT REQUEST API LOGIC ---
     useEffect(() => {
         if (!stripe || !clientSecret || !bookingDetails) return;
 
@@ -48,7 +47,6 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
             sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
             sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
 
-            // CRITICAL: Explicitly confirm the PaymentIntent using the token from the wallet
             const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
                 clientSecret,
                 { payment_method: ev.paymentMethod.id },
@@ -62,10 +60,9 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                 return;
             }
 
-            ev.complete('success'); // Signal to the wallet that the payment is authorized
+            ev.complete('success'); 
 
             if (paymentIntent && paymentIntent.status === 'requires_action') {
-                // Handle 3D Secure or other required authentication
                 const { error: actionError } = await stripe.confirmCardPayment(clientSecret);
                 if (actionError) {
                     setErrorMessage(actionError.message);
@@ -75,17 +72,15 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
             }
             
             // SUCCESS: Redirect to the return page to finalize the booking
-            // Passes client_secret to CheckoutReturnPage.jsx for retrieval
             window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
         });
 
-        // Cleanup function
         return () => {
             if (pr) pr.off('paymentmethod');
         };
 
     }, [stripe, clientSecret, amountInCents, bookingDetails, guestInfo]);
-    // --- END NEW PAYMENT REQUEST API LOGIC ---
+    // --- END PAYMENT REQUEST API LOGIC ---
 
 
     // Standard card submission handling (remains the same)
@@ -113,30 +108,23 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
         }
     };
     
-    // expressConfirmParams and onConfirmExpressCheckout for the old element were removed.
-
 
     return (
-        // The form tag no longer needs action/method="POST"
         <form onSubmit={handleSubmit}> 
-            {/* --- UPDATED: Express Checkout section uses individual reliable elements --- */}
             <div className="secure-payment-frame">
                 {/* 1. Payment Request Button (Apple Pay/Google Pay) */}
                 {paymentRequest ? (
-                    <>
-                        <PaymentRequestButtonElement 
-                            options={{
-                                paymentRequest,
-                                style: {
-                                    paymentRequestButton: {
-                                        theme: 'dark',
-                                        height: '40px',
-                                    },
+                    <PaymentRequestButtonElement 
+                        options={{
+                            paymentRequest,
+                            style: {
+                                paymentRequestButton: {
+                                    theme: 'dark',
+                                    height: '40px',
                                 },
-                            }}
-                        />
-                        {/* 2. Link Authentication Element (Stripe Link) */}
-                    </>
+                            },
+                        }}
+                    />
                 ) : (
                     <p style={{textAlign: 'center', padding: '10px 0'}}>Checking wallet availability...</p>
                 )}
@@ -144,8 +132,15 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                 <div className="payment-divider">
                     <span>OR PAY WITH CARD</span>
                 </div>
-                {/* 3. Payment Element (Standard Card) */}
-                <PaymentElement />
+                {/* 2. Payment Element (Standard Card) */}
+                <PaymentElement 
+                    options={{
+                        // FIX 1: Configure Payment Element to only show the Card input and hide wallets
+                        paymentMethodPreference: {
+                            paymentMethodTypes: ['card'],
+                        }
+                    }}
+                />
             </div>
             
             <button disabled={isProcessing || !stripe || !elements} className="btn btn-confirm" style={{ width: '100%', marginTop: '20px' }}>
@@ -244,8 +239,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
   
-  // Cleaned up Stripe options
-  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' } };
+  // FIX 2: Add explicit locale for stability on iOS/WebKit browsers
+  const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
 
   return (
     <>
@@ -297,7 +292,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             <img src="/stripe-checkout.png" alt="Powered by Stripe" className="stripe-badge-image" />
             {clientSecret ? (
               <Elements options={stripeOptions} stripe={stripePromise}>
-                {/* CRITICAL: Pass clientSecret to the refactored CheckoutForm */}
                 <CheckoutForm 
                     bookingDetails={bookingDetails} 
                     guestInfo={formData} 
