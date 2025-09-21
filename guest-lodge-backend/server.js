@@ -109,9 +109,9 @@ app.post('/api/create-payment-intent', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
-            // CRITICAL FIX: Explicitly list all required methods (Card, Link, and Wallets).
-            // This is the correct way that avoids the API conflict and guarantees Apple Pay/Google Pay inclusion.
-            payment_method_types: ['card', 'link', 'apple_pay', 'google_pay'], 
+            // ✅ Only "card" and optionally "link" here
+            // Wallets like Apple Pay and Google Pay are automatically included under "card"
+            payment_method_types: ['card', 'link'], 
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
