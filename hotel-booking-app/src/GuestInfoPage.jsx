@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-// UPDATED IMPORT: Use PaymentRequestButtonElement
-import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
+// UPDATED IMPORT: Added PaymentRequestButtonElement and LinkAuthenticationElement
+import { Elements, PaymentElement, PaymentRequestButtonElement, LinkAuthenticationElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -13,7 +13,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    // State for the Payment Request object
+    // State for the Payment Request object (Apple Pay / Google Pay)
     const [paymentRequest, setPaymentRequest] = useState(null);
     const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
 
@@ -112,31 +112,45 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
             onComplete(guestInfo, paymentIntent.id);
         }
     };
+    
+    // expressConfirmParams and onConfirmExpressCheckout for the old element were removed.
 
 
     return (
-        // The form no longer needs action/method="POST" as the PR Button handles its own secure redirect
+        // The form tag no longer needs action/method="POST"
         <form onSubmit={handleSubmit}> 
+            {/* --- UPDATED: Express Checkout section uses individual reliable elements --- */}
             <div className="secure-payment-frame">
+                {/* 1. Payment Request Button (Apple Pay/Google Pay) */}
                 {paymentRequest ? (
-                    // RENDER THE NEW PAYMENT REQUEST BUTTON
-                    <PaymentRequestButtonElement 
-                        options={{
-                            paymentRequest,
-                            style: {
-                                paymentRequestButton: {
-                                    theme: 'dark',
-                                    height: '40px',
+                    <>
+                        <PaymentRequestButtonElement 
+                            options={{
+                                paymentRequest,
+                                style: {
+                                    paymentRequestButton: {
+                                        theme: 'dark',
+                                        height: '40px',
+                                    },
                                 },
-                            },
-                        }}
-                    />
+                            }}
+                        />
+                        {/* 2. Link Authentication Element (Stripe Link) */}
+                        <LinkAuthenticationElement 
+                            options={{
+                                defaultValues: { email: guestInfo.email },
+                                layout: 'tabs', // Keeps Link sleek under the main button
+                            }}
+                        />
+                    </>
                 ) : (
                     <p style={{textAlign: 'center', padding: '10px 0'}}>Checking wallet availability...</p>
                 )}
+                
                 <div className="payment-divider">
                     <span>OR PAY WITH CARD</span>
                 </div>
+                {/* 3. Payment Element (Standard Card) */}
                 <PaymentElement />
             </div>
             
@@ -161,7 +175,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   useEffect(() => {
     // We check for bookingDetails.subtotal now, not bookingDetails.total
     if (bookingDetails && bookingDetails.subtotal) {
-        
+
         // --- THIS IS THE CORRECTED FETCH CALL ---
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
