@@ -42,38 +42,13 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     };
 
 
-    const onConfirmExpressCheckout = async (event) => {
-    alert('🍎 Step 1: Apple Pay onConfirm called');
-    
-    // Store data
+    const onConfirmExpressCheckout = (event) => {
+    // Just store the data - don't manually call stripe.confirmPayment
     sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
     sessionStorage.setItem('guestInfo', JSON.stringify(formData));
     
-    alert('🍎 Step 2: Data stored, about to confirm payment');
-    
-    try {
-        const result = await stripe.confirmPayment({
-            elements,
-            confirmParams: {
-                return_url: `${window.location.origin}/confirmation`,
-            },
-            redirect: 'if_required'
-        });
-        
-        alert('🍎 Step 3: Confirmation completed');
-        
-        if (result.error) {
-            alert(`❌ Error: ${result.error.type} - ${result.error.message}`);
-            setErrorMessage(result.error.message);
-        } else if (result.paymentIntent) {
-            alert(`✅ Success: ${result.paymentIntent.status}`);
-        } else {
-            alert('⚠️ Unexpected result structure');
-        }
-    } catch (error) {
-        alert(`💥 Exception: ${error.name} - ${error.message}`);
-        setErrorMessage('Payment confirmation failed');
-    }
+    // Let the ExpressCheckoutElement handle the payment confirmation automatically
+    // The element will use its built-in confirmation flow
 };
 
 
