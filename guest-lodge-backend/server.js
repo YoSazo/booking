@@ -107,13 +107,12 @@ app.post('/api/create-payment-intent', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
-            // ONLY these parameters are needed for Express Checkout
-            payment_method_types: ['card', 'apple_pay', 'google_pay'],
+            // CORRECT CONFIGURATION: ONLY USE ONE OF THESE
             automatic_payment_methods: { 
                 enabled: true,
                 allow_redirects: 'always' 
             }
-            // REMOVED: capture_method, setup_future_usage (conflict with wallets)
+            // REMOVED: payment_method_types (CONFLICTS with automatic_payment_methods)
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
