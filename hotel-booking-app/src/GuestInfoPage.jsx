@@ -12,7 +12,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-
+    const testAmount = 1.00;
     // State for the Payment Request object (Apple Pay / Google Pay)
     const [paymentRequest, setPaymentRequest] = useState(null);
     const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
@@ -171,7 +171,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             headers: { "Content-Type": "application/json" },
             // The body now ONLY contains the amount, which is what the server expects.
             body: JSON.stringify({ 
-                amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url
+                amount: testAmount / 2, hotelUrl: hotel.url
             }),
         })
         .then((res) => {
