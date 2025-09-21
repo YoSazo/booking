@@ -107,12 +107,11 @@ app.post('/api/create-payment-intent', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
-            // CORRECT CONFIGURATION: ONLY USE ONE OF THESE
             automatic_payment_methods: { 
                 enabled: true,
                 allow_redirects: 'always' 
             }
-            // REMOVED: payment_method_types (CONFLICTS with automatic_payment_methods)
+            // CRITICAL: REMOVED capture_method (conflicts with Apple Pay)
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
