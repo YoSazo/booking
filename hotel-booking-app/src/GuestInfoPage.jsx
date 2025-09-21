@@ -42,11 +42,30 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     };
 
 
-    const onConfirmExpressCheckout = () => { 
-        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-        sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-        event.preventDefault(); // CRITICAL
-    };
+    const onConfirmExpressCheckout = async (event) => {
+    // Store the data first
+    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+    
+    // Now actually confirm the payment with Stripe
+    const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+            return_url: `${window.location.origin}/confirmation`,
+        },
+        redirect: 'if_required'
+    });
+
+    if (error) {
+        console.error('Express checkout confirmation failed:', error);
+        setErrorMessage(error.message);
+        // Don't call event.complete('fail') - let Stripe handle it
+    } else {
+        // Payment succeeded
+        console.log('Express checkout payment confirmed');
+        // Stripe will handle the redirect or success state
+    }
+};
 
 
     return (
