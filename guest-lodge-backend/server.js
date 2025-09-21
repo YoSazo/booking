@@ -95,6 +95,8 @@ const ZAPIER_URLS = {
 
 // In your server.js
 
+// File: guest-lodge-backend/server.js
+
 app.post('/api/create-payment-intent', async (req, res) => {
     const { amount } = req.body;
     const amountInCents = Math.round(amount * 100);
@@ -107,22 +109,14 @@ app.post('/api/create-payment-intent', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
-            automatic_payment_methods: { 
-                enabled: true,
-                allow_redirects: 'always' 
-            }
-            // CRITICAL: REMOVED capture_method (conflicts with Apple Pay)
+            // CRITICAL FIX: Explicitly list all required methods (Card, Link, and Wallets).
+            // This is the correct way that avoids the API conflict and guarantees Apple Pay/Google Pay inclusion.
+            payment_method_types: ['card', 'link', 'apple_pay', 'google_pay'], 
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
-        console.error("Stripe API Error creating payment intent:", error);
-        res.status(400).send({ 
-            error: { 
-                message: error.message,
-                code: error.code,
-                doc_url: error.doc_url
-            } 
-        });
+        console.error("Stripe API Error creating payment intent:", error.message);
+        res.status(400).send({ error: { message: error.message || "Failed to create payment intent due to an API error." } });
     }
 });
 
