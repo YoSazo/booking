@@ -42,22 +42,30 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     };
 
 
-    const onConfirmExpressCheckout = () => {
+    const onConfirmExpressCheckout = () => { 
+        if (event && event.preventDefault) {
+            event.preventDefault();
+        }
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-        sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-
-        event.preventDefault(); 
+        sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo)); 
     };
 
 
     return (
-        <form action="/confirmation" onSubmit={handleSubmit}> 
+        // START FIX 2B: Add 'action' and 'method' to enable Express Checkout redirect
+        <form 
+            action="/confirmation" // CRITICAL: Tells the browser where to redirect
+            method="POST" 
+            onSubmit={handleSubmit}
+        > 
             {/* --- UPDATED: The payment elements are now wrapped in the secure frame --- */}
             <div className="secure-payment-frame">
                 <ExpressCheckoutElement 
                     onConfirm={onConfirmExpressCheckout}
-                    // REVERT: Remove the unnecessary 'confirmParams' from the element,
-                    // as the form action now handles the redirect.
+                    // Re-adding confirmParams for robust handling of the PaymentIntent ID in the URL
+                    confirmParams={{
+                        return_url: `${window.location.origin}/confirmation`
+                    }}
                 />
                 <div className="payment-divider">
                     <span>OR PAY WITH CARD</span>
