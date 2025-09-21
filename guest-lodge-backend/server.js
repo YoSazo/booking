@@ -111,7 +111,10 @@ app.post('/api/create-payment-intent', async (req, res) => {
             currency: 'usd',
             // ✅ Only "card" and optionally "link" here
             // Wallets like Apple Pay and Google Pay are automatically included under "card"
-            payment_method_types: ['card', 'link'], 
+            automatic_payment_methods: {
+                enabled: true,
+            },
+            // Remove payment_method_types when using automatic_payment_methods
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
