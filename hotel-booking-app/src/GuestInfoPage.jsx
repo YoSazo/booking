@@ -137,9 +137,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                 <PaymentElement 
                     options={{
                       wallets: {
-                          applePay: 'never',
-                          googlePay: 'never',
-                          amazonPay: 'never',
+                          applePay: 'never'
                       }
                     }}
                 />
