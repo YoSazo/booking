@@ -43,12 +43,11 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
 
 
     const onConfirmExpressCheckout = (event) => {
-    // Just store the data - don't manually call stripe.confirmPayment
     sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
     sessionStorage.setItem('guestInfo', JSON.stringify(formData));
     
-    // Let the ExpressCheckoutElement handle the payment confirmation automatically
-    // The element will use its built-in confirmation flow
+    // Tell the event to complete successfully and let Stripe handle the rest
+    return true; // or you might need to return a promise
 };
 
 
