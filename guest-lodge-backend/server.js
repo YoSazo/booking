@@ -107,8 +107,16 @@ app.post('/api/create-payment-intent', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
-            automatic_payment_methods: { enabled: true },
-            // The 'return_url' has been REMOVED from this server-side call
+            // CRITICAL: ADD THIS LINE TO ENABLE APPLE PAY
+            payment_method_types: ['card', 'apple_pay', 'google_pay'],
+            automatic_payment_methods: { 
+                enabled: true,
+                // CRITICAL: MUST SET allow_redirects TO 'always' FOR APPLE PAY
+                allow_redirects: 'always' 
+            },
+            // REQUIRED FOR EXPRESS CHECKOUT
+            setup_future_usage: 'off_session',
+            capture_method: 'automatic_async'
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
