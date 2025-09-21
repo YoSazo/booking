@@ -136,12 +136,6 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                             }}
                         />
                         {/* 2. Link Authentication Element (Stripe Link) */}
-                        <LinkAuthenticationElement 
-                            options={{
-                                defaultValues: { email: guestInfo.email },
-                                layout: 'tabs', // Keeps Link sleek under the main button
-                            }}
-                        />
                     </>
                 ) : (
                     <p style={{textAlign: 'center', padding: '10px 0'}}>Checking wallet availability...</p>
