@@ -14,7 +14,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
     const [errorMessage, setErrorMessage] = useState('');
     // State for the Payment Request object (Apple Pay / Google Pay)
     const [paymentRequest, setPaymentRequest] = useState(null);
-    const amountInCents = 50;
+    const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
 
     // --- PAYMENT REQUEST API LOGIC ---
     useEffect(() => {
@@ -170,7 +170,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
             headers: { "Content-Type": "application/json" },
             // The body now ONLY contains the amount, which is what the server expects.
             body: JSON.stringify({ 
-                amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url
+                amount: 0.50, hotelUrl: hotel.url
             }),
         })
         .then((res) => {
