@@ -136,17 +136,11 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                 {/* 2. Payment Element (Standard Card) */}
                 <PaymentElement 
                     options={{
-                        // FIX: Configure Payment Element to hide all Express/Wallet options (Apple Pay, Google Pay, Amazon Pay)
-                        // This prevents duplicate buttons and cleans up the UI.
-                        paymentMethodPreference: {
-                            paymentMethodTypes: ['card'],
-                            wallets: {
-                                applePay: 'never',
-                                googlePay: 'never',
-                                amazonPay: 'never',
-                                link: 'never', // Assuming you only want card if express options are gone
-                            }
-                        }
+                      wallets: {
+                          applePay: 'never',
+                          googlePay: 'never',
+                          amazonPay: 'never',
+                      }
                     }}
                 />
             </div>
