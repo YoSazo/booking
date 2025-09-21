@@ -43,11 +43,9 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
 
 
     const onConfirmExpressCheckout = () => { 
-        if (event && event.preventDefault) {
-            event.preventDefault();
-        }
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-        sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo)); 
+        sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+        event.preventDefault(); // CRITICAL
     };
 
 
