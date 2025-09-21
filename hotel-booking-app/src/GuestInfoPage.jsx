@@ -14,7 +14,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
     const [errorMessage, setErrorMessage] = useState('');
     // State for the Payment Request object (Apple Pay / Google Pay)
     const [paymentRequest, setPaymentRequest] = useState(null);
-    const amountInCents = 100;
+    const amountInCents = 50;
 
     // --- PAYMENT REQUEST API LOGIC ---
     useEffect(() => {
