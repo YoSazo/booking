@@ -3,7 +3,6 @@ import { Autocomplete } from '@react-google-maps/api';
 // UPDATED IMPORT: Added PaymentRequestButtonElement
 import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-const testAmount = 1.00;
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // UPDATED PROPS: clientSecret is now required here
@@ -163,7 +162,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   useEffect(() => {
     // We check for bookingDetails.subtotal now, not bookingDetails.total
     if (bookingDetails && bookingDetails.subtotal) {
-
+        const testAmount = 1.00;
         // --- THIS IS THE CORRECTED FETCH CALL ---
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
