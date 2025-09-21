@@ -45,17 +45,19 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete }) => {
     const onConfirmExpressCheckout = () => {
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
+
+        event.preventDefault(); 
     };
 
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form action="/confirmation" onSubmit={handleSubmit}> 
             {/* --- UPDATED: The payment elements are now wrapped in the secure frame --- */}
             <div className="secure-payment-frame">
                 <ExpressCheckoutElement 
                     onConfirm={onConfirmExpressCheckout}
-                    // APPLY THE FIX HERE: Pass the confirmation parameters to the element
-                    confirmParams={expressConfirmParams}
+                    // REVERT: Remove the unnecessary 'confirmParams' from the element,
+                    // as the form action now handles the redirect.
                 />
                 <div className="payment-divider">
                     <span>OR PAY WITH CARD</span>
