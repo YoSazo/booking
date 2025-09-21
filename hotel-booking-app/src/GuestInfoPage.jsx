@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
+// UPDATED IMPORT: Added PaymentRequestButtonElement
 import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -135,9 +136,16 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                 {/* 2. Payment Element (Standard Card) */}
                 <PaymentElement 
                     options={{
-                        // FIX 1: Configure Payment Element to only show the Card input and hide wallets
+                        // FIX: Configure Payment Element to hide all Express/Wallet options (Apple Pay, Google Pay, Amazon Pay)
+                        // This prevents duplicate buttons and cleans up the UI.
                         paymentMethodPreference: {
                             paymentMethodTypes: ['card'],
+                            wallets: {
+                                applePay: 'never',
+                                googlePay: 'never',
+                                amazonPay: 'never',
+                                link: 'never', // Assuming you only want card if express options are gone
+                            }
                         }
                     }}
                 />
@@ -239,7 +247,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   const priceToday = bookingDetails.subtotal / 2;
   const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
   
-  // FIX 2: Add explicit locale for stability on iOS/WebKit browsers
+  // FIX: Add explicit locale for stability on iOS/WebKit browsers
   const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
 
   return (
