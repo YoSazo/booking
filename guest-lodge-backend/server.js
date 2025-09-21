@@ -107,21 +107,24 @@ app.post('/api/create-payment-intent', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
-            // CRITICAL: ADD THIS LINE TO ENABLE APPLE PAY
+            // ONLY these parameters are needed for Express Checkout
             payment_method_types: ['card', 'apple_pay', 'google_pay'],
             automatic_payment_methods: { 
                 enabled: true,
-                // CRITICAL: MUST SET allow_redirects TO 'always' FOR APPLE PAY
                 allow_redirects: 'always' 
-            },
-            // REQUIRED FOR EXPRESS CHECKOUT
-            setup_future_usage: 'off_session',
-            capture_method: 'automatic_async'
+            }
+            // REMOVED: capture_method, setup_future_usage (conflict with wallets)
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
-        console.error("Stripe API Error creating payment intent:", error.message);
-        res.status(400).send({ error: { message: error.message } });
+        console.error("Stripe API Error creating payment intent:", error);
+        res.status(400).send({ 
+            error: { 
+                message: error.message,
+                code: error.code,
+                doc_url: error.doc_url
+            } 
+        });
     }
 });
 
