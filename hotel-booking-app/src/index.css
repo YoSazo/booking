@@ -1473,13 +1473,14 @@ body {
 
 /* This is the main pill/circle */
 .step-circle {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px; /* This creates the circle shape */
-  background-color: #fff;
-  border: 2px solid #ccc;
-  transition: all 0.4s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    /* UPDATED: Changed dimensions and radius to create a pill shape */
+    width: 90px;
+    height: 30px;
+    border-radius: 999px; 
+    background-color: #fff;
+    border: 2px solid #ccc;
+    transition: all 0.4s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .step-name {
@@ -1500,10 +1501,20 @@ body {
 
 /* Styles for the main action button at the bottom */
 .checkout-cta-container {
-  /* UPDATED: Increased top margin for more breathing room */
-  margin-top: 20px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border-color);
+    /* --- UPDATED: These new rules make the button "sticky" --- */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #fff;
+    padding: 16px; /* 1rem */
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1); /* Adds a subtle shadow */
+    z-index: 10; /* Ensures it's on top of other content */
+    /* ----------------------------------------------------------- */
+
+    /* These old rules are no longer needed with the sticky position */
+    /* margin-top: 40px; */
+    /* border-top: 1px solid var(--border-color); */
 }
 
 .billing-address-section {
