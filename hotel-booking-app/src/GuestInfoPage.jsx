@@ -63,11 +63,23 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
-            fetch(`${apiBase.url}/api/create-payment-intent`, {
+            // --- FIXED: Changed `apiBase.url` to the correct `apiBaseUrl` prop ---
+            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
             })
-            .then((res) => res.json()).then((data) => setClientSecret(data.clientSecret));
+            .then((res) => {
+                if (!res.ok) { throw new Error('Failed to create payment intent'); }
+                return res.json();
+            })
+            .then((data) => {
+                if (!data.clientSecret) { throw new Error('Client secret not received'); }
+                setClientSecret(data.clientSecret)
+            })
+            .catch(err => {
+                console.error("Error fetching client secret:", err);
+                setErrorMessage("Could not load payment form. Please try again.");
+            });
         }
     }, [bookingDetails, apiBaseUrl]);
 
@@ -145,7 +157,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setIsProcessing(false);
     };
     
-    // Return a loading state or error if booking details aren't available yet
     if (!bookingDetails) {
         return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
     }
@@ -180,8 +191,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     </div>
                 </div>
 
-                {/* --- FIXED: The content for Step 1 is now filled in --- */}
-                {currentStep === 1 && (
+                <div className="info-summary-wrapper" style={{ display: currentStep === 1 ? 'block' : 'none' }}>
                     <div className="info-summary">
                         <div className="summary-card-details">
                             <p className="detail-line">{bookingDetails.name}</p>
@@ -198,10 +208,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
 
-                <form className="guest-info-form" onSubmit={handleFinalSubmit}>
-                    {/* --- FIXED: The content for Step 2 is now filled in --- */}
+                <form className="guest-info-form" onSubmit={handleFinalSubmit} style={{ display: currentStep > 1 ? 'block' : 'none' }}>
                     {currentStep === 2 && (
                         <div className="form-grid">
                             <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required /></div>
@@ -244,25 +253,25 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                         </div>
                                     </div>
                                 </Elements>
-                            ) : ( <p>Loading...</p> )}
-                        </div>
-                    )}
-                    
-                    {currentStep < 3 ? (
-                        <div className="checkout-cta-container">
-                            <button type="button" className="btn btn-confirm" style={{width: '100%'}} onClick={handleNextStep}>
-                                {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="checkout-cta-container">
-                            <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm" style={{width: '100%'}}>
-                                {isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`}
-                            </button>
-                            {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
+                            ) : ( <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p> )}
                         </div>
                     )}
                 </form>
+
+                {currentStep < 3 ? (
+                    <div className="checkout-cta-container">
+                        <button type="button" className="btn btn-confirm" style={{width: '100%'}} onClick={handleNextStep}>
+                            {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="checkout-cta-container">
+                        <button type="submit" form="guest-info-form-id" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm" style={{width: '100%'}}>
+                            {isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`}
+                        </button>
+                        {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
+                    </div>
+                )}
             </div>
         </>
     );
@@ -278,8 +287,4 @@ function GuestInfoPageWrapper(props) {
 }
 
 export default GuestInfoPageWrapper;
-
-if (!bookingDetails) {
-    return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
-}
 
