@@ -161,6 +161,7 @@ body {
     padding: 12px;
     font-size: 1.1em;
     background-color: var(--success-color);
+    border-radius: 999px; /* This creates the pill shape */
 }
 
 .btn-confirm:hover {
