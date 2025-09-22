@@ -290,14 +290,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     className="stripe-badge-image" 
                   />
                   {clientSecret ? (
-                    <Elements
-                      stripe={stripePromise}
-                      options={{
-                        clientSecret,
-                        appearance: { theme: 'stripe' },
-                        locale: 'en'
-                      }}
-                    >
+                    <>
                       <StripePaymentForm 
                         bookingDetails={bookingDetails} 
                         guestInfo={formData} 
@@ -342,7 +335,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                           )}
                         </div>
                       </div>
-                    </Elements>
+                      </>
                   ) : (
                     <p style={{textAlign: 'center', padding: '20px'}}>
                       Loading secure payment form...
