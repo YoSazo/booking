@@ -129,10 +129,14 @@ function App() {
 
   const handleConfirmBooking = async () => {
     if (!selectedRoom) {
-      alert("Please select a room first.");
-      return;
+        alert("Please select a room first.");
+        return;
     }
-    const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+
+    const nights = checkinDate && checkoutDate
+        ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
+        : 0;
+
     const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
     const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
     const total = selectedRoom.grandTotal || subtotal + taxes;
@@ -140,22 +144,27 @@ function App() {
 
     trackInitiateCheckout({ ...selectedRoom, subtotal });
 
-    setFinalBooking({
-      ...selectedRoom,
-      checkin: checkinDate,
-      checkout: checkoutDate,
-      nights,
-      subtotal,
-      taxes,
-      total,
-      reservationCode: ourReservationCode
-    });
+    // ✅ Store booking in a variable
+    const newBooking = {
+        ...selectedRoom,
+        checkin: checkinDate,
+        checkout: checkoutDate,
+        nights,
+        subtotal,
+        taxes,
+        total,
+        reservationCode: ourReservationCode
+    };
 
+    // Update state
+    setFinalBooking(newBooking);
+
+    // Use the variable to prefetch payment intent
     try {
         const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: finalBookingData.subtotal / 2 }),
+            body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
         });
         const data = await response.json();
         if (data.clientSecret) {
@@ -164,11 +173,11 @@ function App() {
     } catch (error) {
         console.error("Failed to pre-fetch client secret:", error);
     }
-    // --- END OF ADDED LOGIC ---
 
     navigate('/guest-info');
     window.scrollTo(0, 0);
 };
+
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
