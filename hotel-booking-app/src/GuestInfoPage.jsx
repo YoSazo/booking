@@ -124,6 +124,21 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setCurrentStep(prev => prev + 1);
     };
 
+    // --- NEW: Dynamic Back Button Logic ---
+  const handleBackStep = () => {
+    if (currentStep === 1) {
+        onBack(); // Go back to the main booking page
+    } else {
+        setCurrentStep(prev => prev - 1); // Go to previous step in the checkout
+    }
+  };
+
+  const getBackButtonText = () => {
+      if (currentStep === 1) return '< Back to Booking';
+      if (currentStep === 2) return '< Back to Cart';
+      if (currentStep === 3) return '< Back to Info';
+  };
+
     const handleFinalSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
