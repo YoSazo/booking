@@ -102,26 +102,33 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const paymentHeaderRef = useRef(null);
 
 
     useEffect(() => {
-        // If we are on the payment step and the input ref is set, blur it.
-        if (currentStep === 3 && addressInputRef.current) {
-            addressInputRef.current.blur();
+        // When the user gets to the payment step...
+        if (currentStep === 3 && paymentHeaderRef.current) {
+            // ...set focus to the image to prevent the keyboard from opening.
+            // We also add a timeout to ensure this runs after the DOM has fully updated.
+            setTimeout(() => {
+                paymentHeaderRef.current.focus();
+            }, 0);
         }
     }, [currentStep]);
 
     const handleAddressPaste = (e) => {
-        // We need to wait a moment for the pasted value to be reflected in the input
+        // The timeout gives the input field a moment to register the pasted value
         setTimeout(() => {
-            if (addressInputRef.current) {
-                // This simulates a keydown event, which tricks the Autocomplete into showing suggestions
+            const input = e.target;
+            if (input) {
+                // By dispatching a "keydown" event, we simulate user input
+                // and trigger the Autocomplete suggestions.
                 const event = new KeyboardEvent('keydown', {
                     key: 'ArrowDown',
                     bubbles: true,
                     cancelable: true,
                 });
-                addressInputRef.current.dispatchEvent(event);
+                input.dispatchEvent(event);
             }
         }, 100);
     };
@@ -330,6 +337,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                     src="/stripe-checkout.png" 
                     alt="Guaranteed safe and secure checkout" 
                     className="stripe-badge-image" 
+                    tabIndex="-1" // Makes the image focusable but not part of the tab order
                   />
                   {clientSecret ? (
                     <>
@@ -356,7 +364,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 onChange={handleChange} 
                                 required 
                                 placeholder="Start typing..." 
-                                ref={addressInputRef}
                                 onPaste={handleAddressPaste}
                               />
                             </Autocomplete>
