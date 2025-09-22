@@ -122,30 +122,38 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     };
 
     const validateInfoStep = () => {
-        const errors = {};
-        if (!formData.firstName.trim()) errors.firstName = "First name is required.";
-        if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
-        if (!formData.email.trim()) {
-            errors.email = "Email is required.";
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-            errors.email = "Please enter a valid email address.";
-        }
-        
-        if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
-        
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
-        if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
+  const errors = {};
 
-        if (Object.keys(errors).length > 0) {
-          setErrorMessage(Object.values(errors)[0]); // show first error
-          return false;
-        }
+  if (!formData.firstName.trim()) {
+    errors.firstName = "First name is required.";
+  }
+  if (!formData.lastName.trim()) {
+    errors.lastName = "Last name is required.";
+  }
+  if (!formData.email.trim()) {
+    errors.email = "Email is required.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    errors.email = "Please enter a valid email address.";
+  }
 
-          return true;
-    };
+  if (formData.phone.replace(/\D/g, '').length < 11) {
+    errors.phone = "A valid phone number is required.";
+  }
+
+  if (!formData.address || formData.address.trim() === "") {
+    errors.address = "Please fill out your billing address before proceeding.";
+  }
+
+  setFormErrors(errors);
+
+  if (Object.keys(errors).length > 0) {
+    setErrorMessage(Object.values(errors)[0]); // show the first error
+    return false;
+  }
+
+  setErrorMessage(""); // clear any old errors
+  return true;
+};
 
     const handleNextStep = () => {
         if (currentStep === 2) {
