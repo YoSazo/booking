@@ -358,15 +358,17 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                             <label>Billing Address</label>
                             <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                               <input 
-                                type="text" 
-                                name="address" 
-                                value={formData.address} 
-                                onChange={handleChange} 
-                                required 
-                                placeholder="Start typing..." 
-                                onPaste={handleAddressPaste}
-                              />
-                            </Autocomplete>
+                              type="text"
+                              name="address"
+                              value={formData.address}
+                              onChange={handleChange}
+                              placeholder="Start typing..."
+                              required
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
+                              onPaste={handleAddressPaste}
+                            />
+                          </Autocomplete>
                           </div>
                           {isAddressSelected && (
                             <div className="address-reveal-container visible">
