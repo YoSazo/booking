@@ -249,37 +249,33 @@ const validatePaymentStep = () => {
   }
 
   if (currentStep === 3) {
-    // ✅ Only validate when submitting
-    if (!validatePaymentStep()) return;
+  // ✅ Only call validatePaymentStep here
+  if (!validatePaymentStep()) return;
 
-    setIsProcessing(true);
-    setErrorMessage('');
+  setIsProcessing(true);
+  setErrorMessage('');
 
-    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+  sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+  sessionStorage.setItem('guestInfo', JSON.stringify(formData));
 
-    try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          receipt_email: formData.email,
-          return_url: `${window.location.origin}/confirmation`,
-        },
-        redirect: 'if_required',
-      });
+  const { error, paymentIntent } = await stripe.confirmPayment({
+    elements,
+    confirmParams: {
+      receipt_email: formData.email,
+      return_url: `${window.location.origin}/confirmation`,
+    },
+    redirect: 'if_required'
+  });
 
-      if (error) {
-        setErrorMessage(error.message || "An unexpected error occurred.");
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        onComplete(formData, paymentIntent.id);
-      }
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("An unexpected error occurred.");
-    } finally {
-      setIsProcessing(false);
-    }
+  if (error) {
+    setErrorMessage(error.message || "An unexpected error occurred.");
+  } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+    onComplete(formData, paymentIntent.id);
   }
+
+  setIsProcessing(false);
+}
+
 };        
   
     if (!bookingDetails) {
