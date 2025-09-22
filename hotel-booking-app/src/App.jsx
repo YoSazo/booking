@@ -49,7 +49,7 @@ function App() {
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
-  const [clientSecret, setClientSecret] = useState('');
+  const [clientSecret, setClientSecret] = useState(() => sessionStorage.getItem('clientSecret') || '');
 
   useEffect(() => {
     const today = new Date();
@@ -63,7 +63,8 @@ function App() {
     if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
     if (guestInfo) sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
     if (reservationCode) sessionStorage.setItem('reservationCode', reservationCode);
-  }, [finalBooking, guestInfo, reservationCode]);
+    if (clientSecret) sessionStorage.setItem('clientSecret', clientSecret);
+  }, [finalBooking, guestInfo, reservationCode, clientSecret]);
 
   const checkAvailability = async (start, end) => {
     if (!start || !end || currentHotel.pms.toLowerCase() !== 'cloudbeds') {
