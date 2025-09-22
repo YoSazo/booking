@@ -12,14 +12,15 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const [paymentRequest, setPaymentRequest] = useState(null);
 
     const handleWalletClick = (e) => {
-        if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-            // Prevents the Stripe payment sheet from opening
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        }
-        setErrorMessage('');
-    };
+  if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
+    // just block, but don't set error yet
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }
+  // no need to clear error here — validation handles it
+  return true;
+};
 
 
     // This logic is self-contained and correct.
