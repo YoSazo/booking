@@ -89,10 +89,18 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
         if (!stripe || !elements) return;
         setIsProcessing(true);
 
+        if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
+            setErrorMessage("Please fill out your billing address before proceeding.");
+            return;
+        }
+
+        setIsProcessing(true);
+        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+        sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
         const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
-            confirmParams: { receipt_email: guestInfo.email, return_url: `${window.location.origin}/confirmation`,},
-            redirect: 'if_required' 
+            confirmParams: { receipt_email: guestInfo.email, return_url: `${window.location.origin}/confirmation` },
+            redirect: 'if_required'
         });
 
         if (error) {

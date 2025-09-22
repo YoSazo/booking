@@ -268,7 +268,7 @@ function App() {
         />
       )}
       
-      {!isCalendarOpen && <HelpWidget phone={currentHotel.phone} />}
+      {/* {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />} */}
     </>
   );
 }
