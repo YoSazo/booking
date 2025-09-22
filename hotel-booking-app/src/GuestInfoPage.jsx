@@ -311,7 +311,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 {/* --- Step 3 Content: Payment and Billing Address --- */}
                 {currentStep === 3 && (
                     <div className="payment-placeholder">
-                      <StripeBadge />
+                      <img 
+                          src="/stripe-checkout.png" 
+                          alt="Guaranteed safe and secure checkout" 
+                          className="stripe-badge-image" 
+                      />
                       {clientSecret ? (
                         <Elements options={stripeOptions} stripe={stripePromise}>
                           <CheckoutForm 
