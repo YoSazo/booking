@@ -6,7 +6,7 @@ import { loadStripe } from '@stripe/stripe-js';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // This component displays the Stripe elements and the final 'Pay' button
-const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete }) => {
+const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete, errorMessage, setErrorMessage, isProcessing, setIsProcessing }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [paymentRequest, setPaymentRequest] = useState(null);
@@ -72,6 +72,8 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
+    const stripe = useStripe();
+    const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
