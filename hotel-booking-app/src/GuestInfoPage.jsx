@@ -159,6 +159,48 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
         setIsAddressSelected(true);
     };
+
+    const handleFinalSubmit = async (e) => {
+        e.preventDefault();
+        if (!stripe || !elements) return;
+
+        if (currentStep === 2) { // If on the info step, validate and move to payment
+            if (validateInfoStep()) {
+                setFormErrors({});
+                setCurrentStep(3);
+            }
+            return;
+        }
+
+        if (currentStep === 3) { // If on the payment step, process the payment
+            if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+                setErrorMessage("Please fill out your billing address before proceeding.");
+                return;
+            }
+
+            setIsProcessing(true);
+            setErrorMessage('');
+
+            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+            sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+            
+            const { error, paymentIntent } = await stripe.confirmPayment({
+                elements,
+                confirmParams: {
+                    receipt_email: formData.email,
+                    return_url: `${window.location.origin}/confirmation`,
+                },
+                redirect: 'if_required'
+            });
+
+            if (error) {
+                setErrorMessage(error.message || "An unexpected error occurred.");
+            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+                onComplete(formData, paymentIntent.id);
+            }
+            setIsProcessing(false);
+        }
+    };
     
     if (!bookingDetails) {
         return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
@@ -198,7 +240,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
                 {/* --- RESTORED: All original JSX for your steps is back --- */}
                 {currentStep === 1 && (
-                    <div className="info-summary">
+                    <div className="info-summary-wrapper" style={{ display: currentStep === 1 ? 'block' : 'none' }}>
                         <div className="summary-card-details">
                             <p className="detail-line">{bookingDetails.name}</p>
                             <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
@@ -216,9 +258,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     </div>
                 )}
                 
-                {currentStep === 2 && (
-                    <div className="form-grid">
-                        <div className="form-field">
+                <form id="main-checkout-form" onSubmit={handleFinalSubmit}>
+                    <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
+                        <div className="form-grid">
                             <label>First Name</label>
                             <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
                             {formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}
@@ -239,9 +281,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                             {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                         </div>
                     </div>
-                )}
 
-                {currentStep === 3 && (
+                <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
                      <div className="payment-placeholder">
                         <img src="/stripe-checkout.png" alt="Guaranteed safe and secure checkout" className="stripe-badge-image" />
                         {clientSecret ? (
@@ -272,22 +313,25 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                             </Elements>
                         ) : ( <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p> )}
                     </div>
-                )}
+                </div>
+                </form>
                 
                 {/* --- This button is now outside the forms and is conditionally sticky --- */}
                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
-                    {currentStep < 3 && (
-                        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
-                            {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
-                        </button>
-                    )}
-                    <div className="checkout-cta-container">
-                      <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
-                        {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
-                      </button>
-                      {errorMessage && <div className="error-message">{errorMessage}</div>}
-                    </div>
+                    {/* --- FIXED: The logic here is simplified. The button type changes based on the step --- */}
+                    <button 
+                        type={currentStep < 3 ? "button" : "submit"} 
+                        form={currentStep === 3 ? "main-checkout-form" : undefined}
+                        className="btn btn-confirm" 
+                        onClick={currentStep < 3 ? handleNextStep : undefined}
+                        disabled={currentStep === 3 && (isProcessing || !stripe || !elements)}
+                    >
+                        { currentStep === 1 && "Proceed to Info" }
+                        { currentStep === 2 && "Proceed to Payment" }
+                        { currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`) }
+                    </button>
                 </div>
+                {errorMessage && currentStep === 3 && <div className="error-message" style={{textAlign: 'center', marginTop: '-10px'}}>{errorMessage}</div>}
             </div>
         </>
     );

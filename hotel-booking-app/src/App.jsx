@@ -48,7 +48,8 @@ function App() {
 
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
-   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
+  const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
+  const [clientSecret, setClientSecret] = useState('');
 
   useEffect(() => {
     const today = new Date();
@@ -126,7 +127,7 @@ function App() {
     return result;
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = async () => {
     if (!selectedRoom) {
       alert("Please select a room first.");
       return;
@@ -150,9 +151,24 @@ function App() {
       reservationCode: ourReservationCode
     });
 
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: finalBookingData.subtotal / 2 }),
+        });
+        const data = await response.json();
+        if (data.clientSecret) {
+            setClientSecret(data.clientSecret);
+        }
+    } catch (error) {
+        console.error("Failed to pre-fetch client secret:", error);
+    }
+    // --- END OF ADDED LOGIC ---
+
     navigate('/guest-info');
     window.scrollTo(0, 0);
-  };
+};
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
