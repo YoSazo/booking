@@ -368,17 +368,23 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 }
 
 // The wrapper provides the Stripe context to the entire page.
-function GuestInfoPageWrapper(props) {
-    const stripeOptions = {
-        appearance: { theme: 'stripe' },
-        locale: 'en'
-    };
+function GuestInfoPageWrapper({ clientSecret, ...props }) {
+  if (!clientSecret) {
+    return <p style={{ textAlign: "center", padding: "50px" }}>Loading payment form...</p>;
+  }
 
-    return (
-        <Elements stripe={stripePromise} options={stripeOptions}>
-            <GuestInfoPage {...props} />
-        </Elements>
-    );
+  return (
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        appearance: { theme: "stripe" },
+        locale: "en",
+      }}
+    >
+      <GuestInfoPage {...props} />
+    </Elements>
+  );
 }
 
 export default GuestInfoPageWrapper;
