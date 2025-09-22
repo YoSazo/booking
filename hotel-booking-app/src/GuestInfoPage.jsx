@@ -106,14 +106,14 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
 
     useEffect(() => {
-        // When the user gets to the payment step...
-        if (currentStep === 3 && paymentHeaderRef.current) {
-            // ...set focus to the image to prevent the keyboard from opening.
-            // We also add a timeout to ensure this runs after the DOM has fully updated.
-            setTimeout(() => {
-                paymentHeaderRef.current.focus();
-            }, 0);
+      // When the payment step becomes active...
+      if (currentStep === 3) {
+        // ...find whatever element has focus and tell it to blur.
+        // This prevents the keyboard from automatically opening on mobile.
+        if (document.activeElement) {
+          document.activeElement.blur();
         }
+      }
     }, [currentStep]);
 
     const handleAddressPaste = (e) => {
@@ -267,7 +267,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             {/* --- FIXED: The padding is now applied correctly here --- */}
             <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button" autoFocus={currentStep === 3}>{getBackButtonText()}</button>
+                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
                 </div>
 
@@ -358,17 +358,15 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                             <label>Billing Address</label>
                             <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                               <input 
-                              type="text"
-                              name="address"
-                              value={formData.address}
-                              onChange={handleChange}
-                              placeholder="Start typing..."
-                              required
-                              readOnly
-                              onFocus={(e) => e.target.removeAttribute('readonly')}
-                              onPaste={handleAddressPaste}
-                            />
-                          </Autocomplete>
+                                type="text" 
+                                name="address" 
+                                value={formData.address} 
+                                onChange={handleChange} 
+                                required 
+                                placeholder="Start typing..." 
+                                onPaste={handleAddressPaste}
+                              />
+                            </Autocomplete>
                           </div>
                           {isAddressSelected && (
                             <div className="address-reveal-container visible">
