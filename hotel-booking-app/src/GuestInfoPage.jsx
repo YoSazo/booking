@@ -267,7 +267,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             {/* --- FIXED: The padding is now applied correctly here --- */}
             <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
+                    <button onClick={handleBackStep} className="back-button" autoFocus={currentStep === 3}>{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
                 </div>
 
