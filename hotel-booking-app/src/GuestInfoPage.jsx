@@ -121,39 +121,57 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         }, 100);
     };
 
-    const validateInfoStep = () => {
+    // ---- Validators ----
+const validateInfoStep = () => {
   const errors = {};
 
-  if (!formData.firstName.trim()) {
-    errors.firstName = "First name is required.";
-  }
-  if (!formData.lastName.trim()) {
-    errors.lastName = "Last name is required.";
-  }
+  if (!formData.firstName.trim()) errors.firstName = "First name is required.";
+  if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
   if (!formData.email.trim()) {
     errors.email = "Email is required.";
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
     errors.email = "Please enter a valid email address.";
   }
-
   if (formData.phone.replace(/\D/g, '').length < 11) {
     errors.phone = "A valid phone number is required.";
   }
 
-  if (!formData.address || formData.address.trim() === "") {
-    errors.address = "Please fill out your billing address before proceeding.";
-  }
-
-  setFormErrors(errors);
-
+  setFormErrors(prev => ({ ...prev, ...errors }));
   if (Object.keys(errors).length > 0) {
-    setErrorMessage(Object.values(errors)[0]); // show the first error
+    setErrorMessage(Object.values(errors)[0]);
     return false;
   }
 
-  setErrorMessage(""); // clear any old errors
+  setErrorMessage(''); // clear any old messages
   return true;
 };
+
+const validatePaymentStep = () => {
+  const errors = {};
+
+  if (!formData.address || formData.address.trim() === "") {
+    errors.address = "Please fill out your billing address before proceeding.";
+  }
+  if (!formData.city || formData.city.trim() === "") {
+    errors.city = "City is required.";
+  }
+  if (!formData.state || formData.state.trim() === "") {
+    errors.state = "State is required.";
+  }
+  if (!formData.zip || formData.zip.trim() === "") {
+    errors.zip = "Zip is required.";
+  }
+
+  setFormErrors(prev => ({ ...prev, ...errors }));
+  if (Object.keys(errors).length > 0) {
+    setErrorMessage(Object.values(errors)[0]);
+    return false;
+  }
+
+  setErrorMessage('');
+  return true;
+};
+
 
     const handleNextStep = () => {
         if (currentStep === 2) {
@@ -216,22 +234,25 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     };
 
     const handleFinalSubmit = async (e) => {
-        e.preventDefault();
-        if (!stripe || !elements) return;
+  e.preventDefault();
+  if (!stripe || !elements) return;
 
-        if (currentStep === 2) { // If on the info step, validate and move to payment
-            if (validateInfoStep()) {
-                setFormErrors({});
-                setCurrentStep(3);
-            }
-            return;
-        }
+  if (currentStep === 2) {
+    // validate info and move to payment
+    if (validateInfoStep()) {
+      setFormErrors({});
+      setCurrentStep(3);
+    }
+    return;
+  }
 
         if (currentStep === 3) { // If on the payment step, process the payment
             if (!formData.address || !formData.city || !formData.state || !formData.zip) {
                 setErrorMessage("Please fill out your billing address before proceeding.");
                 return;
             }
+
+            if (!validatePaymentStep()) return;
 
             setIsProcessing(true);
             setErrorMessage('');
@@ -368,13 +389,26 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 type="text" 
                                 name="address" 
                                 value={formData.address} 
-                                onChange={handleChange} 
-                                required 
-                                placeholder="Start typing..." 
-                                readOnly
-                                onTouchStart={(e) => e.target.removeAttribute('readonly')}
-                                onPaste={handleAddressPaste}
-                              />
+                                onChange={(e) => {
+      handleChange(e);
+      // clear address error as soon as user types
+      if (formErrors.address) setFormErrors(prev => ({ ...prev, address: '' }));
+      if (errorMessage && errorMessage.includes('billing address')) setErrorMessage('');
+    }}
+    placeholder="Start typing..." 
+    // you can remove `required` to avoid browser native popup;
+    // rely on our validatePaymentStep for consistent UX.
+    readOnly
+    onTouchStart={(e) => {
+      // allow first-touch to open keyboard reliably
+      e.target.removeAttribute('readonly');
+      // clear previous error if any
+      setErrorMessage('');
+      setFormErrors(prev => ({ ...prev, address: '' }));
+    }}
+    onPaste={handleAddressPaste}
+  />
+
                             </Autocomplete>
                           </div>
                           {isAddressSelected && (
