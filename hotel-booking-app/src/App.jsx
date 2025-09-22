@@ -144,7 +144,6 @@ function App() {
 
     trackInitiateCheckout({ ...selectedRoom, subtotal });
 
-    // ✅ Store booking in a variable
     const newBooking = {
         ...selectedRoom,
         checkin: checkinDate,
@@ -156,10 +155,9 @@ function App() {
         reservationCode: ourReservationCode
     };
 
-    // Update state
     setFinalBooking(newBooking);
 
-    // Use the variable to prefetch payment intent
+    // Wait for client secret before navigating
     try {
         const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
             method: 'POST',
@@ -169,14 +167,18 @@ function App() {
         const data = await response.json();
         if (data.clientSecret) {
             setClientSecret(data.clientSecret);
+            // Only navigate AFTER client secret is ready
+            navigate('/guest-info');
+            window.scrollTo(0, 0);
+        } else {
+            alert("Failed to load payment form. Please try again.");
         }
     } catch (error) {
         console.error("Failed to pre-fetch client secret:", error);
+        alert("Failed to load payment form. Please try again.");
     }
-
-    navigate('/guest-info');
-    window.scrollTo(0, 0);
 };
+
 
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
