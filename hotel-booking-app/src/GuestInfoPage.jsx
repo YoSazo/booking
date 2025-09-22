@@ -138,6 +138,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
+
+        if (Object.keys(errors).length > 0) {
+          setErrorMessage(Object.values(errors)[0]); // show first error
+          return false;
+        }
+
+          return true;
     };
 
     const handleNextStep = () => {
@@ -357,7 +364,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 required 
                                 placeholder="Start typing..." 
                                 readOnly
-                                onFocus={(e) => e.target.removeAttribute('readonly')}
+                                onTouchStart={(e) => e.target.removeAttribute('readonly')}
                                 onPaste={handleAddressPaste}
                               />
                             </Autocomplete>
