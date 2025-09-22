@@ -16,7 +16,6 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
             // Prevents the Stripe payment sheet from opening
             e.preventDefault();
             e.stopPropagation();
-            setErrorMessage("Please fill out your billing address before proceeding.");
             return false;
         }
         setErrorMessage('');
