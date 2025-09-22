@@ -10,7 +10,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret }) => {
     const stripe = useStripe();
     const [paymentRequest, setPaymentRequest] = useState(null);
     const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-
+    const [errorMessage, setErrorMessage] = useState(''); // Manages payment-specific errors
     useEffect(() => {
         if (!stripe || !clientSecret) return;
         const pr = stripe.paymentRequest({
@@ -35,13 +35,20 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret }) => {
     }, [stripe, clientSecret, amountInCents, bookingDetails, guestInfo]);
 
     return (
-        <div className="secure-payment-frame">
-            {paymentRequest && (
-                 <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />
-            )}
-            {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
-            <PaymentElement />
-        </div>
+        // The form now has its own ID and submit handler
+        <form id="payment-form" onSubmit={handleSubmit}> 
+            <div className="secure-payment-frame">
+                {/* ... Payment buttons and divider ... */}
+                <PaymentElement />
+            </div>
+            {/* The final 'Pay' button is now part of this form */}
+            <div className="checkout-cta-container">
+                 <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
+                    {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
+                </button>
+                {errorMessage && <div className="error-message">{errorMessage}</div>}
+            </div>
+        </form>
     );
 };
 
@@ -60,7 +67,19 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    useEffect(() => {
+        if (currentStep < 3) {
+            document.body.style.paddingBottom = '120px';
+        } else {
+            document.body.style.paddingBottom = '0px';
+        }
+        // Cleanup function to remove padding when the component unmounts
+        return () => {
+            document.body.style.paddingBottom = '0px';
+        };
+    }, [currentStep]);
 
+    
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
             // --- FIXED: Changed `apiBase.url` to the correct `apiBaseUrl` prop ---
