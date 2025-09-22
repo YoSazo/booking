@@ -151,47 +151,33 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
 };
 
 
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
+  // --- NEW: State to manage which step of the checkout we are on ---
+  const [currentStep, setCurrentStep] = useState(1); // 1: Review, 2: Info, 3: Payment
+  
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', address: '', city: '', state: '', zip: '',
-    phone: '+1 ', email: '',
+    firstName: '', lastName: '', phone: '+1 ', email: '',
+    address: '', city: '', state: '', zip: '',
   });
+
   const [formErrors, setFormErrors] = useState({});
   const [autocomplete, setAutocomplete] = useState(null);
   const [clientSecret, setClientSecret] = useState('');
+  const [isAddressSelected, setIsAddressSelected] = useState(false);
 
   useEffect(() => {
-    // We check for bookingDetails.subtotal now, not bookingDetails.total
     if (bookingDetails && bookingDetails.subtotal) {
-
-        // --- THIS IS THE CORRECTED FETCH CALL ---
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            // The body now ONLY contains the amount, which is what the server expects.
             body: JSON.stringify({ 
                 amount: bookingDetails.subtotal / 2, hotelUrl: hotel.url
             }),
         })
-        .then((res) => {
-            if (!res.ok) {
-                // This makes the error message more descriptive
-                throw new Error('Failed to create payment intent');
-            }
-            return res.json();
-        })
-        .then((data) => {
-             if (!data.clientSecret) {
-                throw new Error("Client secret not received from server.");
-             }
-             setClientSecret(data.clientSecret)
-        })
-        .catch(error => {
-            // This will now log the detailed error to your browser console
-            console.error("Error fetching client secret:", error);
-        });
+        .then((res) => res.json())
+        .then((data) => setClientSecret(data.clientSecret));
     }
-}, [bookingDetails, apiBaseUrl]);
+  }, [bookingDetails, apiBaseUrl, hotel.url]);
 
   const handlePhoneChange = (e) => {
     let value = e.target.value;
@@ -233,6 +219,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
     } else {
       console.log('Autocomplete is not loaded yet!');
     }
+    setIsAddressSelected(true);
   };
   
   const priceToday = bookingDetails.subtotal / 2;
@@ -240,6 +227,22 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
   
   // FIX: Add explicit locale for stability on iOS/WebKit browsers
   const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
+  const handleNextStep = () => {
+      // Validate the simplified form before moving to payment
+      if (currentStep === 2) {
+          if (!formData.firstName || !formData.lastName || !formData.phone || !formData.email) {
+              alert("Please fill out all your information before proceeding.");
+              return;
+          }
+      }
+      setCurrentStep(prev => prev + 1);
+  };
+  const getProgressWidth = () => {
+      if (currentStep === 1) return '0%';
+      if (currentStep === 2) return '50%';
+      if (currentStep === 3) return '100%';
+      return '0%';
+  };
 
   return (
     <>
@@ -250,59 +253,109 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete , apiBaseUrl 
         <div className="guest-info-header">
           <button onClick={onBack} className="back-button">&lt; Back to Booking</button>
           <h1>Guest Information</h1>
-          <p>Please provide your details to complete the booking.</p>
         </div>
-        <div className="info-summary">
-            <div className="summary-card-details">
-              <p className="detail-line">{bookingDetails.name}</p>
-              <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
-              <p className="detail-line">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</p>
+
+        {/* --- NEW: The Progress Bar --- */}
+        <div className="checkout-progress-bar">
+            <div className="progress-step completed">
+                <div className="step-circle"></div>
+                <span className="step-name">Review Cart</span>
             </div>
-            <div className="summary-card-price">
-              <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
-              <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
-              <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
-              <div className="total-breakdown">
-                <p className="pay-today">Only Pay ${priceToday.toFixed(2)} Today</p>
-                <p className="balance-due">Balance (${balanceDue.toFixed(2)}) When you arrive</p>
+            <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
+                <div className="step-circle"></div>
+                <span className="step-name">Info</span>
+            </div>
+            <div className={`progress-step ${currentStep === 3 ? 'active' : ''}`}>
+                <div className="step-circle"></div>
+                <span className="step-name">Payment</span>
+            </div>
+            <div className="progress-line"><div className="progress-line-fill" style={{width: getProgressWidth()}}></div></div>
+        </div>
+
+        {/* --- Step 1: Review Cart --- */}
+        {currentStep === 1 && (
+            <div className="info-summary">
+              <div className="summary-card-details">
+                <p className="detail-line">{bookingDetails.name}</p>
+                <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
+                <p className="detail-line">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</p>
+              </div>
+              <div className="summary-card-price">
+                <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
+                <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
+                <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
+                <div className="total-breakdown">
+                  <p className="pay-today">Only Pay ${priceToday.toFixed(2)} Today</p>
+                  <p className="balance-due">Balance (${balanceDue.toFixed(2)}) When you arrive</p>
+                </div>
               </div>
             </div>
-        </div>
-        <div className="guest-info-form">
-          <div className="form-grid">
-            <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required/></div>
-            <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required/></div>
-            <div className="form-field full-width">
-              <label>Address</label>
-              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
-              </Autocomplete>
+        )}
+
+        {/* --- Step 2 & 3: Main Form Container --- */}
+        {currentStep > 1 && (
+            <div className="guest-info-form">
+                {/* --- Step 2 Content: Simplified Info Form --- */}
+                {currentStep === 2 && (
+                    <div className="form-grid">
+                        <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required/></div>
+                        <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required/></div>
+                        <div className="form-field"><label>Phone Number</label>
+                          <input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} />
+                          {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
+                        </div>
+                        <div className="form-field"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required/></div>
+                    </div>
+                )}
+
+                {/* --- Step 3 Content: Payment and Billing Address --- */}
+                {currentStep === 3 && (
+                    <div className="payment-placeholder">
+                      <StripeBadge />
+                      {clientSecret ? (
+                        <Elements options={stripeOptions} stripe={stripePromise}>
+                          <CheckoutForm 
+                              bookingDetails={bookingDetails} 
+                              guestInfo={formData} 
+                              onComplete={onComplete} 
+                              clientSecret={clientSecret}
+                          />
+                        </Elements>
+                      ) : ( <p>Loading...</p> )}
+                      
+                      <div className="billing-address-section">
+                          <h4 className="billing-address-title">Billing Address</h4>
+                          <div className="form-grid">
+                            <div className="form-field full-width">
+                              <label>Address</label>
+                              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
+                              </Autocomplete>
+                            </div>
+                            <div className={`address-reveal-container ${isAddressSelected ? 'visible' : ''}`}>
+                              {isAddressSelected && (
+                                <>
+                                  <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
+                                  <div className="form-field"><label>State / Province</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
+                                  <div className="form-field"><label>Zip / Postal Code</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                      </div>
+                    </div>
+                )}
             </div>
-            <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
-            <div className="form-field"><label>State / Province</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
-            <div className="form-field"><label>Zip / Postal Code</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
-            <div className="form-field"><label>Phone Number</label>
-              <input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} />
-              {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
+        )}
+        
+        {/* --- The Main CTA Button (hidden on the final payment step) --- */}
+        {currentStep < 3 && (
+            <div className="checkout-cta-container">
+                 <button className="btn btn-confirm" style={{width: '100%'}} onClick={handleNextStep}>
+                    {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
+                </button>
             </div>
-            <div className="form-field full-width"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required/></div>
-          </div>
-          <div className="payment-placeholder">
-            <img src="/stripe-checkout.png" alt="Powered by Stripe" className="stripe-badge-image" />
-            {clientSecret ? (
-              <Elements options={stripeOptions} stripe={stripePromise}>
-                <CheckoutForm 
-                    bookingDetails={bookingDetails} 
-                    guestInfo={formData} 
-                    onComplete={onComplete} 
-                    clientSecret={clientSecret}
-                />
-              </Elements>
-            ) : (
-              <p style={{textAlign: 'center'}}>Loading secure payment form...</p>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </>
   );
