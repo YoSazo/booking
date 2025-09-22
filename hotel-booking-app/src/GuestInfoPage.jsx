@@ -8,10 +8,6 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // UPDATED PROPS: clientSecret is now required here
 const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) => {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
     // State for the Payment Request object (Apple Pay / Google Pay)
     const [paymentRequest, setPaymentRequest] = useState(null);
     const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
@@ -173,6 +169,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
   const [clientSecret, setClientSecret] = useState('');
   const [isAddressSelected, setIsAddressSelected] = useState(false);
 
+
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   useEffect(() => {
     if (bookingDetails && bookingDetails.subtotal) {
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
@@ -238,9 +239,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
   const handleNextStep = () => {
       // Validate the simplified form before moving to payment
       if (currentStep === 2) {
-          if (!formData.firstName || !formData.lastName || !formData.phone || !formData.email) {
-              alert("Please fill out all your information before proceeding.");
-              return;
+          if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+            setErrorMessage("Please fill out your billing address before proceeding.");
+            return; // Exit the function early
           }
       }
       setCurrentStep(prev => prev + 1);
