@@ -6,9 +6,11 @@ import { loadStripe } from '@stripe/stripe-js';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // This component displays the Stripe elements and the final 'Pay' button
-const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete, onStatusChange }) => {
+const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete }) => {
     const stripe = useStripe();
     const elements = useElements();
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     const [paymentRequest, setPaymentRequest] = useState(null);
 
     // This logic is self-contained and correct.
@@ -38,10 +40,11 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         e.preventDefault();
         if (!stripe || !elements) return;
         if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-            onStatusChange({ errorMessage: "Please fill out your billing address before proceeding." });
+            setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
-        onStatusChange({ isProcessing: true, errorMessage: '' });
+        setIsProcessing(true);
+        setErrorMessage('');
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
         const { error, paymentIntent } = await stripe.confirmPayment({
@@ -53,11 +56,11 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
             redirect: 'if_required'
         });
         if (error) {
-            onStatusChange({ errorMessage: error.message || "An unexpected error occurred." });
+            setErrorMessage(error.message || "An unexpected error occurred.");
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
             onComplete(guestInfo, paymentIntent.id);
         }
-        onStatusChange({ isProcessing: false });
+        setIsProcessing(false);
     };
 
     return (
@@ -67,8 +70,8 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
                 {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
                 <PaymentElement />
             </div>
-            {/* CTA removed from here - rendered by parent so it's outside the form */}
         </form>
+        
     );
 };
 
@@ -84,9 +87,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
-    // lifted state for final CTA control
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
@@ -252,10 +252,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                     guestInfo={formData} 
                                     onComplete={onComplete}
                                     clientSecret={clientSecret}
-                                    onStatusChange={({ isProcessing: p, errorMessage: e } = {}) => {
-                                        if (typeof p !== 'undefined') setIsProcessing(p);
-                                        if (typeof e !== 'undefined') setErrorMessage(e);
-                                    }}
                                 />
                                 <div className="billing-address-section">
                                     <div className="form-grid">
@@ -280,20 +276,26 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 )}
                 
                 {/* --- This button is now outside the forms and is conditionally sticky --- */}
-                {/* --- MOVED: final CTA is outside the payment form and placed at the end of the container --- */}
                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
+                    {currentStep < 3 && (
+                        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
+                            {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
+                        </button>
+                    )}
+                    <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
                     {currentStep < 3 ? (
                         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                             {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
                         </button>
                     ) : (
                         <>
-                            <button type="submit" form="payment-form" disabled={isProcessing} className="btn btn-confirm">
+                            <button type="submit" form="main-checkout-form" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
                                 {isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`}
                             </button>
                             {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
                         </>
                     )}
+                    </div>
                 </div>
             </div>
         </>
