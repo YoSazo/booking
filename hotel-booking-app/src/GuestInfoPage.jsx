@@ -11,6 +11,18 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const elements = useElements();
     const [paymentRequest, setPaymentRequest] = useState(null);
 
+    const handleWalletClick = (e) => {
+        if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
+            // Prevents the Stripe payment sheet from opening
+            e.preventDefault();
+            e.stopPropagation();
+            setErrorMessage("Please fill out your billing address before proceeding.");
+            return false;
+        }
+        setErrorMessage('');
+    };
+
+
     // This logic is self-contained and correct.
     useEffect(() => {
         if (!stripe || !clientSecret || !bookingDetails) return;
@@ -55,15 +67,19 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         });
         if (error) {
             setErrorMessage(error.message || "An unexpected error occurred.");
+            setIsProcessing(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
             onComplete(guestInfo, paymentIntent.id);
         }
-        setIsProcessing(false);
     };
 
     return (
     <div className="secure-payment-frame">
-        {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
+        {/* MODIFICATION 2: Wrap the button element in a div with the click handler */}
+        <div onClickCapture={handleWalletClick}>
+            {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
+        </div>
+
         {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
         <PaymentElement />
     </div>
