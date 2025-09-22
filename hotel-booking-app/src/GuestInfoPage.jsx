@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
 import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -91,6 +91,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
+    const addressInputRef = useRef(null);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
@@ -102,6 +103,28 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
+
+    useEffect(() => {
+        // If we are on the payment step and the input ref is set, blur it.
+        if (currentStep === 3 && addressInputRef.current) {
+            addressInputRef.current.blur();
+        }
+    }, [currentStep]);
+
+    const handleAddressPaste = (e) => {
+        // We need to wait a moment for the pasted value to be reflected in the input
+        setTimeout(() => {
+            if (addressInputRef.current) {
+                // This simulates a keydown event, which tricks the Autocomplete into showing suggestions
+                const event = new KeyboardEvent('keydown', {
+                    key: 'ArrowDown',
+                    bubbles: true,
+                    cancelable: true,
+                });
+                addressInputRef.current.dispatchEvent(event);
+            }
+        }, 100);
+    };
 
     const validateInfoStep = () => {
         const errors = {};
@@ -333,6 +356,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 onChange={handleChange} 
                                 required 
                                 placeholder="Start typing..." 
+                                ref={addressInputRef}
+                                onPaste={handleAddressPaste}
                               />
                             </Autocomplete>
                           </div>
