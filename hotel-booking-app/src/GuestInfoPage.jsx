@@ -84,7 +84,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    
+
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
             fetch(`${apiBaseUrl}/api/create-payment-intent`, {
@@ -258,7 +258,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 
                 <form id="main-checkout-form" onSubmit={handleFinalSubmit}>
                     <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
-                        <div className="form-grid">
+                        <div className="form-field">
                             <label>First Name</label>
                             <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
                             {formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}
@@ -349,5 +349,5 @@ function GuestInfoPageWrapper(props) {
     );
 }
 
-// Make sure this export line is the very last line
+// Make sure this is the very last line, exporting the WRAPPER, not the page.
 export default GuestInfoPageWrapper;
