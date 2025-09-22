@@ -328,7 +328,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                         { currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`) }
                     </button>
                 </div>
-                {errorMessage && currentStep === 3 && <div className="error-message" style={{textAlign: 'center', marginTop: '-10px'}}>{errorMessage}</div>}
+                disabled={currentStep === 3}
             </div>
         </>
     );
@@ -336,7 +336,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    // This component does not need to call useStripe() itself.
     return (
         <Elements stripe={stripePromise}>
             <GuestInfoPage {...props} />
@@ -344,4 +343,5 @@ function GuestInfoPageWrapper(props) {
     );
 }}
 
+// Make sure this export line is the very last line
 export default GuestInfoPageWrapper;
