@@ -188,7 +188,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             </div>
             <div className="container-single-column">
                 <div className="guest-info-header">
-                    <button onClick={onBack} className="back-button">&lt; Back to Booking</button>
+                  <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
+                    <button onClick={handleBackStep} className="back-button">
+                        {getBackButtonText()}
+                    </button>
+
                     <h1>Guest Information</h1>
                 </div>
 

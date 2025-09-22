@@ -1500,21 +1500,32 @@ body {
 }
 
 /* Styles for the main action button at the bottom */
+/* Styles for the main action button at the bottom */
 .checkout-cta-container {
-    /* --- UPDATED: These new rules make the button "sticky" --- */
+    /* --- UPDATED: These new rules make the container a transparent sticky bar --- */
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    background-color: #fff;
-    padding: 16px; /* 1rem */
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1); /* Adds a subtle shadow */
-    z-index: 10; /* Ensures it's on top of other content */
-    /* ----------------------------------------------------------- */
+    background-color: transparent; /* Makes the container invisible */
+    padding: 16px 0; /* Vertical padding, no horizontal */
+    z-index: 10;
+    
+    /* --- NEW: These rules center the button inside the container --- */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 
-    /* These old rules are no longer needed with the sticky position */
+    /* These old rules are no longer needed */
+    /* box-shadow: 0 -2px 10px rgba(0,0,0,0.1); */
     /* margin-top: 40px; */
     /* border-top: 1px solid var(--border-color); */
+}
+
+/* --- NEW: This new rule controls the actual button's size --- */
+.checkout-cta-container .btn-confirm {
+    width: 90%; /* Button takes up 90% of the screen width */
+    max-width: 500px; /* But it won't get wider than 500px on large screens */
 }
 
 .billing-address-section {
