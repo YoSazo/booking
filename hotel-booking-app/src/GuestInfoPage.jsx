@@ -71,7 +71,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
 };
 
 // This is the main component that controls the multi-step flow.
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret  }) {
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
