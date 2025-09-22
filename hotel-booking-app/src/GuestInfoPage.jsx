@@ -9,8 +9,6 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete }) => {
     const stripe = useStripe();
     const elements = useElements();
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
     const [paymentRequest, setPaymentRequest] = useState(null);
 
     // This logic is self-contained and correct.
@@ -84,7 +82,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
-
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
             fetch(`${apiBaseUrl}/api/create-payment-intent`, {
