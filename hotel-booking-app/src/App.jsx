@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
-import GuestInfoPage from './GuestInfoPage.jsx';
+import GuestInfoPageWrapper from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
 import CheckoutReturnPage from './CheckoutReturnPage.jsx';
 import HelpWidget from './HelpWidget.jsx';
@@ -252,7 +252,7 @@ function App() {
           />
         } />
         <Route path="/guest-info" element={
-          <GuestInfoPage
+          <GuestInfoPageWrapper
             hotel={currentHotel}
             bookingDetails={finalBooking}
             onBack={() => navigate('/')}
