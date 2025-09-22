@@ -1475,7 +1475,7 @@ body {
 .step-circle {
   width: 30px;
   height: 30px;
-  border-radius: 50%; /* This creates the circle shape */
+  border-radius: 999px; /* This creates the circle shape */
   background-color: #fff;
   border: 2px solid #ccc;
   transition: all 0.4s ease;
@@ -1501,7 +1501,7 @@ body {
 /* Styles for the main action button at the bottom */
 .checkout-cta-container {
   /* UPDATED: Increased top margin for more breathing room */
-  margin-top: 40px;
+  margin-top: 20px;
   padding-top: 24px;
   border-top: 1px solid var(--border-color);
 }
