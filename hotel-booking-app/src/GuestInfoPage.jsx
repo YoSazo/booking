@@ -12,10 +12,11 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [paymentRequest, setPaymentRequest] = useState(null);
-    const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
 
+    // This logic is self-contained and correct.
     useEffect(() => {
-        if (!stripe || !clientSecret) return;
+        if (!stripe || !clientSecret || !bookingDetails) return;
+        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
         const pr = stripe.paymentRequest({
             country: 'US', currency: 'usd',
             total: { label: 'Booking Payment', amount: amountInCents },
@@ -33,23 +34,19 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
             window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
         });
         return () => { if (pr) pr.off('paymentmethod'); };
-    }, [stripe, clientSecret, amountInCents, bookingDetails, guestInfo]);
+    }, [stripe, clientSecret, bookingDetails, guestInfo]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
-
         if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
-
         setIsProcessing(true);
         setErrorMessage('');
-
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-        
         const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
             confirmParams: {
@@ -58,7 +55,6 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
             },
             redirect: 'if_required'
         });
-
         if (error) {
             setErrorMessage(error.message || "An unexpected error occurred.");
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
@@ -68,13 +64,12 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     };
 
     return (
-        <form id="payment-form" onSubmit={handleSubmit}> 
+        <form id="payment-form" onSubmit={handleSubmit}>
             <div className="secure-payment-frame">
                 {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
                 {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
                 <PaymentElement />
             </div>
-            {/* This button is NOT sticky and only appears on the payment step */}
             <div className="checkout-cta-container">
                 <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
                     {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
@@ -85,29 +80,18 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     );
 };
 
-
+// This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
     });
+    // --- FIXED: The formErrors state is correctly defined here ---
     const [formErrors, setFormErrors] = useState({});
     const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
-    
-    // --- FIXED: This useEffect now correctly manages padding for the sticky button ---
-    useEffect(() => {
-        if (currentStep < 3) {
-            document.body.style.paddingBottom = '120px';
-        } else {
-            document.body.style.paddingBottom = '0px';
-        }
-        return () => {
-            document.body.style.paddingBottom = '0px';
-        };
-    }, [currentStep]);
 
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
@@ -119,7 +103,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
     }, [bookingDetails, apiBaseUrl]);
 
-    // --- Validation logic for inline errors ---
     const validateInfoStep = () => {
         const errors = {};
         if (!formData.firstName.trim()) errors.firstName = "First name is required.";
@@ -130,7 +113,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         return Object.keys(errors).length === 0;
     };
 
-    // --- This function now uses validation and clears errors ---
     const handleNextStep = () => {
         if (currentStep === 2) {
             if (!validateInfoStep()) return;
@@ -140,7 +122,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     };
 
     const handleBackStep = () => {
-        if (currentStep === 1) { onBack(); } 
+        if (currentStep === 1) { onBack(); }
         else { setCurrentStep(prev => prev - 1); }
     };
 
@@ -198,7 +180,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
             
-            <div className="guest-info-container">
+            {/* --- FIXED: The padding is now applied correctly here --- */}
+            <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
                     <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
@@ -219,7 +202,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     </div>
                 </div>
 
-                {/* --- RESTORED: All original JSX is back --- */}
+                {/* --- RESTORED: All original JSX for your steps is back --- */}
                 {currentStep === 1 && (
                     <div className="info-summary">
                         <div className="summary-card-details">
@@ -297,32 +280,28 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     </div>
                 )}
                 
-                {/* This button is now outside the forms and is conditionally sticky */}
-                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
-                    {currentStep < 3 ? (
+                {/* --- This button is now outside the forms and is conditionally sticky --- */}
+                <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
+                    {currentStep < 3 && (
                         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                             {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
                         </button>
-                    ) : (
-                        // --- FIXED: This button now correctly submits the main form ---
-                        <>
-                            <button type="submit" form="main-checkout-form" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
-                                {isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`}
-                            </button>
-                            {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
-                        </>
                     )}
+                    {/* The final 'Pay' button is rendered inside the StripePaymentForm */}
                 </div>
             </div>
         </>
-  );
+    );
+}
 
+// The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
+    // This component does not need to call useStripe() itself.
     return (
         <Elements stripe={stripePromise}>
             <GuestInfoPage {...props} />
         </Elements>
     );
-}}
+}
 
 export default GuestInfoPageWrapper;
