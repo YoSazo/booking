@@ -147,30 +147,13 @@ const validateInfoStep = () => {
 };
 
 const validatePaymentStep = () => {
-  const errors = {};
-
-  if (!formData.address || formData.address.trim() === "") {
-    errors.address = "Please fill out your billing address before proceeding.";
-  }
-  if (!formData.city || formData.city.trim() === "") {
-    errors.city = "City is required.";
-  }
-  if (!formData.state || formData.state.trim() === "") {
-    errors.state = "State is required.";
-  }
-  if (!formData.zip || formData.zip.trim() === "") {
-    errors.zip = "Zip is required.";
-  }
-
-  setFormErrors(prev => ({ ...prev, ...errors }));
-
-  if (Object.keys(errors).length > 0) {
-    setErrorMessage(Object.values(errors)[0]);
-    return false;
-  }
-
-  setErrorMessage('');
-  return true;
+    // This function now only returns true or false
+    return (
+        formData.address.trim() !== "" &&
+        formData.city.trim() !== "" &&
+        formData.state.trim() !== "" &&
+        formData.zip.trim() !== ""
+    );
 };
 
 
@@ -231,53 +214,38 @@ const validatePaymentStep = () => {
     };
 
     const handleFinalSubmit = async (e) => {
-  e.preventDefault();
-  if (!stripe || !elements) return;
-  if (!validatePaymentStep()) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    // The button click now ONLY validates the payment step.
+    if (!validatePaymentStep()) {
         setErrorMessage("Please fill out your billing address before proceeding.");
         return;
     }
+
     setIsProcessing(true);
-    setErrorMessage('');
+    setErrorMessage(''); // Clear error before processing
 
-  if (currentStep === 2) {
-    // validate info step
-    if (validateInfoStep()) {
-      setFormErrors({});
-      setCurrentStep(3); // move to payment step
-      window.scrollTo(0, 0);
+    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+            receipt_email: formData.email,
+            return_url: `${window.location.origin}/confirmation`,
+        },
+        redirect: 'if_required'
+    });
+
+    if (error) {
+        setErrorMessage(error.message || "An unexpected error occurred.");
+        // Only stop processing if there's an error.
+        setIsProcessing(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // On success, the page navigates away, so no need to stop processing.
+        onComplete(formData, paymentIntent.id);
     }
-    return;
-  }
-
-  if (currentStep === 3) {
-  // ✅ Only call validatePaymentStep here
-  if (!validatePaymentStep()) return;
-
-  setIsProcessing(true);
-  setErrorMessage('');
-
-  sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-  sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-
-  const { error, paymentIntent } = await stripe.confirmPayment({
-    elements,
-    confirmParams: {
-      receipt_email: formData.email,
-      return_url: `${window.location.origin}/confirmation`,
-    },
-    redirect: 'if_required'
-  });
-
-  if (error) {
-    setErrorMessage(error.message || "An unexpected error occurred.");
-  } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-    onComplete(formData, paymentIntent.id);
-  }
-
-  setIsProcessing(false);
-}
-
 };        
   
     if (!bookingDetails) {
