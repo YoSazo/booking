@@ -145,13 +145,17 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             if (!validateInfoStep()) return;
         }
         setFormErrors({});
+        setErrorMessage(''); 
         setCurrentStep(prev => prev + 1);
+        window.scrollTo(0, 0);
         
         // MODIFICATION: Add this line to scroll the window to the top
         window.scrollTo(0, 0);
     };
 
     const handleBackStep = () => {
+        // MODIFICATION: Clear any previous payment errors when moving backward
+        setErrorMessage(''); 
         if (currentStep === 1) { onBack(); }
         else { setCurrentStep(prev => prev - 1); }
     };
