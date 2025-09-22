@@ -290,10 +290,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
                 <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
                 
-                    <div className="error-message" style={{ textAlign: 'center', marginBottom: '15px', color: '#c92a2a' }}>
-                                {errorMessage}
-                    </div>
-                
                 <div className="payment-placeholder">
                   <img 
                     src="/stripe-checkout.png" 
@@ -371,6 +367,10 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                         { currentStep === 2 && "Proceed to Payment" }
                         { currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`) }
                     </button>
+
+                    <div className="error-message" style={{ textAlign: 'center', marginBottom: '15px', color: '#c92a2a' }}>
+                                {errorMessage}
+                    </div>
                 </div>
                 
             </div>
