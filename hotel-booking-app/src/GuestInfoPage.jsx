@@ -81,21 +81,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     });
     // --- FIXED: The formErrors state is correctly defined here ---
     const [formErrors, setFormErrors] = useState({});
-    const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    useEffect(() => {
-        if (bookingDetails && bookingDetails.subtotal) {
-            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
-            })
-            .then((res) => res.json()).then((data) => setClientSecret(data.clientSecret));
-        }
-    }, [bookingDetails, apiBaseUrl]);
 
     const validateInfoStep = () => {
         const errors = {};
@@ -382,7 +372,8 @@ function GuestInfoPageWrapper({ clientSecret, ...props }) {
         locale: "en",
       }}
     >
-      <GuestInfoPage {...props} />
+      {/* Add the clientSecret prop here */}
+      <GuestInfoPage {...props} clientSecret={clientSecret} />
     </Elements>
   );
 }
