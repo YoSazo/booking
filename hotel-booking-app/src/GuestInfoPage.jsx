@@ -64,15 +64,12 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     };
 
     return (
-        <form id="payment-form" onSubmit={handleSubmit}>
-            <div className="secure-payment-frame">
-                {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
-                {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
-                <PaymentElement />
-            </div>
-        </form>
-    );
-};
+    <div className="secure-payment-frame">
+        {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
+        {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
+        <PaymentElement />
+    </div>
+);
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
@@ -345,6 +342,6 @@ function GuestInfoPageWrapper(props) {
             <GuestInfoPage {...props} />
         </Elements>
     );
-}
+}}
 
 export default GuestInfoPageWrapper;
