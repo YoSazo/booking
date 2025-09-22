@@ -194,7 +194,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     return (
         <>
-            <div className="static-banner">{/* ... */}</div>
+            <div className="static-banner">
+                ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
+            </div>
             
             <div className="guest-info-container">
                 <div className="guest-info-header">
@@ -296,18 +298,24 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 )}
                 
                 {/* This button is now outside the forms and is conditionally sticky */}
-                <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
-                    {currentStep < 3 && (
+                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
+                    {currentStep < 3 ? (
                         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                             {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
                         </button>
+                    ) : (
+                        // --- FIXED: This button now correctly submits the main form ---
+                        <>
+                            <button type="submit" form="main-checkout-form" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
+                                {isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`}
+                            </button>
+                            {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
+                        </>
                     )}
-                    {/* The final 'Pay' button is now rendered inside the StripePaymentForm */}
                 </div>
             </div>
         </>
-    );
-}
+  );
 
 function GuestInfoPageWrapper(props) {
     return (
@@ -315,6 +323,6 @@ function GuestInfoPageWrapper(props) {
             <GuestInfoPage {...props} />
         </Elements>
     );
-}
+}}
 
 export default GuestInfoPageWrapper;
