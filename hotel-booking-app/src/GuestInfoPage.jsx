@@ -246,7 +246,7 @@ const validatePaymentStep = () => {
         // On success, the page navigates away, so no need to stop processing.
         onComplete(formData, paymentIntent.id);
     }
-};        
+}; 
   
     if (!bookingDetails) {
         return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
