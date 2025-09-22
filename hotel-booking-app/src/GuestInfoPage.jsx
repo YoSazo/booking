@@ -71,7 +71,6 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
                 <PaymentElement />
             </div>
         </form>
-        
     );
 };
 
@@ -282,19 +281,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                             {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
                         </button>
                     )}
-                    <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
-                    {currentStep < 3 ? (
-                        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
-                            {currentStep === 1 ? 'Proceed to Info' : 'Proceed to Payment'}
-                        </button>
-                    ) : (
-                        <>
-                            <button type="submit" form="main-checkout-form" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
-                                {isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`}
-                            </button>
-                            {errorMessage && <div className="error-message" style={{textAlign: 'center', marginTop: '10px'}}>{errorMessage}</div>}
-                        </>
-                    )}
+                    <div className="checkout-cta-container">
+                      <button type="submit" disabled={isProcessing || !stripe || !elements} className="btn btn-confirm">
+                        {isProcessing ? "Processing..." : `Pay $${(bookingDetails.subtotal / 2).toFixed(2)} and Complete Booking`}
+                      </button>
+                      {errorMessage && <div className="error-message">{errorMessage}</div>}
                     </div>
                 </div>
             </div>
