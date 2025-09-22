@@ -13,13 +13,13 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
 
     const handleWalletClick = (e) => {
   if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-    // just block, but don't set error yet
-    e.preventDefault();
-    e.stopPropagation();
-    return false;
-  }
-  // no need to clear error here — validation handles it
-  return true;
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+    setErrorMessage(''); // Clear error if address is valid
+    return true;
 };
 
 
@@ -175,24 +175,20 @@ const validatePaymentStep = () => {
 
 
     const handleNextStep = () => {
-        if (currentStep === 2) {
-            if (!validateInfoStep()) return;
-        }
-        setFormErrors({});
-        setErrorMessage(''); 
-        setCurrentStep(prev => prev + 1);
-        window.scrollTo(0, 0);
-        
-        // MODIFICATION: Add this line to scroll the window to the top
-        window.scrollTo(0, 0);
-    };
+    if (currentStep === 2 && !validateInfoStep()) return;
+
+    setFormErrors({});
+    setErrorMessage(''); // Clear errors before moving forward
+    setCurrentStep(prev => prev + 1);
+    window.scrollTo(0, 0);
+};
 
     const handleBackStep = () => {
-        // MODIFICATION: Clear any previous payment errors when moving backward
-        setErrorMessage(''); 
-        if (currentStep === 1) { onBack(); }
-        else { setCurrentStep(prev => prev - 1); }
-    };
+    setErrorMessage(''); // Clear errors before moving backward
+    if (currentStep === 1) onBack();
+    else setCurrentStep(prev => prev - 1);
+};
+
 
     const getBackButtonText = () => {
         if (currentStep === 1) return '< Back to Booking';
@@ -237,6 +233,12 @@ const validatePaymentStep = () => {
     const handleFinalSubmit = async (e) => {
   e.preventDefault();
   if (!stripe || !elements) return;
+  if (!validatePaymentStep()) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
+    }
+    setIsProcessing(true);
+    setErrorMessage('');
 
   if (currentStep === 2) {
     // validate info step
@@ -389,25 +391,12 @@ const validatePaymentStep = () => {
                                 type="text" 
                                 name="address" 
                                 value={formData.address} 
-                                onChange={(e) => {
-      handleChange(e);
-      // clear address error as soon as user types
-      if (formErrors.address) setFormErrors(prev => ({ ...prev, address: '' }));
-      if (errorMessage && errorMessage.includes('billing address')) setErrorMessage('');
-    }}
-    placeholder="Start typing..." 
-    // you can remove `required` to avoid browser native popup;
-    // rely on our validatePaymentStep for consistent UX.
-    readOnly
-    onTouchStart={(e) => {
-      // allow first-touch to open keyboard reliably
-      e.target.removeAttribute('readonly');
-      // clear previous error if any
-      setErrorMessage('');
-      setFormErrors(prev => ({ ...prev, address: '' }));
-    }}
-    onPaste={handleAddressPaste}
-  />
+                                onChange={handleChange}
+                                placeholder="Start typing..."
+                                readOnly
+                                onTouchStart={(e) => e.target.removeAttribute('readonly')}
+                                onPaste={handleAddressPaste}
+                                />
 
                             </Autocomplete>
                           </div>
