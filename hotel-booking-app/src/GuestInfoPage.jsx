@@ -103,9 +103,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     }, [bookingDetails, apiBaseUrl]);
 
     const handlePhoneChange = (e) => {
-      let value = e.target.value;
-      if (!value.startsWith('+1 ')) { value = '+1 '; }
-      setFormData(prev => ({ ...prev, phone: value }));
+        let value = e.target.value;
+        if (!value.startsWith('+1 ')) { value = '+1 '; }
+        setFormData(prev => ({ ...prev, phone: value }));
+        // This part is new: it clears the phone error when the user starts typing
+        if (formErrors.phone) {
+            setFormErrors(prev => ({...prev, phone: ''}));
+        }
     };
     const handleChange = (e) => {
     const { name, value } = e.target;
