@@ -290,6 +290,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                     guestInfo={formData} 
                                     onComplete={onComplete}
                                     clientSecret={clientSecret}
+                                    errorMessage={errorMessage}
+                                    setErrorMessage={setErrorMessage}
+                                    isProcessing={isProcessing}
+                                    setIsProcessing={setIsProcessing}
+
                                 />
                                 <div className="billing-address-section">
                                     <div className="form-grid">
@@ -329,7 +334,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                         { currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`) }
                     </button>
                 </div>
-                {errorMessage && currentStep === 3 && <div className="error-message" style={{textAlign: 'center', marginTop: '-10px'}}>{errorMessage}</div>}
+                
             </div>
         </>
     );
