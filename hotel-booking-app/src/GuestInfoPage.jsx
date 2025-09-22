@@ -89,9 +89,14 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
       setFormData(prev => ({ ...prev, phone: value }));
     };
     const handleChange = (e) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error message for the field when user starts typing
+    if (formErrors[name]) {
+        setFormErrors(prev => ({...prev, [name]: ''}));
+    }
+    if (name === 'address' && value === '') { setIsAddressSelected(false); }
+  };
     const onLoad = (autoC) => setAutocomplete(autoC);
     const onPlaceChanged = () => {
         if (autocomplete !== null) {
@@ -114,15 +119,27 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setIsAddressSelected(true);
     };
 
+    const validateInfoStep = () => {
+    const errors = {};
+    if (!formData.firstName.trim()) errors.firstName = "First name is required.";
+    if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
+    if (!formData.email.trim()) errors.email = "Email is required.";
+    if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
     const handleNextStep = () => {
         if (currentStep === 2) {
-            if (!formData.firstName || !formData.lastName || !formData.phone || !formData.email) {
-                alert("Please fill out all your information before proceeding.");
-                return;
+            const isValid = validateInfoStep();
+            if (!isValid) {
+                return; // Stop if there are validation errors
             }
         }
+        setFormErrors({}); // Clear errors on successful step change
         setCurrentStep(prev => prev + 1);
     };
+
 
     // --- NEW: Dynamic Back Button Logic ---
   // --- NEW: Your dynamic back button logic ---
@@ -233,12 +250,29 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 <form className="guest-info-form" onSubmit={handleFinalSubmit} style={{ display: currentStep > 1 ? 'block' : 'none' }}>
                     {currentStep === 2 && (
                         <div className="form-grid">
-                            <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required /></div>
-                            <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required /></div>
-                            <div className="form-field"><label>Phone Number</label><input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} /></div>
-                            <div className="form-field"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required /></div>
+                            <div className="form-field">
+                                <label>First Name</label>
+                                <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
+                                {formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}
+                            </div>
+                            <div className="form-field">
+                                <label>Last Name</label>
+                                <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />
+                                {formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}
+                            </div>
+                            <div className="form-field">
+                                <label>Phone Number</label>
+                                <input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} />
+                                {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
+                            </div>
+                            <div className="form-field">
+                                <label>Email Address</label>
+                                <input type="email" name="email" value={formData.email} onChange={handleChange} required />
+                                {formErrors.email && <span className="error-message">{formErrors.email}</span>}
+                            </div>
                         </div>
                     )}
+
 
                     {currentStep === 3 && (
                         <div className="payment-placeholder">

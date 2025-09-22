@@ -1439,8 +1439,10 @@ body {
 
 /* --- Styles for Multi-Step Checkout --- */
 
-guest-info-container{
-  padding-bottom: 40px;
+.guest-info-container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
 }
 
 .checkout-progress-bar {
@@ -1511,8 +1513,8 @@ guest-info-container{
     margin-top: 40px;
     padding-top: 24px;
     border-top: 1px solid var(--border-color);
-    display: flex; /* Added for centering */
-    justify-content: center; /* Added for centering */
+    display: flex;
+    justify-content: center;
 }
 
 /* --- NEW: This class applies the sticky styles ONLY when needed --- */
@@ -1524,15 +1526,20 @@ guest-info-container{
     background-color: transparent;
     padding: 16px 0;
     z-index: 10;
-    margin-top: 0; /* Override default margin */
-    padding-top: 0; /* Override default padding */
-    border-top: none; /* Override default border */
+    margin-top: 0;
+    border-top: none;
 }
 
 /* --- UPDATED: This rule now controls the button's size in ALL states --- */
 .checkout-cta-container .btn-confirm {
     width: 90%; 
-    max-width: 380px; /* Reduced max-width to make it smaller */
+    max-width: 380px;
+}
+
+.error-message {
+    color: #dc3545; /* A standard Bootstrap danger red */
+    font-size: 0.8em;
+    margin-top: 4px;
 }
 
 /* --- NEW: This rule fixes the back button's text color when focused --- */
