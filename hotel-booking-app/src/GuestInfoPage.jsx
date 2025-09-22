@@ -186,7 +186,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             <div className="static-banner">
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
-            <div className="container-single-column">
+            <div className="container-single-column" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
                   <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <button onClick={handleBackStep} className="back-button">
@@ -255,7 +255,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                         clientSecret={clientSecret}
                                     />
                                     <div className="billing-address-section">
-                                        <h4 className="billing-address-title">Billing Address</h4>
+                                        <label className="billing-address-title">Billing Address</label>
                                         <div className="form-grid">
                                             <div className="form-field full-width">
                                                 <label>Address</label>

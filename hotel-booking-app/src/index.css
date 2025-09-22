@@ -33,6 +33,7 @@ body {
   max-width: 800px; /* A good width for single-column content */
   margin: 20px auto;
   padding: 20px;
+  padding-bottom: 40px;
 }
 
 /* --- Header --- */
@@ -1438,6 +1439,9 @@ body {
 }
 
 /* --- Styles for Multi-Step Checkout --- */
+
+
+
 .checkout-progress-bar {
   display: flex;
   justify-content: space-between;
@@ -1500,32 +1504,41 @@ body {
 }
 
 /* Styles for the main action button at the bottom */
-/* Styles for the main action button at the bottom */
+
+/* --- UPDATED: This is the style for the button when it's NOT sticky (on the payment step) --- */
 .checkout-cta-container {
-    /* --- UPDATED: These new rules make the container a transparent sticky bar --- */
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+    display: flex; /* Added for centering */
+    justify-content: center; /* Added for centering */
+}
+
+/* --- NEW: This class applies the sticky styles ONLY when needed --- */
+.checkout-cta-container.is-sticky {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    background-color: transparent; /* Makes the container invisible */
-    padding: 16px 0; /* Vertical padding, no horizontal */
+    background-color: transparent;
+    padding: 16px 0;
     z-index: 10;
-    
-    /* --- NEW: These rules center the button inside the container --- */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-
-    /* These old rules are no longer needed */
-    /* box-shadow: 0 -2px 10px rgba(0,0,0,0.1); */
-    /* margin-top: 40px; */
-    /* border-top: 1px solid var(--border-color); */
+    margin-top: 0; /* Override default margin */
+    padding-top: 0; /* Override default padding */
+    border-top: none; /* Override default border */
 }
 
-/* --- NEW: This new rule controls the actual button's size --- */
+/* --- UPDATED: This rule now controls the button's size in ALL states --- */
 .checkout-cta-container .btn-confirm {
-    width: 90%; /* Button takes up 90% of the screen width */
-    max-width: 500px; /* But it won't get wider than 500px on large screens */
+    width: 90%; 
+    max-width: 380px; /* Reduced max-width to make it smaller */
+}
+
+/* --- NEW: This rule fixes the back button's text color when focused --- */
+.back-button:focus, .back-button:active {
+    color: #333; /* Or your preferred default text color */
+    text-decoration: none;
+    outline: none;
 }
 
 .billing-address-section {
