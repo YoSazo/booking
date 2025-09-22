@@ -126,7 +126,7 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                         }}
                     />
                 ) : (
-                    <p style={{textAlign: 'center', padding: '10px 0'}}>Checking wallet availability...</p>
+                    null
                 )}
                 
                 <div className="payment-divider">
