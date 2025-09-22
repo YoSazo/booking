@@ -69,7 +69,8 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
         <PaymentElement />
     </div>
-);
+  );
+};
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
@@ -328,7 +329,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                         { currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`) }
                     </button>
                 </div>
-                disabled={currentStep === 3}
+                {errorMessage && currentStep === 3 && <div className="error-message" style={{textAlign: 'center', marginTop: '-10px'}}>{errorMessage}</div>}
             </div>
         </>
     );
@@ -341,7 +342,7 @@ function GuestInfoPageWrapper(props) {
             <GuestInfoPage {...props} />
         </Elements>
     );
-}}
+}
 
 // Make sure this export line is the very last line
 export default GuestInfoPageWrapper;
