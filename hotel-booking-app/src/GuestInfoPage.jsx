@@ -104,18 +104,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [errorMessage, setErrorMessage] = useState('');
     const paymentHeaderRef = useRef(null);
 
-
-    useEffect(() => {
-      // When the payment step becomes active...
-      if (currentStep === 3) {
-        // ...find whatever element has focus and tell it to blur.
-        // This prevents the keyboard from automatically opening on mobile.
-        if (document.activeElement) {
-          document.activeElement.blur();
-        }
-      }
-    }, [currentStep]);
-
     const handleAddressPaste = (e) => {
         // The timeout gives the input field a moment to register the pasted value
         setTimeout(() => {
@@ -364,6 +352,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 onChange={handleChange} 
                                 required 
                                 placeholder="Start typing..." 
+                                readOnly
+                                onTouchStart={(e) => e.target.removeAttribute('readonly')}
                                 onPaste={handleAddressPaste}
                               />
                             </Autocomplete>
