@@ -824,8 +824,8 @@ body {
 .guest-info-header {
   grid-column: 1 / -1;
   text-align: center;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0px;
+  border-bottom: none;
   position: relative;
   /* UPDATED: Increased top padding for better vertical spacing */
   padding-top: 30px; 
@@ -844,7 +844,7 @@ body {
 .back-button {
   position: absolute;
   left: 0;
-  top: -29px;
+  top: -32px;
   /* UPDATED: New styling for a bigger, filled button */
   background-color: #212529; /* Black background */
   color: #ffffff; /* White text */
@@ -1494,6 +1494,7 @@ body {
 .progress-step.completed .step-circle {
     background-color: #28a745; /* Your green success color */
     border-color: #28a745;
+    margin-top: 25px
 }
 
 /* Style for the text of the active/completed step */
