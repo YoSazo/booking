@@ -357,7 +357,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 required 
                                 placeholder="Start typing..." 
                                 readOnly
-                                onTouchStart={(e) => e.target.removeAttribute('readonly')}
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 onPaste={handleAddressPaste}
                               />
                             </Autocomplete>
