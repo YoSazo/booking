@@ -59,6 +59,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
     });
+    const [formErrors, setFormErrors] = useState({});
     const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
