@@ -5,7 +5,7 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// This component now ONLY displays the Stripe elements and has no submit button of its own.
+// This component ONLY displays the Stripe elements.
 const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret }) => {
     const stripe = useStripe();
     const [paymentRequest, setPaymentRequest] = useState(null);
@@ -45,6 +45,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret }) => {
     );
 };
 
+// This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -55,7 +56,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     
-    // Stripe hooks and state are now correctly placed in the main component.
     const stripe = useStripe();
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -63,7 +63,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
-            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+            fetch(`${apiBase.url}/api/create-payment-intent`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
             })
@@ -145,6 +145,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setIsProcessing(false);
     };
     
+    // Return a loading state or error if booking details aren't available yet
+    if (!bookingDetails) {
+        return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
+    }
+    
     const priceToday = bookingDetails.subtotal / 2;
     const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
     const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
@@ -175,19 +180,39 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     </div>
                 </div>
 
+                {/* --- FIXED: The content for Step 1 is now filled in --- */}
                 {currentStep === 1 && (
-                    <div className="info-summary">{/* Review Cart Details */}</div>
+                    <div className="info-summary">
+                        <div className="summary-card-details">
+                            <p className="detail-line">{bookingDetails.name}</p>
+                            <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
+                            <p className="detail-line">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</p>
+                        </div>
+                        <div className="summary-card-price">
+                            <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
+                            <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
+                            <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
+                            <div className="total-breakdown">
+                                <p className="pay-today">Only Pay ${priceToday.toFixed(2)} Today</p>
+                                <p className="balance-due">Balance (${balanceDue.toFixed(2)}) When you arrive</p>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
-                {/* The main form wraps steps 2 and 3 and uses the final submit handler */}
                 <form className="guest-info-form" onSubmit={handleFinalSubmit}>
+                    {/* --- FIXED: The content for Step 2 is now filled in --- */}
                     {currentStep === 2 && (
-                        <div className="form-grid">{/* Simplified Info Form Fields */}</div>
+                        <div className="form-grid">
+                            <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required /></div>
+                            <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required /></div>
+                            <div className="form-field"><label>Phone Number</label><input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} /></div>
+                            <div className="form-field"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required /></div>
+                        </div>
                     )}
 
                     {currentStep === 3 && (
                         <div className="payment-placeholder">
-                            {/* The trust badge is now a standard, reliable img tag */}
                             <img 
                                 src="/stripe-checkout.png" 
                                 alt="Guaranteed safe and secure checkout" 
@@ -223,7 +248,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                         </div>
                     )}
                     
-                    {/* The main CTA button is now outside the conditional rendering of steps */}
                     {currentStep < 3 ? (
                         <div className="checkout-cta-container">
                             <button type="button" className="btn btn-confirm" style={{width: '100%'}} onClick={handleNextStep}>
@@ -254,3 +278,8 @@ function GuestInfoPageWrapper(props) {
 }
 
 export default GuestInfoPageWrapper;
+
+if (!bookingDetails) {
+    return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
+}
+
