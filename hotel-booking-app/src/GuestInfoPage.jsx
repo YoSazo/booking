@@ -289,6 +289,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                     </div>
 
                 <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+                
+                    <div className="error-message" style={{ textAlign: 'center', marginBottom: '15px', color: '#c92a2a' }}>
+                                {errorMessage}
+                    </div>
+                
                 <div className="payment-placeholder">
                   <img 
                     src="/stripe-checkout.png" 
