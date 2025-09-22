@@ -269,6 +269,7 @@ function App() {
             onBack={() => navigate('/')}
             onComplete={handleCompleteBooking}
             apiBaseUrl={API_BASE_URL}
+            clientSecret={clientSecret}
           />
         } />
         <Route path="/confirmation" element={
