@@ -8,6 +8,10 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // UPDATED PROPS: clientSecret is now required here
 const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) => {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     // State for the Payment Request object (Apple Pay / Google Pay)
     const [paymentRequest, setPaymentRequest] = useState(null);
     const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
@@ -87,10 +91,10 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
 
         if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
+            setIsProcessing(false); // Stop processing if address is missing
             return;
         }
 
-        setIsProcessing(true);
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
         const { error, paymentIntent } = await stripe.confirmPayment({
@@ -139,9 +143,9 @@ const CheckoutForm = ({ bookingDetails, guestInfo, onComplete, clientSecret }) =
                 {/* 2. Payment Element (Standard Card) */}
                 <PaymentElement 
                     options={{
-                      wallets: {
-                          applePay: 'never'
-                      }
+                        wallets: {
+                            applePay: 'never'
+                        }
                     }}
                 />
             </div>
@@ -169,11 +173,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
   const [clientSecret, setClientSecret] = useState('');
   const [isAddressSelected, setIsAddressSelected] = useState(false);
 
+  // --- THESE LINES WERE REMOVED AS THEY CAUSED THE ERROR ---
+  // const stripe = useStripe();
+  // const elements = useElements();
+  // const [isProcessing, setIsProcessing] = useState(false);
+  // const [errorMessage, setErrorMessage] = useState('');
+  // --------------------------------------------------------
 
-  const stripe = useStripe();
-  const elements = useElements();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   useEffect(() => {
     if (bookingDetails && bookingDetails.subtotal) {
         fetch(`${apiBaseUrl}/api/create-payment-intent`, {
@@ -239,9 +245,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
   const handleNextStep = () => {
       // Validate the simplified form before moving to payment
       if (currentStep === 2) {
-          if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return; // Exit the function early
+          if (!formData.firstName || !formData.lastName || !formData.phone || !formData.email) {
+              alert("Please fill out all your information before proceeding.");
+              return;
           }
       }
       setCurrentStep(prev => prev + 1);
@@ -266,7 +272,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
         {/* --- NEW: The Progress Bar --- */}
         <div className="checkout-progress-bar">
-            <div className="progress-step completed">
+            <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
                 <div className="step-circle"></div>
                 <span className="step-name">Review Cart</span>
             </div>
@@ -274,11 +280,10 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 <div className="step-circle"></div>
                 <span className="step-name">Info</span>
             </div>
-            <div className={`progress-step ${currentStep === 3 ? 'active' : ''}`}>
+            <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
                 <div className="step-circle"></div>
                 <span className="step-name">Payment</span>
             </div>
-            <div className="progress-line"><div className="progress-line-fill" style={{width: getProgressWidth()}}></div></div>
         </div>
 
         {/* --- Step 1: Review Cart --- */}
@@ -320,42 +325,42 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 {/* --- Step 3 Content: Payment and Billing Address --- */}
                 {currentStep === 3 && (
                     <div className="payment-placeholder">
-                      <img 
-                          src="/stripe-checkout.png" 
-                          alt="Guaranteed safe and secure checkout" 
-                          className="stripe-badge-image" 
-                      />
-                      {clientSecret ? (
-                        <Elements options={stripeOptions} stripe={stripePromise}>
-                          <CheckoutForm 
-                              bookingDetails={bookingDetails} 
-                              guestInfo={formData} 
-                              onComplete={onComplete} 
-                              clientSecret={clientSecret}
-                          />
-                        </Elements>
-                      ) : ( <p>Loading...</p> )}
-                      
-                      <div className="billing-address-section">
-                          <h4 className="billing-address-title">Billing Address</h4>
-                          <div className="form-grid">
-                            <div className="form-field full-width">
-                              <label>Address</label>
-                              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
-                              </Autocomplete>
+                        <img 
+                            src="/stripe-checkout.png" 
+                            alt="Guaranteed safe and secure checkout" 
+                            className="stripe-badge-image" 
+                        />
+                        {clientSecret ? (
+                            <Elements options={stripeOptions} stripe={stripePromise}>
+                              <CheckoutForm 
+                                  bookingDetails={bookingDetails} 
+                                  guestInfo={formData} 
+                                  onComplete={onComplete} 
+                                  clientSecret={clientSecret}
+                              />
+                            </Elements>
+                        ) : ( <p>Loading...</p> )}
+                        
+                        <div className="billing-address-section">
+                            <h4 className="billing-address-title">Billing Address</h4>
+                            <div className="form-grid">
+                              <div className="form-field full-width">
+                                <label>Address</label>
+                                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                                  <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
+                                </Autocomplete>
+                              </div>
+                              <div className={`address-reveal-container ${isAddressSelected ? 'visible' : ''}`}>
+                                  {isAddressSelected && (
+                                    <>
+                                      <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
+                                      <div className="form-field"><label>State / Province</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
+                                      <div className="form-field"><label>Zip / Postal Code</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
+                                    </>
+                                  )}
+                              </div>
                             </div>
-                            <div className={`address-reveal-container ${isAddressSelected ? 'visible' : ''}`}>
-                              {isAddressSelected && (
-                                <>
-                                  <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
-                                  <div className="form-field"><label>State / Province</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
-                                  <div className="form-field"><label>Zip / Postal Code</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                      </div>
+                        </div>
                     </div>
                 )}
             </div>
