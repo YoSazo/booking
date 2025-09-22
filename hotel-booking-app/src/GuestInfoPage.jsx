@@ -163,6 +163,7 @@ const validatePaymentStep = () => {
   }
 
   setFormErrors(prev => ({ ...prev, ...errors }));
+
   if (Object.keys(errors).length > 0) {
     setErrorMessage(Object.values(errors)[0]);
     return false;
@@ -238,46 +239,49 @@ const validatePaymentStep = () => {
   if (!stripe || !elements) return;
 
   if (currentStep === 2) {
-    // validate info and move to payment
+    // validate info step
     if (validateInfoStep()) {
       setFormErrors({});
-      setCurrentStep(3);
+      setCurrentStep(3); // move to payment step
+      window.scrollTo(0, 0);
     }
     return;
   }
 
-        if (currentStep === 3) { // If on the payment step, process the payment
-            if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-                setErrorMessage("Please fill out your billing address before proceeding.");
-                return;
-            }
+  if (currentStep === 3) {
+    // ✅ Only validate when submitting
+    if (!validatePaymentStep()) return;
 
-            if (!validatePaymentStep()) return;
+    setIsProcessing(true);
+    setErrorMessage('');
 
-            setIsProcessing(true);
-            setErrorMessage('');
+    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
 
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-            sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-            
-            const { error, paymentIntent } = await stripe.confirmPayment({
-                elements,
-                confirmParams: {
-                    receipt_email: formData.email,
-                    return_url: `${window.location.origin}/confirmation`,
-                },
-                redirect: 'if_required'
-            });
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          receipt_email: formData.email,
+          return_url: `${window.location.origin}/confirmation`,
+        },
+        redirect: 'if_required',
+      });
 
-            if (error) {
-                setErrorMessage(error.message || "An unexpected error occurred.");
-            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                onComplete(formData, paymentIntent.id);
-            }
-            setIsProcessing(false);
-        }
-    };
-    
+      if (error) {
+        setErrorMessage(error.message || "An unexpected error occurred.");
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        onComplete(formData, paymentIntent.id);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("An unexpected error occurred.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+};        
+  
     if (!bookingDetails) {
         return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
     }
