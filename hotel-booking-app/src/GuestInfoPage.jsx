@@ -281,42 +281,57 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     </div>
 
                 <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-                     <div className="payment-placeholder">
-                        <img src="/stripe-checkout.png" alt="Guaranteed safe and secure checkout" className="stripe-badge-image" />
-                        {clientSecret ? (
-                            <Elements options={stripeOptions} stripe={stripePromise}>
-                                <StripePaymentForm 
-                                    bookingDetails={bookingDetails} 
-                                    guestInfo={formData} 
-                                    onComplete={onComplete}
-                                    clientSecret={clientSecret}
-                                    errorMessage={errorMessage}
-                                    setErrorMessage={setErrorMessage}
-                                    isProcessing={isProcessing}
-                                    setIsProcessing={setIsProcessing}
+                      <div className="payment-placeholder">
+                          <img 
+                              src="/stripe-checkout.png" 
+                              alt="Guaranteed safe and secure checkout" 
+                              className="stripe-badge-image" 
+                          />
+                          {clientSecret ? (
+                              <>
+                                  <StripePaymentForm 
+                                      bookingDetails={bookingDetails} 
+                                      guestInfo={formData} 
+                                      onComplete={onComplete}
+                                      clientSecret={clientSecret}
+                                      errorMessage={errorMessage}
+                                      setErrorMessage={setErrorMessage}
+                                      isProcessing={isProcessing}
+                                      setIsProcessing={setIsProcessing}
+                                  />
 
-                                />
-                                <div className="billing-address-section">
-                                    <div className="form-grid">
-                                        <div className="form-field full-width">
-                                            <label>Billing Address</label>
-                                            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                                                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing..." />
-                                            </Autocomplete>
-                                        </div>
-                                        {isAddressSelected && (
-                                            <div className="address-reveal-container visible">
-                                                <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
-                                                <div className="form-field"><label>State</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
-                                                <div className="form-field"><label>Zip</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </Elements>
-                        ) : ( <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p> )}
-                    </div>
-                </div>
+                                  <div className="billing-address-section">
+                                      <div className="form-grid">
+                                          <div className="form-field full-width">
+                                              <label>Billing Address</label>
+                                              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                                                  <input 
+                                                      type="text" 
+                                                      name="address" 
+                                                      value={formData.address} 
+                                                      onChange={handleChange} 
+                                                      required 
+                                                      placeholder="Start typing..." 
+                                                  />
+                                              </Autocomplete>
+                                          </div>
+                                          {isAddressSelected && (
+                                              <div className="address-reveal-container visible">
+                                                  <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
+                                                  <div className="form-field"><label>State</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
+                                                  <div className="form-field"><label>Zip</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
+                                              </div>
+                                          )}
+                                      </div>
+                                  </div>
+                              </>
+                          ) : (
+                              <p style={{textAlign: 'center', padding: '20px'}}>
+                                  Loading secure payment form...
+                              </p>
+                          )}
+                      </div>
+                  </div>
                 </form>
                 
                 {/* --- This button is now outside the forms and is conditionally sticky --- */}
@@ -342,12 +357,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
+    const stripeOptions = {
+        appearance: { theme: 'stripe' },
+        locale: 'en'
+    };
+
     return (
-        <Elements stripe={stripePromise}>
+        <Elements stripe={stripePromise} options={stripeOptions}>
             <GuestInfoPage {...props} />
         </Elements>
     );
 }
 
-// Make sure this is the very last line, exporting the WRAPPER, not the page.
 export default GuestInfoPageWrapper;
