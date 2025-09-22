@@ -33,7 +33,6 @@ body {
   max-width: 800px; /* A good width for single-column content */
   margin: 20px auto;
   padding: 20px;
-  padding-bottom: 40px;
 }
 
 /* --- Header --- */
@@ -1440,7 +1439,9 @@ body {
 
 /* --- Styles for Multi-Step Checkout --- */
 
-
+guest-info-container{
+  padding-bottom: 40px;
+}
 
 .checkout-progress-bar {
   display: flex;
