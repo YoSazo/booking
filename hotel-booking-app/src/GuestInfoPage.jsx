@@ -107,7 +107,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         const errors = {};
         if (!formData.firstName.trim()) errors.firstName = "First name is required.";
         if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
-        if (!formData.email.trim()) errors.email = "Email is required.";
+        if (!formData.email.trim()) {
+            errors.email = "Email is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            errors.email = "Please enter a valid email address.";
+        }
+        
+        if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
+        
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
         if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
@@ -119,6 +128,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         }
         setFormErrors({});
         setCurrentStep(prev => prev + 1);
+        
+        // MODIFICATION: Add this line to scroll the window to the top
+        window.scrollTo(0, 0);
     };
 
     const handleBackStep = () => {
