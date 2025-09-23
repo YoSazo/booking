@@ -97,7 +97,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
           paymentRequest,
           style: { paymentRequestButton: { theme: 'dark', height: '40px' } }
         }}
-        onClick={handleWalletClick} // ✅ Only fires when user actually clicks
+        
       />
     )}
 
