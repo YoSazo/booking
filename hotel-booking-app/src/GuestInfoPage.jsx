@@ -22,7 +22,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         return () => clearTimeout(timer);
     }, []);
 
-    // This logic is self-contained and correct.
+    // This logic is self-contained and corrects.
     useEffect(() => {
         if (!stripe || !clientSecret || !bookingDetails) return;
         const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
