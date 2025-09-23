@@ -153,7 +153,7 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
           ev.complete('success');
           navigate('/confirmation', {
             state: {
-              ...location.state,
+              bookingDetails,
               guestInfo: formData,
               paymentMethod: walletName,
             },
@@ -264,7 +264,7 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
         if (onComplete) onComplete(formData, paymentIntent.id); // Or navigate directly
         navigate('/confirmation', {
           state: {
-            ...location.state,
+            bookingDetails,
             guestInfo: formData,
             paymentMethod: 'Card',
           },
