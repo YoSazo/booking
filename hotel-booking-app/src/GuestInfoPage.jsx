@@ -13,7 +13,7 @@ import Autocomplete from 'react-google-autocomplete';
 // --- Stripe Promise ---
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// --- Main Component ---
+// --- Main Composnent ---
 const GuestInfoPage = ({ bookingDetails, onComplete }) => {
   const stripe = useStripe();
   const elements = useElements();
