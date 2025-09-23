@@ -14,11 +14,12 @@ import Autocomplete from 'react-google-autocomplete';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // --- Main Component ---
-const GuestInfoPage = () => {
+const GuestInfoPage = ({ bookingDetails, onComplete }) => {
   const stripe = useStripe();
   const elements = useElements();
-  const location = useLocation();
   const navigate = useNavigate();
+
+  // This check now works correctly because bookingDetails is received as a prop
   if (!bookingDetails) {
     return (
       <div className="container mx-auto p-4 text-center">
