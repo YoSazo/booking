@@ -10,17 +10,20 @@ import { loadStripe } from '@stripe/stripe-js';
 import { countries } from './countries';
 import Autocomplete from 'react-google-autocomplete';
 
-// --- Stripe Promise ---
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // --- Main Component ---
-const GuestInfoPage = ({ bookingDetails, onComplete }) => {
+const GuestInfoPage = () => {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
+  
+  // --- FIX: Reverted to using location.state to get booking data ---
+  const location = useLocation();
+  const { room, totalPrice, searchParams } = location.state || {};
 
-  // This check now works correctly because bookingDetails is received as a prop
-  if (!bookingDetails) {
+  // This check is now reliable again
+  if (!room) {
     return (
       <div className="container mx-auto p-4 text-center">
         <h1 className="text-2xl font-bold">Session expired or invalid access.</h1>
@@ -31,66 +34,37 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
       </div>
     );
   }
+  
+  // Destructure from the searchParams object
+  const { checkIn, checkOut, nights, guests } = searchParams;
 
-  const {
-    room,
-    total: totalPrice,
-    nights,
-    guests,
-    checkin: checkIn,
-    checkout: checkOut
-  } = bookingDetails;
-
-  // New state for managing the selected payment method
+  // --- NEW: State for the payment UI ---
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
+  
+  // Existing state
   const [paymentRequest, setPaymentRequest] = useState(null);
   const [clientSecret, setClientSecret] = useState('');
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
-
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    country: 'United States',
-    address: '',
-    city: '',
-    state: '',
-    zip: '',
+    fullName: '', email: '', phone: '', country: 'United States',
+    address: '', city: '', state: '', zip: '',
   });
 
-  // --- Style for the new payment UI ---
+  // --- NEW: Style for the new payment UI ---
   const paymentMethodButtonStyle = (method) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '12px 16px',
-    border:
-      selectedPaymentMethod === method ? '2px solid #007bff' : '2px solid #ddd',
-    borderRadius: '8px',
-    cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px',
+    border: selectedPaymentMethod === method ? '2px solid #007bff' : '2px solid #ddd',
+    borderRadius: '8px', cursor: 'pointer',
     backgroundColor: selectedPaymentMethod === method ? '#f0f7ff' : '#fff',
-    fontWeight: '600',
-    flex: 1,
-    minWidth: '100px',
-    textAlign: 'center',
+    fontWeight: '600', flex: 1, minWidth: '100px', textAlign: 'center',
     transition: 'all 0.2s ease-in-out',
   });
-
+  
   const cardElementOptions = {
     style: {
-      base: {
-        fontSize: '16px',
-        color: '#32325d',
-        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-        '::placeholder': {
-          color: '#aab7c4',
-        },
-      },
-      invalid: {
-        color: '#fa755a',
-        iconColor: '#fa755a',
-      },
+      base: { fontSize: '16px', color: '#32325d', '::placeholder': { color: '#aab7c4' } },
+      invalid: { color: '#fa755a', iconColor: '#fa755a' },
     },
     hidePostalCode: true,
   };
