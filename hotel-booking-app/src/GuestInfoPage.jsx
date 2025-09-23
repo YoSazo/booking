@@ -5,7 +5,7 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// Simplified component that only displays the payment form
+// This component is now simplified to only display the card entry fields.
 const StripePaymentForm = () => {
     return (
         <div className="secure-payment-frame">
@@ -14,23 +14,11 @@ const StripePaymentForm = () => {
     );
 };
 
-// Skeleton component for loading state (you can implement this as needed)
-const StripeFormSkeleton = () => {
-    return (
-        <div className="stripe-form-skeleton">
-            <div className="skeleton-line"></div>
-            <div className="skeleton-line"></div>
-            <div className="skeleton-line short"></div>
-        </div>
-    );
-};
-
-// Main component that controls the multi-step flow
+// This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
-    const addressInputRef = useRef(null);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
@@ -40,10 +28,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    
+    // ✅ State to hold the Payment Request object (for Apple Pay, Google Pay, etc.)
     const [paymentRequest, setPaymentRequest] = useState(null);
-    const paymentHeaderRef = useRef(null);
 
-    // Create Payment Request for wallet payments (Apple Pay, Google Pay, etc.)
+    // ✅ This effect creates the Payment Request and checks if a wallet is available.
     useEffect(() => {
         if (!stripe || !clientSecret || !bookingDetails) {
             return;
@@ -68,7 +57,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             }
         });
 
-        // Handle wallet payment method
+        // This event is triggered when the user authenticates with their wallet
         pr.on('paymentmethod', async (ev) => {
             if (!validatePaymentStep()) {
                 setErrorMessage("Please fill out your billing address before proceeding.");
@@ -97,28 +86,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             }
         });
 
-    }, [stripe, clientSecret, bookingDetails, formData]);
-
-    // Clear errors when moving to payment step
-    useEffect(() => {
-        if (currentStep === 3) {
-            setErrorMessage('');
-        }
-    }, [currentStep]);
-
-    const handleAddressPaste = (e) => {
-        setTimeout(() => {
-            const input = e.target;
-            if (input) {
-                const event = new KeyboardEvent('keydown', {
-                    key: 'ArrowDown',
-                    bubbles: true,
-                    cancelable: true,
-                });
-                input.dispatchEvent(event);
-            }
-        }, 100);
-    };
+    }, [stripe, clientSecret, bookingDetails, formData]); // formData is a dependency now
 
     const validateInfoStep = () => {
         const errors = {};
@@ -138,7 +106,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             formData.zip.trim() !== ""
         );
     };
-
+    
+    // This function now only handles the standard card payment submission.
     const handleCardSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
@@ -154,31 +123,29 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(formData));
 
-        const { error, paymentIntent } = await stripe.confirmPayment({
+        const { error } = await stripe.confirmPayment({
             elements,
             confirmParams: {
                 receipt_email: formData.email,
                 return_url: `${window.location.origin}/confirmation`,
             },
-            redirect: 'if_required'
         });
 
-        if (error) {
-            setErrorMessage(error.message || "An unexpected error occurred.");
-            setIsProcessing(false);
-        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-            onComplete(formData, paymentIntent.id);
+        if (error.type === "card_error" || error.type === "validation_error") {
+            setErrorMessage(error.message);
+        } else {
+            setErrorMessage("An unexpected error occurred.");
         }
+        setIsProcessing(false);
     };
 
     const handleNextStep = () => {
         if (currentStep === 2 && !validateInfoStep()) return;
-
-        setFormErrors({});
+        setErrorMessage('');
         setCurrentStep(prev => prev + 1);
         window.scrollTo(0, 0);
     };
-
+    
     const handleBackStep = () => {
         setErrorMessage('');
         if (currentStep === 1) onBack();
@@ -190,7 +157,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         if (currentStep === 2) return '< Back to Cart';
         if (currentStep === 3) return '< Back to Info';
     };
-
+    
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -241,30 +208,24 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             <div className="static-banner">
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
-
             <div className="guest-info-container" style={{ paddingBottom: '40px' }}>
                 <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button">
-                        {getBackButtonText()}
-                    </button>
+                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
                 </div>
-
                 <div className="checkout-progress-bar">
                     <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
-                        <div className="step-circle"></div>
-                        <span className="step-name">Review Cart</span>
+                        <div className="step-circle"></div><span className="step-name">Review Cart</span>
                     </div>
                     <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
-                        <div className="step-circle"></div>
-                        <span className="step-name">Info</span>
+                        <div className="step-circle"></div><span className="step-name">Info</span>
                     </div>
                     <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
-                        <div className="step-circle"></div>
-                        <span className="step-name">Payment</span>
+                        <div className="step-circle"></div><span className="step-name">Payment</span>
                     </div>
                 </div>
 
+                {/* Step 1 JSX */}
                 {currentStep === 1 && (
                     <div className="info-summary-wrapper" style={{ display: currentStep === 1 ? 'block' : 'none' }}>
                         <div className="summary-card-details">
@@ -283,7 +244,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                         </div>
                     </div>
                 )}
-
+                
+                {/* We now use handleCardSubmit for the form's onSubmit */}
                 <form id="main-checkout-form" onSubmit={handleCardSubmit}>
                     <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
                         <div className="form-field">
@@ -310,22 +272,14 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
                         <div className="payment-placeholder">
-                            <img
-                                src="/stripe-checkout.png"
-                                alt="Guaranteed safe and secure checkout"
-                                className="stripe-badge-image"
-                                tabIndex="-1"
-                            />
-                            {clientSecret ? (
+                            <img src="/stripe-checkout.png" alt="Guaranteed safe and secure checkout" className="stripe-badge-image" tabIndex="-1" />
+                            
+                            {/* The divider and card fields now render instantly */}
+                            {clientSecret && (
                                 <>
-                                    {paymentRequest && (
-                                        <div className="payment-divider">
-                                            <span>OR PAY WITH CARD</span>
-                                        </div>
-                                    )}
-                                    
+                                    {/* The wallet button is now rendered in the CTA section */}
+                                    {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
                                     <StripePaymentForm />
-
                                     <div className="billing-address-section">
                                         <div className="form-grid">
                                             <div className="form-field full-width">
@@ -339,7 +293,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                                         placeholder="Start typing..."
                                                         readOnly
                                                         onTouchStart={(e) => e.target.removeAttribute('readonly')}
-                                                        onPaste={handleAddressPaste}
                                                         autoComplete="off"
                                                     />
                                                 </Autocomplete>
@@ -363,25 +316,20 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                         </div>
                                     </div>
                                 </>
-                            ) : (
-                                <StripeFormSkeleton />
                             )}
                         </div>
                     </div>
                 </form>
-
+                
                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
+                    {/* ✅ CONDITIONAL BUTTON RENDERING */}
                     {currentStep < 3 ? (
-                        <button
-                            type="button"
-                            className="btn btn-confirm"
-                            onClick={handleNextStep}
-                        >
+                        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                             {currentStep === 1 && "Proceed to Info"}
                             {currentStep === 2 && "Proceed to Payment"}
                         </button>
                     ) : (
-                        // Show wallet button if available, otherwise show card payment button
+                        // If a wallet is available, show the wallet button as the primary CTA
                         paymentRequest ? (
                             <PaymentRequestButtonElement
                                 options={{
@@ -389,21 +337,17 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                     style: {
                                         paymentRequestButton: {
                                             theme: 'dark',
-                                            height: '48px',
+                                            height: '48px', // Match your site's CTA button height
                                             type: 'book'
                                         }
                                     }
                                 }}
                             />
                         ) : (
-                            <button
-                                type="submit"
-                                form="main-checkout-form"
-                                className="btn btn-confirm"
-                                disabled={isProcessing || !stripe || !elements}
-                            >
-                                {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
-                            </button>
+                        // Otherwise, show the standard card payment button
+                        <button type="submit" form="main-checkout-form" className="btn btn-confirm" disabled={isProcessing || !stripe}>
+                            {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
+                        </button>
                         )
                     )}
                 </div>
@@ -416,21 +360,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     );
 }
 
-// The wrapper provides the Stripe context to the entire page
 function GuestInfoPageWrapper({ clientSecret, ...props }) {
     if (!clientSecret) {
         return <p style={{ textAlign: "center", padding: "50px" }}>Loading payment form...</p>;
     }
 
     return (
-        <Elements
-            stripe={stripePromise}
-            options={{
-                clientSecret,
-                appearance: { theme: "stripe" },
-                locale: "en",
-            }}
-        >
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" }, locale: "en" }}>
             <GuestInfoPage {...props} clientSecret={clientSecret} />
         </Elements>
     );
