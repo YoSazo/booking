@@ -74,6 +74,14 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     );
 };
 
+const StripeFormSkeleton = () => (
+    <div className="secure-payment-frame" aria-hidden="true">
+        <div style={{ backgroundColor: '#e0e0e0', height: '40px', borderRadius: '6px', marginBottom: '16px' }}></div>
+        <div style={{ backgroundColor: '#e0e0e0', height: '20px', width: '100%', borderRadius: '6px', marginBottom: '10px', opacity: 0.5 }}></div>
+        <div style={{ backgroundColor: '#e0e0e0', height: '40px', borderRadius: '6px', marginBottom: '16px' }}></div>
+    </div>
+);
+
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     const stripe = useStripe();
@@ -384,9 +392,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                     </div>
                                 </>
                             ) : (
-                                <p style={{ textAlign: 'center', padding: '20px' }}>
-                                    Loading secure payment form...
-                                </p>
+                                <StripeFormSkeleton/>
                             )}
                         </div>
                     </div>
