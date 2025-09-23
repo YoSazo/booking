@@ -411,7 +411,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                         {currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`)}
                     </button>
 
-                    <div className="cta-error-wrapper">
+                    <div className="cta-error-wrapper" style={{ textAlign: 'center', marginTop: '10px' }}>
                         {errorMessage && (<div className="error-message">{errorMessage}</div>)}
                     </div>
                 </div>
