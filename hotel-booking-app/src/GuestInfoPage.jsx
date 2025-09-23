@@ -136,10 +136,10 @@ const validateInfoStep = () => {
         errors.phone = "A valid phone number is required.";
     }
 
-    // This now ONLY sets the inline form errors for the info step
+    // This now ONLY sets the inline form errors (e.g., "First name is required.")
     setFormErrors(errors);
     
-    // It no longer touches the main errorMessage state
+    // It NO LONGER touches the main errorMessage state. This is the key.
     return Object.keys(errors).length === 0;
 };
 
@@ -178,12 +178,22 @@ const validatePaymentStep = () => {
     };
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (formErrors[name]) {
-            setFormErrors(prev => ({...prev, [name]: ''}));
-        }
-    };
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+
+    // Clear inline errors like before
+    if (formErrors[name]) {
+        setFormErrors(prev => ({...prev, [name]: ''}));
+    }
+
+    // NEW: If the user starts typing in any address field, clear the main error message.
+    if (
+        errorMessage.includes("billing address") &&
+        ['address', 'city', 'state', 'zip'].includes(name)
+    ) {
+        setErrorMessage('');
+    }
+};
     
     const handlePhoneChange = (e) => {
         let value = e.target.value;
