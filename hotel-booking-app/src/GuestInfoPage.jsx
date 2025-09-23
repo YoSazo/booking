@@ -5,84 +5,27 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// This component displays the Stripe elements and the final 'Pay' button
-const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete, errorMessage, setErrorMessage, isProcessing, setIsProcessing }) => {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [paymentRequest, setPaymentRequest] = useState(null);
-    const [showPaymentButtons, setShowPaymentButtons] = useState(false);
-
-    const handleWalletClick = (e) => {
-        // Don't validate here - let Stripe handle it and we'll validate in the paymentmethod event
-        return true;
-    };
-
-    useEffect(() => {
-        const timer = setTimeout(() => setShowPaymentButtons(true), 300);
-        return () => clearTimeout(timer);
-    }, []);
-
-    // This logic is self-contained and correct.
-    useEffect(() => {
-        if (!stripe || !clientSecret || !bookingDetails) return;
-        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-        const pr = stripe.paymentRequest({
-            country: 'US', currency: 'usd',
-            total: { label: 'Booking Payment', amount: amountInCents },
-            requestPayerName: true, requestPayerEmail: true,
-        });
-        pr.canMakePayment().then(result => { if (result) setPaymentRequest(pr); });
-        pr.on('paymentmethod', async (ev) => {
-            // FIXED: Validate address before processing payment
-            if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-                setErrorMessage("Please fill out your billing address before proceeding.");
-                ev.complete('fail');
-                return;
-            }
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-            sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-            const { error: confirmError } = await stripe.confirmCardPayment(
-                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-            );
-            if (confirmError) { ev.complete('fail'); return; }
-            ev.complete('success');
-            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-        });
-        return () => { if (pr) pr.off('paymentmethod'); };
-    }, [stripe, clientSecret, bookingDetails, guestInfo, setErrorMessage]);
-
+// Simplified component that only displays the payment form
+const StripePaymentForm = () => {
     return (
         <div className="secure-payment-frame">
-            {paymentRequest && showPaymentButtons && (
-                <PaymentRequestButtonElement
-                    options={{
-                        paymentRequest,
-                        style: { paymentRequestButton: { theme: 'dark', height: '40px' } }
-                    }}
-                    onClick={handleWalletClick}
-                />
-            )}
-
-            {paymentRequest && (
-                <div className="payment-divider">
-                    <span>OR PAY WITH CARD</span>
-                </div>
-            )}
-
             <PaymentElement />
         </div>
     );
 };
 
-const StripeFormSkeleton = () => (
-    <div className="secure-payment-frame" aria-hidden="true">
-        <div style={{ backgroundColor: '#e0e0e0', height: '40px', borderRadius: '6px', marginBottom: '16px' }}></div>
-        <div style={{ backgroundColor: '#e0e0e0', height: '20px', width: '100%', borderRadius: '6px', marginBottom: '10px', opacity: 0.5 }}></div>
-        <div style={{ backgroundColor: '#e0e0e0', height: '40px', borderRadius: '6px', marginBottom: '16px' }}></div>
-    </div>
-);
+// Skeleton component for loading state (you can implement this as needed)
+const StripeFormSkeleton = () => {
+    return (
+        <div className="stripe-form-skeleton">
+            <div className="skeleton-line"></div>
+            <div className="skeleton-line"></div>
+            <div className="skeleton-line short"></div>
+        </div>
+    );
+};
 
-// This is the main component that controls the multi-step flow.
+// Main component that controls the multi-step flow
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     const stripe = useStripe();
     const elements = useElements();
@@ -97,24 +40,71 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    const [showStripeForm, setShowStripeForm] = useState(false);
+    const [paymentRequest, setPaymentRequest] = useState(null);
     const paymentHeaderRef = useRef(null);
 
-    // ✅ THE DEFINITIVE FIX: This effect ensures that when the payment step
-    // becomes active, any previous error messages are cleared.
+    // Create Payment Request for wallet payments (Apple Pay, Google Pay, etc.)
+    useEffect(() => {
+        if (!stripe || !clientSecret || !bookingDetails) {
+            return;
+        }
+
+        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+        const pr = stripe.paymentRequest({
+            country: 'US',
+            currency: 'usd',
+            total: {
+                label: 'Booking Payment',
+                amount: amountInCents,
+            },
+            requestPayerName: true,
+            requestPayerEmail: true,
+        });
+
+        // Check if the browser supports wallet payments
+        pr.canMakePayment().then(result => {
+            if (result) {
+                setPaymentRequest(pr);
+            }
+        });
+
+        // Handle wallet payment method
+        pr.on('paymentmethod', async (ev) => {
+            if (!validatePaymentStep()) {
+                setErrorMessage("Please fill out your billing address before proceeding.");
+                ev.complete('fail');
+                return;
+            }
+            setIsProcessing(true);
+            setErrorMessage('');
+            
+            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+            sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+
+            const { error: confirmError } = await stripe.confirmCardPayment(
+                clientSecret,
+                { payment_method: ev.paymentMethod.id },
+                { handleActions: false }
+            );
+
+            if (confirmError) {
+                ev.complete('fail');
+                setErrorMessage(confirmError.message);
+                setIsProcessing(false);
+            } else {
+                ev.complete('success');
+                onComplete(formData);
+            }
+        });
+
+    }, [stripe, clientSecret, bookingDetails, formData]);
+
+    // Clear errors when moving to payment step
     useEffect(() => {
         if (currentStep === 3) {
-            // Ensure the form is hidden initially when switching to step 3
-            setShowStripeForm(false);
-            // Set a short timer to allow the UI to update and then show the form
-            const timer = setTimeout(() => {
-                setErrorMessage(''); // Clear any lingering errors
-                setShowStripeForm(true); // Now, render the Stripe form
-            }, 100); // A 100ms delay is usually enough
-            return () => clearTimeout(timer);
+            setErrorMessage('');
         }
     }, [currentStep]);
-
 
     const handleAddressPaste = (e) => {
         setTimeout(() => {
@@ -132,18 +122,10 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
     const validateInfoStep = () => {
         const errors = {};
-
         if (!formData.firstName.trim()) errors.firstName = "First name is required.";
         if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
-        if (!formData.email.trim()) {
-            errors.email = "Email is required.";
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-            errors.email = "Please enter a valid email address.";
-        }
-        if (formData.phone.replace(/\D/g, '').length < 11) {
-            errors.phone = "A valid phone number is required.";
-        }
-
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Please enter a valid email address.";
+        if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -157,71 +139,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         );
     };
 
-    const handleNextStep = () => {
-        if (currentStep === 2 && !validateInfoStep()) return;
-
-        setFormErrors({});
-        setCurrentStep(prev => prev + 1);
-        window.scrollTo(0, 0);
-    };
-
-    const handleBackStep = () => {
-        setErrorMessage('');
-        if (currentStep === 1) onBack();
-        else setCurrentStep(prev => prev - 1);
-    };
-
-    const getBackButtonText = () => {
-        if (currentStep === 1) return '< Back to Booking';
-        if (currentStep === 2) return '< Back to Cart';
-        if (currentStep === 3) return '< Back to Info';
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-
-        if (formErrors[name]) {
-            setFormErrors(prev => ({ ...prev, [name]: '' }));
-        }
-
-        if (
-            errorMessage.includes("billing address") &&
-            ['address', 'city', 'state', 'zip'].includes(name) &&
-            value.trim() !== ''
-        ) {
-            setErrorMessage('');
-        }
-    };
-
-    const handlePhoneChange = (e) => {
-        let value = e.target.value;
-        if (!value.startsWith('+1 ')) { value = '+1 '; }
-        setFormData(prev => ({ ...prev, phone: value }));
-        if (formErrors.phone) { setFormErrors(prev => ({ ...prev, phone: '' })); }
-    };
-
-    const onLoad = (autoC) => setAutocomplete(autoC);
-    const onPlaceChanged = () => {
-        if (autocomplete !== null) {
-            const place = autocomplete.getPlace();
-            const components = place.address_components;
-            let streetNumber = '', route = '', city = '', state = '', zip = '';
-            for (const component of components) {
-                const types = component.types;
-                if (types.includes('street_number')) streetNumber = component.long_name;
-                if (types.includes('route')) route = component.long_name;
-                if (types.includes('locality')) city = component.long_name;
-                if (types.includes('administrative_area_level_1')) state = component.short_name;
-                if (types.includes('postal_code')) zip = component.long_name;
-            }
-            setFormData(prev => ({ ...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip }));
-            setErrorMessage('');
-        }
-        setIsAddressSelected(true);
-    };
-
-    const handleFinalSubmit = async (e) => {
+    const handleCardSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
 
@@ -253,13 +171,70 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         }
     };
 
+    const handleNextStep = () => {
+        if (currentStep === 2 && !validateInfoStep()) return;
+
+        setFormErrors({});
+        setCurrentStep(prev => prev + 1);
+        window.scrollTo(0, 0);
+    };
+
+    const handleBackStep = () => {
+        setErrorMessage('');
+        if (currentStep === 1) onBack();
+        else setCurrentStep(prev => prev - 1);
+    };
+
+    const getBackButtonText = () => {
+        if (currentStep === 1) return '< Back to Booking';
+        if (currentStep === 2) return '< Back to Cart';
+        if (currentStep === 3) return '< Back to Info';
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (formErrors[name]) {
+            setFormErrors(prev => ({ ...prev, [name]: '' }));
+        }
+        if (errorMessage && ['address', 'city', 'state', 'zip'].includes(name) && value.trim() !== '') {
+            setErrorMessage('');
+        }
+    };
+
+    const handlePhoneChange = (e) => {
+        let value = e.target.value;
+        if (!value.startsWith('+1 ')) { value = '+1 '; }
+        setFormData(prev => ({ ...prev, phone: value }));
+        if (formErrors.phone) { setFormErrors(prev => ({ ...prev, phone: '' })); }
+    };
+
+    const onLoad = (autoC) => setAutocomplete(autoC);
+    const onPlaceChanged = () => {
+        if (autocomplete !== null) {
+            const place = autocomplete.getPlace();
+            const components = place.address_components;
+            let streetNumber = '', route = '', city = '', state = '', zip = '';
+            for (const component of components) {
+                const types = component.types;
+                if (types.includes('street_number')) streetNumber = component.long_name;
+                if (types.includes('route')) route = component.long_name;
+                if (types.includes('locality')) city = component.long_name;
+                if (types.includes('administrative_area_level_1')) state = component.short_name;
+                if (types.includes('postal_code')) zip = component.long_name;
+            }
+            setFormData(prev => ({ ...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip }));
+            setErrorMessage('');
+        }
+        setIsAddressSelected(true);
+    };
+
     if (!bookingDetails) {
         return <div style={{ textAlign: 'center', padding: '50px' }}>Loading booking details...</div>;
     }
 
     const priceToday = bookingDetails.subtotal / 2;
     const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
-    const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
 
     return (
         <>
@@ -267,7 +242,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
 
-            <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
+            <div className="guest-info-container" style={{ paddingBottom: '40px' }}>
                 <div className="guest-info-header">
                     <button onClick={handleBackStep} className="back-button">
                         {getBackButtonText()}
@@ -309,7 +284,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                     </div>
                 )}
 
-                <form id="main-checkout-form" onSubmit={handleFinalSubmit}>
+                <form id="main-checkout-form" onSubmit={handleCardSubmit}>
                     <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
                         <div className="form-field">
                             <label>First Name</label>
@@ -341,18 +316,15 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 className="stripe-badge-image"
                                 tabIndex="-1"
                             />
-                            {clientSecret && showStripeForm ? (
+                            {clientSecret ? (
                                 <>
-                                    <StripePaymentForm
-                                        bookingDetails={bookingDetails}
-                                        guestInfo={formData}
-                                        onComplete={onComplete}
-                                        clientSecret={clientSecret}
-                                        errorMessage={errorMessage}
-                                        setErrorMessage={setErrorMessage}
-                                        isProcessing={isProcessing}
-                                        setIsProcessing={setIsProcessing}
-                                    />
+                                    {paymentRequest && (
+                                        <div className="payment-divider">
+                                            <span>OR PAY WITH CARD</span>
+                                        </div>
+                                    )}
+                                    
+                                    <StripePaymentForm />
 
                                     <div className="billing-address-section">
                                         <div className="form-grid">
@@ -392,35 +364,59 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                     </div>
                                 </>
                             ) : (
-                                <StripeFormSkeleton/>
+                                <StripeFormSkeleton />
                             )}
                         </div>
                     </div>
                 </form>
 
                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
-                    <button
-                        type={currentStep < 3 ? "button" : "submit"}
-                        form={currentStep === 3 ? "main-checkout-form" : undefined}
-                        className="btn btn-confirm"
-                        onClick={currentStep < 3 ? handleNextStep : undefined}
-                        disabled={currentStep === 3 && (isProcessing || !stripe || !elements)}
-                    >
-                        {currentStep === 1 && "Proceed to Info"}
-                        {currentStep === 2 && "Proceed to Payment"}
-                        {currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`)}
-                    </button>
-                  </div>
-
-                    <div className="cta-error-wrapper" style={{ textAlign: 'center', marginTop: '10px' }}>
-                        {errorMessage && (<div className="error-message">{errorMessage}</div>)}
-                    </div>
+                    {currentStep < 3 ? (
+                        <button
+                            type="button"
+                            className="btn btn-confirm"
+                            onClick={handleNextStep}
+                        >
+                            {currentStep === 1 && "Proceed to Info"}
+                            {currentStep === 2 && "Proceed to Payment"}
+                        </button>
+                    ) : (
+                        // Show wallet button if available, otherwise show card payment button
+                        paymentRequest ? (
+                            <PaymentRequestButtonElement
+                                options={{
+                                    paymentRequest,
+                                    style: {
+                                        paymentRequestButton: {
+                                            theme: 'dark',
+                                            height: '48px',
+                                            type: 'book'
+                                        }
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <button
+                                type="submit"
+                                form="main-checkout-form"
+                                className="btn btn-confirm"
+                                disabled={isProcessing || !stripe || !elements}
+                            >
+                                {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
+                            </button>
+                        )
+                    )}
                 </div>
+
+                <div className="cta-error-wrapper" style={{ textAlign: 'center', marginTop: '10px' }}>
+                    {errorMessage && (<div className="error-message">{errorMessage}</div>)}
+                </div>
+            </div>
         </>
     );
 }
 
-// The wrapper provides the Stripe context to the entire page.
+// The wrapper provides the Stripe context to the entire page
 function GuestInfoPageWrapper({ clientSecret, ...props }) {
     if (!clientSecret) {
         return <p style={{ textAlign: "center", padding: "50px" }}>Loading payment form...</p>;
