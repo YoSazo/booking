@@ -361,10 +361,33 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                         )}
                                     </div>
                                 </div>
-                           </>
-                        )}
-                        {errorMessage && <div className="error-message payment-error">{errorMessage}</div>}
-                    </div>
+<div className="payment-method-logos">
+                <svg className="payment-logo" width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Simplified Visa logo */}
+                    <rect width="32" height="20" rx="3" fill="#1A1F71"/>
+                    <path d="M10 5H22V15H10V5Z" fill="white"/>
+                </svg>
+                <svg className="payment-logo" width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    
+                    <circle cx="16" cy="10" r="9" fill="#FF5E00"/>
+                    <circle cx="12" cy="7" r="3" fill="#EB001B"/>
+                    <circle cx="20" cy="13" r="3" fill="#F79E1B"/>
+                </svg>
+                <svg className="payment-logo" width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                   
+                    <rect width="32" height="20" rx="3" fill="#006FCF"/>
+                    <path d="M8 5H24V15H8V5Z" fill="#FFFFFF"/>
+                </svg>
+                <svg className="payment-logo" width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    
+                    <circle cx="16" cy="10" r="9" fill="#FF6000"/>
+                    <path d="M12 7H20V13H12V7Z" fill="white"/>
+                </svg>
+            </div>
+        </>
+    )}
+    {errorMessage && <div className="error-message payment-error">{errorMessage}</div>}
+</div>
                 </form>
                 
                 <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
