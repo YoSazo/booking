@@ -1644,9 +1644,10 @@ body {
 }
 
 .payment-logo {
-  width: 22px;
-  height: 22px;
-  filter: invert(30%); /* Makes the black logos a nice gray */
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+    margin-right: 8px;
 }
 
 /* Main container for the new card fields */
