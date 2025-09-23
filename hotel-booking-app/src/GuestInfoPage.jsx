@@ -13,28 +13,18 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const [showPaymentButtons, setShowPaymentButtons] = useState(false);
 
     const handleWalletClick = (e) => {
-        // This should perform the full validation, just like the main "Pay" button
-        if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        }
-        setErrorMessage(''); // Clear error if the address is valid
-        return true;
-    };
+  if (!guestInfo.address) return true; // just let Stripe handle actual validation
+};
+
+useEffect(() => {
+  const timer = setTimeout(() => setShowPaymentButtons(true), 300);
+  return () => clearTimeout(timer);
+}, []);
+
 
     // This logic is self-contained and correct.
     useEffect(() => {
-        // The timer to show the buttons should be inside this main hook
-        const timer = setTimeout(() => {
-            setShowPaymentButtons(true);
-        }, 300);
-
-        if (!stripe || !clientSecret || !bookingDetails) {
-            return () => clearTimeout(timer); // Still clear timer on exit
-        }
-        
+        if (!stripe || !clientSecret || !bookingDetails) return;
         const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
         const pr = stripe.paymentRequest({
             country: 'US', currency: 'usd',
@@ -52,15 +42,8 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
             ev.complete('success');
             window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
         });
-        return () => {
-            clearTimeout(timer);
-            if (pr) {
-                pr.off('paymentmethod');
-            }
-        };
+        return () => { if (pr) pr.off('paymentmethod'); };
     }, [stripe, clientSecret, bookingDetails, guestInfo]);
-  
-  };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -91,16 +74,15 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
 
     return (
   <div className="secure-payment-frame">
-    <div onClickCapture={handleWalletClick}>
     {paymentRequest && showPaymentButtons && (
-                    <PaymentRequestButtonElement 
-                        options={{ 
-                            paymentRequest, 
-                            style: { paymentRequestButton: { theme: 'dark', height: '40px' } } 
-                        }} 
-                    />
-                )}
-</div>
+  <PaymentRequestButtonElement
+    options={{
+      paymentRequest,
+      style: { paymentRequestButton: { theme: 'dark', height: '40px' } }
+    }}
+    onClick={handleWalletClick}
+  />
+)}
 
     {paymentRequest && (
       <div className="payment-divider">
@@ -111,6 +93,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     <PaymentElement />
   </div>
 );
+};
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret  }) {
@@ -303,7 +286,6 @@ const validatePaymentStep = () => {
                     <button onClick={handleBackStep} className="back-button">
     {getBackButtonText()}
 </button>
-</div>
                     <h1>Guest Information</h1>
                 </div>
 
@@ -452,11 +434,9 @@ const validatePaymentStep = () => {
                     </button>
 
                     <div className="cta-error-wrapper">
-                      {errorMessage && (
-                        <div className="error-message">
-                          {errorMessage}
-                        </div>
-                      )}
+                                {errorMessage && ( <div className="error-message">{errorMessage}</div>
+                                )}
+                    </div>
                 </div>
                 
             </div>
