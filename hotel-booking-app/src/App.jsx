@@ -11,8 +11,6 @@ import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
-
-
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
@@ -47,7 +45,6 @@ function App() {
   const [availableRooms, setAvailableRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
-
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
@@ -60,7 +57,6 @@ function App() {
     setAvailableRooms(currentHotel.rooms);
   }, [hotelId]);
 
-  // Save booking data to sessionStorage whenever it changes
   useEffect(() => {
     if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
     if (guestInfo) sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
@@ -131,73 +127,68 @@ function App() {
   };
 
   const handleConfirmBooking = async () => {
-  if (!selectedRoom) {
-    alert("Please select a room first.");
-    return;
-  }
+    if (!selectedRoom) {
+      alert("Please select a room first.");
+      return;
+    }
 
-  const nights = checkinDate && checkoutDate
-    ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
-    : 0;
+    const nights = checkinDate && checkoutDate
+      ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
+      : 0;
 
-  const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
-  const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
-  const total = selectedRoom.grandTotal || subtotal + taxes;
-  const ourReservationCode = generateReservationCode();
+    const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
+    const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
+    const total = selectedRoom.grandTotal || subtotal + taxes;
+    const ourReservationCode = generateReservationCode();
 
-  trackInitiateCheckout({ ...selectedRoom, subtotal });
+    trackInitiateCheckout({ ...selectedRoom, subtotal });
 
-  const newBooking = {
-    ...selectedRoom,
-    checkin: checkinDate,
-    checkout: checkoutDate,
-    nights,
-    subtotal,
-    taxes,
-    total,
-    reservationCode: ourReservationCode,
-  };
+    const newBooking = {
+      ...selectedRoom,
+      checkin: checkinDate,
+      checkout: checkoutDate,
+      nights,
+      subtotal,
+      taxes,
+      total,
+      reservationCode: ourReservationCode,
+    };
 
-  // Optional: Keep setFinalBooking for sessionStorage persistence
-  setFinalBooking(newBooking);
+    setFinalBooking(newBooking);
 
-  // Wait for client secret before navigating
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
-    });
-    const data = await response.json();
-    if (data.clientSecret) {
-      setClientSecret(data.clientSecret);
-      // Pass booking data directly in navigate
-      navigate('/guest-info', {
-        state: {
-          room: {
-            name: selectedRoom.name,
-            beds: selectedRoom.beds || 'N/A', // Ensure beds is defined
-          },
-          totalPrice: total,
-          searchParams: {
-            checkIn: checkinDate,
-            checkOut: checkoutDate,
-            nights,
-            guests: selectedRoom.guests,
-          },
-        },
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
       });
-      window.scrollTo(0, 0);
-    } else {
+      const data = await response.json();
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret);
+        navigate('/guest-info', {
+          state: {
+            room: {
+              name: selectedRoom.name,
+              beds: selectedRoom.beds || 'N/A',
+            },
+            totalPrice: total,
+            searchParams: {
+              checkIn: checkinDate,
+              checkOut: checkoutDate,
+              nights,
+              guests: selectedRoom.guests,
+            },
+          },
+        });
+        window.scrollTo(0, 0);
+      } else {
+        alert("Failed to load payment form. Please try again.");
+      }
+    } catch (error) {
+      console.error("Failed to pre-fetch client secret:", error);
       alert("Failed to load payment form. Please try again.");
     }
-  } catch (error) {
-    console.error("Failed to pre-fetch client secret:", error);
-    alert("Failed to load payment form. Please try again.");
-  }
-};
-
-
+  };
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
@@ -225,13 +216,9 @@ function App() {
       const result = await response.json();
       if (result.success) {
         setGuestInfo(formData);
-        // --- START FIX 2C ---
-        // Capture the final reservation code from the server's response
-        setReservationCode(result.reservationCode); 
-        // Update the finalBooking object with the PMS code for storage/session
+        setReservationCode(result.reservationCode);
         setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationCode }));
         trackPurchase(finalBooking, formData, result.reservationCode);
-        // --- END FIX 2C ---
         navigate('/final-confirmation');
         window.scrollTo(0, 0);
       } else {
@@ -280,23 +267,12 @@ function App() {
             onOpenLightbox={handleOpenLightbox}
           />
         } />
-        <Route path="/guest-info" element={
-          <GuestInfoPageWrapper
-            hotel={currentHotel}
-            bookingDetails={finalBooking}
-            onBack={() => navigate('/')}
-            onComplete={handleCompleteBooking}
-            apiBaseUrl={API_BASE_URL}
-            clientSecret={clientSecret}
-          />
-        } />
+        <Route path="/guest-info" element={<GuestInfoPageWrapper />} />
         <Route path="/confirmation" element={
           <Elements stripe={stripePromise}>
             <CheckoutReturnPage onComplete={handleCompleteBooking} />
           </Elements>
         } />
-
-        {/* This is the final, styled page the user will see */}
         <Route path="/final-confirmation" element={
           <ConfirmationPage 
             bookingDetails={finalBooking}
@@ -313,8 +289,6 @@ function App() {
           onClose={handleCloseLightbox}
         />
       )}
-      
-      {/* {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />} */}
     </>
   );
 }
