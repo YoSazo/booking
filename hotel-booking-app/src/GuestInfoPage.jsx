@@ -13,11 +13,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const [showPaymentButtons, setShowPaymentButtons] = useState(false);
 
     const handleWalletClick = (e) => {
-        // FIXED: Only validate when wallet button is actually clicked
-        if (!guestInfo.address) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return false;
-        }
+        // Don't validate here - let Stripe handle it and we'll validate in the paymentmethod event
         return true;
     };
 
