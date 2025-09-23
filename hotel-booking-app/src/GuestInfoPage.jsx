@@ -5,8 +5,49 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// This component is now simplified to only display the card entry fields.
-const StripePaymentForm = () => {
+// Custom payment method selector component
+const PaymentMethodSelector = ({ selectedMethod, onMethodChange, paymentRequest }) => {
+    return (
+        <div className="payment-method-selector">
+            {paymentRequest && (
+                <div className="payment-option">
+                    <input 
+                        type="radio" 
+                        id="apple-pay" 
+                        name="paymentMethod" 
+                        value="wallet"
+                        checked={selectedMethod === 'wallet'}
+                        onChange={(e) => onMethodChange(e.target.value)}
+                    />
+                    <label htmlFor="apple-pay" className="payment-option-label">
+                        <span className="payment-icon">🍎</span>
+                        Apple Pay / Google Pay
+                    </label>
+                </div>
+            )}
+            
+            <div className="payment-option">
+                <input 
+                    type="radio" 
+                    id="credit-card" 
+                    name="paymentMethod" 
+                    value="card"
+                    checked={selectedMethod === 'card'}
+                    onChange={(e) => onMethodChange(e.target.value)}
+                />
+                <label htmlFor="credit-card" className="payment-option-label">
+                    <span className="payment-icon">💳</span>
+                    Credit / Debit Card
+                </label>
+            </div>
+        </div>
+    );
+};
+
+// Conditional card form component
+const StripePaymentForm = ({ showCardForm }) => {
+    if (!showCardForm) return null;
+    
     return (
         <div className="secure-payment-frame">
             <PaymentElement />
@@ -28,9 +69,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    
-    // ✅ State to hold the Payment Request object (for Apple Pay, Google Pay, etc.)
     const [paymentRequest, setPaymentRequest] = useState(null);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card'); // Default to card
 
     // ✅ This effect creates the Payment Request and checks if a wallet is available.
     useEffect(() => {
@@ -50,10 +90,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             requestPayerEmail: true,
         });
 
-        // Check if the browser supports wallet payments
+        // Set initial payment method based on wallet availability
         pr.canMakePayment().then(result => {
             if (result) {
                 setPaymentRequest(pr);
+                setSelectedPaymentMethod('wallet'); // Default to wallet if available
             }
         });
 
@@ -105,6 +146,37 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             formData.state.trim() !== "" &&
             formData.zip.trim() !== ""
         );
+    };
+
+    const handlePaymentMethodChange = (method) => {
+        setSelectedPaymentMethod(method);
+        setErrorMessage(''); // Clear errors when switching methods
+    };
+
+    const handleWalletPayment = async () => {
+        if (!paymentRequest || !validatePaymentStep()) {
+            if (!validatePaymentStep()) {
+                setErrorMessage("Please fill out your billing address before proceeding.");
+            }
+            return;
+        }
+
+        setIsProcessing(true);
+        setErrorMessage('');
+        
+        // Trigger the wallet payment
+        paymentRequest.show();
+    };
+
+    // Modified card submit to work with unified CTA
+    const handleUnifiedPayment = async (e) => {
+        e.preventDefault();
+        
+        if (selectedPaymentMethod === 'wallet') {
+            handleWalletPayment();
+        } else {
+            handleCardSubmit(e);
+        }
     };
     
     // This function now only handles the standard card payment submission.
@@ -277,9 +349,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                             {/* The divider and card fields now render instantly */}
                             {clientSecret && (
                                 <>
-                                    {/* The wallet button is now rendered in the CTA section */}
-                                    {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
-                                    <StripePaymentForm />
+                                    <PaymentMethodSelector 
+                                        selectedMethod={selectedPaymentMethod}
+                                        onMethodChange={handlePaymentMethodChange}
+                                        paymentRequest={paymentRequest}
+                                    />
+                                    
+                                    <StripePaymentForm showCardForm={selectedPaymentMethod === 'card'} />
                                     <div className="billing-address-section">
                                         <div className="form-grid">
                                             <div className="form-field full-width">
