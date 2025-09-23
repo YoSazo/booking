@@ -284,7 +284,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                         <img src="/stripe-checkout.png" alt="Guaranteed safe and secure checkout" className="stripe-badge-image" />
                         {clientSecret ? (
                             <Elements options={stripeOptions} stripe={stripePromise}>
-                                <StripePaymentForm 
+                                <StripePaymentElements 
                                     bookingDetails={bookingDetails} 
                                     guestInfo={formData} 
                                     onComplete={onComplete}
