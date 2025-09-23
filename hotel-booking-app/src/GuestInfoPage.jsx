@@ -1,353 +1,416 @@
-import React, { useState, useEffect } from 'react';
-import { Autocomplete } from '@react-google-maps/api';
-import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import { countries } from './countries';
+import Autocomplete from 'react-google-autocomplete';
 
+// --- Stripe Promise ---
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// This component displays the Stripe elements and the final 'Pay' button
-const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete }) => {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [paymentRequest, setPaymentRequest] = useState(null);
+// --- Main Component ---
+const GuestInfoPage = () => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    room,
+    totalPrice,
+    searchParams: initialSearchParams,
+  } = location.state || {};
+  const [searchParams, setSearchParams] = useState(initialSearchParams);
 
-    // This logic is self-contained and correct.
-    useEffect(() => {
-        if (!stripe || !clientSecret || !bookingDetails) return;
-        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-        const pr = stripe.paymentRequest({
-            country: 'US', currency: 'usd',
-            total: { label: 'Booking Payment', amount: amountInCents },
-            requestPayerName: true, requestPayerEmail: true,
-        });
-        pr.canMakePayment().then(result => { if (result) setPaymentRequest(pr); });
-        pr.on('paymentmethod', async (ev) => {
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-            sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-            const { error: confirmError } = await stripe.confirmCardPayment(
-                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-            );
-            if (confirmError) { ev.complete('fail'); return; }
-            ev.complete('success');
-            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-        });
-        return () => { if (pr) pr.off('paymentmethod'); };
-    }, [stripe, clientSecret, bookingDetails, guestInfo]);
+  // New state for managing the selected payment method
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
+  const [paymentRequest, setPaymentRequest] = useState(null);
+  const [clientSecret, setClientSecret] = useState('');
+  const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!stripe || !elements) return;
-        if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    country: 'United States',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+  });
+
+  // --- Style for the new payment UI ---
+  const paymentMethodButtonStyle = (method) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '12px 16px',
+    border:
+      selectedPaymentMethod === method ? '2px solid #007bff' : '2px solid #ddd',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    backgroundColor: selectedPaymentMethod === method ? '#f0f7ff' : '#fff',
+    fontWeight: '600',
+    flex: 1,
+    minWidth: '100px',
+    textAlign: 'center',
+    transition: 'all 0.2s ease-in-out',
+  });
+
+  const cardElementOptions = {
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#32325d',
+        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+        '::placeholder': {
+          color: '#aab7c4',
+        },
+      },
+      invalid: {
+        color: '#fa755a',
+        iconColor: '#fa755a',
+      },
+    },
+    hidePostalCode: true,
+  };
+
+  const createPaymentIntent = useCallback(async () => {
+    try {
+      const response = await fetch(
+        'http://localhost:4242/create-payment-intent',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: Math.round(totalPrice * 100) }),
         }
-        setIsProcessing(true);
-        setErrorMessage('');
-        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-        sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-        const { error, paymentIntent } = await stripe.confirmPayment({
-            elements,
-            confirmParams: {
-                receipt_email: guestInfo.email,
-                return_url: `${window.location.origin}/confirmation`,
+      );
+      const data = await response.json();
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret);
+      } else {
+        throw new Error('Failed to create payment intent.');
+      }
+    } catch (err) {
+      setError(
+        err.message || 'An error occurred while setting up the payment.'
+      );
+    }
+  }, [totalPrice]);
+
+  useEffect(() => {
+    if (totalPrice > 0) {
+      createPaymentIntent();
+    }
+  }, [totalPrice, createPaymentIntent]);
+
+  useEffect(() => {
+    if (stripe && clientSecret) {
+      const pr = stripe.paymentRequest({
+        country: 'US',
+        currency: 'usd',
+        total: {
+          label: 'Total',
+          amount: Math.round(totalPrice * 100),
+        },
+        requestPayerName: true,
+        requestPayerEmail: true,
+      });
+
+      pr.canMakePayment().then((result) => {
+        if (result) {
+          setPaymentRequest(pr);
+        }
+      });
+
+      pr.on('paymentmethod', async (ev) => {
+        const { paymentMethod, walletName } = ev;
+        const { error: confirmError } = await stripe.confirmCardPayment(
+          clientSecret,
+          { payment_method: paymentMethod.id },
+          { handleActions: false }
+        );
+        if (confirmError) {
+          ev.complete('fail');
+          setError(
+            `Payment confirmation failed: ${confirmError.message || 'Unknown error'}`
+          );
+        } else {
+          ev.complete('success');
+          navigate('/confirmation', {
+            state: {
+              ...location.state,
+              guestInfo: formData,
+              paymentMethod: walletName,
             },
-            redirect: 'if_required'
-        });
-        if (error) {
-            setErrorMessage(error.message || "An unexpected error occurred.");
-        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-            onComplete(guestInfo, paymentIntent.id);
+          });
         }
-        setIsProcessing(false);
-    };
+      });
+    }
+  }, [stripe, clientSecret, totalPrice, navigate, location.state, formData]);
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePlaceSelected = (place) => {
+    let address = '';
+    let city = '';
+    let state = '';
+    let zip = '';
+
+    const streetNumber =
+      place.address_components.find((c) => c.types.includes('street_number'))
+        ?.long_name || '';
+    const route =
+      place.address_components.find((c) => c.types.includes('route'))
+        ?.long_name || '';
+    address = `${streetNumber} ${route}`.trim();
+
+    city =
+      place.address_components.find((c) => c.types.includes('locality'))
+        ?.long_name || '';
+    state =
+      place.address_components.find((c) =>
+        c.types.includes('administrative_area_level_1')
+      )?.short_name || '';
+    zip =
+      place.address_components.find((c) => c.types.includes('postal_code'))
+        ?.long_name || '';
+
+    setFormData((prev) => ({
+      ...prev,
+      address,
+      city,
+      state,
+      zip,
+    }));
+  };
+
+  const isFormComplete = () => {
     return (
-    <div className="secure-payment-frame">
-        {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
-        {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
-        <PaymentElement />
+      formData.fullName &&
+      formData.email &&
+      formData.phone &&
+      formData.address &&
+      formData.city &&
+      formData.state &&
+      formData.zip
+    );
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!stripe || !elements || !clientSecret || !isFormComplete()) {
+      setError('Please fill out all required fields before proceeding.');
+      return;
+    }
+    setProcessing(true);
+    setError(null);
+
+    if (selectedPaymentMethod === 'card') {
+      const cardElement = elements.getElement(CardElement);
+      const { error: createPaymentMethodError, paymentMethod } =
+        await stripe.createPaymentMethod({
+          type: 'card',
+          card: cardElement,
+          billing_details: {
+            name: formData.fullName,
+            email: formData.email,
+            phone: formData.phone,
+            address: {
+              line1: formData.address,
+              city: formData.city,
+              state: formData.state,
+              postal_code: formData.zip,
+              country: 'US',
+            },
+          },
+        });
+
+      if (createPaymentMethodError) {
+        setError(
+          createPaymentMethodError.message || 'Failed to create payment method.'
+        );
+        setProcessing(false);
+        return;
+      }
+
+      const { error: confirmError } = await stripe.confirmCardPayment(
+        clientSecret,
+        {
+          payment_method: paymentMethod.id,
+        }
+      );
+
+      if (confirmError) {
+        setError(
+          confirmError.message || 'An error occurred during payment confirmation.'
+        );
+      } else {
+        navigate('/confirmation', {
+          state: {
+            ...location.state,
+            guestInfo: formData,
+            paymentMethod: 'Card',
+          },
+        });
+      }
+    } else if (selectedPaymentMethod === 'wallet' && paymentRequest) {
+        paymentRequest.show();
+    } else if (selectedPaymentMethod === 'amazon' || selectedPaymentMethod === 'paypal') {
+        alert(`Redirecting to ${selectedPaymentMethod === 'amazon' ? 'Amazon Pay' : 'PayPal'}...`);
+    }
+
+    setProcessing(false);
+  };
+
+  if (!room) {
+    return (
+      <div className="container mx-auto p-4 text-center">
+        <h1 className="text-2xl font-bold">Session expired or invalid access.</h1>
+        <p>Please start your booking again.</p>
+        <button onClick={() => navigate('/')} className="btn btn-primary mt-4">
+          Go to Homepage
+        </button>
+      </div>
+    );
+  }
+
+  const { name, beds } = room;
+  const { checkIn, checkOut, nights, guests } = searchParams;
+
+  return (
+    <div className="container mx-auto p-4 lg:p-8">
+      <h1 className="text-3xl font-bold mb-6">Complete Your Booking</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="card bg-base-100 shadow-xl p-6">
+              <h2 className="text-2xl font-semibold mb-4">Guest Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* ... (form fields for name, email, etc.) ... */}
+              </div>
+            </div>
+
+            <div className="card bg-base-100 shadow-xl p-6">
+              <h2 className="text-2xl font-semibold mb-4">Payment Method</h2>
+
+              <div className="flex gap-2 mb-6">
+                <div
+                  style={paymentMethodButtonStyle('card')}
+                  onClick={() => setSelectedPaymentMethod('card')}
+                >
+                  Card
+                </div>
+                {paymentRequest && (
+                  <div
+                    style={paymentMethodButtonStyle('wallet')}
+                    onClick={() => setSelectedPaymentMethod('wallet')}
+                  >
+                   Apple Pay / Google Pay
+                  </div>
+                )}
+                 <div
+                    style={paymentMethodButtonStyle('amazon')}
+                    onClick={() => setSelectedPaymentMethod('amazon')}
+                    >
+                    Amazon Pay
+                </div>
+              </div>
+
+              <div>
+                {selectedPaymentMethod === 'card' && (
+                  <div>
+                    <label className="label font-semibold">Card Details</label>
+                    <div
+                      className="p-4 border rounded-lg"
+                      style={{ borderColor: '#ddd' }}
+                    >
+                      <CardElement options={cardElementOptions} />
+                    </div>
+                  </div>
+                )}
+                {selectedPaymentMethod === 'wallet' && (
+                  <div className="text-center p-4 bg-gray-100 rounded-lg">
+                    <p>The <strong>Apple Pay / Google Pay</strong> modal will appear after you click "Complete Payment".</p>
+                  </div>
+                )}
+                {selectedPaymentMethod === 'amazon' && (
+                   <div className="text-center p-4 bg-gray-100 rounded-lg">
+                    <p>The <strong>Amazon Pay</strong> modal will appear after you click "Complete Payment".</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6">
+                 <h3 className="text-xl font-semibold mb-3">Billing Address</h3>
+                 <Autocomplete
+                   className="input input-bordered w-full"
+                   apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+                   onPlaceSelected={handlePlaceSelected}
+                   options={{
+                     types: ['address'],
+                     componentRestrictions: { country: 'us' },
+                   }}
+                   placeholder="Start typing your address..."
+                 />
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <input type="text" value={formData.city} placeholder="City" className="input input-bordered" readOnly />
+                    <input type="text" value={formData.state} placeholder="State" className="input input-bordered" readOnly />
+                    <input type="text" value={formData.zip} placeholder="ZIP Code" className="input input-bordered" readOnly />
+                 </div>
+              </div>
+            </div>
+
+            {error && (
+              <div role="alert" className="alert alert-error">
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn btn-primary w-full text-lg"
+              disabled={processing || !stripe || !clientSecret}
+            >
+              {processing
+                ? 'Processing...'
+                : `Pay $${totalPrice.toFixed(2)} and Complete Booking`}
+            </button>
+          </form>
+        </div>
+
+        <div className="lg:col-span-1">
+          <div className="card bg-base-100 shadow-xl p-6 sticky top-8">
+            <h2 className="text-2xl font-semibold mb-4">Your Booking</h2>
+            <div className="space-y-2">
+              <p><strong>Room:</strong> {name} ({beds})</p>
+              <p><strong>Check-in:</strong> {new Date(checkIn).toLocaleDateString()}</p>
+              <p><strong>Check-out:</strong> {new Date(checkOut).toLocaleDateString()}</p>
+              <p><strong>Duration:</strong> {nights} nights</p>
+              <p><strong>Guests:</strong> {guests}</p>
+              <div className="divider"></div>
+              <p className="text-xl font-bold">Total: ${totalPrice.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// This is the main component that controls the multi-step flow.
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
-    const [currentStep, setCurrentStep] = useState(1);
-    const [formData, setFormData] = useState({
-        firstName: '', lastName: '', phone: '+1 ', email: '',
-        address: '', city: '', state: '', zip: '',
-    });
-    // --- FIXED: The formErrors state is correctly defined here ---
-    const [formErrors, setFormErrors] = useState({});
-    const [clientSecret, setClientSecret] = useState('');
-    const [autocomplete, setAutocomplete] = useState(null);
-    const [isAddressSelected, setIsAddressSelected] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
+// --- Wrapper Component ---
+const GuestInfoPageWrapper = (props) => (
+  <Elements stripe={stripePromise}>
+    <GuestInfoPage {...props} />
+  </Elements>
+);
 
-    useEffect(() => {
-        if (bookingDetails && bookingDetails.subtotal) {
-            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
-            })
-            .then((res) => res.json()).then((data) => setClientSecret(data.clientSecret));
-        }
-    }, [bookingDetails, apiBaseUrl]);
-
-    const validateInfoStep = () => {
-        const errors = {};
-        if (!formData.firstName.trim()) errors.firstName = "First name is required.";
-        if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
-        if (!formData.email.trim()) errors.email = "Email is required.";
-        if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
-
-    const handleNextStep = () => {
-        if (currentStep === 2) {
-            if (!validateInfoStep()) return;
-        }
-        setFormErrors({});
-        setCurrentStep(prev => prev + 1);
-    };
-
-    const handleBackStep = () => {
-        if (currentStep === 1) { onBack(); }
-        else { setCurrentStep(prev => prev - 1); }
-    };
-
-    const getBackButtonText = () => {
-        if (currentStep === 1) return '< Back to Booking';
-        if (currentStep === 2) return '< Back to Cart';
-        if (currentStep === 3) return '< Back to Info';
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (formErrors[name]) {
-            setFormErrors(prev => ({...prev, [name]: ''}));
-        }
-    };
-    
-    const handlePhoneChange = (e) => {
-        let value = e.target.value;
-        if (!value.startsWith('+1 ')) { value = '+1 '; }
-        setFormData(prev => ({ ...prev, phone: value }));
-        if (formErrors.phone) { setFormErrors(prev => ({...prev, phone: ''})); }
-    };
-
-    const onLoad = (autoC) => setAutocomplete(autoC);
-    const onPlaceChanged = () => {
-        if (autocomplete !== null) {
-          const place = autocomplete.getPlace();
-          const components = place.address_components;
-          let streetNumber = '', route = '', city = '', state = '', zip = '';
-          for (const component of components) {
-            const types = component.types;
-            if (types.includes('street_number')) streetNumber = component.long_name;
-            if (types.includes('route')) route = component.long_name;
-            if (types.includes('locality')) city = component.long_name;
-            if (types.includes('administrative_area_level_1')) state = component.short_name;
-            if (types.includes('postal_code')) zip = component.long_name;
-          }
-          setFormData(prev => ({...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip}));
-        }
-        setIsAddressSelected(true);
-    };
-
-    const handleFinalSubmit = async (e) => {
-        e.preventDefault();
-        if (!stripe || !elements) return;
-
-        if (currentStep === 2) { // If on the info step, validate and move to payment
-            if (validateInfoStep()) {
-                setFormErrors({});
-                setCurrentStep(3);
-            }
-            return;
-        }
-
-        if (currentStep === 3) { // If on the payment step, process the payment
-            if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-                setErrorMessage("Please fill out your billing address before proceeding.");
-                return;
-            }
-
-            setIsProcessing(true);
-            setErrorMessage('');
-
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-            sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-            
-            const { error, paymentIntent } = await stripe.confirmPayment({
-                elements,
-                confirmParams: {
-                    receipt_email: formData.email,
-                    return_url: `${window.location.origin}/confirmation`,
-                },
-                redirect: 'if_required'
-            });
-
-            if (error) {
-                setErrorMessage(error.message || "An unexpected error occurred.");
-            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                onComplete(formData, paymentIntent.id);
-            }
-            setIsProcessing(false);
-        }
-    };
-    
-    if (!bookingDetails) {
-        return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
-    }
-    
-    const priceToday = bookingDetails.subtotal / 2;
-    const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
-    const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
-
-    return (
-        <>
-            <div className="static-banner">
-                ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
-            </div>
-            
-            {/* --- FIXED: The padding is now applied correctly here --- */}
-            <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
-                <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
-                    <h1>Guest Information</h1>
-                </div>
-
-                <div className="checkout-progress-bar">
-                    <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
-                        <div className="step-circle"></div>
-                        <span className="step-name">Review Cart</span>
-                    </div>
-                    <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
-                        <div className="step-circle"></div>
-                        <span className="step-name">Info</span>
-                    </div>
-                    <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
-                        <div className="step-circle"></div>
-                        <span className="step-name">Payment</span>
-                    </div>
-                </div>
-
-                {/* --- RESTORED: All original JSX for your steps is back --- */}
-                {currentStep === 1 && (
-                    <div className="info-summary-wrapper" style={{ display: currentStep === 1 ? 'block' : 'none' }}>
-                        <div className="summary-card-details">
-                            <p className="detail-line">{bookingDetails.name}</p>
-                            <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
-                            <p className="detail-line">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</p>
-                        </div>
-                        <div className="summary-card-price">
-                            <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
-                            <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
-                            <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
-                            <div className="total-breakdown">
-                                <p className="pay-today">Only Pay ${priceToday.toFixed(2)} Today</p>
-                                <p className="balance-due">Balance (${balanceDue.toFixed(2)}) When you arrive</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-                <form id="main-checkout-form" onSubmit={handleFinalSubmit}>
-                    <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
-                        <div className="form-field">
-                            <label>First Name</label>
-                            <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
-                            {formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}
-                        </div>
-                        <div className="form-field">
-                            <label>Last Name</label>
-                            <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />
-                            {formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}
-                        </div>
-                        <div className="form-field">
-                            <label>Phone Number</label>
-                            <input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} />
-                            {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
-                        </div>
-                        <div className="form-field">
-                            <label>Email Address</label>
-                            <input type="email" name="email" value={formData.email} onChange={handleChange} required />
-                            {formErrors.email && <span className="error-message">{formErrors.email}</span>}
-                        </div>
-                    </div>
-
-                <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-                     <div className="payment-placeholder">
-                        <img src="/stripe-checkout.png" alt="Guaranteed safe and secure checkout" className="stripe-badge-image" />
-                        {clientSecret ? (
-                            <Elements options={stripeOptions} stripe={stripePromise}>
-                                <StripePaymentForm 
-                                    bookingDetails={bookingDetails} 
-                                    guestInfo={formData} 
-                                    onComplete={onComplete}
-                                    clientSecret={clientSecret}
-                                    errorMessage={errorMessage}
-                                    setErrorMessage={setErrorMessage}
-                                    isProcessing={isProcessing}
-                                    setIsProcessing={setIsProcessing}
-
-                                />
-                                <div className="billing-address-section">
-                                    <div className="form-grid">
-                                        <div className="form-field full-width">
-                                            <label>Billing Address</label>
-                                            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                                                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing..." />
-                                            </Autocomplete>
-                                        </div>
-                                        {isAddressSelected && (
-                                            <div className="address-reveal-container visible">
-                                                <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
-                                                <div className="form-field"><label>State</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
-                                                <div className="form-field"><label>Zip</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </Elements>
-                        ) : ( <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p> )}
-                    </div>
-                </div>
-                </form>
-                
-                {/* --- This button is now outside the forms and is conditionally sticky --- */}
-                <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
-                    {/* --- FIXED: The logic here is simplified. The button type changes based on the step --- */}
-                    <button 
-                        type={currentStep < 3 ? "button" : "submit"} 
-                        form={currentStep === 3 ? "main-checkout-form" : undefined}
-                        className="btn btn-confirm" 
-                        onClick={currentStep < 3 ? handleNextStep : undefined}
-                        disabled={currentStep === 3 && (isProcessing || !stripe || !elements)}
-                    >
-                        { currentStep === 1 && "Proceed to Info" }
-                        { currentStep === 2 && "Proceed to Payment" }
-                        { currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`) }
-                    </button>
-                </div>
-                
-            </div>
-        </>
-    );
-}
-
-// The wrapper provides the Stripe context to the entire page.
-function GuestInfoPageWrapper(props) {
-    return (
-        <Elements stripe={stripePromise}>
-            <GuestInfoPage {...props} />
-        </Elements>
-    );
-}
-
-// Make sure this is the very last line, exporting the WRAPPER, not the page.
 export default GuestInfoPageWrapper;
