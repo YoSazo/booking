@@ -77,7 +77,7 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     <div className="secure-payment-frame">
         {/* MODIFICATION 2: Wrap the button element in a div with the click handler */}
         <div onClickCapture={handleWalletClick}>
-            {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} />}
+            {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} onClick={handleWalletClick}/>}
         </div>
 
         {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
