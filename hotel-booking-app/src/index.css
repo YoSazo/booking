@@ -1579,10 +1579,16 @@ body {
 }
 
 .tab-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px; /* Space between logo and text */
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background-color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  color: #666;
+  transition: background-color 0.2s, color 0.2s;
+  border-right: 1px solid #e0e0e0;
 }
 
 .tab-button:last-child {
@@ -1630,6 +1636,14 @@ body {
 
 /* --- Styles for Split Card Fields & Tab Logos --- */
 
+/* Tab button improvements for logos */
+.tab-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px; /* Space between logo and text */
+}
+
 .tab-button svg {
   width: 22px;
   height: 22px;
@@ -1667,4 +1681,3 @@ body {
 .card-field-wrapper .__PrivateStripeElement {
   padding: 8px 0;
 }
-
