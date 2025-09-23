@@ -13,7 +13,7 @@ import Autocomplete from 'react-google-autocomplete';
 // --- Stripe Promise ---
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// --- Main Composnent ---
+// --- Main Component ---
 const GuestInfoPage = ({ bookingDetails, onComplete }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -161,7 +161,7 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
         }
       });
     }
-  }, [stripe, clientSecret, totalPrice]);
+  }, [stripe, clientSecret, totalPrice, navigate, bookingDetails, formData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -243,12 +243,10 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
           },
         });
 
-      if (createPaymentMethodError) {
-        setError(
-          createPaymentMethodError.message || 'Failed to create payment method.'
-        );
-        setProcessing(false);
-        return;
+      if (paymentMethodError) {
+          setError(paymentMethodError.message);
+          setProcessing(false);
+          return;
       }
 
       const { error: confirmError } = await stripe.confirmCardPayment(
@@ -263,7 +261,7 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
           confirmError.message || 'An error occurred during payment confirmation.'
         );
       } else {
-        onComplete(formData, paymentIntent.id); // Or navigate directly
+        if (onComplete) onComplete(formData, paymentIntent.id); // Or navigate directly
         navigate('/confirmation', {
           state: {
             ...location.state,
@@ -272,7 +270,7 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
           },
         });
       }
-    } else if (selectedPaymentMethod === 'wallet') {
+    } else if (selectedPaymentMethod === 'wallet' && paymentRequest) {
         paymentRequest.show();
     } else if (selectedPaymentMethod === 'amazon' || selectedPaymentMethod === 'paypal') {
         alert(`Redirecting to ${selectedPaymentMethod === 'amazon' ? 'Amazon Pay' : 'PayPal'}...`);
@@ -280,18 +278,6 @@ const GuestInfoPage = ({ bookingDetails, onComplete }) => {
 
     setProcessing(false);
   };
-
-  if (!room) {
-    return (
-      <div className="container mx-auto p-4 text-center">
-        <h1 className="text-2xl font-bold">Session expired or invalid access.</h1>
-        <p>Please start your booking again.</p>
-        <button onClick={() => navigate('/')} className="btn btn-primary mt-4">
-          Go to Homepage
-        </button>
-      </div>
-    );
-  }
 
   const { name, beds } = room;
 
