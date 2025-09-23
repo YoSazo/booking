@@ -1682,31 +1682,3 @@ body {
   padding: 8px 0;
 }
 
-/* Styles for payment method logos */
-.payment-method-logos {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 15px;
-    padding: 10px 0;
-    border-top: 1px solid #e0e0e0;
-}
-
-.payment-logo {
-    width: 32px;
-    height: 20px;
-    object-fit: contain;
-}
-
-/* Ensure the logos are visible and styled */
-.payment-logo path,
-.payment-logo rect,
-.payment-logo circle {
-    transition: fill 0.3s ease;
-}
-
-.payment-logo:hover path,
-.payment-logo:hover rect,
-.payment-logo:hover circle {
-    fill: #000; /* Darken on hover for better visibility */
-}
