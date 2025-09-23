@@ -186,7 +186,8 @@ const validatePaymentStep = () => {
         setFormErrors(prev => ({...prev, [name]: ''}));
     }
 
-    // NEW: If the user starts typing in any address field, clear the main error message.
+    // NEW: If the "billing address" error is showing and the user types
+    // in any address field, clear the main error message.
     if (
         errorMessage.includes("billing address") &&
         ['address', 'city', 'state', 'zip'].includes(name)
