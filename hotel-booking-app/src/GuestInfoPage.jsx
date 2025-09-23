@@ -4,14 +4,6 @@ import { Elements, PaymentElement, PaymentRequestButtonElement, useStripe, useEl
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-useEffect(() => {
-  console.log('GuestInfoPage mounted, currentStep:', currentStep);
-  console.log('errorMessage on mount:', errorMessage);
-}, []);
-
-useEffect(() => {
-  console.log('errorMessage changed to:', errorMessage);
-}, [errorMessage]);
 
 // This component displays the Stripe elements and the final 'Pay' button
 const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete, errorMessage, setErrorMessage, isProcessing, setIsProcessing }) => {
