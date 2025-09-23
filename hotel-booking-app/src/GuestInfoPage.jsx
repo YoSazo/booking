@@ -10,33 +10,16 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const stripe = useStripe();
     const elements = useElements();
     const [paymentRequest, setPaymentRequest] = useState(null);
+    const [showPaymentButtons, setShowPaymentButtons] = useState(false);
 
-    pr.on('paymentmethod', async (ev) => {
-    // Validate address here
-    if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        ev.complete('fail'); // ❌ Reject payment request
-        return;
-    }
+    const handleWalletClick = (e) => {
+  if (!guestInfo.address) return true; // just let Stripe handle actual validation
+};
 
-    setErrorMessage(''); // Clear previous errors
-
-    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-    sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-
-    const { error: confirmError } = await stripe.confirmCardPayment(
-        clientSecret, 
-        { payment_method: ev.paymentMethod.id }, 
-        { handleActions: false }
-    );
-    
-    if (confirmError) {
-        ev.complete('fail');
-        return;
-    }
-    ev.complete('success');
-    window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-});
+useEffect(() => {
+  const timer = setTimeout(() => setShowPaymentButtons(true), 300);
+  return () => clearTimeout(timer);
+}, []);
 
 
     // This logic is self-contained and correct.
@@ -91,15 +74,15 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
 
     return (
   <div className="secure-payment-frame">
-    {paymentRequest && (
-      <PaymentRequestButtonElement
-        options={{
-          paymentRequest,
-          style: { paymentRequestButton: { theme: 'dark', height: '40px' } }
-        }}
-        
-      />
-    )}
+    {paymentRequest && showPaymentButtons && (
+  <PaymentRequestButtonElement
+    options={{
+      paymentRequest,
+      style: { paymentRequestButton: { theme: 'dark', height: '40px' } }
+    }}
+    onClick={handleWalletClick}
+  />
+)}
 
     {paymentRequest && (
       <div className="payment-divider">
@@ -401,6 +384,7 @@ const validatePaymentStep = () => {
                                 readOnly
                                 onTouchStart={(e) => e.target.removeAttribute('readonly')}
                                 onPaste={handleAddressPaste}
+                                autoComplete="off"
                                 />
 
                             </Autocomplete>
