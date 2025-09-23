@@ -8,7 +8,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { countries } from './countries';
-import Autocomplete from '@react-google-maps/api';
+import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 
 // --- Stripe Promise ---
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
