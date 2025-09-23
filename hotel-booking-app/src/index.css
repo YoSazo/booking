@@ -1572,7 +1572,7 @@ body {
 /* New styles for Vercel-style payment tabs */
 .payment-method-tabs {
   display: flex;
-  gap: 15px; /* Adds space between tabs */
+  gap: 12px; /* Adds space between tabs */
   margin-bottom: 20px; /* Space below the tabs */
 }
 
