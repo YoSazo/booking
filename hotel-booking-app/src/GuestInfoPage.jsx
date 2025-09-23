@@ -89,6 +89,15 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    
+    // Debug wrapper to track where errors are being set
+    const debugSetErrorMessage = (message) => {
+        if (message && message.includes('billing address')) {
+            console.log('ERROR SET:', message);
+            console.trace('Stack trace for error setting');
+        }
+        setErrorMessage(message);
+    };
     const paymentHeaderRef = useRef(null);
 
     const handleAddressPaste = (e) => {
@@ -331,7 +340,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                         onComplete={onComplete}
                                         clientSecret={clientSecret}
                                         errorMessage={errorMessage}
-                                        setErrorMessage={setErrorMessage}
+                                        setErrorMessage={debugSetErrorMessage}
                                         isProcessing={isProcessing}
                                         setIsProcessing={setIsProcessing}
                                     />
