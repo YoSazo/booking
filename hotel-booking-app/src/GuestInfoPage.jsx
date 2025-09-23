@@ -213,10 +213,10 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
     };
 
-    const getWalletLogo = () => {
-        if (walletType === 'Apple Pay') return '/apple.svg';
-        if (walletType === 'Google Pay') return '/google.svg';
-        return '/credit.svg'; // Fallback icon
+    const getWalletLogoInfo = () => {
+        if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
+        if (walletType === 'Google Pay') return { src: '/google.svg', alt: 'Google Pay', className: 'google-pay-logo' };
+        return { src: '/credit.svg', alt: 'Wallet', className: 'payment-logo' }; // Fallback
     };
 
     
@@ -286,11 +286,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                            <>
                                 <div className="payment-method-tabs">
                                     <button type="button" className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} onClick={() => setPaymentMethod('card')}>
-                                        <img src="/credit.svg" alt="Card" className="payment-logo" /> Card
+                                        <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
                                     </button>
                                     {walletType && (
                                         <button type="button" className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} onClick={() => setPaymentMethod('wallet')}>
-                                            <img src={getWalletLogo()} alt={walletType} className="payment-logo" /> {walletType}
+                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> {walletType}
                                         </button>
                                     )}
                                 </div>
@@ -315,6 +315,22 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         </div>
     </div>
 )}
+
+{paymentMethod === 'wallet' && walletType && (
+                                        <div className="wallet-selection-message">
+                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
+                                            <p className="wallet-selected-text">{walletType} selected.</p>
+                                            <div className="wallet-info-box">
+                                                <img src="/card-to-wallet-icon.svg" alt="Transfer to wallet" className="transfer-icon"/> {/* Assuming you might want a small icon here, or replace with text */}
+                                                <span>Another step will appear to securely submit your payment information.</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {paymentMethod === 'wallet' && !walletType && (
+                                        <div className="wallet-info-box">
+                                            <p>Select your wallet provider above.</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="billing-address-section">
