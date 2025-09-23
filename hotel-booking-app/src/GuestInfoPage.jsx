@@ -6,7 +6,7 @@ import { loadStripe } from '@stripe/stripe-js';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // This component displays the Stripe elements and the final 'Pay' button
-const StripePaymentElements = ({ bookingDetails, clientSecret }) => {
+const StripePaymentElements = ({ bookingDetails, clientSecret, guestInfo }) => {
     const stripe = useStripe();
     const [paymentRequest, setPaymentRequest] = useState(null);
 
