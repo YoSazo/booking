@@ -12,13 +12,17 @@ import Autocomplete from '@react-google-maps/api';
 
 // --- Stripe Promise ---
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
+const libraries = ['places'];
 // --- Main Component ---
 const GuestInfoPage = () => {
   const stripe = useStripe();
   const elements = useElements();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries,
+  });
   const {
     room,
     totalPrice,
@@ -43,7 +47,7 @@ const GuestInfoPage = () => {
     state: '',
     zip: '',
   });
-
+  const autocompleteRef = useRef(null);
   // --- Style for the new payment UI ---
   const paymentMethodButtonStyle = (method) => ({
     display: 'flex',
@@ -159,11 +163,16 @@ const GuestInfoPage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handlePlaceSelected = (place) => {
-    let address = '';
-    let city = '';
-    let state = '';
-    let zip = '';
+  const handlePlaceChanged = () => {
+    if (autocompleteRef.current) {
+      const place = autocompleteRef.current.getPlace();
+      if (place && place.address_components) {
+        let address = '';
+        let city = '';
+        let state = '';
+        let zip = '';
+
+    
 
     const streetNumber =
       place.address_components.find((c) => c.types.includes('street_number'))
@@ -191,7 +200,9 @@ const GuestInfoPage = () => {
       state,
       zip,
     }));
-  };
+  }
+  }
+};
 
   const isFormComplete = () => {
     return (
@@ -352,15 +363,19 @@ const GuestInfoPage = () => {
               <div className="mt-6">
                  <h3 className="text-xl font-semibold mb-3">Billing Address</h3>
                  <Autocomplete
-                   className="input input-bordered w-full"
-                   apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-                   onPlaceSelected={handlePlaceSelected}
+                   onLoad={(ref) => (autocompleteRef.current = ref)}
+                   onPlaceChanged={handlePlaceChanged}
                    options={{
                      types: ['address'],
                      componentRestrictions: { country: 'us' },
                    }}
-                   placeholder="Start typing your address..."
-                 />
+                 >
+                   <input
+                     type="text"
+                     className="input input-bordered w-full"
+                     placeholder="Start typing your address..."
+                   />
+                 </Autocomplete>
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                     <input type="text" value={formData.city} placeholder="City" className="input input-bordered" readOnly />
                     <input type="text" value={formData.state} placeholder="State" className="input input-bordered" readOnly />
