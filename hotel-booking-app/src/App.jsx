@@ -131,55 +131,70 @@ function App() {
   };
 
   const handleConfirmBooking = async () => {
-    if (!selectedRoom) {
-        alert("Please select a room first.");
-        return;
+  if (!selectedRoom) {
+    alert("Please select a room first.");
+    return;
+  }
+
+  const nights = checkinDate && checkoutDate
+    ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
+  const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
+  const total = selectedRoom.grandTotal || subtotal + taxes;
+  const ourReservationCode = generateReservationCode();
+
+  trackInitiateCheckout({ ...selectedRoom, subtotal });
+
+  const newBooking = {
+    ...selectedRoom,
+    checkin: checkinDate,
+    checkout: checkoutDate,
+    nights,
+    subtotal,
+    taxes,
+    total,
+    reservationCode: ourReservationCode,
+  };
+
+  // Optional: Keep setFinalBooking for sessionStorage persistence
+  setFinalBooking(newBooking);
+
+  // Wait for client secret before navigating
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
+    });
+    const data = await response.json();
+    if (data.clientSecret) {
+      setClientSecret(data.clientSecret);
+      // Pass booking data directly in navigate
+      navigate('/guest-info', {
+        state: {
+          room: {
+            name: selectedRoom.name,
+            beds: selectedRoom.beds || 'N/A', // Ensure beds is defined
+          },
+          totalPrice: total,
+          searchParams: {
+            checkIn: checkinDate,
+            checkOut: checkoutDate,
+            nights,
+            guests: selectedRoom.guests,
+          },
+        },
+      });
+      window.scrollTo(0, 0);
+    } else {
+      alert("Failed to load payment form. Please try again.");
     }
-
-    const nights = checkinDate && checkoutDate
-        ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
-        : 0;
-
-    const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
-    const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
-    const total = selectedRoom.grandTotal || subtotal + taxes;
-    const ourReservationCode = generateReservationCode();
-
-    trackInitiateCheckout({ ...selectedRoom, subtotal });
-
-    const newBooking = {
-        ...selectedRoom,
-        checkin: checkinDate,
-        checkout: checkoutDate,
-        nights,
-        subtotal,
-        taxes,
-        total,
-        reservationCode: ourReservationCode
-    };
-
-    setFinalBooking(newBooking);
-
-    // Wait for client secret before navigating
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
-        });
-        const data = await response.json();
-        if (data.clientSecret) {
-            setClientSecret(data.clientSecret);
-            // Only navigate AFTER client secret is ready
-            navigate('/guest-info');
-            window.scrollTo(0, 0);
-        } else {
-            alert("Failed to load payment form. Please try again.");
-        }
-    } catch (error) {
-        console.error("Failed to pre-fetch client secret:", error);
-        alert("Failed to load payment form. Please try again.");
-    }
+  } catch (error) {
+    console.error("Failed to pre-fetch client secret:", error);
+    alert("Failed to load payment form. Please try again.");
+  }
 };
 
 
