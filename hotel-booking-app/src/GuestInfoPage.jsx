@@ -33,16 +33,11 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         });
         pr.canMakePayment().then(result => { if (result) setPaymentRequest(pr); });
         pr.on('paymentmethod', async (ev) => {
-            if (!validatePaymentStep()) {
-                setErrorMessage("Please fill out your billing address before proceeding.");
-                ev.complete('fail');
-                return;
-            }
             setIsProcessing(true);
             setErrorMessage('');
-            
+
             sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-            sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+            sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
 
             const { error: confirmError } = await stripe.confirmCardPayment(
                 clientSecret,
@@ -56,11 +51,11 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
                 setIsProcessing(false);
             } else {
                 ev.complete('success');
-                onComplete(formData);
+                onComplete(guestInfo);
             }
         });
 
-    }, [stripe, clientSecret, bookingDetails, formData]); // formData is a dependency now
+    }, [stripe, clientSecret, bookingDetails, guestInfo, onComplete, setErrorMessage, setIsProcessing]);
 
     return (
         <div className="secure-payment-frame">
@@ -98,33 +93,21 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
-    const addressInputRef = useRef(null);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
     });
     const [formErrors, setFormErrors] = useState({});
-    const [autocomplete, setAutocomplete] = useState(null);
-    const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    const [showStripeForm, setShowStripeForm] = useState(false);
-    const paymentHeaderRef = useRef(null);
 
-    // ✅ THE DEFINITIVE FIX: This effect ensures that when the payment step
-    // becomes active, any previous error messages are cleared.
     useEffect(() => {
         if (currentStep === 3) {
-            // Ensure the form is hidden initially when switching to step 3
-            setShowStripeForm(false);
-            // Set a short timer to allow the UI to update and then show the form
-            const timer = setTimeout(() => {
-                setErrorMessage(''); // Clear any lingering errors
-                setShowStripeForm(true); // Now, render the Stripe form
-            }, 100); // A 100ms delay is usually enough
-            return () => clearTimeout(timer);
+            setErrorMessage('');
         }
     }, [currentStep]);
+
+    
 
 
     const handleAddressPaste = (e) => {
@@ -163,11 +146,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const handleCardSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
-
-        if (!validatePaymentStep()) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
-        }
 
         setIsProcessing(true);
         setErrorMessage('');
@@ -252,11 +230,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const handleFinalSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
-
-        if (!validatePaymentStep()) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
-        }
 
         setIsProcessing(true);
         setErrorMessage('');
@@ -369,7 +342,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 className="stripe-badge-image"
                                 tabIndex="-1"
                             />
-                            {clientSecret && showStripeForm ? (
+                            {clientSecret ? (
                                 <>
                                     <StripePaymentForm
                                         bookingDetails={bookingDetails}
