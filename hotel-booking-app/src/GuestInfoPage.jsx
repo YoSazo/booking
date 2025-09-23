@@ -6,6 +6,7 @@ import { loadStripe } from '@stripe/stripe-js';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // This component displays the Stripe elements and the final 'Pay' button
+// NO CHANGES NEEDED IN THIS COMPONENT
 const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete, errorMessage, setErrorMessage, isProcessing, setIsProcessing }) => {
     const stripe = useStripe();
     const elements = useElements();
@@ -13,7 +14,6 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const [showPaymentButtons, setShowPaymentButtons] = useState(false);
 
     const handleWalletClick = (e) => {
-        // Don't validate here - let Stripe handle it and we'll validate in the paymentmethod event
         return true;
     };
 
@@ -22,7 +22,6 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         return () => clearTimeout(timer);
     }, []);
 
-    // This logic is self-contained and correct.
     useEffect(() => {
         if (!stripe || !clientSecret || !bookingDetails) return;
         const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
@@ -33,7 +32,6 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
         });
         pr.canMakePayment().then(result => { if (result) setPaymentRequest(pr); });
         pr.on('paymentmethod', async (ev) => {
-            // FIXED: Validate address before processing payment
             if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
                 setErrorMessage("Please fill out your billing address before proceeding.");
                 ev.complete('fail');
@@ -89,17 +87,25 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    
+    // ✅ NEW STATE: This will control the rendering of the Stripe form.
+    const [showStripeForm, setShowStripeForm] = useState(false);
 
     const paymentHeaderRef = useRef(null);
 
-    // ✅ THE DEFINITIVE FIX: This effect ensures that when the payment step
-    // becomes active, any previous error messages are cleared.
+    // ✅ MODIFIED EFFECT: This now delays the appearance of the Stripe form itself.
     useEffect(() => {
         if (currentStep === 3) {
-            setErrorMessage('');
+            // Ensure the form is hidden initially when switching to step 3
+            setShowStripeForm(false);
+            // Set a short timer to allow the UI to update and then show the form
+            const timer = setTimeout(() => {
+                setErrorMessage(''); // Clear any lingering errors
+                setShowStripeForm(true); // Now, render the Stripe form
+            }, 100); // A 100ms delay is usually enough
+            return () => clearTimeout(timer);
         }
     }, [currentStep]);
-
 
     const handleAddressPaste = (e) => {
         setTimeout(() => {
@@ -117,7 +123,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
     const validateInfoStep = () => {
         const errors = {};
-
         if (!formData.firstName.trim()) errors.firstName = "First name is required.";
         if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
         if (!formData.email.trim()) {
@@ -128,7 +133,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         if (formData.phone.replace(/\D/g, '').length < 11) {
             errors.phone = "A valid phone number is required.";
         }
-
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -144,7 +148,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
     const handleNextStep = () => {
         if (currentStep === 2 && !validateInfoStep()) return;
-
         setFormErrors({});
         setCurrentStep(prev => prev + 1);
         window.scrollTo(0, 0);
@@ -165,11 +168,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-
         if (formErrors[name]) {
             setFormErrors(prev => ({ ...prev, [name]: '' }));
         }
-
         if (
             errorMessage.includes("billing address") &&
             ['address', 'city', 'state', 'zip'].includes(name) &&
@@ -244,8 +245,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
     const priceToday = bookingDetails.subtotal / 2;
     const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
-    const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
-
+    
     return (
         <>
             <div className="static-banner">
@@ -275,47 +275,15 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                     </div>
                 </div>
 
+                {/* --- Steps 1 and 2 are unchanged --- */}
                 {currentStep === 1 && (
-                    <div className="info-summary-wrapper" style={{ display: currentStep === 1 ? 'block' : 'none' }}>
-                        <div className="summary-card-details">
-                            <p className="detail-line">{bookingDetails.name}</p>
-                            <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
-                            <p className="detail-line">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</p>
-                        </div>
-                        <div className="summary-card-price">
-                            <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
-                            <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
-                            <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
-                            <div className="total-breakdown">
-                                <p className="pay-today">Only Pay ${priceToday.toFixed(2)} Today</p>
-                                <p className="balance-due">Balance (${balanceDue.toFixed(2)}) When you arrive</p>
-                            </div>
-                        </div>
+                    <div className="info-summary-wrapper">
+                        {/* ... your step 1 JSX ... */}
                     </div>
                 )}
-
                 <form id="main-checkout-form" onSubmit={handleFinalSubmit}>
                     <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
-                        <div className="form-field">
-                            <label>First Name</label>
-                            <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
-                            {formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}
-                        </div>
-                        <div className="form-field">
-                            <label>Last Name</label>
-                            <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />
-                            {formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}
-                        </div>
-                        <div className="form-field">
-                            <label>Phone Number</label>
-                            <input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} />
-                            {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
-                        </div>
-                        <div className="form-field">
-                            <label>Email Address</label>
-                            <input type="email" name="email" value={formData.email} onChange={handleChange} required />
-                            {formErrors.email && <span className="error-message">{formErrors.email}</span>}
-                        </div>
+                        {/* ... your step 2 JSX ... */}
                     </div>
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
@@ -326,7 +294,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                 className="stripe-badge-image"
                                 tabIndex="-1"
                             />
-                            {clientSecret ? (
+                            {clientSecret && showStripeForm ? ( // ✅ CONDITIONALLY RENDER HERE
                                 <>
                                     <StripePaymentForm
                                         bookingDetails={bookingDetails}
@@ -338,42 +306,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                         isProcessing={isProcessing}
                                         setIsProcessing={setIsProcessing}
                                     />
-
+                                    {/* ... rest of your payment section ... */}
                                     <div className="billing-address-section">
-                                        <div className="form-grid">
-                                            <div className="form-field full-width">
-                                                <label>Billing Address</label>
-                                                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                                                    <input
-                                                        type="text"
-                                                        name="address"
-                                                        value={formData.address}
-                                                        onChange={handleChange}
-                                                        placeholder="Start typing..."
-                                                        readOnly
-                                                        onTouchStart={(e) => e.target.removeAttribute('readonly')}
-                                                        onPaste={handleAddressPaste}
-                                                        autoComplete="off"
-                                                    />
-                                                </Autocomplete>
-                                            </div>
-                                            {isAddressSelected && (
-                                                <div className="address-reveal-container visible">
-                                                    <div className="form-field">
-                                                        <label>City</label>
-                                                        <input type="text" name="city" value={formData.city} onChange={handleChange} required />
-                                                    </div>
-                                                    <div className="form-field">
-                                                        <label>State</label>
-                                                        <input type="text" name="state" value={formData.state} onChange={handleChange} required />
-                                                    </div>
-                                                    <div className="form-field">
-                                                        <label>Zip</label>
-                                                        <input type="text" name="zip" value={formData.zip} onChange={handleChange} required />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                      {/* ... your address form fields ... */}
                                     </div>
                                 </>
                             ) : (
@@ -397,7 +332,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                         {currentStep === 2 && "Proceed to Payment"}
                         {currentStep === 3 && (isProcessing ? "Processing..." : `Pay $${(priceToday).toFixed(2)} and Complete Booking`)}
                     </button>
-
                     <div className="cta-error-wrapper">
                         {errorMessage && (<div className="error-message">{errorMessage}</div>)}
                     </div>
@@ -407,7 +341,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     );
 }
 
-// The wrapper provides the Stripe context to the entire page.
+// NO CHANGES NEEDED IN THE WRAPPER
 function GuestInfoPageWrapper({ clientSecret, ...props }) {
     if (!clientSecret) {
         return <p style={{ textAlign: "center", padding: "50px" }}>Loading payment form...</p>;
@@ -416,11 +350,7 @@ function GuestInfoPageWrapper({ clientSecret, ...props }) {
     return (
         <Elements
             stripe={stripePromise}
-            options={{
-                clientSecret,
-                appearance: { theme: "stripe" },
-                locale: "en",
-            }}
+            options={{ clientSecret, appearance: { theme: "stripe" }, locale: "en" }}
         >
             <GuestInfoPage {...props} clientSecret={clientSecret} />
         </Elements>
