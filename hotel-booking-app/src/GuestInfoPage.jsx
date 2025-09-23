@@ -11,16 +11,32 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     const elements = useElements();
     const [paymentRequest, setPaymentRequest] = useState(null);
 
-    const handleWalletClick = (e) => {
-  if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
+    pr.on('paymentmethod', async (ev) => {
+    // Validate address here
+    if (!guestInfo.address || !guestInfo.city || !guestInfo.state || !guestInfo.zip) {
         setErrorMessage("Please fill out your billing address before proceeding.");
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
+        ev.complete('fail'); // ❌ Reject payment request
+        return;
     }
-    setErrorMessage(''); // Clear error if address is valid
-    return true;
-};
+
+    setErrorMessage(''); // Clear previous errors
+
+    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+    sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
+
+    const { error: confirmError } = await stripe.confirmCardPayment(
+        clientSecret, 
+        { payment_method: ev.paymentMethod.id }, 
+        { handleActions: false }
+    );
+    
+    if (confirmError) {
+        ev.complete('fail');
+        return;
+    }
+    ev.complete('success');
+    window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+});
 
 
     // This logic is self-contained and correct.
