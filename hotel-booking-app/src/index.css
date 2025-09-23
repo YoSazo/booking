@@ -1595,9 +1595,8 @@ body {
   border-right: none;
 }
 
-.tab-button.active {
-  background-color: #f7f7f7;
-  color: #000;
+.tab-button.active .payment-logo {
+    filter: invert(0%);
 }
 
 .payment-content {
@@ -1644,9 +1643,10 @@ body {
   gap: 8px; /* Space between logo and text */
 }
 
-.tab-button svg {
+.payment-logo {
   width: 22px;
   height: 22px;
+  filter: invert(30%); /* Makes the black logos a nice gray */
 }
 
 /* Main container for the new card fields */
