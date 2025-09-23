@@ -123,27 +123,21 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
     // ---- Validators ----
 const validateInfoStep = () => {
-  const errors = {};
+    const errors = {};
 
-  if (!formData.firstName.trim()) errors.firstName = "First name is required.";
-  if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
-  if (!formData.email.trim()) {
-    errors.email = "Email is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-    errors.email = "Please enter a valid email address.";
-  }
-  if (formData.phone.replace(/\D/g, '').length < 11) {
-    errors.phone = "A valid phone number is required.";
-  }
+    if (!formData.firstName.trim()) errors.firstName = "First name is required.";
+    if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
+    if (!formData.email.trim()) {
+        errors.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        errors.email = "Please enter a valid email address.";
+    }
+    if (formData.phone.replace(/\D/g, '').length < 11) {
+        errors.phone = "A valid phone number is required.";
+    }
 
-  setFormErrors(prev => ({ ...prev, ...errors }));
-  if (Object.keys(errors).length > 0) {
-    setErrorMessage(Object.values(errors)[0]);
-    return false;
-  }
-
-  setErrorMessage(''); // clear any old messages
-  return true;
+    setFormErrors(errors); // This only sets the inline form errors
+    return Object.keys(errors).length === 0;
 };
 
 const validatePaymentStep = () => {
@@ -158,10 +152,11 @@ const validatePaymentStep = () => {
 
 
     const handleNextStep = () => {
+    // We removed the part of validateInfoStep that was setting the main error message
     if (currentStep === 2 && !validateInfoStep()) return;
 
     setFormErrors({});
-    setErrorMessage(''); // Clear errors before moving forward
+    setErrorMessage(''); // This correctly clears any old errors
     setCurrentStep(prev => prev + 1);
     window.scrollTo(0, 0);
 };
@@ -265,7 +260,7 @@ const validatePaymentStep = () => {
             {/* --- FIXED: The padding is now applied correctly here --- */}
             <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button" autoFocus={currentStep === 3}>{getBackButtonText()}</button>
+                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
                 </div>
 
