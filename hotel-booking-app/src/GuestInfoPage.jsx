@@ -12,18 +12,27 @@ import Autocomplete from 'react-google-autocomplete';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// --- Main Component ---
 const GuestInfoPage = () => {
   const stripe = useStripe();
   const elements = useElements();
-  const navigate = useNavigate();
-  
-  // --- FIX: Reverted to using location.state to get booking data ---
   const location = useLocation();
+  const navigate = useNavigate();
+
   const { room, totalPrice, searchParams } = location.state || {};
 
-  // This check is now reliable again
-  if (!room) {
+  // Robust validation
+  if (
+    !room ||
+    !room.name ||
+    !room.beds ||
+    !totalPrice ||
+    !searchParams ||
+    !searchParams.checkIn ||
+    !searchParams.checkOut ||
+    !searchParams.nights ||
+    !searchParams.guests
+  ) {
+    console.log('Missing data:', { room, totalPrice, searchParams });
     return (
       <div className="container mx-auto p-4 text-center">
         <h1 className="text-2xl font-bold">Session expired or invalid access.</h1>
@@ -34,36 +43,50 @@ const GuestInfoPage = () => {
       </div>
     );
   }
-  
-  // Destructure from the searchParams object
+
+  const { name, beds } = room;
   const { checkIn, checkOut, nights, guests } = searchParams;
 
-  // --- NEW: State for the payment UI ---
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
-  
-  // Existing state
   const [paymentRequest, setPaymentRequest] = useState(null);
   const [clientSecret, setClientSecret] = useState('');
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '', email: '', phone: '', country: 'United States',
-    address: '', city: '', state: '', zip: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    country: 'United States',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
   });
 
-  // --- NEW: Style for the new payment UI ---
   const paymentMethodButtonStyle = (method) => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '12px 16px',
     border: selectedPaymentMethod === method ? '2px solid #007bff' : '2px solid #ddd',
-    borderRadius: '8px', cursor: 'pointer',
+    borderRadius: '8px',
+    cursor: 'pointer',
     backgroundColor: selectedPaymentMethod === method ? '#f0f7ff' : '#fff',
-    fontWeight: '600', flex: 1, minWidth: '100px', textAlign: 'center',
+    fontWeight: '600',
+    flex: 1,
+    minWidth: '100px',
+    textAlign: 'center',
     transition: 'all 0.2s ease-in-out',
   });
-  
+
   const cardElementOptions = {
     style: {
-      base: { fontSize: '16px', color: '#32325d', '::placeholder': { color: '#aab7c4' } },
+      base: {
+        fontSize: '16px',
+        color: '#32325d',
+        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+        '::placeholder': { color: '#aab7c4' },
+      },
       invalid: { color: '#fa755a', iconColor: '#fa755a' },
     },
     hidePostalCode: true,
@@ -89,26 +112,23 @@ const GuestInfoPage = () => {
   }, [totalPrice]);
 
   useEffect(() => {
-    createPaymentIntent();
-  }, [createPaymentIntent]);
+    if (totalPrice > 0) {
+      createPaymentIntent();
+    }
+  }, [createPaymentIntent, totalPrice]);
 
   useEffect(() => {
     if (stripe && clientSecret) {
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: {
-          label: 'Total',
-          amount: Math.round(totalPrice * 100),
-        },
+        total: { label: 'Total', amount: Math.round(totalPrice * 100) },
         requestPayerName: true,
         requestPayerEmail: true,
       });
 
       pr.canMakePayment().then((result) => {
-        if (result) {
-          setPaymentRequest(pr);
-        }
+        if (result) setPaymentRequest(pr);
       });
 
       pr.on('paymentmethod', async (ev) => {
@@ -120,14 +140,14 @@ const GuestInfoPage = () => {
         );
         if (confirmError) {
           ev.complete('fail');
-          setError(
-            `Payment confirmation failed: ${confirmError.message || 'Unknown error'}`
-          );
+          setError(`Payment confirmation failed: ${confirmError.message || 'Unknown error'}`);
         } else {
           ev.complete('success');
           navigate('/confirmation', {
             state: {
-              bookingDetails,
+              room,
+              totalPrice,
+              searchParams,
               guestInfo: formData,
               paymentMethod: walletName,
             },
@@ -135,7 +155,7 @@ const GuestInfoPage = () => {
         }
       });
     }
-  }, [stripe, clientSecret, totalPrice, navigate, bookingDetails, formData]);
+  }, [stripe, clientSecret, totalPrice, navigate, formData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -148,32 +168,15 @@ const GuestInfoPage = () => {
     let state = '';
     let zip = '';
 
-    const streetNumber =
-      place.address_components.find((c) => c.types.includes('street_number'))
-        ?.long_name || '';
-    const route =
-      place.address_components.find((c) => c.types.includes('route'))
-        ?.long_name || '';
+    const streetNumber = place.address_components.find((c) => c.types.includes('street_number'))?.long_name || '';
+    const route = place.address_components.find((c) => c.types.includes('route'))?.long_name || '';
     address = `${streetNumber} ${route}`.trim();
 
-    city =
-      place.address_components.find((c) => c.types.includes('locality'))
-        ?.long_name || '';
-    state =
-      place.address_components.find((c) =>
-        c.types.includes('administrative_area_level_1')
-      )?.short_name || '';
-    zip =
-      place.address_components.find((c) => c.types.includes('postal_code'))
-        ?.long_name || '';
+    city = place.address_components.find((c) => c.types.includes('locality'))?.long_name || '';
+    state = place.address_components.find((c) => c.types.includes('administrative_area_level_1'))?.short_name || '';
+    zip = place.address_components.find((c) => c.types.includes('postal_code'))?.long_name || '';
 
-    setFormData((prev) => ({
-      ...prev,
-      address,
-      city,
-      state,
-      zip,
-    }));
+    setFormData((prev) => ({ ...prev, address, city, state, zip }));
   };
 
   const isFormComplete = () => {
@@ -199,61 +202,54 @@ const GuestInfoPage = () => {
 
     if (selectedPaymentMethod === 'card') {
       const cardElement = elements.getElement(CardElement);
-      const { error: createPaymentMethodError, paymentMethod } =
-        await stripe.createPaymentMethod({
-          type: 'card',
-          card: cardElement,
-          billing_details: {
-            name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            address: {
-              line1: formData.address,
-              city: formData.city,
-              state: formData.state,
-              postal_code: formData.zip,
-              country: 'US',
-            },
+      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: {
+            line1: formData.address,
+            city: formData.city,
+            state: formData.state,
+            postal_code: formData.zip,
+            country: 'US',
           },
-        });
+        },
+      });
 
-      if (paymentMethodError) {
-          setError(paymentMethodError.message);
-          setProcessing(false);
-          return;
+      if (createPaymentMethodError) {
+        setError(createPaymentMethodError.message || 'Failed to create payment method.');
+        setProcessing(false);
+        return;
       }
 
-      const { error: confirmError } = await stripe.confirmCardPayment(
-        clientSecret,
-        {
-          payment_method: paymentMethod.id,
-        }
-      );
+      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: paymentMethod.id,
+      });
 
       if (confirmError) {
-        setError(
-          confirmError.message || 'An error occurred during payment confirmation.'
-        );
+        setError(confirmError.message || 'An error occurred during payment confirmation.');
       } else {
-        if (onComplete) onComplete(formData, paymentIntent.id); // Or navigate directly
         navigate('/confirmation', {
           state: {
-            bookingDetails,
+            room,
+            totalPrice,
+            searchParams,
             guestInfo: formData,
             paymentMethod: 'Card',
           },
         });
       }
     } else if (selectedPaymentMethod === 'wallet' && paymentRequest) {
-        paymentRequest.show();
-    } else if (selectedPaymentMethod === 'amazon' || selectedPaymentMethod === 'paypal') {
-        alert(`Redirecting to ${selectedPaymentMethod === 'amazon' ? 'Amazon Pay' : 'PayPal'}...`);
+      paymentRequest.show();
+    } else if (selectedPaymentMethod === 'amazon') {
+      alert('Redirecting to Amazon Pay...');
     }
 
     setProcessing(false);
   };
-
-  const { name, beds } = room;
 
   return (
     <div className="container mx-auto p-4 lg:p-8">
@@ -264,13 +260,63 @@ const GuestInfoPage = () => {
             <div className="card bg-base-100 shadow-xl p-6">
               <h2 className="text-2xl font-semibold mb-4">Guest Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* ... (form fields for name, email, etc.) ... */}
+                <div>
+                  <label className="label font-semibold">Full Name</label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    className="input input-bordered w-full"
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label font-semibold">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="input input-bordered w-full"
+                    placeholder="john.doe@example.com"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label font-semibold">Phone</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="input input-bordered w-full"
+                    placeholder="+1 123-456-7890"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label font-semibold">Country</label>
+                  <select
+                    name="country"
+                    value={formData.country}
+                    onChange={handleChange}
+                    className="select select-bordered w-full"
+                    required
+                  >
+                    {countries.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
             <div className="card bg-base-100 shadow-xl p-6">
               <h2 className="text-2xl font-semibold mb-4">Payment Method</h2>
-
               <div className="flex gap-2 mb-6">
                 <div
                   style={paymentMethodButtonStyle('card')}
@@ -283,25 +329,21 @@ const GuestInfoPage = () => {
                     style={paymentMethodButtonStyle('wallet')}
                     onClick={() => setSelectedPaymentMethod('wallet')}
                   >
-                   Apple Pay / Google Pay
+                    Apple Pay / Google Pay
                   </div>
                 )}
-                 <div
-                    style={paymentMethodButtonStyle('amazon')}
-                    onClick={() => setSelectedPaymentMethod('amazon')}
-                    >
-                    Amazon Pay
+                <div
+                  style={paymentMethodButtonStyle('amazon')}
+                  onClick={() => setSelectedPaymentMethod('amazon')}
+                >
+                  Amazon Pay
                 </div>
               </div>
-
               <div>
                 {selectedPaymentMethod === 'card' && (
                   <div>
                     <label className="label font-semibold">Card Details</label>
-                    <div
-                      className="p-4 border rounded-lg"
-                      style={{ borderColor: '#ddd' }}
-                    >
+                    <div className="p-4 border rounded-lg" style={{ borderColor: '#ddd' }}>
                       <CardElement options={cardElementOptions} />
                     </div>
                   </div>
@@ -312,50 +354,41 @@ const GuestInfoPage = () => {
                   </div>
                 )}
                 {selectedPaymentMethod === 'amazon' && (
-                   <div className="text-center p-4 bg-gray-100 rounded-lg">
+                  <div className="text-center p-4 bg-gray-100 rounded-lg">
                     <p>The <strong>Amazon Pay</strong> modal will appear after you click "Complete Payment".</p>
                   </div>
                 )}
               </div>
-
               <div className="mt-6">
-                 <h3 className="text-xl font-semibold mb-3">Billing Address</h3>
-                 <Autocomplete
-                   className="input input-bordered w-full"
-                   apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-                   onPlaceSelected={handlePlaceSelected}
-                   options={{
-                     types: ['address'],
-                     componentRestrictions: { country: 'us' },
-                   }}
-                   placeholder="Start typing your address..."
-                 />
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    <input type="text" value={formData.city} placeholder="City" className="input input-bordered" readOnly />
-                    <input type="text" value={formData.state} placeholder="State" className="input input-bordered" readOnly />
-                    <input type="text" value={formData.zip} placeholder="ZIP Code" className="input input-bordered" readOnly />
-                 </div>
+                <h3 className="text-xl font-semibold mb-3">Billing Address</h3>
+                <Autocomplete
+                  className="input input-bordered w-full"
+                  apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+                  onPlaceSelected={handlePlaceSelected}
+                  options={{ types: ['address'], componentRestrictions: { country: 'us' } }}
+                  placeholder="Start typing your address..."
+                />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <input type="text" value={formData.city} placeholder="City" className="input input-bordered" readOnly />
+                  <input type="text" value={formData.state} placeholder="State" className="input input-bordered" readOnly />
+                  <input type="text" value={formData.zip} placeholder="ZIP Code" className="input input-bordered" readOnly />
+                </div>
               </div>
             </div>
-
             {error && (
               <div role="alert" className="alert alert-error">
                 <span>{error}</span>
               </div>
             )}
-
             <button
               type="submit"
               className="btn btn-primary w-full text-lg"
               disabled={processing || !stripe || !clientSecret}
             >
-              {processing
-                ? 'Processing...'
-                : `Pay $${totalPrice.toFixed(2)} and Complete Booking`}
+              {processing ? 'Processing...' : `Pay $${totalPrice.toFixed(2)} and Complete Booking`}
             </button>
           </form>
         </div>
-
         <div className="lg:col-span-1">
           <div className="card bg-base-100 shadow-xl p-6 sticky top-8">
             <h2 className="text-2xl font-semibold mb-4">Your Booking</h2>
@@ -375,10 +408,9 @@ const GuestInfoPage = () => {
   );
 };
 
-// --- Wrapper Component ---
-const GuestInfoPageWrapper = (props) => (
+const GuestInfoPageWrapper = () => (
   <Elements stripe={stripePromise}>
-    <GuestInfoPage {...props} />
+    <GuestInfoPage />
   </Elements>
 );
 
