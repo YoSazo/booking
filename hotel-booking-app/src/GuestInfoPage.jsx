@@ -136,7 +136,10 @@ const validateInfoStep = () => {
         errors.phone = "A valid phone number is required.";
     }
 
-    setFormErrors(errors); // This only sets the inline form errors
+    // This now ONLY sets the inline form errors for the info step
+    setFormErrors(errors);
+    
+    // It no longer touches the main errorMessage state
     return Object.keys(errors).length === 0;
 };
 
@@ -260,7 +263,9 @@ const validatePaymentStep = () => {
             {/* --- FIXED: The padding is now applied correctly here --- */}
             <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
+                    <button onClick={handleBackStep} className="back-button">
+    {getBackButtonText()}
+</button>
                     <h1>Guest Information</h1>
                 </div>
 
