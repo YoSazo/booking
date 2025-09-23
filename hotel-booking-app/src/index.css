@@ -1599,10 +1599,6 @@ body {
   border-color: #a0a0a0;
 }
 
-.tab-button:last-child {
-  border-right: none;
-}
-
 .tab-button.active .payment-logo {
     filter: invert(0%);
 }
