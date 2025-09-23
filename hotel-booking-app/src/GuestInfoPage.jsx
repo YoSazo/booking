@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, 
+    CardNumberElement, 
+    CardExpiryElement, 
+    CardCvcElement, 
+    useStripe, 
+    useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -333,15 +338,24 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                 
                                 <div className="payment-content">
                                     {paymentMethod === 'card' && (
-                                        <div className="card-element-container">
-                                            <CardElement options={CARD_ELEMENT_OPTIONS} />
-                                        </div>
-                                    )}
-                                    {paymentMethod === 'wallet' && (
-                                        <div className="wallet-info-box">
-                                            <p>After confirming your billing address, another step will appear to complete your purchase using {walletType}.</p>
-                                        </div>
-                                    )}
+    <div className="card-and-billing-container">
+        {/* --- UPDATED: Split Card Fields --- */}
+        <div className="split-card-fields">
+            <div className="card-field-wrapper">
+                <label>Card number</label>
+                <CardNumberElement options={ELEMENT_OPTIONS} />
+            </div>
+            <div className="card-field-wrapper half-width">
+                <label>Expiration</label>
+                <CardExpiryElement options={ELEMENT_OPTIONS} />
+            </div>
+            <div className="card-field-wrapper half-width">
+                <label>CVC</label>
+                <CardCvcElement options={ELEMENT_OPTIONS} />
+            </div>
+        </div>
+    </div>
+)}
                                 </div>
 
                                 <div className="billing-address-section">
