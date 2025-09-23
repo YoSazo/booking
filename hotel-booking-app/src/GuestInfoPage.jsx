@@ -89,16 +89,17 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    
-    // Debug wrapper to track where errors are being set
-    const debugSetErrorMessage = (message) => {
-        if (message && message.includes('billing address')) {
-            console.log('ERROR SET:', message);
-            console.trace('Stack trace for error setting');
-        }
-        setErrorMessage(message);
-    };
+
     const paymentHeaderRef = useRef(null);
+
+    // ✅ THE DEFINITIVE FIX: This effect ensures that when the payment step
+    // becomes active, any previous error messages are cleared.
+    useEffect(() => {
+        if (currentStep === 3) {
+            setErrorMessage('');
+        }
+    }, [currentStep]);
+
 
     const handleAddressPaste = (e) => {
         setTimeout(() => {
@@ -114,7 +115,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         }, 100);
     };
 
-    // FIXED: This function now ONLY validates info step fields and NEVER sets main error message
     const validateInfoStep = () => {
         const errors = {};
 
@@ -133,7 +133,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         return Object.keys(errors).length === 0;
     };
 
-    // FIXED: Simple function that only returns true/false, no error setting
     const validatePaymentStep = () => {
         return (
             formData.address.trim() !== "" &&
@@ -147,7 +146,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         if (currentStep === 2 && !validateInfoStep()) return;
 
         setFormErrors({});
-        setErrorMessage('');
         setCurrentStep(prev => prev + 1);
         window.scrollTo(0, 0);
     };
@@ -168,12 +166,10 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
 
-        // Clear inline errors
         if (formErrors[name]) {
             setFormErrors(prev => ({ ...prev, [name]: '' }));
         }
 
-        // FIXED: Clear billing address error when user types in any address field
         if (
             errorMessage.includes("billing address") &&
             ['address', 'city', 'state', 'zip'].includes(name) &&
@@ -205,13 +201,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                 if (types.includes('postal_code')) zip = component.long_name;
             }
             setFormData(prev => ({ ...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip }));
-            // FIXED: Clear error when address is selected
             setErrorMessage('');
         }
         setIsAddressSelected(true);
     };
 
-    // FIXED: This is the ONLY place where billing address validation should set the main error
     const handleFinalSubmit = async (e) => {
         e.preventDefault();
         if (!stripe || !elements) return;
@@ -340,7 +334,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
                                         onComplete={onComplete}
                                         clientSecret={clientSecret}
                                         errorMessage={errorMessage}
-                                        setErrorMessage={debugSetErrorMessage}
+                                        setErrorMessage={setErrorMessage}
                                         isProcessing={isProcessing}
                                         setIsProcessing={setIsProcessing}
                                     />
