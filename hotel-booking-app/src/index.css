@@ -1560,3 +1560,11 @@ body {
     text-align: center;
     margin: 0 0 20px 0;
 }
+
+.cta-error-wrapper {
+  margin-top: 15px;
+  text-align: center;
+  color: #c92a2a;
+  font-size: 0.9em;
+  min-height: 1.2em; /* Prevents layout shift when error appears/disappears */
+}

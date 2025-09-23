@@ -93,7 +93,7 @@ const ZAPIER_URLS = {
 };
 
 
-// In your server.js
+// In your server.jss
 
 // File: guest-lodge-backend/server.js
 

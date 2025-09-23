@@ -11,6 +11,8 @@ import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
+
+
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
 const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
@@ -49,7 +51,7 @@ function App() {
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
-  const [clientSecret, setClientSecret] = useState('');
+  const [clientSecret, setClientSecret] = useState(() => sessionStorage.getItem('clientSecret') || '');
 
   useEffect(() => {
     const today = new Date();
@@ -63,7 +65,8 @@ function App() {
     if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
     if (guestInfo) sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
     if (reservationCode) sessionStorage.setItem('reservationCode', reservationCode);
-  }, [finalBooking, guestInfo, reservationCode]);
+    if (clientSecret) sessionStorage.setItem('clientSecret', clientSecret);
+  }, [finalBooking, guestInfo, reservationCode, clientSecret]);
 
   const checkAvailability = async (start, end) => {
     if (!start || !end || currentHotel.pms.toLowerCase() !== 'cloudbeds') {
@@ -129,10 +132,14 @@ function App() {
 
   const handleConfirmBooking = async () => {
     if (!selectedRoom) {
-      alert("Please select a room first.");
-      return;
+        alert("Please select a room first.");
+        return;
     }
-    const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+
+    const nights = checkinDate && checkoutDate
+        ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
+        : 0;
+
     const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
     const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
     const total = selectedRoom.grandTotal || subtotal + taxes;
@@ -140,35 +147,42 @@ function App() {
 
     trackInitiateCheckout({ ...selectedRoom, subtotal });
 
-    setFinalBooking({
-      ...selectedRoom,
-      checkin: checkinDate,
-      checkout: checkoutDate,
-      nights,
-      subtotal,
-      taxes,
-      total,
-      reservationCode: ourReservationCode
-    });
+    const newBooking = {
+        ...selectedRoom,
+        checkin: checkinDate,
+        checkout: checkoutDate,
+        nights,
+        subtotal,
+        taxes,
+        total,
+        reservationCode: ourReservationCode
+    };
 
+    setFinalBooking(newBooking);
+
+    // Wait for client secret before navigating
     try {
         const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: finalBookingData.subtotal / 2 }),
+            body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
         });
         const data = await response.json();
         if (data.clientSecret) {
             setClientSecret(data.clientSecret);
+            // Only navigate AFTER client secret is ready
+            navigate('/guest-info');
+            window.scrollTo(0, 0);
+        } else {
+            alert("Failed to load payment form. Please try again.");
         }
     } catch (error) {
         console.error("Failed to pre-fetch client secret:", error);
+        alert("Failed to load payment form. Please try again.");
     }
-    // --- END OF ADDED LOGIC ---
-
-    navigate('/guest-info');
-    window.scrollTo(0, 0);
 };
+
+
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
@@ -258,6 +272,7 @@ function App() {
             onBack={() => navigate('/')}
             onComplete={handleCompleteBooking}
             apiBaseUrl={API_BASE_URL}
+            clientSecret={clientSecret}
           />
         } />
         <Route path="/confirmation" element={
