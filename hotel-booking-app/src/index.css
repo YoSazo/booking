@@ -1633,3 +1633,51 @@ body {
     text-align: center;
     margin-top: 20px;
 }
+
+/* --- Styles for Split Card Fields & Tab Logos --- */
+
+/* Tab button improvements for logos */
+.tab-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px; /* Space between logo and text */
+}
+
+.tab-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Main container for the new card fields */
+.split-card-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px; /* Creates space between the fields */
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.card-field-wrapper {
+  width: 100%;
+  flex-grow: 1;
+}
+
+.card-field-wrapper.half-width {
+  width: calc(50% - 7.5px); /* Two fields side-by-side with a gap */
+}
+
+.card-field-wrapper label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #667;
+  margin-bottom: 5px;
+}
+
+/* This targets the input wrapper Stripe creates */
+.card-field-wrapper .__PrivateStripeElement {
+  padding: 8px 0;
+}

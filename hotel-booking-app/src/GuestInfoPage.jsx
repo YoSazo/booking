@@ -5,6 +5,44 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
+
+// --- NEW: SVG Icons for Payment Tabs ---
+const CardLogo = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+  </svg>
+);
+
+const ApplePayLogo = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.18,9.54a3.4,3.4,0,0,0-1.21-.2,4.87,4.87,0,0,0-3.6,1.7,4.32,4.32,0,0,0-1.26,3.22,5,5,0,0,0,2.37,4.32,4.17,4.17,0,0,0,2.83.94,2.5,2.5,0,0,0,1-.13,4.42,4.42,0,0,0,2.39-2.61,1.25,1.25,0,0,1,1.17-.79,1.18,1.18,0,0,1,.84.38,1.3,1.3,0,0,1,.21,1.55,6.86,6.86,0,0,1-3.66,4.1,6,6,0,0,1-4.22.95,6.53,6.53,0,0,1-5-2.28A6.29,6.29,0,0,1,8.35,14a6.76,6.76,0,0,1,3-5.46,6.4,6.4,0,0,1,4.49-1.58,4.72,4.72,0,0,1,2.53.58,1.22,1.22,0,0,1,.51.93,1.32,1.32,0,0,1-1,.88A1.17,1.17,0,0,1,19.18,9.54ZM15.07,3.69a4.5,4.5,0,0,0-1.63,3.31,4.35,4.35,0,0,0,1.35-2.53A4.2,4.2,0,0,0,15.07,3.69Z"/>
+    </svg>
+);
+
+const GooglePayLogo = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.4,9.6H20v-.8a2.1,2.1,0,0,0-2.1-2.1H5.7a2.1,2.1,0,0,0-2.1,2.1v7.6a2.1,2.1,0,0,0,2.1,2.1h12.2a2.1,2.1,0,0,0,2.1-2.1v-1.1h.4a1.8,1.8,0,0,0,1.8-1.8V11.4A1.8,1.8,0,0,0,20.4,9.6ZM5.7,8.8h12.2a.1.1,0,0,1,.1.1v.7H5.6v-.7A.1.1,0,0,1,5.7,8.8Zm12.2,8a.1.1,0,0,1-.1.1H5.7a.1.1,0,0,1-.1-.1V12.2H18v4.6Zm2.5-4.5a.3.3,0,0,1-.3.3h-.4V11.1h.4a.3.3,0,0,1,.3.3Z"/>
+        <path d="M12.9,13.8v1.3h2.3a1.9,1.9,0,1,1-1.9-1.9,2,2,0,0,1,1.5.7l.9-.9a3.1,3.1,0,1,0-2.4,5.1,3.2,3.2,0,0,0,3.2-3.2V13.8Z"/>
+    </svg>
+);
+
+
+const ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      fontSize: '16px',
+      color: '#424770',
+      '::placeholder': {
+        color: '#aab7c4',
+      },
+    },
+    invalid: {
+      color: '#9e2146',
+    },
+  },
+};
+
 const CARD_ELEMENT_OPTIONS = {
   style: {
     base: {
@@ -214,6 +252,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             paymentRequest.show();
         }
     };
+
+    const renderWalletIcon = () => {
+        if (walletType === 'Apple Pay') return <ApplePayLogo />;
+        if (walletType === 'Google Pay') return <GooglePayLogo />;
+        return null;
+    };
+
     
     if (!bookingDetails) {
         return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
