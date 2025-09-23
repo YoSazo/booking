@@ -74,16 +74,26 @@ const StripePaymentForm = ({ bookingDetails, guestInfo, clientSecret, onComplete
     };
 
     return (
-    <div className="secure-payment-frame">
-        {/* MODIFICATION 2: Wrap the button element in a div with the click handler */}
-        <div onClickCapture={handleWalletClick}>
-            {paymentRequest && <PaymentRequestButtonElement options={{ paymentRequest, style: { paymentRequestButton: { theme: 'dark', height: '40px' } } }} onClick={handleWalletClick}/>}
-        </div>
+  <div className="secure-payment-frame">
+    {paymentRequest && (
+      <PaymentRequestButtonElement
+        options={{
+          paymentRequest,
+          style: { paymentRequestButton: { theme: 'dark', height: '40px' } }
+        }}
+        onClick={handleWalletClick} // ✅ Only fires when user actually clicks
+      />
+    )}
 
-        {paymentRequest && <div className="payment-divider"><span>OR PAY WITH CARD</span></div>}
-        <PaymentElement />
-    </div>
-  );
+    {paymentRequest && (
+      <div className="payment-divider">
+        <span>OR PAY WITH CARD</span>
+      </div>
+    )}
+
+    <PaymentElement />
+  </div>
+);
 };
 
 // This is the main component that controls the multi-step flow.
