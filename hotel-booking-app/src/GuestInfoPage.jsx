@@ -7,11 +7,25 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 
 // --- NEW: SVG Icons for Payment Tabs ---
-const LOGOS = {
-  card: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjIiIHk9IjUiIHdpZHRoPSIyMCIgaGVpZ2h0PSIxNCIgcng9IjIiLz48bGluZSB4MT0iMiIgeTE9IjEwIiB4Mj0iMjIiIHkyPSIxMCIvPjwvc3ZnPg==',
-  'Apple Pay': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJjdXJyZW50Q29sb3IiPjxwYXRoIGQ9Ik0xOS4xOCw5LjU0YTMuNCwzLjQsMCwwLDAtMS4yMS0uMiw0Ljg3LDQuODcsMCwwLDAtMy42LDEuNyw0LjMyLDQuMzIsMCwwLDAtMS4yNiwzLjIyLDUsNSwwLDAsMCwyLjM3LDQuMzIsNC4xNyw0LjE3LDAsMCwwLDIuODMuOTQsMi41LDIuNSwwLDAsMCwxLS4xMyw0LjQyLDQuNDIsMCwwLDAsMi4zOS0yLjYxLDEuMjUsMS4yNSwwLDAsMSwxLjE3LS43OSwxLjE4LDEuMTgsMCwwLDEsLjg0LjM4LDEuMywxLjMsMCwwLDEsLjIxLDEuNTUsNi44Niw2Ljg2LDAsMCwxLTMuNjYsNC4xLDYsNiwwLDAsMS00LjIyLjk1LDYuNTMsNi41MywwLDAsMS01LTIuMjhBNi4yOSw2LjI5LDAsMCwxLDguMzUsMTRhNi43Niw2Ljc2LDAsMCwxLDMtNS40Niw2LjQsNi40LDAsMCwxLDQuNDktMS41OCw0LjcyLDQuNzIsMCwwLDEsMi41My41OCwxLjIyLDEuMjIsMCwwLDEsLjUxLjkzLDEuMzIsMS4zMiwwLDAsMS0xLC44OEEuMTcsMS4xNywwLDAsMSwxOS4xOCw5LjU0Wk0xNS4wNywzLjY5YTQuNSw0LjUsMCwwLDAtMS42MywzLjMxLDQuMzUsNC4zNSwwLDAsMCwxLjM1LTIuNTN BNC4yLDQuMiwwLDAsMCwxNS4wNywzLjY5WiIvPjwvc3ZnPg==',
-  'Google Pay': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJjdXJyZW50Q29sb3IiPjxwYXRoIGQ9Ik0yMC40LDkuNkgxOXYtLjhBMi4xLDIuMSwwLDAsMCwxNy45LDYuN0g1LjdBMi4xLDIuMSwwLDAsMCwzLjYsOC44djcuNmEyLjEsMi4xLDAsMCwwLDIuMSwyLjFoMTIuMmEyLjEsMi4xLDAsMCwwLDIuMS0yLjF2LTEuMWguNGExLjgsMS44LDAsMCwwLDEuOC0xLjhWMTFBNTEuOCwxLjgsMCwwLDAsMjAuNCw5LjZaTTUuNyw4LjhoMTIuMmEuMS4xLDAsMCwxLC4xLjF2LjdINS42di0uN0EuMS4xLDAsMCwxLDUuNyw4LjhabTEyLjIsOGEuMS4xLDAsMCwxLS4xLjFINTdhLjEuMSwwLDAsMS0uMS0uMVYxMi4ySDE4djQuNlptMi41LTQuNWwuMy4zLDAsMCwxLS4zLjNoLS40VjExLjFoLjRhLjMuMywwLDAsMSwuMy4zWiIvPjxwYXRoIGQ9Ik0xMi45LDEzLjh2MS4zaDIuM2ExLjksMS45LDAsMSwxLTEuOS0xLjksMiwyLDAsMCwxLDEuNS43bC45LS45YTMuMSwzLjEsMCwxLDAtMi40LDUuMSwzLjIsMy4yLDAsMCwwLDMuMi0zLjJWMTMuOFoiLz48L3N2Zz4=',
-};
+const CardLogo = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+  </svg>
+);
+
+const ApplePayLogo = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.18,9.54a3.4,3.4,0,0,0-1.21-.2,4.87,4.87,0,0,0-3.6,1.7,4.32,4.32,0,0,0-1.26,3.22,5,5,0,0,0,2.37,4.32,4.17,4.17,0,0,0,2.83.94,2.5,2.5,0,0,0,1-.13,4.42,4.42,0,0,0,2.39-2.61,1.25,1.25,0,0,1,1.17-.79,1.18,1.18,0,0,1,.84.38,1.3,1.3,0,0,1,.21,1.55,6.86,6.86,0,0,1-3.66,4.1,6,6,0,0,1-4.22.95,6.53,6.53,0,0,1-5-2.28A6.29,6.29,0,0,1,8.35,14a6.76,6.76,0,0,1,3-5.46,6.4,6.4,0,0,1,4.49-1.58,4.72,4.72,0,0,1,2.53.58,1.22,1.22,0,0,1,.51.93,1.32,1.32,0,0,1-1,.88A1.17,1.17,0,0,1,19.18,9.54ZM15.07,3.69a4.5,4.5,0,0,0-1.63,3.31,4.35,4.35,0,0,0,1.35-2.53A4.2,4.2,0,0,0,15.07,3.69Z"/>
+    </svg>
+);
+
+const GooglePayLogo = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.4,9.6H20v-.8a2.1,2.1,0,0,0-2.1-2.1H5.7a2.1,2.1,0,0,0-2.1,2.1v7.6a2.1,2.1,0,0,0,2.1,2.1h12.2a2.1,2.1,0,0,0,2.1-2.1v-1.1h.4a1.8,1.8,0,0,0,1.8-1.8V11.4A1.8,1.8,0,0,0,20.4,9.6ZM5.7,8.8h12.2a.1.1,0,0,1,.1.1v.7H5.6v-.7A.1.1,0,0,1,5.7,8.8Zm12.2,8a.1.1,0,0,1-.1.1H5.7a.1.1,0,0,1-.1-.1V12.2H18v4.6Zm2.5-4.5a.3.3,0,0,1-.3.3h-.4V11.1h.4a.3.3,0,0,1,.3.3Z"/>
+        <path d="M12.9,13.8v1.3h2.3a1.9,1.9,0,1,1-1.9-1.9,2,2,0,0,1,1.5.7l.9-.9a3.1,3.1,0,1,0-2.4,5.1,3.2,3.2,0,0,0,3.2-3.2V13.8Z"/>
+    </svg>
+);
 
 
 const ELEMENT_OPTIONS = {
@@ -312,11 +326,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                            <>
                                 <div className="payment-method-tabs">
                                     <button type="button" className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} onClick={() => setPaymentMethod('card')}>
-                                        <img src={LOGOS.card} alt="Card" className="payment-logo" /> Card
+                                        <CardLogo /> Card
                                     </button>
                                     {walletType && (
                                         <button type="button" className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} onClick={() => setPaymentMethod('wallet')}>
-                                            <img src={LOGOS[walletType]} alt={walletType} className="payment-logo" /> {walletType}
+                                            {renderWalletIcon()} {walletType}
                                         </button>
                                     )}
                                 </div>
