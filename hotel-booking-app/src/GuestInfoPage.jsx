@@ -265,16 +265,22 @@ useEffect(() => {
 
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = async () => {
-        // Reset state before showing the wallet
-        setErrorMessage('');
-        setHasAttemptedSubmit(false);
+        setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
+        // --- ADD THIS VALIDATION BLOCK ---
+        // This is the same check used in the card submission handler.
+        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+            setErrorMessage("Please fill out your billing address before proceeding.");
+            return; // Stop here if the address is missing
+        }
+        // --- END OF VALIDATION BLOCK ---
+
+        // If validation passes, clear any previous errors and show the wallet.
+        setErrorMessage('');
         if (paymentRequest) {
             paymentRequest.show();
         } else {
-            // This is a fallback in case the wallet button is shown by mistake
             setErrorMessage("Digital wallet is not available. Please select another payment method.");
-            setHasAttemptedSubmit(true);
         }
     };
 
