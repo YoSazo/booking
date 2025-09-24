@@ -60,6 +60,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
     }, [bookingDetails, apiBaseUrl]);
 
+    // This effect runs whenever the user navigates to a new step.
+    useEffect(() => {
+        // When we land on the payment step (step 3)...
+        if (currentStep === 3) {
+            // ...reset the error states, just like clicking a payment tab.
+            setHasAttemptedSubmit(false);
+            setErrorMessage('');
+        }
+    }, [currentStep]); // The hook will re-run only when currentStep changes
+
     useEffect(() => {
                 if (elements) {
                     const cardNumberElement = elements.getElement(CardNumberElement);
