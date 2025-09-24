@@ -43,6 +43,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
+    // In GuestInfoPage.jsx, with your other state and refs
+const isInteractingWithAutocomplete = useRef(false);
 
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
@@ -136,6 +138,10 @@ useEffect(() => {
         // Wait a short moment to see where the focus goes next.
         // This is the key to differentiating between tabbing and closing the keyboard.
         setTimeout(() => {
+            if (isInteractingWithAutocomplete.current) {
+            return;
+        }
+
             const newActiveElement = document.activeElement;
 
             // If the new focused element is another input, do nothing.
@@ -189,6 +195,35 @@ useEffect(() => {
             setFormErrors({});
         }
     }, [currentStep, bookingDetails, clientSecret]);
+
+    // In GuestInfoPage.jsx, add this with your other useEffect hooks
+
+useEffect(() => {
+    const handleMouseDown = (event) => {
+        // Check if the user's click started inside the Google Places Autocomplete container
+        if (event.target.closest('.pac-container')) {
+            isInteractingWithAutocomplete.current = true;
+        }
+    };
+
+    const handleMouseUp = () => {
+        // After the click is finished, reset the flag. A tiny delay ensures
+        // this runs after other events have had a chance to fire.
+        setTimeout(() => {
+            isInteractingWithAutocomplete.current = false;
+        }, 100);
+    };
+
+    // Add the listeners to the entire document
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Cleanup function to remove listeners when the component unmounts
+    return () => {
+        document.removeEventListener('mousedown', handleMouseDown);
+        document.removeEventListener('mouseup', handleMouseUp);
+    };
+}, []);
 
     useEffect(() => {
                 if (elements) {

@@ -1823,7 +1823,7 @@ body {
 /* Your icon style is perfect */
 .lock-icon {
   height: 15px;
-  margin-top: 40px;
+  margin-top: 100px;
 }
 
 /* You no longer need styles for .lock-text */
@@ -1844,6 +1844,13 @@ body {
   border: 1px solid #e2e8f0;
   margin-top: 4px; /* Add a little space below the input field */
   font-family: 'Inter', sans-serif;
+  min-width: 320px; 
+  
+  /* On mobile, allow it to be almost the full screen width */
+  max-width: 95vw;
+
+  /* Ensure it always appears on top of all other content */
+  z-index: 9999 !important; 
 }
 
 /* Each individual suggestion/row in the dropdown */
