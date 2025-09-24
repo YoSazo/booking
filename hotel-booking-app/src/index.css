@@ -1547,7 +1547,7 @@ body {
 }
 
 .billing-address-section {
-    margin-top: 30px;
+    margin-top: 40px;
 }
 
 .billing-address-title {
@@ -1815,7 +1815,7 @@ body {
   gap: 20px; /* -+This adds a nice space between the icon and the text */
   margin-bottom: 20px; /* Adds some space below the badge */
   color: #555; /* A soft color for the text */
-  font-size: 3px;
+  font-size: 15px;
 }
 
 .lock-icon {
