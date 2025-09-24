@@ -1826,3 +1826,7 @@ body {
 }
 
 /* You no longer need styles for .lock-text */
+
+.link-pay-logo{
+  height: 10px;
+}
