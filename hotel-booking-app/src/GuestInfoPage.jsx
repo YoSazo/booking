@@ -50,36 +50,15 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     // Fetch the Payment Intent from the server
     useEffect(() => {
-    if (bookingDetails && bookingDetails.subtotal) {
-        setErrorMessage('');
-        fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
-        })
-        .then((res) => {
-            if (!res.ok) {
-                // If the server response is not OK, read the error message and throw it
-                return res.json().then(err => { throw new Error(err.message || 'Failed to create payment intent') });
-            }
-            return res.json();
-        })
-        .then((data) => {
-            if (data.clientSecret) {
-                setClientSecret(data.clientSecret);
-            } else {
-                // If the response is OK but there's no clientSecret, it's still an error
-                throw new Error(data.error || 'Client secret not received from server.');
-            }
-        })
-        .catch(error => {
-            // Now, we catch any error from the fetch chain
-            console.error("Payment Intent Error:", error);
-            setHasAttemptedSubmit(true); // This makes the error visible immediately
-            setErrorMessage(error.message);
-        });
-    }
-}, [bookingDetails, apiBaseUrl]);
+        if (bookingDetails && bookingDetails.subtotal) {
+            setErrorMessage('');
+            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
+            })
+            .then((res) => res.json()).then((data) => setClientSecret(data.clientSecret));
+        }
+    }, [bookingDetails, apiBaseUrl]);
 
     useEffect(() => {
                 if (elements) {
@@ -251,13 +230,17 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = async () => {
-        setHasAttemptedSubmit(true);
-        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
-        }
+        // Clear any previous errors when the user clicks the wallet button
+        setErrorMessage('');
+        setHasAttemptedSubmit(false);
+
+        // Directly show the payment request modal
         if (paymentRequest) {
             paymentRequest.show();
+        } else {
+            // Fallback error if the wallet button is somehow available when it shouldn't be
+            setErrorMessage("Digital wallet is not available. Please select another payment method.");
+            setHasAttemptedSubmit(true);
         }
     };
 
