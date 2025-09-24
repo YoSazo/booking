@@ -316,14 +316,22 @@ useEffect(() => {
 
 
     const validateInfoStep = () => {
-        const errors = {};
-        if (!formData.firstName.trim()) errors.firstName = "First name is required.";
-        if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
-        if (!formData.email.trim()) errors.email = "Email is required.";
-        if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
+    const errors = {};
+    if (!formData.firstName.trim()) errors.firstName = "First name is required.";
+    if (!formData.lastName.trim()) errors.lastName = "Last name is required.";
+
+    // --- Replace the old email check with this ---
+    if (!formData.email.trim()) {
+        errors.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        errors.email = "Please enter a valid email format.";
+    }
+    // --- End of new email check ---
+
+    if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+};
 
     const handleNextStep = () => {
         if (currentStep === 1) {

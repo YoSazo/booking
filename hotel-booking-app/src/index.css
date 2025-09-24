@@ -1,4 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+html, body {
+  /* This prevents the "rubber band" scrolling bounce effect on mobile,
+     especially on iOS, and stops the grey background from appearing. */
+  overscroll-behavior-y: contain;
+}
 
 /* --- Basic Styles & Fonts --- */
 :root {
