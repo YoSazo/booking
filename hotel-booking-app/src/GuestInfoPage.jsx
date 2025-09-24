@@ -39,6 +39,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
     // New state for tabbed payment methods
     const [paymentMethod, setPaymentMethod] = useState('card');
@@ -182,7 +183,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setIsAddressSelected(true);
     };
 
-    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
