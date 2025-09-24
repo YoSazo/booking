@@ -89,6 +89,7 @@ const ZAPIER_URLS = {
     Search: process.env.ZAPIER_SEARCH_URL,
     AddToCart: process.env.ZAPIER_ADDTOCART_URL,
     InitiateCheckout: process.env.ZAPIER_INITIATECHECKOUT_URL,
+    AddPaymentInfo: process.env.ZAPIER_PAYMENT_INFO_URL,
     Purchase: process.env.ZAPIER_PURCHASE_URL,
 };
 
