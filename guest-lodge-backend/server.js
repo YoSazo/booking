@@ -228,7 +228,7 @@ app.post('/api/book', async (req, res) => {
             }
         }
         
-        // Step 3: Forward the original success response from the PMS to the frontend
+        // Step 3: Fosrward the original success response from the PMS to the frontend
         res.json({
             success: pmsResponse.data.success,
             message: pmsResponse.data.success ? 'Reservation created successfully.' : pmsResponse.data.message,
