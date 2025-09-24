@@ -49,45 +49,51 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [walletType, setWalletType] = useState(null);
 
     // Fetch the Payment Intent from the server
-    useEffect(() => {
-        if (bookingDetails && bookingDetails.subtotal) {
-            setErrorMessage('');
-            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
-            })
-            .then((res) => res.json()).then((data) => setClientSecret(data.clientSecret));
-        }
-    }, [bookingDetails, apiBaseUrl]);
-
-    // This effect runs whenever the user navigates to a new step.
-    useEffect(() => {
-        // When we land on the payment step (step 3)...
-        if (currentStep === 3) {
-            // ...reset the error states, just like clicking a payment tab.
-            setHasAttemptedSubmit(false);
-            setErrorMessage('');
-        }
-    }, [currentStep]); // The hook will re-run only when currentStep changes
-
-    // This effect runs when the clientSecret is successfully fetched.
-    useEffect(() => {
-        // When we have a clientSecret, we know the payment form is truly ready.
-        // This is the perfect time to reset any lingering errors.
-        if (clientSecret) {
-            setHasAttemptedSubmit(false);
-            setErrorMessage('');
-        }
-    }, [clientSecret]);
-    
-    useEffect(() => {
-    // Only reset when we have everything needed for payment AND are on step 3
-    if (currentStep === 3 && clientSecret && stripe) {
-        setHasAttemptedSubmit(false);
+useEffect(() => {
+    if (bookingDetails && bookingDetails.subtotal) {
         setErrorMessage('');
-        setFormErrors({});
+        fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+            method: "POST", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
+        })
+        .then((res) => {
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.json();
+        })
+        .then((data) => {
+            if (data.clientSecret) {
+                setClientSecret(data.clientSecret);
+            } else {
+                console.error('No client secret received:', data);
+                // Don't set user error here since they haven't attempted payment
+            }
+        })
+        .catch((error) => {
+            console.error('Failed to create payment intent:', error);
+            // Don't set errorMessage here! User hasn't attempted to pay yet.
+            // This prevents the error from showing on page load.
+        });
     }
-}, [currentStep, clientSecret, stripe]);// This runs once when the clientSecret is populated.
+}, [bookingDetails, apiBaseUrl]);
+
+    // Replace your multiple reset useEffects with this single one:
+    useEffect(() => {
+        // Reset error state when we're on payment step and have all required data
+        if (currentStep === 3 && bookingDetails && clientSecret) {
+            setHasAttemptedSubmit(false);
+            setErrorMessage('');
+            setFormErrors({});
+        }
+        // Also reset when navigating away from payment step
+        else if (currentStep < 3) {
+            setHasAttemptedSubmit(false);
+            setErrorMessage('');
+            setFormErrors({});
+        }
+    }, [currentStep, bookingDetails, clientSecret]);
 
     useEffect(() => {
                 if (elements) {
