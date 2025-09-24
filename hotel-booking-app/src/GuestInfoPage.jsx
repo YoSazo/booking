@@ -43,6 +43,68 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
+
+
+    // In GuestInfoPage.jsx, add this function alongside your other handlers
+
+const handleAddressPaste = (e) => {
+    // Prevent the default paste behavior
+    e.preventDefault();
+    // Get the text that was pasted from the clipboard
+    const pastedText = e.clipboardData.getData('text');
+    
+    // Immediately update the form state so the user sees the pasted text
+    setFormData(prev => ({ ...prev, address: pastedText }));
+
+    // Use Google's Geocoder to find the address
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: pastedText }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+            const place = results[0];
+            const components = place.address_components;
+            let streetNumber = '', route = '', city = '', state = '', zip = '';
+
+            for (const component of components) {
+                const types = component.types;
+                if (types.includes('street_number')) streetNumber = component.long_name;
+                if (types.includes('route')) route = component.long_name;
+                if (types.includes('locality')) city = component.long_name;
+                if (types.includes('administrative_area_level_1')) state = component.short_name;
+                if (types.includes('postal_code')) zip = component.long_name;
+            }
+
+            // Update the form with the parsed address components
+            setFormData(prev => ({
+                ...prev,
+                address: `${streetNumber} ${route}`.trim(),
+                city,
+                state,
+                zip
+            }));
+
+            // This is crucial: unhide the city, state, and zip fields
+            setIsAddressSelected(true);
+        } else {
+            console.warn('Geocode was not successful for the following reason: ' + status);
+        }
+    });
+};
+
+// Now, find your address input inside the <Autocomplete> component
+// and add the onPaste handler to it.
+
+<input
+    type="text"
+    name="address"
+    value={formData.address}
+    onChange={handleChange}
+    onPaste={handleAddressPaste} // <-- ADD THIS LINE
+    placeholder="Start typing or paste your address..."
+    autoComplete="street-address"
+    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+/>
+
+
     useEffect(() => { latestFormData.current = formData; }, [formData]);
 
     // New state for tabbed payment methods

@@ -1823,11 +1823,60 @@ body {
 /* Your icon style is perfect */
 .lock-icon {
   height: 15px;
-  margin-top: 25px;
+  margin-top: 40px;
 }
 
 /* You no longer need styles for .lock-text */
 
 .link-pay-logo{
   height: 10px;
+}
+
+/* =============================================== */
+/* Modern Styles for Google Maps Autocomplete      */
+/* =============================================== */
+
+/* The main dropdown container */
+.pac-container {
+  background-color: #fff;
+  border-radius: 8px !important; /* Use !important to override inline styles */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  margin-top: 4px; /* Add a little space below the input field */
+  font-family: 'Inter', sans-serif;
+}
+
+/* Each individual suggestion/row in the dropdown */
+.pac-item {
+  padding: 10px 14px;
+  font-size: 15px;
+  color: #333;
+  border-top: 1px solid #f1f1f1;
+  cursor: pointer;
+}
+
+.pac-item:first-child {
+  border-top: none;
+}
+
+/* The style for a suggestion when you hover over it */
+.pac-item:hover {
+  background-color: #f7f7f7;
+}
+
+/* The bolded part of the suggestion that matches what the user typed */
+.pac-item-query {
+  font-size: 15px;
+  color: #000;
+}
+
+/* The small map pin icon next to each suggestion */
+.pac-icon {
+  margin-top: 4px;
+}
+
+/* This hides the "Powered by Google" logo.
+   Check Google's Terms of Service if you are required to display it. */
+.pac-logo:after {
+  display: none;
 }
