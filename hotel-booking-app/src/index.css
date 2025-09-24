@@ -1823,6 +1823,7 @@ body {
 /* Your icon style is perfect */
 .lock-icon {
   height: 15px;
+  margin-top: 25px;
 }
 
 /* You no longer need styles for .lock-text */
