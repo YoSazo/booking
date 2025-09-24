@@ -886,7 +886,6 @@ body {
 .form-field {
   display: flex;
   flex-direction: column;
-  margin-bottom: 16px;
 }
 .form-field.full-width {
   grid-column: 1 / -1;
@@ -903,7 +902,6 @@ body {
   border-radius: 8px;
   font-size: 1em;
   font-family: 'Inter', sans-serif;
-  width: 100%
 }
 .payment-placeholder {
   margin-top: 40px;
