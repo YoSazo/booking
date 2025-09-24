@@ -1700,10 +1700,11 @@ body {
 }
 
 .billing-address-label {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     margin-bottom: 16px;
     display: block;
+    color: #667;
 }
 
 .payment-error {
