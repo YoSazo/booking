@@ -50,15 +50,36 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     // Fetch the Payment Intent from the server
     useEffect(() => {
-        if (bookingDetails && bookingDetails.subtotal) {
-            setErrorMessage('');
-            fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
-            })
-            .then((res) => res.json()).then((data) => setClientSecret(data.clientSecret));
-        }
-    }, [bookingDetails, apiBaseUrl]);
+    if (bookingDetails && bookingDetails.subtotal) {
+        setErrorMessage('');
+        fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
+        })
+        .then((res) => {
+            if (!res.ok) {
+                // If the server response is not OK, read the error message and throw it
+                return res.json().then(err => { throw new Error(err.message || 'Failed to create payment intent') });
+            }
+            return res.json();
+        })
+        .then((data) => {
+            if (data.clientSecret) {
+                setClientSecret(data.clientSecret);
+            } else {
+                // If the response is OK but there's no clientSecret, it's still an error
+                throw new Error(data.error || 'Client secret not received from server.');
+            }
+        })
+        .catch(error => {
+            // Now, we catch any error from the fetch chain
+            console.error("Payment Intent Error:", error);
+            setHasAttemptedSubmit(true); // This makes the error visible immediately
+            setErrorMessage(error.message);
+        });
+    }
+}, [bookingDetails, apiBaseUrl]);
 
     useEffect(() => {
                 if (elements) {
