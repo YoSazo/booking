@@ -50,33 +50,46 @@ const isInteractingWithAutocomplete = useRef(false);
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
-  e.preventDefault();
-  const pastedText = e.clipboardData.getData('text');
-  
-  const scrollY = window.scrollY; // 👈 Save scroll
+    // Prevent the default paste behavior
+    e.preventDefault();
+    // Get the text that was pasted from the clipboard
+    const pastedText = e.clipboardData.getData('text');
+    
+    // Immediately update the form state so the user sees the pasted text
+    setFormData(prev => ({ ...prev, address: pastedText }));
 
-  setFormData(prev => ({ ...prev, address: pastedText }));
+    // Use Google's Geocoder to find the address
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: pastedText }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+            const place = results[0];
+            const components = place.address_components;
+            let streetNumber = '', route = '', city = '', state = '', zip = '';
 
-  const geocoder = new window.google.maps.Geocoder();
-  geocoder.geocode({ address: pastedText }, (results, status) => {
-    if (status === 'OK' && results[0]) {
-      // ... parsing logic ...
-      
-      setFormData(prev => ({
-        ...prev,
-        address: `${streetNumber} ${route}`.trim(),
-        city,
-        state,
-        zip
-      }));
-      setIsAddressSelected(true);
+            for (const component of components) {
+                const types = component.types;
+                if (types.includes('street_number')) streetNumber = component.long_name;
+                if (types.includes('route')) route = component.long_name;
+                if (types.includes('locality')) city = component.long_name;
+                if (types.includes('administrative_area_level_1')) state = component.short_name;
+                if (types.includes('postal_code')) zip = component.long_name;
+            }
 
-      // 👇 Restore scroll after update
-      setTimeout(() => {
-        window.scrollTo(0, scrollY);
-      }, 0);
-    }
-  });
+            // Update the form with the parsed address components
+            setFormData(prev => ({
+                ...prev,
+                address: `${streetNumber} ${route}`.trim(),
+                city,
+                state,
+                zip
+            }));
+
+            // This is crucial: unhide the city, state, and zip fields
+            setIsAddressSelected(true);
+        } else {
+            console.warn('Geocode was not successful for the following reason: ' + status);
+        }
+    });
 };
 
 // Now, find your address input inside the <Autocomplete> component
@@ -114,45 +127,51 @@ useEffect(() => {
 // In GuestInfoPage.jsx, replace the previous blur-handling useEffect with this one.
 
 useEffect(() => {
+    // This function handles the blur event for any input.
     const handleInputBlur = (event) => {
+        // We only care about blur events on form inputs.
         const target = event.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
             return;
         }
 
+        // Wait a short moment to see where the focus goes next.
+        // This is the key to differentiating between tabbing and closing the keyboard.
         setTimeout(() => {
-            // 🚫 DO NOT scroll if we're interacting with autocomplete
             if (isInteractingWithAutocomplete.current) {
-                return;
-            }
+            return;
+        }
 
             const newActiveElement = document.activeElement;
-            if (
-                newActiveElement &&
-                (newActiveElement.tagName === 'INPUT' ||
-                 newActiveElement.tagName === 'SELECT' ||
-                 newActiveElement.tagName === 'TEXTAREA')
-            ) {
+
+            // If the new focused element is another input, do nothing.
+            // This means the user is just moving between form fields.
+            if (newActiveElement && (newActiveElement.tagName === 'INPUT' || newActiveElement.tagName === 'SELECT' || newActiveElement.tagName === 'TEXTAREA')) {
                 return;
             }
 
-            // ✅ Only scroll if truly leaving the form (e.g., tapping outside on mobile)
-            // But NOT when selecting from autocomplete
+            // If the focus has gone anywhere else (like the body of the page),
+            // we can be confident the user has dismissed the keyboard.
+            // Now it is safe to scroll the page back to the top.
             window.scrollTo(0, 0);
-        }, 200);
+
+        }, 200); // A 200ms delay is usually a safe bet.
     };
 
+    // We'll attach the listener to the main form container.
     const container = document.querySelector('.guest-info-container');
     if (container) {
+        // The 'true' uses the "capture" phase, which is more reliable for this trick.
         container.addEventListener('blur', handleInputBlur, true);
     }
 
+    // --- Cleanup Function ---
     return () => {
         if (container) {
             container.removeEventListener('blur', handleInputBlur, true);
         }
     };
-}, []);
+}, []); // The empty array ensures this effect runs only once.
 
 useEffect(() => {
     console.log('DEBUG - errorMessage changed:', errorMessage);
@@ -180,42 +199,31 @@ useEffect(() => {
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
 
 useEffect(() => {
-    const handleBodyClick = (event) => {
-        // If click is inside Google Autocomplete dropdown, mark as interacting
+    const handleMouseDown = (event) => {
+        // Check if the user's click started inside the Google Places Autocomplete container
         if (event.target.closest('.pac-container')) {
             isInteractingWithAutocomplete.current = true;
-        } else {
-            // Only reset AFTER a short delay to cover blur timing
-            setTimeout(() => {
-                isInteractingWithAutocomplete.current = false;
-            }, 300);
         }
     };
 
-    const handleAutocompleteBlur = () => {
-        // When the input blurs, don't reset immediately — wait
+    const handleMouseUp = () => {
+        // After the click is finished, reset the flag. A tiny delay ensures
+        // this runs after other events have had a chance to fire.
         setTimeout(() => {
             isInteractingWithAutocomplete.current = false;
-        }, 300);
+        }, 100);
     };
 
-    // Attach to body to catch all clicks
-    document.body.addEventListener('click', handleBodyClick);
+    // Add the listeners to the entire document
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
 
-    // Also listen for blur on the address input specifically
-    const addressInput = document.querySelector('input[name="address"]');
-    if (addressInput) {
-        addressInput.addEventListener('blur', handleAutocompleteBlur);
-    }
-
+    // Cleanup function to remove listeners when the component unmounts
     return () => {
-        document.body.removeEventListener('click', handleBodyClick);
-        if (addressInput) {
-            addressInput.removeEventListener('blur', handleAutocompleteBlur);
-        }
+        document.removeEventListener('mousedown', handleMouseDown);
+        document.removeEventListener('mouseup', handleMouseUp);
     };
 }, []);
-
 
     useEffect(() => {
                 if (elements) {
@@ -344,31 +352,22 @@ useEffect(() => {
 
     const onLoad = (autoC) => setAutocomplete(autoC);
     const onPlaceChanged = () => {
-  if (autocomplete !== null) {
-    const place = autocomplete.getPlace();
-    const components = place.address_components;
-    let streetNumber = '', route = '', city = '', state = '', zip = '';
-    for (const component of components) {
-      const types = component.types;
-      if (types.includes('street_number')) streetNumber = component.long_name;
-      if (types.includes('route')) route = component.long_name;
-      if (types.includes('locality')) city = component.long_name;
-      if (types.includes('administrative_area_level_1')) state = component.short_name;
-      if (types.includes('postal_code')) zip = component.long_name;
-    }
-
-    // 🚀 Save current scroll position BEFORE state update
-    const scrollY = window.scrollY;
-
-    setFormData(prev => ({...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip}));
-    setIsAddressSelected(true);
-
-    // 🚀 Restore scroll position AFTER React updates DOM
-    setTimeout(() => {
-      window.scrollTo(0, scrollY);
-    }, 0); // Use setTimeout to defer until after render
-  }
-};
+        if (autocomplete !== null) {
+          const place = autocomplete.getPlace();
+          const components = place.address_components;
+          let streetNumber = '', route = '', city = '', state = '', zip = '';
+          for (const component of components) {
+            const types = component.types;
+            if (types.includes('street_number')) streetNumber = component.long_name;
+            if (types.includes('route')) route = component.long_name;
+            if (types.includes('locality')) city = component.long_name;
+            if (types.includes('administrative_area_level_1')) state = component.short_name;
+            if (types.includes('postal_code')) zip = component.long_name;
+          }
+          setFormData(prev => ({...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip}));
+        }
+        setIsAddressSelected(true);
+    };
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
