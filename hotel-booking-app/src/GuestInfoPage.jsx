@@ -122,37 +122,49 @@ useEffect(() => {
     }
 }, [hasAttemptedSubmit]);
 
-// In GuestInfoPage.jsx
-
-// In GuestInfoPage.jsx, replace the blur-handling useEffect with this new one.
+// In GuestInfoPage.jsx, add this with your other useEffect hooks.
+// REMOVE ALL PREVIOUS SCROLL/BLUR/VIEWPORT USEEFFECTS.
 
 useEffect(() => {
-    // This function will be called whenever the visual viewport resizes,
-    // which is what happens when the keyboard appears or disappears.
-    const handleViewportResize = () => {
-        // We check if the viewport's height is now roughly the same as the
-        // total window height. This is a reliable way to know the keyboard has closed.
-        if (window.visualViewport.height / window.innerHeight > 0.9) {
-             // A very short delay gives the browser a moment to finish its resize animation.
-            setTimeout(() => {
-                window.scrollTo(0, 0);
-            }, 100);
-        }
+    // This ref will store the height of the visible area when an input is focused.
+    const viewportHeightOnFocus = { current: window.innerHeight };
+
+    const handleInputFocus = () => {
+        // When a user taps an input, we record the current visible height.
+        // If the keyboard is about to open, this value will be the full screen height.
+        viewportHeightOnFocus.current = window.visualViewport.height;
     };
 
-    // Make sure we're in a browser environment that supports visualViewport
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', handleViewportResize);
+    const handleInputBlur = () => {
+        // When the user leaves an input, we wait a moment for the browser to resize.
+        setTimeout(() => {
+            const currentViewportHeight = window.visualViewport.height;
+            
+            // THE KEY LOGIC: We only scroll to the top if the visible area is now
+            // significantly TALLER than it was when the input was focused.
+            // A threshold of 150px is a safe bet to confirm it was the keyboard closing.
+            if (currentViewportHeight > viewportHeightOnFocus.current + 150) {
+                window.scrollTo(0, 0);
+            }
+        }, 300); // A 300ms delay is robust enough for most devices.
+    };
+
+    // Find the form container to attach listeners to.
+    const container = document.querySelector('.guest-info-container');
+    if (container) {
+        // Use event delegation to listen for focus and blur on any input inside the container.
+        container.addEventListener('focusin', handleInputFocus);
+        container.addEventListener('blur', handleInputBlur, true);
     }
 
-    // --- Cleanup Function ---
-    // This removes the listener when the user navigates away to prevent memory leaks.
+    // Cleanup function to prevent memory leaks.
     return () => {
-        if (window.visualViewport) {
-            window.visualViewport.removeEventListener('resize', handleViewportResize);
+        if (container) {
+            container.removeEventListener('focusin', handleInputFocus);
+            container.removeEventListener('blur', handleInputBlur, true);
         }
     };
-}, []); // The empty array ensures this effect runs only once.
+}, []); // The empty array ensures this complex setup runs only once.
 
 
 
