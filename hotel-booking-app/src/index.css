@@ -893,7 +893,8 @@ body {
 .form-field label {
   margin-bottom: 8px;
   font-weight: 500;
-  font-size: 0.9em;
+  font-size: 13px;
+  color: #667;
 }
 .form-field input, .form-field select, .form-field textarea {
   padding: 12px;
