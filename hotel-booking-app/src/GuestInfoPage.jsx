@@ -125,46 +125,39 @@ useEffect(() => {
 // In GuestInfoPage.jsx, add this with your other useEffect hooks.
 // REMOVE ALL PREVIOUS SCROLL/BLUR/VIEWPORT USEEFFECTS.
 
+// In GuestInfoPage.jsx, REPLACE the old keyboard/blur useEffect with this one.
 useEffect(() => {
-    // This ref will store the height of the visible area when an input is focused.
     const viewportHeightOnFocus = { current: window.innerHeight };
 
-    const handleInputFocus = () => {
-        // When a user taps an input, we record the current visible height.
-        // If the keyboard is about to open, this value will be the full screen height.
+    const handleFocusIn = () => {
+        // When any input is focused, record the current VISIBLE screen height.
         viewportHeightOnFocus.current = window.visualViewport.height;
     };
 
-    const handleInputBlur = () => {
-        // When the user leaves an input, we wait a moment for the browser to resize.
+    const handleBlurOut = () => {
+        // A brief delay allows the browser to finish its resize animation.
         setTimeout(() => {
             const currentViewportHeight = window.visualViewport.height;
             
-            // THE KEY LOGIC: We only scroll to the top if the visible area is now
-            // significantly TALLER than it was when the input was focused.
-            // A threshold of 150px is a safe bet to confirm it was the keyboard closing.
+            // If the viewport is now significantly TALLER than when the input was
+            // focused, we know the keyboard has closed.
             if (currentViewportHeight > viewportHeightOnFocus.current + 150) {
                 window.scrollTo(0, 0);
             }
-        }, 300); // A 300ms delay is robust enough for most devices.
+        }, 300);
     };
 
-    // Find the form container to attach listeners to.
-    const container = document.querySelector('.guest-info-container');
-    if (container) {
-        // Use event delegation to listen for focus and blur on any input inside the container.
-        container.addEventListener('focusin', handleInputFocus);
-        container.addEventListener('blur', handleInputBlur, true);
-    }
+    // We use 'focusin' and 'focusout' because they bubble up and can be
+    // caught on the window, even from inside the Stripe iframes.
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleBlurOut);
 
-    // Cleanup function to prevent memory leaks.
+    // Cleanup function to remove listeners when the component unmounts.
     return () => {
-        if (container) {
-            container.removeEventListener('focusin', handleInputFocus);
-            container.removeEventListener('blur', handleInputBlur, true);
-        }
+        window.removeEventListener('focusin', handleFocusIn);
+        window.removeEventListener('focusout', handleBlurOut);
     };
-}, []); // The empty array ensures this complex setup runs only once.
+}, []); // Empty array ensures this setup runs only once. // The empty array ensures this complex setup runs only once.
 
 
 
