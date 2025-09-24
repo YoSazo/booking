@@ -1793,12 +1793,19 @@ body {
 .card-brand-icon {
   height: 20px;
   width: auto;
-  opacity: 0.5;
+  opacity: 0.8;
   transition: opacity 0.2s ease;
 }
 
 .card-brand-icon.active {
-  opacity: 0;
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+
+.card-field-container .__PrivateStripeElement {
+  padding: 0;
+  margin-right: 80px; /* Make space for card brand icons */
 }
 
 /* For expiry and CVC fields, no extra margin needed */

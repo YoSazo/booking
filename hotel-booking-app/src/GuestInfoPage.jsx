@@ -382,14 +382,48 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     <div className="form-grid">
         <div className="form-field full-width">
             <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
+                <input 
+                    type="text" 
+                    name="address" 
+                    value={formData.address} 
+                    onChange={handleChange} 
+                    placeholder="Start typing your address..." 
+                    autoComplete="street-address"
+                />
             </Autocomplete>
         </div>
         {isAddressSelected && (
             <div className="address-reveal-container visible">
-                <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
-                <div className="form-field"><label>State</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
-                <div className="form-field"><label>Zip</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
+                <div className="form-field">
+                    <label>City</label>
+                    <input 
+                        type="text" 
+                        name="city" 
+                        value={formData.city} 
+                        onChange={handleChange} 
+                        autoComplete="address-level2"
+                    />
+                </div>
+                <div className="form-field">
+                    <label>State</label>
+                    <input 
+                        type="text" 
+                        name="state" 
+                        value={formData.state} 
+                        onChange={handleChange} 
+                        autoComplete="address-level1"
+                    />
+                </div>
+                <div className="form-field">
+                    <label>Zip</label>
+                    <input 
+                        type="text" 
+                        name="zip" 
+                        value={formData.zip} 
+                        onChange={handleChange} 
+                        autoComplete="postal-code"
+                    />
+                </div>
             </div>
         )}
     </div>
