@@ -78,7 +78,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             setHasAttemptedSubmit(false);
             setErrorMessage('');
         }
-    }, [clientSecret]); // This runs once when the clientSecret is populated.
+    }, [clientSecret]);
+    
+    useEffect(() => {
+    // Only reset when we have everything needed for payment AND are on step 3
+    if (currentStep === 3 && clientSecret && stripe) {
+        setHasAttemptedSubmit(false);
+        setErrorMessage('');
+        setFormErrors({});
+    }
+}, [currentStep, clientSecret, stripe]);// This runs once when the clientSecret is populated.
 
     useEffect(() => {
                 if (elements) {
@@ -104,17 +113,22 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             });
 
             pr.canMakePayment().then(result => {
-                if (result) {
-                    setPaymentRequest(pr);
-                    if (result.applePay) {
-                        setWalletType('Apple Pay');
-                    } else if (result.googlePay) {
-                        setWalletType('Google Pay');
-                    } else {
-                        setWalletType('Wallet'); // Fallback
-                    }
-                }
-            });
+    if (result) {
+        setPaymentRequest(pr);
+        if (result.applePay) {
+            setWalletType('Apple Pay');
+        } else if (result.googlePay) {
+            setWalletType('Google Pay');
+        } else {
+            setWalletType('Wallet');
+        }
+    }
+}).catch(error => {
+    console.warn('Payment request check failed:', error);
+    // Don't set user-facing error here - just disable wallet option
+    setPaymentRequest(null);
+    setWalletType(null);
+});
 
             // Add this helper function
 
