@@ -23,10 +23,8 @@ const ELEMENT_OPTIONS = {
 };
 
 // This is the main component that controls the multi-step flow.
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     // Add this at the very top of your component, before any other code
-console.log('COMPONENT MOUNTED - Fresh start');
-console.log('Initial bookingDetails:', bookingDetails);
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
@@ -37,7 +35,7 @@ console.log('Initial bookingDetails:', bookingDetails);
         address: '', city: '', state: '', zip: '',
     });
     const [formErrors, setFormErrors] = useState({});
-    const [clientSecret, setClientSecret] = useState('');
+    // const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -64,35 +62,7 @@ useEffect(() => {
 }, [errorMessage]);
 
     // Fetch the Payment Intent from the server
-useEffect(() => {
-    if (bookingDetails && bookingDetails.subtotal) {
-        setErrorMessage('');
-        fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-            method: "POST", 
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
-        })
-        .then((res) => {
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
-            return res.json();
-        })
-        .then((data) => {
-            if (data.clientSecret) {
-                setClientSecret(data.clientSecret);
-            } else {
-                console.error('No client secret received:', data);
-                // Don't set user error here since they haven't attempted payment
-            }
-        })
-        .catch((error) => {
-            console.error('Failed to create payment intent:', error);
-            // Don't set errorMessage here! User hasn't attempted to pay yet.
-            // This prevents the error from showing on page load.
-        });
-    }
-}, [bookingDetails, apiBaseUrl]);
+
 
     // Replace your multiple reset useEffects with this single one:
     useEffect(() => {
@@ -243,9 +213,6 @@ useEffect(() => {
     };
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
-        console.log('FORM SUBMITTED - Event type:', e.type);
-    console.log('Form submitter:', e.target);
-    console.log('Stack trace:', new Error().stack);
         e.preventDefault();
         if (!window.userInitiatedSubmit) {
         console.warn('Form submitted without user interaction - ignoring');
