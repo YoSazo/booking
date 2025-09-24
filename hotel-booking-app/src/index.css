@@ -1423,12 +1423,7 @@ body {
     margin-left: .25em;
 }
 
-.stripe-badge-image {
-    display: block;
-    margin: 0 auto 17px auto;
-    height: 30px;
-    width: auto;
-}
+
 
 .secure-payment-frame {
     background-color: #f9f9f9;
@@ -1813,4 +1808,19 @@ body {
 /* For expiry and CVC fields, no extra margin needed */
 .card-fields-row .card-field-container .__PrivateStripeElement {
   margin-right: 0;
+}
+
+.secure-checkout-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* This will center the items horizontally */
+  gap: 8px; /* This adds a nice space between the icon and the text */
+  margin-bottom: 20px; /* Adds some space below the badge */
+  color: #555; /* A soft color for the text */
+  font-size: 14px;
+}
+
+.lock-icon {
+  /* Adjust size as needed */
+  height: 25px;
 }
