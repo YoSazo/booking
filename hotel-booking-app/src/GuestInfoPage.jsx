@@ -48,6 +48,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     // Fetch the Payment Intent from the server
     useEffect(() => {
         if (bookingDetails && bookingDetails.subtotal) {
+            setErrorMessage('');
             fetch(`${apiBaseUrl}/api/create-payment-intent`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ amount: bookingDetails.subtotal / 2 }),
@@ -102,6 +103,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 );
                 if (confirmError) {
                     ev.complete('fail');
+                    setHasAttemptedSubmit(true);
                     setErrorMessage(confirmError.message);
                     return;
                 }
@@ -137,6 +139,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const handleBackStep = () => {
         if (currentStep === 1) onBack();
         else setCurrentStep(prev => prev - 1);
+        setHasAttemptedSubmit(false); // Reset attempt state when going back
+        setErrorMessage('');
     };
 
     const getBackButtonText = () => {
@@ -304,7 +308,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                         {!clientSecret ? (<p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>) : (
                            <>
                                 <div className="payment-method-tabs">
-                                    <button type="button" className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} onClick={() => setPaymentMethod('card')}>
+                                    <button type="button" className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} onClick={() => {
+    setPaymentMethod('card');
+    setHasAttemptedSubmit(false);
+    setErrorMessage('');
+}}>
                                         <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
                                     </button>
                                     {walletType && (
