@@ -1813,7 +1813,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px; /* A smaller gap is usually better */
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   color: #555;
   font-size: 13px;
 }
