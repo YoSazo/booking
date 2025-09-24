@@ -4,7 +4,7 @@ import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStri
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-const [cardBrand, setCardBrand] = useState('');
+
 
 
 const ELEMENT_OPTIONS = {
@@ -24,7 +24,7 @@ const ELEMENT_OPTIONS = {
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
-    
+    const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
 
