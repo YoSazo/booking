@@ -442,6 +442,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                            </>
                         )}
                         {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
+                        <div style={{fontSize: '12px', color: 'blue'}}>Debug: errorMessage="{errorMessage}", hasAttemptedSubmit={hasAttemptedSubmit}</div>        
                     </div>
                 </form>
                 
