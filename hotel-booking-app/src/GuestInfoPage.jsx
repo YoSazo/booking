@@ -124,52 +124,32 @@ useEffect(() => {
 
 // In GuestInfoPage.jsx
 
-// In GuestInfoPage.jsx, replace the previous blur-handling useEffect with this one.
+// In GuestInfoPage.jsx, replace the blur-handling useEffect with this new one.
 
 useEffect(() => {
-    const handleInputBlur = (event) => {
-        const target = event.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
-            return;
+    // This function will be called whenever the visual viewport resizes,
+    // which is what happens when the keyboard appears or disappears.
+    const handleViewportResize = () => {
+        // We check if the viewport's height is now roughly the same as the
+        // total window height. This is a reliable way to know the keyboard has closed.
+        if (window.visualViewport.height / window.innerHeight > 0.9) {
+             // A very short delay gives the browser a moment to finish its resize animation.
+            setTimeout(() => {
+                window.scrollTo(0, 0);
+            }, 100);
         }
-
-        // Increased delay and additional checks for autocomplete interaction
-        setTimeout(() => {
-            // Check if user is interacting with autocomplete
-            if (isInteractingWithAutocomplete.current) {
-                return;
-            }
-
-            // Additional check: see if the autocomplete dropdown is visible
-            const pacContainer = document.querySelector('.pac-container');
-            if (pacContainer && pacContainer.style.display !== 'none') {
-                return;
-            }
-
-            // Check if the newly focused element is part of the autocomplete
-            const newActiveElement = document.activeElement;
-            if (newActiveElement && newActiveElement.closest('.pac-container')) {
-                return;
-            }
-
-            // If the new focused element is another form input, don't scroll
-            if (newActiveElement && (newActiveElement.tagName === 'INPUT' || newActiveElement.tagName === 'SELECT' || newActiveElement.tagName === 'TEXTAREA')) {
-                return;
-            }
-
-            // Only scroll if focus has truly left all form elements
-            
-        }, 300); // Increased delay from 200ms to 300ms
     };
 
-    const container = document.querySelector('.guest-info-container');
-    if (container) {
-        container.addEventListener('blur', handleInputBlur, true);
+    // Make sure we're in a browser environment that supports visualViewport
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleViewportResize);
     }
 
+    // --- Cleanup Function ---
+    // This removes the listener when the user navigates away to prevent memory leaks.
     return () => {
-        if (container) {
-            container.removeEventListener('blur', handleInputBlur, true);
+        if (window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', handleViewportResize);
         }
     };
 }, []); // The empty array ensures this effect runs only once.
