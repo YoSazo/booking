@@ -24,6 +24,9 @@ const ELEMENT_OPTIONS = {
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
+    // Add this at the very top of your component, before any other code
+console.log('COMPONENT MOUNTED - Fresh start');
+console.log('Initial bookingDetails:', bookingDetails);
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
