@@ -107,7 +107,9 @@ useEffect(() => {
             pr.canMakePayment().then(result => {
     if (result) {
         setPaymentRequest(pr);
-        if (result.applePay) {
+        if (result.link) { // Prioritize Link if it's available
+            setWalletType('Link');
+        } else if (result.applePay) {
             setWalletType('Apple Pay');
         } else if (result.googlePay) {
             setWalletType('Google Pay');
@@ -260,10 +262,10 @@ useEffect(() => {
 
         if (error) {
             setErrorMessage(error.message || "An unexpected error occurred.");
+            setIsProcessing(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
             onComplete(formData, paymentIntent.id);
         }
-        setIsProcessing(false);
     };
 
     // Click handler for WALLET PAYMENTS
@@ -290,6 +292,7 @@ useEffect(() => {
     const getWalletLogoInfo = () => {
         if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
         if (walletType === 'Google Pay') return { src: '/google.svg', alt: 'Google Pay', className: 'google-pay-logo' };
+        if (walletType === 'Link') return { src: '/Link.svg', alt: 'Link', className: 'link-logo' };
         return { src: '/credit.svg', alt: 'Wallet', className: 'payment-logo' }; // Fallback
     };
 
