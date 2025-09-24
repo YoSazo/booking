@@ -321,7 +321,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
                                             <p className="wallet-selected-text">{walletType} selected.</p>
                                             <div className="wallet-info-box">
-                                                <img src="/card-to-wallet-icon.svg" alt="Transfer to wallet" className="transfer-icon"/> {/* Assuming you might want a small icon here, or replace with text */}
+                                                <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/> {/* Assuming you might want a small icon here, or replace with text */}
                                                 <span>Another step will appear to securely submit your payment information.</span>
                                             </div>
                                         </div>
