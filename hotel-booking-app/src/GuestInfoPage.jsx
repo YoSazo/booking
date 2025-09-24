@@ -56,6 +56,17 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
     }, [bookingDetails, apiBaseUrl]);
 
+    useEffect(() => {
+                if (elements) {
+                    const cardNumberElement = elements.getElement(CardNumberElement);
+                    if (cardNumberElement) {
+                        cardNumberElement.on('change', (event) => {
+                            setCardBrand(event.brand || '');
+                        });
+                    }
+                }
+            }, [elements]);
+
     // Create and check for a Payment Request (Apple Pay / Google Pay)
     useEffect(() => {
         if (stripe && clientSecret && bookingDetails) {
@@ -80,16 +91,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     }
                 }
             });
-    useEffect(() => {
-                if (elements) {
-                    const cardNumberElement = elements.getElement(CardNumberElement);
-                    if (cardNumberElement) {
-                        cardNumberElement.on('change', (event) => {
-                            setCardBrand(event.brand || '');
-                        });
-                    }
-                }
-            }, [elements]);
 
             // Add this helper function
             const getCardBrandIcon = (brand) => {
@@ -193,7 +194,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
-        if (!stripe || !elements || !elements.getElement(CardElement)) return;
+        if (!stripe || !elements || !elements.getElement(CardNumberElement)) return;
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
             return;
