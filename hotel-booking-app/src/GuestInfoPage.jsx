@@ -50,46 +50,33 @@ const isInteractingWithAutocomplete = useRef(false);
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
-    // Prevent the default paste behavior
-    e.preventDefault();
-    // Get the text that was pasted from the clipboard
-    const pastedText = e.clipboardData.getData('text');
-    
-    // Immediately update the form state so the user sees the pasted text
-    setFormData(prev => ({ ...prev, address: pastedText }));
+  e.preventDefault();
+  const pastedText = e.clipboardData.getData('text');
+  
+  const scrollY = window.scrollY; // 👈 Save scroll
 
-    // Use Google's Geocoder to find the address
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: pastedText }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-            const place = results[0];
-            const components = place.address_components;
-            let streetNumber = '', route = '', city = '', state = '', zip = '';
+  setFormData(prev => ({ ...prev, address: pastedText }));
 
-            for (const component of components) {
-                const types = component.types;
-                if (types.includes('street_number')) streetNumber = component.long_name;
-                if (types.includes('route')) route = component.long_name;
-                if (types.includes('locality')) city = component.long_name;
-                if (types.includes('administrative_area_level_1')) state = component.short_name;
-                if (types.includes('postal_code')) zip = component.long_name;
-            }
+  const geocoder = new window.google.maps.Geocoder();
+  geocoder.geocode({ address: pastedText }, (results, status) => {
+    if (status === 'OK' && results[0]) {
+      // ... parsing logic ...
+      
+      setFormData(prev => ({
+        ...prev,
+        address: `${streetNumber} ${route}`.trim(),
+        city,
+        state,
+        zip
+      }));
+      setIsAddressSelected(true);
 
-            // Update the form with the parsed address components
-            setFormData(prev => ({
-                ...prev,
-                address: `${streetNumber} ${route}`.trim(),
-                city,
-                state,
-                zip
-            }));
-
-            // This is crucial: unhide the city, state, and zip fields
-            setIsAddressSelected(true);
-        } else {
-            console.warn('Geocode was not successful for the following reason: ' + status);
-        }
-    });
+      // 👇 Restore scroll after update
+      setTimeout(() => {
+        window.scrollTo(0, scrollY);
+      }, 0);
+    }
+  });
 };
 
 // Now, find your address input inside the <Autocomplete> component
@@ -357,22 +344,31 @@ useEffect(() => {
 
     const onLoad = (autoC) => setAutocomplete(autoC);
     const onPlaceChanged = () => {
-        if (autocomplete !== null) {
-          const place = autocomplete.getPlace();
-          const components = place.address_components;
-          let streetNumber = '', route = '', city = '', state = '', zip = '';
-          for (const component of components) {
-            const types = component.types;
-            if (types.includes('street_number')) streetNumber = component.long_name;
-            if (types.includes('route')) route = component.long_name;
-            if (types.includes('locality')) city = component.long_name;
-            if (types.includes('administrative_area_level_1')) state = component.short_name;
-            if (types.includes('postal_code')) zip = component.long_name;
-          }
-          setFormData(prev => ({...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip}));
-        }
-        setIsAddressSelected(true);
-    };
+  if (autocomplete !== null) {
+    const place = autocomplete.getPlace();
+    const components = place.address_components;
+    let streetNumber = '', route = '', city = '', state = '', zip = '';
+    for (const component of components) {
+      const types = component.types;
+      if (types.includes('street_number')) streetNumber = component.long_name;
+      if (types.includes('route')) route = component.long_name;
+      if (types.includes('locality')) city = component.long_name;
+      if (types.includes('administrative_area_level_1')) state = component.short_name;
+      if (types.includes('postal_code')) zip = component.long_name;
+    }
+
+    // 🚀 Save current scroll position BEFORE state update
+    const scrollY = window.scrollY;
+
+    setFormData(prev => ({...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip}));
+    setIsAddressSelected(true);
+
+    // 🚀 Restore scroll position AFTER React updates DOM
+    setTimeout(() => {
+      window.scrollTo(0, scrollY);
+    }, 0); // Use setTimeout to defer until after render
+  }
+};
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
