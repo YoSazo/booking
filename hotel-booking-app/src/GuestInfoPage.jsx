@@ -93,15 +93,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             });
 
             // Add this helper function
-            const getCardBrandIcon = (brand) => {
-                const iconMap = {
-                    'visa': '/visa.svg',
-                    'mastercard': '/mastercard.svg',
-                    'amex': '/express.svg',
-                    // Add more brands as needed
-                };
-                return iconMap[brand] || null;
-            };
 
             pr.on('paymentmethod', async (ev) => {
                 sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
@@ -203,7 +194,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
         const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
             payment_method: {
-                card: elements.getElement(CardElement),
+                card: elements.getElement(CardNumberElement),
                 billing_details: {
                     name: `${formData.firstName} ${formData.lastName}`,
                     email: formData.email,
