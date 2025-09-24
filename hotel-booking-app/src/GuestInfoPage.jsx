@@ -200,30 +200,29 @@ useEffect(() => {
 
 useEffect(() => {
     const handleMouseDown = (event) => {
-        // Check if the user's click started inside the Google Places Autocomplete container
+        // When a user presses their mouse down on the autocomplete list, we set our flag.
         if (event.target.closest('.pac-container')) {
             isInteractingWithAutocomplete.current = true;
         }
     };
 
     const handleMouseUp = () => {
-        // After the click is finished, reset the flag. A tiny delay ensures
-        // this runs after other events have had a chance to fire.
-        setTimeout(() => {
-            isInteractingWithAutocomplete.current = false;
-        }, 100);
+        // As soon as they release the mouse, the interaction is over. We reset the flag.
+        // By removing the timeout, we ensure this flag is correct during the blur event.
+        isInteractingWithAutocomplete.current = false;
     };
 
-    // Add the listeners to the entire document
+    // Add listeners to the entire document to catch the clicks anywhere.
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
 
-    // Cleanup function to remove listeners when the component unmounts
+    // Cleanup function
     return () => {
         document.removeEventListener('mousedown', handleMouseDown);
         document.removeEventListener('mouseup', handleMouseUp);
     };
 }, []);
+
 
     useEffect(() => {
                 if (elements) {
