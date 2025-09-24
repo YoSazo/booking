@@ -107,13 +107,20 @@ useEffect(() => {
             pr.canMakePayment().then(result => {
     if (result) {
         setPaymentRequest(pr);
-        if (result.link) { // Prioritize Link if it's available
-            setWalletType('Link');
-        } else if (result.applePay) {
+        
+        // --- CORRECTED PRIORITY ---
+        // 1. Prioritize native device wallets first for the best experience.
+        if (result.applePay) {
             setWalletType('Apple Pay');
         } else if (result.googlePay) {
             setWalletType('Google Pay');
-        } else {
+        } 
+        // 2. Fallback to Link if no native wallet is found.
+        else if (result.link) {
+            setWalletType('Link');
+        } 
+        // 3. A generic fallback if something unexpected is available.
+        else {
             setWalletType('Wallet');
         }
     }
@@ -169,6 +176,7 @@ useEffect(() => {
                 setCurrentStep(3);
             }
         }
+        window.scrollTo(0, 0);
     };
     
     const handleBackStep = () => {
