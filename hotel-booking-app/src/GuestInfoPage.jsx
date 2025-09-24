@@ -499,24 +499,13 @@ useEffect(() => {
                            { currentStep === 2 && "Proceed to Payment" }
                         </button>
                     ) : (
-                         <button
-    // If the payment method is 'card', this is a submit button.
-    // Otherwise, it's just a regular button.
-    type={paymentMethod === 'card' ? "submit" : "button"}
-
-    // Only associate with the form when it's a card payment.
-    form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
-
+                         <button 
+    type="submit"
+    form="main-checkout-form"
     className="btn btn-confirm"
-
-    // If the method is 'wallet', call the wallet handler directly.
-    // If it's 'card', set the user intent flag for the form's onSubmit.
-    onClick={
-        paymentMethod === 'wallet'
-        ? handleWalletPayment
-        : () => { window.userInitiatedSubmit = true; }
-    }
-    
+    onClick={() => {
+        window.userInitiatedSubmit = true;
+    }}
     disabled={isProcessing || !clientSecret || !stripe || !elements}
 >
     {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
