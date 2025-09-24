@@ -158,7 +158,7 @@ useEffect(() => {
             }
 
             // Only scroll if focus has truly left all form elements
-            window.scrollTo(0, 0);
+            
         }, 300); // Increased delay from 200ms to 300ms
     };
 
