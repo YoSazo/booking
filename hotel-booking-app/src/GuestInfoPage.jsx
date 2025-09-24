@@ -70,6 +70,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
     }, [currentStep]); // The hook will re-run only when currentStep changes
 
+    // This effect runs when the clientSecret is successfully fetched.
+    useEffect(() => {
+        // When we have a clientSecret, we know the payment form is truly ready.
+        // This is the perfect time to reset any lingering errors.
+        if (clientSecret) {
+            setHasAttemptedSubmit(false);
+            setErrorMessage('');
+        }
+    }, [clientSecret]); // This runs once when the clientSecret is populated.
+
     useEffect(() => {
                 if (elements) {
                     const cardNumberElement = elements.getElement(CardNumberElement);
@@ -196,19 +206,25 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         }
         setIsAddressSelected(true);
     };
-
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
-        setHasAttemptedSubmit(true);
-        if (!stripe || !elements || !elements.getElement(CardNumberElement)) return;
+        setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
+
+        if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
+            // This is an unexpected error, but good to have a safeguard
+            setErrorMessage("Payment components are not ready. Please refresh the page.");
+            return;
+        }
+
+        // --- Address validation is now ONLY here ---
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
 
         setIsProcessing(true);
-        setErrorMessage('');
+        setErrorMessage(''); // Clear previous errors before a new attempt
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(formData));
 
@@ -240,15 +256,14 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = async () => {
-        // Clear any previous errors when the user clicks the wallet button
+        // Reset state before showing the wallet
         setErrorMessage('');
         setHasAttemptedSubmit(false);
 
-        // Directly show the payment request modal
         if (paymentRequest) {
             paymentRequest.show();
         } else {
-            // Fallback error if the wallet button is somehow available when it shouldn't be
+            // This is a fallback in case the wallet button is shown by mistake
             setErrorMessage("Digital wallet is not available. Please select another payment method.");
             setHasAttemptedSubmit(true);
         }
