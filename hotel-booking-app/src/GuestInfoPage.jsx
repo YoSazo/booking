@@ -352,7 +352,7 @@ useEffect(() => {
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
                         <img src="/lock.svg" alt="Guaranteed safe and secure checkout" className="lock-icon" />
-                        <span>Guaranteed safe and secure Checkout</span>
+                        <span className="lock-text">Guaranteed safe and secure Checkout</span>
                         {!clientSecret ? (<p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>) : (
                            <>
                                 <div className="payment-method-tabs">

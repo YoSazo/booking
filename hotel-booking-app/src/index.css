@@ -1810,14 +1810,14 @@ body {
   margin-right: 0;
 }
 
-.secure-checkout-badge {
+.lock-text {
   display: flex;
   align-items: center;
   justify-content: center; /* This will center the items horizontally */
-  gap: 8px; /* This adds a nice space between the icon and the text */
+  gap: 20px; /* -+This adds a nice space between the icon and the text */
   margin-bottom: 20px; /* Adds some space below the badge */
   color: #555; /* A soft color for the text */
-  font-size: 7px;
+  font-size: 3px;
 }
 
 .lock-icon {
