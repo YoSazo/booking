@@ -433,7 +433,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 </div>
                            </>
                         )}
-                        {errorMessage && <div className="error-message payment-error">{errorMessage}</div>}
+                        {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
                     </div>
                 </form>
                 
