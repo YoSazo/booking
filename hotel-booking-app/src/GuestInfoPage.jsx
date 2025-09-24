@@ -318,88 +318,89 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                     )}
                                 </div>
                                 <div className="payment-content">
-                                {paymentMethod === 'card' && (
-    <div className="card-and-billing-container">
-        <div className="split-card-fields">
-            {/* Card Number Field */}
-            <div className="card-field-wrapper">
-                <label>Card number</label>
-                <div className="card-field-container">
-                    <CardNumberElement options={ELEMENT_OPTIONS} />
-                    <div className="card-brands">
-                        {/* Always show these icons, highlight the detected one */}
-                        <img 
-                            src="/visa.svg" 
-                            alt="Visa" 
-                            className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
-                        />
-                        <img 
-                            src="/mastercard.svg" 
-                            alt="Mastercard" 
-                            className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
-                        />
-                        <img 
-                            src="/express.svg" 
-                            alt="American Express" 
-                            className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
-                        />
+    {paymentMethod === 'card' && (
+        <div className="card-and-billing-container">
+            <div className="split-card-fields">
+                {/* Card Number Field */}
+                <div className="card-field-wrapper">
+                    <label>Card number</label>
+                    <div className="card-field-container">
+                        <CardNumberElement options={ELEMENT_OPTIONS} />
+                        <div className="card-brands">
+                            {/* Always show these icons, highlight the detected one */}
+                            <img 
+                                src="/visa.svg" 
+                                alt="Visa" 
+                                className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
+                            />
+                            <img 
+                                src="/mastercard.svg" 
+                                alt="Mastercard" 
+                                className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
+                            />
+                            <img 
+                                src="/express.svg" 
+                                alt="American Express" 
+                                className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            {/* Expiry and CVC Row */}
-            <div className="card-fields-row">
-                <div className="card-field-wrapper">
-                    <label>Expiration date</label>
-                    <div className="card-field-container">
-                        <CardExpiryElement options={ELEMENT_OPTIONS} />
+                
+                {/* Expiry and CVC Row */}
+                <div className="card-fields-row">
+                    <div className="card-field-wrapper">
+                        <label>Expiration date</label>
+                        <div className="card-field-container">
+                            <CardExpiryElement options={ELEMENT_OPTIONS} />
+                        </div>
                     </div>
-                </div>
-                <div className="card-field-wrapper">
-                    <label>CVC</label>
-                    <div className="card-field-container">
-                        <CardCvcElement options={ELEMENT_OPTIONS} />
+                    <div className="card-field-wrapper">
+                        <label>CVC</label>
+                        <div className="card-field-container">
+                            <CardCvcElement options={ELEMENT_OPTIONS} />
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+    )}
+
+    {paymentMethod === 'wallet' && walletType && (
+        <div className="wallet-selection-message">
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
+            <p className="wallet-selected-text">{walletType} selected.</p>
+            <div className="wallet-info-box">
+                <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
+                <span>Another step will appear to securely submit your payment information.</span>
+            </div>
+        </div>
+    )}
+
+    {paymentMethod === 'wallet' && !walletType && (
+        <div className="wallet-info-box">
+            <p>Select your wallet provider above.</p>
+        </div>
+    )}
+</div>
+
+<div className="billing-address-section">
+    <label className="billing-address-label">Billing Address</label>
+    <div className="form-grid">
+        <div className="form-field full-width">
+            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
+            </Autocomplete>
+        </div>
+        {isAddressSelected && (
+            <div className="address-reveal-container visible">
+                <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
+                <div className="form-field"><label>State</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
+                <div className="form-field"><label>Zip</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
+            </div>
+        )}
     </div>
-)}
-
-{paymentMethod === 'wallet' && walletType && (
-                                        <div className="wallet-selection-message">
-                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
-                                            <p className="wallet-selected-text">{walletType} selected.</p>
-                                            <div className="wallet-info-box">
-                                                <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/> {/* Assuming you might want a small icon here, or replace with text */}
-                                                <span>Another step will appear to securely submit your payment information.</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {paymentMethod === 'wallet' && !walletType && (
-                                        <div className="wallet-info-box">
-                                            <p>Select your wallet provider above.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="billing-address-section">
-                                    <label className="billing-address-label">Billing Address</label>
-                                    <div className="form-grid">
-                                        <div className="form-field full-width">
-                                            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                                                <input type="text" name="address" value={formData.address} onChange={handleChange} required placeholder="Start typing your address..." />
-                                            </Autocomplete>
-                                        </div>
-                                        {isAddressSelected && (
-                                            <div className="address-reveal-container visible">
-                                                <div className="form-field"><label>City</label><input type="text" name="city" value={formData.city} onChange={handleChange} required/></div>
-                                                <div className="form-field"><label>State</label><input type="text" name="state" value={formData.state} onChange={handleChange} required/></div>
-                                                <div className="form-field"><label>Zip</label><input type="text" name="zip" value={formData.zip} onChange={handleChange} required/></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+</div>
                            </>
                         )}
                         {errorMessage && <div className="error-message payment-error">{errorMessage}</div>}
