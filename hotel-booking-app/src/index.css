@@ -1798,7 +1798,7 @@ body {
 }
 
 .card-brand-icon.active {
-  opacity: 1;
+  opacity: 0;
 }
 
 /* For expiry and CVC fields, no extra margin needed */
