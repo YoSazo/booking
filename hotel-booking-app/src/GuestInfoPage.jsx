@@ -115,6 +115,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                 }
                 ev.complete('success');
                 window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+            
+            return () => {
+                pr.off('paymentmethod', handlePaymentMethod);
+            };
+            
             });
         }
     }, [stripe, clientSecret, bookingDetails, formData]);
