@@ -154,6 +154,8 @@ useEffect(() => {
     };
 }, []); // The empty array ensures this effect runs only once.
 
+
+
 useEffect(() => {
     console.log('DEBUG - errorMessage changed:', errorMessage);
 }, [errorMessage]);
@@ -219,6 +221,22 @@ useEffect(() => {
         document.removeEventListener('mouseup', handleMouseUp);
     };
 }, []);
+
+
+    // In GuestInfoPage.jsx, add this with your other useEffect hooks
+
+useEffect(() => {
+    // When this component mounts, forcefully remove any inline overflow
+    // styles that may have been left behind by a modal on a previous page.
+    document.body.style.overflow = '';
+
+    // The CSS rule in index.css will now take effect reliably.
+
+    // Cleanup function in case this component ever needs one
+    return () => {
+        // No cleanup needed, as we want the body's default scroll behavior.
+    };
+}, []); // Empty array ensures this runs only once on mount.
 
 
     useEffect(() => {
