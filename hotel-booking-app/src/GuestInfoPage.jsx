@@ -127,45 +127,46 @@ useEffect(() => {
 // In GuestInfoPage.jsx, replace the previous blur-handling useEffect with this one.
 
 useEffect(() => {
-    // This function handles the blur event for any input.
     const handleInputBlur = (event) => {
-        // We only care about blur events on form inputs.
         const target = event.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
             return;
         }
 
-        // Wait a short moment to see where the focus goes next.
-        // This is the key to differentiating between tabbing and closing the keyboard.
+        // Increased delay and additional checks for autocomplete interaction
         setTimeout(() => {
+            // Check if user is interacting with autocomplete
             if (isInteractingWithAutocomplete.current) {
-            return;
-        }
+                return;
+            }
 
+            // Additional check: see if the autocomplete dropdown is visible
+            const pacContainer = document.querySelector('.pac-container');
+            if (pacContainer && pacContainer.style.display !== 'none') {
+                return;
+            }
+
+            // Check if the newly focused element is part of the autocomplete
             const newActiveElement = document.activeElement;
+            if (newActiveElement && newActiveElement.closest('.pac-container')) {
+                return;
+            }
 
-            // If the new focused element is another input, do nothing.
-            // This means the user is just moving between form fields.
+            // If the new focused element is another form input, don't scroll
             if (newActiveElement && (newActiveElement.tagName === 'INPUT' || newActiveElement.tagName === 'SELECT' || newActiveElement.tagName === 'TEXTAREA')) {
                 return;
             }
 
-            // If the focus has gone anywhere else (like the body of the page),
-            // we can be confident the user has dismissed the keyboard.
-            // Now it is safe to scroll the page back to the top.
+            // Only scroll if focus has truly left all form elements
             window.scrollTo(0, 0);
-
-        }, 200); // A 200ms delay is usually a safe bet.
+        }, 300); // Increased delay from 200ms to 300ms
     };
 
-    // We'll attach the listener to the main form container.
     const container = document.querySelector('.guest-info-container');
     if (container) {
-        // The 'true' uses the "capture" phase, which is more reliable for this trick.
         container.addEventListener('blur', handleInputBlur, true);
     }
 
-    // --- Cleanup Function ---
     return () => {
         if (container) {
             container.removeEventListener('blur', handleInputBlur, true);
@@ -200,30 +201,45 @@ useEffect(() => {
 
 useEffect(() => {
     const handleMouseDown = (event) => {
-        // Check if the user's click started inside the Google Places Autocomplete container
-        if (event.target.closest('.pac-container')) {
+        // More comprehensive check for autocomplete interaction
+        if (event.target.closest('.pac-container') || 
+            event.target.closest('.pac-item') ||
+            event.target.classList.contains('pac-item')) {
             isInteractingWithAutocomplete.current = true;
         }
     };
 
     const handleMouseUp = () => {
-        // After the click is finished, reset the flag. A tiny delay ensures
-        // this runs after other events have had a chance to fire.
+        // Longer delay to ensure autocomplete selection completes
         setTimeout(() => {
             isInteractingWithAutocomplete.current = false;
-        }, 100);
+        }, 500); // Increased from 100ms to 500ms
     };
 
-    // Add the listeners to the entire document
+    // Also listen for clicks directly on pac-container elements
+    const handleAutocompleteClick = () => {
+        isInteractingWithAutocomplete.current = true;
+        setTimeout(() => {
+            isInteractingWithAutocomplete.current = false;
+        }, 500);
+    };
+
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
+    
+    // Add a more specific listener for autocomplete clicks
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('.pac-container')) {
+            handleAutocompleteClick();
+        }
+    });
 
-    // Cleanup function to remove listeners when the component unmounts
     return () => {
         document.removeEventListener('mousedown', handleMouseDown);
         document.removeEventListener('mouseup', handleMouseUp);
     };
 }, []);
+
 
     useEffect(() => {
                 if (elements) {
@@ -352,22 +368,39 @@ useEffect(() => {
 
     const onLoad = (autoC) => setAutocomplete(autoC);
     const onPlaceChanged = () => {
-        if (autocomplete !== null) {
-          const place = autocomplete.getPlace();
-          const components = place.address_components;
-          let streetNumber = '', route = '', city = '', state = '', zip = '';
-          for (const component of components) {
+    // Set flag to prevent scrolling during place selection
+    isInteractingWithAutocomplete.current = true;
+    
+    if (autocomplete !== null) {
+        const place = autocomplete.getPlace();
+        const components = place.address_components;
+        let streetNumber = '', route = '', city = '', state = '', zip = '';
+        
+        for (const component of components) {
             const types = component.types;
             if (types.includes('street_number')) streetNumber = component.long_name;
             if (types.includes('route')) route = component.long_name;
             if (types.includes('locality')) city = component.long_name;
             if (types.includes('administrative_area_level_1')) state = component.short_name;
             if (types.includes('postal_code')) zip = component.long_name;
-          }
-          setFormData(prev => ({...prev, address: `${streetNumber} ${route}`.trim(), city, state, zip}));
         }
-        setIsAddressSelected(true);
-    };
+        
+        setFormData(prev => ({
+            ...prev, 
+            address: `${streetNumber} ${route}`.trim(), 
+            city, 
+            state, 
+            zip
+        }));
+    }
+    
+    setIsAddressSelected(true);
+    
+    // Clear the flag after a delay
+    setTimeout(() => {
+        isInteractingWithAutocomplete.current = false;
+    }, 1000);
+};
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
