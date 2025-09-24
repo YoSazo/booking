@@ -396,7 +396,7 @@ useEffect(() => {
     
     setIsAddressSelected(true);
     
-    // Clear the flag after a delay
+    // Clear the fllag after a delay
     setTimeout(() => {
         isInteractingWithAutocomplete.current = false;
     }, 1000);
