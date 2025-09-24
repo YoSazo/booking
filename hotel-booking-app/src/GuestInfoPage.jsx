@@ -127,51 +127,45 @@ useEffect(() => {
 // In GuestInfoPage.jsx, replace the previous blur-handling useEffect with this one.
 
 useEffect(() => {
-    // This function handles the blur event for any input.
     const handleInputBlur = (event) => {
-        // We only care about blur events on form inputs.
         const target = event.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT' && target.tagName !== 'TEXTAREA') {
             return;
         }
 
-        // Wait a short moment to see where the focus goes next.
-        // This is the key to differentiating between tabbing and closing the keyboard.
         setTimeout(() => {
+            // 🚫 DO NOT scroll if we're interacting with autocomplete
             if (isInteractingWithAutocomplete.current) {
-            return;
-        }
-
-            const newActiveElement = document.activeElement;
-
-            // If the new focused element is another input, do nothing.
-            // This means the user is just moving between form fields.
-            if (newActiveElement && (newActiveElement.tagName === 'INPUT' || newActiveElement.tagName === 'SELECT' || newActiveElement.tagName === 'TEXTAREA')) {
                 return;
             }
 
-            // If the focus has gone anywhere else (like the body of the page),
-            // we can be confident the user has dismissed the keyboard.
-            // Now it is safe to scroll the page back to the top.
-            window.scrollTo(0, 0);
+            const newActiveElement = document.activeElement;
+            if (
+                newActiveElement &&
+                (newActiveElement.tagName === 'INPUT' ||
+                 newActiveElement.tagName === 'SELECT' ||
+                 newActiveElement.tagName === 'TEXTAREA')
+            ) {
+                return;
+            }
 
-        }, 200); // A 200ms delay is usually a safe bet.
+            // ✅ Only scroll if truly leaving the form (e.g., tapping outside on mobile)
+            // But NOT when selecting from autocomplete
+            window.scrollTo(0, 0);
+        }, 200);
     };
 
-    // We'll attach the listener to the main form container.
     const container = document.querySelector('.guest-info-container');
     if (container) {
-        // The 'true' uses the "capture" phase, which is more reliable for this trick.
         container.addEventListener('blur', handleInputBlur, true);
     }
 
-    // --- Cleanup Function ---
     return () => {
         if (container) {
             container.removeEventListener('blur', handleInputBlur, true);
         }
     };
-}, []); // The empty array ensures this effect runs only once.
+}, []);
 
 useEffect(() => {
     console.log('DEBUG - errorMessage changed:', errorMessage);
@@ -199,27 +193,39 @@ useEffect(() => {
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
 
 useEffect(() => {
-    const handleMouseDown = (event) => {
-        // When a user presses their mouse down on the autocomplete list, we set our flag.
+    const handleBodyClick = (event) => {
+        // If click is inside Google Autocomplete dropdown, mark as interacting
         if (event.target.closest('.pac-container')) {
             isInteractingWithAutocomplete.current = true;
+        } else {
+            // Only reset AFTER a short delay to cover blur timing
+            setTimeout(() => {
+                isInteractingWithAutocomplete.current = false;
+            }, 300);
         }
     };
 
-    const handleMouseUp = () => {
-        // As soon as they release the mouse, the interaction is over. We reset the flag.
-        // By removing the timeout, we ensure this flag is correct during the blur event.
-        isInteractingWithAutocomplete.current = false;
+    const handleAutocompleteBlur = () => {
+        // When the input blurs, don't reset immediately — wait
+        setTimeout(() => {
+            isInteractingWithAutocomplete.current = false;
+        }, 300);
     };
 
-    // Add listeners to the entire document to catch the clicks anywhere.
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Attach to body to catch all clicks
+    document.body.addEventListener('click', handleBodyClick);
 
-    // Cleanup function
+    // Also listen for blur on the address input specifically
+    const addressInput = document.querySelector('input[name="address"]');
+    if (addressInput) {
+        addressInput.addEventListener('blur', handleAutocompleteBlur);
+    }
+
     return () => {
-        document.removeEventListener('mousedown', handleMouseDown);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.removeEventListener('click', handleBodyClick);
+        if (addressInput) {
+            addressInput.removeEventListener('blur', handleAutocompleteBlur);
+        }
     };
 }, []);
 
