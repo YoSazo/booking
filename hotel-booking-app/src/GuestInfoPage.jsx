@@ -4,6 +4,7 @@ import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStri
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const [cardBrand, setCardBrand] = useState('');
 
 
 const ELEMENT_OPTIONS = {
@@ -23,6 +24,7 @@ const ELEMENT_OPTIONS = {
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }) {
+    
     const stripe = useStripe();
     const elements = useElements();
 
@@ -78,6 +80,27 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                     }
                 }
             });
+    useEffect(() => {
+                if (elements) {
+                    const cardNumberElement = elements.getElement(CardNumberElement);
+                    if (cardNumberElement) {
+                        cardNumberElement.on('change', (event) => {
+                            setCardBrand(event.brand || '');
+                        });
+                    }
+                }
+            }, [elements]);
+
+            // Add this helper function
+            const getCardBrandIcon = (brand) => {
+                const iconMap = {
+                    'visa': '/visa.svg',
+                    'mastercard': '/mastercard.svg',
+                    'amex': '/express.svg',
+                    // Add more brands as needed
+                };
+                return iconMap[brand] || null;
+            };
 
             pr.on('paymentmethod', async (ev) => {
                 sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
@@ -294,23 +317,50 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                                         </button>
                                     )}
                                 </div>
-                                
                                 <div className="payment-content">
-                                    {paymentMethod === 'card' && (
+                                {paymentMethod === 'card' && (
     <div className="card-and-billing-container">
-        {/* --- UPDATED: Split Card Fields --- */}
         <div className="split-card-fields">
+            {/* Card Number Field */}
             <div className="card-field-wrapper">
                 <label>Card number</label>
-                <CardNumberElement options={ELEMENT_OPTIONS} />
+                <div className="card-field-container">
+                    <CardNumberElement options={ELEMENT_OPTIONS} />
+                    <div className="card-brands">
+                        {/* Always show these icons, highlight the detected one */}
+                        <img 
+                            src="/visa.svg" 
+                            alt="Visa" 
+                            className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
+                        />
+                        <img 
+                            src="/mastercard.svg" 
+                            alt="Mastercard" 
+                            className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
+                        />
+                        <img 
+                            src="/express.svg" 
+                            alt="American Express" 
+                            className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
+                        />
+                    </div>
+                </div>
             </div>
-            <div className="card-field-wrapper half-width">
-                <label>Expiration</label>
-                <CardExpiryElement options={ELEMENT_OPTIONS} />
-            </div>
-            <div className="card-field-wrapper half-width">
-                <label>CVC</label>
-                <CardCvcElement options={ELEMENT_OPTIONS} />
+            
+            {/* Expiry and CVC Row */}
+            <div className="card-fields-row">
+                <div className="card-field-wrapper">
+                    <label>Expiration date</label>
+                    <div className="card-field-container">
+                        <CardExpiryElement options={ELEMENT_OPTIONS} />
+                    </div>
+                </div>
+                <div className="card-field-wrapper">
+                    <label>CVC</label>
+                    <div className="card-field-container">
+                        <CardCvcElement options={ELEMENT_OPTIONS} />
+                    </div>
+                </div>
             </div>
         </div>
     </div>

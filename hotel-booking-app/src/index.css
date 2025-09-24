@@ -1729,21 +1729,18 @@ body {
 /* Main container for the new card fields */
 .split-card-fields {
   display: flex;
-  flex-wrap: wrap;
-  gap: 15px; /* Creates space between the fields */
-  background-color: #fff;
-  border: 1px solid #ccc;
-  padding: 12px;
-  border-radius: 6px;
+  flex-direction: column;
+  gap: 15px; /* Space between each field */
 }
 
 .card-field-wrapper {
   width: 100%;
-  flex-grow: 1;
+  position: relative;
 }
 
+
 .card-field-wrapper.half-width {
-  width: calc(50% - 7.5px); /* Two fields side-by-side with a gap */
+  width: 100%; /* Override - we'll use flexbox for the row */
 }
 
 .card-field-wrapper label {
@@ -1751,10 +1748,60 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: #667;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 /* This targets the input wrapper Stripe creates */
-.card-field-wrapper .__PrivateStripeElement {
-  padding: 8px 0;
+.card-field-container .__PrivateStripeElement {
+  padding: 0;
+  margin-right: 80px; /* Make space for card brand icons */
+}
+
+.card-fields-row {
+  display: flex;
+  gap: 15px;
+}
+
+.card-fields-row .card-field-wrapper {
+  flex: 1; /* Equal width for both fields */
+}
+
+.card-field-container {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #fff;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+.card-field-container:focus-within {
+  border-color: #0070f3;
+  box-shadow: 0 0 0 1px #0070f3;
+}
+
+.card-brands {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.card-brand-icon {
+  height: 20px;
+  width: auto;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.card-brand-icon.active {
+  opacity: 1;
+}
+
+/* For expiry and CVC fields, no extra margin needed */
+.card-fields-row .card-field-container .__PrivateStripeElement {
+  margin-right: 0;
 }
