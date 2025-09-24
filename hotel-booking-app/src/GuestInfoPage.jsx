@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -40,6 +40,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+    const latestFormData = useRef(formData);
+    useEffect(() => { latestFormData.current = formData; }, [formData]);
 
     // New state for tabbed payment methods
     const [paymentMethod, setPaymentMethod] = useState('card');
@@ -97,23 +99,25 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
             // Add this helper function
 
             pr.on('paymentmethod', async (ev) => {
-                sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-                sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-                const { error: confirmError } = await stripe.confirmCardPayment(
-                    clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-                );
-                if (confirmError) {
-                    ev.complete('fail');
-                    setHasAttemptedSubmit(true);
-                    setErrorMessage(confirmError.message);
-                    return;
-                }
-                ev.complete('success');
-                window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-            
-            });
+            // Use the ref to get the latest form data
+            sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+
+            const { error: confirmError } = await stripe.confirmCardPayment(
+                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
+            );
+            if (confirmError) {
+                ev.complete('fail');
+                setHasAttemptedSubmit(true);
+                setErrorMessage(confirmError.message);
+                return;
+            }
+            ev.complete('success');
+            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+
+        });
         }
-    }, [stripe, clientSecret, bookingDetails, formData]);
+    }, [stripe, clientSecret, bookingDetails]);
 
 
     const validateInfoStep = () => {
@@ -189,7 +193,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setHasAttemptedSubmit(true);
         if (!stripe || !elements || !elements.getElement(CardNumberElement)) return;
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            // setErrorMessage("Please fill out your billing address before proceeding.");
+            setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
 
@@ -228,7 +232,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const handleWalletPayment = async () => {
         setHasAttemptedSubmit(true);
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            // setErrorMessage("Please fill out your billing address before proceeding.");
+            setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
         if (paymentRequest) {
@@ -442,7 +446,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
                            </>
                         )}
                         {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
-                        <div style={{fontSize: '12px', color: 'blue'}}>Debug: errorMessage="{errorMessage}", hasAttemptedSubmit={hasAttemptedSubmit}</div>        
                     </div>
                 </form>
                 
