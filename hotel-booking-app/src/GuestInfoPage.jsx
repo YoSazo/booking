@@ -58,6 +58,37 @@ useEffect(() => {
     }
 }, [hasAttemptedSubmit]);
 
+// In GuestInfoPage.jsx
+
+useEffect(() => {
+    // This function handles the blur event for any input inside the container.
+    const handleInputBlur = (event) => {
+        // Check if the element that lost focus is an input, select, or textarea
+        const target = event.target;
+        if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
+            // A short delay helps ensure the viewport has finished resizing after the keyboard closes.
+            setTimeout(() => {
+                window.scrollTo(0, 0);
+            }, 100);
+        }
+    };
+
+    // We use event delegation, adding a single listener to the main container.
+    const container = document.querySelector('.guest-info-container');
+    if (container) {
+        // The 'true' at the end makes this a "capture" listener, which is more reliable for blur events.
+        container.addEventListener('blur', handleInputBlur, true);
+    }
+
+    // --- Cleanup Function ---
+    // This is crucial to prevent memory leaks when you navigate away from the page.
+    return () => {
+        if (container) {
+            container.removeEventListener('blur', handleInputBlur, true);
+        }
+    };
+}, []); // The empty array ensures this effect runs only once when the component mounts.
+
 useEffect(() => {
     console.log('DEBUG - errorMessage changed:', errorMessage);
 }, [errorMessage]);
