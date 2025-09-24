@@ -144,7 +144,7 @@ useEffect(() => {
             // significantly TALLER than it was when the input was focused.
             // A threshold of 150px is a safe bet to confirm it was the keyboard closing.
             if (currentViewportHeight > viewportHeightOnFocus.current + 150) {
-                window.scrollTo(0, 0);
+                
             }
         }, 300); // A 300ms delay is robust enough for most devices.
     };
@@ -354,7 +354,7 @@ useEffect(() => {
                 setCurrentStep(3);
             }
         }
-        
+        window.scrollTo(0, 0);
     };
     
     const handleBackStep = () => {
