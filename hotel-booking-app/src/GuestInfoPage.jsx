@@ -178,9 +178,11 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setIsAddressSelected(true);
     };
 
+    const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
+        setHasAttemptedSubmit(true);
         if (!stripe || !elements || !elements.getElement(CardNumberElement)) return;
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
@@ -220,6 +222,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
 
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = async () => {
+        setHasAttemptedSubmit(true);
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
             return;

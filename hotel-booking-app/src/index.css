@@ -1791,7 +1791,7 @@ body {
 }
 
 .card-brand-icon {
-  height: 20px;
+  height: 30px;
   width: auto;
   opacity: 0.8;
   transition: opacity 0.2s ease;
