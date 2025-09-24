@@ -1812,7 +1812,6 @@ body {
 .secure-checkout-badge {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px; /* A smaller gap is usually better */
   margin-bottom: 20px;
   color: #555;
