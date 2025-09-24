@@ -243,7 +243,14 @@ useEffect(() => {
     };
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
+        console.log('FORM SUBMITTED - Event type:', e.type);
+    console.log('Form submitter:', e.target);
+    console.log('Stack trace:', new Error().stack);
         e.preventDefault();
+        if (!window.userInitiatedSubmit) {
+        console.warn('Form submitted without user interaction - ignoring');
+        return;
+    }
         setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
         if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
@@ -362,7 +369,7 @@ useEffect(() => {
                     </div>
                 )}
                 
-                <form id="main-checkout-form" onSubmit={handleCardSubmit}>
+                <form id="main-checkout-form" onSubmit={handleCardSubmit} noValidate>
                     <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
                         <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />{formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}</div>
                         <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />{formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}</div>
@@ -468,6 +475,11 @@ useEffect(() => {
                     onChange={handleChange} 
                     placeholder="Start typing your address..." 
                     autoComplete="street-address"
+                    onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Prevent Enter from submitting form
+        }
+    }}
                 />
             </Autocomplete>
         </div>
@@ -521,12 +533,14 @@ useEffect(() => {
                         </button>
                     ) : (
                          <button 
-                            type={paymentMethod === 'card' ? "submit" : "button"} 
-                            form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
-                            className="btn btn-confirm" 
-                            onClick={paymentMethod === 'wallet' ? handleWalletPayment : undefined}
-                            disabled={isProcessing || !clientSecret || !stripe || !elements}
-                        >
+    type="submit"
+    form="main-checkout-form"
+    className="btn btn-confirm"
+    onClick={() => {
+        window.userInitiatedSubmit = true;
+    }}
+    disabled={isProcessing || !clientSecret || !stripe || !elements}
+>
                             {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
                         </button>
                     )}
