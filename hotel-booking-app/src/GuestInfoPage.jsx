@@ -189,7 +189,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
         setHasAttemptedSubmit(true);
         if (!stripe || !elements || !elements.getElement(CardNumberElement)) return;
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
+            // setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
 
@@ -228,7 +228,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl }
     const handleWalletPayment = async () => {
         setHasAttemptedSubmit(true);
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
+            // setErrorMessage("Please fill out your billing address before proceeding.");
             return;
         }
         if (paymentRequest) {
