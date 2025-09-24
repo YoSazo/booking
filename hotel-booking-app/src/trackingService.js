@@ -6,6 +6,8 @@ const ZAPIER_WEBHOOKS = {
     Search: 'https://hooks.zapier.com/hooks/catch/23096608/uu9wu4u/',
     AddToCart: 'https://hooks.zapier.com/hooks/catch/23096608/uu9whix/',
     InitiateCheckout: 'https://hooks.zapier.com/hooks/catch/23096608/umy17ci/',
+    // New Webhook for AddPaymentInfo event
+    AddPaymentInfo: 'https://hooks.zapier.com/hooks/catch/23096608/u11il0b/',
     Purchase: 'https://hooks.zapier.com/hooks/catch/23096608/umyhejw/',
 };
 
@@ -75,8 +77,32 @@ export const trackInitiateCheckout = (bookingDetails) => {
     sendEventToServer('InitiateCheckout', { ...checkoutData, event_id: eventID });
 };
 
+// New tracking function for when a user submits their info and proceeds to payment
+export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
+    const eventID = `addpaymentinfo.${Date.now()}`;
+    const pixelPayload = {
+        value: bookingDetails.subtotal,
+        currency: 'USD',
+        content_name: bookingDetails.name,
+        num_items: bookingDetails.guests,
+    };
+    const serverPayload = {
+        ...pixelPayload,
+        event_id: eventID,
+        user_data: {
+            em: guestInfo.email,
+            ph: guestInfo.phone.replace(/\D/g, ''),
+            fn: guestInfo.firstName,
+            ln: guestInfo.lastName,
+        }
+    };
+    sendEventToPixel('AddPaymentInfo', pixelPayload, eventID);
+    sendEventToServer('AddPaymentInfo', serverPayload);
+};
+
+
 export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
-    const eventID = reservationCode; 
+    const eventID = reservationCode;
     const pixelPayload = {
         value: bookingDetails.total,
         currency: 'USD',

@@ -145,7 +145,6 @@ function App() {
   const total = selectedRoom.grandTotal || subtotal + taxes;
   const ourReservationCode = generateReservationCode();
 
-  trackInitiateCheckout({ ...selectedRoom, subtotal });
 
   const newBooking = {
     ...selectedRoom,

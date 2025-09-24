@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -158,9 +159,11 @@ useEffect(() => {
     const handleNextStep = () => {
         if (currentStep === 1) {
              setCurrentStep(2);
+             trackInitiateCheckout(bookingDetails);
         } else if (currentStep === 2) {
             if (validateInfoStep()) {
                 setFormErrors({});
+                trackAddPaymentInfo(bookingDetails, formData);
                 setCurrentStep(3);
             }
         }
@@ -351,8 +354,10 @@ useEffect(() => {
                     </div>
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-                        <img src="/lock.svg" alt="Guaranteed safe and secure checkout" className="lock-icon" />
-                        <span className="lock-text">Guaranteed safe and secure Checkout</span>
+                        <div className="secure-checkout-badge">
+    <img src="/lock.svg" alt="Secure Checkout" className="lock-icon" />
+    <span>Guaranteed safe and secure Checkout</span>
+</div>
                         {!clientSecret ? (<p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>) : (
                            <>
                                 <div className="payment-method-tabs">
