@@ -1548,8 +1548,6 @@ body {
 
 .billing-address-section {
     margin-top: 30px;
-    padding-top: 30px;
-    border-top: 1px dashed var(--border-color);
 }
 
 .billing-address-title {
