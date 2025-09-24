@@ -292,7 +292,7 @@ useEffect(() => {
     const getWalletLogoInfo = () => {
         if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
         if (walletType === 'Google Pay') return { src: '/google.svg', alt: 'Google Pay', className: 'google-pay-logo' };
-        if (walletType === 'Link') return { src: '/Link.svg', alt: 'Link', className: 'link-logo' };
+        if (walletType === 'Link') return { src: '/Link.svg', alt: 'Link', className: 'link-pay-logo' };
         return { src: '/credit.svg', alt: 'Wallet', className: 'payment-logo' }; // Fallback
     };
 
