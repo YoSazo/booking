@@ -1817,10 +1817,10 @@ body {
   gap: 8px; /* This adds a nice space between the icon and the text */
   margin-bottom: 20px; /* Adds some space below the badge */
   color: #555; /* A soft color for the text */
-  font-size: 14px;
+  font-size: 7px;
 }
 
 .lock-icon {
   /* Adjust size as needed */
-  height: 25px;
+  height: 15px;
 }
