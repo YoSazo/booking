@@ -62,6 +62,13 @@ function App() {
     setAvailableRooms(currentHotel.rooms);
   }, [hotelId]);
 
+  useEffect(() => {
+        // If the user is on the booking page, reset the processing state
+        if (location.pathname === '/') {
+            setIsProcessingBooking(false);
+        }
+    }, [location]);
+
   // Save booking data to sessionStorage whenever it changes
   useEffect(() => {
     if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
