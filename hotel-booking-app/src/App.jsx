@@ -142,21 +142,17 @@ function App() {
   setIsProcessingBooking(true); //  <-- This will now be called!
 
   try {
-    // Simulate the delay from talking to your backend (like Stripe)
-    await new Promise(resolve => setTimeout(resolve, 1500));
+            // This simulates your backend call to Stripe
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // After the delay, you would navigate to the guest info page
-    // For example:
-    // setBookingDetails(bookingDetails); 
-    // navigate('/guest-info');
+            // Set the booking details and then navigate
+            setBookingDetails(bookingDetails);
+            navigate('/guest-info'); // <-- Navigation happens here
 
-  } catch (error) {
-    console.error("Error during booking confirmation:", error);
-    // You can also show an error message to the user here
-  } finally {
-    // This part runs whether the 'try' block succeeded or failed
-    setIsProcessingBooking(false); 
-  }
+        } catch (error) {
+            console.error("Error during booking confirmation:", error);
+            setIsProcessingBooking(false); // Make sure to stop processing on error
+        }
 
 
   
