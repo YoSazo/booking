@@ -22,6 +22,7 @@ function BookingPage({
   isLoading,
   isProcessingBooking
 }) {
+  console.log('isProcessingBooking in BookingPage:', isProcessingBooking);
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
   // Calculate nights here to pass to the RoomCard for display
