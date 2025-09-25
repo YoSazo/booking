@@ -71,6 +71,16 @@ const roomIDMapping = {
             weekly: '144727534629093',
             monthly: '131632375537874'
         }
+    },
+
+    'Double Queen Suite With Kitchenette': {
+        roomTypeID: '117068633694351', // Replace with actual Room Type ID
+        rates: {
+            nightly: '117068633694362',
+            weekly: '121313468612837',
+            monthly: '131637796552937'
+        }
+
     }
 };
 
