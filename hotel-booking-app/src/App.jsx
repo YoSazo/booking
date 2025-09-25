@@ -151,7 +151,6 @@ function App() {
 
   try {
             await new Promise(resolve => setTimeout(resolve, 1500));
-            setBookingDetails(bookingDetails);
             navigate('/guest-info');
 
         } catch (error) {
