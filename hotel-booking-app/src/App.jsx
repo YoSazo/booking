@@ -40,6 +40,7 @@ function App() {
   const navigate = useNavigate();
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
+  const location = useLocation(); 
   
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
@@ -131,6 +132,12 @@ function App() {
     return result;
   };
 
+  useEffect(() => {
+        // If the user is on the booking page, reset the processing state
+        if (location.pathname === '/') {
+            setIsProcessingBooking(false);
+        }
+    }, [location]);
   const handleConfirmBooking = async (bookingDetails) => {
   // First, check if a room has been selected.
   if (!selectedRoom) {
@@ -142,18 +149,14 @@ function App() {
   setIsProcessingBooking(true); //  <-- This will now be called!
 
   try {
-    // Simulate the delay from talking to your backend (like Stripe)
-    await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            setBookingDetails(bookingDetails);
+            navigate('/guest-info');
 
-    // After the delay, you would navigate to the guest info page
-    // For example:
-    // setBookingDetails(bookingDetails); 
-      navigate('/guest-info');
-
-  } catch (error) {
-    console.error("Error during booking confirmation:", error);
-    setIsProcessingBooking(false); 
-  }
+        } catch (error) {
+            console.error("Error during booking confirmation:", error);
+            setIsProcessingBooking(false);
+        }
 
 
   
