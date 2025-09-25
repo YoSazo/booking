@@ -20,14 +20,17 @@ function BookingPage({
   onCalendarClose,
   onDatesChange,
   isLoading,
-  isProcessingBooking
+  isProcessingBooking,
+  setIsProcessingBooking
 }) {
   console.log('isProcessingBooking in BookingPage:', isProcessingBooking);
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
   // Calculate nights here to pass to the RoomCard for display
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-
+  useEffect(() => {
+    setIsProcessingBooking(false);
+  }, []);
   return (
     <>
       <div className="marquee-banner">
