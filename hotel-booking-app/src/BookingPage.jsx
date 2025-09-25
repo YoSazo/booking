@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
 import ReviewCard from './ReviewCard.jsx';
