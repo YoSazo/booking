@@ -96,6 +96,7 @@ export const hotelData = {
 
       { id: 3, name: 'Double Queen Suite With Kitchenette', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds and a Kitchenette, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'double-kitchen.jpeg',
+            'kitchen.jpeg',
             'IMG_4300.jpg',
             'IMG_4325.jpg',
             'Pool.jpg',
