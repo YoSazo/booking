@@ -73,7 +73,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
                 </select>
               </div>
             </div>
-            <button className="btn book-now-btn" onClick={onBookNow}>Book Now</button>
+            <button className="btn book-now-btn" onClick={onBookNow} disabled={isProcessing}>{isProcessing ? 'Processing...' : 'Book Now'}</button>
           </div>
         ) : (
           <button className="btn btn-select" onClick={() => onSelect(room)}>Select Room</button>

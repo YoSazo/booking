@@ -38,8 +38,9 @@ const calculateTieredPrice = (nights, rates) => {
 
 function App() {
   const navigate = useNavigate();
-
+  const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
+  
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -134,7 +135,12 @@ function App() {
   if (!selectedRoom) {
     alert("Please select a room first.");
     return;
+    setIsProcessingBooking(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsProcessingBooking(false);
   }
+
+  
 
   const nights = checkinDate && checkoutDate
     ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
@@ -272,6 +278,7 @@ function App() {
             onGuestsChange={handleGuestCountChange}
             onPetsChange={handlePetCountChange}
             onConfirmBooking={handleConfirmBooking}
+            isProcessingBooking={isProcessingBooking}
             onCalendarOpen={() => setIsCalendarOpen(true)}
             onCalendarClose={() => setIsCalendarOpen(false)}
             onDatesChange={handleDatesUpdate}

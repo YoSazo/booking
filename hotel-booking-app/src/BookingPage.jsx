@@ -19,7 +19,8 @@ function BookingPage({
   onCalendarOpen,
   onCalendarClose,
   onDatesChange,
-  isLoading
+  isLoading,
+  isProcessingBooking
 }) {
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
@@ -88,6 +89,7 @@ function BookingPage({
                 // Use the real-time rate from the API, or fallback to our tiered calculator
                 subtotal={room.totalRate}
                 taxes={0}
+                isProcessing={isProcessingBooking}
               />
             ))
           ) : (
