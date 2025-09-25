@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, isProcessing }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   const priceToday = subtotal ? subtotal / 2 : 0;
