@@ -1519,18 +1519,7 @@ body {
 }
 
 /* --- NEW: This class applies the sticky styles ONLY when needed --- */
-.checkout-cta-container.is-sticky {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: transparent;
-    padding: 16px 0;
-    z-index: 10;
-    /* These lines override the default styles when the button is sticky */
-    margin-top: 0;
-    border-top: none;
-}
+
 
 /* --- UPDATED: This rule now controls the button's size in ALL states --- */
 .checkout-cta-container .btn-confirm {
