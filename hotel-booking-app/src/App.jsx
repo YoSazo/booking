@@ -73,6 +73,7 @@ function App() {
     if (!start || !end || currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       setAvailableRooms(currentHotel.rooms);
       return;
+    }
     setIsLoading(true);
     setAvailableRooms([]);
     try {
@@ -131,30 +132,32 @@ function App() {
   };
 
   const handleConfirmBooking = async (bookingDetails) => {
+  // First, check if a room has been selected.
   if (!selectedRoom) {
     alert("Please select a room first.");
-    return;
+    return; // This stops the function if no room is selected.
   }
 
-  setIsProcessingBooking(true);
+  // If a room *is* selected, we proceed...
+  setIsProcessingBooking(true); //  <-- This will now be called!
 
   try {
-    // --- THIS IS WHERE YOU CALL YOUR BACKEND TO CREATE THE PAYMENT INTENT ---
-    // For demonstration, we'll simulate a 1.5-second delay
+    // Simulate the delay from talking to your backend (like Stripe)
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // After the delay, you would navigate to the next page
+    // After the delay, you would navigate to the guest info page
     // For example:
     // setBookingDetails(bookingDetails); 
     // navigate('/guest-info');
 
   } catch (error) {
-    console.error("Error confirming booking:", error);
-    // Handle any errors here, maybe show an error message to the user
+    console.error("Error during booking confirmation:", error);
+    // You can also show an error message to the user here
   } finally {
-    setIsProcessingBooking(false); // This will run whether the request succeeds or fails
+    // This part runs whether the 'try' block succeeded or failed
+    setIsProcessingBooking(false); 
   }
-};
+
 
   
 
