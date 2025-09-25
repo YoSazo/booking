@@ -293,12 +293,12 @@ function App() {
             onGuestsChange={handleGuestCountChange}
             onPetsChange={handlePetCountChange}
             onConfirmBooking={handleConfirmBooking}
-            isProcessingBooking={isProcessingBooking}
             onCalendarOpen={() => setIsCalendarOpen(true)}
             onCalendarClose={() => setIsCalendarOpen(false)}
             onDatesChange={handleDatesUpdate}
             isLoading={isLoading}
             onOpenLightbox={handleOpenLightbox}
+            isProcessingBooking={isProcessingBooking}
           />
         } />
         <Route path="/guest-info" element={
