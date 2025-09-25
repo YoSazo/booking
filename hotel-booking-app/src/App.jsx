@@ -135,9 +135,24 @@ function App() {
   if (!selectedRoom) {
     alert("Please select a room first.");
     return;
+
     setIsProcessingBooking(true);
+    try {
+    // --- THIS IS WHERE YOU CALL YOUR BACKEND TO CREATE THE PAYMENT INTENT ---
+    // For demonstration, we'll simulate a 1.5-second delay
     await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsProcessingBooking(false);
+
+    // After the delay, you would navigate to the next page
+    // For example:
+    // setBookingDetails(bookingDetails); 
+    // navigate('/guest-info');
+
+  } catch (error) {
+    console.error("Error confirming booking:", error);
+    // Handle any errors here, maybe show an error message to the user
+  } finally {
+    setIsProcessingBooking(false); // This will run whether the request succeeds or fails
+  }
   }
 
   
