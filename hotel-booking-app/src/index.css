@@ -101,6 +101,7 @@ body {
   overflow: hidden;
   display: flex;
   min-height: 250px;
+  overflow: visible; 
 }
 
 .room-card img {
