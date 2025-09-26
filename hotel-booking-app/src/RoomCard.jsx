@@ -30,7 +30,6 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
           View Photos
         </a>
         
-        {/* This will now be visible */}
         {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
           <div className="availability-pill">{roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!</div>
         )}

@@ -1884,31 +1884,32 @@ body {
 /* Add these new rules to the end of your index.css file */
 
 /* This makes the image container a positioning parent for the overlay */
-.room-card-image-container {
+/* Make sure the parent container is relative */
+.room-image-container {
   position: relative;
+  /* Add this so the pill doesn't get cut off */
+  overflow: visible; 
 }
 
-.image-overlay-container {
+/* This container is now just for grouping, so we can remove its CSS */
+.room-image-container {
+  position: relative;
+  /* Add this so the pill doesn't get cut off */
+  overflow: visible; 
+}
+/* Position the "View Photos" pill on the top-left */
+.view-photos-pill {
   position: absolute;
   top: 12px;
   left: 12px;
-  right: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  pointer-events: none; /* Allows clicks to pass through to the image */
-  z-index: 2;
-}
-
-.view-photos-pill,
-.availability-pill {
+  z-index: 2; /* Keeps it on top of the image */
   background-color: rgba(0, 0, 0, 0.6);
   color: white;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
-  pointer-events: all; /* Makes the pills clickable again */
+  pointer-events: all;
   cursor: pointer;
   text-decoration: none;
   backdrop-filter: blur(4px);
@@ -1917,18 +1918,21 @@ body {
 }
 
 .view-photos-pill:hover {
-    background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.8);
 }
 
+/* Position the "availability" pill on the top-right, just like your Figma design */
 .availability-pill {
-  background-color: hsla(0, 84%, 60%, 0.9); /* A reddish color for urgency */
-  cursor: default;
+  position: absolute;
+  top: -10px;   /* Pulls it up, outside the container */
+  right: -10px;  /* Pushes it right, outside the container */
+  z-index: 3;   /* Ensures it's on top of everything */
+  background-color: hsla(0, 84%, 60%, 0.9);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: bold;
+  pointer-events: all;
+  cursor: default;
 }
-
-/* You can now REMOVE the old CSS rule for .view-photos-link */
-/*
-.view-photos-link {
-    ...
-}
-*/
