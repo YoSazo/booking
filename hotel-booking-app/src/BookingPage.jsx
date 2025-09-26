@@ -117,7 +117,7 @@ function BookingPage({
         rates={rates}
       />
 
-      <HelpWidget />
+      <HelpWidget phone={hotel.phone}/>
     </>
   );
 }

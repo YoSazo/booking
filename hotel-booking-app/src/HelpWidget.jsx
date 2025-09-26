@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { hotelData } from './hotelData';
+
 // You can easily change your questions and answers here
 const faqs = [
   {
