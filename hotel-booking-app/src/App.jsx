@@ -96,8 +96,6 @@ function App() {
       });
       const result = await response.json();
       if (result.success) {
-        console.log("Data from Server:", result.data);
-        console.log("Static Hotel Data:", currentHotel.rooms);
         const mergedRooms = result.data.map(apiRoom => {
           const staticRoomData = currentHotel.rooms.find(r => r.name === apiRoom.roomName);
           return { ...staticRoomData, ...apiRoom };

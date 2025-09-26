@@ -24,7 +24,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
 
     
     <div className="room-card">
-      <div className="room-image-container">
+      <div className="room-card-image-container">
         {/* We now show the FIRST image as the preview */}
         <img 
           src={room.imageUrls[0]} 
