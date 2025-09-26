@@ -159,6 +159,7 @@ app.post('/api/availability', async (req, res) => {
             return {
                 roomName: roomName,
                 available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
+                roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
                 totalRate: specificRatePlan ? specificRatePlan.totalRate : null,
                 rateID: currentRateID,
                 roomTypeID: ids.roomTypeID
