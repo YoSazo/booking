@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import './SalesPop.css'; // We will create this CSS file next
+import './SalesPop.css'; // The existing CSS will work perfectly
 
-// --- Data for randomization ---
-const firstNames = ["Michael", "Jessica", "Chris", "Emily", "David", "Sarah", "James", "Laura", "Robert", "Jennifer"];
-const cities = ["Minneapolis, MN", "Chicago, IL", "New York, NY", "Los Angeles, CA", "Houston, TX", "Phoenix, AZ", "Denver, CO", "Miami, FL"];
-const rooms = ["King Bed Suite", "Double Queen Suite", "Executive King Room"];
+// --- Updated data for randomization ---
+const peopleCount = ["1 person", "2 people", "3 people"];
+const durations = ["4 nights", "1 week", "2 weeks", "1 month"];
 
 const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const getRandomNights = () => Math.floor(Math.random() * 5) + 2; // Random nights between 2 and 6
 
 function SalesPop() {
     const [isVisible, setIsVisible] = useState(false);
@@ -20,12 +18,10 @@ function SalesPop() {
         if (!hasBeenShown) {
             // After a 5-second delay, show the pop-up
             const timer = setTimeout(() => {
-                // Create the random notification
+                // Create the new random notification
                 setNotification({
-                    name: getRandomItem(firstNames),
-                    city: getRandomItem(cities),
-                    room: getRandomItem(rooms),
-                    nights: getRandomNights(),
+                    people: getRandomItem(peopleCount),
+                    duration: getRandomItem(durations),
                 });
                 setIsVisible(true);
                 
@@ -55,8 +51,8 @@ function SalesPop() {
             <div className="sales-pop-content">
                 <p><strong>Someone just booked!</strong></p>
                 <p>
-                    {notification.name} from {notification.city} booked the <br />
-                    <strong>{notification.room}</strong> for {notification.nights} nights.
+                    {/* Updated text to be more general */}
+                    <strong>{notification.people}</strong> just booked for <strong>{notification.duration}</strong>.
                 </p>
             </div>
         </div>

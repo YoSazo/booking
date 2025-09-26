@@ -34,6 +34,16 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
         </button>
       </div>
 
+      <div className="image-overlay-container">
+            <a onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.images, 0); }} className="view-photos-pill">
+                View Photos
+            </a>
+            {/* Show pill only if availability is a number between 1 and 5 for urgency */}
+            {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
+                <div className="availability-pill">{roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!</div>
+            )}
+        </div>
+
 
       <div className="room-details">
         <h3>{room.name}</h3>

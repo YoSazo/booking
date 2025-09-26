@@ -103,6 +103,7 @@ function BookingPage({
                 subtotal={room.totalRate}
                 taxes={0}
                 isProcessing={isProcessingBooking}
+                roomsAvailable={room.roomsAvailable}
               />
             ))
           ) : (
