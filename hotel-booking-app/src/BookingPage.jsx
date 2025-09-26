@@ -127,7 +127,7 @@ function BookingPage({
         rates={rates}
       />
 
-      <HelpWidget phone={hotel.phone}/>
+      {!isCalendarOpen && <HelpWidget phone={hotel.phone} />}
       <SalesPop />
     </>
   );
