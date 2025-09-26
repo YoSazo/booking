@@ -709,7 +709,7 @@ useEffect(() => {
                     </div>
                 </form>
                 
-                <div className={`checkout-cta-container ${currentStep < 3 ? 'is-sticky' : ''}`}>
+                <div className="checkout-cta-container">
                     {currentStep < 3 ? (
                         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                            { currentStep === 1 && "Proceed to Info" }
