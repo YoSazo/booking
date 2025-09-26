@@ -82,31 +82,37 @@ function BookingPage({
         </div>
 
         <main className="rooms-list">
+          
           {/* Conditional rendering based on loading and availability */}
           {isLoading ? (
             <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>Checking for available rooms...</strong></p>
           ) : roomData && roomData.length > 0 ? (
-            roomData.map(room => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                rates={rates}
-                onSelect={onRoomSelect}
-                isSelected={selectedRoom?.id === room.id}
-                bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
-                onGuestsChange={onGuestsChange}
-                onPetsChange={onPetsChange}
-                onBookNow={onConfirmBooking}
-                nights={nights}
-                onOpenLightbox={onOpenLightbox}
-                // Use the real-time rate from the API, or fallback to our tiered calculator
-                subtotal={room.totalRate}
-                taxes={0}
-                isProcessing={isProcessingBooking}
-                roomsAvailable={room.roomsAvailable}
-              />
-            ))
-          ) : (
+  roomData.map(room => { // <-- 1. Changed parenthesis to curly brace
+    // 2. This is the new line of logic to find the most current data
+    const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
+
+    return ( // <-- 3. Added the 'return' keyword
+      <RoomCard
+        key={room.id}
+        room={room}
+        rates={rates}
+        onSelect={onRoomSelect}
+        isSelected={selectedRoom?.id === room.id}
+        bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
+        onGuestsChange={onGuestsChange}
+        onPetsChange={onPetsChange}
+        onBookNow={onConfirmBooking}
+        nights={nights}
+        onOpenLightbox={onOpenLightbox}
+        subtotal={room.totalRate}
+        taxes={0}
+        isProcessing={isProcessingBooking}
+        // 4. This is the only prop that changed
+        roomsAvailable={currentRoomData.roomsAvailable}
+      />
+    ); // <-- 5. Closed the return statement
+  }) // <-- 6. Closed the map function with a curly brace
+) : (
             <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
           )}
         </main>
