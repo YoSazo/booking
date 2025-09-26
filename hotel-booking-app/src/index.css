@@ -1885,13 +1885,9 @@ body {
 
 /* This makes the image container a positioning parent for the overlay */
 /* Make sure the parent container is relative */
-.room-image-container {
-  position: relative;
-  /* Add this so the pill doesn't get cut off */
-  overflow: visible; 
-}
 
-/* This container is now just for grouping, so we can remove its CSS */
+
+/* This container is now just for grouaping, so we can remove its CSS */
 .room-image-container {
   position: relative;
   /* Add this so the pill doesn't get cut off */
