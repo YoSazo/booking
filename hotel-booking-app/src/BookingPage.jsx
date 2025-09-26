@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
 import ReviewCard from './ReviewCard.jsx';
+import HelpWidget from './HelpWidget.jsx';
 
 function BookingPage({ 
   hotel,
@@ -112,6 +113,8 @@ function BookingPage({
         checkoutDate={checkoutDate}
         rates={rates}
       />
+
+      <HelpWidget />
     </>
   );
 }
