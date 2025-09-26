@@ -62,14 +62,14 @@ export const hotelData = {
     },
     reviews: [
       {
-        text: "Perfect for a Work Trip – Comfortable, Quiet, and Convenient I stayed at Home Place Suites for a work assignment and had a great experience. The room was spacious, clean, and very comfortable—perfect for an extended stay.",
-        author: "Rachelle Soper",
+        text: "Home Place Suites was a lifesaver. No credit checks, no deposit, and I was able to stay for months just renewing—no hassle. For anyone struggling with housing barriers, this place is unreal.",
+        author: "Hanson M.",
         location: "OK",
         rating: 5,
       },
       {
-        text: "Our reservation at home place suits was the best choice we could have made. After staying at Extended stay last weekend, I so wish I would have cancelled there and booked here.",
-        author: "B Moody",
+        text: "Perfect for a Work Trip – Comfortable, Quiet, and Convenient I stayed at Home Place Suites for a work assignment and had a great experience. The room was spacious, clean, and very comfortable—perfect for an extended stay.",
+        author: "Rachelle Soper",
         location: "OK",
         rating: 5,
       },
