@@ -166,7 +166,9 @@ useEffect(() => {
     };
 }, []); // The empty array ensures this complex setup runs only once.
 
-
+useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
 
 useEffect(() => {
     console.log('DEBUG - errorMessage changed:', errorMessage);
