@@ -60,7 +60,7 @@ function SalesPop() {
             <div className="sales-pop-footer">
                 <div className="sales-pop-timestamp">{notification.time}</div>
                 <div className="sales-pop-verified">
-                    &#10003; Verified by <strong>Nudgify</strong>
+                     Verified by <strong>Nudgify</strong>
                 </div>
             </div>
             {/* --- END: NEW ELEMENTS --- */}
