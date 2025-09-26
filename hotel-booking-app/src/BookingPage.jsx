@@ -25,7 +25,10 @@ function BookingPage({
   setIsProcessingBooking
 }) {
   console.log('isProcessingBooking in BookingPage:', isProcessingBooking);
-
+  useEffect(() => {
+    // This will run once when the application starts
+    trackPageView(); 
+  }, []);
   useEffect(() => {
     setIsProcessingBooking(false);
   }, []);
