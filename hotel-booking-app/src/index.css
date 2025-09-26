@@ -631,7 +631,7 @@ body {
   border-radius: 999px;
   padding: 8px 24px;
   font-weight: 700;
-  font-size: 5px;
+  font-size: 12px;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.07);
@@ -1090,7 +1090,7 @@ body {
   border-radius: 999px; /* Pill shape */
   padding: 8px 24px;
   font-weight: 700;
-  font-size: 0.9em;
+  font-size: 12px;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.07);
