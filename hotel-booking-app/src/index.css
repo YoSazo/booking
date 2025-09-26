@@ -107,6 +107,7 @@ body {
     width: 200px;
     height: 100%;
     object-fit: cover;
+    aspect-ratio: 4 / 3;
 }
 
 .room-details {
@@ -285,6 +286,7 @@ body {
     .room-card img {
         width: 100%;
         height: 180px;
+        aspect-ratio: 4 / 3;
     }
 }
 
