@@ -22,28 +22,27 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
 
   return (
   <div className="room-card">
-    {/* --- START: CORRECTED STRUCTURE --- */}
     <div className="room-image-container">
 
-      {/* 1. Move the overlay container to be the FIRST child */}
+      {/* 1. The overlay container is now the FIRST child */}
       <div className="image-overlay-container">
         <a onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.imageUrls, 0); }} className="view-photos-pill">
           View Photos
         </a>
-        {/* This logic is perfect and will now be visible */}
+        
+        {/* This will now be visible */}
         {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
           <div className="availability-pill">{roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!</div>
         )}
       </div>
 
-      {/* 2. The image and button now come after the overlay */}
+      {/* The image is now the only other element here */}
       <img 
         src={room.imageUrls[0]} 
         alt={`${room.name} preview`} 
       />
-      <button className="view-photos-btn" onClick={() => onOpenLightbox(room.imageUrls, 0)}>
-        View Photos
-      </button>
+      
+      {/* 2. The old <button> that was here has been REMOVED */}
 
     </div>
 
