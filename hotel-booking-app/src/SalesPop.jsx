@@ -4,6 +4,7 @@ import './SalesPop.css'; // The existing CSS will work perfectly
 // --- Updated data for randomization ---
 const peopleCount = ["1 person", "2 people", "3 people"];
 const durations = ["4 nights", "1 week", "2 weeks", "1 month"];
+const timeAgos = ["2 hours ago", "3 hours ago", "5 hours ago", "8 hours ago"]; // New timestamps
 
 const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -22,6 +23,7 @@ function SalesPop() {
                 setNotification({
                     people: getRandomItem(peopleCount),
                     duration: getRandomItem(durations),
+                    time: getRandomItem(timeAgos), // Add random time
                 });
                 setIsVisible(true);
                 
@@ -51,10 +53,17 @@ function SalesPop() {
             <div className="sales-pop-content">
                 <p><strong>Someone just booked!</strong></p>
                 <p>
-                    {/* Updated text to be more general */}
                     <strong>{notification.people}</strong> just booked for <strong>{notification.duration}</strong>.
                 </p>
             </div>
+            {/* --- START: NEW ELEMENTS --- */}
+            <div className="sales-pop-footer">
+                <div className="sales-pop-timestamp">{notification.time}</div>
+                <div className="sales-pop-verified">
+                    &#10003; Verified by <strong>Nudgify</strong>
+                </div>
+            </div>
+            {/* --- END: NEW ELEMENTS --- */}
         </div>
     );
 }
