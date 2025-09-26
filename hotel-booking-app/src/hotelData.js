@@ -75,7 +75,7 @@ export const hotelData = {
       },
     ],
     rooms: [
-      { id: 1, name: 'Single King Room', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 4, imageUrls: [
+      { id: 1, name: 'Single King Room', roomTypeID: '117057244229790', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 4, imageUrls: [
             'kingbedbart.jpg',
             'IMG_4300.jpg',
             'IMG_4325.jpg',
@@ -84,7 +84,7 @@ export const hotelData = {
             'Lobby.jpg',
             'bathroomamen.jpg',
         ] },
-      { id: 2, name: 'Double Queen Room', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
+      { id: 2, name: 'Double Queen Room', roomTypeID: '116355544711397', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'twoqueenbart.jpg',
             'IMG_4300.jpg',
             'IMG_4325.jpg',
@@ -94,7 +94,7 @@ export const hotelData = {
             'bathroomamen.jpg',
         ] },
 
-      { id: 3, name: 'Double Queen Suite With Kitchenette', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds and a Kitchenette, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
+      { id: 3, name: 'Double Queen Suite With Kitchenette', roomTypeID: '117068633694351', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds and a Kitchenette, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'double-kitchen.jpeg',
             'kitchen.jpeg',
             'IMG_4300.jpg',
