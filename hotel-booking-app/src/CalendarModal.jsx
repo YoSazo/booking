@@ -53,6 +53,16 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     setUpsellDeclined(false);
   };
 
+  const handleBookWeek = () => {
+    const start = startDate || new Date();
+    start.setHours(0,0,0,0);
+    const newEndDate = new Date(start);
+    newEndDate.setDate(newEndDate.getDate() + 7);
+    setStartDate(start);
+    setEndDate(newEndDate);
+    setUpsellDeclined(false);
+  };
+
   const handleUpsellConfirm = () => {
     if (!startDate) return;
     const newEndDate = new Date(startDate);
@@ -133,6 +143,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
             </div>
           </div>
           <div className="calendar-footer-buttons">
+            <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
             <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
             <button className="btn" onClick={handleDone}>Done</button>
           </div>
