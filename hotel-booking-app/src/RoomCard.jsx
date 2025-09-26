@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, isProcessing, roomsAvailable }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, isProcessing }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
   const priceToday = subtotal ? subtotal / 2 : 0;
@@ -21,30 +21,31 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
   };
 
   return (
+  <div className="room-card">
+    {/* --- START: CORRECTED STRUCTURE --- */}
+    <div className="room-image-container">
 
-    
-    <div className="room-card">
-      <div className="room-card-image-container">
-        {/* We now show the FIRST image as the preview */}
-        <img 
-          src={room.imageUrls[0]} 
-          alt={`${room.name} preview`} 
-        />
-        {/* The new button to open the lightbox */}
-        <button className="view-photos-btn" onClick={() => onOpenLightbox(room.imageUrls, 0)}>
+      {/* 1. Move the overlay container to be the FIRST child */}
+      <div className="image-overlay-container">
+        <a onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.imageUrls, 0); }} className="view-photos-pill">
           View Photos
-        </button>
+        </a>
+        {/* This logic is perfect and will now be visible */}
+        {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
+          <div className="availability-pill">{roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!</div>
+        )}
       </div>
 
-      <div className="image-overlay-container">
-            <a onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.images, 0); }} className="view-photos-pill">
-                View Photos
-            </a>
-            {/* Show pill only if availability is a number between 1 and 5 for urgency */}
-            {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
-                <div className="availability-pill">{roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!</div>
-            )}
-        </div>
+      {/* 2. The image and button now come after the overlay */}
+      <img 
+        src={room.imageUrls[0]} 
+        alt={`${room.name} preview`} 
+      />
+      <button className="view-photos-btn" onClick={() => onOpenLightbox(room.imageUrls, 0)}>
+        View Photos
+      </button>
+
+    </div>
 
 
 
