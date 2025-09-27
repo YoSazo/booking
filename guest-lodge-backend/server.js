@@ -186,6 +186,7 @@ app.post('/api/book', async (req, res) => {
     }
     const reservationData = {
         propertyID: PROPERTY_ID,
+        sourceID: "Salah",
         startDate: bookingDetails.checkin.split('T')[0],
         endDate: bookingDetails.checkout.split('T')[0],
         guestFirstName: guestInfo.firstName,
