@@ -104,7 +104,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       }
       days.push(
         <div key={i} className={className} onClick={() => !className.includes('disabled') && handleDayClick(day)}>
-          <div className="calendar-day-content">{i}<span className="calendar-day-price">${rates.NIGHTLY.toFixed(1)}</span></div>
+          <div className="calendar-day-content">{i}</div>
         </div>
       );
     }
