@@ -1,14 +1,19 @@
+// In hotel-booking-app/vite.config.js
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // --- ADD THIS ENTIRE 'server' BLOCK ---
   server: {
-    host: true, // Keep this - it's good practice for network access
-    
-    // --- ADD THIS ---
-    // This explicitly tells Vite to trust requests from any ngrok free domain
-    allowedHosts: ['.ngrok-free.app']
-  }
+    proxy: {
+      '/api': {
+        target: 'https://www.myhomeplacesuites.com',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })
