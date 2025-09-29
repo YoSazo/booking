@@ -315,7 +315,6 @@ function App() {
             onComplete={handleCompleteBooking}
             apiBaseUrl={API_BASE_URL}
             clientSecret={clientSecret}
-            stripePromise={stripePromise}
           />
         } />
         <Route path="/confirmation" element={

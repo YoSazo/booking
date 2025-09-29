@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
-
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -25,12 +24,11 @@ const ELEMENT_OPTIONS = {
 };
 
 // This is the main component that controls the multi-step flow.
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret, stripePromise }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     // Add this at the very top of your component, before any other code
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
-    const paymentRequestButtonRef = useRef(null);
 
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -228,77 +226,67 @@ useEffect(() => {
             }, [elements]);
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
-    // Create and check for a Payment Request (Apple Pay / Google Pay)
-useEffect(() => {
-    // 1. Exit early if Stripe, clientSecret, or bookingDetails are not ready.
-    if (!stripe || !clientSecret || !bookingDetails) {
-        return;
+    useEffect(() => {
+        if (stripe && clientSecret && bookingDetails) {
+            const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+            const pr = stripe.paymentRequest({
+                country: 'US',
+                currency: 'usd',
+                total: { label: 'Booking Payment', amount: amountInCents },
+                requestPayerName: true,
+                requestPayerEmail: true,
+            });
+
+            pr.canMakePayment().then(result => {
+                console.log('Stripe canMakePayment result:', result);
+    if (result) {
+        setPaymentRequest(pr);
+        
+        // --- CORRECTED PRIORITY ---
+        // 1. Prioritize native device wallets first for the best experience.
+        if (result.applePay) {
+            setWalletType('Apple Pay');
+        } else if (result.googlePay) {
+            setWalletType('Google Pay');
+        } 
+        // 2. Fallback to Link if no native wallet is found.
+        else if (result.link) {
+            setWalletType('Link');
+        } 
+        // 3. A generic fallback if something unexpected is available.
+        else {
+            setWalletType('Wallet');
+        }
     }
+}).catch(error => {
+    console.warn('Payment request check failed:', error);
+    // Don't set user-facing error here - just disable wallet option
+    setPaymentRequest(null);
+    setWalletType(null);
+});
 
-    // 2. Create the Payment Request object.
-    const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-    const pr = stripe.paymentRequest({
-        country: 'US',
-        currency: 'usd',
-        total: { label: 'Booking Payment', amount: amountInCents },
-        requestPayerName: true,
-        requestPayerEmail: true,
-    });
+            // Add this helper function
 
-    // 3. Check if the wallet can be used and update state.
-    pr.canMakePayment().then(result => {
-        console.log('Stripe canMakePayment result:', result);
-        if (result) {
-            setPaymentRequest(pr); // Store the request object in state
-            if (result.googlePay) {
-                setWalletType('Google Pay');
-            } else if (result.applePay) {
-                setWalletType('Apple Pay');
-            } else if (result.link) {
-                setWalletType('Link');
-            } else {
-                setWalletType('Wallet');
+            pr.on('paymentmethod', async (ev) => {
+            // Use the ref to get the latest form data
+            sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+
+            const { error: confirmError } = await stripe.confirmCardPayment(
+                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
+            );
+            if (confirmError) {
+                ev.complete('fail');
+                setHasAttemptedSubmit(true);
+                setErrorMessage(confirmError.message);
+                return;
             }
-        } else {
-            // If no wallet is available, ensure state is cleared
-            setPaymentRequest(null);
-            setWalletType(null);
+            ev.complete('success');
+            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+
+        });
         }
-    });
-
-    // 4. Define the event handler for when a payment method is selected in the wallet.
-    const handlePaymentMethod = async (ev) => {
-        sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-
-        const { error: confirmError } = await stripe.confirmCardPayment(
-            clientSecret, 
-            { payment_method: ev.paymentMethod.id }, 
-            { handleActions: false }
-        );
-
-        if (confirmError) {
-            ev.complete('fail');
-            setHasAttemptedSubmit(true);
-            setErrorMessage(confirmError.message);
-            return;
-        }
-
-        ev.complete('success');
-        window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-    };
-
-    // 5. Attach the event listener.
-    pr.on('paymentmethod', handlePaymentMethod);
-
-    // 6. IMPORTANT: Return a cleanup function.
-    // This runs when the component unmounts or the effect re-runs.
-    // It removes the event listener to prevent memory leaks and bugs.
-    return () => {
-        pr.off('paymentmethod', handlePaymentMethod);
-    };
-
-}, [stripe, clientSecret, bookingDetails]); // The dependency array is correct.
+    }, [stripe, clientSecret, bookingDetails]);
 
 
     const validateInfoStep = () => {
@@ -461,19 +449,12 @@ useEffect(() => {
 
         // If validation passes, clear any previous errors and show the wallet.
         setErrorMessage('');
-        if (paymentRequestButtonRef.current) {
-        // Find the actual button element rendered by Stripe inside our hidden div
-        const stripeButton = paymentRequestButtonRef.current.querySelector('button');
-        if (stripeButton) {
-            stripeButton.click(); // Programmatically click the hidden button
+        if (paymentRequest) {
+            paymentRequest.show();
         } else {
-            // This is a fallback error in case the button isn't found
-            setErrorMessage("Could not initiate wallet payment. Please try again.");
+            setErrorMessage("Digital wallet is not available. Please select another payment method.");
         }
-    } else {
-        setErrorMessage("Digital wallet is not available. Please select another payment method.");
-    }
-};
+    };
 
     const getWalletLogoInfo = () => {
         if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
@@ -613,30 +594,28 @@ useEffect(() => {
     )}
 
     {paymentMethod === 'wallet' && walletType && (
-    <div className="wallet-selection-message">
-        {/* Your existing custom message can stay */}
-        <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
-        <p className="wallet-selected-text">{walletType} selected.</p>
-        <div className="wallet-info-box">
-            <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
-            <span>Another step will appear to securely submit your payment information.</span>
-        </div>
-
-        {/* --- ADD THE HIDDEN STRIPE BUTTON --- */}
-        {paymentRequest && (
-            <div ref={paymentRequestButtonRef} style={{ display: 'none' }}>
-                <PaymentRequestButtonElement options={{ paymentRequest }} />
+        <div className="wallet-selection-message">
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
+            <p className="wallet-selected-text">{walletType} selected.</p>
+            <div className="wallet-info-box">
+                <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
+                <span>Another step will appear to securely submit your payment information.</span>
             </div>
-        )}
-    </div>
-)}
+        </div>
+    )}
+
+    {paymentMethod === 'wallet' && !walletType && (
+        <div className="wallet-info-box">
+            <p>Select your wallet provider above.</p>
+        </div>
+    )}
 </div>
 
 <div className="billing-address-section">
     <label className="billing-address-label">Billing Address</label>
     <div className="form-grid">
         <div className="form-field full-width">
-            {/* <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}> */}
+            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                 <input 
                     type="text" 
                     name="address" 
@@ -645,12 +624,12 @@ useEffect(() => {
                     placeholder="Start typing your address..." 
                     autoComplete="street-address"
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                        }
-                    }}
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Prevent Enter from submitting form
+        }
+    }}
                 />
-            {/* </Autocomplete> */}
+            </Autocomplete>
         </div>
         {isAddressSelected && (
             <div className="address-reveal-container visible">
@@ -731,19 +710,12 @@ useEffect(() => {
 }
 
 // The wrapper provides the Stripe context to the entire page.
-function GuestInfoPageWrapper({ stripePromise, ...props }) {
-    if (!stripePromise) {
-        // Render a loading state or null while the promise is not yet passed
-        return <div>Loading Payment Gateway...</div>;
-    }
-
+function GuestInfoPageWrapper(props) {
     return (
         <Elements stripe={stripePromise}>
-            {/* Pass the same promise down to the child component */}
-            <GuestInfoPage {...props} stripePromise={stripePromise} />
+            <GuestInfoPage {...props} />
         </Elements>
     );
 }
-
 
 export default GuestInfoPageWrapper;
