@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 const allowedOrigins = [
     'https://myhomeplacesuites.com',      // Alloow the non-www version
     'https://www.myhomeplacesuites.com', // Allow the www version
-    'http://localhost:5173'            // Allow local development
+    'http://localhost:3000'            // Allow local development
 ];
 
 const corsOptions = {
