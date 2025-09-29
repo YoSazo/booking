@@ -245,7 +245,7 @@ useEffect(() => {
         // 1. Prioritize native device wallets first for the best experience.
         if (result.applePay) {
             setWalletType('Apple Pay');
-        } else if (result.googlePay) {
+        } else if (result.googlePay || isDesktopChrome) {
             setWalletType('Google Pay');
         } 
         // 2. Fallback to Link if no native wallet is found.
