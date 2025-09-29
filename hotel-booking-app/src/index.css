@@ -863,8 +863,8 @@ body {
 }
 
 .back-button:hover {
-  background-color: #495057; /* Dark gray on hover */
-  border-color: #495057;
+  background-color: #212529; /* Dark gray on hover */
+  border-color: #212529;
 }
 
 .info-summary {
