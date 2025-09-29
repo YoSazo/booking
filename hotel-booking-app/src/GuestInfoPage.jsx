@@ -636,7 +636,7 @@ useEffect(() => {
     <label className="billing-address-label">Billing Address</label>
     <div className="form-grid">
         <div className="form-field full-width">
-            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+            {/* <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}> */}
                 <input 
                     type="text" 
                     name="address" 
@@ -645,12 +645,12 @@ useEffect(() => {
                     placeholder="Start typing your address..." 
                     autoComplete="street-address"
                     onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault(); // Prevent Enter from submitting form
-        }
-    }}
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                        }
+                    }}
                 />
-            </Autocomplete>
+            {/* </Autocomplete> */}
         </div>
         {isAddressSelected && (
             <div className="address-reveal-container visible">
