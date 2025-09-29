@@ -866,10 +866,7 @@ body {
   background-color: #495057; /* Dark gray on hover */
   border-color: #495057;
 }
-.back-button:hover {
-  background-color: var(--secondary-color);
-  border-color: #aaa;
-}
+
 .info-summary {
   grid-column: 1 / -1;
   margin-top: 20px;
