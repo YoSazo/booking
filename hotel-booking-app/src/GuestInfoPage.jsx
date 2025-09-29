@@ -25,7 +25,7 @@ const ELEMENT_OPTIONS = {
 };
 
 // This is the main component that controls the multi-step flow.
-function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
+function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret, stripePromise }) {
     // Add this at the very top of your component, before any other code
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
@@ -731,12 +731,19 @@ useEffect(() => {
 }
 
 // The wrapper provides the Stripe context to the entire page.
-function GuestInfoPageWrapper(props) {
+function GuestInfoPageWrapper({ stripePromise, ...props }) {
+    if (!stripePromise) {
+        // Render a loading state or null while the promise is not yet passed
+        return <div>Loading Payment Gateway...</div>;
+    }
+
     return (
         <Elements stripe={stripePromise}>
-            <GuestInfoPage {...props} />
+            {/* Pass the same promise down to the child component */}
+            <GuestInfoPage {...props} stripePromise={stripePromise} />
         </Elements>
     );
 }
+
 
 export default GuestInfoPageWrapper;
