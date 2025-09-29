@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-// import { Autocomplete } from '@react-google-maps/api';
+import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
@@ -37,19 +37,18 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     });
     const [formErrors, setFormErrors] = useState({});
     // const [clientSecret, setClientSecret] = useState('');
-    // const [autocomplete, setAutocomplete] = useState(null);
-    // const [isAddressSelected, setIsAddressSelected] = useState(false);
+    const [autocomplete, setAutocomplete] = useState(null);
+    const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
     // In GuestInfoPage.jsx, with your other state and refs
-// const isInteractingWithAutocomplete = useRef(false);
+const isInteractingWithAutocomplete = useRef(false);
 
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
-    /*
 const handleAddressPaste = (e) => {
     // Prevent the default paste behavior
     e.preventDefault();
@@ -92,11 +91,10 @@ const handleAddressPaste = (e) => {
         }
     });
 };
-*/
 
 // Now, find your address input inside the <Autocomplete> component
 // and add the onPaste handler to it.
-/*
+
 <input
     type="text"
     name="address"
@@ -107,8 +105,6 @@ const handleAddressPaste = (e) => {
     autoComplete="street-address"
     onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
 />
-
-*/
 
 
     useEffect(() => { latestFormData.current = formData; }, [formData]);
@@ -160,7 +156,6 @@ useEffect(() => {
 
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
 
-    /*
 useEffect(() => {
     const handleMouseDown = (event) => {
         // More comprehensive check for autocomplete interaction
@@ -201,8 +196,6 @@ useEffect(() => {
         document.removeEventListener('mouseup', handleMouseUp);
     };
 }, []);
-
-*/
 
 
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
@@ -354,7 +347,7 @@ useEffect(() => {
         setFormData(prev => ({ ...prev, phone: value }));
         if (formErrors.phone) setFormErrors(prev => ({...prev, phone: ''}));
     };
-/*
+
     const onLoad = (autoC) => setAutocomplete(autoC);
     const onPlaceChanged = () => {
     // Set flag to prevent scrolling during place selection
@@ -390,8 +383,6 @@ useEffect(() => {
         isInteractingWithAutocomplete.current = false;
     }, 1000);
 };
-
-*/
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
@@ -624,46 +615,56 @@ useEffect(() => {
     <label className="billing-address-label">Billing Address</label>
     <div className="form-grid">
         <div className="form-field full-width">
-            <label>Street Address</label>
-            <input 
-                type="text" 
-                name="address" 
-                value={formData.address} 
-                onChange={handleChange} 
-                placeholder="123 Main St" 
-                autoComplete="street-address"
-            />
+            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input 
+                    type="text" 
+                    name="address" 
+                    value={formData.address} 
+                    onChange={handleChange} 
+                    placeholder="Start typing your address..." 
+                    autoComplete="street-address"
+                    onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Prevent Enter from submitting form
+        }
+    }}
+                />
+            </Autocomplete>
         </div>
-        <div className="form-field">
-            <label>City</label>
-            <input 
-                type="text" 
-                name="city" 
-                value={formData.city} 
-                onChange={handleChange} 
-                autoComplete="address-level2"
-            />
-        </div>
-        <div className="form-field">
-            <label>State</label>
-            <input 
-                type="text" 
-                name="state" 
-                value={formData.state} 
-                onChange={handleChange} 
-                autoComplete="address-level1"
-            />
-        </div>
-        <div className="form-field">
-            <label>Zip</label>
-            <input 
-                type="text" 
-                name="zip" 
-                value={formData.zip} 
-                onChange={handleChange} 
-                autoComplete="postal-code"
-            />
-        </div>
+        {isAddressSelected && (
+            <div className="address-reveal-container visible">
+                <div className="form-field">
+                    <label>City</label>
+                    <input 
+                        type="text" 
+                        name="city" 
+                        value={formData.city} 
+                        onChange={handleChange} 
+                        autoComplete="address-level2"
+                    />
+                </div>
+                <div className="form-field">
+                    <label>State</label>
+                    <input 
+                        type="text" 
+                        name="state" 
+                        value={formData.state} 
+                        onChange={handleChange} 
+                        autoComplete="address-level1"
+                    />
+                </div>
+                <div className="form-field">
+                    <label>Zip</label>
+                    <input 
+                        type="text" 
+                        name="zip" 
+                        value={formData.zip} 
+                        onChange={handleChange} 
+                        autoComplete="postal-code"
+                    />
+                </div>
+            </div>
+        )}
     </div>
 </div>
                            </>
