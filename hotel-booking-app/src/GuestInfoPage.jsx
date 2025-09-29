@@ -30,6 +30,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
+    const paymentRequestButtonRef = useRef(null);
 
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
