@@ -226,157 +226,67 @@ useEffect(() => {
             }, [elements]);
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
-    // REPLACE THIS ENTIRE useEffect
-useEffect(() => {
-    let mounted = true;
-    
-    const initializePaymentRequest = async () => {
-        if (!stripe || !clientSecret || !bookingDetails) {
-            console.log('Waiting for dependencies:', { stripe: !!stripe, clientSecret: !!clientSecret, bookingDetails: !!bookingDetails });
-            return;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        if (!mounted) return;
-        
-        console.log('Initializing payment request...');
-        
-        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-        console.log('Payment amount:', amountInCents, 'cents ($' + (amountInCents/100).toFixed(2) + ')');
-        
-        try {
+    useEffect(() => {
+        if (stripe && clientSecret && bookingDetails) {
+            const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
             const pr = stripe.paymentRequest({
                 country: 'US',
                 currency: 'usd',
-                total: { 
-                    label: 'Booking Payment', 
-                    amount: amountInCents,
-                    pending: false  // Add this
-                },
+                total: { label: 'Booking Payment', amount: amountInCents },
                 requestPayerName: true,
                 requestPayerEmail: true,
-                // Try adding these additional options
-                disableWallets: [], // Explicitly enable all wallets
             });
 
-            console.log('Payment request created, checking availability...');
-            
-            const result = await pr.canMakePayment();
-            console.log('Stripe canMakePayment result:', result);
-            console.log('Stripe canMakePayment raw:', JSON.stringify(result, null, 2));
-            
-            if (!mounted) return;
-            
-            if (result) {
-                setPaymentRequest(pr);
-                
-                if (result.applePay) {
-                    setWalletType('Apple Pay');
-                } else if (result.googlePay) {
-                    setWalletType('Google Pay');
-                } else if (result.link) {
-                    setWalletType('Link');
-                } else {
-                    setWalletType('Wallet');
-                }
-                
-                pr.on('paymentmethod', async (ev) => {
-                    sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-                    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-
-                    const { error: confirmError } = await stripe.confirmCardPayment(
-                        clientSecret, 
-                        { payment_method: ev.paymentMethod.id }, 
-                        { handleActions: false }
-                    );
-                    
-                    if (confirmError) {
-                        ev.complete('fail');
-                        setHasAttemptedSubmit(true);
-                        setErrorMessage(confirmError.message);
-                        return;
-                    }
-                    
-                    ev.complete('success');
-                    window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-                });
-            } else {
-                console.log('No payment methods available');
-            }
-        } catch (error) {
-            console.error('Payment request initialization error:', error);
-            if (mounted) {
-                setPaymentRequest(null);
-                setWalletType(null);
-            }
-        }
-    };
-    
-    initializePaymentRequest();
-    
-    return () => {
-        mounted = false;
-    };
-}, [stripe, clientSecret, bookingDetails]);
-
-useEffect(() => {
-    if (stripe) {
-        console.log('Stripe instance:', stripe);
-        console.log('Stripe._apiKey (first 10 chars):', stripe._apiKey?.substring(0, 10));
-    }
-}, [stripe]);
-
-// Add this useEffect temporarily for diagnosis
-useEffect(() => {
-    const testGooglePayDirectly = async () => {
-        console.log('=== DIRECT GOOGLE PAY TEST ===');
+            pr.canMakePayment().then(result => {
+                console.log('Stripe canMakePayment result:', result);
+    if (result) {
+        setPaymentRequest(pr);
         
-        if (!('PaymentRequest' in window)) {
-            console.error('PaymentRequest API not supported in this browser');
-            return;
+        // --- CORRECTED PRIORITY ---
+        // 1. Prioritize native device wallets first for the best experience.
+        if (result.applePay) {
+            setWalletType('Apple Pay');
+        } else if (result.googlePay) {
+            setWalletType('Google Pay');
+        } 
+        // 2. Fallback to Link if no native wallet is found.
+        else if (result.link) {
+            setWalletType('Link');
+        } 
+        // 3. A generic fallback if something unexpected is available.
+        else {
+            setWalletType('Wallet');
         }
+    }
+}).catch(error => {
+    console.warn('Payment request check failed:', error);
+    // Don't set user-facing error here - just disable wallet option
+    setPaymentRequest(null);
+    setWalletType(null);
+});
 
-        console.log('PaymentRequest API is available');
+            // Add this helper function
 
-        const supportedMethods = [{
-            supportedMethods: 'https://google.com/pay',
-            data: {
-                environment: 'TEST',
-                apiVersion: 2,
-                apiVersionMinor: 0,
-                merchantInfo: {
-                    merchantId: '12345678901234567890',
-                    merchantName: 'Test'
-                },
-                allowedPaymentMethods: [{
-                    type: 'CARD',
-                    parameters: {
-                        allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
-                        allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX']
-                    }
-                }]
+            pr.on('paymentmethod', async (ev) => {
+            // Use the ref to get the latest form data
+            sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+
+            const { error: confirmError } = await stripe.confirmCardPayment(
+                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
+            );
+            if (confirmError) {
+                ev.complete('fail');
+                setHasAttemptedSubmit(true);
+                setErrorMessage(confirmError.message);
+                return;
             }
-        }];
+            ev.complete('success');
+            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
 
-        try {
-            const request = new PaymentRequest(supportedMethods, {
-                total: { label: 'Test', amount: { currency: 'USD', value: '1.00' } }
-            });
-            
-            console.log('PaymentRequest created successfully');
-            const canMake = await request.canMakePayment();
-            console.log('DIRECT Google Pay canMakePayment result:', canMake);
-        } catch (error) {
-            console.error('Direct Google Pay test FAILED:', error);
+        });
         }
-    };
-    
-    // Run after a short delay to let everything load
-    setTimeout(() => {
-        testGooglePayDirectly();
-    }, 1000);
-}, []);
+    }, [stripe, clientSecret, bookingDetails]);
 
 
     const validateInfoStep = () => {
