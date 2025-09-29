@@ -238,6 +238,7 @@ useEffect(() => {
             });
 
             pr.canMakePayment().then(result => {
+                console.log('Stripe canMakePayment result:', result);
     if (result) {
         setPaymentRequest(pr);
         
