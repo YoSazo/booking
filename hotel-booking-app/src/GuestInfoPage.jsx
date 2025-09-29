@@ -125,46 +125,7 @@ useEffect(() => {
 // In GuestInfoPage.jsx, add this with your other useEffect hooks.
 // REMOVE ALL PREVIOUS SCROLL/BLUR/VIEWPORT USEEFFECTS.
 
-useEffect(() => {
-    // This ref will store the height of the visible area when an input is focused.
-    const viewportHeightOnFocus = { current: window.innerHeight };
-
-    const handleInputFocus = () => {
-        // When a user taps an input, we record the current visible height.
-        // If the keyboard is about to open, this value will be the full screen height.
-        viewportHeightOnFocus.current = window.visualViewport.height;
-    };
-
-    const handleInputBlur = () => {
-        // When the user leaves an input, we wait a moment for the browser to resize.
-        setTimeout(() => {
-            const currentViewportHeight = window.visualViewport.height;
-            
-            // THE KEY LOGIC: We only scroll to the top if the visible area is now
-            // significantly TALLER than it was when the input was focused.
-            // A threshold of 150px is a safe bet to confirm it was the keyboard closing.
-            if (currentViewportHeight > viewportHeightOnFocus.current + 150) {
-                
-            }
-        }, 300); // A 300ms delay is robust enough for most devices.
-    };
-
-    // Find the form container to attach listeners to.
-    const container = document.querySelector('.guest-info-container');
-    if (container) {
-        // Use event delegation to listen for focus and blur on any input inside the container.
-        container.addEventListener('focusin', handleInputFocus);
-        container.addEventListener('blur', handleInputBlur, true);
-    }
-
-    // Cleanup function to prevent memory leaks.
-    return () => {
-        if (container) {
-            container.removeEventListener('focusin', handleInputFocus);
-            container.removeEventListener('blur', handleInputBlur, true);
-        }
-    };
-}, []); // The empty array ensures this complex setup runs only once.
+ // The empty array ensures this complex setup runs only once.
 
 useEffect(() => {
         
