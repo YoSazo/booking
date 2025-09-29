@@ -320,6 +320,13 @@ useEffect(() => {
     };
 }, [stripe, clientSecret, bookingDetails]);
 
+useEffect(() => {
+    if (stripe) {
+        console.log('Stripe instance:', stripe);
+        console.log('Stripe._apiKey (first 10 chars):', stripe._apiKey?.substring(0, 10));
+    }
+}, [stripe]);
+
 // Add this useEffect temporarily for diagnosis
 useEffect(() => {
     const testGooglePayDirectly = async () => {
