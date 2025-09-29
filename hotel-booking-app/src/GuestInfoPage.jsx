@@ -228,67 +228,77 @@ useEffect(() => {
             }, [elements]);
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
-    useEffect(() => {
-        if (stripe && clientSecret && bookingDetails) {
-            const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-            const pr = stripe.paymentRequest({
-                country: 'US',
-                currency: 'usd',
-                total: { label: 'Booking Payment', amount: amountInCents },
-                requestPayerName: true,
-                requestPayerEmail: true,
-            });
-
-            pr.canMakePayment().then(result => {
-                console.log('Stripe canMakePayment result:', result);
-    if (result) {
-        setPaymentRequest(pr);
-        
-        // --- CORRECTED PRIORITY ---
-        // 1. Prioritize native device wallets first for the best experience.
-        if (result.applePay) {
-            setWalletType('Apple Pay');
-        } else if (result.googlePay) {
-            setWalletType('Google Pay');
-        } 
-        // 2. Fallback to Link if no native wallet is found.
-        else if (result.link) {
-            setWalletType('Link');
-        } 
-        // 3. A generic fallback if something unexpected is available.
-        else {
-            setWalletType('Wallet');
-        }
+    // Create and check for a Payment Request (Apple Pay / Google Pay)
+useEffect(() => {
+    // 1. Exit early if Stripe, clientSecret, or bookingDetails are not ready.
+    if (!stripe || !clientSecret || !bookingDetails) {
+        return;
     }
-}).catch(error => {
-    console.warn('Payment request check failed:', error);
-    // Don't set user-facing error here - just disable wallet option
-    setPaymentRequest(null);
-    setWalletType(null);
-});
 
-            // Add this helper function
+    // 2. Create the Payment Request object.
+    const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+    const pr = stripe.paymentRequest({
+        country: 'US',
+        currency: 'usd',
+        total: { label: 'Booking Payment', amount: amountInCents },
+        requestPayerName: true,
+        requestPayerEmail: true,
+    });
 
-            pr.on('paymentmethod', async (ev) => {
-            // Use the ref to get the latest form data
-            sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-
-            const { error: confirmError } = await stripe.confirmCardPayment(
-                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-            );
-            if (confirmError) {
-                ev.complete('fail');
-                setHasAttemptedSubmit(true);
-                setErrorMessage(confirmError.message);
-                return;
+    // 3. Check if the wallet can be used and update state.
+    pr.canMakePayment().then(result => {
+        console.log('Stripe canMakePayment result:', result);
+        if (result) {
+            setPaymentRequest(pr); // Store the request object in state
+            if (result.googlePay) {
+                setWalletType('Google Pay');
+            } else if (result.applePay) {
+                setWalletType('Apple Pay');
+            } else if (result.link) {
+                setWalletType('Link');
+            } else {
+                setWalletType('Wallet');
             }
-            ev.complete('success');
-            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-
-        });
+        } else {
+            // If no wallet is available, ensure state is cleared
+            setPaymentRequest(null);
+            setWalletType(null);
         }
-    }, [stripe, clientSecret, bookingDetails]);
+    });
+
+    // 4. Define the event handler for when a payment method is selected in the wallet.
+    const handlePaymentMethod = async (ev) => {
+        sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+
+        const { error: confirmError } = await stripe.confirmCardPayment(
+            clientSecret, 
+            { payment_method: ev.paymentMethod.id }, 
+            { handleActions: false }
+        );
+
+        if (confirmError) {
+            ev.complete('fail');
+            setHasAttemptedSubmit(true);
+            setErrorMessage(confirmError.message);
+            return;
+        }
+
+        ev.complete('success');
+        window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+    };
+
+    // 5. Attach the event listener.
+    pr.on('paymentmethod', handlePaymentMethod);
+
+    // 6. IMPORTANT: Return a cleanup function.
+    // This runs when the component unmounts or the effect re-runs.
+    // It removes the event listener to prevent memory leaks and bugs.
+    return () => {
+        pr.off('paymentmethod', handlePaymentMethod);
+    };
+
+}, [stripe, clientSecret, bookingDetails]); // The dependency array is correct.
 
 
     const validateInfoStep = () => {
