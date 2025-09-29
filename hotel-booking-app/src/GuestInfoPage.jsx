@@ -226,9 +226,27 @@ useEffect(() => {
             }, [elements]);
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
-    useEffect(() => {
-        if (stripe && clientSecret && bookingDetails) {
-            const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+    // REPLACE THIS ENTIRE useEffect
+useEffect(() => {
+    let mounted = true;
+    
+    const initializePaymentRequest = async () => {
+        // Ensure all dependencies are ready
+        if (!stripe || !clientSecret || !bookingDetails) {
+            console.log('Waiting for dependencies:', { stripe: !!stripe, clientSecret: !!clientSecret, bookingDetails: !!bookingDetails });
+            return;
+        }
+        
+        // Add a delay to ensure Stripe is fully initialized
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (!mounted) return;
+        
+        console.log('Initializing payment request...');
+        
+        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+        
+        try {
             const pr = stripe.paymentRequest({
                 country: 'US',
                 currency: 'usd',
@@ -237,56 +255,65 @@ useEffect(() => {
                 requestPayerEmail: true,
             });
 
-            pr.canMakePayment().then(result => {
-                console.log('Stripe canMakePayment result:', result);
-    if (result) {
-        setPaymentRequest(pr);
-        
-        // --- CORRECTED PRIORITY ---
-        // 1. Prioritize native device wallets first for the best experience.
-        if (result.applePay) {
-            setWalletType('Apple Pay');
-        } else if (result.googlePay) {
-            setWalletType('Google Pay');
-        } 
-        // 2. Fallback to Link if no native wallet is found.
-        else if (result.link) {
-            setWalletType('Link');
-        } 
-        // 3. A generic fallback if something unexpected is available.
-        else {
-            setWalletType('Wallet');
-        }
-    }
-}).catch(error => {
-    console.warn('Payment request check failed:', error);
-    // Don't set user-facing error here - just disable wallet option
-    setPaymentRequest(null);
-    setWalletType(null);
-});
+            console.log('Payment request created, checking availability...');
+            
+            const result = await pr.canMakePayment();
+            console.log('Stripe canMakePayment result:', result);
+            
+            if (!mounted) return;
+            
+            if (result) {
+                setPaymentRequest(pr);
+                
+                if (result.applePay) {
+                    setWalletType('Apple Pay');
+                } else if (result.googlePay) {
+                    setWalletType('Google Pay');
+                } else if (result.link) {
+                    setWalletType('Link');
+                } else {
+                    setWalletType('Wallet');
+                }
+                
+                // Register payment method handler
+                pr.on('paymentmethod', async (ev) => {
+                    sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+                    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
 
-            // Add this helper function
-
-            pr.on('paymentmethod', async (ev) => {
-            // Use the ref to get the latest form data
-            sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-
-            const { error: confirmError } = await stripe.confirmCardPayment(
-                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-            );
-            if (confirmError) {
-                ev.complete('fail');
-                setHasAttemptedSubmit(true);
-                setErrorMessage(confirmError.message);
-                return;
+                    const { error: confirmError } = await stripe.confirmCardPayment(
+                        clientSecret, 
+                        { payment_method: ev.paymentMethod.id }, 
+                        { handleActions: false }
+                    );
+                    
+                    if (confirmError) {
+                        ev.complete('fail');
+                        setHasAttemptedSubmit(true);
+                        setErrorMessage(confirmError.message);
+                        return;
+                    }
+                    
+                    ev.complete('success');
+                    window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+                });
+            } else {
+                console.log('No payment methods available');
             }
-            ev.complete('success');
-            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-
-        });
+        } catch (error) {
+            console.error('Payment request initialization error:', error);
+            if (mounted) {
+                setPaymentRequest(null);
+                setWalletType(null);
+            }
         }
-    }, [stripe, clientSecret, bookingDetails]);
+    };
+    
+    initializePaymentRequest();
+    
+    return () => {
+        mounted = false;
+    };
+}, [stripe, clientSecret, bookingDetails]);
 
 
     const validateInfoStep = () => {
