@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
+
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -449,12 +450,19 @@ useEffect(() => {
 
         // If validation passes, clear any previous errors and show the wallet.
         setErrorMessage('');
-        if (paymentRequest) {
-            paymentRequest.show();
+        if (paymentRequestButtonRef.current) {
+        // Find the actual button element rendered by Stripe inside our hidden div
+        const stripeButton = paymentRequestButtonRef.current.querySelector('button');
+        if (stripeButton) {
+            stripeButton.click(); // Programmatically click the hidden button
         } else {
-            setErrorMessage("Digital wallet is not available. Please select another payment method.");
+            // This is a fallback error in case the button isn't found
+            setErrorMessage("Could not initiate wallet payment. Please try again.");
         }
-    };
+    } else {
+        setErrorMessage("Digital wallet is not available. Please select another payment method.");
+    }
+};
 
     const getWalletLogoInfo = () => {
         if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
@@ -594,21 +602,23 @@ useEffect(() => {
     )}
 
     {paymentMethod === 'wallet' && walletType && (
-        <div className="wallet-selection-message">
-            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
-            <p className="wallet-selected-text">{walletType} selected.</p>
-            <div className="wallet-info-box">
-                <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
-                <span>Another step will appear to securely submit your payment information.</span>
-            </div>
-        </div>
-    )}
-
-    {paymentMethod === 'wallet' && !walletType && (
+    <div className="wallet-selection-message">
+        {/* Your existing custom message can stay */}
+        <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
+        <p className="wallet-selected-text">{walletType} selected.</p>
         <div className="wallet-info-box">
-            <p>Select your wallet provider above.</p>
+            <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
+            <span>Another step will appear to securely submit your payment information.</span>
         </div>
-    )}
+
+        {/* --- ADD THE HIDDEN STRIPE BUTTON --- */}
+        {paymentRequest && (
+            <div ref={paymentRequestButtonRef} style={{ display: 'none' }}>
+                <PaymentRequestButtonElement options={{ paymentRequest }} />
+            </div>
+        )}
+    </div>
+)}
 </div>
 
 <div className="billing-address-section">
