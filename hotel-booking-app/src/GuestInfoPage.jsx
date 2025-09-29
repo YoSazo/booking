@@ -231,13 +231,11 @@ useEffect(() => {
     let mounted = true;
     
     const initializePaymentRequest = async () => {
-        // Ensure all dependencies are ready
         if (!stripe || !clientSecret || !bookingDetails) {
             console.log('Waiting for dependencies:', { stripe: !!stripe, clientSecret: !!clientSecret, bookingDetails: !!bookingDetails });
             return;
         }
         
-        // Add a delay to ensure Stripe is fully initialized
         await new Promise(resolve => setTimeout(resolve, 500));
         
         if (!mounted) return;
@@ -245,20 +243,28 @@ useEffect(() => {
         console.log('Initializing payment request...');
         
         const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+        console.log('Payment amount:', amountInCents, 'cents ($' + (amountInCents/100).toFixed(2) + ')');
         
         try {
             const pr = stripe.paymentRequest({
                 country: 'US',
                 currency: 'usd',
-                total: { label: 'Booking Payment', amount: amountInCents },
+                total: { 
+                    label: 'Booking Payment', 
+                    amount: amountInCents,
+                    pending: false  // Add this
+                },
                 requestPayerName: true,
                 requestPayerEmail: true,
+                // Try adding these additional options
+                disableWallets: [], // Explicitly enable all wallets
             });
 
             console.log('Payment request created, checking availability...');
             
             const result = await pr.canMakePayment();
             console.log('Stripe canMakePayment result:', result);
+            console.log('Stripe canMakePayment raw:', JSON.stringify(result, null, 2));
             
             if (!mounted) return;
             
@@ -275,7 +281,6 @@ useEffect(() => {
                     setWalletType('Wallet');
                 }
                 
-                // Register payment method handler
                 pr.on('paymentmethod', async (ev) => {
                     sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
                     sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
