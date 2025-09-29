@@ -315,6 +315,57 @@ useEffect(() => {
     };
 }, [stripe, clientSecret, bookingDetails]);
 
+// Add this useEffect temporarily for diagnosis
+useEffect(() => {
+    const testGooglePayDirectly = async () => {
+        console.log('=== DIRECT GOOGLE PAY TEST ===');
+        
+        if (!('PaymentRequest' in window)) {
+            console.error('PaymentRequest API not supported in this browser');
+            return;
+        }
+
+        console.log('PaymentRequest API is available');
+
+        const supportedMethods = [{
+            supportedMethods: 'https://google.com/pay',
+            data: {
+                environment: 'TEST',
+                apiVersion: 2,
+                apiVersionMinor: 0,
+                merchantInfo: {
+                    merchantId: '12345678901234567890',
+                    merchantName: 'Test'
+                },
+                allowedPaymentMethods: [{
+                    type: 'CARD',
+                    parameters: {
+                        allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+                        allowedCardNetworks: ['VISA', 'MASTERCARD', 'AMEX']
+                    }
+                }]
+            }
+        }];
+
+        try {
+            const request = new PaymentRequest(supportedMethods, {
+                total: { label: 'Test', amount: { currency: 'USD', value: '1.00' } }
+            });
+            
+            console.log('PaymentRequest created successfully');
+            const canMake = await request.canMakePayment();
+            console.log('DIRECT Google Pay canMakePayment result:', canMake);
+        } catch (error) {
+            console.error('Direct Google Pay test FAILED:', error);
+        }
+    };
+    
+    // Run after a short delay to let everything load
+    setTimeout(() => {
+        testGooglePayDirectly();
+    }, 1000);
+}, []);
+
 
     const validateInfoStep = () => {
     const errors = {};
