@@ -249,9 +249,6 @@ useEffect(() => {
             setWalletType('Google Pay');
         } 
         // 2. Fallback to Link if no native wallet is found.
-        else if (result.link) {
-            setWalletType('Link');
-        } 
         // 3. A generic fallback if something unexpected is available.
         else {
             setWalletType('Wallet');
