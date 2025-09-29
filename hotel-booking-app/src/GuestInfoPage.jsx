@@ -167,7 +167,7 @@ useEffect(() => {
 }, []); // The empty array ensures this complex setup runs only once.
 
 useEffect(() => {
-        window.scrollTo(0, 0);
+        
     }, []);
 
 useEffect(() => {
@@ -356,7 +356,7 @@ useEffect(() => {
                 setCurrentStep(3);
             }
         }
-        window.scrollTo(0, 0);
+        
     };
     
     const handleBackStep = () => {
