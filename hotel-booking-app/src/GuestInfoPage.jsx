@@ -711,11 +711,19 @@ useEffect(() => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
+    const { clientSecret } = props;
+    
+    const options = clientSecret ? {
+        clientSecret,
+        appearance: { theme: 'stripe' }
+    } : undefined;
+    
     return (
-        <Elements stripe={stripePromise}>
+        <Elements stripe={stripePromise} options={options}>
             <GuestInfoPage {...props} />
         </Elements>
     );
 }
+
 
 export default GuestInfoPageWrapper;
