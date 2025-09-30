@@ -632,36 +632,36 @@ useEffect(() => {
     )}
 
     {/* NEW: Add Express Checkout for Google Pay */}
-    {paymentMethod === 'express' && !isSafari && (
-        <div className="express-checkout-container">
-            <ExpressCheckoutElement
-                onConfirm={async (event) => {
-                    // Validate address first
-                    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-                        setErrorMessage("Please fill out your billing address before proceeding.");
-                        return;
-                    }
+    {paymentMethod === 'express' && !isSafari && clientSecret && (
+    <div className="express-checkout-container" style={{ marginTop: '20px' }}>
+        <ExpressCheckoutElement
+            onConfirm={async (event) => {
+                // Validate address first
+                if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+                    setErrorMessage("Please fill out your billing address before proceeding.");
+                    return { error: 'validation_error' };
+                }
 
-                    // Save data
-                    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-                    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+                // Save data
+                sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+                sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
 
-                    // Payment will be confirmed automatically by ExpressCheckoutElement
-                    if (event.expressPaymentType === 'google_pay') {
-                        // Success - navigate to confirmation
-                        window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-                    }
-                }}
-                options={{
-                    wallets: {
-                        googlePay: 'always',
-                        applePay: 'never',
-                        link: 'never'
-                    }
-                }}
-            />
-        </div>
-    )}
+                // Let Stripe handle the confirmation
+                // The onComplete will be called automatically if successful
+            }}
+            onReady={() => {
+                console.log('ExpressCheckoutElement is ready');
+            }}
+            options={{
+                wallets: {
+                    googlePay: 'always',
+                    applePay: 'never',
+                    link: 'never'
+                }
+            }}
+        />
+    </div>
+)}
 </div>
 
 <div className="billing-address-section">
@@ -764,8 +764,15 @@ useEffect(() => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
+    const { clientSecret } = props;
+    
+    const options = clientSecret ? {
+        clientSecret,
+        appearance: { theme: 'stripe' }
+    } : undefined;
+    
     return (
-        <Elements stripe={stripePromise}>
+        <Elements stripe={stripePromise} options={options}>
             <GuestInfoPage {...props} />
         </Elements>
     );
