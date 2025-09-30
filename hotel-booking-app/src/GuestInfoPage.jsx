@@ -542,7 +542,7 @@ useEffect(() => {
     >
         <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
     </button>
-                                    {isSafari && walletType && (
+                                    {walletType && (
         <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
@@ -550,17 +550,6 @@ useEffect(() => {
         >
             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
             {walletType}
-        </button>
-    )}
-
-    {!isSafari && (
-        <button 
-            type="button" 
-            className={`tab-button ${paymentMethod === 'express' ? 'active' : ''}`} 
-            onClick={() => setPaymentMethod('express')}
-        >
-            <img src="/google.svg" alt="Google Pay" className="google-pay-logo" /> 
-            Google Pay
         </button>
     )}
 
@@ -631,37 +620,6 @@ useEffect(() => {
         </div>
     )}
 
-    {/* NEW: Add Express Checkout for Google Pay */}
-    {paymentMethod === 'express' && !isSafari && clientSecret && (
-    <div className="express-checkout-container" style={{ marginTop: '20px' }}>
-        <ExpressCheckoutElement
-            onConfirm={async (event) => {
-                // Validate address first
-                if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-                    setErrorMessage("Please fill out your billing address before proceeding.");
-                    return { error: 'validation_error' };
-                }
-
-                // Save data
-                sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-                sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-
-                // Let Stripe handle the confirmation
-                // The onComplete will be called automatically if successful
-            }}
-            onReady={() => {
-                console.log('ExpressCheckoutElement is ready');
-            }}
-            options={{
-                wallets: {
-                    googlePay: 'always',
-                    applePay: 'never',
-                    link: 'never'
-                }
-            }}
-        />
-    </div>
-)}
 </div>
 
 <div className="billing-address-section">
