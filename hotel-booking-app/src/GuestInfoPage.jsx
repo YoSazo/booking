@@ -539,10 +539,17 @@ useEffect(() => {
                                         <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
                                     </button>
                                     {walletType && (
-                                        <button type="button" className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} onClick={() => setPaymentMethod('wallet')}>
-                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> {walletType}
-                                        </button>
-                                    )}
+    <button 
+      type="button" 
+      className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
+      // When this button is clicked, it ONLY sets the payment method.
+      // This avoids any potential state conflicts.
+      onClick={() => setPaymentMethod('wallet')}
+    >
+        <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
+        {walletType}
+    </button>
+)}
                                 </div>
                                 <div className="payment-content">
     {paymentMethod === 'card' && (
