@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPageWrapper from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
@@ -10,7 +10,6 @@ import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './tracking
 import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
