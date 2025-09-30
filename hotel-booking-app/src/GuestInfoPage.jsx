@@ -25,17 +25,11 @@ const ELEMENT_OPTIONS = {
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
-    
     // Add this at the very top of your component, before any other code
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
-    const userAgent = navigator.userAgent;
-
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-console.log('User Agent:', userAgent);
-console.log('isSafari detection:', isSafari);
-
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
