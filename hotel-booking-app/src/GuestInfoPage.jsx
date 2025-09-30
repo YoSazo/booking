@@ -29,7 +29,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
-const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
@@ -727,18 +726,14 @@ useEffect(() => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    const { clientSecret } = props;
-    
-    const options = clientSecret ? {
-        clientSecret,
-        appearance: { theme: 'stripe' }
-    } : undefined;
-    
+    // The Elements provider just needs the stripePromise.
+    // The options are not needed for individual elements.
     return (
-        <Elements stripe={stripePromise} options={options}>
+        <Elements stripe={stripePromise}>
             <GuestInfoPage {...props} />
         </Elements>
     );
 }
 
 export default GuestInfoPageWrapper;
+
