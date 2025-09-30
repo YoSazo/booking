@@ -1607,7 +1607,7 @@ body {
 }
 
 .google-pay-logo {
-  height: 24px; /* Slightly larger size for Google Pay logo */
+  height: 50px; /* Slightly larger size for Google Pay logo */
   width: auto;
 }
 
