@@ -469,7 +469,7 @@ useEffect(() => {
     
     const priceToday = bookingDetails.subtotal / 2;
     const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
-    const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
+    const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, layout: 'accordion', locale: 'en' };
 
     return (
         <>
