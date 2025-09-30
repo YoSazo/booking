@@ -29,9 +29,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
-    console.log('User Agent:', userAgent);
-console.log('isSafari detection:', isSafari);
-
+    
 
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
