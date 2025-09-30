@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
 
@@ -450,11 +450,16 @@ useEffect(() => {
         // If validation passes, clear any previous errors and show the wallet.
         setErrorMessage('');
         if (paymentRequest) {
-            paymentRequest.show();
-        } else {
-            setErrorMessage("Digital wallet is not available. Please select another payment method.");
-        }
-    };
+        // --- ADD THIS LINE ---
+        // This ensures the wallet always has the latest user info.
+        paymentRequest.update({ total: { label: 'Booking Payment', amount: Math.round((bookingDetails.subtotal / 2) * 100) } });
+        
+        // Now, show the payment sheet
+        paymentRequest.show();
+    } else {
+        setErrorMessage("Digital wallet is not available. Please select another payment method.");
+    }
+};
 
     const getWalletLogoInfo = () => {
         if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
