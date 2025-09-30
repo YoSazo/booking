@@ -4,7 +4,8 @@ import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStri
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = Promise.resolve(window.Stripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY));
+
 
 
 
