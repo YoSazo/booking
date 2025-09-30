@@ -294,8 +294,8 @@ function App() {
 
   return (
     <>
+    <ScrollToTop />
       <Routes>
-        <ScrollToTop />
         <Route path="/" element={
           <BookingPage
             hotel={currentHotel}
