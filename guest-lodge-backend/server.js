@@ -119,16 +119,14 @@ app.post('/api/create-payment-intent', async (req, res) => {
     try {
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
-    currency: 'usd',
-    payment_method_types: ['card', 'link'],
-    // Add this to explicitly enable Google Pay
-    payment_method_options: {
-        card: {
-            request_three_d_secure: 'automatic',
-        },
-    },
-});
-
+            currency: 'usd',
+            // ✅ Only "card" and optionally "link" here
+            // Wallets like Apple Pay and Google Pay are automatically included under "card"
+            automatic_payment_methods: {
+                enabled: true,
+            },
+            // Remove payment_method_types when using automatic_payment_methods
+        });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
         console.error("Stripe API Error creating payment intent:", error.message);
