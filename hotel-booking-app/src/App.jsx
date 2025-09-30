@@ -10,7 +10,7 @@ import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './tracking
 import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
@@ -35,6 +35,17 @@ const calculateTieredPrice = (nights, rates) => {
   discountedTotal += discountedTotalRem * WEEK_N;
   return +discountedTotal.toFixed(2);
 };
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]); // This effect runs every time the path changes
+
+  return null;
+}
+
 
 function App() {
   const navigate = useNavigate();
@@ -285,6 +296,7 @@ function App() {
   return (
     <>
       <Routes>
+        <ScrollToTop />
         <Route path="/" element={
           <BookingPage
             hotel={currentHotel}
