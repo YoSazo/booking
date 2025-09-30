@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Autocomplete } from '@react-google-maps/api';
-import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
 
@@ -29,7 +29,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
-
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
@@ -531,18 +531,39 @@ useEffect(() => {
                         {!clientSecret ? (<p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>) : (
                            <>
                                 <div className="payment-method-tabs">
-                                    <button type="button" className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} onClick={() => {
-    setPaymentMethod('card');
-    setHasAttemptedSubmit(false);
-    setErrorMessage('');
-}}>
-                                        <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
-                                    </button>
-                                    {walletType && (
-                                        <button type="button" className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} onClick={() => setPaymentMethod('wallet')}>
-                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> {walletType}
-                                        </button>
-                                    )}
+    <button 
+        type="button" 
+        className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
+        onClick={() => {
+            setPaymentMethod('card');
+            setHasAttemptedSubmit(false);
+            setErrorMessage('');
+        }}
+    >
+        <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
+    </button>
+                                    {isSafari && walletType && (
+        <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
+            onClick={() => setPaymentMethod('wallet')}
+        >
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
+            {walletType}
+        </button>
+    )}
+
+    {!isSafari && (
+        <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'express' ? 'active' : ''}`} 
+            onClick={() => setPaymentMethod('express')}
+        >
+            <img src="/google.svg" alt="Google Pay" className="google-pay-logo" /> 
+            Google Pay
+        </button>
+    )}
+
                                 </div>
                                 <div className="payment-content">
     {paymentMethod === 'card' && (
@@ -607,6 +628,38 @@ useEffect(() => {
     {paymentMethod === 'wallet' && !walletType && (
         <div className="wallet-info-box">
             <p>Select your wallet provider above.</p>
+        </div>
+    )}
+
+    {/* NEW: Add Express Checkout for Google Pay */}
+    {paymentMethod === 'express' && !isSafari && (
+        <div className="express-checkout-container">
+            <ExpressCheckoutElement
+                onConfirm={async (event) => {
+                    // Validate address first
+                    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+                        setErrorMessage("Please fill out your billing address before proceeding.");
+                        return;
+                    }
+
+                    // Save data
+                    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+                    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+
+                    // Payment will be confirmed automatically by ExpressCheckoutElement
+                    if (event.expressPaymentType === 'google_pay') {
+                        // Success - navigate to confirmation
+                        window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+                    }
+                }}
+                options={{
+                    wallets: {
+                        googlePay: 'always',
+                        applePay: 'never',
+                        link: 'never'
+                    }
+                }}
+            />
         </div>
     )}
 </div>
@@ -711,19 +764,11 @@ useEffect(() => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    const { clientSecret } = props;
-    
-    const options = clientSecret ? {
-        clientSecret,
-        appearance: { theme: 'stripe' }
-    } : undefined;
-    
     return (
-        <Elements stripe={stripePromise} options={options}>
+        <Elements stripe={stripePromise}>
             <GuestInfoPage {...props} />
         </Elements>
     );
 }
-
 
 export default GuestInfoPageWrapper;
