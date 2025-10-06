@@ -81,12 +81,10 @@ const sendEventToServer = (eventName, payload) => {
 
 export const trackPageView = () => {
     const eventID = `pageview.${Date.now()}`;
-    // The external_id will be added automatically by sendEventToServer
-    sendEventToServer('PageView', { event_id: eventID }); 
+    sendEventToServer('PageView', { event_id: eventID });
     
-    if (typeof fbq === 'function') {
-        fbq('track', 'PageView', {}, { eventID: eventID });
-    }
+    // We can just call our smart function. It handles the external_id for us.
+    sendEventToPixel('PageView', {}, eventID); 
 };
 
 
