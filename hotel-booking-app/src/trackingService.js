@@ -81,12 +81,10 @@ const sendEventToServer = (eventName, payload) => {
 
 export const trackPageView = () => {
     const eventID = `pageview.${Date.now()}`;
-    // The external_id will be added automatically by sendEventToServer
-    sendEventToServer('PageView', { event_id: eventID }); 
+    sendEventToServer('PageView', { event_id: eventID });
     
-    if (typeof fbq === 'function') {
-        fbq('track', 'PageView', {}, { eventID: eventID });
-    }
+    // We can just call our smart function. It handles the external_id for us.
+    sendEventToPixel('PageView', {}, eventID); 
 };
 
 
@@ -96,8 +94,19 @@ export const trackPageView = () => {
 
 const sendEventToPixel = (pixelEventName, payload, eventID) => {
     if (typeof fbq === 'function') {
-        fbq('track', pixelEventName, payload, { eventID: eventID });
-        console.log(`Sent ${pixelEventName} Pixel event (Event ID: ${eventID}):`, payload);
+        // Create a copy of the payload to avoid mutating the original object
+        const pixelPayload = { ...payload };
+
+        // Ensure the user_data object exists
+        if (!pixelPayload.user_data) {
+            pixelPayload.user_data = {};
+        }
+
+        // Add the external_id to the user_data object
+        pixelPayload.user_data.external_id = getExternalId();
+
+        fbq('track', pixelEventName, pixelPayload, { eventID: eventID });
+        console.log(`Sent ${pixelEventName} Pixel event (Event ID: ${eventID}):`, pixelPayload);
     } else {
         console.warn('fbq (Meta Pixel) function not found.');
     }

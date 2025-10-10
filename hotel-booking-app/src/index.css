@@ -1607,14 +1607,14 @@ body {
 }
 
 .google-pay-logo {
-  height: 24px; /* Slightly larger size for Google Pay logo */
+  height: 50px; /* Slightly larger size for Google Pay logo */
   width: auto;
 }
 
 .large-wallet-logo {
   display: block; /* Make it block to take its own line */
-  margin: 0 auto 15px auto; /* Center it and add space below */
-  height: 40px; /* Even larger size for the displayed logo */
+  margin: 0 auto 8px auto; /* Center it and add space below */
+  height: 70px; /* Even larger size for the displayed logo */
   width: auto;
 }
 
