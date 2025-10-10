@@ -687,11 +687,12 @@ useEffect(() => {
                         {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
                     </div>
                 </form>
-                
-                <div className="checkout-cta-container">
-                    {currentStep === 3 && (
+
+                {currentStep === 3 && (
                         <p className="cancellation-policy-text">Book now, cancel anytime up to 7 days ahead.</p>
                     )}
+                
+                <div className="checkout-cta-container">
                     {currentStep < 3 ? (
                         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                            { currentStep === 1 && "Proceed to Info" }
