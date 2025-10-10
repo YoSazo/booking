@@ -689,6 +689,9 @@ useEffect(() => {
                 </form>
                 
                 <div className="checkout-cta-container">
+                    {currentStep === 3 && (
+                        <p className="cancellation-policy-text">Book now, cancel anytime up to 7 days ahead.</p>
+                    )}
                     {currentStep < 3 ? (
                         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
                            { currentStep === 1 && "Proceed to Info" }
@@ -717,10 +720,6 @@ useEffect(() => {
 >
     {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
 </button>
-
-)}
-                    {currentStep === 3 && (
-                        <p className="cancellation-policy-text">Book now, cancel anytime up to 7 days ahead.</p>
                     )}
                 </div>
             </div>
