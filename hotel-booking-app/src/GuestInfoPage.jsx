@@ -689,7 +689,7 @@ useEffect(() => {
                 </form>
 
                 {currentStep === 3 && (
-                        <p className="cancellation-policy-text">Book now, cancel anytime up to 7 days ahead.</p>
+                        <p className="cancellation-policy-text">Book now, cancel anytime up to 7 days ahead. No Hassle</p>
                     )}
                 
                 <div className="checkout-cta-container">
