@@ -1934,8 +1934,9 @@ body {
 
 .cancellation-policy-text {
     text-align: center;
+    margin-top: 20px;
     margin-bottom: 12px;
     font-size: 15px;
-    color: #4a5568;
+    color: #00FF00;
     font-weight: 500;
 }
