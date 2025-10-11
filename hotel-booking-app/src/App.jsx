@@ -129,7 +129,6 @@ function App() {
 
   const handleRoomSelect = (room) => {
     if (!checkinDate || !checkoutDate) {
-      alert('Please select your check-in and check-out dates first.');
       setIsCalendarOpen(true);
       return;
     }
