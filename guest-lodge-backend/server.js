@@ -38,6 +38,7 @@ const corsOptions = {
 
 
 app.use(cors(corsOptions));
+app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api/stripe-webhook')) {
@@ -107,31 +108,123 @@ const ZAPIER_URLS = {
 // In your server.jss
 
 // File: guest-lodge-backend/server.js
+app.post('/api/stripe-webhook', async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the payment_intent.succeeded event
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+    console.log('💰 Payment succeeded via webhook:', paymentIntent.id);
+
+    // Extract booking data from metadata
+    const metadata = paymentIntent.metadata;
+
+    if (metadata.bookingDetails && metadata.guestInfo) {
+      const bookingDetails = JSON.parse(metadata.bookingDetails);
+      const guestInfo = JSON.parse(metadata.guestInfo);
+      const hotelId = metadata.hotelId;
+
+      // Call your booking logic
+      try {
+        const reservationData = {
+          propertyID: PROPERTY_ID,
+          startDate: bookingDetails.checkin.split('T')[0],
+          endDate: bookingDetails.checkout.split('T')[0],
+          guestFirstName: guestInfo.firstName,
+          guestLastName: guestInfo.lastName,
+          guestCountry: 'US',
+          guestZip: guestInfo.zip,
+          guestEmail: guestInfo.email,
+          guestPhone: guestInfo.phone,
+          paymentMethod: "cash",
+          sendEmailConfirmation: "true",
+          rooms: JSON.stringify([{
+             roomTypeID: bookingDetails.roomTypeID,
+             quantity: 1,
+             roomRateID: bookingDetails.rateID
+           }]),
+          adults: JSON.stringify([{
+             roomTypeID: bookingDetails.roomTypeID,
+             quantity: bookingDetails.guests
+           }]),
+          children: JSON.stringify([{
+             roomTypeID: bookingDetails.roomTypeID,
+             quantity: 0
+           }]),
+        };
+
+        // Create booking in Cloudbeds
+        const pmsResponse = await axios.post(
+          'https://api.cloudbeds.com/api/v1.3/postReservation',
+           new URLSearchParams(reservationData),
+           {
+            headers: {
+              'accept': 'application/json',
+              'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
+              'content-type': 'application/x-www-form-urlencoded',
+            }
+          }
+        );
+
+        if (pmsResponse.data.success) {
+          console.log('✅ Booking created via webhook:', pmsResponse.data.reservationID);
+
+          // Fire Purchase event
+          await axios.post(process.env.ZAPIER_PURCHASE_URL, {
+            event_name: 'Purchase',
+            value: bookingDetails.total,
+            currency: 'USD',
+            event_id: pmsResponse.data.reservationID,
+            user_data: {
+              em: guestInfo.email,
+              ph: guestInfo.phone.replace(/\D/g, ''),
+              fn: guestInfo.firstName,
+              ln: guestInfo.lastName,
+            }
+          });
+
+          console.log('✅ Purchase event fired via webhook');
+        }
+      } catch (error) {
+        console.error('❌ Webhook booking failed:', error.message);
+      }
+    }
+  }
+
+  res.json({received: true});
+});
+
 
 app.post('/api/create-payment-intent', async (req, res) => {
-    const { amount } = req.body;
-    const amountInCents = Math.round(amount * 100);
+  const { amount, bookingDetails, guestInfo, hotelId } = req.body;
 
-    if (typeof amount !== 'number' || amount <= 0) {
-        return res.status(400).send({ error: { message: "Invalid amount provided." } });
-    }
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        bookingDetails: JSON.stringify(bookingDetails),
+        guestInfo: JSON.stringify(guestInfo),
+        hotelId: hotelId
+      }
+    });
 
-    try {
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: amountInCents,
-            currency: 'usd',
-            // ✅ Only "card" and optionally "link" here
-            // Wallets like Apple Pay and Google Pay are automatically included under "card"
-            automatic_payment_methods: {
-                enabled: true,
-            },
-            // Remove payment_method_types when using automatic_payment_methods
-        });
-        res.send({ clientSecret: paymentIntent.client_secret });
-    } catch (error) {
-        console.error("Stripe API Error creating payment intent:", error.message);
-        res.status(400).send({ error: { message: error.message || "Failed to create payment intent due to an API error." } });
-    }
+    res.send({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    console.error("Stripe API Error:", error.message);
+    res.status(400).send({ error: { message: error.message } });
+  }
 });
 
 
