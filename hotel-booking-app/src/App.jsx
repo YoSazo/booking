@@ -199,10 +199,16 @@ function App() {
   // Wait for client secret before navigating
   try {
     const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
-    });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    amount: newBooking.subtotal / 2,
+    bookingDetails: newBooking,
+    guestInfo: formData,  // You'll need to pass this
+    hotelId: hotelId
+  }),
+});
+
     const data = await response.json();
     if (data.clientSecret) {
       setClientSecret(data.clientSecret);
