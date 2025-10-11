@@ -19,17 +19,36 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   }, [isOpen, initialCheckin, initialCheckout]);
 
   const handleDayClick = (day) => {
-    if (!startDate || (startDate && endDate)) {
-      setStartDate(day);
-      setEndDate(null);
-    } else if (day > startDate) {
-      setEndDate(day);
-    } else {
-      setStartDate(day);
-      setEndDate(null);
+    // If no dates are selected yet, set start date
+    if (!startDate) {
+        setStartDate(day);
+        setEndDate(null);
+        return;
     }
-    setUpsellDeclined(false);
-  };
+    
+    // If only start date is set
+    if (startDate && !endDate) {
+        // If they click a date after start, set it as end
+        if (day > startDate) {
+            setEndDate(day);
+        } 
+        // If they click the same date or earlier, reset and make it the new start
+        else {
+            setStartDate(day);
+            setEndDate(null);
+        }
+        setUpsellDeclined(false);
+        return;
+    }
+    
+    // If both dates are already set, reset and start over
+    if (startDate && endDate) {
+        setStartDate(day);
+        setEndDate(null);
+        setUpsellDeclined(false);
+        return;
+    }
+};
   
   const handleDone = () => {
     if (startDate && endDate) {
