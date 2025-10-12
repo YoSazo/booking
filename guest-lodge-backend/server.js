@@ -171,20 +171,29 @@ app.post('/api/stripe-webhook', async (req, res) => {
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the payment_intent.succeeded event
     if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
         console.log('💰 Payment succeeded via webhook:', paymentIntent.id);
 
-        // Extract booking data from metadata
-        const metadata = paymentIntent.metadata;
-        if (metadata.bookingDetails && metadata.guestInfo) {
-            const bookingDetails = JSON.parse(metadata.bookingDetails);
-            const guestInfo = JSON.parse(metadata.guestInfo);
-            const hotelId = metadata.hotelId;
+        // Check if booking already exists in our database
+        try {
+            const existingBooking = await prisma.booking.findFirst({
+                where: { stripePaymentIntentId: paymentIntent.id }
+            });
 
-            // Call your booking logic
-            try {
+            if (existingBooking) {
+                console.log('✅ Booking already handled by frontend:', existingBooking.pmsConfirmationCode);
+                return res.json({received: true});
+            }
+
+            // If NOT handled by frontend, webhook creates it as backup
+            const metadata = paymentIntent.metadata;
+            if (metadata.bookingDetails && metadata.guestInfo) {
+                console.log('⚠️ Frontend booking failed, webhook creating backup booking...');
+                
+                const bookingDetails = JSON.parse(metadata.bookingDetails);
+                const guestInfo = JSON.parse(metadata.guestInfo);
+                
                 const reservationData = {
                     propertyID: PROPERTY_ID,
                     startDate: bookingDetails.checkin.split('T')[0],
@@ -212,7 +221,6 @@ app.post('/api/stripe-webhook', async (req, res) => {
                     }]),
                 };
 
-                // Create booking in Cloudbeds
                 const pmsResponse = await axios.post(
                     'https://api.cloudbeds.com/api/v1.3/postReservation',
                     new URLSearchParams(reservationData),
@@ -226,70 +234,36 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 );
 
                 if (pmsResponse.data.success) {
-                    console.log('✅ Booking created via webhook:', pmsResponse.data.reservationID);
+                    console.log('✅ Backup booking created via webhook:', pmsResponse.data.reservationID);
                     
-                    // Fire Purchase event
-                    await axios.post(process.env.ZAPIER_PURCHASE_URL, {
-                        event_name: 'Purchase',
-                        value: bookingDetails.total,
-                        currency: 'USD',
-                        event_id: pmsResponse.data.reservationID,
-                        user_data: {
-                            em: guestInfo.email,
-                            ph: guestInfo.phone.replace(/\D/g, ''),
-                            fn: guestInfo.firstName,
-                            ln: guestInfo.lastName,
+                    // Save to database
+                    await prisma.booking.create({
+                        data: {
+                            stripePaymentIntentId: paymentIntent.id,
+                            ourReservationCode: bookingDetails.reservationCode,
+                            pmsConfirmationCode: pmsResponse.data.reservationID,
+                            hotelId: metadata.hotelId,
+                            roomName: bookingDetails.roomName,
+                            checkinDate: new Date(bookingDetails.checkin),
+                            checkoutDate: new Date(bookingDetails.checkout),
+                            nights: bookingDetails.nights,
+                            guestFirstName: guestInfo.firstName,
+                            guestLastName: guestInfo.lastName,
+                            guestEmail: guestInfo.email,
+                            guestPhone: guestInfo.phone,
+                            subtotal: bookingDetails.subtotal,
+                            taxesAndFees: bookingDetails.taxes,
+                            grandTotal: bookingDetails.total
                         }
                     });
-                    console.log('✅ Purchase event fired via webhook');
                 }
-            } catch (error) {
-                console.error('❌ Webhook booking failed:', error.message);
             }
+        } catch (error) {
+            console.error('❌ Webhook error:', error.message);
         }
     }
 
     res.json({received: true});
-});
-
-
-// --- API ENDPOINTS ---
-app.post('/api/availability', async (req, res) => {
-    const { hotelId, checkin, checkout } = req.body;
-    if (hotelId !== 'home-place-suites') {
-        return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
-    }
-    const nights = Math.round((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24));
-    const ratePlanType = getBestRatePlan(nights);
-
-    try {
-        const availabilityPromises = Object.entries(roomIDMapping).map(async ([roomName, ids]) => {
-            const currentRateID = ids.rates[ratePlanType];
-            const url = `https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${PROPERTY_ID}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${ids.roomTypeID}`;
-            
-            const response = await axios.get(url, {
-                headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
-            });
-            
-            const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
-
-            return {
-                roomName: roomName,
-                available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
-                roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
-                totalRate: specificRatePlan ? specificRatePlan.totalRate : null,
-                rateID: currentRateID,
-                roomTypeID: ids.roomTypeID
-            };
-        });
-
-        const availableRooms = await Promise.all(availabilityPromises);
-        res.json({ success: true, data: availableRooms.filter(room => room.available) });
-
-    } catch (error) {
-        console.error("Error fetching availability from Cloudbeds:", error.response?.data || error.message);
-        res.status(500).json({ success: false, message: 'Failed to fetch availability.' });
-    }
 });
 
 app.post('/api/book', async (req, res) => {
