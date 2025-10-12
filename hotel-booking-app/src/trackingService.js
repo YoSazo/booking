@@ -1,20 +1,29 @@
 // Track which events have fired this session
-const sessionEvents = {
-  PageView: false,
-  Search: false,
-  AddToCart: false,
-  InitiateCheckout: false,
-  AddPaymentInfo: false,
-  Purchase: false
+const getSessionEvents = () => {
+  const stored = sessionStorage.getItem('firedEvents');
+  return stored ? JSON.parse(stored) : {
+    PageView: false,
+    Search: false,
+    AddToCart: false,
+    InitiateCheckout: false,
+    AddPaymentInfo: false,
+    Purchase: false
+  };
 };
 
-// Helper to check if event should fire
+const saveSessionEvent = (eventName) => {
+  const events = getSessionEvents();
+  events[eventName] = true;
+  sessionStorage.setItem('firedEvents', JSON.stringify(events));
+};
+
 const shouldFireEvent = (eventName) => {
-  if (sessionEvents[eventName]) {
+  const events = getSessionEvents();
+  if (events[eventName]) {
     console.log(`⚠️ ${eventName} already fired this session - skipping`);
     return false;
   }
-  sessionEvents[eventName] = true;
+  saveSessionEvent(eventName);
   return true;
 };
 
