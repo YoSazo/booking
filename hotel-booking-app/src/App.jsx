@@ -238,17 +238,47 @@ function App() {
 
 
 
-  // hotel-booking-app/src/App.jsx
+  const handleCompleteBooking = async (formData, paymentIntentId) => {
+    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
+      const newReservationCode = generateReservationCode();
+      setGuestInfo(formData);
+      setReservationCode(newReservationCode);
+      trackPurchase(finalBooking, formData, newReservationCode);
+      navigate('/final-confirmation');
+      window.scrollTo(0, 0);
+      return;
+    }
 
-const handleCompleteBooking = async (formData, paymentIntentId) => {
-  // The 'async' keyword is restored to prevent rendering issues.
-  
-  // The webhook handles the booking, so we just navigate the user.
-  setGuestInfo(formData);
-  setReservationCode(paymentIntentId); // Use paymentIntentId as a temporary code
-  
-  navigate('/confirmation');
-  window.scrollTo(0, 0);
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/book`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotelId,
+          bookingDetails: finalBooking,
+          guestInfo: formData,
+          paymentIntentId,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setGuestInfo(formData);
+        setReservationCode(result.reservationCode); 
+        setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationCode }));
+        trackPurchase(finalBooking, formData, result.reservationCode);
+        navigate('/final-confirmation');
+        window.scrollTo(0, 0);
+      } else {
+        alert('Booking failed: ' + (result.message || 'An unknown error occurred.'));
+      }
+    } catch (error) {
+      console.error('Failed to create booking:', error);
+      alert('Could not connect to the booking server to finalize your reservation.');
+    }
+    setIsLoading(false);
 };
 
   const handleGuestCountChange = (newGuestCount) => {
