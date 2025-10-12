@@ -464,6 +464,7 @@ useEffect(() => {
         // --- END OF VALIDATION BLOCK ---
 
         // If validation passes, clear any previous errors and show the wallet.
+        setIsProcessing(true);
         setErrorMessage('');
 
         try {
