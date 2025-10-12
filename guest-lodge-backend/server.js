@@ -230,7 +230,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.data.reservationID,
                         hotelId: hotelId,
-                        roomName: bookingDetails.name,
+                        roomName: bookingDetails.name || bookingDetails.roomName,
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,
