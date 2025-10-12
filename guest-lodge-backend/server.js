@@ -137,6 +137,27 @@ app.post('/api/create-payment-intent', async (req, res) => {
     }
 });
 
+app.post('/api/update-payment-intent', async (req, res) => {
+  const { clientSecret, guestInfo } = req.body;
+
+  // The clientSecret contains the Payment Intent ID
+  const paymentIntentId = clientSecret.split('_secret')[0];
+
+  try {
+    await stripe.paymentIntents.update(paymentIntentId, {
+      metadata: {
+        // We only need to update the guestInfo, the bookingDetails are already there
+        guestInfo: JSON.stringify(guestInfo)
+      }
+    });
+    res.send({ success: true });
+  } catch (error) {
+    console.error("Failed to update payment intent:", error.message);
+    res.status(400).send({ success: false, error: { message: error.message } });
+  }
+});
+
+
 
 app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -268,85 +289,6 @@ app.post('/api/availability', async (req, res) => {
     } catch (error) {
         console.error("Error fetching availability from Cloudbeds:", error.response?.data || error.message);
         res.status(500).json({ success: false, message: 'Failed to fetch availability.' });
-    }
-});
-
-
-app.post('/api/book', async (req, res) => {
-    const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
-    if (hotelId !== 'home-place-suites') {
-         return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
-    }
-    if (!bookingDetails.rateID) {
-        return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
-    }
-    const reservationData = {
-        propertyID: PROPERTY_ID,
-        startDate: bookingDetails.checkin.split('T')[0],
-        endDate: bookingDetails.checkout.split('T')[0],
-        guestFirstName: guestInfo.firstName,
-        guestLastName: guestInfo.lastName,
-        guestCountry: 'US',
-        guestZip: guestInfo.zip,
-        guestEmail: guestInfo.email,
-        guestPhone: guestInfo.phone,
-        paymentMethod: "cash",
-        sendEmailConfirmation: "true",
-        rooms: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 1, roomRateID: bookingDetails.rateID }]),
-        adults: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: bookingDetails.guests }]),
-        children: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 0 }]),
-    };
-
-    try {
-        // Step 1: Make the reservation with the PMS (Cloudbeds)
-        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
-            headers: {
-                'accept': 'application/json',
-                'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
-                'content-type': 'application/x-www-form-urlencoded',
-            }
-        });
-
-        if (pmsResponse.data.success) {
-            // Step 2: If PMS booking is successful, save a record to OUR database
-            try {
-                const newBooking = await prisma.booking.create({
-                    data: {
-                        stripePaymentIntentId: paymentIntentId,
-                        ourReservationCode: bookingDetails.reservationCode, // The code from the frontend
-                        pmsConfirmationCode: pmsResponse.data.reservationID, // The REAL code from Cloudbeds
-                        hotelId: hotelId,
-                        roomName: bookingDetails.name,
-                        checkinDate: new Date(bookingDetails.checkin),
-                        checkoutDate: new Date(bookingDetails.checkout),
-                        nights: bookingDetails.nights,
-                        guestFirstName: guestInfo.firstName,
-                        guestLastName: guestInfo.lastName,
-                        guestEmail: guestInfo.email,
-                        guestPhone: guestInfo.phone,
-                        subtotal: bookingDetails.subtotal,
-                        taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total
-                    }
-                });
-                console.log('Successfully saved booking to our database:', newBooking.id);
-            } catch (dbError) {
-                // IMPORTANT: Log if our database fails, but don't fail the whole request
-                console.error("CRITICAL: Failed to save confirmed booking to our database.", dbError);
-            }
-        }
-        
-        // Step 3: Fosrward the original success response from the PMS to the frontend
-        res.json({
-            success: pmsResponse.data.success,
-            message: pmsResponse.data.success ? 'Reservation created successfully.' : pmsResponse.data.message,
-            reservationCode: pmsResponse.data.reservationID,
-            pmsResponse: pmsResponse.data // Keep original response for debug/future use
-        });
-
-    } catch (error) {
-        console.error("Error creating reservation with Cloudbeds:", error.response?.data || error.message);
-        res.status(500).json({ success: false, message: 'Failed to create reservation.' });
     }
 });
 

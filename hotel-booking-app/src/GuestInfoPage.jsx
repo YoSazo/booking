@@ -408,6 +408,23 @@ useEffect(() => {
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(formData));
 
+        try {
+      const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
+      });
+      const updateData = await updateRes.json();
+      if (!updateData.success) {
+        throw new Error('Failed to update payment details.');
+      }
+    } catch (updateError) {
+      setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
+      setIsProcessing(false);
+      return;
+    }
+
+
         const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
             payment_method: {
                 card: elements.getElement(CardNumberElement),
@@ -448,6 +465,22 @@ useEffect(() => {
 
         // If validation passes, clear any previous errors and show the wallet.
         setErrorMessage('');
+
+        try {
+      const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
+      });
+      const updateData = await updateRes.json();
+      if (!updateData.success) {
+        throw new Error('Failed to update payment details.');
+      }
+    } catch (updateError) {
+      setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
+      setIsProcessing(false); // Re-enable button on failure
+      return;
+    }
         if (paymentRequest) {
         // --- ADD THIS LINE ---
         // This ensures the wallet always has the latest user info.
