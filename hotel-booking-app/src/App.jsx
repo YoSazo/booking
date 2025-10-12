@@ -238,63 +238,22 @@ function App() {
 
 
 
-  const handleCompleteBooking = async (formData, paymentIntentId) => {
-    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
-      const newReservationCode = generateReservationCode();
-      setGuestInfo(formData);
-      setReservationCode(newReservationCode);
-      trackPurchase(finalBooking, formData, newReservationCode);
-      navigate('/confirmation');
-      window.scrollTo(0, 0);
-      return;
-    }
+  const handleCompleteBooking = (formData, paymentIntentId) => {
+  // The webhook now handles the entire booking process.
+  // This function's only job is to get the user to the confirmation page.
 
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/book`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hotelId,
-          bookingDetails: finalBooking,
-          guestInfo: formData,
-          paymentIntentId,
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        setGuestInfo(formData);
-        // --- START FIX 2C ---
-        // Capture the final reservation code from the server's response
-        setReservationCode(result.reservationCode); 
-        // Update the finalBooking object with the PMS code for storage/session
-        setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationCode }));
-        trackPurchase(finalBooking, formData, result.reservationCode);
-        // --- END FIX 2C ---
-        navigate('/final-confirmation');
-        window.scrollTo(0, 0);
-      } else {
-        alert('Booking failed: ' + (result.message || 'An unknown error occurred.'));
-      }
-    } catch (error) {
-      console.error('Failed to create booking:', error);
-      alert('Could not connect to the booking server to finalize your reservation.');
-    }
-    setIsLoading(false);
-  };
+  setGuestInfo(formData);
+  
+  // We use the paymentIntentId as a temporary reference. 
+  // The webhook will create the real booking with the official reservation ID from Cloudbeds.
+  setReservationCode(paymentIntentId); 
+  
+  // Navigate to the final confirmation page.
+  navigate('/confirmation'); 
+  window.scrollTo(0, 0);
 
-  const handleGuestCountChange = (newGuestCount) => {
-    if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });
-  };
-  const handlePetCountChange = (newPetCount) => {
-    if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount });
-  };
-  const handleOpenLightbox = (images, startIndex = 0) => {
-    setLightboxData({ images, startIndex });
-  };
-  const handleCloseLightbox = () => {
-    setLightboxData(null);
-  };
+  // No more API calls from here!
+};
 
   return (
     <>
