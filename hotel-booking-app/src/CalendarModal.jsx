@@ -19,13 +19,17 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   }, [isOpen, initialCheckin, initialCheckout]);
 
   const handleDayClick = (day) => {
-
     console.log('Clicked day:', day);
     console.log('Current startDate:', startDate);
     console.log('Current endDate:', endDate);
+    
+    // Normalize the clicked day to midnight
+    const normalizedDay = new Date(day);
+    normalizedDay.setHours(0, 0, 0, 0);
+    
     // If no start date OR both dates are already set, reset to new start
     if (!startDate || (startDate && endDate)) {
-        setStartDate(day);
+        setStartDate(normalizedDay);
         setEndDate(null);
         setUpsellDeclined(false);
         return;
@@ -33,13 +37,17 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     
     // Only start date is set
     if (startDate && !endDate) {
-        if (day > startDate) {
+        // Normalize start date for comparison
+        const normalizedStart = new Date(startDate);
+        normalizedStart.setHours(0, 0, 0, 0);
+        
+        if (normalizedDay.getTime() > normalizedStart.getTime()) {
             // Set as end date
-            setEndDate(day);
+            setEndDate(normalizedDay);
             setUpsellDeclined(false);
         } else {
             // Clicking same or earlier date resets
-            setStartDate(day);
+            setStartDate(normalizedDay);
             setEndDate(null);
             setUpsellDeclined(false);
         }

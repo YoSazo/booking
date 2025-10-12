@@ -67,6 +67,7 @@ function App() {
 
   useEffect(() => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     setCheckinDate(today);
     setCheckoutDate(null);
     setAvailableRooms(currentHotel.rooms);
