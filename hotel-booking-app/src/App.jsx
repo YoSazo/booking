@@ -179,14 +179,29 @@ function App() {
 
   setFinalBooking(newBooking);
 
+  // ONLY send essential data to Stripe (strip out images, descriptions, etc.)
+  const stripeMetadata = {
+    roomTypeID: newBooking.roomTypeID,
+    rateID: newBooking.rateID,
+    roomName: newBooking.name,
+    checkin: newBooking.checkin.toISOString(),
+    checkout: newBooking.checkout.toISOString(),
+    nights: newBooking.nights,
+    guests: newBooking.guests,
+    subtotal: newBooking.subtotal,
+    taxes: newBooking.taxes,
+    total: newBooking.total,
+    reservationCode: ourReservationCode
+  };
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         amount: newBooking.subtotal / 2,
-        bookingDetails: newBooking,
-        guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' }, // Will be filled later
+        bookingDetails: stripeMetadata, // ← Use stripped-down version
+        guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
         hotelId: hotelId
       }),
     });
