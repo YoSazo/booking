@@ -292,6 +292,83 @@ app.post('/api/availability', async (req, res) => {
     }
 });
 
+app.post('/api/book', async (req, res) => {
+    const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
+    
+    if (hotelId !== 'home-place-suites') {
+         return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
+    }
+    
+    if (!bookingDetails.rateID) {
+        return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
+    }
+    
+    const reservationData = {
+        propertyID: PROPERTY_ID,
+        startDate: bookingDetails.checkin.split('T')[0],
+        endDate: bookingDetails.checkout.split('T')[0],
+        guestFirstName: guestInfo.firstName,
+        guestLastName: guestInfo.lastName,
+        guestCountry: 'US',
+        guestZip: guestInfo.zip,
+        guestEmail: guestInfo.email,
+        guestPhone: guestInfo.phone,
+        paymentMethod: "cash",
+        sendEmailConfirmation: "true",
+        rooms: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 1, roomRateID: bookingDetails.rateID }]),
+        adults: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: bookingDetails.guests }]),
+        children: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 0 }]),
+    };
+
+    try {
+        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
+            headers: {
+                'accept': 'application/json',
+                'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
+                'content-type': 'application/x-www-form-urlencoded',
+            }
+        });
+
+        if (pmsResponse.data.success) {
+            // Save to database
+            try {
+                await prisma.booking.create({
+                    data: {
+                        stripePaymentIntentId: paymentIntentId,
+                        ourReservationCode: bookingDetails.reservationCode,
+                        pmsConfirmationCode: pmsResponse.data.reservationID,
+                        hotelId: hotelId,
+                        roomName: bookingDetails.roomName,
+                        checkinDate: new Date(bookingDetails.checkin),
+                        checkoutDate: new Date(bookingDetails.checkout),
+                        nights: bookingDetails.nights,
+                        guestFirstName: guestInfo.firstName,
+                        guestLastName: guestInfo.lastName,
+                        guestEmail: guestInfo.email,
+                        guestPhone: guestInfo.phone,
+                        subtotal: bookingDetails.subtotal,
+                        taxesAndFees: bookingDetails.taxes,
+                        grandTotal: bookingDetails.total
+                    }
+                });
+            } catch (dbError) {
+                console.error("Failed to save to database:", dbError);
+            }
+        }
+        
+        res.json({
+            success: pmsResponse.data.success,
+            message: pmsResponse.data.success ? 'Reservation created successfully.' : pmsResponse.data.message,
+            reservationCode: pmsResponse.data.reservationID,
+            pmsResponse: pmsResponse.data
+        });
+
+    } catch (error) {
+        console.error("Error creating reservation:", error.response?.data || error.message);
+        res.status(500).json({ success: false, message: 'Failed to create reservation.' });
+    }
+});
+
 
 app.post('/api/track', async (req, res) => {
     let body;
