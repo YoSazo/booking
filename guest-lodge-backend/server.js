@@ -10,7 +10,7 @@ const app = express();
 const prisma = new PrismaClient();
 
 const allowedOrigins = [
-    'https://myhomeplacesuites.com',      // Alloow the non-www version
+    'https://myhomeplacesuites.com',      // Alloow the non-wwww version
     'https://www.myhomeplacesuites.com', // Allow the www version
     'http://localhost:3000'            // Allow local development
 ];
