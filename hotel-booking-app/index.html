@@ -6,7 +6,29 @@
     <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Home Place Suites</title>
+    <script>
+(function() {
+  // Get fbclid from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const fbclid = urlParams.get('fbclid');
+  
+  if (fbclid) {
+    // Immediately create _fbc cookie
+    const timestamp = Date.now();
+    const fbc = 'fb.1.' + timestamp + '.' + fbclid;
     
+    // Set cookie for 90 days
+    const expires = new Date(timestamp + 90 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = '_fbc=' + fbc + '; expires=' + expires + '; path=/; domain=' + location.hostname.replace(/^www\./, '.');
+    
+    // Also store in sessionStorage as backup
+    sessionStorage.setItem('fbclid', fbclid);
+    sessionStorage.setItem('_fbc', fbc);
+    
+    console.log('✅ Captured fbclid:', fbclid);
+  }
+})();
+</script>
     <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KJ3720RFZH"></script>
 <script>
@@ -15,6 +37,8 @@
   gtag('js', new Date());
 
   gtag('config', 'G-KJ3720RFZH');
+
+
 </script>
     <!-- Meta Pixel Code -->
     <script>
