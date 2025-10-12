@@ -177,14 +177,19 @@ app.post('/api/stripe-webhook', async (req, res) => {
         console.log('💰 Payment succeeded via webhook:', paymentIntent.id);
 
         try {
-            // First, check if the frontend already created this booking record.
+            // --- THIS IS THE CRUCIAL FIX ---
+            // Wait for 5 seconds to give the frontend API call a head start to finish.
+            console.log('Webhook is pausing for 5 seconds to allow frontend to complete...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Now, check if the frontend already created the booking record.
             const existingBooking = await prisma.booking.findUnique({
                 where: { stripePaymentIntentId: paymentIntent.id }
             });
 
             if (existingBooking) {
-                // If it exists, the job is done. Stop here.
-                console.log('✅ Booking already handled by frontend. Webhook signing off.');
+                // If the record exists, the frontend was successful. Our job is done.
+                console.log('✅ Frontend call was successful. Webhook signing off. No duplicates created.');
                 return res.json({ received: true });
             }
 
