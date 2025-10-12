@@ -238,22 +238,17 @@ function App() {
 
 
 
-  const handleCompleteBooking = (formData, paymentIntentId) => {
-  // The webhook now handles the entire booking process.
-  // This function's only job is to get the user to the confirmation page.
-
+  const handleCompleteBooking = async (formData, paymentIntentId) => {
+  // The 'async' keyword is restored to prevent rendering issues.
+  
+  // The webhook handles the booking, so we just navigate the user.
   setGuestInfo(formData);
+  setReservationCode(paymentIntentId); // Use paymentIntentId as a temporary code
   
-  // We use the paymentIntentId as a temporary reference. 
-  // The webhook will create the real booking with the official reservation ID from Cloudbeds.
-  setReservationCode(paymentIntentId); 
-  
-  // Navigate to the final confirmation page.
-  navigate('/confirmation'); 
+  navigate('/confirmation');
   window.scrollTo(0, 0);
-
-  // No more API calls from here!
 };
+
 
   return (
     <>
