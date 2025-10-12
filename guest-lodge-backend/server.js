@@ -305,8 +305,8 @@ app.post('/api/book', async (req, res) => {
     
     const reservationData = {
         propertyID: PROPERTY_ID,
-        startDate: bookingDetails.checkin.split('T')[0],
-        endDate: bookingDetails.checkout.split('T')[0],
+        startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
+        endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
         guestFirstName: guestInfo.firstName,
         guestLastName: guestInfo.lastName,
         guestCountry: 'US',
@@ -315,9 +315,19 @@ app.post('/api/book', async (req, res) => {
         guestPhone: guestInfo.phone,
         paymentMethod: "cash",
         sendEmailConfirmation: "true",
-        rooms: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 1, roomRateID: bookingDetails.rateID }]),
-        adults: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: bookingDetails.guests }]),
-        children: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 0 }]),
+        rooms: JSON.stringify([{ 
+            roomTypeID: bookingDetails.roomTypeID, 
+            quantity: 1, 
+            roomRateID: bookingDetails.rateID 
+        }]),
+        adults: JSON.stringify([{ 
+            roomTypeID: bookingDetails.roomTypeID, 
+            quantity: bookingDetails.guests 
+        }]),
+        children: JSON.stringify([{ 
+            roomTypeID: bookingDetails.roomTypeID, 
+            quantity: 0 
+        }]),
     };
 
     try {
@@ -338,7 +348,7 @@ app.post('/api/book', async (req, res) => {
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.data.reservationID,
                         hotelId: hotelId,
-                        roomName: bookingDetails.roomName,
+                        roomName: bookingDetails.name || bookingDetails.roomName, // ← FIXED
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,
