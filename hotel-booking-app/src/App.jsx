@@ -238,7 +238,9 @@ function App() {
 
 
 
-  const handleCompleteBooking = async (formData, paymentIntentId) => {
+  // hotel-booking-app/src/App.jsx
+
+const handleCompleteBooking = async (formData, paymentIntentId) => {
   // The 'async' keyword is restored to prevent rendering issues.
   
   // The webhook handles the booking, so we just navigate the user.
@@ -249,6 +251,18 @@ function App() {
   window.scrollTo(0, 0);
 };
 
+  const handleGuestCountChange = (newGuestCount) => {
+    if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });
+  };
+  const handlePetCountChange = (newPetCount) => {
+    if (selectedRoom) setSelectedRoom({ ...selectedRoom, pets: newPetCount });
+  };
+  const handleOpenLightbox = (images, startIndex = 0) => {
+    setLightboxData({ images, startIndex });
+  };
+  const handleCloseLightbox = () => {
+    setLightboxData(null);
+  };
 
   return (
     <>
