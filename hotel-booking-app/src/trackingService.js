@@ -1,3 +1,23 @@
+// Track which events have fired this session
+const sessionEvents = {
+  PageView: false,
+  Search: false,
+  AddToCart: false,
+  InitiateCheckout: false,
+  AddPaymentInfo: false,
+  Purchase: false
+};
+
+// Helper to check if event should fire
+const shouldFireEvent = (eventName) => {
+  if (sessionEvents[eventName]) {
+    console.log(`⚠️ ${eventName} already fired this session - skipping`);
+    return false;
+  }
+  sessionEvents[eventName] = true;
+  return true;
+};
+
 // hotel-booking-app/src/trackingService.js
 
 // --- 1. ADD HELPER FUNCTIONS AT THE TOP ---
@@ -49,16 +69,28 @@ const ZAPIER_WEBHOOKS = {
 };
 
 const sendEventToServer = (eventName, payload) => {
+    // Try multiple sources for fbc
+    let fbc = getCookie('_fbc') || sessionStorage.getItem('_fbc');
+    
+    // If still missing, try to reconstruct from fbclid
+    if (!fbc) {
+        const fbclid = sessionStorage.getItem('fbclid');
+        if (fbclid) {
+            fbc = `fb.1.${Date.now()}.${fbclid}`;
+            // Try to set cookie again
+            setCookie('_fbc', fbc, 90);
+        }
+    }
+    
     const fullPayload = {
         event_name: eventName,
         event_source_url: window.location.href,
-        fbc: getCookie('_fbc'),
+        fbc: fbc,
         fbp: getCookie('_fbp'),
         ...payload,
-        // Ensure the user_data object exists and add the external_id to it
         user_data: { 
             ...payload.user_data,
-            external_id: getExternalId(), // <-- ADD THE EXTERNAL ID HERE
+            external_id: getExternalId(),
         }
     };
 
@@ -72,18 +104,18 @@ const sendEventToServer = (eventName, payload) => {
             keepalive: true,
         });
     }
-    console.log(`Sent ${eventName} event to our backend:`, fullPayload);
+    console.log(`Sent ${eventName} event:`, fullPayload);
 };
+
 
 
 // --- 3. (RECOMMENDED) ADD A PageView EVENT ---
 // This ensures the external_id is created as soon as a user lands on your site.
 
 export const trackPageView = () => {
+    if (!shouldFireEvent('PageView')) return;
     const eventID = `pageview.${Date.now()}`;
     sendEventToServer('PageView', { event_id: eventID });
-    
-    // We can just call our smart function. It handles the external_id for us.
     sendEventToPixel('PageView', {}, eventID); 
 };
 
@@ -113,6 +145,7 @@ const sendEventToPixel = (pixelEventName, payload, eventID) => {
 };
 
 export const trackSearch = (checkinDate, checkoutDate) => {
+    if (!shouldFireEvent('Search')) return;
     const eventID = `search.${Date.now()}`;
     const searchData = {
         checkin_date: checkinDate.toISOString().split('T')[0],
@@ -123,6 +156,7 @@ export const trackSearch = (checkinDate, checkoutDate) => {
 };
 
 export const trackAddToCart = (bookingDetails) => {
+    if (!shouldFireEvent('AddToCart')) return;
     const eventID = `addtocart.${Date.now()}`;
     const cartData = {
         value: bookingDetails.subtotal,
@@ -136,6 +170,7 @@ export const trackAddToCart = (bookingDetails) => {
 };
 
 export const trackInitiateCheckout = (bookingDetails) => {
+    if (!shouldFireEvent('InitiateCheckout')) return;
     const eventID = `initiatecheckout.${Date.now()}`;
     const checkoutData = {
         value: bookingDetails.subtotal,
@@ -148,6 +183,7 @@ export const trackInitiateCheckout = (bookingDetails) => {
 };
 
 export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
+    if (!shouldFireEvent('AddPaymentInfo')) return;
     const eventID = `addpaymentinfo.${Date.now()}`;
     const pixelPayload = {
         value: bookingDetails.subtotal,
@@ -171,13 +207,11 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
 
 
 export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
+    if (!shouldFireEvent('Purchase')) return;
     const eventID = reservationCode;
-    const pixelPayload = {
+    const serverPayload = {
         value: bookingDetails.total,
         currency: 'USD',
-    };
-    const serverPayload = {
-        ...pixelPayload,
         event_id: eventID,
         user_data: {
             em: guestInfo.email,
@@ -192,6 +226,8 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
             },
         }
     };
-    sendEventToPixel('Purchase', pixelPayload, eventID);
+    
+    // ONLY send to server - not browser pixel (prevents duplicate)
     sendEventToServer('Purchase', serverPayload);
+    console.log('Purchase event sent server-side only with event_id:', eventID);
 };
