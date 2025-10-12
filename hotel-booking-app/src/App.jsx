@@ -150,27 +150,12 @@ function App() {
   };
 
   const handleConfirmBooking = async (bookingDetails) => {
-  // First, check if a room has been selected.
   if (!selectedRoom) {
     alert("Please select a room first.");
-    return; // This stops the function if no room is selected.
+    return;
   }
 
-  // If a room *is* selected, we proceed...
-  setIsProcessingBooking(true); //  <-- This will now be called!
-
-  try {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            navigate('/guest-info');
-
-        } catch (error) {
-            console.error("Error during booking confirmation:", error);
-            setIsProcessingBooking(false);
-        }
-
-
-
-  
+  setIsProcessingBooking(true);
 
   const nights = checkinDate && checkoutDate
     ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
@@ -180,7 +165,6 @@ function App() {
   const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
   const total = selectedRoom.grandTotal || subtotal + taxes;
   const ourReservationCode = generateReservationCode();
-
 
   const newBooking = {
     ...selectedRoom,
@@ -193,25 +177,29 @@ function App() {
     reservationCode: ourReservationCode,
   };
 
-  // Optional: Keep setFinalBooking for sessionStorage persistence
   setFinalBooking(newBooking);
 
-  // Wait for client secret before navigating
   try {
     const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: newBooking.subtotal / 2 }),
+      body: JSON.stringify({ 
+        amount: newBooking.subtotal / 2,
+        bookingDetails: newBooking,
+        guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' }, // Will be filled later
+        hotelId: hotelId
+      }),
     });
+    
     const data = await response.json();
+    
     if (data.clientSecret) {
       setClientSecret(data.clientSecret);
-      // Pass booking data directly in navigate
       navigate('/guest-info', {
         state: {
           room: {
             name: selectedRoom.name,
-            beds: selectedRoom.beds || 'N/A', // Ensure beds is defined
+            beds: selectedRoom.beds || 'N/A',
           },
           totalPrice: total,
           searchParams: {
@@ -222,13 +210,14 @@ function App() {
           },
         },
       });
-      window.scrollTo(0, 0);
     } else {
       alert("Failed to load payment form. Please try again.");
+      setIsProcessingBooking(false);
     }
   } catch (error) {
     console.error("Failed to pre-fetch client secret:", error);
     alert("Failed to load payment form. Please try again.");
+    setIsProcessingBooking(false);
   }
 };
 
