@@ -116,6 +116,15 @@ const sendEventToServer = (eventName, payload) => {
     console.log(`Sent ${eventName} event:`, fullPayload);
 };
 
+// Send events to Google Analytics 4
+const sendEventToGA4 = (eventName, payload) => {
+    if (typeof gtag === 'function') {
+        gtag('event', eventName, payload);
+        console.log(`Sent ${eventName} GA4 event:`, payload);
+    } else {
+        console.warn('gtag (Google Analytics) function not found.');
+    }
+};
 
 
 // --- 3. (RECOMMENDED) ADD A PageView EVENT ---
@@ -126,6 +135,11 @@ export const trackPageView = () => {
     const eventID = `pageview.${Date.now()}`;
     sendEventToServer('PageView', { event_id: eventID });
     sendEventToPixel('PageView', {}, eventID); 
+
+    sendEventToGA4('page_view', {
+        page_location: window.location.href,
+        page_title: document.title
+    });
 };
 
 
@@ -162,6 +176,12 @@ export const trackSearch = (checkinDate, checkoutDate) => {
     };
     sendEventToPixel('Search', searchData, eventID);
     sendEventToServer('Search', { ...searchData, event_id: eventID });
+
+    sendEventToGA4('search', {
+        search_term: `${searchData.checkin_date} to ${searchData.checkout_date}`,
+        checkin_date: searchData.checkin_date,
+        checkout_date: searchData.checkout_date
+    });
 };
 
 export const trackAddToCart = (bookingDetails) => {
@@ -176,6 +196,17 @@ export const trackAddToCart = (bookingDetails) => {
     };
     sendEventToPixel('AddToCart', cartData, eventID);
     sendEventToServer('AddToCart', { ...cartData, event_id: eventID });
+
+    sendEventToGA4('add_to_cart', {
+        currency: 'USD',
+        value: bookingDetails.subtotal,
+        items: [{
+            item_id: bookingDetails.id,
+            item_name: bookingDetails.name,
+            quantity: bookingDetails.guests,
+            price: bookingDetails.subtotal
+        }]
+    });
 };
 
 export const trackInitiateCheckout = (bookingDetails) => {
@@ -189,6 +220,17 @@ export const trackInitiateCheckout = (bookingDetails) => {
     };
     sendEventToPixel('InitiateCheckout', checkoutData, eventID);
     sendEventToServer('InitiateCheckout', { ...checkoutData, event_id: eventID });
+
+    sendEventToGA4('begin_checkout', {
+        currency: 'USD',
+        value: bookingDetails.subtotal,
+        items: [{
+            item_id: bookingDetails.id,
+            item_name: bookingDetails.name,
+            quantity: bookingDetails.guests,
+            price: bookingDetails.subtotal
+        }]
+    });
 };
 
 export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
@@ -212,6 +254,17 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
     };
     sendEventToPixel('AddPaymentInfo', pixelPayload, eventID);
     sendEventToServer('AddPaymentInfo', serverPayload);
+
+    sendEventToGA4('add_payment_info', {
+        currency: 'USD',
+        value: bookingDetails.subtotal,
+        items: [{
+            item_id: bookingDetails.id,
+            item_name: bookingDetails.name,
+            quantity: bookingDetails.guests,
+            price: bookingDetails.subtotal
+        }]
+    });
 };
 
 
@@ -239,4 +292,16 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     // ONLY send to server - not browser pixel (prevents duplicate)
     sendEventToServer('Purchase', serverPayload);
     console.log('Purchase event sent server-side only with event_id:', eventID);
+
+    sendEventToGA4('purchase', {
+        transaction_id: reservationCode,
+        value: bookingDetails.total,
+        currency: 'USD',
+        items: [{
+            item_id: bookingDetails.id,
+            item_name: bookingDetails.name,
+            quantity: bookingDetails.guests,
+            price: bookingDetails.subtotal
+        }]
+    });
 };
