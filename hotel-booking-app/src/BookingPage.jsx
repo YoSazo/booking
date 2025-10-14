@@ -43,13 +43,19 @@ function BookingPage({
   return (
     <>
       <div className="marquee-banner">
-        <div className="marquee-content">
-          <span>Only Pay 50% Today!</span>
-          <span>Only Pay 50% Today!</span>
-          <span>Only Pay 50% Today!</span>
-          <span>Only Pay 50% Today!</span>
-        </div>
-      </div>
+  <div className="marquee-content">
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+  </div>
+</div>
 
       <div className="container">
         <header className="header">
