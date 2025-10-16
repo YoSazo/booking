@@ -48,14 +48,11 @@ function ImageLightbox({ images, startIndex, onClose }) {
         
         <div className="lightbox-image-container">
           {/* We show a simple loader if the image isn't cached yet */}
-          {!isLoaded && <div className="loader"></div>}
           <img
-            src={images[currentIndex]}
-            alt={`Room image ${currentIndex + 1}`}
-            className={`lightbox-image ${isLoaded ? 'visible' : ''}`}
-            // This tells us when the image is fully loaded and ready to be shown
-            onLoad={() => setIsLoaded(true)} 
-          />
+  src={images[currentIndex]}
+  alt={`Room image ${currentIndex + 1}`}
+  className="lightbox-image"
+/>
         </div>
 
         <button className="lightbox-nav-btn next" onClick={goToNext}>&#10095;</button>
