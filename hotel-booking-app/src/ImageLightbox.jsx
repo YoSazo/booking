@@ -2,40 +2,30 @@ import React, { useState, useEffect } from 'react';
 
 function ImageLightbox({ images, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   // --- START: NEW PRELOADING LOGIC ---
   useEffect(() => {
-    // This effect runs whenever the current image changes.
-    // Its job is to secretly preload the next and previous images
-    // so they are ready to be displayed instantly.
-
-    // Preload the NEXT image
-    const nextIndex = (currentIndex + 1) % images.length;
-    const nextImage = new Image();
-    nextImage.src = images[nextIndex];
-
-    // Preload the PREVIOUS image
-    const prevIndex = (currentIndex - 1 + images.length) % images.length;
-    const prevImage = new Image();
-    prevImage.src = images[prevIndex];
-
-  }, [currentIndex, images]); // Re-run this logic when the image changes
+  images.forEach(src => {
+    const img = new Image();
+    img.src = src;
+  });
+}, [images]);
+ // Re-run this logic when the image changes
   // --- END: NEW PRELOADING LOGIC ---
 
   const goToPrevious = () => {
-    setIsLoaded(false); // Hide image briefly to show loading state for fast clicks
-    const isFirstImage = currentIndex === 0;
-    const newIndex = isFirstImage ? images.length - 1 : currentIndex - 1;
-    setCurrentIndex(newIndex);
-  };
+  const isFirstImage = currentIndex === 0;
+  const newIndex = isFirstImage ? images.length - 1 : currentIndex - 1;
+  setCurrentIndex(newIndex);
+};
+
 
   const goToNext = () => {
-    setIsLoaded(false);
-    const isLastImage = currentIndex === images.length - 1;
-    const newIndex = isLastImage ? 0 : currentIndex + 1;
-    setCurrentIndex(newIndex);
-  };
+  const isLastImage = currentIndex === images.length - 1;
+  const newIndex = isLastImage ? 0 : currentIndex + 1;
+  setCurrentIndex(newIndex);
+};
+
   
   // Handle keyboard navigation
   useEffect(() => {
