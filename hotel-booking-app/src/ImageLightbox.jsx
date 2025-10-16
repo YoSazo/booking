@@ -2,29 +2,36 @@ import React, { useState, useEffect } from 'react';
 
 function ImageLightbox({ images, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
+  const [loadedImages, setLoadedImages] = useState(new Set());
 
   // --- START: NEW PRELOADING LOGIC ---
   useEffect(() => {
-  images.forEach(src => {
-    const img = new Image();
-    img.src = src;
-  });
-}, [images]);
+    const newLoadedImages = new Set();
+    
+    images.forEach((src, index) => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        newLoadedImages.add(index);
+        setLoadedImages(new Set(newLoadedImages));
+      };
+    });
+  }, [images]);
  // Re-run this logic when the image changes
   // --- END: NEW PRELOADING LOGIC ---
 
   const goToPrevious = () => {
-  const isFirstImage = currentIndex === 0;
-  const newIndex = isFirstImage ? images.length - 1 : currentIndex - 1;
-  setCurrentIndex(newIndex);
-};
+    const isFirstImage = currentIndex === 0;
+    const newIndex = isFirstImage ? images.length - 1 : currentIndex - 1;
+    setCurrentIndex(newIndex);
+  };
 
 
   const goToNext = () => {
-  const isLastImage = currentIndex === images.length - 1;
-  const newIndex = isLastImage ? 0 : currentIndex + 1;
-  setCurrentIndex(newIndex);
-};
+    const isLastImage = currentIndex === images.length - 1;
+    const newIndex = isLastImage ? 0 : currentIndex + 1;
+    setCurrentIndex(newIndex);
+  };
 
   
   // Handle keyboard navigation
