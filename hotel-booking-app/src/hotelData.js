@@ -77,8 +77,11 @@ export const hotelData = {
     rooms: [
       { id: 1, name: 'Single King Room', roomTypeID: '117057244229790', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 4, imageUrls: [
             'kingbedbart.jpg',
+            'Bed-high.jpg',
             'IMG_4300.jpg',
+            'TV.jpg',
             'IMG_4325.jpg',
+            'reception.jpg',
             'Pool.jpg',
             'Outside.jpg',
             'Lobby.jpg',
@@ -87,7 +90,9 @@ export const hotelData = {
       { id: 2, name: 'Double Queen Room', roomTypeID: '116355544711397', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'twoqueenbart.jpg',
             'IMG_4300.jpg',
+            'TV.jpg',
             'IMG_4325.jpg',
+            'reception.jpg',
             'Pool.jpg',
             'Outside.jpg',
             'Lobby.jpg',
@@ -96,9 +101,12 @@ export const hotelData = {
 
       { id: 3, name: 'Double Queen Suite With Kitchenette', roomTypeID: '117068633694351', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds and a Kitchenette, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'double-kitchen.jpeg',
+            'Kitchen-front-view.jpg',
             'kitchen.jpeg',
+            'TV.jpg',
             'IMG_4300.jpg',
             'IMG_4325.jpg',
+            'reception.jpg',
             'Pool.jpg',
             'Outside.jpg',
             'Lobby.jpg',
