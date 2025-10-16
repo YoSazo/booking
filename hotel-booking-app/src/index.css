@@ -111,6 +111,14 @@ body {
     object-fit: cover;
 }
 
+/* Add this new rule right below */
+@media (min-width: 901px) {
+  .room-card img {
+    width: 300px; /* Wider on desktop */
+  }
+}
+
+
 .room-details {
   padding: 20px;
   flex-grow: 1;
