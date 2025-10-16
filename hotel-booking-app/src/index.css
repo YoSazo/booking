@@ -89,6 +89,7 @@ body {
 
 /* --- Room Listings --- */
 .rooms-list {
+    grid-column: 1 / -1; /* This makes it span all columns */
     display: flex;
     flex-direction: column;
     gap: 20px;
