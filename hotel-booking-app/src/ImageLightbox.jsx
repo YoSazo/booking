@@ -2,6 +2,26 @@ import React, { useState, useEffect } from 'react';
 
 function ImageLightbox({ images, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
+  const [allLoaded, setAllLoaded] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(0);
+
+  // Preload all images before showing lightbox
+  useEffect(() => {
+    let loaded = 0;
+    const total = images.length;
+
+    images.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        loaded++;
+        setLoadedCount(loaded);
+        if (loaded === total) {
+          setAllLoaded(true);
+        }
+      };
+    });
+  }, [images]);
 
   const goToPrevious = () => {
     const isFirstImage = currentIndex === 0;
@@ -15,7 +35,6 @@ function ImageLightbox({ images, startIndex, onClose }) {
     setCurrentIndex(newIndex);
   };
   
-  // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowLeft') goToPrevious();
@@ -38,34 +57,43 @@ function ImageLightbox({ images, startIndex, onClose }) {
           </svg>
         </button>
         
-        <button className="lightbox-nav-btn prev" onClick={goToPrevious}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </button>
-        
-        <div className="lightbox-image-container">
-          {/* Render ALL images but only show the current one */}
-          {images.map((src, index) => (
-            <img
-              key={index}
-              src={src}
-              alt={`Room image ${index + 1}`}
-              className="lightbox-image"
-              style={{
-                display: index === currentIndex ? 'block' : 'none'
-              }}
-            />
-          ))}
-        </div>
+        {allLoaded ? (
+          <>
+            <button className="lightbox-nav-btn prev" onClick={goToPrevious}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            
+            <div className="lightbox-image-container">
+              {images.map((src, index) => (
+                <img
+                  key={index}
+                  src={src}
+                  alt={`Room image ${index + 1}`}
+                  className="lightbox-image"
+                  style={{
+                    display: index === currentIndex ? 'block' : 'none'
+                  }}
+                />
+              ))}
+            </div>
 
-        <button className="lightbox-nav-btn next" onClick={goToNext}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-        
-        <div className="lightbox-counter">{currentIndex + 1} / {images.length}</div>
+            <button className="lightbox-nav-btn next" onClick={goToNext}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+            
+            <div className="lightbox-counter">{currentIndex + 1} / {images.length}</div>
+          </>
+        ) : (
+          <div className="lightbox-loader">
+            <div style={{ color: '#fff', fontSize: '18px', textAlign: 'center' }}>
+              Loading images... {loadedCount} / {images.length}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
