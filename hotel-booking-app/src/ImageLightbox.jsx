@@ -5,17 +5,6 @@ function ImageLightbox({ images, startIndex, onClose }) {
   const [loadedImages, setLoadedImages] = useState(new Set());
 
   // --- START: NEW PRELOADING LOGIC ---
-
-  useEffect(() => {
-  // Preload ALL room images immediately when page loads
-  roomData.forEach(room => {
-    room.imageUrls.forEach(url => {
-      const img = new Image();
-      img.src = url;
-    });
-  });
-}, [roomData]);
-
   useEffect(() => {
     const newLoadedImages = new Set();
     
