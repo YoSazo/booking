@@ -74,6 +74,18 @@ function App() {
   }, [hotelId]);
 
   useEffect(() => {
+  availableRooms.forEach(room => {
+    if (room.imageUrls) {
+      room.imageUrls.forEach(url => {
+        const img = new Image();
+        img.src = url;
+      });
+    }
+  });
+}, [availableRooms]);
+
+
+  useEffect(() => {
         // If the user is on the booking page, reset the processing state
         if (location.pathname === '/') {
             setIsProcessingBooking(false);
