@@ -3,6 +3,9 @@ import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
+import TestimonialTrigger from './TestimonialTrigger.jsx';
+import TestimonialPlayer from './TestimonialPlayer.jsx';
+import { testimonials } from './TestimonialData.js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -44,6 +47,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const latestFormData = useRef(formData);
     // In GuestInfoPage.jsx, with your other state and refs
 const isInteractingWithAutocomplete = useRef(false);
+const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
 
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
@@ -533,6 +537,22 @@ useEffect(() => {
                         <div className="step-circle"></div><span className="step-name">Payment</span>
                     </div>
                 </div>
+
+                {currentStep === 3 && (
+                    <>
+                        <TestimonialTrigger 
+                        onClick={() => setIsTestimonialOpen(true)}
+                        thumbnailUrl={testimonials[0].thumbnailUrl}
+                        />
+                        {isTestimonialOpen && (
+                        <TestimonialPlayer
+                            testimonials={testimonials}
+                            startIndex={0}
+                            onClose={() => setIsTestimonialOpen(false)}
+                        />
+                        )}
+                    </>
+                )}
 
                 {currentStep === 1 && (
                     <div className="info-summary-wrapper">
