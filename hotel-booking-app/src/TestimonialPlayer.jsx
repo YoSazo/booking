@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 
 function TestimonialPlayer({ testimonials, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
-  const [isZoomed, setIsZoomed] = useState(false);
   const videoRef = useRef(null);
 
   const currentTestimonial = testimonials[currentIndex];
@@ -28,25 +27,15 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
     setCurrentIndex(newIndex);
   };
 
-  const toggleZoom = () => {
-    setIsZoomed(!isZoomed);
-  };
-
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowLeft' && testimonials.length > 1) goToPrevious();
-      if (e.key === 'ArrowRight' && testimonials.length > 1) goToNext();
-      if (e.key === 'Escape') {
-        if (isZoomed) {
-          setIsZoomed(false);
-        } else {
-          onClose();
-        }
-      }
+      if (e.key === 'ArrowLeft') goToPrevious();
+      if (e.key === 'ArrowRight') goToNext();
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, isZoomed, testimonials.length]);
+  }, [currentIndex]);
 
   return (
     <div className="testimonial-overlay" onClick={onClose}>
@@ -58,7 +47,7 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
           </svg>
         </button>
 
-        {testimonials.length > 1 && (
+        
           <>
             <button className="testimonial-nav-btn prev" onClick={goToPrevious}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -72,7 +61,7 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
               </svg>
             </button>
           </>
-        )}
+       
 
         <div className="testimonial-video-container">
           <video
@@ -85,25 +74,18 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
           <div className="testimonial-guest-info">
             {currentTestimonial.name} - {currentTestimonial.nights} nights
           </div>
-          
-          <div className="testimonial-confirmation-wrapper">
-            <div className={`testimonial-confirmation-container ${isZoomed ? 'zoomed' : ''}`}>
-              <img
-                src={currentTestimonial.confirmationImageUrl}
-                alt={`${currentTestimonial.name}'s booking confirmation`}
-                className="testimonial-confirmation-image"
-                onClick={toggleZoom}
-              />
-            </div>
-            <button className="zoom-hint" onClick={toggleZoom}>
-              {isZoomed ? '🔍 Tap to zoom out' : '🔍 Tap to zoom in'}
-            </button>
+          <div className="testimonial-confirmation-container">
+            <img
+              src={currentTestimonial.confirmationImageUrl}
+              alt={`${currentTestimonial.name}'s booking confirmation`}
+              className="testimonial-confirmation-image"
+            />
           </div>
         </div>
 
-        {testimonials.length > 1 && (
+        
           <div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
-        )}
+        
       </div>
     </div>
   );
