@@ -2204,11 +2204,11 @@ padding: 6px 16px;
 }
 
 .testimonial-nav-btn.prev {
-  left: -80px;
+  left: 10px; /* Bring them inside on all screens */
 }
 
 .testimonial-nav-btn.next {
-  right: -80px;
+  right: 10px; /* Bring them inside on all screens */
 }
 
 .testimonial-counter {
