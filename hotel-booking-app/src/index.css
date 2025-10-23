@@ -2142,11 +2142,12 @@ padding: 6px 16px;
 .testimonial-guest-info {
   text-align: center;
   color: #fff;
-  font-size: 1.5em;
+  font-size: 1.05em;
   font-weight: 600;
-  margin-top: 10px;
-  position: relative;
-  padding: 0 80px; /* Space for nav buttons on desktop */
+  margin: 8px 0 0 0;       /* Less space above, no space below */
+  padding: 0;               /* Remove left/right padding */
+  line-height: 1.1;         /* Tighter lines */
+  white-space: nowrap;      /* Force a single line, no wrapping */
 }
 
 .testimonial-confirmation-container {
@@ -2267,8 +2268,8 @@ padding: 6px 16px;
   }
   
   .testimonial-guest-info {
-    font-size: 1.2em;
-    padding: 0 70px; /* Space for smaller nav buttons on mobile */
+    font-size: 1em;
+    margin: 6px 0 0 0; /* Space for smaller nav buttons on mobile */
   }
   
   .testimonial-confirmation-container {
