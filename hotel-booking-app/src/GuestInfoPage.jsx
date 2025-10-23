@@ -48,6 +48,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // In GuestInfoPage.jsx, with your other state and refs
 const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
+const paymentFormRef = useRef(null);
 
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
@@ -548,11 +549,20 @@ useEffect(() => {
                         <TestimonialPlayer
                             testimonials={testimonials}
                             startIndex={0}
-                            onClose={() => setIsTestimonialOpen(false)}
+                            onClose={() => {
+                            setIsTestimonialOpen(false);
+                            // Scroll to payment form after a tiny delay (lets modal close first)
+                            setTimeout(() => {
+                                paymentFormRef.current?.scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'start' 
+                                });
+                            }, 100);
+                            }}
                         />
                         )}
                     </>
-                )}
+                    )}
 
                 {currentStep === 1 && (
                     <div className="info-summary-wrapper">
@@ -582,6 +592,7 @@ useEffect(() => {
                     </div>
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+                        <div ref={paymentFormRef} className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}></div>
                         <div className="secure-checkout-badge">
     <img src="/lock.svg" alt="Secure Checkout" className="lock-icon" />
     <span>Guaranteed safe and secure Checkout</span>
