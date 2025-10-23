@@ -2170,7 +2170,7 @@ padding: 6px 16px;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  z-index: 2001;
+  z-index: 2002;
 }
 
 .testimonial-close-btn:hover {
