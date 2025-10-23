@@ -84,7 +84,9 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
         </div>
 
         
-          <div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
+        <div style={{ textAlign: 'center', width: '100%' }}>
+            <div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
+        </div>
         
       </div>
     </div>
