@@ -2265,11 +2265,11 @@ padding: 6px 16px;
   }
   
   .testimonial-nav-btn.prev {
-    left: -60px;
+    left: 10px;
   }
   
   .testimonial-nav-btn.next {
-    right: -60px;
+    right: 10px;
   }
   
   .testimonial-close-btn {
