@@ -2106,7 +2106,7 @@ padding: 6px 16px;
   position: relative;
   width: 100%;
   max-width: 900px;
-  padding: 80px 80px 120px 80px;
+  padding: 80px 20px 140px 20px; /* Bottom padding for counter */
   min-height: 100vh;
 }
 
@@ -2115,6 +2115,7 @@ padding: 6px 16px;
   display: flex;
   flex-direction: column;
   gap: 40px;
+  position: relative; /* For nav button positioning */
 }
 
 .testimonial-video {
@@ -2136,29 +2137,12 @@ padding: 6px 16px;
   margin-top: 10px;
 }
 
-.testimonial-confirmation-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .testimonial-confirmation-container {
   background-color: #fff;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   margin-top: 30px;
-  transition: all 0.3s ease;
-  cursor: zoom-in;
-}
-
-.testimonial-confirmation-container.zoomed {
-  transform: scale(1.8);
-  transform-origin: top center;
-  cursor: zoom-out;
-  z-index: 10;
-  margin-bottom: 200px; /* Extra space when zoomed */
 }
 
 .testimonial-confirmation-image {
@@ -2166,24 +2150,6 @@ padding: 6px 16px;
   height: auto;
   display: block;
   border-radius: 8px;
-}
-
-.zoom-hint {
-  background-color: rgba(255, 255, 255, 0.9);
-  color: #333;
-  border: 1px solid #ddd;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  align-self: center;
-}
-
-.zoom-hint:hover {
-  background-color: #fff;
-  transform: scale(1.05);
 }
 
 .testimonial-close-btn {
@@ -2212,9 +2178,8 @@ padding: 6px 16px;
 }
 
 .testimonial-nav-btn {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
+  position: absolute; /* Changed from fixed to absolute */
+  top: 300px; /* Position below the video */
   background-color: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(10px);
   color: #fff;
@@ -2227,25 +2192,25 @@ padding: 6px 16px;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  z-index: 2001;
+  z-index: 10;
 }
 
 .testimonial-nav-btn:hover {
   background-color: rgba(0, 0, 0, 1);
-  transform: translateY(-50%) scale(1.1);
+  transform: scale(1.1);
   border-color: rgba(255, 255, 255, 0.6);
 }
 
 .testimonial-nav-btn.prev {
-  left: 20px;
+  left: -80px; /* Position outside content area */
 }
 
 .testimonial-nav-btn.next {
-  right: 20px;
+  right: -80px; /* Position outside content area */
 }
 
 .testimonial-counter {
-  position: fixed;
+  position: fixed; /* Keeps it at viewport bottom */
   bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
@@ -2267,7 +2232,7 @@ padding: 6px 16px;
   }
   
   .testimonial-content {
-    padding: 60px 15px 100px 15px;
+    padding: 60px 15px 120px 15px;
   }
   
   .testimonial-video-container {
@@ -2290,27 +2255,18 @@ padding: 6px 16px;
     margin-top: 20px;
   }
   
-  .testimonial-confirmation-container.zoomed {
-    transform: scale(2.2); /* Even more zoom on mobile */
-    margin-bottom: 300px; /* More space on mobile when zoomed */
-  }
-  
-  .zoom-hint {
-    font-size: 13px;
-    padding: 6px 14px;
-  }
-  
   .testimonial-nav-btn {
     width: 48px;
     height: 48px;
+    top: 200px; /* Adjust for mobile video height */
   }
   
   .testimonial-nav-btn.prev {
-    left: 10px;
+    left: 10px; /* Bring inside on mobile */
   }
   
   .testimonial-nav-btn.next {
-    right: 10px;
+    right: 10px; /* Bring inside on mobile */
   }
   
   .testimonial-close-btn {
