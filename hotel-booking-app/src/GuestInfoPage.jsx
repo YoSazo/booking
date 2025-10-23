@@ -591,8 +591,8 @@ useEffect(() => {
                         <div className="form-field"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required />{formErrors.email && <span className="error-message">{formErrors.email}</span>}</div>
                     </div>
 
-                    <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-                        <div ref={paymentFormRef} className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}></div>
+                    <div ref={paymentFormRef} className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+                        
                         <div className="secure-checkout-badge">
     <img src="/lock.svg" alt="Secure Checkout" className="lock-icon" />
     <span>Guaranteed safe and secure Checkout</span>
