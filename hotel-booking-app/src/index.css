@@ -2033,7 +2033,7 @@ padding: 6px 16px;
 
 /* --- Testimonial Trigger Styles --- */
 .testimonial-trigger-container {
-  margin: 30px 0;
+  margin: 20px 0;
 }
 
 .testimonial-trigger-card {
@@ -2054,7 +2054,7 @@ padding: 6px 16px;
 .testimonial-thumbnail-wrapper {
   position: relative;
   width: 100%;
-  max-height: 300px;
+  max-height: 200px;
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 16px;
@@ -2237,7 +2237,7 @@ padding: 6px 16px;
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .testimonial-thumbnail-wrapper {
-    max-height: 250px;
+    max-height: 180px;
   }
   
   .testimonial-content {
