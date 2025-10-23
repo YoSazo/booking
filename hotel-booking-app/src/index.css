@@ -2192,8 +2192,8 @@ padding: 6px 16px;
 }
 
 .testimonial-nav-btn {
-  position: fixed;           /* Fixed to viewport */
-  top: 50%;                  /* Vertically center */
+  position: absolute;           /* Fixed to viewport */
+  top: 44%;                  /* Vertically center */
   transform: translateY(-50%);
   background-color: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(10px);
