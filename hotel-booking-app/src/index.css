@@ -2398,3 +2398,23 @@ padding: 6px 16px;
     margin-top: 20px;
   }
 }
+
+/* Stripe badge at top of payment form */
+.stripe-badge-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.stripe-badge {
+  height: 20px; /* Small and subtle */
+  width: auto;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.stripe-badge:hover {
+  opacity: 1;
+}
