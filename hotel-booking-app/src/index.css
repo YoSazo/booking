@@ -1621,8 +1621,17 @@ padding: 6px 16px;
 
 /* --- UPDATED: This rule now controls the button's size in ALL states --- */
 .checkout-cta-container .btn-confirm {
-    width: 90%; 
-    max-width: 380px;
+  width: 90%; 
+  max-width: 380px;
+  padding: 16px; /* Slightly larger */
+  font-size: 1.05em;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.25); /* Green shadow */
+  transition: all 0.2s ease;
+}
+
+.checkout-cta-container .btn-confirm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(40, 167, 69, 0.35);
 }
 
 .error-message {
@@ -1639,7 +1648,9 @@ padding: 6px 16px;
 }
 
 .billing-address-section {
-    margin-top: 40px;
+  margin-top: 30px;
+  padding-top: 30px;
+  border-top: 1px solid #f0f0f0; /* Add a subtle separator */
 }
 
 .billing-address-title {
@@ -1757,10 +1768,11 @@ padding: 6px 16px;
 
 .payment-wrapper {
   background-color: #fff;
-  border-radius: 8px;
+  border-radius: 12px; /* Add rounded corners */
   padding: 30px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); /* Subtle shadow */
   margin-top: 30px;
+  border: 1px solid #e8e8e8; /* Light border */
 }
 
 .payment-content {
@@ -1855,17 +1867,18 @@ padding: 6px 16px;
 }
 
 .card-field-container {
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 12px;
-  background-color: #fff;
+  border: 1px solid #e0e0e0; /* Lighter border */
+  border-radius: 8px;
+  padding: 14px; /* Slightly more padding */
+  background-color: #fafafa; /* Very subtle background */
   position: relative;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .card-field-container:focus-within {
   border-color: #0070f3;
-  box-shadow: 0 0 0 1px #0070f3;
+  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1); /* Softer glow */
+  background-color: #fff;
 }
 
 .card-brands {
