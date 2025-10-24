@@ -6,6 +6,7 @@ import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js
 import TestimonialTrigger from './TestimonialTrigger.jsx';
 import TestimonialPlayer from './TestimonialPlayer.jsx';
 import { testimonials } from './TestimonialData.js';
+import { useNavigate } from 'react-router-dom';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -37,6 +38,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
     });
+    const navigate = useNavigate();
     const [formErrors, setFormErrors] = useState({});
     // const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
