@@ -2033,8 +2033,9 @@ padding: 6px 16px;
 
 /* --- Testimonial Trigger Styles --- */
 .testimonial-trigger-container {
-  margin: 30px 0;
+  margin: 30px auto; /* This centers it */
   max-width: 600px;
+  display: block; /* Ensure it's a block element */
 }
 
 .testimonial-trigger-card {
