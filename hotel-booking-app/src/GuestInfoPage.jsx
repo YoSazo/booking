@@ -603,7 +603,7 @@ useEffect(() => {
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
                         <div className="stripe-badge-container">
     <img 
-        src="/powerstripe.svg" 
+        src="stripe.svg" 
         alt="Powered by Stripe" 
         className="stripe-badge"
         onError={(e) => {
