@@ -2193,7 +2193,7 @@ padding: 6px 16px;
 
 .testimonial-nav-btn {
   position: fixed;           /* Fixed to viewport */
-  top: 59%;                  /* Vertically center */
+  top: 65%;                  /* Vertically center */
   transform: translateY(-50%);
   background-color: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(10px);
