@@ -2034,13 +2034,14 @@ padding: 6px 16px;
 /* --- Testimonial Trigger Styles --- */
 .testimonial-trigger-container {
   margin: 30px 0;
+  max-width: 600px;
 }
 
 .testimonial-trigger-card {
   background-color: #fff;
   border: 1px solid #212529;
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px; /* Reduced from 20px */
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -2054,11 +2055,12 @@ padding: 6px 16px;
 .testimonial-thumbnail-wrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9; /* Maintains proper video proportions */
+  aspect-ratio: 16 / 9;
   border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: 12px; /* Reduced from 16px */
 }
+
 
 .testimonial-thumbnail {
   width: 100%;
@@ -2077,7 +2079,7 @@ padding: 6px 16px;
 
 .testimonial-trigger-text {
   text-align: center;
-  font-size: 1.1em;
+  font-size: 1em; /* Reduced from 1.1em */
   font-weight: 600;
   color: #333;
   margin: 0;
