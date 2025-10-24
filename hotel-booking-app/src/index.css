@@ -973,7 +973,8 @@ body {
   stroke-width: 3;
   stroke: #28a745;
   stroke-miterlimit: 10;
-  animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
+  /* REMOVE the fill animation, just keep scale */
+  animation: scale 0.3s ease-in-out 0.9s both;
 }
 
 .checkmark-circle {

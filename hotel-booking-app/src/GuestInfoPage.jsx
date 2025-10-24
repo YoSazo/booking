@@ -602,8 +602,16 @@ useEffect(() => {
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
                         <div className="stripe-badge-container">
-        <img src="/powerstripe.svg" alt="Powered by Stripe" className="stripe-badge" />
-    </div>
+    <img 
+        src="/powerstripe.svg" 
+        alt="Powered by Stripe" 
+        className="stripe-badge"
+        onError={(e) => {
+            console.log('Stripe badge failed to load');
+            e.target.style.display = 'none';
+        }}
+    />
+</div>
                         <div className="secure-checkout-badge">
     <img src="/lock.svg" alt="Secure Checkout" className="lock-icon" />
     <span>Guaranteed safe and secure Checkout</span>
