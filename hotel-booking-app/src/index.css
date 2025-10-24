@@ -1842,11 +1842,11 @@ padding: 6px 16px;
 
 .payment-wrapper {
   background-color: #fff;
-  border-radius: 12px; /* Add rounded corners */
-  padding: 30px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); /* Subtle shadow */
+  border-radius: 12px;
+  padding: 20px 30px 30px 30px; /* Reduced top padding from 30px to 20px */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   margin-top: 30px;
-  border: 1px solid #e8e8e8; /* Light border */
+  border: 1px solid #e8e8e8;
 }
 
 .payment-content {
@@ -2400,20 +2400,22 @@ padding: 6px 16px;
   }
 }
 
-/* Stripe badge at top of payment form */
+/* Find .stripe-badge-container and UPDATE it: */
 .stripe-badge-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 8px; /* Reduced from 16px */
+  padding-bottom: 8px; /* Reduced from 12px */
   border-bottom: 1px solid #f0f0f0;
 }
 
 .stripe-badge {
-  height: 20px; /* Small and subtle */
+  height: 150px; /* Your preferred size */
   width: auto;
   opacity: 0.85;
   transition: opacity 0.2s ease;
+  display: block;
+  margin: -20px 0 -20px 0; /* Negative margins to "pull" content closer */
 }
 
 .stripe-badge:hover {
