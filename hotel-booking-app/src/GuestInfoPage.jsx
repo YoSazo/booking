@@ -507,8 +507,15 @@ useEffect(() => {
     };
 
     
+    // Redirect to home if booking details are missing
+    useEffect(() => {
+        if (!bookingDetails || !clientSecret) {
+            navigate('/');
+        }
+    }, [bookingDetails, clientSecret, navigate]);
+
     if (!bookingDetails) {
-        return <div style={{textAlign: 'center', padding: '50px'}}>Loading booking details...</div>;
+        return null; // Don't render anything while redirecting
     }
     
     const priceToday = bookingDetails.subtotal / 2;
