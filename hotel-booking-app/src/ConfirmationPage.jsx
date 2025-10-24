@@ -13,9 +13,6 @@ const formatDateWithSuffix = (date) => {
 };
 
 function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
-
-  // The useEffect hook that set overflow:hidden has been completely REMOVED from here.
-
   return (
     <>
       <div className="static-banner">
@@ -24,27 +21,35 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
 
       <div className="confirmation-container">
         <div className="confirmation-card">
+          {/* Success checkmark */}
+          <div className="success-checkmark">
+            <svg className="checkmark-icon" viewBox="0 0 52 52">
+              <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+              <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+          </div>
+
           <div className="confirmation-header">
-            <img src="/logo.jpg" alt="Hotel Logo" className="success-icon" />
-            <h2>Thank you for booking with us!</h2>
-            <p>Your Reservation Code is <strong>#{reservationCode}</strong></p>
-            <p>We have sent the Booking Confirmation to your email: <strong>{guestInfo.email}</strong></p>
+            <h2>Booking Confirmed!</h2>
+            <p className="confirmation-code">Confirmation Code: <strong>#{reservationCode}</strong></p>
+            <p className="confirmation-email">A confirmation email has been sent to <strong>{guestInfo.email}</strong></p>
           </div>
 
           <div className="stay-details-card">
-            <div className="stay-dates">
-              <div className="stay-detail-line">
-                Check in: <strong>{formatDateWithSuffix(bookingDetails.checkin)}</strong>
-              </div>
-              <div className="stay-detail-line">
-                Check out: <strong>{formatDateWithSuffix(bookingDetails.checkout)}</strong>
-              </div>
+            <div className="detail-row">
+              <span className="detail-label">Check-in</span>
+              <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkin)}</span>
             </div>
-            <div className="stay-nights">
-              <svg className="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M21.5,12.5A9.5,9.5,0,0,1,5.2,20.8a9.5,9.5,0,1,0,11.2-15,9.5,9.5,0,0,1,5.1,6.7Z" fill="currentColor"/>
-              </svg>
-              <strong>{bookingDetails.nights} Nights</strong>
+            <div className="detail-row">
+              <span className="detail-label">Check-out</span>
+              <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkout)}</span>
+            </div>
+            <div className="detail-row nights-row">
+              <span className="detail-label">
+                <img src="/moon.png" alt="Nights" className="moon-icon" />
+                Duration
+              </span>
+              <span className="detail-value">{bookingDetails.nights} Night{bookingDetails.nights > 1 ? 's' : ''}</span>
             </div>
           </div>
         </div>
