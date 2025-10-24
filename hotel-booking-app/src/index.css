@@ -2063,9 +2063,8 @@ padding: 6px 16px;
 .testimonial-thumbnail {
   width: 100%;
   height: 100%;
-  object-fit: cover;           /* still fills the box when scale=1 */
-  transform: scale(0.92);      /* tweak 0.85–0.96 to taste */
-  transform-origin: center;    /* keep it centered while scaling */
+  object-fit: cover;
+  display: block;
 }
 
 .testimonial-play-button {
