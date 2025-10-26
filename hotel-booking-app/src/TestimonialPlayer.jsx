@@ -8,15 +8,6 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
 
   const currentTestimonial = testimonials[currentIndex];
 
-  useEffect(() => {
-  // Lock body scroll when testimonial opens
-  document.body.classList.add('testimonial-modal-open');
-  
-  // Cleanup when component unmounts
-  return () => {
-    document.body.classList.remove('testimonial-modal-open');
-  };
-}, []);
   // Auto-play when testimonial changes
   useEffect(() => {
     if (videoRef.current) {
