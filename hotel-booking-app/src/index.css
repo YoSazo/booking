@@ -2422,3 +2422,22 @@ padding: 6px 16px;
   opacity: 1;
 }
 
+/* =============================================== */
+/* MODAL SCROLL LOCK FIX                          */
+/* =============================================== */
+
+/* When calendar modal is open, lock the body scroll */
+body.calendar-modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* When testimonial modal is open, lock the body scroll */
+body.testimonial-modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}

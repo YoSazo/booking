@@ -10,13 +10,25 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [upsellDeclined, setUpsellDeclined] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      setStartDate(initialCheckin);
-      setEndDate(initialCheckout);
-      setCurrentDate(initialCheckin || new Date());
-      setUpsellDeclined(false);
-    }
-  }, [isOpen, initialCheckin, initialCheckout]);
+  if (isOpen) {
+    // Lock body scroll when modal opens
+    document.body.classList.add('calendar-modal-open');
+    
+    setStartDate(initialCheckin);
+    setEndDate(initialCheckout);
+    setCurrentDate(initialCheckin || new Date());
+    setUpsellDeclined(false);
+  } else {
+    // Unlock body scroll when modal closes
+    document.body.classList.remove('calendar-modal-open');
+  }
+  
+  // Cleanup function to ensure class is removed if component unmounts
+  return () => {
+    document.body.classList.remove('calendar-modal-open');
+  };
+}, [isOpen, initialCheckin, initialCheckout]);
+
 
   const handleDayClick = (day) => {
     console.log('Clicked day:', day);
