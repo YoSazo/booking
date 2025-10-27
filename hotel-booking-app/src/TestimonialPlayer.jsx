@@ -8,9 +8,12 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
 
   const currentTestimonial = testimonials[currentIndex];
 // At the top with your other useEffects
+// Replace your current useEffect with this:
 useEffect(() => {
-  // Prevent body scroll when modal is open
-  document.body.style.overflow = 'hidden';
+  // Only prevent body scroll on mobile (screens < 768px)
+  if (window.innerWidth < 768) {
+    document.body.style.overflow = 'hidden';
+  }
   
   // Re-enable scroll when modal closes
   return () => {

@@ -2189,7 +2189,7 @@ padding: 6px 16px;
   box-sizing: border-box;
   /* Remove backdrop-filter from here */
   animation: fadeIn 0.2s ease-out;
-  overflow-y: hidden;
+  overflow-y: auto;
 }
 
 .testimonial-overlay::before {
@@ -2379,6 +2379,10 @@ padding: 6px 16px;
   .testimonial-nav-btn {
     width: 44px; /* Even smaller on mobile */
     height: 44px;
+  }
+
+  .testimonial-overlay {
+    overflow-y: hidden; /* Prevent scroll on mobile */
   }
   
   .testimonial-nav-btn svg {
