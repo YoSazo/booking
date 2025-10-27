@@ -47,6 +47,7 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
           </svg>
         </button>
 
+<div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
         
           <>
             <button className="testimonial-nav-btn prev" onClick={goToPrevious}>
@@ -85,7 +86,6 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
 
         
         <div style={{ textAlign: 'center', width: '100%' }}>
-            <div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
         </div>
         
       </div>
