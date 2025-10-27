@@ -460,44 +460,54 @@ useEffect(() => {
 
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = async () => {
-        setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
+    setHasAttemptedSubmit(true);
 
-        // --- ADD THIS VALIDATION BLOCK ---
-        // This is the same check used in the card submission handler.
-        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return; // Stop here if the address is missing
-        }
-        // --- END OF VALIDATION BLOCK ---
-
-        // If validation passes, clear any previous errors and show the wallet.
-        setIsProcessing(true);
-        setErrorMessage('');
-
-        try {
-      const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
-      });
-      const updateData = await updateRes.json();
-      if (!updateData.success) {
-        throw new Error('Failed to update payment details.');
-      }
-    } catch (updateError) {
-      setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
-      setIsProcessing(false); // Re-enable button on failure
-      return;
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
     }
-        if (paymentRequest) {
-        // --- ADD THIS LINE ---
-        // This ensures the wallet always has the latest user info.
-        paymentRequest.update({ total: { label: 'Booking Payment', amount: Math.round((bookingDetails.subtotal / 2) * 100) } });
+
+    setIsProcessing(true);
+    setErrorMessage('');
+
+    try {
+        const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
+        });
+        const updateData = await updateRes.json();
+        if (!updateData.success) {
+            throw new Error('Failed to update payment details.');
+        }
+    } catch (updateError) {
+        setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
+        setIsProcessing(false);
+        return;
+    }
+
+    if (paymentRequest) {
+        paymentRequest.update({ 
+            total: { 
+                label: 'Booking Payment', 
+                amount: Math.round((bookingDetails.subtotal / 2) * 100) 
+            } 
+        });
         
-        // Now, show the payment sheet
-        paymentRequest.show();
+        // ADD ERROR HANDLING HERE
+        try {
+            const result = await paymentRequest.show();
+            // If show() resolves, the payment sheet opened successfully
+            // The 'paymentmethod' event listener will handle the rest
+        } catch (error) {
+            // If show() is rejected, the sheet failed to open
+            console.error('Payment request show failed:', error);
+            setErrorMessage(error.message || "Could not open payment sheet. Please try another payment method.");
+            setIsProcessing(false);
+        }
     } else {
         setErrorMessage("Digital wallet is not available. Please select another payment method.");
+        setIsProcessing(false);
     }
 };
 
