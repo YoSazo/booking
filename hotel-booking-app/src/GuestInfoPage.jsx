@@ -459,7 +459,7 @@ useEffect(() => {
     };
 
     // Click handler for WALLET PAYMENTS
-    const handleWalletPayment = async () => {
+    const handleWalletPayment = () => {
     setHasAttemptedSubmit(true);
 
     if (!formData.address || !formData.city || !formData.state || !formData.zip) {
@@ -470,45 +470,43 @@ useEffect(() => {
     setIsProcessing(true);
     setErrorMessage('');
 
-    try {
-        const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
-        });
-        const updateData = await updateRes.json();
-        if (!updateData.success) {
-            throw new Error('Failed to update payment details.');
-        }
-    } catch (updateError) {
-        setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
+    if (!paymentRequest) {
+        setErrorMessage("Digital wallet is not available. Please select another payment method.");
         setIsProcessing(false);
         return;
     }
 
-    if (paymentRequest) {
-        paymentRequest.update({ 
-            total: { 
-                label: 'Booking Payment', 
-                amount: Math.round((bookingDetails.subtotal / 2) * 100) 
-            } 
-        });
-        
-        // ADD ERROR HANDLING HERE
-        try {
-            const result = await paymentRequest.show();
-            // If show() resolves, the payment sheet opened successfully
-            // The 'paymentmethod' event listener will handle the rest
-        } catch (error) {
-            // If show() is rejected, the sheet failed to open
-            console.error('Payment request show failed:', error);
-            setErrorMessage(error.message || "Could not open payment sheet. Please try another payment method.");
+    // CRITICAL: Call .show() IMMEDIATELY in the click handler (synchronously)
+    // This must happen BEFORE any async operations for Apple Pay to work
+    const showPromise = paymentRequest.show();
+    
+    // Now handle the promise
+    showPromise
+        .then(async (paymentResponse) => {
+            // Payment sheet opened successfully
+            // Now do the async update
+            try {
+                const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
+                });
+                const updateData = await updateRes.json();
+                if (!updateData.success) {
+                    throw new Error('Failed to update payment details.');
+                }
+            } catch (updateError) {
+                console.error('Failed to update payment intent:', updateError);
+                // Payment sheet is still open, so this error won't show to user
+                // The paymentmethod event handler will handle the actual payment
+            }
+        })
+        .catch((error) => {
+            // User cancelled or payment sheet failed to open
+            console.log('Payment sheet cancelled or failed:', error);
+            setErrorMessage(error.message || "Payment cancelled or failed to open.");
             setIsProcessing(false);
-        }
-    } else {
-        setErrorMessage("Digital wallet is not available. Please select another payment method.");
-        setIsProcessing(false);
-    }
+        });
 };
 
     const getWalletLogoInfo = () => {
