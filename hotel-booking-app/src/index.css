@@ -2227,24 +2227,23 @@ padding: 6px 16px;
   background-color: #000;
 }
 
-.testimonial-guest-info {
-  text-align: center;
-  color: #fff;
-  font-size: 1.05em;
-  font-weight: 600;
-  margin: 8px 0 0 0;       /* Less space above, no space below */
-  padding: 0;               /* Remove left/right padding */
-  line-height: 1.1;         /* Tighter lines */
-  white-space: nowrap;      /* Force a single line, no wrapping */
-}
-
 .testimonial-confirmation-container {
   background-color: #fff;
   border-radius: 12px;
-  padding: 24px;
+  padding: 16px; /* Reduced from 24px */
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  margin-top: 30px;
-  margin-bottom: 80px;
+  margin-top: 20px; /* Reduced from 30px */
+  max-height: 300px; /* NEW: Limit height on mobile */
+  overflow: hidden; /* NEW: Hide overflow */
+}
+
+.testimonial-confirmation-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  max-height: 280px; /* NEW: Prevent it from being too tall */
+  object-fit: contain; /* NEW: Maintain aspect ratio */
 }
 
 .testimonial-confirmation-image {
@@ -2360,9 +2359,13 @@ padding: 6px 16px;
   }
   
   .testimonial-confirmation-container {
-    padding: 16px;
-    margin-top: 20px;
-    margin-bottom: 60px;
+    padding: 12px;
+    margin-top: 15px;
+    max-height: 200px; /* Smaller on mobile */
+  }
+
+  .testimonial-confirmation-image {
+    max-height: 180px;
   }
   
   .testimonial-nav-btn {

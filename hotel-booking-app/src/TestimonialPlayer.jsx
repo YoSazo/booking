@@ -7,7 +7,16 @@ function TestimonialPlayer({ testimonials, startIndex, onClose }) {
   const videoRef = useRef(null);
 
   const currentTestimonial = testimonials[currentIndex];
-
+// At the top with your other useEffects
+useEffect(() => {
+  // Prevent body scroll when modal is open
+  document.body.style.overflow = 'hidden';
+  
+  // Re-enable scroll when modal closes
+  return () => {
+    document.body.style.overflow = '';
+  };
+}, []);
   // Auto-play when testimonial changes
   useEffect(() => {
     if (videoRef.current) {
