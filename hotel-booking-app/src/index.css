@@ -2381,6 +2381,10 @@ padding: 6px 16px;
     width: 44px; /* Even smaller on mobile */
     height: 44px;
   }
+
+  .testimonial-overlay {
+    overflow-y: auto; /* Prevent scroll on mobile */
+  }
   
   .testimonial-nav-btn svg {
     width: 18px;
