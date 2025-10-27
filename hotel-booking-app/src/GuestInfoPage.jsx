@@ -285,6 +285,7 @@ useEffect(() => {
                 ev.complete('fail');
                 setHasAttemptedSubmit(true);
                 setErrorMessage(confirmError.message);
+                setIsProcessing(false);
                 return;
             }
             ev.complete('success');
@@ -634,20 +635,26 @@ useEffect(() => {
             setPaymentMethod('card');
             setHasAttemptedSubmit(false);
             setErrorMessage('');
+            setIsProcessing(false);
         }}
     >
         <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
     </button>
                                     {walletType && (
-        <button 
-            type="button" 
-            className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
-            onClick={() => setPaymentMethod('wallet')}
-        >
-            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
-            {walletType}
-        </button>
-    )}
+                                        <button 
+                                            type="button" 
+                                            className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
+                                            onClick={() => {
+                                                setPaymentMethod('wallet');
+                                                setHasAttemptedSubmit(false);
+                                                setErrorMessage('');
+                                                setIsProcessing(false);
+                                            }}
+                                        >
+                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
+                                            {walletType}
+                                        </button>
+                                    )}
 
                                 </div>
                                 <div className="payment-content">
