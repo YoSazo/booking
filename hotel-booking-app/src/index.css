@@ -2184,12 +2184,12 @@ padding: 6px 16px;
   z-index: 2000;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* CHANGED from center to flex-start */
+  align-items: flex-start;
   padding: 20px;
   box-sizing: border-box;
   animation: fadeIn 0.2s ease-out;
-  overflow-y: auto;
-  padding-top: 80px; /* ADD space from top for close button */
+  overflow-y: auto; /* This allows scrolling on ALL devices */
+  padding-top: 80px;
 }
 
 .testimonial-overlay::before {
