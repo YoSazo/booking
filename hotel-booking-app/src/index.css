@@ -2332,6 +2332,14 @@ padding: 6px 16px;
   z-index: 2002;
 }
 
+.testimonial-guest-info {
+  text-align: center;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #ffffff; /* White text */
+  margin: 16px 0;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .testimonial-thumbnail-wrapper {
