@@ -2184,12 +2184,12 @@ padding: 6px 16px;
   z-index: 2000;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* CHANGED from center to flex-start */
   padding: 20px;
   box-sizing: border-box;
-  /* Remove backdrop-filter from here */
   animation: fadeIn 0.2s ease-out;
   overflow-y: auto;
+  padding-top: 80px; /* ADD space from top for close button */
 }
 
 .testimonial-overlay::before {
@@ -2207,6 +2207,7 @@ padding: 6px 16px;
   position: relative;
   width: 100%;
   max-width: 900px;
+  margin: auto 0; /* ADD auto margins for safe centering */
 }
 
 .testimonial-video-container {
