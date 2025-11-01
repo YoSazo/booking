@@ -118,9 +118,11 @@ function App() {
         }),
       });
       const result = await response.json();
+      console.log('🔍 API Response:', result);  // ← ADD THIS
       if (result.success) {
         const mergedRooms = result.data.map(apiRoom => {
           const staticRoomData = currentHotel.rooms.find(r => r.name === apiRoom.roomName);
+          console.log(`Room: ${apiRoom.roomName}, totalRate: ${apiRoom.totalRate}`);  // ← ADD THIS
           return { ...staticRoomData, ...apiRoom };
         });
         setAvailableRooms(mergedRooms);
@@ -132,7 +134,8 @@ function App() {
       alert('Could not connect to the booking server. Please try again later.');
     }
     setIsLoading(false);
-  };
+};
+
 
   const handleDatesUpdate = (dates) => {
     setCheckinDate(dates.start);
