@@ -4,8 +4,9 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
-  const priceToday = subtotal ? subtotal / 2 : 0;
-  const balanceDue = subtotal ? (subtotal / 2) + (taxes || 0) : 0;
+
+  const displayPayToday = payToday || 0;
+  const displayBalanceDue = balanceDue || 0;
 
   const guestOptions = Array.from({ length: room.maxOccupancy }, (_, i) => i + 1);
   const petOptions = [0, 1, 2];
@@ -55,8 +56,8 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
 
         {nights > 0 ? (
           <div className="dynamic-price-display">
-            <div className="price-today">Only Pay ${priceToday.toFixed(2)} Today</div>
-            <div className="price-balance">Balance (${balanceDue.toFixed(2)}) When You Arrive</div>
+            <div className="price-today">Only Pay ${displayPayToday.toFixed(2)} Today</div>
+            <div className="price-balance">Balance (${displayBalanceDue.toFixed(2)}) When You Arrive</div>
           </div>
         ) : (
           <div className="room-price">${rates?.NIGHTLY || 59} <span>/ night</span></div>
