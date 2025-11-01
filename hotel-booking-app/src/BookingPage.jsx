@@ -99,9 +99,12 @@ function BookingPage({
       ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) 
       : 0;
 
-    const subtotalBeforeTax = calculateTieredPrice(nights, rates);
-    const taxAmount = subtotalBeforeTax * 0.10;
-    const grandTotal = subtotalBeforeTax + taxAmount;
+    // Use the API's totalRate (includes tax already from Cloudbeds)
+    const grandTotal = room.totalRate || 0;
+    
+    // Back out the tax to get subtotal
+    const subtotalBeforeTax = grandTotal / 1.10;
+    const taxAmount = grandTotal - subtotalBeforeTax;
     
     const payToday = grandTotal / 2;
     const balanceDue = grandTotal / 2;
