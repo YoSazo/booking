@@ -110,8 +110,8 @@ function BookingPage({
         onBookNow={onConfirmBooking}
         nights={nights}
         onOpenLightbox={onOpenLightbox}
-        subtotal={room.totalRate}
-        taxes={0}
+        subtotal={room.subtotal}
+        taxes={room.taxesAndFees}
         isProcessing={isProcessingBooking}
         // 4. This is the only prop that changed
         roomsAvailable={currentRoomData.roomsAvailable}
