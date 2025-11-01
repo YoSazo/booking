@@ -287,32 +287,11 @@ app.post('/api/availability', async (req, res) => {
             
             const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
 
-            if (specificRatePlan) {
-                // Calculate the subtotal (room rate before taxes) by dividing totalRate by 1.10
-                // This assumes a 10% tax rate, which matches your calculation elsewhere
-                const totalRate = specificRatePlan.totalRate;
-                const subtotal = totalRate / 1.10; // Remove the 10% tax
-                const taxes = totalRate - subtotal; // Calculate actual tax amount
-
-                return {
-                    roomName: roomName,
-                    available: specificRatePlan.roomsAvailable > 0,
-                    roomsAvailable: specificRatePlan.roomsAvailable,
-                    subtotal: parseFloat(subtotal.toFixed(2)), // Room rate before taxes
-                    taxesAndFees: parseFloat(taxes.toFixed(2)), // Actual tax amount
-                    grandTotal: totalRate, // Total including taxes
-                    rateID: currentRateID,
-                    roomTypeID: ids.roomTypeID
-                };
-            }
-
             return {
                 roomName: roomName,
-                available: false,
-                roomsAvailable: 0,
-                subtotal: null,
-                taxesAndFees: null,
-                grandTotal: null,
+                available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
+                roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
+                totalRate: specificRatePlan ? specificRatePlan.totalRate : null,
                 rateID: currentRateID,
                 roomTypeID: ids.roomTypeID
             };
