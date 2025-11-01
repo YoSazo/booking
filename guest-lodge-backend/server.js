@@ -60,13 +60,13 @@ const roomIDMapping = {
     'Single King Room': {
         roomTypeID: '117057244229790',
         rates: {
-            nightly: '117057244229807',
+            nightly: '131632531103971',
             weekly: '121313720520953',
             monthly: '131632531103971'
         }
     },
     'Double Queen Room': {
-        roomTypeID: '116355544711397',
+        roomTypeID: '131632375537874',
         rates: {
             nightly: '116355544711421',
             weekly: '144727534629093',
@@ -77,7 +77,7 @@ const roomIDMapping = {
     'Double Queen Suite With Kitchenette': {
         roomTypeID: '117068633694351', // Replace with actual Room Type ID
         rates: {
-            nightly: '117068633694362',
+            nightly: '131637796552937',
             weekly: '121313468612837',
             monthly: '131637796552937'
         }
@@ -268,6 +268,8 @@ app.post('/api/stripe-webhook', async (req, res) => {
 
 
 // --- API ENDPOINTS ---
+// In server.js, replace your /api/availability endpoint:
+
 app.post('/api/availability', async (req, res) => {
     const { hotelId, checkin, checkout } = req.body;
     if (hotelId !== 'home-place-suites') {
@@ -287,11 +289,32 @@ app.post('/api/availability', async (req, res) => {
             
             const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
 
+            if (specificRatePlan) {
+                // Calculate the subtotal (room rate before taxes) by dividing totalRate by 1.10
+                // This assumes a 10% tax rate, which matches your calculation elsewhere
+                const totalRate = specificRatePlan.totalRate;
+                const subtotal = totalRate / 1.25; // Remove the 10% tax
+                const taxes = totalRate - subtotal; // Calculate actual tax amount
+
+                return {
+                    roomName: roomName,
+                    available: specificRatePlan.roomsAvailable > 0,
+                    roomsAvailable: specificRatePlan.roomsAvailable,
+                    subtotal: parseFloat(subtotal.toFixed(2)), // Room rate before taxes
+                    taxesAndFees: parseFloat(taxes.toFixed(2)), // Actual tax amount
+                    grandTotal: totalRate, // Total including taxes
+                    rateID: currentRateID,
+                    roomTypeID: ids.roomTypeID
+                };
+            }
+
             return {
                 roomName: roomName,
-                available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
-                roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
-                totalRate: specificRatePlan ? specificRatePlan.totalRate : null,
+                available: false,
+                roomsAvailable: 0,
+                subtotal: null,
+                taxesAndFees: null,
+                grandTotal: null,
                 rateID: currentRateID,
                 roomTypeID: ids.roomTypeID
             };
