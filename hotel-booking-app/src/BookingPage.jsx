@@ -100,7 +100,7 @@ function BookingPage({
     const correctSubtotal = room.totalRate / 1.10;
     const correctTaxes = correctSubtotal * 0.10;
 
-    return ( // <-- 3. Added the 'return' keyword
+    return ( // <-- 3. Addedd the 'return' keyword
       <RoomCard
         key={room.id}
         room={room}
