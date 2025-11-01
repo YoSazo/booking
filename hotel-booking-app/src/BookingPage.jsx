@@ -99,10 +99,9 @@ function BookingPage({
       ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) 
       : 0;
 
-    // Use the API's totalRate (dynamic from Cloudbeds) instead of calculating
-    const grandTotal = room.totalRate || 0;  // This comes from the API
-    const taxAmount = grandTotal * 0.10;     // Calculate tax from total
-    const subtotalBeforeTax = grandTotal / 1.10;  // Back out the tax
+    const subtotalBeforeTax = calculateTieredPrice(nights, rates);
+    const taxAmount = subtotalBeforeTax * 0.10;
+    const grandTotal = subtotalBeforeTax + taxAmount;
     
     const payToday = grandTotal / 2;
     const balanceDue = grandTotal / 2;
@@ -127,7 +126,6 @@ function BookingPage({
         isProcessing={isProcessingBooking}
         roomsAvailable={currentRoomData.roomsAvailable}
       />
-
     ); // <-- 5. Closed the return statement
   }) // <-- 6. Closed the map function with a curly brace
 ) : (
