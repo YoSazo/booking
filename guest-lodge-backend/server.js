@@ -291,7 +291,7 @@ app.post('/api/availability', async (req, res) => {
                 // Calculate the subtotal (room rate before taxes) by dividing totalRate by 1.10
                 // This assumes a 10% tax rate, which matches your calculation elsewhere
                 const totalRate = specificRatePlan.totalRate;
-                const subtotal = totalRate / 1.25; // Remove the 10% tax
+                const subtotal = totalRate / 1.10; // Remove the 10% tax
                 const taxes = totalRate - subtotal; // Calculate actual tax amount
 
                 return {
