@@ -318,6 +318,10 @@ app.post('/api/availability', async (req, res) => {
             };
         });
 
+        console.log('🔍 Searching for dates:', checkin, 'to', checkout);
+        console.log('🔍 Rate Plan ID:', currentRateID);
+        console.log('🔍 Cloudbeds Response:', JSON.stringify(specificRatePlan, null, 2));
+
         const availableRooms = await Promise.all(availabilityPromises);
         res.json({ success: true, data: availableRooms.filter(room => room.available) });
 
