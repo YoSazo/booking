@@ -93,18 +93,20 @@ function BookingPage({
           {isLoading ? (
             <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>Checking for available rooms...</strong></p>
           ) : roomData && roomData.length > 0 ? (
-  roomData.map(room => { // <-- 1. Changed parenthesis to curly brace
-    // 2. This is the new line of logic to find the most current data
+  roomData.map(room => {
     const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
+    const nights = checkinDate && checkoutDate 
+      ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) 
+      : 0;
 
-    const subtotalBeforeTax = room.totalRate / 1.10;
-    const taxAmount = room.totalRate - subtotalBeforeTax;
-
-    const grandTotal = room.totalRate;
+    const subtotalBeforeTax = calculateTieredPrice(nights, rates);
+    const taxAmount = subtotalBeforeTax * 0.10;
+    const grandTotal = subtotalBeforeTax + taxAmount;
+    
     const payToday = grandTotal / 2;
     const balanceDue = grandTotal / 2;
 
-    return ( // <-- 3. Addedd the 'return' keyword
+    return (
       <RoomCard
         key={room.id}
         room={room}
@@ -122,7 +124,6 @@ function BookingPage({
         payToday={payToday}
         balanceDue={balanceDue}
         isProcessing={isProcessingBooking}
-        // 4. This is the only prop that changed
         roomsAvailable={currentRoomData.roomsAvailable}
       />
     ); // <-- 5. Closed the return statement
