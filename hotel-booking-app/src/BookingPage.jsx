@@ -100,9 +100,10 @@ function BookingPage({
     const subtotalBeforeTax = room.totalRate / 1.10;
     const taxAmount = room.totalRate - subtotalBeforeTax;
 
-    const grandTotal = room.totalRate;
-    const payToday = grandTotal / 2;
+    const grandTotal = bookingDetails.subtotal + bookingDetails.taxes;
+    const priceToday = grandTotal / 2;
     const balanceDue = grandTotal / 2;
+
 
     return ( // <-- 3. Addedd the 'return' keyword
       <RoomCard
