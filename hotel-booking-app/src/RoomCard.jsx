@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, isProcessing, roomsAvailable  }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
