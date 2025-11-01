@@ -75,7 +75,7 @@ const roomIDMapping = {
     },
 
     'Double Queen Suite With Kitchenette': {
-        roomTypeID: '117068633694351', // Replace with actual Room Type ID
+        roomTypeID: '117068633694351', // Replace with actual Rooom Type ID
         rates: {
             nightly: '131637796552937',
             weekly: '121313468612837',
