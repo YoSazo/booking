@@ -5,7 +5,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
   const priceToday = subtotal ? subtotal / 2 : 0;
-  const balanceDue = subtotal ? (subtotal / 2) + (taxes || 0) : 0;
+  const balanceDue = subtotal ? subtotal / 2 : 0;
 
   const guestOptions = Array.from({ length: room.maxOccupancy }, (_, i) => i + 1);
   const petOptions = [0, 1, 2];
