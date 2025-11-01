@@ -97,6 +97,9 @@ function BookingPage({
     // 2. This is the new line of logic to find the most current data
     const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
 
+    const correctSubtotal = room.totalRate / 1.10;
+    const correctTaxes = correctSubtotal * 0.10;
+
     return ( // <-- 3. Added the 'return' keyword
       <RoomCard
         key={room.id}
@@ -110,8 +113,8 @@ function BookingPage({
         onBookNow={onConfirmBooking}
         nights={nights}
         onOpenLightbox={onOpenLightbox}
-        subtotal={room.totalRate}
-        taxes={0}
+        subtotal={correctSubtotal}
+        taxes={correctTaxes}
         isProcessing={isProcessingBooking}
         // 4. This is the only prop that changed
         roomsAvailable={currentRoomData.roomsAvailable}
