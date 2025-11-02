@@ -561,7 +561,7 @@ useEffect(() => {
                     <>
                         <TestimonialTrigger 
                         onClick={() => setIsTestimonialOpen(true)}
-                        thumbnailUrl={testimonials[0].thumbnailUrl}
+                        videoUrl={testimonials[0].videoUrl}
                         />
                         {isTestimonialOpen && (
                         <TestimonialPlayer
