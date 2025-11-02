@@ -15,7 +15,7 @@ function TestimonialTrigger({ onClick, thumbnailUrl }) {
             </svg>
           </div>
         </div>
-        <p className="testimonial-trigger-text">Is This Legit? Real Guests Show Their Bookings</p>
+        <p className="testimonial-trigger-text">Watch Ve Granger's 33-Night Stay (See why she trusted us)</p>
       </div>
     </div>
   );
