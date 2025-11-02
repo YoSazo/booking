@@ -1805,7 +1805,7 @@ padding: 6px 16px;
 .wallet-selection-message {
     text-align: center;
     padding: 30px 20px;
-    background-color: #f9f9f9;
+    background-color: #fff; /* Changed from #f9f9f9 to #fff */
     border-radius: 8px;
     border: 1px solid #e0e0e0;
     margin-bottom: 20px;
@@ -1825,14 +1825,15 @@ padding: 6px 16px;
     gap: 10px;
     font-size: 15px;
     color: #555;
-    background-color: #fff;
+    background-color: #f8f9fa; /* Kept slightly grey for contrast */
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     padding: 12px 15px;
-    max-width: 380px; /* Constrain width as seen in Vercel example */
-    margin: 0 auto; /* Center the box */
-    text-align: left; /* Ensure text inside is left-aligned */
+    max-width: 380px;
+    margin: 0 auto;
+    text-align: left;
 }
+
 
 .wallet-info-box .transfer-icon {
     height: 24px; /* Adjust size for this small icon if needed */
@@ -1941,17 +1942,17 @@ padding: 6px 16px;
 }
 
 .card-field-container {
-  border: 1px solid #e0e0e0; /* Lighter border */
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 14px; /* Slightly more padding */
-  background-color: #fafafa; /* Very subtle background */
+  padding: 14px;
+  background-color: #fff; /* Changed from #fafafa to #fff */
   position: relative;
   transition: all 0.2s ease;
 }
 
 .card-field-container:focus-within {
   border-color: #0070f3;
-  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1); /* Softer glow */
+  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1);
   background-color: #fff;
 }
 
