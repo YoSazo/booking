@@ -1,0 +1,74 @@
+.sales-pop-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e0e0e0;
+    padding: 16px;
+    z-index: 1000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    animation: slide-in 0.5s ease-out forwards;
+    max-width: 300px;
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.sales-pop-content p {
+    margin: 0;
+    line-height: 1.5;
+    color: #333;
+}
+
+.sales-pop-content p:first-child {
+    font-size: 16px;
+    color: #000;
+}
+
+.sales-pop-content strong {
+    font-weight: 600;
+}
+
+.sales-pop-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.sales-pop-timestamp {
+    font-size: 12px;
+    color: #999;
+}
+
+.sales-pop-verified {
+    font-size: 12px;
+    color: #555;
+    display: flex;
+    align-items: center;
+}
+
+.sales-pop-verified strong {
+    margin-left: 4px;
+    font-weight: 600;
+}
+
+/* The checkmark character can be styled directly */
+.sales-pop-verified::before {
+    content: '✔'; /* You can also use '\2713' */
+    color: #28a745; /* A green checkmark color */
+    font-size: 14px;
+    margin-right: 5px;
+}
