@@ -127,44 +127,49 @@ export const hotelData = {
     ]
   },
 
-// --- Second Hotel (Example with different data) ---
-  'suite-inn': {
-    name: 'Suite Inn',
-    url: 'https://www.myhomeplacesuites.com',
+
+  // --- Second Hotel (Example with different data) ---
+  'suite-stay': {
+    name: 'Suite Stay',
+    url: 'clickinns.com',
     subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
-    phone: '(605) 388-0959',
-    address: '2520 Tower Rd, Rapid City, SD 57701',
-    pms: 'bookingcenter',
+    phone: '256-207-8086',
+    address: '65600 AL-77, Talladega, AL 35160',
+    pms: 'Cloudbeds',
     propertyCode: 'Dont know yet',
     rates: {
-      NIGHTLY: 69,
+      NIGHTLY: 75,
       WEEKLY: 350,
-      MONTHLY: 950,
+      MONTHLY: 1100,
     },
     reviews: [
       {
-        text: "Very impressed with the new ownership! They removed all the old beds & old furniture and now it is a gorgeous hotel!",
+        text: "The Suite Stay was a lifesaver. No credit checks, no deposit, and I was able to stay for months just renewing—no hassle. For anyone struggling with housing barriers, this place is unreal.",
         author: "Kim D",
-        location: "SD",
+        location: "AL",
         rating: 5,
       },
       {
-        text: "Me and my kids stayed here several weeks And I have to say it's such a beautiful change. I wouldn't have stayed if it was how I remembered it. It has an elegant look and with a full size fridge and 3 in 1 oven and good size tv. I was very pleased especially with the gm being understanding. Highly recommend it if you on a budget and can't afford a deposit. Friendly staff :)",
+        text: "Perfect for a Work Trip – Comfortable, Quiet, and Convenient I stayed at the Suite Stay for a work assignment and had a great experience. The room was spacious, clean, and very comfortable—perfect for an extended stay.",
         author: "Lariah High Hawk",
-        location: "SD",
+        location: "AL",
         rating: 5,
       },
     ],
     rooms: [
-      { id: 1, name: 'Single King Room', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 4, imageUrl: 'doublequeenrapid.jpg', imageUrls: [
-            '/kingbedbart.jpg',
-            'https://placehold.co/400x400/667280/ffffff?text=King+Bathroom',
-            'https://placehold.co/400x400/7989a1/ffffff?text=Workstation',
+      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.JPG', imageUrls: [
+            'doublesuitestay2.JPG',
+            'doublesuitestay3.JPG',
+            'sinksuitestay.JPG',
+            'tvsuitestay.JPG',
+            'workspacesuitestay.JPG',
         ] },
-      { id: 2, name: 'Double Queen Room', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrl: 'singlekingrapid.jpg', imageUrls: [
-            '/kingbedbart.jpg',
-            'https://placehold.co/400x400/667280/ffffff?text=King+Bathroom',
-            'https://placehold.co/400x400/7989a1/ffffff?text=Workstation',
+      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.JPG', imageUrls: [
+            'doublesuitestay2.JPG',
+            'doublesuitestay3.JPG',
+            'sinksuitestay.JPG',
+            'tvsuitestay.JPG',
+            'workspacesuitestay.JPG',
         ] },
     ]
   },
