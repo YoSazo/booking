@@ -260,7 +260,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
 // --- API ENDPOINTS ---
 app.post('/api/availability', async (req, res) => {
     const { hotelId, checkin, checkout } = req.body;
-    if (hotelId !== 'home-place-suites') {
+    if (hotelId !== 'suite-stay') {
         return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
     }
     const nights = Math.round((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24));
@@ -299,7 +299,7 @@ app.post('/api/availability', async (req, res) => {
 app.post('/api/book', async (req, res) => {
     const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
     
-    if (hotelId !== 'home-place-suites') {
+    if (hotelId !== 'suite-stay') {
          return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
     }
     
