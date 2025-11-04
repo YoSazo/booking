@@ -10,9 +10,9 @@ const app = express();
 const prisma = new PrismaClient();
 
 const allowedOrigins = [
-    'https://myhomeplacesuites.com',      // Alloow the non-wwww version
-    'https://www.myhomeplacesuites.com', // Allow the www version
-    'http://localhost:3000'            // Allow local development
+    'https://suitestay.clickinns.com',      // Alloow the non-wwww version
+    'https://www.suitestay.clickinns.com', // Allow the www version
+    'http://localhost:3000'       ,     // Allow local development
 ];
 
 const corsOptions = {
@@ -54,34 +54,24 @@ app.set('trust proxy', true);
 
 const PORT = 3001;
 const CLOUDBEDS_API_KEY = process.env.CLOUDBEDS_API_KEY;
-const PROPERTY_ID = '113548817731712';
+const PROPERTY_ID = '100080519237760';
 
 const roomIDMapping = {
-    'Single King Room': {
-        roomTypeID: '117057244229790',
+    'King Room': {
+        roomTypeID: '104645995544800',
         rates: {
-            nightly: '117057244229807',
-            weekly: '121313720520953',
-            monthly: '131632531103971'
+            nightly: '104646759809220',
+            weekly: '163454677930190',
+            monthly: '163455843680425'
         }
     },
-    'Double Queen Room': {
-        roomTypeID: '116355544711397',
+    'Double Full Bed': {
+        roomTypeID: '104644269441156',
         rates: {
-            nightly: '116355544711421',
-            weekly: '144727534629093',
-            monthly: '131632375537874'
+            nightly: '104644269441201',
+            weekly: '163455410200730',
+            monthly: '163456335478922'
         }
-    },
-
-    'Double Queen Suite With Kitchenette': {
-        roomTypeID: '117068633694351', // Replace with actual Room Type ID
-        rates: {
-            nightly: '117068633694362',
-            weekly: '121313468612837',
-            monthly: '131637796552937'
-        }
-
     }
 };
 
