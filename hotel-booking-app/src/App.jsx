@@ -144,16 +144,24 @@ function App() {
   };
 
   const handleRoomSelect = (room) => {
-    if (!checkinDate || !checkoutDate) {
-      setIsCalendarOpen(true);
-      return;
-    }
-    const bookingState = { ...room, guests: 1, pets: 0 };
-    setSelectedRoom(bookingState);
-    const nights = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
-    const subtotal = room.subtotal || calculateTieredPrice(nights, RATES);
-    trackAddToCart({ ...bookingState, subtotal });
+  if (!checkinDate || !checkoutDate) {
+    setIsCalendarOpen(true);
+    return;
+  }
+  const bookingState = { 
+    ...room, 
+    guests: 1, 
+    pets: 0,
+    // ✅ Preserve API data if it exists
+    apiTotalRate: room.totalRate,
+    apiSubtotal: room.subtotal,
+    apiTaxes: room.taxes
   };
+  setSelectedRoom(bookingState);
+  const nights = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
+  const subtotal = room.subtotal || calculateTieredPrice(nights, RATES);
+  trackAddToCart({ ...bookingState, subtotal });
+};
 
   const generateReservationCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -176,9 +184,21 @@ function App() {
     ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
     : 0;
 
-  const subtotal = selectedRoom.subtotal || calculateTieredPrice(nights, RATES);
-  const taxes = selectedRoom.taxesAndFees || subtotal * 0.10;
-  const total = selectedRoom.grandTotal || subtotal + taxes;
+  // ✅ Use API data if available, otherwise fall back to calculation
+  let subtotal, taxes, total;
+  
+  if (selectedRoom.apiTotalRate !== undefined && selectedRoom.apiTotalRate !== null) {
+    // Use Cloudbeds data (totalRate already includes taxes)
+    total = selectedRoom.apiTotalRate;
+    subtotal = total / 1.10; // Back out the 10% tax to show breakdown
+    taxes = total - subtotal;
+  } else {
+    // Fallback to local calculation
+    subtotal = calculateTieredPrice(nights, RATES);
+    taxes = subtotal * 0.10;
+    total = subtotal + taxes;
+  }
+
   const ourReservationCode = generateReservationCode();
 
   const newBooking = {
@@ -193,6 +213,8 @@ function App() {
   };
 
   setFinalBooking(newBooking);
+
+  // Rest of the function stays the same...
 
   // ONLY send essential data to Stripe (strip out images, descriptions, etc.)
   const stripeMetadata = {

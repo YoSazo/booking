@@ -99,12 +99,21 @@ function BookingPage({
       ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) 
       : 0;
 
-    const subtotalBeforeTax = calculateTieredPrice(nights, rates);
-    const taxAmount = subtotalBeforeTax * 0.10;
-    const grandTotal = subtotalBeforeTax + taxAmount;
+    let grandTotal, payToday, balanceDue;
     
-    const payToday = grandTotal / 2;
-    const balanceDue = grandTotal / 2;
+    if (room.totalRate !== undefined && room.totalRate !== null) {
+      // Cloudbeds API returned a rate - use it directly
+      grandTotal = room.totalRate;
+      payToday = grandTotal / 2;
+      balanceDue = grandTotal / 2;
+    } else {
+      // Fallback to local calculation if API didn't return rates
+      const subtotalBeforeTax = calculateTieredPrice(nights, rates);
+      const taxAmount = subtotalBeforeTax * 0.10;
+      grandTotal = subtotalBeforeTax + taxAmount;
+      payToday = grandTotal / 2;
+      balanceDue = grandTotal / 2;
+    }
 
     return (
       <RoomCard
@@ -119,8 +128,8 @@ function BookingPage({
         onBookNow={onConfirmBooking}
         nights={nights}
         onOpenLightbox={onOpenLightbox}
-        subtotal={subtotalBeforeTax}
-        taxes={taxAmount}
+        subtotal={grandTotal}
+        taxes={0}
         payToday={payToday}
         balanceDue={balanceDue}
         isProcessing={isProcessingBooking}
