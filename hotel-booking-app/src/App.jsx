@@ -148,11 +148,15 @@ function App() {
     setIsCalendarOpen(true);
     return;
   }
+  
+  // ✅ Clear any previous booking data when selecting a new room
+  setFinalBooking(null);
+  sessionStorage.removeItem('finalBooking');
+  
   const bookingState = { 
     ...room, 
     guests: 1, 
     pets: 0,
-    // ✅ Preserve API data if it exists
     apiTotalRate: room.totalRate,
     apiSubtotal: room.subtotal,
     apiTaxes: room.taxes
@@ -162,6 +166,7 @@ function App() {
   const subtotal = room.subtotal || calculateTieredPrice(nights, RATES);
   trackAddToCart({ ...bookingState, subtotal });
 };
+
 
   const generateReservationCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
