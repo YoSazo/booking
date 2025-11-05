@@ -73,6 +73,30 @@ function App() {
     setAvailableRooms(currentHotel.rooms);
   }, [hotelId]);
 
+  // This effect listens for the state updates and *then* navigates.
+  useEffect(() => {
+    // Only navigate if we have a new clientSecret AND a finalBooking
+    // and we are currently on the booking page (to prevent re-navigation loops)
+    if (finalBooking && clientSecret && location.pathname === '/') {
+      navigate('/guest-info', {
+        state: {
+          room: {
+            // Pull data from finalBooking, NOT selectedRoom
+            name: finalBooking.name, 
+            beds: finalBooking.beds || 'N/A',
+          },
+          totalPrice: finalBooking.total,
+          searchParams: {
+            checkIn: finalBooking.checkin,
+            checkOut: finalBooking.checkout,
+            nights: finalBooking.nights,
+            guests: finalBooking.guests,
+          },
+        },
+      });
+    }
+  }, [finalBooking, clientSecret, location.pathname, navigate]); // Add all dependencies
+
   useEffect(() => {
   availableRooms.forEach(room => {
     if (room.imageUrls) {
@@ -178,105 +202,91 @@ function App() {
   };
 
   const handleConfirmBooking = async (bookingDetails) => {
-  if (!selectedRoom) {
-    alert("Please select a room first.");
-    return;
-  }
-
-  setIsProcessingBooking(true);
-
-  const nights = checkinDate && checkoutDate
-    ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
-    : 0;
-
-  // ✅ Use API data if available, otherwise fall back to calculation
-  let subtotal, taxes, total;
-  
-  if (selectedRoom.apiTotalRate !== undefined && selectedRoom.apiTotalRate !== null) {
-    // Use Cloudbeds data (totalRate already includes taxes)
-    total = selectedRoom.apiTotalRate;
-    subtotal = total / 1.10; // Back out the 10% tax to show breakdown
-    taxes = total - subtotal;
-  } else {
-    // Fallback to local calculation
-    subtotal = calculateTieredPrice(nights, RATES);
-    taxes = subtotal * 0.10;
-    total = subtotal + taxes;
-  }
-
-  const ourReservationCode = generateReservationCode();
-
-  const newBooking = {
-    ...selectedRoom,
-    checkin: checkinDate,
-    checkout: checkoutDate,
-    nights,
-    subtotal,
-    taxes,
-    total,
-    reservationCode: ourReservationCode,
-  };
-
-  setFinalBooking(newBooking);
-
-  // Rest of the function stays the same...
-
-  // ONLY send essential data to Stripe (strip out images, descriptions, etc.)
-  const stripeMetadata = {
-    roomTypeID: newBooking.roomTypeID,
-    rateID: newBooking.rateID,
-    roomName: newBooking.name,
-    checkin: newBooking.checkin.toISOString(),
-    checkout: newBooking.checkout.toISOString(),
-    nights: newBooking.nights,
-    guests: newBooking.guests,
-    subtotal: newBooking.subtotal,
-    taxes: newBooking.taxes,
-    total: newBooking.total,
-    reservationCode: ourReservationCode
-  };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        amount: newBooking.subtotal / 2,
-        bookingDetails: stripeMetadata, // ← Use stripped-down version
-        guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
-        hotelId: hotelId
-      }),
-    });
-    
-    const data = await response.json();
-    
-    if (data.clientSecret) {
-      setClientSecret(data.clientSecret);
-      navigate('/guest-info', {
-        state: {
-          room: {
-            name: selectedRoom.name,
-            beds: selectedRoom.beds || 'N/A',
-          },
-          totalPrice: total,
-          searchParams: {
-            checkIn: checkinDate,
-            checkOut: checkoutDate,
-            nights,
-            guests: selectedRoom.guests,
-          },
-        },
-      });
-    } else {
-      alert("Failed to load payment form. Please try again.");
-      setIsProcessingBooking(false);
+    if (!selectedRoom) {
+      alert("Please select a room first.");
+      return;
     }
-  } catch (error) {
-    console.error("Failed to pre-fetch client secret:", error);
-    alert("Failed to load payment form. Please try again.");
-    setIsProcessingBooking(false);
-  }
-};
+
+    setIsProcessingBooking(true);
+
+    const nights = checkinDate && checkoutDate
+      ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    // ✅ Use API data if available, otherwise fall back to calculation
+    let subtotal, taxes, total;
+    
+    if (selectedRoom.apiTotalRate !== undefined && selectedRoom.apiTotalRate !== null) {
+      // Use Cloudbeds data (totalRate already includes taxes)
+      total = selectedRoom.apiTotalRate;
+      subtotal = total / 1.10; // Back out the 10% tax to show breakdown
+      taxes = total - subtotal;
+    } else {
+      // Fallback to local calculation
+      subtotal = calculateTieredPrice(nights, RATES);
+      taxes = subtotal * 0.10;
+      total = subtotal + taxes;
+    }
+
+    const ourReservationCode = generateReservationCode();
+
+    const newBooking = {
+      ...selectedRoom,
+      checkin: checkinDate,
+      checkout: checkoutDate,
+      nights,
+      subtotal,
+      taxes,
+      total,
+      reservationCode: ourReservationCode,
+    };
+
+    setFinalBooking(newBooking); // <-- Set the final booking state
+
+    // ONLY send essential data to Stripe (strip out images, descriptions, etc.)
+    const stripeMetadata = {
+      roomTypeID: newBooking.roomTypeID,
+      rateID: newBooking.rateID,
+      roomName: newBooking.name,
+      checkin: newBooking.checkin.toISOString(),
+      checkout: newBooking.checkout.toISOString(),
+      nights: newBooking.nights,
+      guests: newBooking.guests,
+      subtotal: newBooking.subtotal,
+      taxes: newBooking.taxes,
+      total: newBooking.total,
+      reservationCode: ourReservationCode
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          amount: newBooking.subtotal / 2,
+          bookingDetails: stripeMetadata,
+          guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
+          hotelId: hotelId
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret); // <-- Set the client secret state
+        
+        // ❌ DO NOT NAVIGATE HERE
+        
+      } else {
+        alert("Failed to load payment form. Please try again.");
+        setIsProcessingBooking(false); // <-- Reset on failure
+      }
+    } catch (error) {
+      console.error("Failed to pre-fetch client secret:", error);
+      alert("Failed to load payment form. Please try again.");
+      setIsProcessingBooking(false); // <-- Reset on failure
+    }
+  };
 
 
 
