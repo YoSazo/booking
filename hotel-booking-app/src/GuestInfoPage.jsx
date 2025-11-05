@@ -274,33 +274,28 @@ useEffect(() => {
             // Add this helper function
 
             pr.on('paymentmethod', async (ev) => {
-    // CRITICAL: Tell Stripe we're handling everything
-    ev.complete('success');
-    
-    // Confirm payment with Stripe
+    // Confirm payment with Stripe FIRST
     const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret, 
-        { payment_method: ev.paymentMethod.id }, 
-        { handleActions: false }
+        clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
     );
     
     if (confirmError) {
-        console.error('Payment confirmation failed:', confirmError);
+        ev.complete('fail');
         setHasAttemptedSubmit(true);
         setErrorMessage(confirmError.message);
         setIsProcessing(false);
         return;
     }
     
-    // Now create the booking directly here
+    ev.complete('success');
+    
+    // Now create the booking directly here (don't redirect to CheckoutReturnPage)
     try {
-        setIsProcessing(true);
         await onComplete(latestFormData.current, paymentIntent.id);
         // onComplete will navigate to /final-confirmation
     } catch (error) {
         console.error('Failed to complete booking after wallet payment:', error);
-        setErrorMessage('Payment succeeded but booking failed. Please contact support with confirmation: ' + paymentIntent.id);
-        setIsProcessing(false);
+        setErrorMessage('Payment succeeded but booking failed. Please contact support.');
     }
 });
 
