@@ -214,6 +214,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 new URLSearchParams(reservationData),
                 { headers: { 'accept': 'application/json', 'authorization': `Bearer ${CLOUDBEDS_API_KEY}`, 'content-type': 'application/x-www-form-urlencoded' } }
             );
+                console.log('📥 Webhook Cloudbeds response:', JSON.stringify(pmsResponse.data, null, 2));
 
             // 2. If Cloudbeds booking is successful, save the record to our database.
             if (pmsResponse.data.success) {
@@ -323,6 +324,8 @@ app.post('/api/book', async (req, res) => {
   };
 
   try {
+    console.log('📤 Attempting to create Cloudbeds reservation with data:', JSON.stringify(reservationData, null, 2));
+    
     const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
       headers: {
         'accept': 'application/json',
@@ -331,8 +334,15 @@ app.post('/api/book', async (req, res) => {
       }
     });
 
+    console.log('📥 Cloudbeds API response:', JSON.stringify(pmsResponse.data, null, 2));
+
     if (!pmsResponse.data.success) {
-      return res.status(500).json({ success: false, message: pmsResponse.data.message || 'Failed to create Cloudbeds reservation.' });
+      console.error('❌ Cloudbeds returned success:false -', pmsResponse.data.message);
+      return res.status(500).json({ 
+        success: false, 
+        message: pmsResponse.data.message || 'Failed to create Cloudbeds reservation.',
+        cloudbedsError: pmsResponse.data 
+      });
     }
 
     try {
@@ -373,9 +383,16 @@ app.post('/api/book', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to save booking to database.' });
       }
     }
-  } catch (error) {
-    console.error("Error creating reservation:", error.response?.data || error.message);
-    return res.status(500).json({ success: false, message: 'Failed to create reservation.' });
+} catch (error) {
+    console.error("❌ Error creating reservation in Cloudbeds:");
+    console.error("Status:", error.response?.status);
+    console.error("Data:", JSON.stringify(error.response?.data, null, 2));
+    console.error("Message:", error.message);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.response?.data?.message || error.message || 'Failed to create reservation.',
+      details: error.response?.data 
+    });
   }
 });
 
