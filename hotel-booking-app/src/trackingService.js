@@ -271,8 +271,9 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
 export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     if (!shouldFireEvent('Purchase')) return;
     const eventID = reservationCode;
+    const totalAmount = (bookingDetails.subtotal || 0) + (bookingDetails.taxes || 0);
     const serverPayload = {
-        value: bookingDetails.total,
+        value: totalAmount,
         currency: 'USD',
         event_id: eventID,
         user_data: {
