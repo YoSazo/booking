@@ -233,15 +233,16 @@ useEffect(() => {
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
     useEffect(() => {
-        if (stripe && clientSecret && bookingDetails) {
-            const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
-            const pr = stripe.paymentRequest({
-                country: 'US',
-                currency: 'usd',
-                total: { label: 'Booking Payment', amount: amountInCents },
-                requestPayerName: true,
-                requestPayerEmail: true,
-            });
+    if (stripe && clientSecret && bookingDetails) {
+        const amountInCents = Math.round((bookingDetails.subtotal / 2) * 100);
+        const pr = stripe.paymentRequest({
+            country: 'US',
+            currency: 'usd',
+            total: { label: 'Booking Payment', amount: amountInCents },
+            requestPayerName: true,
+            requestPayerEmail: true,
+        });
+
 
             pr.canMakePayment().then(result => {
                 console.log('Stripe canMakePayment result:', result);
