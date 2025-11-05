@@ -274,13 +274,16 @@ useEffect(() => {
             // Add this helper function
 
             pr.on('paymentmethod', async (ev) => {
-            // Use the ref to get the latest form data
+            // ✅ Use the ref to get the latest form data
             sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
             sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
 
-            const { error: confirmError } = await stripe.confirmCardPayment(
+            setIsProcessing(true);
+
+            const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
                 clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
             );
+            
             if (confirmError) {
                 ev.complete('fail');
                 setHasAttemptedSubmit(true);
@@ -288,9 +291,20 @@ useEffect(() => {
                 setIsProcessing(false);
                 return;
             }
+            
             ev.complete('success');
-            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-
+            
+            // ✅ NEW: Call onComplete directly instead of redirecting
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                onComplete(latestFormData.current, paymentIntent?.id);
+                navigate('/final-confirmation');
+                window.scrollTo(0, 0);
+            } catch (error) {
+                console.error('Apple Pay completion failed:', error);
+                setErrorMessage('Payment processing failed. Please try again.');
+                setIsProcessing(false);
+            }
         });
         }
     }, [stripe, clientSecret, bookingDetails]);
