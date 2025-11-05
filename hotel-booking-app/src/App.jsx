@@ -286,6 +286,8 @@ function App() {
 
 
   const handleCompleteBooking = async (formData, paymentIntentId) => {
+    console.log('🔴 handleCompleteBooking called with:', { formData, paymentIntentId });
+    
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       const newReservationCode = generateReservationCode();
       setGuestInfo(formData);
@@ -298,6 +300,13 @@ function App() {
 
     setIsLoading(true);
     try {
+      console.log('📤 Calling /api/book with:', { 
+        hotelId, 
+        bookingDetails: finalBooking, 
+        guestInfo: formData, 
+        paymentIntentId 
+      });
+      
       const response = await fetch(`${API_BASE_URL}/api/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -310,6 +319,7 @@ function App() {
       });
       
       const result = await response.json();
+      console.log('📥 /api/book response:', result);
       
       if (result.success) {
         setGuestInfo(formData);
@@ -319,14 +329,16 @@ function App() {
         navigate('/final-confirmation');
         window.scrollTo(0, 0);
       } else {
+        console.error('❌ Booking failed:', result.message);
         alert('Booking failed: ' + (result.message || 'An unknown error occurred.'));
       }
     } catch (error) {
-      console.error('Failed to create booking:', error);
+      console.error('❌ Failed to create booking:', error);
       alert('Could not connect to the booking server to finalize your reservation.');
     }
     setIsLoading(false);
 };
+
 
   const handleGuestCountChange = (newGuestCount) => {
     if (selectedRoom) setSelectedRoom({ ...selectedRoom, guests: newGuestCount });
