@@ -140,6 +140,11 @@ function App() {
   const handleDatesUpdate = (dates) => {
     setCheckinDate(dates.start);
     setCheckoutDate(dates.end);
+    
+    // ✅ Reset selection state when dates change
+    setSelectedRoom(null);
+    setFinalBooking(null); // Also clear any lingering final booking
+
     checkAvailability(dates.start, dates.end);
   };
 
