@@ -274,25 +274,26 @@ useEffect(() => {
             // Add this helper function
 
             pr.on('paymentmethod', async (ev) => {
-    // Save user info to sessionStorage so CheckoutReturnPage can use it
-    sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-    sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+  sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+  sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
 
-    // Confirm payment with Stripe
-    const { error: confirmError } = await stripe.confirmCardPayment(
-        clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-    );
-    if (confirmError) {
-        ev.complete('fail');
-        setHasAttemptedSubmit(true);
-        setErrorMessage(confirmError.message);
-        setIsProcessing(false);
-        return;
-    }
-    ev.complete('success');
-    // Redirect to confirmation page, which now (and only now!) triggers booking creation
-    window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
+  const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+    clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
+  );
+  if (confirmError) {
+    ev.complete('fail');
+    setHasAttemptedSubmit(true);
+    setErrorMessage(confirmError.message);
+    setIsProcessing(false);
+    return;
+  }
+  ev.complete('success');
+  // ✅ Instead of redirect, just call onComplete (like card)
+  onComplete(latestFormData.current, paymentIntent?.id);
+  // Optionally: navigate('/final-confirmation')
+  navigate('/final-confirmation');
 });
+
 
         }
     }, [stripe, clientSecret, bookingDetails]);
