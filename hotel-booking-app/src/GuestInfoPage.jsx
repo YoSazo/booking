@@ -274,24 +274,30 @@ useEffect(() => {
             // Add this helper function
 
             pr.on('paymentmethod', async (ev) => {
-            // Use the ref to get the latest form data
-            sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-            sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
+                // Save form data to sessionStorage
+                sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
+                sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
 
-            const { error: confirmError } = await stripe.confirmCardPayment(
-                clientSecret, { payment_method: ev.paymentMethod.id }, { handleActions: false }
-            );
-            if (confirmError) {
-                ev.complete('fail');
-                setHasAttemptedSubmit(true);
-                setErrorMessage(confirmError.message);
-                setIsProcessing(false);
-                return;
-            }
-            ev.complete('success');
-            window.location.href = `${window.location.origin}/confirmation?payment_intent_client_secret=${clientSecret}`;
-
-        });
+                // Confirm the payment with Stripe
+                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                    clientSecret, 
+                    { payment_method: ev.paymentMethod.id }, 
+                    { handleActions: false }
+                );
+                
+                if (confirmError) {
+                    ev.complete('fail');
+                    setHasAttemptedSubmit(true);
+                    setErrorMessage(confirmError.message);
+                    setIsProcessing(false);
+                    return;
+                }
+                
+                ev.complete('success');
+                
+                // ✅ Call onComplete directly (just like card payments do)
+                onComplete(latestFormData.current, paymentIntent.id);
+            });
         }
     }, [stripe, clientSecret, bookingDetails]);
 
