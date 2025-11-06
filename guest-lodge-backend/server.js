@@ -58,11 +58,11 @@ const PROPERTY_ID = '100080519237760';
 
 const roomIDMapping = {
     'King Room': {
-        roomTypeID: '104645995544800',
+        roomTypeID: '104645995540719',
         rates: {
-            nightly: '104646759809220',
-            weekly: '163454677930190',
-            monthly: '163455843680425'
+            nightly: '104645995540724',
+            weekly: '163454677930189',
+            monthly: '163455843680424'
         }
     },
     'Double Full Bed': {
