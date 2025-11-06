@@ -82,7 +82,7 @@ const getBestRatePlan = (nights) => {
     if (nights >= 7) {
         return 'weekly';
     }
-    return 'nightly';
+    return 'weekly';
 };
 
 
