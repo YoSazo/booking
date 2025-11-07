@@ -15,7 +15,7 @@ function TestimonialTrigger({ onClick, thumbnailUrl }) {
             </svg>
           </div>
         </div>
-        <p className="testimonial-trigger-text">Watch why Kenneth stayed with us for more than a year</p>
+        <p className="testimonial-trigger-text">Watch Why Kenneth Stayed With Us For 300+ Nights</p>
       </div>
     </div>
   );
