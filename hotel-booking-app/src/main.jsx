@@ -4,8 +4,8 @@ import App from './App.jsx';
 import './index.css';
 import { LoadScript } from '@react-google-maps/api';
 import { BrowserRouter } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';  // ← Add this
 
-// This is a required list of Google services to load. 'places' is for autocomplete.
 const libraries = ['places'];
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -16,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     >
       <BrowserRouter>
         <App />
+        <Analytics />  {/* ← Add this */}
       </BrowserRouter>
     </LoadScript>
   </React.StrictMode>,
