@@ -245,6 +245,9 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
     const serverPayload = {
         ...pixelPayload,
         event_id: eventID,
+        nights: bookingDetails.nights,
+        checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null, // ← Optional: add check-in date
+        checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null, // ← Optional: add check-out date
         user_data: {
             em: guestInfo.email,
             ph: guestInfo.phone.replace(/\D/g, ''),
