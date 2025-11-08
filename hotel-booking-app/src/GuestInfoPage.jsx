@@ -327,6 +327,7 @@ useEffect(() => {
         } else if (currentStep === 2) {
             if (validateInfoStep()) {
                 setFormErrors({});
+                console.log('bookingDetails being passed to trackAddPaymentInfo:', bookingDetails);
                 trackAddPaymentInfo(bookingDetails, formData);
                 setCurrentStep(3);
             }
