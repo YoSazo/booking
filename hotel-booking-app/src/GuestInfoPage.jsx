@@ -564,7 +564,7 @@ useEffect(() => {
                     </div>
                 </div>
 
-                {currentStep === 3 && (
+                {currentStep === 2 && (
                     <>
                         <TestimonialTrigger 
                         onClick={() => setIsTestimonialOpen(true)}
