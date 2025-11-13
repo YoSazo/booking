@@ -617,6 +617,17 @@ useEffect(() => {
                     </div>
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+                        <div className="money-back-guarantee">
+        <div className="guarantee-content">
+            <div className="guarantee-icon">🛡️</div>
+            <div className="guarantee-text">
+                <div className="guarantee-title">100% Money-Back Guarantee</div>
+                <div className="guarantee-description">
+                    If the room isn't exactly what we promised when you arrive, we'll refund you on the spot—no questions asked.
+                </div>
+            </div>
+        </div>
+    </div>
                         <div className="stripe-badge-container">
     <img 
         src="stripe.svg" 

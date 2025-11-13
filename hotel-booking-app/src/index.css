@@ -2431,3 +2431,96 @@ padding: 6px 16px;
 .stripe-badge:hover {
   opacity: 1;
 }
+
+/* --- Money-Back Guarantee Badge Styles --- */
+.money-back-guarantee {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  border: 3px solid #1e7e34;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin: 24px 0;
+  box-shadow: 0 8px 24px rgba(40, 167, 69, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle shine effect */
+.money-back-guarantee::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+.guarantee-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.guarantee-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.guarantee-text {
+  flex: 1;
+}
+
+.guarantee-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 8px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.guarantee-description {
+  font-size: 14px;
+  color: #fff;
+  margin: 0;
+  line-height: 1.5;
+  opacity: 0.95;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .money-back-guarantee {
+    padding: 16px 18px;
+    margin: 20px 0;
+  }
+  
+  .guarantee-icon {
+    font-size: 28px;
+  }
+  
+  .guarantee-title {
+    font-size: 16px;
+  }
+  
+  .guarantee-description {
+    font-size: 13px;
+  }
+}
