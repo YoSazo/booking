@@ -2442,6 +2442,20 @@ padding: 6px 16px;
   box-shadow: 0 8px 24px rgba(40, 167, 69, 0.3);
   position: relative;
   overflow: hidden;
+  
+  /* ADD THESE LINES: */
+  animation: slideInFromTop 0.5s ease-out;
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Subtle shine effect */
