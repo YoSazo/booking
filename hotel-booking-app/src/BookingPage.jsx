@@ -65,7 +65,15 @@ function BookingPage({
         </header>
         
         <div className="reviews-section">
-          <ReviewCard reviews={hotel.reviews} />
+          {hotel.reviews.map((review, index) => (
+            <ReviewCard 
+              key={index}
+              text={review.text}
+              author={review.author}
+              location={review.location}
+              rating={review.rating}
+            />
+          ))}
           <img src="/google.png" alt="Google Reviews" className="reviews-google-logo" />
         </div>
 
