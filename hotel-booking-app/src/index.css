@@ -1716,9 +1716,10 @@ padding: 6px 16px;
 
 /* --- NEW: This rule fixes the back button's text color when focused --- */
 .back-button:focus, .back-button:active {
-    color: #333; /* Or your preferred default text color */
+    color: #ffffff; /* Keep white text color */
     text-decoration: none;
     outline: none;
+    background-color: #212529; /* Maintain black background */
 }
 
 .billing-address-section {
