@@ -58,9 +58,10 @@ useEffect(() => {
           </svg>
         </button>
 
-<div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
-        
+{testimonials.length > 1 && (
           <>
+            <div className="testimonial-counter">{currentIndex + 1} / {testimonials.length}</div>
+            
             <button className="testimonial-nav-btn prev" onClick={goToPrevious}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="15 18 9 12 15 6"></polyline>
@@ -73,7 +74,7 @@ useEffect(() => {
               </svg>
             </button>
           </>
-       
+        )}
 
         <div className="testimonial-video-container">
           <video
