@@ -62,7 +62,7 @@ const roomIDMapping = {
         rates: {
             nightly: '104645995540724',
             weekly: '163454677930189',
-            monthly: '163455843680424'
+            monthly: '160215797358749'
         }
     },
     'Double Full Bed': {
@@ -70,7 +70,7 @@ const roomIDMapping = {
         rates: {
             nightly: '104644269441201',
             weekly: '163455410200730',
-            monthly: '163456335478922'
+            monthly: '160215797358749'
         }
     }
 };
