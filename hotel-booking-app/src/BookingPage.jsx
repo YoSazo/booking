@@ -44,16 +44,11 @@ function BookingPage({
     <>
       <div className="marquee-banner">
   <div className="marquee-content">
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
-    <span>Only Pay 50% Today!</span>
+    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
+    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
+    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
+    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
+    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
   </div>
 </div>
 
@@ -100,12 +95,20 @@ function BookingPage({
       : 0;
 
     let grandTotal, payToday, balanceDue;
+    
+    if (room.totalRate !== undefined && room.totalRate !== null) {
+      // Cloudbeds API returned a rate - use it directly
+      grandTotal = room.totalRate;
+      payToday = grandTotal / 2;
+      balanceDue = grandTotal / 2;
+    } else {
       // Fallback to local calculation if API didn't return rates
       const subtotalBeforeTax = calculateTieredPrice(nights, rates);
       const taxAmount = subtotalBeforeTax * 0.10;
       grandTotal = subtotalBeforeTax + taxAmount;
       payToday = grandTotal / 2;
       balanceDue = grandTotal / 2;
+    }
 
     return (
       <RoomCard
