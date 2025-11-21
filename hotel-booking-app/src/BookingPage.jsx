@@ -100,20 +100,12 @@ function BookingPage({
       : 0;
 
     let grandTotal, payToday, balanceDue;
-    
-    if (room.totalRate !== undefined && room.totalRate !== null) {
-      // Cloudbeds API returned a rate - use it directly
-      grandTotal = room.totalRate;
-      payToday = grandTotal / 2;
-      balanceDue = grandTotal / 2;
-    } else {
       // Fallback to local calculation if API didn't return rates
       const subtotalBeforeTax = calculateTieredPrice(nights, rates);
       const taxAmount = subtotalBeforeTax * 0.10;
       grandTotal = subtotalBeforeTax + taxAmount;
       payToday = grandTotal / 2;
       balanceDue = grandTotal / 2;
-    }
 
     return (
       <RoomCard

@@ -197,17 +197,12 @@ function App() {
   // ✅ Use API data if available, otherwise fall back to calculation
   let subtotal, taxes, total;
   
-  if (selectedRoom.apiTotalRate !== undefined && selectedRoom.apiTotalRate !== null) {
-    // Use Cloudbeds data (totalRate already includes taxes)
-    total = selectedRoom.apiTotalRate;
-    subtotal = total / 1.10; // Back out the 10% tax to show breakdown
-    taxes = total - subtotal;
-  } else {
+  
     // Fallback to local calculation
     subtotal = calculateTieredPrice(nights, RATES);
     taxes = subtotal * 0.10;
     total = subtotal + taxes;
-  }
+  
 
   const ourReservationCode = generateReservationCode();
 
