@@ -241,7 +241,7 @@ function App() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        amount: newBooking.subtotal / 2,
+        amount: newBooking.total / 2,
         bookingDetails: stripeMetadata, // ← Use stripped-down version
         guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
         hotelId: hotelId

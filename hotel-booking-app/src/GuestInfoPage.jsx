@@ -566,8 +566,8 @@ useEffect(() => {
         return null; // Don't render anything while redirecting
     }
     
-    const priceToday = bookingDetails.subtotal / 2;
-    const balanceDue = (bookingDetails.subtotal / 2) + bookingDetails.taxes;
+    const priceToday = bookingDetails.total / 2;
+    const balanceDue = (bookingDetails.total / 2) + bookingDetails.taxes;
     const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
 
     return (
