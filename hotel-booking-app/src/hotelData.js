@@ -138,9 +138,9 @@ export const hotelData = {
     pms: 'Cloudbeds',
     propertyCode: 'Dont know yet',
     rates: {
-      NIGHTLY: 75,
-      WEEKLY: 350,
-      MONTHLY: 1100,
+      NIGHTLY: 69,
+      WEEKLY: 299,
+      MONTHLY: 999,
     },
     reviews: [
       {
