@@ -44,11 +44,11 @@ function BookingPage({
     <>
       <div className="marquee-banner">
   <div className="marquee-content">
-    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
-    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
-    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
-    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
-    <span>📢 Rates Starting $75/day • $350/week • $1100/month - Check Availability for Surprise Pricing! 🎉</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
   </div>
 </div>
 
