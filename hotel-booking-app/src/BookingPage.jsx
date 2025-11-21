@@ -123,8 +123,8 @@ function BookingPage({
         onBookNow={onConfirmBooking}
         nights={nights}
         onOpenLightbox={onOpenLightbox}
-        subtotal={subtotalBeforeTax}
-        taxes={taxAmount}
+        subtotal={grandTotal}
+        taxes={0}
         payToday={payToday}
         balanceDue={balanceDue}
         isProcessing={isProcessingBooking}
