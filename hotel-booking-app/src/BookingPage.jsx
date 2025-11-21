@@ -104,7 +104,7 @@ function BookingPage({
     } else {
       // Fallback to local calculation if API didn't return rates
       const subtotalBeforeTax = calculateTieredPrice(nights, rates);
-      const taxAmount = subtotalBeforeTax * 0.10;
+      const taxAmount = 0;
       grandTotal = subtotalBeforeTax + taxAmount;
       payToday = grandTotal / 2;
       balanceDue = grandTotal / 2;
