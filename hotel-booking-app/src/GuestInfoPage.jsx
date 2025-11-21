@@ -653,7 +653,7 @@ useEffect(() => {
             <div className="guarantee-text">
                 <div className="guarantee-title">100% Money-Back Guarantee</div>
                 <div className="guarantee-description">
-                    If the room isn't exactly what we promised when you arrive, we'll refund you on the spot—no questions asked.
+                    If the room isn't exactly what we promised when you arrive, we'll refund you 100% of what you paid on the spot. No questions asked.
                 </div>
             </div>
         </div>
