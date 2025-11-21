@@ -44,17 +44,16 @@ function BookingPage({
     <>
       <div className="marquee-banner">
   <div className="marquee-content">
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
-    <span>Special! Rates dropped for a limited time.</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
+    <span>Only Pay 50% Today!</span>
   </div>
 </div>
 
