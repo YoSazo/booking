@@ -4,7 +4,6 @@ import CalendarModal from './CalendarModal.jsx';
 import ReviewCard from './ReviewCard.jsx';
 import HelpWidget from './HelpWidget.jsx';
 import { trackPageView } from './trackingService.js';
-import SalesPop from './SalesPop.jsx';
 
 
 function BookingPage({ 
@@ -161,7 +160,6 @@ function BookingPage({
       />
 
       {!isCalendarOpen && <HelpWidget phone={hotel.phone} />}
-      <SalesPop />
     </>
   );
 }
