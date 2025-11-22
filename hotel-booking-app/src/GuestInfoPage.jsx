@@ -138,36 +138,6 @@ useEffect(() => {
     }, []);
 
 useEffect(() => {
-  // Only scroll when arriving at payment step (step 3) for the first time
-  if (currentStep === 3) {
-    // Use a small delay to let the DOM render first
-    const timeoutId = setTimeout(() => {
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth' // Smooth scroll instead of instant jump
-      });
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }
-}, [currentStep]);
-
-useEffect(() => {
-  // Only scroll when arriving at payment step (step 3) for the first time
-  if (currentStep === 2) {
-    // Use a small delay to let the DOM render first
-    const timeoutId = setTimeout(() => {
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth' // Smooth scroll instead of instant jump
-      });
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }
-}, [currentStep]);
-
-useEffect(() => {
     console.log('DEBUG - errorMessage changed:', errorMessage);
 }, [errorMessage]);
 
