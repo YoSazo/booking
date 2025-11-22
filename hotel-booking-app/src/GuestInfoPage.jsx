@@ -351,7 +351,23 @@ useEffect(() => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        if (formErrors[name]) setFormErrors(prev => ({...prev, [name]: ''}));
+        
+        // Real-time validation feedback - clear errors as user types valid data
+        if (formErrors[name]) {
+            // Check if the field now has valid content
+            let isValid = false;
+            if (name === 'firstName' || name === 'lastName') {
+                isValid = value.trim().length > 0;
+            } else if (name === 'email') {
+                isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+            }
+            
+            // Clear the error if field is now valid
+            if (isValid) {
+                setFormErrors(prev => ({...prev, [name]: ''}));
+            }
+        }
+        
         if (errorMessage) setErrorMessage('');
     };
     
@@ -359,7 +375,15 @@ useEffect(() => {
         let value = e.target.value;
         if (!value.startsWith('+1 ')) value = '+1 ';
         setFormData(prev => ({ ...prev, phone: value }));
-        if (formErrors.phone) setFormErrors(prev => ({...prev, phone: ''}));
+        
+        // Real-time validation feedback for phone
+        if (formErrors.phone) {
+            // Clear error if phone number is now valid (11+ digits including country code)
+            const digitCount = value.replace(/\D/g, '').length;
+            if (digitCount >= 11) {
+                setFormErrors(prev => ({...prev, phone: ''}));
+            }
+        }
     };
 
     const onLoad = (autoC) => setAutocomplete(autoC);
@@ -610,10 +634,10 @@ useEffect(() => {
                 
                 <form id="main-checkout-form" onSubmit={handleCardSubmit} noValidate>
                     <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
-                        <div className="form-field"><label>First Name</label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />{formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}</div>
-                        <div className="form-field"><label>Last Name</label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />{formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}</div>
-                        <div className="form-field"><label>Phone Number</label><input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} />{formErrors.phone && <span className="error-message">{formErrors.phone}</span>}</div>
-                        <div className="form-field"><label>Email Address</label><input type="email" name="email" value={formData.email} onChange={handleChange} required />{formErrors.email && <span className="error-message">{formErrors.email}</span>}</div>
+                        <div className="form-field"><label>First Name <span style={{ color: 'red' }}>*</span></label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />{formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}</div>
+                        <div className="form-field"><label>Last Name <span style={{ color: 'red' }}>*</span></label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />{formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}</div>
+                        <div className="form-field"><label>Phone Number <span style={{ color: 'red' }}>*</span></label><input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} required />{formErrors.phone && <span className="error-message">{formErrors.phone}</span>}</div>
+                        <div className="form-field"><label>Email Address <span style={{ color: 'red' }}>*</span></label><input type="email" name="email" value={formData.email} onChange={handleChange} required />{formErrors.email && <span className="error-message">{formErrors.email}</span>}</div>
                     </div>
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
