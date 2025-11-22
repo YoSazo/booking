@@ -49,6 +49,11 @@ function BookingPage({
     <span>Pay only 50%</span>
     <span>Pay only 50%</span>
     <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
+    <span>Pay only 50%</span>
   </div>
 </div>
 
