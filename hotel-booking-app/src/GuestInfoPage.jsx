@@ -374,12 +374,18 @@ useEffect(() => {
     const handlePhoneChange = (e) => {
         let value = e.target.value;
         if (!value.startsWith('+1 ')) value = '+1 ';
+        
+        // Limit phone number to 10 digits (plus country code = 11 total)
+        const digitCount = value.replace(/\D/g, '').length;
+        if (digitCount > 11) {
+            return; // Don't update if exceeding max length
+        }
+        
         setFormData(prev => ({ ...prev, phone: value }));
         
         // Real-time validation feedback for phone
         if (formErrors.phone) {
-            // Clear error if phone number is now valid (11+ digits including country code)
-            const digitCount = value.replace(/\D/g, '').length;
+            // Clear error if phone number is now valid (11 digits including country code)
             if (digitCount >= 11) {
                 setFormErrors(prev => ({...prev, phone: ''}));
             }
