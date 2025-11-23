@@ -1690,6 +1690,27 @@ padding: 6px 16px;
     justify-content: center;
 }
 
+/* NEW: Make CTA sticky on mobile */
+@media (max-width: 768px) {
+  .checkout-cta-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 16px 20px;
+    background: linear-gradient(to top, #ffffff 80%, rgba(255,255,255,0.95) 95%, transparent);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+  }
+  
+  /* Add bottom padding to page so content doesn't get hidden behind sticky button */
+  .guest-info-container {
+    padding-bottom: 100px;
+  }
+}
+
 /* --- NEW: This class applies the sticky styles ONLY when needed --- */
 
 
