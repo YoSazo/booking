@@ -301,6 +301,22 @@ app.post('/api/book', async (req, res) => {
     if (hotelId !== 'suite-stay') {
          return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
     }
+
+    const isTrial = bookingDetails.bookingType === 'trial';
+
+    let rateIDToUse = bookingDetails.rateID;
+
+    if (isTrial && bookingDetails.useNightlyRate) {
+        // Find the room's nightly rate ID
+        const roomMapping = Object.entries(roomIDMapping).find(
+            ([name, ids]) => ids.roomTypeID === bookingDetails.roomTypeID
+        );
+        
+        if (roomMapping) {
+            rateIDToUse = roomMapping[1].rates.nightly; // Use nightly rate
+            console.log(`✅ Trial booking - switching to nightly rate: ${rateIDToUse}`);
+        }
+    }
     
     if (!bookingDetails.rateID) {
         return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
@@ -321,7 +337,7 @@ app.post('/api/book', async (req, res) => {
         rooms: JSON.stringify([{ 
             roomTypeID: bookingDetails.roomTypeID, 
             quantity: 1, 
-            roomRateID: bookingDetails.rateID 
+            roomRateID: rateIDToUse  
         }]),
         adults: JSON.stringify([{ 
             roomTypeID: bookingDetails.roomTypeID, 
