@@ -1711,7 +1711,7 @@ padding: 6px 16px;
   
   /* Extra padding specifically for the payment step */
   .payment-wrapper {
-    padding-bottom: 40px; /* Adds extra space below billing address section */
+    padding-bottom: 70px; /* Adds extra space below billing address section */
   }
 }
 
