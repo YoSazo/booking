@@ -1690,7 +1690,6 @@ padding: 6px 16px;
     justify-content: center;
 }
 
-/* NEW: Make CTA sticky on mobile */
 @media (max-width: 768px) {
   .checkout-cta-container {
     position: fixed;
@@ -1705,9 +1704,14 @@ padding: 6px 16px;
     z-index: 100;
   }
   
-  /* Add bottom padding to page so content doesn't get hidden behind sticky button */
+  /* Increase bottom padding so content doesn't get hidden behind sticky button */
   .guest-info-container {
-    padding-bottom: 100px;
+    padding-bottom: 120px; /* Increased from the existing padding */
+  }
+  
+  /* Extra padding specifically for the payment step */
+  .payment-wrapper {
+    padding-bottom: 40px; /* Adds extra space below billing address section */
   }
 }
 
