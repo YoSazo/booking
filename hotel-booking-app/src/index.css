@@ -1715,16 +1715,7 @@ padding: 6px 16px;
   
   /* More padding needed because payment form is longer */
   .guest-info-container {
-    padding-bottom: 150px !important; /* Force override */
-  }
-  
-  /* Extra space for payment wrapper specifically */
-  .payment-wrapper {
-    padding-bottom: 80px !important;
-  }
-
-  .guest-info-container:has(.checkout-cta-container.payment-step) {
-    padding-bottom: 40px;
+    padding-bottom: 40px !important; /* Force override */
   }
 }
 
