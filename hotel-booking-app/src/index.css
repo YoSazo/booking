@@ -1715,7 +1715,7 @@ padding: 6px 16px;
   
   /* More padding needed because payment form is longer */
   .guest-info-container {
-    padding-bottom: 40px !important; /* Force override */
+    padding-bottom: 40px; /* Force override */
   }
 }
 
