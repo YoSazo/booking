@@ -1704,14 +1704,14 @@ padding: 6px 16px;
     z-index: 100;
   }
   
-  /* Increase bottom padding so content doesn't get hidden behind sticky button */
+  /* More padding needed because payment form is longer */
   .guest-info-container {
-    padding-bottom: 150px; /* Increased from the existing padding */
+    padding-bottom: 150px !important; /* Force override */
   }
   
-  /* Extra padding specifically for the payment step */
+  /* Extra space for payment wrapper specifically */
   .payment-wrapper {
-    padding-bottom: 70px; /* Adds extra space below billing address section */
+    padding-bottom: 80px !important;
   }
 }
 
