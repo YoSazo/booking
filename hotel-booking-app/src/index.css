@@ -1703,6 +1703,15 @@ padding: 6px 16px;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     z-index: 100;
   }
+
+   /* BUT: Remove sticky behavior on payment step */
+  .checkout-cta-container.payment-step {
+    position: static; /* Change from fixed to normal flow */
+    margin-top: 20px;
+    padding: 16px 20px;
+    background: #fff; /* Solid background */
+    box-shadow: none; /* Remove shadow */
+  }
   
   /* More padding needed because payment form is longer */
   .guest-info-container {
@@ -1712,6 +1721,10 @@ padding: 6px 16px;
   /* Extra space for payment wrapper specifically */
   .payment-wrapper {
     padding-bottom: 80px !important;
+  }
+
+  .guest-info-container:has(.checkout-cta-container.payment-step) {
+    padding-bottom: 40px;
   }
 }
 
@@ -2646,8 +2659,4 @@ padding: 6px 16px;
 
 .payment-option .btn-confirm.secondary:hover {
     background-color: #0056b3;
-}
-
-.billing-address-section {
-  min-height: 400px !important;
 }
