@@ -501,7 +501,10 @@ useEffect(() => {
         }
     };
 
-    const handleTrialNightBooking = async () => {
+    const handleTrialNightBooking = async (e) => {
+    e?.preventDefault();      // Prevent default form behavior
+    e?.stopPropagation();     // Stop event from bubbling up
+    
     setHasAttemptedSubmit(true);
 
     // Validate billing address first
@@ -513,16 +516,21 @@ useEffect(() => {
     setIsProcessing(true);
     setErrorMessage('');
 
-    // Create a modified booking for 1 night only
-    const oneNightCheckout = new Date(bookingDetails.checkin);
-    oneNightCheckout.setDate(oneNightCheckout.getDate() + 1);
+    // ✅ FIX: Ensure checkin is a Date object
+    const checkinDate = bookingDetails.checkin instanceof Date 
+        ? bookingDetails.checkin 
+        : new Date(bookingDetails.checkin);
+    
+    // Create checkout date (1 day after checkin)
+    const checkoutDate = new Date(checkinDate);
+    checkoutDate.setDate(checkoutDate.getDate() + 1);
 
     const trialBooking = {
         roomTypeID: bookingDetails.roomTypeID,
         rateID: bookingDetails.rateID,
         roomName: bookingDetails.name,
-        checkin: bookingDetails.checkin.toISOString(),
-        checkout: oneNightCheckout.toISOString(),
+        checkin: checkinDate.toISOString(),  // ✅ Now safe
+        checkout: checkoutDate.toISOString(), // ✅ Now safe
         nights: 1,
         guests: bookingDetails.guests,
         subtotal: 69,
@@ -540,7 +548,7 @@ useEffect(() => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                amount: 75.90, // Full trial amount
+                amount: 75.90,
                 bookingDetails: trialBooking,
                 guestInfo: formData,
                 hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
@@ -590,9 +598,12 @@ useEffect(() => {
                 // Save session data with trial flag
                 sessionStorage.setItem('finalBooking', JSON.stringify({
                     ...bookingDetails,
+                    checkin: checkinDate.toISOString(),    // ✅ Save as ISO string
+                    checkout: checkoutDate.toISOString(),  // ✅ Save as ISO string
                     nights: 1,
-                    checkout: oneNightCheckout,
                     total: 75.90,
+                    subtotal: 69,
+                    taxes: 6.90,
                     bookingType: 'trial',
                     intendedNights: bookingDetails.nights
                 }));
@@ -601,8 +612,8 @@ useEffect(() => {
                 onComplete(formData, paymentIntent.id);
             }
         } else if (paymentMethod === 'wallet') {
-            // ✅ CREATE A NEW PAYMENT REQUEST FOR THE TRIAL AMOUNT
-            const trialAmountInCents = Math.round(75.90 * 100); // $75.90
+            // Create a NEW payment request for the trial amount
+            const trialAmountInCents = Math.round(75.90 * 100);
             
             const trialPaymentRequest = stripe.paymentRequest({
                 country: 'US',
@@ -612,9 +623,8 @@ useEffect(() => {
                 requestPayerEmail: true,
             });
 
-            // ✅ Set up the payment method handler for this NEW request
+            // Set up the payment method handler
             trialPaymentRequest.on('paymentmethod', async (ev) => {
-                // Confirm the payment with Stripe
                 const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
                     data.clientSecret, 
                     { payment_method: ev.paymentMethod.id }, 
@@ -633,18 +643,20 @@ useEffect(() => {
                 // Save session data with trial flag
                 sessionStorage.setItem('finalBooking', JSON.stringify({
                     ...bookingDetails,
+                    checkin: checkinDate.toISOString(),
+                    checkout: checkoutDate.toISOString(),
                     nights: 1,
-                    checkout: oneNightCheckout,
                     total: 75.90,
+                    subtotal: 69,
+                    taxes: 6.90,
                     bookingType: 'trial',
                     intendedNights: bookingDetails.nights
                 }));
                 
-                // Complete the booking
                 onComplete(formData, paymentIntent.id);
             });
 
-            // ✅ Show the NEW payment request (with correct amount)
+            // Show the payment request
             const canMakePayment = await trialPaymentRequest.canMakePayment();
             
             if (!canMakePayment) {
@@ -1052,7 +1064,7 @@ useEffect(() => {
                 <button
                     type="button"
                     className="btn btn-confirm secondary"
-                    onClick={handleTrialNightBooking}
+                    onClick={(e) => handleTrialNightBooking(e)}
                     disabled={isProcessing}
                 >
                     Book Trial Night
