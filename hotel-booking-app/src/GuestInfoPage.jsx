@@ -44,6 +44,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isProcessingTrial, setIsProcessingTrial] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
@@ -513,7 +514,7 @@ useEffect(() => {
         return;
     }
 
-    setIsProcessing(true);
+    setIsProcessingTrial(true);
     setErrorMessage('');
 
     // ✅ FIX: Ensure checkin is a Date object
@@ -593,7 +594,7 @@ useEffect(() => {
 
             if (error) {
                 setErrorMessage(error.message || "Payment failed");
-                setIsProcessing(false);
+                setIsProcessingTrial(false);
             } else if (paymentIntent && paymentIntent.status === 'succeeded') {
                 // Save session data with trial flag
                 sessionStorage.setItem('finalBooking', JSON.stringify({
@@ -634,7 +635,7 @@ useEffect(() => {
                 if (confirmError) {
                     ev.complete('fail');
                     setErrorMessage(confirmError.message);
-                    setIsProcessing(false);
+                    setIsProcessingTrial(false);
                     return;
                 }
                 
@@ -661,7 +662,7 @@ useEffect(() => {
             
             if (!canMakePayment) {
                 setErrorMessage("Digital wallet is not available. Please use card payment.");
-                setIsProcessing(false);
+                setIsProcessingTrial(false);
                 return;
             }
 
@@ -670,7 +671,7 @@ useEffect(() => {
             } catch (error) {
                 console.log('Payment cancelled:', error);
                 setErrorMessage("Payment cancelled");
-                setIsProcessing(false);
+                setIsProcessingTrial(false);
             }
         }
 
@@ -1065,9 +1066,9 @@ useEffect(() => {
                     type="button"
                     className="btn btn-confirm secondary"
                     onClick={(e) => handleTrialNightBooking(e)}
-                    disabled={isProcessing}
+                    disabled={isProcessingTrial}
                 >
-                    Book Trial Night
+                    {isProcessingTrial ? "Processing..." : "Book Trial Night"}
                 </button>
             </div>
         </div>
