@@ -1874,14 +1874,6 @@ padding: 6px 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   margin-top: 30px;
   border: 1px solid #e8e8e8;
-
-  padding-bottom: 200px;
-}
-
-@media (min-width: 769px) {
-  .payment-wrapper {
-    padding-bottom: 30px; /* Normal padding on desktop */
-  }
 }
 
 .payment-content {
@@ -2654,4 +2646,9 @@ padding: 6px 16px;
 
 .payment-option .btn-confirm.secondary:hover {
     background-color: #0056b3;
+}
+
+.billing-address-section {
+  background-color: yellow !important;
+  min-height: 400px !important;
 }
