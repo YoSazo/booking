@@ -501,6 +501,174 @@ useEffect(() => {
         }
     };
 
+    const handleTrialNightBooking = async () => {
+    setHasAttemptedSubmit(true);
+
+    // Validate billing address first
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage('');
+
+    // Create a modified booking for 1 night only
+    const oneNightCheckout = new Date(bookingDetails.checkin);
+    oneNightCheckout.setDate(oneNightCheckout.getDate() + 1);
+
+    const trialBooking = {
+        roomTypeID: bookingDetails.roomTypeID,
+        rateID: bookingDetails.rateID,
+        roomName: bookingDetails.name,
+        checkin: bookingDetails.checkin.toISOString(),
+        checkout: oneNightCheckout.toISOString(),
+        nights: 1,
+        guests: bookingDetails.guests,
+        subtotal: 69,
+        taxes: 6.90,
+        total: 75.90,
+        reservationCode: bookingDetails.reservationCode,
+        bookingType: 'trial',
+        intendedNights: bookingDetails.nights,
+        useNightlyRate: true,
+    };
+
+    try {
+        // Create new payment intent for trial amount
+        const response = await fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                amount: 75.90, // Full trial amount
+                bookingDetails: trialBooking,
+                guestInfo: formData,
+                hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!data.clientSecret) {
+            throw new Error("Failed to create trial payment");
+        }
+
+        // Update payment intent with guest info
+        await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                clientSecret: data.clientSecret, 
+                guestInfo: formData 
+            }),
+        });
+
+        // Process payment based on method
+        if (paymentMethod === 'card') {
+            const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardNumberElement),
+                    billing_details: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        address: {
+                            line1: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postal_code: formData.zip,
+                            country: 'US',
+                        },
+                    },
+                },
+            });
+
+            if (error) {
+                setErrorMessage(error.message || "Payment failed");
+                setIsProcessing(false);
+            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+                // Save session data with trial flag
+                sessionStorage.setItem('finalBooking', JSON.stringify({
+                    ...bookingDetails,
+                    nights: 1,
+                    checkout: oneNightCheckout,
+                    total: 75.90,
+                    bookingType: 'trial',
+                    intendedNights: bookingDetails.nights
+                }));
+                
+                // Complete the booking
+                onComplete(formData, paymentIntent.id);
+            }
+        } else if (paymentMethod === 'wallet') {
+            // ✅ CREATE A NEW PAYMENT REQUEST FOR THE TRIAL AMOUNT
+            const trialAmountInCents = Math.round(75.90 * 100); // $75.90
+            
+            const trialPaymentRequest = stripe.paymentRequest({
+                country: 'US',
+                currency: 'usd',
+                total: { label: 'Trial Night Booking', amount: trialAmountInCents },
+                requestPayerName: true,
+                requestPayerEmail: true,
+            });
+
+            // ✅ Set up the payment method handler for this NEW request
+            trialPaymentRequest.on('paymentmethod', async (ev) => {
+                // Confirm the payment with Stripe
+                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                    data.clientSecret, 
+                    { payment_method: ev.paymentMethod.id }, 
+                    { handleActions: false }
+                );
+                
+                if (confirmError) {
+                    ev.complete('fail');
+                    setErrorMessage(confirmError.message);
+                    setIsProcessing(false);
+                    return;
+                }
+                
+                ev.complete('success');
+                
+                // Save session data with trial flag
+                sessionStorage.setItem('finalBooking', JSON.stringify({
+                    ...bookingDetails,
+                    nights: 1,
+                    checkout: oneNightCheckout,
+                    total: 75.90,
+                    bookingType: 'trial',
+                    intendedNights: bookingDetails.nights
+                }));
+                
+                // Complete the booking
+                onComplete(formData, paymentIntent.id);
+            });
+
+            // ✅ Show the NEW payment request (with correct amount)
+            const canMakePayment = await trialPaymentRequest.canMakePayment();
+            
+            if (!canMakePayment) {
+                setErrorMessage("Digital wallet is not available. Please use card payment.");
+                setIsProcessing(false);
+                return;
+            }
+
+            try {
+                await trialPaymentRequest.show();
+            } catch (error) {
+                console.log('Payment cancelled:', error);
+                setErrorMessage("Payment cancelled");
+                setIsProcessing(false);
+            }
+        }
+
+    } catch (error) {
+        console.error("Trial night booking failed:", error);
+        setErrorMessage("Failed to process trial booking. Please try again.");
+        setIsProcessing(false);
+    }
+};
+
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = () => {
     setHasAttemptedSubmit(true);
@@ -884,7 +1052,7 @@ useEffect(() => {
                 <button
                     type="button"
                     className="btn btn-confirm secondary"
-                    onClick={() => alert('Trial night booking - implement handler next')}
+                    onClick={handleTrialNightBooking}
                     disabled={isProcessing}
                 >
                     Book Trial Night
