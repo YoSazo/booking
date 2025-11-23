@@ -840,7 +840,7 @@ useEffect(() => {
                     </div>
                 </form>
                 
-                <div className="checkout-cta-container">
+                <div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`}>
     {currentStep < 3 ? (
         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
            { currentStep === 1 && "Proceed to Info" }
