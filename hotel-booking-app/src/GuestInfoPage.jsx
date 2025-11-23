@@ -581,7 +581,7 @@ useEffect(() => {
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
             
-            <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '250px' : '40px' }}>
+            <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
                 <div className="guest-info-header">
                     <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
