@@ -2565,3 +2565,103 @@ padding: 6px 16px;
   }
 }
 
+/* Payment Options Container */
+.payment-options-container {
+    display: flex;
+    gap: 20px;
+    margin-top: 30px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+    .payment-options-container {
+        flex-direction: column;
+        gap: 15px;
+    }
+}
+
+/* Individual Payment Option Cards */
+.payment-option {
+    flex: 1;
+    background-color: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+}
+
+.payment-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.payment-option.primary {
+    border-color: var(--success-color);
+    background: linear-gradient(to bottom, #f0fdf4 0%, #fff 100%);
+}
+
+.payment-option.secondary {
+    border-color: var(--primary-color);
+    background: linear-gradient(to bottom, #eff6ff 0%, #fff 100%);
+}
+
+/* Option Header */
+.option-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.option-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #333;
+}
+
+.option-badge {
+    background-color: var(--success-color);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
+/* Option Price */
+.option-price {
+    font-size: 2em;
+    font-weight: 700;
+    color: var(--success-color);
+    margin: 16px 0 8px 0;
+}
+
+.option-price.trial {
+    color: var(--primary-color);
+}
+
+/* Option Details */
+.option-details {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 20px;
+    flex-grow: 1;
+}
+
+/* Option Buttons */
+.payment-option .btn-confirm {
+    margin-top: auto;
+    width: 100%;
+}
+
+.payment-option .btn-confirm.secondary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.payment-option .btn-confirm.secondary:hover {
+    background-color: #0056b3;
+}

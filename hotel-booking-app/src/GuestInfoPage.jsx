@@ -52,6 +52,11 @@ const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
 const paymentFormRef = useRef(null);
 
+// Check for trial testing parameter
+const [showTrialOption] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('trial') === 'test';
+});
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
@@ -836,36 +841,69 @@ useEffect(() => {
                 </form>
                 
                 <div className="checkout-cta-container">
-                    {currentStep < 3 ? (
-                        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
-                           { currentStep === 1 && "Proceed to Info" }
-                           { currentStep === 2 && "Proceed to Payment" }
-                        </button>
-                    ) : (
-                         <button
-    // If the payment method is 'card', this is a submit button.
-    // Otherwise, it's just a regular button.
-    type={paymentMethod === 'card' ? "submit" : "button"}
-
-    // Only associate with the form when it's a card payment.
-    form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
-
-    className="btn btn-confirm"
-
-    // If the method is 'wallet', call the wallet handler directly.
-    // If it's 'card', set the user intent flag for the form's onSubmit.
-    onClick={
-        paymentMethod === 'wallet'
-        ? handleWalletPayment
-        : () => { window.userInitiatedSubmit = true; }
-    }
-    
-    disabled={isProcessing || !clientSecret || !stripe || !elements}
->
-    {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
-</button>
-                    )}
+    {currentStep < 3 ? (
+        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
+           { currentStep === 1 && "Proceed to Info" }
+           { currentStep === 2 && "Proceed to Payment" }
+        </button>
+    ) : showTrialOption && bookingDetails.nights >= 7 ? (
+        // NEW: Two-option layout for testing
+        <div className="payment-options-container">
+            <div className="payment-option primary">
+                <div className="option-header">
+                    <span className="option-title">Complete Your Booking</span>
+                    <span className="option-badge">Most Popular</span>
                 </div>
+                <div className="option-price">
+                    Pay ${priceToday.toFixed(2)} Today
+                </div>
+                <div className="option-details">
+                    Balance ${balanceDue.toFixed(2)} due at check-in
+                </div>
+                <button
+                    type={paymentMethod === 'card' ? "submit" : "button"}
+                    form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
+                    className="btn btn-confirm primary"
+                    onClick={paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; }}
+                    disabled={isProcessing || !clientSecret || !stripe || !elements}
+                >
+                    {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} Now`}
+                </button>
+            </div>
+
+            <div className="payment-option secondary">
+                <div className="option-header">
+                    <span className="option-title">🔍 Try 1 Night First</span>
+                </div>
+                <div className="option-price trial">
+                    Only $69
+                </div>
+                <div className="option-details">
+                    See the room, then extend to your full stay
+                </div>
+                <button
+                    type="button"
+                    className="btn btn-confirm secondary"
+                    onClick={() => alert('Trial night booking - implement handler next')}
+                    disabled={isProcessing}
+                >
+                    Book Trial Night
+                </button>
+            </div>
+        </div>
+    ) : (
+        // EXISTING: Single button for normal users
+        <button
+            type={paymentMethod === 'card' ? "submit" : "button"}
+            form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
+            className="btn btn-confirm"
+            onClick={paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; }}
+            disabled={isProcessing || !clientSecret || !stripe || !elements}
+        >
+            {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
+        </button>
+    )}
+</div>
             </div>
         </>
     );
