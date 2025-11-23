@@ -1706,7 +1706,7 @@ padding: 6px 16px;
   
   /* Increase bottom padding so content doesn't get hidden behind sticky button */
   .guest-info-container {
-    padding-bottom: 120px; /* Increased from the existing padding */
+    padding-bottom: 150px; /* Increased from the existing padding */
   }
   
   /* Extra padding specifically for the payment step */
