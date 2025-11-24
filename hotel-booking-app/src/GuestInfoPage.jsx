@@ -1029,7 +1029,7 @@ useEffect(() => {
         </button>
     ) : showTrialOption && bookingDetails.nights >= 7 ? (
         // NEW: Two-option layout for testing
-        <>
+        <div className="payment-options-container">
             <div className="payment-option primary">
                 <div className="option-header">
                     <span className="option-title">Complete Your Booking</span>
@@ -1071,7 +1071,7 @@ useEffect(() => {
                     {isProcessingTrial ? "Processing..." : "Book Trial Night"}
                 </button>
             </div>
-        </>
+        </div>
     ) : (
         // EXISTING: Single button for normal users
         <button
