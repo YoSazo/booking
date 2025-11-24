@@ -53,11 +53,8 @@ const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
 const paymentFormRef = useRef(null);
 
-// Check for trial testing parameter
-const [showTrialOption] = useState(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('trial') === 'test';
-});
+// Always show trial option for 7+ night bookings
+const showTrialOption = true;
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
