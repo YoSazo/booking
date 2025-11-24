@@ -1078,7 +1078,7 @@ useEffect(() => {
                     Only $69
                 </div>
                 <div className="option-details">
-                    {new Date(bookingDetails.checkInDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(new Date(bookingDetails.checkInDate).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     <br />
                     See the room, then extend to your full stay
                 </div>
