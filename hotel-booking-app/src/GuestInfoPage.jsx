@@ -52,6 +52,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
 const paymentFormRef = useRef(null);
+const paymentOptionsRef = useRef(null);
+const hasScrolledToPayment = useRef(false);
 
 // Always show trial option for 7+ night bookings
 const showTrialOption = true;
@@ -160,8 +162,27 @@ useEffect(() => {
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setFormErrors({});
+            hasScrolledToPayment.current = false; // Reset scroll flag when leaving step 3
         }
     }, [currentStep, bookingDetails, clientSecret]);
+
+    // Auto-scroll to payment options when reaching step 3 (ONE TIME ONLY)
+    useEffect(() => {
+        if (currentStep === 3 && paymentOptionsRef.current && !hasScrolledToPayment.current) {
+            // Mark that we've scrolled so we never do it again
+            hasScrolledToPayment.current = true;
+            
+            // Small delay to ensure the DOM has rendered
+            setTimeout(() => {
+                if (paymentOptionsRef.current) {
+                    paymentOptionsRef.current.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' // Center the payment options in the viewport
+                    });
+                }
+            }, 300); // 300ms delay gives time for the page to render
+        }
+    }, [currentStep]);
 
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
 
@@ -1018,7 +1039,7 @@ useEffect(() => {
                     </div>
                 </form>
                 
-                <div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`}>
+                <div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
     {currentStep < 3 ? (
         <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
            { currentStep === 1 && "Proceed to Info" }
