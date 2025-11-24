@@ -1057,6 +1057,8 @@ useEffect(() => {
                     Pay ${priceToday.toFixed(2)} Today
                 </div>
                 <div className="option-details">
+                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <br />
                     Balance ${balanceDue.toFixed(2)} due at check-in
                 </div>
                 <button
