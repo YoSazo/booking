@@ -291,11 +291,15 @@ function App() {
   const handleCompleteBooking = async (formData, paymentIntentId) => {
     console.log('🔴 handleCompleteBooking called with:', { formData, paymentIntentId });
     
+    // ✅ Get the latest booking details from sessionStorage (in case trial booking modified it)
+    const currentBooking = JSON.parse(sessionStorage.getItem('finalBooking')) || finalBooking;
+    
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       const newReservationCode = generateReservationCode();
       setGuestInfo(formData);
       setReservationCode(newReservationCode);
-      trackPurchase(finalBooking, formData, newReservationCode);
+      setFinalBooking(currentBooking); // ✅ Update state with current booking
+      trackPurchase(currentBooking, formData, newReservationCode);
       navigate('/final-confirmation');
       window.scrollTo(0, 0);
       return;
@@ -305,7 +309,7 @@ function App() {
     try {
       console.log('📤 Calling /api/book with:', { 
         hotelId, 
-        bookingDetails: finalBooking, 
+        bookingDetails: currentBooking, 
         guestInfo: formData, 
         paymentIntentId 
       });
@@ -315,7 +319,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           hotelId,
-          bookingDetails: finalBooking,
+          bookingDetails: currentBooking,
           guestInfo: formData,
           paymentIntentId,
         }),
@@ -327,8 +331,8 @@ function App() {
       if (result.success) {
         setGuestInfo(formData);
         setReservationCode(result.reservationCode); 
-        setFinalBooking(prev => ({ ...prev, pmsConfirmationCode: result.reservationCode }));
-        trackPurchase(finalBooking, formData, result.reservationCode);
+        setFinalBooking(prev => ({ ...currentBooking, pmsConfirmationCode: result.reservationCode }));
+        trackPurchase(currentBooking, formData, result.reservationCode);
         navigate('/final-confirmation');
         window.scrollTo(0, 0);
       } else {
