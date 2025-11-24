@@ -1081,6 +1081,8 @@ useEffect(() => {
                     {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     <br />
                     See the room, then extend to your full stay
+                    <br />
+                    <strong style={{ color: '#28a745' }}>💰 Your $69 is fully credited if you extend</strong>
                 </div>
                 <button
                     type="button"
