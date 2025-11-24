@@ -226,6 +226,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                         pmsConfirmationCode: pmsResponse.data.reservationID,
                         hotelId: hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
+                        BookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,
@@ -367,7 +368,8 @@ app.post('/api/book', async (req, res) => {
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.data.reservationID,
                         hotelId: hotelId,
-                        roomName: bookingDetails.name || bookingDetails.roomName, // ← FIXED
+                        roomName: bookingDetails.name || bookingDetails.roomName,
+                        BookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,

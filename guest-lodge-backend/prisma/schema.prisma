@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: [https://pris.ly/d/prisma-schema](https://pris.ly/d/prisma-schema)
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,30 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Defines the structure for our permanent booking records
 model Booking {
-  id                    String    @id @default(cuid())
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  ourReservationCode    String    @unique
+  id                    String   @id @default(cuid())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  ourReservationCode    String   @unique
   pmsConfirmationCode   String?
-  stripePaymentIntentId String?   @unique
-  status                String    @default("confirmed")
-
+  stripePaymentIntentId String?  @unique
+  status                String   @default("confirmed")
   hotelId               String
   roomName              String
-
   checkinDate           DateTime
   checkoutDate          DateTime
   nights                Int
-  
   guestFirstName        String
   guestLastName         String
   guestEmail            String
   guestPhone            String
-
   subtotal              Float
   taxesAndFees          Float
   grandTotal            Float
+  BookingType           String   @default("standard")
 }
