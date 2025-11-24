@@ -2575,8 +2575,10 @@ padding: 6px 16px;
     flex-direction: column;
     gap: 12px;
     margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-color);
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background-color: #fafafa;
 }
 
 @media (min-width: 769px) {
