@@ -925,7 +925,7 @@ useEffect(() => {
                                     <br />
                                     See the room, then extend to your full stay
                                     <br />
-                                    <strong style={{ color: '#28a745' }}>💰 Your $69 is fully credited if you extend</strong>
+                                    <strong style={{ color: '#28a745' }}>Your $69 is 100% credited toward any longer stay</strong>
                                 </div>
                             </div>
                         </label>
