@@ -759,6 +759,17 @@ useEffect(() => {
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
     }
+
+    const getPaymentButtonText = () => {
+    const selectedPlan = sessionStorage.getItem('selectedPlan') || 'full';
+    
+    if (selectedPlan === 'trial') {
+        return 'Book Trial Night - Pay $69 Now';
+    } else {
+        const priceToday = bookingDetails.total / 2;
+        return `Pay $${priceToday.toFixed(2)} and Complete Booking`;
+    }
+    };
     
     const priceToday = bookingDetails.total / 2;
     const balanceDue = (bookingDetails.total / 2);
@@ -777,15 +788,15 @@ useEffect(() => {
                 </div>
 
                 <div className="checkout-progress-bar">
-                    <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
-                        <div className="step-circle"></div><span className="step-name">Review Cart</span>
-                    </div>
-                    <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
-                        <div className="step-circle"></div><span className="step-name">Info</span>
-                    </div>
-                    <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
-                        <div className="step-circle"></div><span className="step-name">Payment</span>
-                    </div>
+                <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
+                    <div className="step-circle"></div><span className="step-name">Review</span>
+                </div>
+                <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
+                    <div className="step-circle"></div><span className="step-name">Info</span>
+                </div>
+                <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
+                    <div className="step-circle"></div><span className="step-name">Payment</span>
+                </div>
                 </div>
 
                 {currentStep === 2 && (
@@ -841,263 +852,214 @@ useEffect(() => {
                     </div>
 
                     <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-                        <div className="money-back-guarantee">
-        <div className="guarantee-content">
-            <div className="guarantee-icon">🛡️</div>
-            <div className="guarantee-text">
-                <div className="guarantee-title">100% Money-Back Guarantee</div>
-                <div className="guarantee-description">
-                    If the room isn't exactly what we promised when you arrive, we'll refund 100% of what you paid on the spot. No questions asked.
-                </div>
-            </div>
+  <div className="money-back-guarantee">
+    <div className="guarantee-content">
+      <div className="guarantee-icon">🛡️</div>
+      <div className="guarantee-text">
+        <div className="guarantee-title">100% Money-Back Guarantee</div>
+        <div className="guarantee-description">
+          If the room isn't exactly what we promised when you arrive, we'll refund 100% of what you paid on the spot. No questions asked.
         </div>
+      </div>
     </div>
-                        <div className="stripe-badge-container">
+  </div>
+  
+  <div className="stripe-badge-container">
     <img 
-        src="stripe.svg" 
-        alt="Powered by Stripe" 
-        className="stripe-badge"
-        onError={(e) => {
-            console.log('Stripe badge failed to load');
-            e.target.style.display = 'none';
-        }}
+      src="stripe.svg" 
+      alt="Powered by Stripe" 
+      className="stripe-badge"
+      onError={(e) => {
+        console.log('Stripe badge failed to load');
+        e.target.style.display = 'none';
+      }}
     />
-</div>
-                        <div className="secure-checkout-badge">
+  </div>
+  
+  <div className="secure-checkout-badge">
     <img src="/lock.svg" alt="Secure Checkout" className="lock-icon" />
     <span>Guaranteed safe and secure Checkout</span>
-</div>
-                        {!clientSecret ? (<p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>) : (
-                           <>
-                                <div className="payment-method-tabs">
-    <button 
-        type="button" 
-        className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
-        onClick={() => {
+  </div>
+  
+  {!clientSecret ? (
+    <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>
+  ) : (
+    <>
+      <div className="payment-method-tabs">
+        <button 
+          type="button" 
+          className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
+          onClick={() => {
             setPaymentMethod('card');
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setIsProcessing(false);
-        }}
-    >
-        <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
-    </button>
-                                    {walletType && (
-                                        <button 
-                                            type="button" 
-                                            className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
-                                            onClick={() => {
-                                                setPaymentMethod('wallet');
-                                                setHasAttemptedSubmit(false);
-                                                setErrorMessage('');
-                                                setIsProcessing(false);
-                                            }}
-                                        >
-                                            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
-                                            {walletType}
-                                        </button>
-                                    )}
-
-                                </div>
-                                <div className="payment-content">
-    {paymentMethod === 'card' && (
-        <div className="card-and-billing-container">
+          }}
+        >
+          <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
+        </button>
+        {walletType && (
+          <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
+            onClick={() => {
+              setPaymentMethod('wallet');
+              setHasAttemptedSubmit(false);
+              setErrorMessage('');
+              setIsProcessing(false);
+            }}
+          >
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
+            {walletType}
+          </button>
+        )}
+      </div>
+      
+      <div className="payment-content">
+        {paymentMethod === 'card' && (
+          <div className="card-and-billing-container">
             <div className="split-card-fields">
-                {/* Card Number Field */}
+              <div className="card-field-wrapper">
+                <label>Card number</label>
+                <div className="card-field-container">
+                  <CardNumberElement options={ELEMENT_OPTIONS} />
+                  <div className="card-brands">
+                    <img 
+                      src="/visa.svg" 
+                      alt="Visa" 
+                      className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
+                    />
+                    <img 
+                      src="/mastercard.svg" 
+                      alt="Mastercard" 
+                      className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
+                    />
+                    <img 
+                      src="/express.svg" 
+                      alt="American Express" 
+                      className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="card-fields-row">
                 <div className="card-field-wrapper">
-                    <label>Card number</label>
-                    <div className="card-field-container">
-                        <CardNumberElement options={ELEMENT_OPTIONS} />
-                        <div className="card-brands">
-                            {/* Always show these icons, highlight the detected one */}
-                            <img 
-                                src="/visa.svg" 
-                                alt="Visa" 
-                                className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
-                            />
-                            <img 
-                                src="/mastercard.svg" 
-                                alt="Mastercard" 
-                                className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
-                            />
-                            <img 
-                                src="/express.svg" 
-                                alt="American Express" 
-                                className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
-                            />
-                        </div>
-                    </div>
+                  <label>Expiration date</label>
+                  <div className="card-field-container">
+                    <CardExpiryElement options={ELEMENT_OPTIONS} />
+                  </div>
                 </div>
-                
-                {/* Expiry and CVC Row */}
-                <div className="card-fields-row">
-                    <div className="card-field-wrapper">
-                        <label>Expiration date</label>
-                        <div className="card-field-container">
-                            <CardExpiryElement options={ELEMENT_OPTIONS} />
-                        </div>
-                    </div>
-                    <div className="card-field-wrapper">
-                        <label>CVC</label>
-                        <div className="card-field-container">
-                            <CardCvcElement options={ELEMENT_OPTIONS} />
-                        </div>
-                    </div>
+                <div className="card-field-wrapper">
+                  <label>CVC</label>
+                  <div className="card-field-container">
+                    <CardCvcElement options={ELEMENT_OPTIONS} />
+                  </div>
                 </div>
+              </div>
             </div>
-        </div>
-    )}
+          </div>
+        )}
 
-    {paymentMethod === 'wallet' && walletType && (
-        <div className="wallet-selection-message">
+        {paymentMethod === 'wallet' && walletType && (
+          <div className="wallet-selection-message">
             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
             <p className="wallet-selected-text">{walletType} selected.</p>
             <div className="wallet-info-box">
-                <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
-                <span>Another step will appear to securely submit your payment information.</span>
+              <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
+              <span>Another step will appear to securely submit your payment information.</span>
             </div>
-        </div>
-    )}
-
-    {paymentMethod === 'wallet' && !walletType && (
-        <div className="wallet-info-box">
-            <p>Select your wallet provider above.</p>
-        </div>
-    )}
-
-</div>
-
-<div className="billing-address-section">
-    <label className="billing-address-label">Billing Address</label>
-    <div className="form-grid">
-        <div className="form-field full-width">
-            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                <input 
-                    type="text" 
-                    name="address" 
-                    value={formData.address} 
-                    onChange={handleChange} 
-                    placeholder="Start typing your address..." 
-                    autoComplete="street-address"
-                    onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault(); // Prevent Enter from submitting form
-        }
-    }}
-                />
-            </Autocomplete>
-        </div>
-        {isAddressSelected && (
-            <div className="address-reveal-container visible">
-                <div className="form-field">
-                    <label>City</label>
-                    <input 
-                        type="text" 
-                        name="city" 
-                        value={formData.city} 
-                        onChange={handleChange} 
-                        autoComplete="address-level2"
-                    />
-                </div>
-                <div className="form-field">
-                    <label>State</label>
-                    <input 
-                        type="text" 
-                        name="state" 
-                        value={formData.state} 
-                        onChange={handleChange} 
-                        autoComplete="address-level1"
-                    />
-                </div>
-                <div className="form-field">
-                    <label>Zip</label>
-                    <input 
-                        type="text" 
-                        name="zip" 
-                        value={formData.zip} 
-                        onChange={handleChange} 
-                        autoComplete="postal-code"
-                    />
-                </div>
-            </div>
+          </div>
         )}
-    </div>
+
+        {paymentMethod === 'wallet' && !walletType && (
+          <div className="wallet-info-box">
+            <p>Select your wallet provider above.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="billing-address-section">
+        <label className="billing-address-label">Billing Address</label>
+        <div className="form-grid">
+          <div className="form-field full-width">
+            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+              <input 
+                type="text" 
+                name="address" 
+                value={formData.address} 
+                onChange={handleChange} 
+                placeholder="Start typing your address..." 
+                autoComplete="street-address"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                  }
+                }}
+              />
+            </Autocomplete>
+          </div>
+          {isAddressSelected && (
+            <div className="address-reveal-container visible">
+              <div className="form-field">
+                <label>City</label>
+                <input 
+                  type="text" 
+                  name="city" 
+                  value={formData.city} 
+                  onChange={handleChange} 
+                  autoComplete="address-level2"
+                />
+              </div>
+              <div className="form-field">
+                <label>State</label>
+                <input 
+                  type="text" 
+                  name="state" 
+                  value={formData.state} 
+                  onChange={handleChange} 
+                  autoComplete="address-level1"
+                />
+              </div>
+              <div className="form-field">
+                <label>Zip</label>
+                <input 
+                  type="text" 
+                  name="zip" 
+                  value={formData.zip} 
+                  onChange={handleChange} 
+                  autoComplete="postal-code"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )}
+  {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
 </div>
-                           </>
-                        )}
-                        {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
-                    </div>
                 </form>
                 
-                <div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
-    {currentStep < 3 ? (
-        <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
-           { currentStep === 1 && "Proceed to Info" }
-           { currentStep === 2 && "Proceed to Payment" }
-        </button>
-    ) : showTrialOption && bookingDetails.nights >= 7 ? (
-        // NEW: Two-option layout for testing
-        <div className="payment-options-container">
-            <div className="payment-option primary">
-                <div className="option-header">
-                    <span className="option-title">Complete Your Booking</span>
-                    <span className="option-badge">Most Popular</span>
-                </div>
-                <div className="option-price">
-                    Pay ${priceToday.toFixed(2)} Today
-                </div>
-                <div className="option-details">
-                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    <br />
-                    Balance ${balanceDue.toFixed(2)} due at check-in
-                </div>
-                <button
-                    type={paymentMethod === 'card' ? "submit" : "button"}
-                    form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
-                    className="btn btn-confirm primary"
-                    onClick={paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; }}
-                    disabled={isProcessing || !clientSecret || !stripe || !elements}
-                >
-                    {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} Now`}
-                </button>
-            </div>
+                // Replace the entire checkout-cta-container section at the bottom with:
 
-            <div className="payment-option secondary">
-                <div className="option-header">
-                    <span className="option-title">🔍 Try 1 Night First</span>
-                </div>
-                <div className="option-price trial">
-                    Only $69
-                </div>
-                <div className="option-details">
-                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    <br />
-                    See the room, then extend to your full stay
-                    <br />
-                    <strong style={{ color: '#28a745' }}>💰 Your $69 is fully credited if you extend</strong>
-                </div>
-                <button
-                    type="button"
-                    className="btn btn-confirm secondary"
-                    onClick={(e) => handleTrialNightBooking(e)}
-                    disabled={isProcessingTrial}
-                >
-                    {isProcessingTrial ? "Processing..." : "Book Trial Night"}
-                </button>
-            </div>
-        </div>
-    ) : (
-        // EXISTING: Single button for normal users
-        <button
-            type={paymentMethod === 'card' ? "submit" : "button"}
-            form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
-            className="btn btn-confirm"
-            onClick={paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; }}
-            disabled={isProcessing || !clientSecret || !stripe || !elements}
-        >
-            {isProcessing ? "Processing..." : `Pay $${priceToday.toFixed(2)} and Complete Booking`}
-        </button>
-    )}
+<div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
+  {currentStep < 3 ? (
+    <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
+      {currentStep === 1 && "Proceed to Info"}
+      {currentStep === 2 && "Proceed to Payment"}
+    </button>
+  ) : (
+    <button
+      type={paymentMethod === 'card' ? "submit" : "button"}
+      form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
+      className="btn btn-confirm"
+      onClick={paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; }}
+      disabled={isProcessing || !clientSecret || !stripe || !elements}
+    >
+      {isProcessing ? "Processing..." : getPaymentButtonText()}
+    </button>
+  )}
 </div>
             </div>
         </>

@@ -10,6 +10,7 @@ import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './tracking
 import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import PlanPage from './PlanPage.jsx';
 
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
@@ -190,7 +191,8 @@ function App() {
     return result;
   };
 
-  const handleConfirmBooking = async (bookingDetails) => {
+  // In App.jsx, update handleConfirmBooking function:
+const handleConfirmBooking = async (bookingDetails) => {
   if (!selectedRoom) {
     alert("Please select a room first.");
     return;
@@ -202,15 +204,11 @@ function App() {
     ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
     : 0;
 
-  // ✅ Use API data if available, otherwise fall back to calculation
   let subtotal, taxes, total;
   
-  
-    // Fallback to local calculation
-    subtotal = calculateTieredPrice(nights, RATES);
-    taxes = subtotal * 0.10;
-    total = subtotal + taxes;
-  
+  subtotal = calculateTieredPrice(nights, RATES);
+  taxes = subtotal * 0.10;
+  total = subtotal + taxes;
 
   const ourReservationCode = generateReservationCode();
 
@@ -227,9 +225,6 @@ function App() {
 
   setFinalBooking(newBooking);
 
-  // Rest of the function stays the same...
-
-  // ONLY send essential data to Stripe (strip out images, descriptions, etc.)
   const stripeMetadata = {
     roomTypeID: newBooking.roomTypeID,
     rateID: newBooking.rateID,
@@ -250,7 +245,7 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         amount: newBooking.total / 2,
-        bookingDetails: stripeMetadata, // ← Use stripped-down version
+        bookingDetails: stripeMetadata,
         guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
         hotelId: hotelId
       }),
@@ -260,21 +255,41 @@ function App() {
     
     if (data.clientSecret) {
       setClientSecret(data.clientSecret);
-      navigate('/guest-info', {
-        state: {
-          room: {
-            name: selectedRoom.name,
-            beds: selectedRoom.beds || 'N/A',
+      
+      // Navigate to Plan page if 7+ nights, otherwise go straight to guest-info
+      if (nights >= 7) {
+        navigate('/plan', {
+          state: {
+            room: {
+              name: selectedRoom.name,
+              beds: selectedRoom.beds || 'N/A',
+            },
+            totalPrice: total,
+            searchParams: {
+              checkIn: checkinDate,
+              checkOut: checkoutDate,
+              nights,
+              guests: selectedRoom.guests,
+            },
           },
-          totalPrice: total,
-          searchParams: {
-            checkIn: checkinDate,
-            checkOut: checkoutDate,
-            nights,
-            guests: selectedRoom.guests,
+        });
+      } else {
+        navigate('/guest-info', {
+          state: {
+            room: {
+              name: selectedRoom.name,
+              beds: selectedRoom.beds || 'N/A',
+            },
+            totalPrice: total,
+            searchParams: {
+              checkIn: checkinDate,
+              checkOut: checkoutDate,
+              nights,
+              guests: selectedRoom.guests,
+            },
           },
-        },
-      });
+        });
+      }
     } else {
       alert("Failed to load payment form. Please try again.");
       setIsProcessingBooking(false);
@@ -386,11 +401,59 @@ function App() {
             setIsProcessingBooking={setIsProcessingBooking}
           />
         } />
+
+        {/* NEW: Plan Selection Page */}
+  <Route path="/plan" element={
+    <PlanPage
+      bookingDetails={finalBooking}
+      onBack={() => navigate('/guest-info')}
+      onContinue={(selectedPlan) => {
+        sessionStorage.setItem('selectedPlan', selectedPlan);
+        
+        // If trial is selected, modify booking details
+        if (selectedPlan === 'trial') {
+          const checkinDate = finalBooking.checkin instanceof Date 
+            ? finalBooking.checkin 
+            : new Date(finalBooking.checkin);
+          
+          const checkoutDate = new Date(checkinDate);
+          checkoutDate.setDate(checkoutDate.getDate() + 1);
+          
+          const trialBooking = {
+            ...finalBooking,
+            checkin: checkinDate.toISOString(),
+            checkout: checkoutDate.toISOString(),
+            nights: 1,
+            subtotal: 69,
+            taxes: 6.90,
+            total: 75.90,
+            bookingType: 'trial',
+            intendedNights: finalBooking.nights,
+            useNightlyRate: true,
+          };
+          
+          setFinalBooking(trialBooking);
+          sessionStorage.setItem('finalBooking', JSON.stringify(trialBooking));
+        }
+        
+        navigate('/guest-info');
+      }}
+      showTrialOption={true}
+    />
+  } />
+
         <Route path="/guest-info" element={
           <GuestInfoPageWrapper
             hotel={currentHotel}
             bookingDetails={finalBooking}
-            onBack={() => navigate('/')}
+            onBack={() => {
+              const currentPath = window.location.pathname;
+              if (currentPath === '/guest-info' && sessionStorage.getItem('selectedPlan')) {
+                navigate('/plan');
+              } else {
+                navigate('/');
+              }
+            }}
             onComplete={handleCompleteBooking}
             apiBaseUrl={API_BASE_URL}
             clientSecret={clientSecret}

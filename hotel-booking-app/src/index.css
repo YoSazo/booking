@@ -2700,3 +2700,35 @@ padding: 6px 16px;
         font-size: 0.9em;
     }
 }
+
+
+/* Add to index.css */
+
+/* Radio button payment options */
+.payment-option-radio {
+  cursor: pointer;
+  position: relative;
+  display: block;
+}
+
+.payment-option-radio input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.payment-option-radio.selected .payment-option {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1);
+  transform: scale(1.02);
+}
+
+.payment-option-radio .payment-option {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.payment-option-radio:hover .payment-option {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
