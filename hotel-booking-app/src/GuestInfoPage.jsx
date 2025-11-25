@@ -796,7 +796,10 @@ useEffect(() => {
         .catch((error) => {
             // User cancelled or payment sheet failed to open
             console.log('Payment sheet cancelled or failed:', error);
-            setErrorMessage(error.message || "Payment cancelled or failed to open.");
+            // Only show error message if it's not a user cancellation
+            if (error.message && !error.message.includes('cancelled')) {
+                setErrorMessage(error.message || "Payment failed to open.");
+            }
             setIsProcessing(false);
         });
 };
@@ -1016,6 +1019,7 @@ useEffect(() => {
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setIsProcessing(false);
+            setIsProcessingTrial(false);
           }}
         >
           <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
@@ -1029,6 +1033,7 @@ useEffect(() => {
               setHasAttemptedSubmit(false);
               setErrorMessage('');
               setIsProcessing(false);
+              setIsProcessingTrial(false);
             }}
           >
             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
