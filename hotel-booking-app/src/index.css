@@ -1623,18 +1623,19 @@ padding: 6px 16px;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  max-width: 400px;
+  max-width: 550px;
   margin: 0 auto 40px auto;
   position: relative;
+  padding: 0 10px;
 }
 
 /* The static gray line that connects the steps */
 .checkout-progress-bar::before {
   content: '';
   position: absolute;
-  top: 15px; /* Vertically center on the pills */
-  left: 15%;
-  right: 15%;
+  top: 12px; /* Vertically center on the smaller pills */
+  left: 12%;
+  right: 12%;
   height: 2px;
   background-color: #ddd;
   z-index: 0; /* Place it behind the pills */
@@ -1645,17 +1646,17 @@ padding: 6px 16px;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 500;
-  font-size: 0.9em;
+  font-size: 0.75em;
   z-index: 1; /* Place the steps in front of the line */
+  flex: 1;
 }
 
 /* This is the main pill/circle */
 .step-circle {
-    /* UPDATED: Changed dimensions and radius to create a pill shape */
-    width: 90px;
-    height: 30px;
+    width: 60px;
+    height: 24px;
     border-radius: 999px; 
     background-color: #fff;
     border: 2px solid #ccc;
@@ -1666,6 +1667,8 @@ padding: 6px 16px;
 .step-name {
   color: #888;
   transition: color 0.4s ease;
+  font-size: 0.95em;
+  white-space: nowrap;
 }
 
 /* --- Active & Completed States --- */
@@ -1709,6 +1712,25 @@ padding: 6px 16px;
   /* More padding needed because forms are longer */
   .guest-info-container {
     padding-bottom: 100px; /* Ensure content doesn't hide under sticky button */
+  }
+  
+  /* Make progress bar even more compact on mobile */
+  .checkout-progress-bar {
+    max-width: 100%;
+    padding: 0 5px;
+  }
+  
+  .step-circle {
+    width: 50px;
+    height: 20px;
+  }
+  
+  .step-name {
+    font-size: 0.7em;
+  }
+  
+  .progress-step {
+    gap: 4px;
   }
 }
 
