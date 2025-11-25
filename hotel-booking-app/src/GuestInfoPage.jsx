@@ -1069,7 +1069,7 @@ useEffect(() => {
 </div>
                 </form>
                 
-                // Replace the entire checkout-cta-container section at the bottom with:
+                
 
 <div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
   {currentStep < 3 ? (
