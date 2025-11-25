@@ -139,6 +139,7 @@ useEffect(() => {
 
  // The empty array ensures this complex setup runs only once.
 
+
 useEffect(() => {
   // Load selected plan from sessionStorage if it exists
   const savedPlan = sessionStorage.getItem('selectedPlan');
@@ -158,6 +159,9 @@ useEffect(() => {
 }, [errorMessage]);
 
     // Fetch the Payment Intent from the server
+
+
+
 
 
     // Replace your multiple reset useEffects with this single one:
@@ -183,6 +187,7 @@ useEffect(() => {
     // Auto-scroll to payment options when reaching step 3 (ONE TIME ONLY)
 
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
+
 
 useEffect(() => {
     const handleMouseDown = (event) => {
@@ -227,6 +232,7 @@ useEffect(() => {
 
 
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
+
 
 useEffect(() => {
     // When this component mounts, forcefully remove any inline overflow
@@ -433,6 +439,12 @@ useEffect(() => {
     };
     
     const handlePhoneChange = (e) => {
+        // Defensive check for autofill and other edge cases
+        if (!e || !e.target) {
+            console.warn('handlePhoneChange called without valid event object');
+            return;
+        }
+        
         let value = e.target.value;
         if (!value.startsWith('+1 ')) value = '+1 ';
         
@@ -772,18 +784,9 @@ useEffect(() => {
     // This must happen BEFORE any async operations for Apple Pay to work
     const showPromise = paymentRequest.show();
     
-    // Set up a timeout as a safety net (in case .catch doesn't trigger)
-    const timeoutId = setTimeout(() => {
-        console.log('Payment sheet timeout - resetting processing state');
-        setIsProcessing(false);
-    }, 60000); // 60 second timeout
-    
     // Now handle the promise
     showPromise
         .then(async (paymentResponse) => {
-            // Clear the timeout since payment sheet opened successfully
-            clearTimeout(timeoutId);
-            
             // Payment sheet opened successfully
             // Now do the async update
             try {
@@ -803,22 +806,10 @@ useEffect(() => {
             }
         })
         .catch((error) => {
-            // Clear the timeout
-            clearTimeout(timeoutId);
-            
             // User cancelled or payment sheet failed to open
             console.log('Payment sheet cancelled or failed:', error);
-            
-            // Reset processing state immediately
+            setErrorMessage(error.message || "Payment cancelled or failed to open.");
             setIsProcessing(false);
-            
-            // Only show error message if it's an actual error (not user cancellation)
-            if (error && error.message && 
-                !error.message.toLowerCase().includes('cancel') && 
-                !error.message.toLowerCase().includes('abort') &&
-                error.message !== 'Cancelled') {
-                setErrorMessage("Payment failed to open. Please try again or use card payment.");
-            }
         });
 };
 
