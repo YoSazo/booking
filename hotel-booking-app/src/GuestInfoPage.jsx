@@ -6,7 +6,6 @@ import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js
 import TestimonialTrigger from './TestimonialTrigger.jsx';
 import TestimonialPlayer from './TestimonialPlayer.jsx';
 import { testimonials } from './TestimonialData.js';
-import { useNavigate } from 'react-router-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
