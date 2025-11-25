@@ -2,10 +2,16 @@
 import React, { useState } from 'react';
 
 function PlanPage({ bookingDetails, onBack, onContinue, showTrialOption }) {
-  const [selectedPlan, setSelectedPlan] = useState('full'); // 'full' or 'trial'
+  const [selectedPlan, setSelectedPlan] = useState('full');
 
   const handleContinue = () => {
     onContinue(selectedPlan);
+  };
+
+  const handleBack = () => {
+    // Clear the plan selection when going back
+    sessionStorage.removeItem('selectedPlan');
+    onBack();
   };
 
   const priceToday = bookingDetails.total / 2;

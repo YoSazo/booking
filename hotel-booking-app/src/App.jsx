@@ -192,6 +192,7 @@ function App() {
   };
 
   // In App.jsx, update handleConfirmBooking function:
+// In App.jsx, update handleConfirmBooking to go to guest-info first:
 const handleConfirmBooking = async (bookingDetails) => {
   if (!selectedRoom) {
     alert("Please select a room first.");
@@ -256,40 +257,22 @@ const handleConfirmBooking = async (bookingDetails) => {
     if (data.clientSecret) {
       setClientSecret(data.clientSecret);
       
-      // Navigate to Plan page if 7+ nights, otherwise go straight to guest-info
-      if (nights >= 7) {
-        navigate('/plan', {
-          state: {
-            room: {
-              name: selectedRoom.name,
-              beds: selectedRoom.beds || 'N/A',
-            },
-            totalPrice: total,
-            searchParams: {
-              checkIn: checkinDate,
-              checkOut: checkoutDate,
-              nights,
-              guests: selectedRoom.guests,
-            },
+      // ALWAYS navigate to guest-info first (starts at step 1)
+      navigate('/guest-info', {
+        state: {
+          room: {
+            name: selectedRoom.name,
+            beds: selectedRoom.beds || 'N/A',
           },
-        });
-      } else {
-        navigate('/guest-info', {
-          state: {
-            room: {
-              name: selectedRoom.name,
-              beds: selectedRoom.beds || 'N/A',
-            },
-            totalPrice: total,
-            searchParams: {
-              checkIn: checkinDate,
-              checkOut: checkoutDate,
-              nights,
-              guests: selectedRoom.guests,
-            },
+          totalPrice: total,
+          searchParams: {
+            checkIn: checkinDate,
+            checkOut: checkoutDate,
+            nights,
+            guests: selectedRoom.guests,
           },
-        });
-      }
+        },
+      });
     } else {
       alert("Failed to load payment form. Please try again.");
       setIsProcessingBooking(false);
@@ -404,43 +387,47 @@ const handleConfirmBooking = async (bookingDetails) => {
 
         {/* NEW: Plan Selection Page */}
   <Route path="/plan" element={
-    <PlanPage
-      bookingDetails={finalBooking}
-      onBack={() => navigate('/guest-info')}
-      onContinue={(selectedPlan) => {
-        sessionStorage.setItem('selectedPlan', selectedPlan);
+  <PlanPage
+    bookingDetails={finalBooking}
+    onBack={() => {
+      // Go back to guest info page at step 2
+      navigate('/guest-info');
+    }}
+    onContinue={(selectedPlan) => {
+      sessionStorage.setItem('selectedPlan', selectedPlan);
+      
+      // If trial is selected, modify booking details
+      if (selectedPlan === 'trial') {
+        const checkinDate = finalBooking.checkin instanceof Date 
+          ? finalBooking.checkin 
+          : new Date(finalBooking.checkin);
         
-        // If trial is selected, modify booking details
-        if (selectedPlan === 'trial') {
-          const checkinDate = finalBooking.checkin instanceof Date 
-            ? finalBooking.checkin 
-            : new Date(finalBooking.checkin);
-          
-          const checkoutDate = new Date(checkinDate);
-          checkoutDate.setDate(checkoutDate.getDate() + 1);
-          
-          const trialBooking = {
-            ...finalBooking,
-            checkin: checkinDate.toISOString(),
-            checkout: checkoutDate.toISOString(),
-            nights: 1,
-            subtotal: 69,
-            taxes: 6.90,
-            total: 75.90,
-            bookingType: 'trial',
-            intendedNights: finalBooking.nights,
-            useNightlyRate: true,
-          };
-          
-          setFinalBooking(trialBooking);
-          sessionStorage.setItem('finalBooking', JSON.stringify(trialBooking));
-        }
+        const checkoutDate = new Date(checkinDate);
+        checkoutDate.setDate(checkoutDate.getDate() + 1);
         
-        navigate('/guest-info');
-      }}
-      showTrialOption={true}
-    />
-  } />
+        const trialBooking = {
+          ...finalBooking,
+          checkin: checkinDate.toISOString(),
+          checkout: checkoutDate.toISOString(),
+          nights: 1,
+          subtotal: 69,
+          taxes: 6.90,
+          total: 75.90,
+          bookingType: 'trial',
+          intendedNights: finalBooking.nights,
+          useNightlyRate: true,
+        };
+        
+        setFinalBooking(trialBooking);
+        sessionStorage.setItem('finalBooking', JSON.stringify(trialBooking));
+      }
+      
+      // Navigate back to guest-info but set it to step 3 (payment)
+      navigate('/guest-info', { state: { goToPayment: true } });
+    }}
+    showTrialOption={true}
+  />
+} />
 
         <Route path="/guest-info" element={
           <GuestInfoPageWrapper

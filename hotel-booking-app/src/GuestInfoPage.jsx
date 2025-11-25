@@ -7,6 +7,7 @@ import TestimonialTrigger from './TestimonialTrigger.jsx';
 import TestimonialPlayer from './TestimonialPlayer.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -38,6 +39,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
     });
+    const location = useLocation();
     const navigate = useNavigate();
     const [formErrors, setFormErrors] = useState({});
     // const [clientSecret, setClientSecret] = useState('');
@@ -137,6 +139,17 @@ useEffect(() => {
 // REMOVE ALL PREVIOUS SCROLL/BLUR/VIEWPORT USEEFFECTS.
 
  // The empty array ensures this complex setup runs only once.
+
+useEffect(() => {
+  // If navigating from plan page, go directly to step 3
+  if (location.state?.goToPayment) {
+    setCurrentStep(3);
+    // Clear the state so it doesn't trigger again
+    window.history.replaceState({}, document.title);
+  }
+}, [location]);
+
+
 
 useEffect(() => {
         
@@ -329,26 +342,42 @@ useEffect(() => {
 };
 
     const handleNextStep = () => {
-        if (currentStep === 1) {
-             setCurrentStep(2);
-             trackInitiateCheckout(bookingDetails);
-        } else if (currentStep === 2) {
-            if (validateInfoStep()) {
-                setFormErrors({});
-                console.log('bookingDetails being passed to trackAddPaymentInfo:', bookingDetails);
-                trackAddPaymentInfo(bookingDetails, formData);
-                setCurrentStep(3);
-            }
-        }
-        
-    };
+  if (currentStep === 1) {
+    setCurrentStep(2);
+    trackInitiateCheckout(bookingDetails);
+  } else if (currentStep === 2) {
+    if (validateInfoStep()) {
+      setFormErrors({});
+      trackAddPaymentInfo(bookingDetails, formData);
+      
+      // Check if we should show the plan page
+      if (bookingDetails.nights >= 7) {
+        // Navigate to Plan page for 7+ night bookings
+        navigate('/plan');
+      } else {
+        // Go directly to payment step for <7 nights
+        setCurrentStep(3);
+      }
+    }
+  }
+};
     
     const handleBackStep = () => {
-        if (currentStep === 1) onBack();
-        else setCurrentStep(prev => prev - 1);
-        setHasAttemptedSubmit(false); // Reset attempt state when going back
-        setErrorMessage('');
-    };
+  if (currentStep === 1) {
+    onBack(); // Goes back to booking page
+  } else if (currentStep === 2) {
+    setCurrentStep(1); // Goes back to Review Cart
+  } else if (currentStep === 3) {
+    // Check if we came from plan page
+    if (sessionStorage.getItem('selectedPlan')) {
+      navigate('/plan'); // Go back to plan page
+    } else {
+      setCurrentStep(2); // Go back to Info step
+    }
+  }
+  setHasAttemptedSubmit(false);
+  setErrorMessage('');
+};
 
     const getBackButtonText = () => {
         if (currentStep === 1) return '< Back to Booking';
@@ -788,16 +817,16 @@ useEffect(() => {
                 </div>
 
                 <div className="checkout-progress-bar">
-                <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
-                    <div className="step-circle"></div><span className="step-name">Review</span>
-                </div>
-                <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
-                    <div className="step-circle"></div><span className="step-name">Info</span>
-                </div>
-                <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
-                    <div className="step-circle"></div><span className="step-name">Payment</span>
-                </div>
-                </div>
+                    <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
+                        <div className="step-circle"></div><span className="step-name">Review Cart</span>
+                    </div>
+                    <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
+                        <div className="step-circle"></div><span className="step-name">Info</span>
+                    </div>
+                    <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
+                        <div className="step-circle"></div><span className="step-name">Payment</span>
+                    </div>
+                    </div>
 
                 {currentStep === 2 && (
                     <>
