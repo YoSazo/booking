@@ -772,9 +772,18 @@ useEffect(() => {
     // This must happen BEFORE any async operations for Apple Pay to work
     const showPromise = paymentRequest.show();
     
+    // Set up a timeout as a safety net (in case .catch doesn't trigger)
+    const timeoutId = setTimeout(() => {
+        console.log('Payment sheet timeout - resetting processing state');
+        setIsProcessing(false);
+    }, 60000); // 60 second timeout
+    
     // Now handle the promise
     showPromise
         .then(async (paymentResponse) => {
+            // Clear the timeout since payment sheet opened successfully
+            clearTimeout(timeoutId);
+            
             // Payment sheet opened successfully
             // Now do the async update
             try {
@@ -794,13 +803,22 @@ useEffect(() => {
             }
         })
         .catch((error) => {
+            // Clear the timeout
+            clearTimeout(timeoutId);
+            
             // User cancelled or payment sheet failed to open
             console.log('Payment sheet cancelled or failed:', error);
-            // Only show error message if it's not a user cancellation
-            if (error.message && !error.message.includes('cancelled')) {
-                setErrorMessage(error.message || "Payment failed to open.");
-            }
+            
+            // Reset processing state immediately
             setIsProcessing(false);
+            
+            // Only show error message if it's an actual error (not user cancellation)
+            if (error && error.message && 
+                !error.message.toLowerCase().includes('cancel') && 
+                !error.message.toLowerCase().includes('abort') &&
+                error.message !== 'Cancelled') {
+                setErrorMessage("Payment failed to open. Please try again or use card payment.");
+            }
         });
 };
 
