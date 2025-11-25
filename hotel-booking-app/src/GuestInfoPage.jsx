@@ -167,22 +167,6 @@ useEffect(() => {
     }, [currentStep, bookingDetails, clientSecret]);
 
     // Auto-scroll to payment options when reaching step 3 (ONE TIME ONLY)
-    useEffect(() => {
-        if (currentStep === 3 && paymentOptionsRef.current && !hasScrolledToPayment.current) {
-            // Mark that we've scrolled so we never do it again
-            hasScrolledToPayment.current = true;
-            
-            // Small delay to ensure the DOM has rendered
-            setTimeout(() => {
-                if (paymentOptionsRef.current) {
-                    paymentOptionsRef.current.scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'center' // Center the payment options in the viewport
-                    });
-                }
-            }, 300); // 300ms delay gives time for the page to render
-        }
-    }, [currentStep]);
 
     // In GuestInfoPage.jsx, add this with your other useEffect hooks
 
@@ -373,6 +357,12 @@ useEffect(() => {
     };
 
     const handleChange = (e) => {
+        // Defensive check for autofill and other edge cases
+        if (!e || !e.target) {
+            console.warn('handleChange called without valid event object');
+            return;
+        }
+        
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
         
