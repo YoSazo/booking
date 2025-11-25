@@ -56,8 +56,8 @@ const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
 
-// Plan selection state
-const [selectedPlan, setSelectedPlan] = useState('full');
+// Plan selection state - Trial is default
+const [selectedPlan, setSelectedPlan] = useState('trial');
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
@@ -901,34 +901,7 @@ useEffect(() => {
 
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
                     <div className="payment-options-container">
-                        {/* Full Booking Option */}
-                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
-                            <input 
-                                type="radio" 
-                                name="plan" 
-                                value="full" 
-                                checked={selectedPlan === 'full'}
-                                onChange={() => setSelectedPlan('full')}
-                            />
-                            <div className="payment-option primary">
-                                <div className="option-header">
-                                    <span className="option-title">Complete Your Booking</span>
-                                    <span className="option-badge">Most Popular</span>
-                                </div>
-                                <div className="option-price">
-                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
-                                </div>
-                                <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
-                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
-                                </div>
-                            </div>
-                        </label>
-
-                        {/* Trial Night Option */}
+                        {/* Trial Night Option - NOW ON TOP AND DEFAULT */}
                         <label className={`payment-option-radio ${selectedPlan === 'trial' ? 'selected' : ''}`}>
                             <input 
                                 type="radio" 
@@ -937,9 +910,10 @@ useEffect(() => {
                                 checked={selectedPlan === 'trial'}
                                 onChange={() => setSelectedPlan('trial')}
                             />
-                            <div className="payment-option secondary">
+                            <div className="payment-option primary">
                                 <div className="option-header">
                                     <span className="option-title">🔍 Try 1 Night First</span>
+                                    <span className="option-badge">Most Popular</span>
                                 </div>
                                 <div className="option-price trial">
                                     Only $69
@@ -952,6 +926,32 @@ useEffect(() => {
                                     See the room, then extend to your full stay
                                     <br />
                                     <strong style={{ color: '#28a745' }}>💰 Your $69 is fully credited if you extend</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        {/* Full Booking Option - NOW SECONDARY */}
+                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="full" 
+                                checked={selectedPlan === 'full'}
+                                onChange={() => setSelectedPlan('full')}
+                            />
+                            <div className="payment-option secondary">
+                                <div className="option-header">
+                                    <span className="option-title">Complete Your Booking</span>
+                                </div>
+                                <div className="option-price">
+                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
                                 </div>
                             </div>
                         </label>
