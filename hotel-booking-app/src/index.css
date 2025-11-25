@@ -1721,12 +1721,12 @@ padding: 6px 16px;
   }
   
   .step-circle {
-    width: 50px;
-    height: 20px;
+    width: 70px;
+    height: 30px;
   }
   
   .step-name {
-    font-size: 0.7em;
+    font-size: 1.0em;
   }
   
   .progress-step {
