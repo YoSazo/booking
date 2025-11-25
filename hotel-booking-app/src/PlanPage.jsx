@@ -55,7 +55,6 @@ function PlanPage({ bookingDetails, onBack, onContinue, showTrialOption }) {
           {/* Full Booking Option */}
           <label 
             className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}
-            onClick={() => setSelectedPlan('full')}
           >
             <input 
               type="radio" 
@@ -86,7 +85,6 @@ function PlanPage({ bookingDetails, onBack, onContinue, showTrialOption }) {
           {showTrialOption && bookingDetails.nights >= 7 && (
             <label 
               className={`payment-option-radio ${selectedPlan === 'trial' ? 'selected' : ''}`}
-              onClick={() => setSelectedPlan('trial')}
             >
               <input 
                 type="radio" 

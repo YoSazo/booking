@@ -1691,9 +1691,9 @@ padding: 6px 16px;
 }
 
 @media (max-width: 768px) {
-  /* Sticky behavior for Review Cart, Info, and Plan pages */
+  /* Sticky behavior for ALL pages including payment */
   .checkout-cta-container.sticky,
-  .checkout-cta-container:not(.payment-step) {
+  .checkout-cta-container {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -1705,20 +1705,10 @@ padding: 6px 16px;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     z-index: 100;
   }
-
-   /* BUT: Remove sticky behavior on payment step */
-  .checkout-cta-container.payment-step {
-    position: static; /* Change from fixed to normal flow */
-    margin-top: 20px;
-    padding: 24px;
-    background: #fff; /* Solid background */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border-radius: 16px; /* Add rounded corners */
-  }
   
-  /* More padding needed because payment form is longer */
+  /* More padding needed because forms are longer */
   .guest-info-container {
-    padding-bottom: 40px; /* Force override */
+    padding-bottom: 100px; /* Ensure content doesn't hide under sticky button */
   }
 }
 
@@ -2710,26 +2700,21 @@ padding: 6px 16px;
 .payment-option-radio {
   cursor: pointer;
   position: relative;
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .payment-option-radio input[type="radio"] {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.payment-option-radio.selected .payment-option {
-  border-color: var(--primary-color);
-  border-width: 3px;
-  background-color: #f0f7ff;
+  margin-top: 28px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: var(--primary-color);
 }
 
 .payment-option-radio .payment-option {
-  transition: all 0.2s ease;
   cursor: pointer;
-}
-
-.payment-option-radio:hover .payment-option {
-  border-color: #999;
+  flex: 1;
 }

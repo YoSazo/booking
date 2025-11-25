@@ -10,7 +10,6 @@ import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './tracking
 import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import PlanPage from './PlanPage.jsx';
 
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
@@ -385,25 +384,6 @@ const handleConfirmBooking = async (bookingDetails) => {
           />
         } />
 
-        {/* NEW: Plan Selection Page */}
-  <Route path="/plan" element={
-  <PlanPage
-    bookingDetails={finalBooking}
-    onBack={() => {
-      // Go back to guest info page at step 2
-      navigate('/guest-info');
-    }}
-    onContinue={(selectedPlan) => {
-      // Store the selected plan but DON'T modify booking details yet
-      sessionStorage.setItem('selectedPlan', selectedPlan);
-      
-      // Navigate back to guest-info but set it to step 3 (payment)
-      // GuestInfoPage will handle trial logic when processing payment
-      navigate('/guest-info', { state: { goToPayment: true } });
-    }}
-    showTrialOption={true}
-  />
-} />
 
         <Route path="/guest-info" element={
           <GuestInfoPageWrapper

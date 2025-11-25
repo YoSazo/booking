@@ -56,8 +56,8 @@ const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
 
-// Always show trial option for 7+ night bookings
-const showTrialOption = true;
+// Plan selection state
+const [selectedPlan, setSelectedPlan] = useState('full');
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
@@ -140,13 +140,12 @@ useEffect(() => {
  // The empty array ensures this complex setup runs only once.
 
 useEffect(() => {
-  // If navigating from plan page, go directly to step 3
-  if (location.state?.goToPayment) {
-    setCurrentStep(3);
-    // Clear the state so it doesn't trigger again
-    window.history.replaceState({}, document.title);
+  // Load selected plan from sessionStorage if it exists
+  const savedPlan = sessionStorage.getItem('selectedPlan');
+  if (savedPlan) {
+    setSelectedPlan(savedPlan);
   }
-}, [location]);
+}, []);
 
 
 
@@ -163,18 +162,21 @@ useEffect(() => {
 
     // Replace your multiple reset useEffects with this single one:
     useEffect(() => {
+        // Payment step is 3 for <7 nights, 4 for 7+ nights
+        const paymentStep = bookingDetails && bookingDetails.nights >= 7 ? 4 : 3;
+        
         // Reset error state when we're on payment step and have all required data
-        if (currentStep === 3 && bookingDetails && clientSecret) {
+        if (currentStep === paymentStep && bookingDetails && clientSecret) {
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setFormErrors({});
         }
         // Also reset when navigating away from payment step
-        else if (currentStep < 3) {
+        else if (currentStep < paymentStep) {
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setFormErrors({});
-            hasScrolledToPayment.current = false; // Reset scroll flag when leaving step 3
+            hasScrolledToPayment.current = false; // Reset scroll flag when leaving payment step
         }
     }, [currentStep, bookingDetails, clientSecret]);
 
@@ -349,15 +351,20 @@ useEffect(() => {
       setFormErrors({});
       trackAddPaymentInfo(bookingDetails, formData);
       
-      // Check if we should show the plan page
+      // Check if we should show the plan step
       if (bookingDetails.nights >= 7) {
-        // Navigate to Plan page for 7+ night bookings
-        navigate('/plan');
+        // Go to plan step (step 3) for 7+ night bookings
+        setCurrentStep(3);
       } else {
-        // Go directly to payment step for <7 nights
+        // Go directly to payment step (step 3 for <7 nights, no plan step) for <7 nights
         setCurrentStep(3);
       }
     }
+  } else if (currentStep === 3 && bookingDetails.nights >= 7) {
+    // User is on plan selection, proceed to payment (step 4)
+    // Save the selected plan to sessionStorage
+    sessionStorage.setItem('selectedPlan', selectedPlan);
+    setCurrentStep(4);
   }
 };
     
@@ -367,12 +374,16 @@ useEffect(() => {
   } else if (currentStep === 2) {
     setCurrentStep(1); // Goes back to Review Cart
   } else if (currentStep === 3) {
-    // Check if we came from plan page (7+ nights)
+    // If we have 7+ nights and are on plan step, go back to info
+    // If we have <7 nights and are on payment step, go back to info
     if (bookingDetails && bookingDetails.nights >= 7) {
-      navigate('/plan'); // Go back to plan page
+      setCurrentStep(2); // Go back to Info step from Plan
     } else {
-      setCurrentStep(2); // Go back to Info step for <7 nights
+      setCurrentStep(2); // Go back to Info step from Payment
     }
+  } else if (currentStep === 4) {
+    // Go back from payment step (7+ nights only, has plan step)
+    setCurrentStep(3); // Go back to plan step
   }
   setHasAttemptedSubmit(false);
   setErrorMessage('');
@@ -382,8 +393,13 @@ useEffect(() => {
         if (currentStep === 1) return '< Back to Booking';
         if (currentStep === 2) return '< Back to Cart';
         if (currentStep === 3) {
-            // Show "Back to Plan" if 7+ nights, else "Back to Info"
-            return bookingDetails && bookingDetails.nights >= 7 ? '< Back to Plan' : '< Back to Info';
+            // If 7+ nights, we're on Plan step, go back to Info
+            // If <7 nights, we're on Payment step, go back to Info
+            return '< Back to Info';
+        }
+        if (currentStep === 4) {
+            // Payment step for 7+ nights, go back to Plan
+            return '< Back to Plan';
         }
     };
 
@@ -475,6 +491,13 @@ useEffect(() => {
     // Main submit handler for CARD PAYMENTS
     const handleCardSubmit = async (e) => {
         e.preventDefault();
+        
+        // If trial plan selected, use trial handler instead
+        if (selectedPlan === 'trial') {
+            handleTrialNightBooking(e);
+            return;
+        }
+        
         if (!window.userInitiatedSubmit) {
         console.warn('Form submitted without user interaction - ignoring');
         return;
@@ -798,8 +821,6 @@ useEffect(() => {
     }
 
     const getPaymentButtonText = () => {
-    const selectedPlan = sessionStorage.getItem('selectedPlan') || 'full';
-    
     if (selectedPlan === 'trial') {
         return 'Book Trial Night - Pay $69 Now';
     } else {
@@ -818,7 +839,7 @@ useEffect(() => {
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
             
-            <div className="guest-info-container" style={{ paddingBottom: currentStep < 3 ? '120px' : '40px' }}>
+            <div className="guest-info-container" style={{ paddingBottom: '120px' }}>
                 <div className="guest-info-header">
                     <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
@@ -832,11 +853,11 @@ useEffect(() => {
                         <div className="step-circle"></div><span className="step-name">Info</span>
                     </div>
                     {bookingDetails && bookingDetails.nights >= 7 && (
-                        <div className={`progress-step ${sessionStorage.getItem('selectedPlan') ? 'completed' : ''}`}>
+                        <div className={`progress-step ${currentStep >= 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
                             <div className="step-circle"></div><span className="step-name">Plan</span>
                         </div>
                     )}
-                    <div className={`progress-step ${currentStep === 3 ? 'completed active' : ''}`}>
+                    <div className={`progress-step ${currentStep === (bookingDetails && bookingDetails.nights >= 7 ? 4 : 3) ? 'completed active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Payment</span>
                     </div>
                     </div>
@@ -866,6 +887,65 @@ useEffect(() => {
                     </>
                     )}
 
+                {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
+                    <div className="payment-options-container">
+                        {/* Full Booking Option */}
+                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="full" 
+                                checked={selectedPlan === 'full'}
+                                onChange={() => setSelectedPlan('full')}
+                            />
+                            <div className="payment-option primary">
+                                <div className="option-header">
+                                    <span className="option-title">Complete Your Booking</span>
+                                    <span className="option-badge">Most Popular</span>
+                                </div>
+                                <div className="option-price">
+                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
+                                </div>
+                            </div>
+                        </label>
+
+                        {/* Trial Night Option */}
+                        <label className={`payment-option-radio ${selectedPlan === 'trial' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="trial" 
+                                checked={selectedPlan === 'trial'}
+                                onChange={() => setSelectedPlan('trial')}
+                            />
+                            <div className="payment-option secondary">
+                                <div className="option-header">
+                                    <span className="option-title">🔍 Try 1 Night First</span>
+                                </div>
+                                <div className="option-price trial">
+                                    Only $69
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>1 night trial</strong>
+                                    <br />
+                                    See the room, then extend to your full stay
+                                    <br />
+                                    <strong style={{ color: '#28a745' }}>💰 Your $69 is fully credited if you extend</strong>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                )}
+
                 {currentStep === 1 && (
                     <div className="info-summary-wrapper">
                         <div className="summary-card-details">
@@ -893,7 +973,7 @@ useEffect(() => {
                         <div className="form-field"><label>Email Address <span style={{ color: 'red' }}>*</span></label><input type="email" name="email" value={formData.email} onChange={handleChange} required />{formErrors.email && <span className="error-message">{formErrors.email}</span>}</div>
                     </div>
 
-                    <div className="payment-wrapper" style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+                    <div className="payment-wrapper" style={{ display: (currentStep === 4 || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? 'block' : 'none' }}>
   <div className="money-back-guarantee">
     <div className="guarantee-content">
       <div className="guarantee-icon">🛡️</div>
@@ -1085,21 +1165,26 @@ useEffect(() => {
                 
                 
 
-<div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step sticky' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
-  {currentStep < 3 ? (
+<div className={`checkout-cta-container sticky`} ref={(currentStep === 4 || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? paymentOptionsRef : null}>
+  {!((currentStep === 4) || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? (
     <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
       {currentStep === 1 && "Proceed to Info"}
-      {currentStep === 2 && "Proceed to Payment"}
+      {currentStep === 2 && (bookingDetails && bookingDetails.nights >= 7 ? "Proceed to Plan" : "Proceed to Payment")}
+      {currentStep === 3 && "Proceed to Payment"}
     </button>
   ) : (
     <button
-      type={paymentMethod === 'card' ? "submit" : "button"}
-      form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
+      type={selectedPlan === 'trial' ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
+      form={selectedPlan === 'trial' ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
       className="btn btn-confirm"
-      onClick={paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; }}
-      disabled={isProcessing || !clientSecret || !stripe || !elements}
+      onClick={
+        selectedPlan === 'trial' 
+          ? handleTrialNightBooking 
+          : (paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; })
+      }
+      disabled={isProcessing || isProcessingTrial || !clientSecret || !stripe || !elements}
     >
-      {isProcessing ? "Processing..." : getPaymentButtonText()}
+      {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
     </button>
   )}
 </div>
