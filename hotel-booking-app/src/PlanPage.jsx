@@ -9,8 +9,7 @@ function PlanPage({ bookingDetails, onBack, onContinue, showTrialOption }) {
   };
 
   const handleBack = () => {
-    // Clear the plan selection when going back
-    sessionStorage.removeItem('selectedPlan');
+    // DON'T clear plan selection - just go back
     onBack();
   };
 
@@ -118,7 +117,7 @@ function PlanPage({ bookingDetails, onBack, onContinue, showTrialOption }) {
         </div>
       </div>
 
-      <div className="checkout-cta-container">
+      <div className="checkout-cta-container sticky">
         <button 
           type="button" 
           className="btn btn-confirm" 

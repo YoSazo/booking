@@ -1691,7 +1691,9 @@ padding: 6px 16px;
 }
 
 @media (max-width: 768px) {
-  .checkout-cta-container {
+  /* Sticky behavior for Review Cart, Info, and Plan pages */
+  .checkout-cta-container.sticky,
+  .checkout-cta-container:not(.payment-step) {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -2719,16 +2721,15 @@ padding: 6px 16px;
 
 .payment-option-radio.selected .payment-option {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1);
-  transform: scale(1.02);
+  border-width: 3px;
+  background-color: #f0f7ff;
 }
 
 .payment-option-radio .payment-option {
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .payment-option-radio:hover .payment-option {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  border-color: #999;
 }

@@ -394,35 +394,11 @@ const handleConfirmBooking = async (bookingDetails) => {
       navigate('/guest-info');
     }}
     onContinue={(selectedPlan) => {
+      // Store the selected plan but DON'T modify booking details yet
       sessionStorage.setItem('selectedPlan', selectedPlan);
       
-      // If trial is selected, modify booking details
-      if (selectedPlan === 'trial') {
-        const checkinDate = finalBooking.checkin instanceof Date 
-          ? finalBooking.checkin 
-          : new Date(finalBooking.checkin);
-        
-        const checkoutDate = new Date(checkinDate);
-        checkoutDate.setDate(checkoutDate.getDate() + 1);
-        
-        const trialBooking = {
-          ...finalBooking,
-          checkin: checkinDate.toISOString(),
-          checkout: checkoutDate.toISOString(),
-          nights: 1,
-          subtotal: 69,
-          taxes: 6.90,
-          total: 75.90,
-          bookingType: 'trial',
-          intendedNights: finalBooking.nights,
-          useNightlyRate: true,
-        };
-        
-        setFinalBooking(trialBooking);
-        sessionStorage.setItem('finalBooking', JSON.stringify(trialBooking));
-      }
-      
       // Navigate back to guest-info but set it to step 3 (payment)
+      // GuestInfoPage will handle trial logic when processing payment
       navigate('/guest-info', { state: { goToPayment: true } });
     }}
     showTrialOption={true}

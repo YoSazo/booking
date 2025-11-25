@@ -367,11 +367,11 @@ useEffect(() => {
   } else if (currentStep === 2) {
     setCurrentStep(1); // Goes back to Review Cart
   } else if (currentStep === 3) {
-    // Check if we came from plan page
-    if (sessionStorage.getItem('selectedPlan')) {
+    // Check if we came from plan page (7+ nights)
+    if (bookingDetails && bookingDetails.nights >= 7) {
       navigate('/plan'); // Go back to plan page
     } else {
-      setCurrentStep(2); // Go back to Info step
+      setCurrentStep(2); // Go back to Info step for <7 nights
     }
   }
   setHasAttemptedSubmit(false);
@@ -381,7 +381,10 @@ useEffect(() => {
     const getBackButtonText = () => {
         if (currentStep === 1) return '< Back to Booking';
         if (currentStep === 2) return '< Back to Cart';
-        if (currentStep === 3) return '< Back to Info';
+        if (currentStep === 3) {
+            // Show "Back to Plan" if 7+ nights, else "Back to Info"
+            return bookingDetails && bookingDetails.nights >= 7 ? '< Back to Plan' : '< Back to Info';
+        }
     };
 
     const handleChange = (e) => {
@@ -553,29 +556,33 @@ useEffect(() => {
     setIsProcessingTrial(true);
     setErrorMessage('');
 
+    // ✅ CRITICAL FIX: Get ORIGINAL booking from sessionStorage to preserve full stay data
+    const originalBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
+    
     // ✅ FIX: Ensure checkin is a Date object
-    const checkinDate = bookingDetails.checkin instanceof Date 
-        ? bookingDetails.checkin 
-        : new Date(bookingDetails.checkin);
+    const checkinDate = originalBooking.checkin instanceof Date 
+        ? originalBooking.checkin 
+        : new Date(originalBooking.checkin);
     
     // Create checkout date (1 day after checkin)
     const checkoutDate = new Date(checkinDate);
     checkoutDate.setDate(checkoutDate.getDate() + 1);
 
     const trialBooking = {
-        roomTypeID: bookingDetails.roomTypeID,
-        rateID: bookingDetails.rateID,
-        roomName: bookingDetails.name,
+        roomTypeID: originalBooking.roomTypeID,
+        rateID: originalBooking.rateID,
+        roomName: originalBooking.name,
         checkin: checkinDate.toISOString(),  // ✅ Now safe
         checkout: checkoutDate.toISOString(), // ✅ Now safe
         nights: 1,
-        guests: bookingDetails.guests,
+        guests: originalBooking.guests,
         subtotal: 69,
         taxes: 6.90,
         total: 75.90,
-        reservationCode: bookingDetails.reservationCode,
+        reservationCode: originalBooking.reservationCode,
         bookingType: 'trial',
-        intendedNights: bookingDetails.nights,
+        intendedNights: originalBooking.nights,  // ✅ Preserve original nights
+        originalTotal: originalBooking.total,     // ✅ NEW: Preserve original total
         useNightlyRate: true,
     };
 
@@ -632,17 +639,18 @@ useEffect(() => {
                 setErrorMessage(error.message || "Payment failed");
                 setIsProcessingTrial(false);
             } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                // Save session data with trial flag
+                // ✅ Save trial booking data for confirmation page ONLY
                 sessionStorage.setItem('finalBooking', JSON.stringify({
-                    ...bookingDetails,
-                    checkin: checkinDate.toISOString(),    // ✅ Save as ISO string
-                    checkout: checkoutDate.toISOString(),  // ✅ Save as ISO string
+                    ...originalBooking,
+                    checkin: checkinDate.toISOString(),
+                    checkout: checkoutDate.toISOString(),
                     nights: 1,
                     total: 75.90,
                     subtotal: 69,
                     taxes: 6.90,
                     bookingType: 'trial',
-                    intendedNights: bookingDetails.nights
+                    intendedNights: originalBooking.nights,
+                    originalTotal: originalBooking.total
                 }));
                 
                 // Complete the booking
@@ -677,9 +685,9 @@ useEffect(() => {
                 
                 ev.complete('success');
                 
-                // Save session data with trial flag
+                // ✅ Save trial booking for confirmation page ONLY
                 sessionStorage.setItem('finalBooking', JSON.stringify({
-                    ...bookingDetails,
+                    ...originalBooking,
                     checkin: checkinDate.toISOString(),
                     checkout: checkoutDate.toISOString(),
                     nights: 1,
@@ -687,7 +695,8 @@ useEffect(() => {
                     subtotal: 69,
                     taxes: 6.90,
                     bookingType: 'trial',
-                    intendedNights: bookingDetails.nights
+                    intendedNights: originalBooking.nights,
+                    originalTotal: originalBooking.total
                 }));
                 
                 onComplete(formData, paymentIntent.id);
@@ -822,7 +831,12 @@ useEffect(() => {
                     <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Info</span>
                     </div>
-                    <div className={`progress-step ${currentStep === 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
+                    {bookingDetails && bookingDetails.nights >= 7 && (
+                        <div className={`progress-step ${sessionStorage.getItem('selectedPlan') ? 'completed' : ''}`}>
+                            <div className="step-circle"></div><span className="step-name">Plan</span>
+                        </div>
+                    )}
+                    <div className={`progress-step ${currentStep === 3 ? 'completed active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Payment</span>
                     </div>
                     </div>
@@ -1071,7 +1085,7 @@ useEffect(() => {
                 
                 
 
-<div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
+<div className={`checkout-cta-container ${currentStep === 3 ? 'payment-step sticky' : ''}`} ref={currentStep === 3 ? paymentOptionsRef : null}>
   {currentStep < 3 ? (
     <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
       {currentStep === 1 && "Proceed to Info"}
