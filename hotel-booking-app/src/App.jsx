@@ -390,12 +390,8 @@ const handleConfirmBooking = async (bookingDetails) => {
             hotel={currentHotel}
             bookingDetails={finalBooking}
             onBack={() => {
-              const currentPath = window.location.pathname;
-              if (currentPath === '/guest-info' && sessionStorage.getItem('selectedPlan')) {
-                navigate('/plan');
-              } else {
-                navigate('/');
-              }
+              // Always go back to booking page
+              navigate('/');
             }}
             onComplete={handleCompleteBooking}
             apiBaseUrl={API_BASE_URL}
