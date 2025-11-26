@@ -195,6 +195,12 @@ useEffect(() => {
       // Store in sessionStorage for the rest of the flow
       sessionStorage.setItem('finalBooking', JSON.stringify(recoveredBooking));
       
+      // Set the selected plan from recovery data (for 7+ nights)
+      if (decodedData.plan && recoveredBooking.nights >= 7) {
+        setSelectedPlan(decodedData.plan);
+        sessionStorage.setItem('selectedPlan', decodedData.plan);
+      }
+      
       // Create payment intent for this booking
       fetch(`${apiBaseUrl}/api/create-payment-intent`, {
         method: 'POST',
@@ -217,9 +223,15 @@ useEffect(() => {
         if (data.clientSecret) {
           sessionStorage.setItem('clientSecret', data.clientSecret);
           
-          // Jump directly to PAYMENT step (skip plan selection even for 7+ nights)
-          const paymentStep = recoveredBooking.nights >= 7 ? 4 : 3;
-          setCurrentStep(paymentStep);
+          // For 7+ nights, go to PLAN STEP so they can see their selected plan
+          // For <7 nights, go directly to PAYMENT step
+          let targetStep;
+          if (recoveredBooking.nights >= 7) {
+            targetStep = 3; // Plan selection step
+          } else {
+            targetStep = 3; // Payment step (no plan selection for <7 nights)
+          }
+          setCurrentStep(targetStep);
           
           // Mark as recovery mode to prevent re-running this effect
           setIsRecoveryMode(true);

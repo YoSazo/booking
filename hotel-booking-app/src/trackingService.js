@@ -236,6 +236,10 @@ export const trackInitiateCheckout = (bookingDetails) => {
 export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
     if (!shouldFireEvent('AddPaymentInfo')) return;
     const eventID = `addpaymentinfo.${Date.now()}`;
+    
+    // Get selected plan from sessionStorage (for 7+ nights bookings)
+    const selectedPlan = sessionStorage.getItem('selectedPlan') || 'regular';
+    
     const pixelPayload = {
         value: bookingDetails.subtotal,
         currency: 'USD',
@@ -248,6 +252,7 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
         nights: bookingDetails.nights,
         checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null, // ← Optional: add check-in date
         checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null, // ← Optional: add check-out date
+        plan: bookingDetails.nights >= 7 ? selectedPlan : 'regular', // ← Add plan to payload
         user_data: {
             em: guestInfo.email,
             ph: guestInfo.phone.replace(/\D/g, ''),
