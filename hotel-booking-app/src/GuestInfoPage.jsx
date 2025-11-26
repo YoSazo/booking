@@ -195,20 +195,51 @@ useEffect(() => {
       // Store in sessionStorage for the rest of the flow
       sessionStorage.setItem('finalBooking', JSON.stringify(recoveredBooking));
       
-      // Jump directly to PAYMENT step (skip plan selection even for 7+ nights)
-      const paymentStep = recoveredBooking.nights >= 7 ? 4 : 3;
-      setCurrentStep(paymentStep);
-      
-      // Mark as recovery mode to prevent re-running this effect
-      setIsRecoveryMode(true);
-      
-      // Scroll to payment after a brief delay
-      setTimeout(() => {
-        paymentOptionsRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
-        });
-      }, 500);
+      // Create payment intent for this booking
+      fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          amount: recoveredBooking.total / 2,
+          bookingDetails: recoveredBooking,
+          guestInfo: { 
+            firstName: decodedData.firstName, 
+            lastName: decodedData.lastName, 
+            email: decodedData.email, 
+            phone: decodedData.phone,
+            zip: '' 
+          },
+          hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+        }),
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.clientSecret) {
+          sessionStorage.setItem('clientSecret', data.clientSecret);
+          
+          // Jump directly to PAYMENT step (skip plan selection even for 7+ nights)
+          const paymentStep = recoveredBooking.nights >= 7 ? 4 : 3;
+          setCurrentStep(paymentStep);
+          
+          // Mark as recovery mode to prevent re-running this effect
+          setIsRecoveryMode(true);
+          
+          // Scroll to payment after a brief delay
+          setTimeout(() => {
+            paymentOptionsRef.current?.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start' 
+            });
+          }, 500);
+        } else {
+          throw new Error('Failed to create payment intent');
+        }
+      })
+      .catch(err => {
+        console.error('❌ Failed to create payment intent:', err);
+        alert('Failed to load payment form. Please start a new booking.');
+        navigate('/');
+      });
       
     } catch (err) {
       console.error('❌ Recovery failed:', err);
@@ -891,12 +922,12 @@ useEffect(() => {
     };
 
     
-    // Redirect to home if booking details are missing
+    // Redirect to home if booking details are missing (but NOT in recovery mode)
     useEffect(() => {
-        if (!bookingDetails || !clientSecret) {
+        if (!isRecoveryMode && (!bookingDetails || !clientSecret)) {
             navigate('/');
         }
-    }, [bookingDetails, clientSecret, navigate]);
+    }, [bookingDetails, clientSecret, navigate, isRecoveryMode]);
 
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
