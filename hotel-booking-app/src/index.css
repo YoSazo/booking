@@ -1792,6 +1792,25 @@ padding: 6px 16px;
   margin-bottom: 20px; /* Space below the tabs */
 }
 
+/* Payment method label (when no wallet available) */
+.payment-method-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.credit-card-icon {
+  height: 22px;
+  width: auto;
+}
+
 .tab-button {
   flex: 1; /* Allows tabs to take equal width if needed, or adjust based on content */
   display: flex;

@@ -986,18 +986,6 @@ useEffect(() => {
                     </div>
 
                     <div className="payment-wrapper" style={{ display: (currentStep === 4 || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? 'block' : 'none' }}>
-  <div className="money-back-guarantee">
-    <div className="guarantee-content">
-      <div className="guarantee-icon">🛡️</div>
-      <div className="guarantee-text">
-        <div className="guarantee-title">100% Money-Back Guarantee</div>
-        <div className="guarantee-description">
-          If the room isn't exactly what we promised when you arrive, we'll refund 100% of what you paid on the spot. No questions asked.
-        </div>
-      </div>
-    </div>
-  </div>
-  
   <div className="stripe-badge-container">
     <img 
       src="stripe.svg" 
@@ -1015,25 +1003,38 @@ useEffect(() => {
     <span>Guaranteed safe and secure Checkout</span>
   </div>
   
+  <div className="money-back-guarantee">
+    <div className="guarantee-content">
+      <div className="guarantee-icon">🛡️</div>
+      <div className="guarantee-text">
+        <div className="guarantee-title">100% Money-Back Guarantee</div>
+        <div className="guarantee-description">
+          If the room isn't exactly what we promised when you arrive, we'll refund 100% of what you paid on the spot. No questions asked.
+        </div>
+      </div>
+    </div>
+  </div>
+  
   {!clientSecret ? (
     <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>
   ) : (
     <>
-      <div className="payment-method-tabs">
-        <button 
-          type="button" 
-          className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
-          onClick={() => {
-            setPaymentMethod('card');
-            setHasAttemptedSubmit(false);
-            setErrorMessage('');
-            setIsProcessing(false);
-            setIsProcessingTrial(false);
-          }}
-        >
-          <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
-        </button>
-        {walletType && (
+      {walletType ? (
+        // Show tabs only if wallet is available
+        <div className="payment-method-tabs">
+          <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
+            onClick={() => {
+              setPaymentMethod('card');
+              setHasAttemptedSubmit(false);
+              setErrorMessage('');
+              setIsProcessing(false);
+              setIsProcessingTrial(false);
+            }}
+          >
+            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
+          </button>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
@@ -1048,8 +1049,14 @@ useEffect(() => {
             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
             {walletType}
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        // No tabs if only card available - just show "Payment Details" header
+        <div className="payment-method-label">
+          <img src="/credit.svg" alt="Card" className="credit-card-icon" />
+          <span>Pay with Card</span>
+        </div>
+      )}
       
       <div className="payment-content">
         {paymentMethod === 'card' && (
