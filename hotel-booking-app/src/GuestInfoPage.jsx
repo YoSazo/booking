@@ -59,9 +59,6 @@ const hasScrolledToPayment = useRef(false);
 // Plan selection state - Trial is default
 const [selectedPlan, setSelectedPlan] = useState('trial');
 
-// Recovery mode state
-const [isRecoveryMode, setIsRecoveryMode] = useState(false);
-
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
@@ -150,124 +147,6 @@ useEffect(() => {
     setSelectedPlan(savedPlan);
   }
 }, []);
-
-// Lightweight Recovery Mode - reads data from URL params
-useEffect(() => {
-  const urlParams = new URLSearchParams(location.search);
-  const recoveryData = urlParams.get('recovery');
-  
-  console.log('🔍 Recovery check:', { 
-    hasRecoveryData: !!recoveryData, 
-    isRecoveryMode, 
-    hasApiBaseUrl: !!apiBaseUrl,
-    apiBaseUrl 
-  });
-  
-  // Wait for apiBaseUrl to be available before proceeding
-  if (recoveryData && !isRecoveryMode && apiBaseUrl) {
-    try {
-      console.log('🔄 Recovery mode activated');
-      
-      // Decode the base64 data from URL
-      const decodedData = JSON.parse(atob(recoveryData));
-      console.log('✅ Recovery data loaded:', decodedData);
-      
-      // Pre-fill guest info form (but leave billing address empty)
-      setFormData(prev => ({
-        ...prev,
-        firstName: decodedData.firstName,
-        lastName: decodedData.lastName,
-        email: decodedData.email,
-        phone: decodedData.phone || '+1 ',
-        // Leave billing address fields empty - they'll fill these
-        address: '',
-        city: '',
-        state: '',
-        zip: ''
-      }));
-      
-      // Reconstruct bookingDetails from saved data
-      const recoveredBooking = {
-        name: decodedData.roomType,
-        checkin: new Date(decodedData.checkin),
-        checkout: new Date(decodedData.checkout),
-        nights: parseInt(decodedData.nights),
-        guests: parseInt(decodedData.guests) || 2,
-        children: 0,
-        pets: 0,
-        subtotal: parseFloat(decodedData.subtotal),
-        taxes: parseFloat(decodedData.tax),
-        total: parseFloat(decodedData.total)
-      };
-      
-      // Store in sessionStorage for the rest of the flow
-      sessionStorage.setItem('finalBooking', JSON.stringify(recoveredBooking));
-      
-      // Set the selected plan from recovery data (for 7+ nights)
-      if (decodedData.plan && recoveredBooking.nights >= 7) {
-        setSelectedPlan(decodedData.plan);
-        sessionStorage.setItem('selectedPlan', decodedData.plan);
-      }
-      
-      // Create payment intent for this booking
-      fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: recoveredBooking.total / 2,
-          bookingDetails: recoveredBooking,
-          guestInfo: { 
-            firstName: decodedData.firstName, 
-            lastName: decodedData.lastName, 
-            email: decodedData.email, 
-            phone: decodedData.phone,
-            zip: '' 
-          },
-          hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
-        }),
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.clientSecret) {
-          sessionStorage.setItem('clientSecret', data.clientSecret);
-          
-          // For 7+ nights, go to PLAN STEP so they can see their selected plan
-          // For <7 nights, go directly to PAYMENT step
-          let targetStep;
-          if (recoveredBooking.nights >= 7) {
-            targetStep = 3; // Plan selection step
-          } else {
-            targetStep = 3; // Payment step (no plan selection for <7 nights)
-          }
-          setCurrentStep(targetStep);
-          
-          // Mark as recovery mode to prevent re-running this effect
-          setIsRecoveryMode(true);
-          
-          // Scroll to payment after a brief delay
-          setTimeout(() => {
-            paymentOptionsRef.current?.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'start' 
-            });
-          }, 500);
-        } else {
-          throw new Error('Failed to create payment intent');
-        }
-      })
-      .catch(err => {
-        console.error('❌ Failed to create payment intent:', err);
-        alert('Failed to load payment form. Please start a new booking.');
-        navigate('/');
-      });
-      
-    } catch (err) {
-      console.error('❌ Recovery failed:', err);
-      alert('This recovery link is invalid. Please start a new booking.');
-      navigate('/');
-    }
-  }
-}, [location.search, isRecoveryMode, navigate, apiBaseUrl]);
 
 
 
@@ -942,44 +821,13 @@ useEffect(() => {
     };
 
     
-    // Redirect to home if booking details are missing (but NOT in recovery mode)
+    // Redirect to home if booking details are missing
     useEffect(() => {
-        // Check if there's a recovery param - if yes, wait for recovery to complete
-        const urlParams = new URLSearchParams(location.search);
-        const hasRecoveryParam = urlParams.get('recovery');
-        
-        // Only redirect if:
-        // 1. NOT in recovery mode AND
-        // 2. Missing booking details/clientSecret AND
-        // 3. No recovery parameter in URL (or recovery has already been attempted)
-        if (!hasRecoveryParam && !isRecoveryMode && (!bookingDetails || !clientSecret)) {
+        if (!bookingDetails || !clientSecret) {
             navigate('/');
         }
-    }, [bookingDetails, clientSecret, navigate, isRecoveryMode, location.search]);
+    }, [bookingDetails, clientSecret, navigate]);
 
-    // Show loading state while recovery is in progress
-    const urlParams = new URLSearchParams(location.search);
-    const hasRecoveryParam = urlParams.get('recovery');
-    
-    if (hasRecoveryParam && !isRecoveryMode) {
-        // Still loading recovery data
-        return (
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                height: '100vh',
-                fontSize: '18px',
-                color: '#666',
-                flexDirection: 'column',
-                gap: '10px'
-            }}>
-                <div>🔄 Loading your booking...</div>
-                <div style={{ fontSize: '14px', color: '#999' }}>Please wait</div>
-            </div>
-        );
-    }
-    
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
     }

@@ -396,8 +396,6 @@ const handleConfirmBooking = async (bookingDetails) => {
             onComplete={handleCompleteBooking}
             apiBaseUrl={API_BASE_URL}
             clientSecret={clientSecret}
-            // Pass location so recovery mode can be detected
-            location={location}
           />
         } />
         <Route path="/confirmation" element={
