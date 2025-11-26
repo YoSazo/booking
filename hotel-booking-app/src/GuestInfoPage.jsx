@@ -259,7 +259,7 @@ useEffect(() => {
       navigate('/');
     }
   }
-}, [location.search, isRecoveryMode, navigate]);
+}, [location.search, isRecoveryMode, navigate, apiBaseUrl]);
 
 
 
@@ -936,10 +936,18 @@ useEffect(() => {
     
     // Redirect to home if booking details are missing (but NOT in recovery mode)
     useEffect(() => {
-        if (!isRecoveryMode && (!bookingDetails || !clientSecret)) {
+        // Check if there's a recovery param - if yes, wait for recovery to complete
+        const urlParams = new URLSearchParams(location.search);
+        const hasRecoveryParam = urlParams.get('recovery');
+        
+        // Only redirect if:
+        // 1. NOT in recovery mode AND
+        // 2. Missing booking details/clientSecret AND
+        // 3. No recovery parameter in URL (or recovery has already been attempted)
+        if (!hasRecoveryParam && !isRecoveryMode && (!bookingDetails || !clientSecret)) {
             navigate('/');
         }
-    }, [bookingDetails, clientSecret, navigate, isRecoveryMode]);
+    }, [bookingDetails, clientSecret, navigate, isRecoveryMode, location.search]);
 
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
