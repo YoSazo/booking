@@ -59,6 +59,9 @@ const hasScrolledToPayment = useRef(false);
 // Plan selection state - Trial is default
 const [selectedPlan, setSelectedPlan] = useState('trial');
 
+// Recovery mode state
+const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
@@ -147,6 +150,73 @@ useEffect(() => {
     setSelectedPlan(savedPlan);
   }
 }, []);
+
+// Lightweight Recovery Mode - reads data from URL params
+useEffect(() => {
+  const urlParams = new URLSearchParams(location.search);
+  const recoveryData = urlParams.get('recovery');
+  
+  if (recoveryData && !isRecoveryMode) {
+    try {
+      console.log('🔄 Recovery mode activated');
+      
+      // Decode the base64 data from URL
+      const decodedData = JSON.parse(atob(recoveryData));
+      console.log('✅ Recovery data loaded:', decodedData);
+      
+      // Pre-fill guest info form (but leave billing address empty)
+      setFormData(prev => ({
+        ...prev,
+        firstName: decodedData.firstName,
+        lastName: decodedData.lastName,
+        email: decodedData.email,
+        phone: decodedData.phone || '+1 ',
+        // Leave billing address fields empty - they'll fill these
+        address: '',
+        city: '',
+        state: '',
+        zip: ''
+      }));
+      
+      // Reconstruct bookingDetails from saved data
+      const recoveredBooking = {
+        name: decodedData.roomType,
+        checkin: new Date(decodedData.checkin),
+        checkout: new Date(decodedData.checkout),
+        nights: parseInt(decodedData.nights),
+        guests: parseInt(decodedData.guests) || 2,
+        children: 0,
+        pets: 0,
+        subtotal: parseFloat(decodedData.subtotal),
+        taxes: parseFloat(decodedData.tax),
+        total: parseFloat(decodedData.total)
+      };
+      
+      // Store in sessionStorage for the rest of the flow
+      sessionStorage.setItem('finalBooking', JSON.stringify(recoveredBooking));
+      
+      // Jump directly to PAYMENT step (skip plan selection even for 7+ nights)
+      const paymentStep = recoveredBooking.nights >= 7 ? 4 : 3;
+      setCurrentStep(paymentStep);
+      
+      // Mark as recovery mode to prevent re-running this effect
+      setIsRecoveryMode(true);
+      
+      // Scroll to payment after a brief delay
+      setTimeout(() => {
+        paymentOptionsRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 500);
+      
+    } catch (err) {
+      console.error('❌ Recovery failed:', err);
+      alert('This recovery link is invalid. Please start a new booking.');
+      navigate('/');
+    }
+  }
+}, [location.search, isRecoveryMode, navigate]);
 
 
 
