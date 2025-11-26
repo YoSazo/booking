@@ -156,7 +156,15 @@ useEffect(() => {
   const urlParams = new URLSearchParams(location.search);
   const recoveryData = urlParams.get('recovery');
   
-  if (recoveryData && !isRecoveryMode) {
+  console.log('🔍 Recovery check:', { 
+    hasRecoveryData: !!recoveryData, 
+    isRecoveryMode, 
+    hasApiBaseUrl: !!apiBaseUrl,
+    apiBaseUrl 
+  });
+  
+  // Wait for apiBaseUrl to be available before proceeding
+  if (recoveryData && !isRecoveryMode && apiBaseUrl) {
     try {
       console.log('🔄 Recovery mode activated');
       
@@ -949,6 +957,29 @@ useEffect(() => {
         }
     }, [bookingDetails, clientSecret, navigate, isRecoveryMode, location.search]);
 
+    // Show loading state while recovery is in progress
+    const urlParams = new URLSearchParams(location.search);
+    const hasRecoveryParam = urlParams.get('recovery');
+    
+    if (hasRecoveryParam && !isRecoveryMode) {
+        // Still loading recovery data
+        return (
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100vh',
+                fontSize: '18px',
+                color: '#666',
+                flexDirection: 'column',
+                gap: '10px'
+            }}>
+                <div>🔄 Loading your booking...</div>
+                <div style={{ fontSize: '14px', color: '#999' }}>Please wait</div>
+            </div>
+        );
+    }
+    
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
     }
