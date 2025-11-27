@@ -1651,6 +1651,8 @@ padding: 6px 16px;
   font-size: 0.75em;
   z-index: 1; /* Place the steps in front of the line */
   flex: 1;
+  cursor: default; /* Show it's not clickable */
+  user-select: none; /* Prevent text selection */
 }
 
 /* This is the main pill/circle */
@@ -1669,6 +1671,7 @@ padding: 6px 16px;
   transition: color 0.4s ease;
   font-size: 0.95em;
   white-space: nowrap;
+  pointer-events: none; /* Make completely non-interactive */
 }
 
 /* --- Active & Completed States --- */
@@ -1679,7 +1682,8 @@ padding: 6px 16px;
 
 .progress-step.active .step-name {
   color: #000;
-  text-decoration: underline;
+  font-weight: 600; /* Bold instead of underline - less clickable looking */
+  /* Removed text-decoration: underline - looked too much like a link */
 }
 
 /* Styles for the main action button at the bottom */
