@@ -72,6 +72,7 @@ body {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    margin-bottom: 20px; /* Add breathing room between form fields */
 }
 
 .form-group label {
