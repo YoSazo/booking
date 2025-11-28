@@ -127,14 +127,6 @@ const handleAddressPaste = (e) => {
     const [paymentRequest, setPaymentRequest] = useState(null);
     const [walletType, setWalletType] = useState(null);
 
-useEffect(() => {
-    console.log('DEBUG - hasAttemptedSubmit changed:', hasAttemptedSubmit);
-    console.log('DEBUG - errorMessage:', errorMessage);
-    if (hasAttemptedSubmit) {
-        console.trace('hasAttemptedSubmit was set to true here:');
-    }
-}, [hasAttemptedSubmit]);
-
 // In GuestInfoPage.jsx, add this with your other useEffect hooks.
 // REMOVE ALL PREVIOUS SCROLL/BLUR/VIEWPORT USEEFFECTS.
 
@@ -167,14 +159,6 @@ useEffect(() => {
 }, [currentStep, bookingDetails]);
 
 
-
-useEffect(() => {
-        
-    }, []);
-
-useEffect(() => {
-    console.log('DEBUG - errorMessage changed:', errorMessage);
-}, [errorMessage]);
 
     // Fetch the Payment Intent from the server
 
