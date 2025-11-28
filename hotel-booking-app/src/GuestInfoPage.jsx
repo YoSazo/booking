@@ -149,6 +149,49 @@ useEffect(() => {
   }
 }, []);
 
+// Pre-fill from URL parameters (for manual recovery links)
+useEffect(() => {
+  const urlParams = new URLSearchParams(location.search);
+  
+  // Check if there are pre-fill params
+  const firstName = urlParams.get('firstName');
+  const lastName = urlParams.get('lastName');
+  const email = urlParams.get('email');
+  
+  if (firstName && lastName && email) {
+    console.log('📝 Pre-filling from URL parameters');
+    
+    // Pre-fill guest info
+    setFormData(prev => ({
+      ...prev,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      email: email || '',
+      phone: urlParams.get('phone') || '+1 ',
+      address: '',
+      city: '',
+      state: '',
+      zip: ''
+    }));
+    
+    // Jump to payment step (step 3 for <7 nights, step 4 for 7+ nights)
+    const nights = urlParams.get('nights');
+    if (nights && parseInt(nights) >= 7) {
+      setCurrentStep(4); // Skip to payment for 7+ nights
+    } else {
+      setCurrentStep(3); // Skip to payment for <7 nights
+    }
+    
+    // Scroll to payment
+    setTimeout(() => {
+      paymentOptionsRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 500);
+  }
+}, [location.search]);
+
 
 
 useEffect(() => {
