@@ -570,6 +570,7 @@ body {
 
 /* --- FINAL Responsive Calendar Modal Styles with Sticky Footer --- */
 .calendar-container {
+  position: relative; /* For absolute positioned fade indicators */
   background-color: #f7f8fa;
   border-radius: 24px;
   border: 1px solid #212529;
@@ -590,6 +591,35 @@ body {
   flex-grow: 1; /* This makes the scroll area take up all available space */
   overflow-y: auto; /* Enable vertical scrolling */
   padding: 10px; /* Give the scrolling content some internal padding */
+}
+
+/* Scroll fade indicators */
+.scroll-fade-top,
+.scroll-fade-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none; /* Don't block clicks */
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.scroll-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(247, 248, 250, 0.95), transparent);
+  border-radius: 24px 24px 0 0;
+}
+
+.scroll-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(247, 248, 250, 0.95), transparent);
+}
+
+.scroll-fade-top.visible,
+.scroll-fade-bottom.visible {
+  opacity: 1;
 }
 
 /* The fixed action bar at the bottom */
