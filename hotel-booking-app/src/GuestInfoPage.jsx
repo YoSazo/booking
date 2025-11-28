@@ -149,104 +149,6 @@ useEffect(() => {
   }
 }, []);
 
-// Pre-fill from URL parameters (for manual recovery links)
-useEffect(() => {
-  const urlParams = new URLSearchParams(location.search);
-  
-  // Check if there are pre-fill params
-  const firstName = urlParams.get('firstName');
-  const lastName = urlParams.get('lastName');
-  const email = urlParams.get('email');
-  
-  if (firstName && lastName && email && !bookingDetails) {
-    console.log('📝 Pre-filling from URL parameters and creating booking');
-    
-    // Get booking params from URL
-    const roomType = urlParams.get('roomType') || 'Room';
-    const checkin = urlParams.get('checkin');
-    const checkout = urlParams.get('checkout');
-    const nights = urlParams.get('nights') || 1;
-    const guests = urlParams.get('guests') || 2;
-    const total = parseFloat(urlParams.get('total') || 0);
-    const subtotal = total / 1.10; // Assuming 10% tax
-    const taxes = total - subtotal;
-    
-    // Pre-fill guest info
-    setFormData(prev => ({
-      ...prev,
-      firstName: firstName || '',
-      lastName: lastName || '',
-      email: email || '',
-      phone: urlParams.get('phone') || '+1 ',
-      address: '',
-      city: '',
-      state: '',
-      zip: ''
-    }));
-    
-    // Create booking details object
-    const recoveredBooking = {
-      name: roomType,
-      checkin: checkin ? new Date(checkin) : new Date(),
-      checkout: checkout ? new Date(checkout) : new Date(),
-      nights: parseInt(nights),
-      guests: parseInt(guests),
-      children: 0,
-      pets: 0,
-      subtotal: subtotal,
-      taxes: taxes,
-      total: total
-    };
-    
-    // Store in sessionStorage
-    sessionStorage.setItem('finalBooking', JSON.stringify(recoveredBooking));
-    
-    // Create payment intent
-    fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        amount: recoveredBooking.total / 2,
-        bookingDetails: recoveredBooking,
-        guestInfo: { 
-          firstName: firstName, 
-          lastName: lastName, 
-          email: email, 
-          phone: urlParams.get('phone') || '',
-          zip: '' 
-        },
-        hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
-      }),
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.clientSecret) {
-        sessionStorage.setItem('clientSecret', data.clientSecret);
-        
-        // Jump to payment step
-        if (parseInt(nights) >= 7) {
-          setCurrentStep(4); // Skip to payment for 7+ nights
-        } else {
-          setCurrentStep(3); // Skip to payment for <7 nights
-        }
-        
-        // Scroll to payment
-        setTimeout(() => {
-          paymentOptionsRef.current?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }, 500);
-      }
-    })
-    .catch(err => {
-      console.error('❌ Failed to create payment intent:', err);
-      alert('Failed to load payment. Please try again.');
-      navigate('/');
-    });
-  }
-}, [location.search, bookingDetails, apiBaseUrl, navigate]);
-
 
 
 useEffect(() => {
@@ -920,35 +822,13 @@ useEffect(() => {
     };
 
     
-    // Redirect to home if booking details are missing (unless URL has pre-fill params)
+    // Redirect to home if booking details are missing
     useEffect(() => {
-        const urlParams = new URLSearchParams(location.search);
-        const hasPreFillParams = urlParams.get('firstName') && urlParams.get('lastName') && urlParams.get('email');
-        
-        if (!hasPreFillParams && (!bookingDetails || !clientSecret)) {
+        if (!bookingDetails || !clientSecret) {
             navigate('/');
         }
-    }, [bookingDetails, clientSecret, navigate, location.search]);
+    }, [bookingDetails, clientSecret, navigate]);
 
-    // Show loading if URL has pre-fill params but bookingDetails hasn't loaded yet
-    const urlParams = new URLSearchParams(location.search);
-    const hasPreFillParams = urlParams.get('firstName') && urlParams.get('lastName') && urlParams.get('email');
-    
-    if (hasPreFillParams && !bookingDetails) {
-        return (
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                height: '100vh',
-                fontSize: '18px',
-                color: '#666'
-            }}>
-                Loading your booking...
-            </div>
-        );
-    }
-    
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
     }
