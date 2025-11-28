@@ -56,8 +56,9 @@ const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
 
-// Plan selection state - Trial is default
-const [selectedPlan, setSelectedPlan] = useState('trial');
+// Plan selection state - Default to 'full' (for <7 nights bookings that skip plan page)
+// For 7+ nights, plan selection page will let them choose
+const [selectedPlan, setSelectedPlan] = useState('full');
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
