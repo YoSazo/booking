@@ -134,21 +134,27 @@ const handleAddressPaste = (e) => {
 
 
 useEffect(() => {
-  // For <7 nights, always use 'full' and clear any stale sessionStorage
-  if (bookingDetails && bookingDetails.nights < 7) {
+  // Load selected plan from sessionStorage ONLY for 7+ night bookings
+  if (bookingDetails && bookingDetails.nights >= 7) {
+    const savedPlan = sessionStorage.getItem('selectedPlan');
+    if (savedPlan) {
+      setSelectedPlan(savedPlan);
+    }
+  } else {
+    // For <7 nights, always use 'full' and clear any stale sessionStorage
     setSelectedPlan('full');
     sessionStorage.removeItem('selectedPlan');
   }
 }, [bookingDetails]);
 
-// ALWAYS default to trial when reaching plan selection step for 7+ nights
+// Auto-select trial for 7+ night bookings when reaching plan selection step
 useEffect(() => {
   if (currentStep === 3 && bookingDetails && bookingDetails.nights >= 7) {
-    // Always set to 'trial' when landing on the plan page
-    // User must manually select 'full' if they want complete booking
-    setSelectedPlan('trial');
-    // Clear any old saved preference so fresh bookings always start with trial
-    sessionStorage.removeItem('selectedPlan');
+    const savedPlan = sessionStorage.getItem('selectedPlan');
+    // Only auto-select trial if no plan was previously selected
+    if (!savedPlan) {
+      setSelectedPlan('trial');
+    }
   }
 }, [currentStep, bookingDetails]);
 
