@@ -97,6 +97,18 @@ function App() {
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
   const [clientSecret, setClientSecret] = useState(() => sessionStorage.getItem('clientSecret') || '');
+  
+  // Listen for clientSecret changes in sessionStorage (for recovery links)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const stored = sessionStorage.getItem('clientSecret');
+      if (stored && !clientSecret) {
+        setClientSecret(stored);
+      }
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [clientSecret]);
 
   useEffect(() => {
     const today = new Date();
