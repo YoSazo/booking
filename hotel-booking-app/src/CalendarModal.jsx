@@ -8,8 +8,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
   const [upsellDeclined, setUpsellDeclined] = useState(false);
-  const [scrollState, setScrollState] = useState({ canScrollUp: false, canScrollDown: false });
-  const scrollAreaRef = React.useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -17,24 +15,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       setEndDate(initialCheckout);
       setCurrentDate(initialCheckin || new Date());
       setUpsellDeclined(false);
-      // Check scroll on mount
-      setTimeout(checkScroll, 100);
     }
   }, [isOpen, initialCheckin, initialCheckout]);
-
-  const checkScroll = () => {
-    if (scrollAreaRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
-      setScrollState({
-        canScrollUp: scrollTop > 20,
-        canScrollDown: scrollTop < scrollHeight - clientHeight - 20
-      });
-    }
-  };
-
-  const handleScroll = (e) => {
-    checkScroll();
-  };
 
   const handleDayClick = (day) => {
     console.log('Clicked day:', day);
@@ -159,14 +141,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   return (
     <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
       <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        {/* Top scroll fade indicator */}
-        <div className={`scroll-fade-top ${scrollState.canScrollUp ? 'visible' : ''}`}></div>
-        
-        <div 
-          ref={scrollAreaRef}
-          className="calendar-scroll-area"
-          onScroll={handleScroll}
-        >
+        <div className="calendar-scroll-area">
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
             <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
@@ -177,9 +152,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </div>
           <div className="calendar-grid">{renderDays()}</div>
         </div>
-        
-        {/* Bottom scroll fade indicator */}
-        <div className={`scroll-fade-bottom ${scrollState.canScrollDown ? 'visible' : ''}`}></div>
         <div className="modal-actions-footer">
           <div className="price-card">
             <div className="calendar-price-badge">
