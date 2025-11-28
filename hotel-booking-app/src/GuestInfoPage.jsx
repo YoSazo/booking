@@ -142,12 +142,18 @@ useEffect(() => {
 
 
 useEffect(() => {
-  // Load selected plan from sessionStorage if it exists
-  const savedPlan = sessionStorage.getItem('selectedPlan');
-  if (savedPlan) {
-    setSelectedPlan(savedPlan);
+  // Load selected plan from sessionStorage ONLY for 7+ night bookings
+  if (bookingDetails && bookingDetails.nights >= 7) {
+    const savedPlan = sessionStorage.getItem('selectedPlan');
+    if (savedPlan) {
+      setSelectedPlan(savedPlan);
+    }
+  } else {
+    // For <7 nights, always use 'full' and clear any stale sessionStorage
+    setSelectedPlan('full');
+    sessionStorage.removeItem('selectedPlan');
   }
-}, []);
+}, [bookingDetails]);
 
 // Auto-select trial for 7+ night bookings when reaching plan selection step
 useEffect(() => {
