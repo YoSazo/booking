@@ -930,6 +930,25 @@ useEffect(() => {
         }
     }, [bookingDetails, clientSecret, navigate, location.search]);
 
+    // Show loading if URL has pre-fill params but bookingDetails hasn't loaded yet
+    const urlParams = new URLSearchParams(location.search);
+    const hasPreFillParams = urlParams.get('firstName') && urlParams.get('lastName') && urlParams.get('email');
+    
+    if (hasPreFillParams && !bookingDetails) {
+        return (
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100vh',
+                fontSize: '18px',
+                color: '#666'
+            }}>
+                Loading your booking...
+            </div>
+        );
+    }
+    
     if (!bookingDetails) {
         return null; // Don't render anything while redirecting
     }

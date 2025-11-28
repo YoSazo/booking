@@ -69,6 +69,31 @@ function App() {
   const [lightboxData, setLightboxData] = useState(null);
 
   const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
+  
+  // Listen for sessionStorage changes (for recovery links)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = sessionStorage.getItem('finalBooking');
+      if (stored) {
+        setFinalBooking(JSON.parse(stored));
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically for sessionStorage changes (storage event doesn't fire in same tab)
+    const interval = setInterval(() => {
+      const stored = sessionStorage.getItem('finalBooking');
+      if (stored && !finalBooking) {
+        setFinalBooking(JSON.parse(stored));
+      }
+    }, 100);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [finalBooking]);
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
   const [clientSecret, setClientSecret] = useState(() => sessionStorage.getItem('clientSecret') || '');
