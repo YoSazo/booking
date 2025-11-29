@@ -1132,20 +1132,12 @@ const handleTrialNightBooking = async (e) => {
                                     Only $20
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
+                                    Holds your room for 48 hours
                                     <br />
                                     Remaining ${(bookingDetails.total - 20).toFixed(2)} due at arrival
                                     <br />
-                                    <strong style={{ color: '#dc3545' }}>⚠️ $20 reservation fee is non-refundable</strong>
+                                    <strong style={{ color: '#dc3545' }}>✅ $20 reservation fee is non-refundable if you cancel</strong>
                                 </div>
-                                <ul style={{ marginTop: '10px', paddingLeft: '20px', fontSize: '14px' }}>
-                                    <li>✅ Secure your booking with just $20</li>
-                                    <li>✅ Lowest upfront payment</li>
-                                    <li>✅ Guaranteed room availability</li>
-                                    <li>❌ $20 fee non-refundable if you cancel</li>
-                                </ul>
                             </div>
                         </label>
 
@@ -1166,18 +1158,10 @@ const handleTrialNightBooking = async (e) => {
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
                                     Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
+                                    <br />
+                                    <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
                                 </div>
-                                <ul style={{ marginTop: '10px', paddingLeft: '20px', fontSize: '14px' }}>
-                                    <li>✅ Split payment 50/50</li>
-                                    <li>✅ Standard cancellation policy</li>
-                                    <li>✅ Full booking confirmed</li>
-                                    <li>✅ If room isn't as promised, 100% refund on the spot</li>
-                                </ul>
                             </div>
                         </label>
                     </div>
