@@ -2765,37 +2765,44 @@ padding: 6px 16px;
   flex: 1;
 }
 
-/* Update the calendar-scroll-area to show scrollbar */
+/* Update the calendar-scroll-area - REPLACE the existing rule */
 .calendar-scroll-area {
   flex-grow: 1;
-  overflow-y: scroll; /* Changed from 'auto' to 'scroll' to always show scrollbar */
+  overflow-y: scroll !important; /* Force scrollbar to always show */
   padding: 10px;
-  scrollbar-gutter: stable; /* Prevents layout shift */
+  padding-right: 5px; /* Make room for scrollbar */
+  scrollbar-gutter: stable;
 }
 
-/* Style the scrollbar to be visible and attractive */
+/* Make scrollbar ALWAYS visible and prominent - Webkit browsers (Chrome, Safari, Edge) */
 .calendar-scroll-area::-webkit-scrollbar {
-  width: 10px;
+  width: 12px; /* Wider scrollbar */
+  display: block !important; /* Force display */
 }
 
 .calendar-scroll-area::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 5px;
-  margin: 4px 0;
+  background: #e0e0e0; /* More visible gray background */
+  border-radius: 6px;
+  margin: 8px 0;
 }
 
 .calendar-scroll-area::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 5px;
-  border: 2px solid #f7f8fa; /* Creates padding effect */
+  background: #666; /* Darker, more visible */
+  border-radius: 6px;
+  border: 2px solid #f7f8fa;
+  min-height: 40px; /* Ensure thumb is always visible */
 }
 
 .calendar-scroll-area::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #333; /* Even darker on hover */
 }
 
-/* For Firefox */
+.calendar-scroll-area::-webkit-scrollbar-thumb:active {
+  background: #000; /* Black when dragging */
+}
+
+/* For Firefox - force visible scrollbar */
 .calendar-scroll-area {
-  scrollbar-width: thin;
-  scrollbar-color: #888 rgba(0, 0, 0, 0.05);
+  scrollbar-width: auto; /* Changed from 'thin' to 'auto' for more visibility */
+  scrollbar-color: #666 #e0e0e0; /* Dark thumb, light track */
 }
