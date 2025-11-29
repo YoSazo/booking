@@ -1105,6 +1105,8 @@ const handleTrialNightBooking = async (e) => {
                                     <strong>{bookingDetails.nights} nights</strong>
                                     <br />
                                     Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
+                                    <br />
+                                    <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
                                 </div>
                             </div>
                         </label>
