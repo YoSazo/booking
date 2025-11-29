@@ -1158,6 +1158,10 @@ const handleTrialNightBooking = async (e) => {
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
                                 </div>
                                 <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
                                     Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
                                     <br />
                                     <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
