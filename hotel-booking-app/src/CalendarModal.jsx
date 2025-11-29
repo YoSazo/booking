@@ -9,6 +9,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
   const [upsellDeclined, setUpsellDeclined] = useState(false);
   const [scrollPercentage, setScrollPercentage] = useState(0);
+  const scrollAreaRef = useRef(null);
+  
   useEffect(() => {
     if (isOpen) {
       setStartDate(initialCheckin);
