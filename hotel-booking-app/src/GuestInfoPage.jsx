@@ -61,24 +61,6 @@ const hasScrolledToPayment = useRef(false);
 // For <7 nights, plan selection page will let them choose between 'reserve' and 'full'
 const [selectedPlan, setSelectedPlan] = useState('reserve');
 
-// Debug: Track when hasAttemptedSubmit changes
-const prevHasAttemptedSubmit = useRef(false);
-useEffect(() => {
-    if (hasAttemptedSubmit !== prevHasAttemptedSubmit.current) {
-        console.log('hasAttemptedSubmit changed to:', hasAttemptedSubmit, 'Stack trace:', new Error().stack);
-        prevHasAttemptedSubmit.current = hasAttemptedSubmit;
-    }
-}, [hasAttemptedSubmit]);
-
-// Debug: Track when errorMessage changes
-const prevErrorMessage = useRef('');
-useEffect(() => {
-    if (errorMessage !== prevErrorMessage.current) {
-        console.log('errorMessage changed to:', errorMessage, 'Stack trace:', new Error().stack);
-        prevErrorMessage.current = errorMessage;
-    }
-}, [errorMessage]);
-
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
@@ -197,7 +179,6 @@ useEffect(() => {
         
         // Reset error state when we're on payment step and have all required data
         if (currentStep === paymentStep && bookingDetails && clientSecret) {
-            console.log('Resetting errors on payment page'); // Debug log
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setFormErrors({});
@@ -1439,13 +1420,15 @@ const handleTrialNightBooking = async (e) => {
     </button>
   ) : (
     <button
-      type={selectedPlan === 'trial' ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
-      form={selectedPlan === 'trial' ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
+      type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
+      form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
       className="btn btn-confirm"
       onClick={
         selectedPlan === 'trial' 
-          ? handleTrialNightBooking 
-          : (paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; })
+          ? (e) => handleTrialNightBooking(e)
+          : selectedPlan === 'reserve'
+            ? (e) => handleReserveBooking(e)
+            : (paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; })
       }
       disabled={isProcessing || isProcessingTrial || !clientSecret || !stripe || !elements}
     >
