@@ -1216,6 +1216,8 @@ const handleTrialNightBooking = async (e) => {
     <span>Guaranteed safe and secure Checkout</span>
   </div>
   
+  {/* Only show money-back guarantee for non-reserve bookings */}
+  {selectedPlan !== 'reserve' && (
   <div className="money-back-guarantee">
     <div className="guarantee-content">
       <div className="guarantee-icon">🛡️</div>
@@ -1227,6 +1229,7 @@ const handleTrialNightBooking = async (e) => {
       </div>
     </div>
   </div>
+  )}
   
   {!clientSecret ? (
     <p style={{textAlign: 'center', padding: '20px'}}>Loading secure payment form...</p>
