@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PriceBadge from './PriceBadge.jsx';
 import UpsellPrompt from './UpsellPrompt.jsx';
 import { trackSearch } from './trackingService.js';
