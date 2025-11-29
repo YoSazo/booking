@@ -1154,7 +1154,7 @@ const handleTrialNightBooking = async (e) => {
                             />
                             <div className="payment-option secondary">
                                 <div className="option-header">
-                                    <span className="option-title">Standard Booking</span>
+                                    <span className="option-title">Complete Your Booking</span>
                                 </div>
                                 <div className="option-price">
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
