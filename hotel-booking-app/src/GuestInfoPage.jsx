@@ -363,7 +363,6 @@ useEffect(() => {
   } else if (currentStep === 2) {
     if (validateInfoStep()) {
       setFormErrors({});
-      trackAddPaymentInfo(bookingDetails, formData);
       
       // Always go to plan step (step 3) for both <7 and 7+ nights
       setCurrentStep(3);
@@ -372,6 +371,7 @@ useEffect(() => {
     // User is on plan selection, proceed to payment (step 4)
     // Save the selected plan to sessionStorage
     sessionStorage.setItem('selectedPlan', selectedPlan);
+    trackAddPaymentInfo(bookingDetails, formData);
     setCurrentStep(4);
   }
 };
