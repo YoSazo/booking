@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import PriceBadge from './PriceBadge.jsx';
 import UpsellPrompt from './UpsellPrompt.jsx';
 import { trackSearch } from './trackingService.js';
@@ -8,9 +8,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
   const [upsellDeclined, setUpsellDeclined] = useState(false);
-  const [scrollPercentage, setScrollPercentage] = useState(0);
-  const scrollAreaRef = useRef(null);
-  
+
   useEffect(() => {
     if (isOpen) {
       setStartDate(initialCheckin);
@@ -64,14 +62,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     } else {
       alert("Please select a check-out date.");
     }
-  };
-
-  const handleScroll = (e) => {
-    const element = e.target;
-    const scrollTop = element.scrollTop;
-    const scrollHeight = element.scrollHeight - element.clientHeight;
-    const percentage = (scrollTop / scrollHeight) * 100;
-    setScrollPercentage(percentage);
   };
 
   const handleUpsellDecline = () => { setUpsellDeclined(true); };
@@ -149,13 +139,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
   return (
-  <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
-    <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-      
-      {/* WRAP: Add this div with relative positioning */}
-      <div style={{ position: 'relative' }}>
-        
-        <div className="calendar-scroll-area" onScroll={handleScroll} ref={scrollAreaRef}>
+    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
+      <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
+        <div className="calendar-scroll-area">
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
             <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
@@ -166,40 +152,28 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </div>
           <div className="calendar-grid">{renderDays()}</div>
         </div>
-        
-        {/* ADD: Custom scrollbar track */}
-        <div className="custom-scrollbar-track">
-          <div 
-            className="custom-scrollbar-thumb" 
-            style={{ top: `${scrollPercentage}%` }}
-          />
-        </div>
-        
-      </div>
-      {/* END WRAP */}
-      
-      <div className="modal-actions-footer">
-        <div className="price-card">
-          <div className="calendar-price-badge">
-            {showUpsell ? (
-              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-            ) : showShortStayPrice ? (
-              <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-                <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
-              </div>
-            ) : ( <PriceBadge nights={nights} rates={rates} /> )}
+        <div className="modal-actions-footer">
+          <div className="price-card">
+            <div className="calendar-price-badge">
+              {showUpsell ? (
+                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+              ) : showShortStayPrice ? (
+                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
+                </div>
+              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
+            </div>
           </div>
-        </div>
-        <div className="calendar-footer-buttons">
-          <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
-          <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
-          <button className="btn" onClick={handleDone}>Done</button>
+          <div className="calendar-footer-buttons">
+            <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
+            <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
+            <button className="btn" onClick={handleDone}>Done</button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 export default CalendarModal;
