@@ -2765,3 +2765,25 @@ padding: 6px 16px;
   flex: 1;
 }
 
+/* Custom scrollbar CSS */
+.custom-scrollbar-track {
+  position: absolute;
+  right: 4px;
+  top: 10px;
+  bottom: 10px;
+  width: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.custom-scrollbar-thumb {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: #007bff;
+  border-radius: 4px;
+  transition: top 0.1s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
