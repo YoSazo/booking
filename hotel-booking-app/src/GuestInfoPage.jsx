@@ -1136,7 +1136,7 @@ const handleTrialNightBooking = async (e) => {
                                     <br />
                                     Pay remaining ${(bookingDetails.total - 20).toFixed(2)} at check-in
                                     <br />
-                                    <strong style={{ color: '#dc3545' }}>⚠️ $20 deposit is non-refundable</strong>
+                                    <strong style={{ color: '#6c757d' }}>$20 deposit is non-refundable</strong>
                                 </div>
                             </div>
                         </label>
