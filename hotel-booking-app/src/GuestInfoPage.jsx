@@ -1132,11 +1132,11 @@ const handleTrialNightBooking = async (e) => {
                                     Only $20
                                 </div>
                                 <div className="option-details">
-                                    Holds your room for 48 hours
+                                    Secure your booking with $20 deposit
                                     <br />
-                                    Remaining ${(bookingDetails.total - 20).toFixed(2)} due at arrival
+                                    Pay remaining ${(bookingDetails.total - 20).toFixed(2)} at check-in
                                     <br />
-                                    <strong style={{ color: '#dc3545' }}>⚠️ $20 reservation fee is non-refundable if you cancel</strong>
+                                    <strong style={{ color: '#dc3545' }}>⚠️ $20 deposit is non-refundable</strong>
                                 </div>
                             </div>
                         </label>
