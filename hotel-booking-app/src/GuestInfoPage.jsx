@@ -179,6 +179,7 @@ useEffect(() => {
         
         // Reset error state when we're on payment step and have all required data
         if (currentStep === paymentStep && bookingDetails && clientSecret) {
+            console.log('Resetting errors on payment page'); // Debug log
             setHasAttemptedSubmit(false);
             setErrorMessage('');
             setFormErrors({});
@@ -190,7 +191,7 @@ useEffect(() => {
             setFormErrors({});
             hasScrolledToPayment.current = false; // Reset scroll flag when leaving payment step
         }
-    }, [currentStep, bookingDetails, clientSecret]);
+    }, [currentStep, bookingDetails, clientSecret, selectedPlan]); // Add selectedPlan to dependencies
 
     // Auto-scroll to payment options when reaching step 3 (ONE TIME ONLY)
 
