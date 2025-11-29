@@ -56,9 +56,10 @@ const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
 
-// Plan selection state - Default to 'full' (for <7 nights bookings that skip plan page)
-// For 7+ nights, plan selection page will let them choose
-const [selectedPlan, setSelectedPlan] = useState('full');
+// Plan selection state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
+// For 7+ nights, plan selection page will let them choose between 'trial' and 'full'
+// For <7 nights, plan selection page will let them choose between 'reserve' and 'full'
+const [selectedPlan, setSelectedPlan] = useState('reserve');
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
@@ -134,26 +135,31 @@ const handleAddressPaste = (e) => {
 
 
 useEffect(() => {
-  // Load selected plan from sessionStorage ONLY for 7+ night bookings
-  if (bookingDetails && bookingDetails.nights >= 7) {
+  // Load selected plan from sessionStorage for both 7+ and <7 night bookings
+  if (bookingDetails) {
     const savedPlan = sessionStorage.getItem('selectedPlan');
     if (savedPlan) {
       setSelectedPlan(savedPlan);
+    } else {
+      // Default to 'reserve' for <7 nights, keep 'reserve' as initial state
+      if (bookingDetails.nights < 7) {
+        setSelectedPlan('reserve');
+      }
     }
-  } else {
-    // For <7 nights, always use 'full' and clear any stale sessionStorage
-    setSelectedPlan('full');
-    sessionStorage.removeItem('selectedPlan');
   }
 }, [bookingDetails]);
 
-// Auto-select trial for 7+ night bookings when reaching plan selection step
+// Auto-select default plans when reaching plan selection step
 useEffect(() => {
-  if (currentStep === 3 && bookingDetails && bookingDetails.nights >= 7) {
+  if (currentStep === 3 && bookingDetails) {
     const savedPlan = sessionStorage.getItem('selectedPlan');
-    // Only auto-select trial if no plan was previously selected
+    // Only auto-select if no plan was previously selected
     if (!savedPlan) {
-      setSelectedPlan('trial');
+      if (bookingDetails.nights >= 7) {
+        setSelectedPlan('trial'); // Default to trial for 7+ nights
+      } else {
+        setSelectedPlan('reserve'); // Default to reserve for <7 nights
+      }
     }
   }
 }, [currentStep, bookingDetails]);
@@ -168,8 +174,8 @@ useEffect(() => {
 
     // Replace your multiple reset useEffects with this single one:
     useEffect(() => {
-        // Payment step is 3 for <7 nights, 4 for 7+ nights
-        const paymentStep = bookingDetails && bookingDetails.nights >= 7 ? 4 : 3;
+        // Payment step is always 4 now (plan step is 3 for all bookings)
+        const paymentStep = 4;
         
         // Reset error state when we're on payment step and have all required data
         if (currentStep === paymentStep && bookingDetails && clientSecret) {
@@ -359,16 +365,10 @@ useEffect(() => {
       setFormErrors({});
       trackAddPaymentInfo(bookingDetails, formData);
       
-      // Check if we should show the plan step
-      if (bookingDetails.nights >= 7) {
-        // Go to plan step (step 3) for 7+ night bookings
-        setCurrentStep(3);
-      } else {
-        // Go directly to payment step (step 3 for <7 nights, no plan step) for <7 nights
-        setCurrentStep(3);
-      }
+      // Always go to plan step (step 3) for both <7 and 7+ nights
+      setCurrentStep(3);
     }
-  } else if (currentStep === 3 && bookingDetails.nights >= 7) {
+  } else if (currentStep === 3) {
     // User is on plan selection, proceed to payment (step 4)
     // Save the selected plan to sessionStorage
     sessionStorage.setItem('selectedPlan', selectedPlan);
@@ -382,15 +382,10 @@ useEffect(() => {
   } else if (currentStep === 2) {
     setCurrentStep(1); // Goes back to Review Cart
   } else if (currentStep === 3) {
-    // If we have 7+ nights and are on plan step, go back to info
-    // If we have <7 nights and are on payment step, go back to info
-    if (bookingDetails && bookingDetails.nights >= 7) {
-      setCurrentStep(2); // Go back to Info step from Plan
-    } else {
-      setCurrentStep(2); // Go back to Info step from Payment
-    }
+    // Plan step - go back to info for both <7 and 7+ nights
+    setCurrentStep(2); // Go back to Info step from Plan
   } else if (currentStep === 4) {
-    // Go back from payment step (7+ nights only, has plan step)
+    // Payment step - go back to plan step
     setCurrentStep(3); // Go back to plan step
   }
   setHasAttemptedSubmit(false);
@@ -400,15 +395,8 @@ useEffect(() => {
     const getBackButtonText = () => {
         if (currentStep === 1) return '< Back to Booking';
         if (currentStep === 2) return '< Back to Cart';
-        if (currentStep === 3) {
-            // If 7+ nights, we're on Plan step, go back to Info
-            // If <7 nights, we're on Payment step, go back to Info
-            return '< Back to Info';
-        }
-        if (currentStep === 4) {
-            // Payment step for 7+ nights, go back to Plan
-            return '< Back to Plan';
-        }
+        if (currentStep === 3) return '< Back to Info'; // Plan step for both <7 and 7+ nights
+        if (currentStep === 4) return '< Back to Plan'; // Payment step
     };
 
     const handleChange = (e) => {
@@ -512,6 +500,12 @@ useEffect(() => {
             return;
         }
         
+        // If reserve plan selected, use reserve handler instead
+        if (selectedPlan === 'reserve') {
+            handleReserveBooking(e);
+            return;
+        }
+        
         if (!window.userInitiatedSubmit) {
         console.warn('Form submitted without user interaction - ignoring');
         return;
@@ -578,7 +572,163 @@ useEffect(() => {
         }
     };
 
-    const handleTrialNightBooking = async (e) => {
+    const handleReserveBooking = async (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
+    setHasAttemptedSubmit(true);
+
+    // Validate billing address first
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage('');
+
+    // Get original booking from sessionStorage
+    const originalBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
+    
+    // Create reserve booking (full stay dates, but only $20 payment now)
+    const reserveBooking = {
+        roomTypeID: originalBooking.roomTypeID,
+        rateID: originalBooking.rateID,
+        roomName: originalBooking.name,
+        checkin: originalBooking.checkin,
+        checkout: originalBooking.checkout,
+        nights: originalBooking.nights,
+        guests: originalBooking.guests,
+        subtotal: originalBooking.subtotal,
+        taxes: originalBooking.taxes,
+        total: originalBooking.total,
+        reservationCode: originalBooking.reservationCode,
+        bookingType: 'reserve',
+        amountPaidNow: 20,
+        amountDueAtArrival: originalBooking.total - 20,
+        isNonRefundable: true,
+    };
+
+    try {
+        // Create new payment intent for $20 reserve amount
+        const response = await fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                amount: 20,
+                bookingDetails: reserveBooking,
+                guestInfo: formData,
+                hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!data.clientSecret) {
+            throw new Error("Failed to create reserve payment");
+        }
+
+        // Update payment intent with guest info
+        await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                clientSecret: data.clientSecret, 
+                guestInfo: formData 
+            }),
+        });
+
+        // Process payment based on method
+        if (paymentMethod === 'card') {
+            const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardNumberElement),
+                    billing_details: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        address: {
+                            line1: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postal_code: formData.zip,
+                            country: 'US',
+                        },
+                    },
+                },
+            });
+
+            if (error) {
+                setErrorMessage(error.message || "Payment failed");
+                setIsProcessing(false);
+            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+                // Save reserve booking data for confirmation page
+                sessionStorage.setItem('finalBooking', JSON.stringify(reserveBooking));
+                
+                // Complete the booking
+                onComplete(formData, paymentIntent.id);
+            }
+        } else if (paymentMethod === 'wallet') {
+            // Create payment request for $20
+            const reserveAmountInCents = 2000; // $20
+            
+            const reservePaymentRequest = stripe.paymentRequest({
+                country: 'US',
+                currency: 'usd',
+                total: { label: 'Room Reservation', amount: reserveAmountInCents },
+                requestPayerName: true,
+                requestPayerEmail: true,
+            });
+
+            // Set up payment method handler
+            reservePaymentRequest.on('paymentmethod', async (ev) => {
+                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                    data.clientSecret, 
+                    { payment_method: ev.paymentMethod.id }, 
+                    { handleActions: false }
+                );
+                
+                if (confirmError) {
+                    ev.complete('fail');
+                    setErrorMessage(confirmError.message);
+                    setIsProcessing(false);
+                    return;
+                }
+                
+                ev.complete('success');
+                
+                // Save reserve booking for confirmation page
+                sessionStorage.setItem('finalBooking', JSON.stringify(reserveBooking));
+                
+                onComplete(formData, paymentIntent.id);
+            });
+
+            // Show payment request
+            const canMakePayment = await reservePaymentRequest.canMakePayment();
+            
+            if (!canMakePayment) {
+                setErrorMessage("Digital wallet is not available. Please use card payment.");
+                setIsProcessing(false);
+                return;
+            }
+
+            try {
+                await reservePaymentRequest.show();
+            } catch (error) {
+                console.log('Payment cancelled:', error);
+                setErrorMessage("Payment cancelled");
+                setIsProcessing(false);
+            }
+        }
+
+    } catch (error) {
+        console.error("Reserve booking failed:", error);
+        setErrorMessage("Failed to process reservation. Please try again.");
+        setIsProcessing(false);
+    }
+};
+
+const handleTrialNightBooking = async (e) => {
     e?.preventDefault();      // Prevent default form behavior
     e?.stopPropagation();     // Stop event from bubbling up
     
@@ -837,6 +987,8 @@ useEffect(() => {
     const getPaymentButtonText = () => {
     if (selectedPlan === 'trial') {
         return 'Book Trial Night - Pay $69 Now';
+    } else if (selectedPlan === 'reserve') {
+        return 'Reserve Room - Pay $20 Now';
     } else {
         const priceToday = bookingDetails.total / 2;
         return `Pay $${priceToday.toFixed(2)} and Complete Booking`;
@@ -866,12 +1018,10 @@ useEffect(() => {
                     <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Info</span>
                     </div>
-                    {bookingDetails && bookingDetails.nights >= 7 && (
-                        <div className={`progress-step ${currentStep >= 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
-                            <div className="step-circle"></div><span className="step-name">Plan</span>
-                        </div>
-                    )}
-                    <div className={`progress-step ${currentStep === (bookingDetails && bookingDetails.nights >= 7 ? 4 : 3) ? 'completed active' : ''}`}>
+                    <div className={`progress-step ${currentStep >= 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
+                        <div className="step-circle"></div><span className="step-name">Plan</span>
+                    </div>
+                    <div className={`progress-step ${currentStep === 4 ? 'completed active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Payment</span>
                     </div>
                     </div>
@@ -901,6 +1051,7 @@ useEffect(() => {
                     </>
                     )}
 
+                {/* Plan selection for 7+ nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
                     <div className="payment-options-container">
                         {/* Trial Night Option - NOW ON TOP AND DEFAULT */}
@@ -960,6 +1111,78 @@ useEffect(() => {
                     </div>
                 )}
 
+                {/* Plan selection for <7 nights */}
+                {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
+                    <div className="payment-options-container">
+                        {/* Reserve for $20 Option - DEFAULT */}
+                        <label className={`payment-option-radio ${selectedPlan === 'reserve' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="reserve" 
+                                checked={selectedPlan === 'reserve'}
+                                onChange={() => setSelectedPlan('reserve')}
+                            />
+                            <div className="payment-option primary">
+                                <div className="option-header">
+                                    <span className="option-title">💰 Reserve for $20</span>
+                                    <span className="option-badge">Most Popular</span>
+                                </div>
+                                <div className="option-price trial">
+                                    Only $20
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Remaining ${(bookingDetails.total - 20).toFixed(2)} due at arrival
+                                    <br />
+                                    <strong style={{ color: '#dc3545' }}>⚠️ $20 reservation fee is non-refundable</strong>
+                                </div>
+                                <ul style={{ marginTop: '10px', paddingLeft: '20px', fontSize: '14px' }}>
+                                    <li>✅ Secure your booking with just $20</li>
+                                    <li>✅ Lowest upfront payment</li>
+                                    <li>✅ Guaranteed room availability</li>
+                                    <li>❌ $20 fee non-refundable if you cancel</li>
+                                </ul>
+                            </div>
+                        </label>
+
+                        {/* Standard Booking Option - SECONDARY */}
+                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="full" 
+                                checked={selectedPlan === 'full'}
+                                onChange={() => setSelectedPlan('full')}
+                            />
+                            <div className="payment-option secondary">
+                                <div className="option-header">
+                                    <span className="option-title">Standard Booking</span>
+                                </div>
+                                <div className="option-price">
+                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
+                                </div>
+                                <ul style={{ marginTop: '10px', paddingLeft: '20px', fontSize: '14px' }}>
+                                    <li>✅ Split payment 50/50</li>
+                                    <li>✅ Standard cancellation policy</li>
+                                    <li>✅ Full booking confirmed</li>
+                                    <li>✅ If room isn't as promised, 100% refund on the spot</li>
+                                </ul>
+                            </div>
+                        </label>
+                    </div>
+                )}
+
                 {currentStep === 1 && (
                     <div className="info-summary-wrapper">
                         <div className="summary-card-details">
@@ -987,7 +1210,7 @@ useEffect(() => {
                         <div className="form-field"><label>Email Address <span style={{ color: 'red' }}>*</span></label><input type="email" name="email" value={formData.email} onChange={handleChange} required />{formErrors.email && <span className="error-message">{formErrors.email}</span>}</div>
                     </div>
 
-                    <div className="payment-wrapper" style={{ display: (currentStep === 4 || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? 'block' : 'none' }}>
+                    <div className="payment-wrapper" style={{ display: currentStep === 4 ? 'block' : 'none' }}>
   <div className="stripe-badge-container">
     <img 
       src="stripe.svg" 
@@ -1188,11 +1411,11 @@ useEffect(() => {
                 
                 
 
-<div className={`checkout-cta-container sticky`} ref={(currentStep === 4 || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? paymentOptionsRef : null}>
-  {!((currentStep === 4) || (currentStep === 3 && bookingDetails && bookingDetails.nights < 7)) ? (
+<div className={`checkout-cta-container sticky`} ref={currentStep === 4 ? paymentOptionsRef : null}>
+  {currentStep !== 4 ? (
     <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
       {currentStep === 1 && "Proceed to Info"}
-      {currentStep === 2 && (bookingDetails && bookingDetails.nights >= 7 ? "Proceed to Plan" : "Proceed to Payment")}
+      {currentStep === 2 && "Proceed to Plan"}
       {currentStep === 3 && "Proceed to Payment"}
     </button>
   ) : (
