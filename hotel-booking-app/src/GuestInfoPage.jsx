@@ -1136,7 +1136,7 @@ const handleTrialNightBooking = async (e) => {
                                     <br />
                                     Remaining ${(bookingDetails.total - 20).toFixed(2)} due at arrival
                                     <br />
-                                    <strong style={{ color: '#dc3545' }}>✅ $20 reservation fee is non-refundable if you cancel</strong>
+                                    <strong style={{ color: '#dc3545' }}>⚠️ $20 reservation fee is non-refundable if you cancel</strong>
                                 </div>
                             </div>
                         </label>
