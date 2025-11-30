@@ -34,11 +34,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const stripe = useStripe();
     const elements = useElements();
     
-    // ✨ NEW: Refs for auto-advancing between payment fields
-    const cardNumberRef = useRef(null);
-    const cardExpiryRef = useRef(null);
-    const cardCvcRef = useRef(null);
-    
     // ✨ NEW: Track completion state for visual feedback
     const [cardNumberComplete, setCardNumberComplete] = useState(false);
     const [cardExpiryComplete, setCardExpiryComplete] = useState(false);
@@ -269,9 +264,35 @@ useEffect(() => {
     useEffect(() => {
                 if (elements) {
                     const cardNumberElement = elements.getElement(CardNumberElement);
+                    const cardExpiryElement = elements.getElement(CardExpiryElement);
+                    const cardCvcElement = elements.getElement(CardCvcElement);
+                    
                     if (cardNumberElement) {
                         cardNumberElement.on('change', (event) => {
                             setCardBrand(event.brand || '');
+                            setCardNumberComplete(event.complete);
+                            
+                            // ✨ Auto-advance to expiry when card number is complete
+                            if (event.complete && cardExpiryElement) {
+                                cardExpiryElement.focus();
+                            }
+                        });
+                    }
+                    
+                    if (cardExpiryElement) {
+                        cardExpiryElement.on('change', (event) => {
+                            setCardExpiryComplete(event.complete);
+                            
+                            // ✨ Auto-advance to CVC when expiry is complete
+                            if (event.complete && cardCvcElement) {
+                                cardCvcElement.focus();
+                            }
+                        });
+                    }
+                    
+                    if (cardCvcElement) {
+                        cardCvcElement.on('change', (event) => {
+                            setCardCvcComplete(event.complete);
                         });
                     }
                 }
@@ -1294,23 +1315,7 @@ const handleTrialNightBooking = async (e) => {
                 <label>Card number</label>
                 <div className={`card-field-container ${cardNumberComplete ? 'complete' : ''}`}>
                   <CardNumberElement 
-                    ref={cardNumberRef}
                     options={ELEMENT_OPTIONS}
-                    onChange={(e) => {
-                      setCardBrand(e.brand || '');
-                      setCardNumberComplete(e.complete);
-                      
-                      // ✨ Auto-advance to expiry when card number is complete
-                      if (e.complete && cardExpiryRef.current) {
-                        setTimeout(() => {
-                          try {
-                            cardExpiryRef.current.focus();
-                          } catch (err) {
-                            console.log('Could not auto-focus expiry field');
-                          }
-                        }, 50);
-                      }
-                    }}
                   />
                   <div className="card-brands">
                     <img 
@@ -1337,22 +1342,7 @@ const handleTrialNightBooking = async (e) => {
                   <label>Expiration date</label>
                   <div className={`card-field-container ${cardExpiryComplete ? 'complete' : ''}`}>
                     <CardExpiryElement 
-                      ref={cardExpiryRef}
                       options={ELEMENT_OPTIONS}
-                      onChange={(e) => {
-                        setCardExpiryComplete(e.complete);
-                        
-                        // ✨ Auto-advance to CVC when expiry is complete
-                        if (e.complete && cardCvcRef.current) {
-                          setTimeout(() => {
-                            try {
-                              cardCvcRef.current.focus();
-                            } catch (err) {
-                              console.log('Could not auto-focus CVC field');
-                            }
-                          }, 50);
-                        }
-                      }}
                     />
                   </div>
                 </div>
@@ -1360,11 +1350,7 @@ const handleTrialNightBooking = async (e) => {
                   <label>CVC</label>
                   <div className={`card-field-container ${cardCvcComplete ? 'complete' : ''}`}>
                     <CardCvcElement 
-                      ref={cardCvcRef}
                       options={ELEMENT_OPTIONS}
-                      onChange={(e) => {
-                        setCardCvcComplete(e.complete);
-                      }}
                     />
                   </div>
                 </div>
