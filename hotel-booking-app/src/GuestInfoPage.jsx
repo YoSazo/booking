@@ -33,11 +33,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
-    
-    // ✨ NEW: Track completion state for visual feedback
-    const [cardNumberComplete, setCardNumberComplete] = useState(false);
-    const [cardExpiryComplete, setCardExpiryComplete] = useState(false);
-    const [cardCvcComplete, setCardCvcComplete] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
@@ -264,35 +259,9 @@ useEffect(() => {
     useEffect(() => {
                 if (elements) {
                     const cardNumberElement = elements.getElement(CardNumberElement);
-                    const cardExpiryElement = elements.getElement(CardExpiryElement);
-                    const cardCvcElement = elements.getElement(CardCvcElement);
-                    
                     if (cardNumberElement) {
                         cardNumberElement.on('change', (event) => {
                             setCardBrand(event.brand || '');
-                            setCardNumberComplete(event.complete);
-                            
-                            // ✨ Auto-advance to expiry when card number is complete
-                            if (event.complete && cardExpiryElement) {
-                                cardExpiryElement.focus();
-                            }
-                        });
-                    }
-                    
-                    if (cardExpiryElement) {
-                        cardExpiryElement.on('change', (event) => {
-                            setCardExpiryComplete(event.complete);
-                            
-                            // ✨ Auto-advance to CVC when expiry is complete
-                            if (event.complete && cardCvcElement) {
-                                cardCvcElement.focus();
-                            }
-                        });
-                    }
-                    
-                    if (cardCvcElement) {
-                        cardCvcElement.on('change', (event) => {
-                            setCardCvcComplete(event.complete);
                         });
                     }
                 }
@@ -1313,10 +1282,8 @@ const handleTrialNightBooking = async (e) => {
             <div className="split-card-fields">
               <div className="card-field-wrapper">
                 <label>Card number</label>
-                <div className={`card-field-container ${cardNumberComplete ? 'complete' : ''}`}>
-                  <CardNumberElement 
-                    options={ELEMENT_OPTIONS}
-                  />
+                <div className="card-field-container">
+                  <CardNumberElement options={ELEMENT_OPTIONS} />
                   <div className="card-brands">
                     <img 
                       src="/visa.svg" 
@@ -1340,18 +1307,14 @@ const handleTrialNightBooking = async (e) => {
               <div className="card-fields-row">
                 <div className="card-field-wrapper">
                   <label>Expiration date</label>
-                  <div className={`card-field-container ${cardExpiryComplete ? 'complete' : ''}`}>
-                    <CardExpiryElement 
-                      options={ELEMENT_OPTIONS}
-                    />
+                  <div className="card-field-container">
+                    <CardExpiryElement options={ELEMENT_OPTIONS} />
                   </div>
                 </div>
                 <div className="card-field-wrapper">
                   <label>CVC</label>
-                  <div className={`card-field-container ${cardCvcComplete ? 'complete' : ''}`}>
-                    <CardCvcElement 
-                      options={ELEMENT_OPTIONS}
-                    />
+                  <div className="card-field-container">
+                    <CardCvcElement options={ELEMENT_OPTIONS} />
                   </div>
                 </div>
               </div>
