@@ -33,6 +33,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [cardBrand, setCardBrand] = useState('');
     const stripe = useStripe();
     const elements = useElements();
+    
+    // ✨ NEW: Refs for auto-advancing between payment fields
+    const cardNumberRef = useRef(null);
+    const cardExpiryRef = useRef(null);
+    const cardCvcRef = useRef(null);
+    
+    // ✨ NEW: Track completion state for visual feedback
+    const [cardNumberComplete, setCardNumberComplete] = useState(false);
+    const [cardExpiryComplete, setCardExpiryComplete] = useState(false);
+    const [cardCvcComplete, setCardCvcComplete] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', phone: '+1 ', email: '',
@@ -1282,8 +1292,26 @@ const handleTrialNightBooking = async (e) => {
             <div className="split-card-fields">
               <div className="card-field-wrapper">
                 <label>Card number</label>
-                <div className="card-field-container">
-                  <CardNumberElement options={ELEMENT_OPTIONS} />
+                <div className={`card-field-container ${cardNumberComplete ? 'complete' : ''}`}>
+                  <CardNumberElement 
+                    ref={cardNumberRef}
+                    options={ELEMENT_OPTIONS}
+                    onChange={(e) => {
+                      setCardBrand(e.brand || '');
+                      setCardNumberComplete(e.complete);
+                      
+                      // ✨ Auto-advance to expiry when card number is complete
+                      if (e.complete && cardExpiryRef.current) {
+                        setTimeout(() => {
+                          try {
+                            cardExpiryRef.current.focus();
+                          } catch (err) {
+                            console.log('Could not auto-focus expiry field');
+                          }
+                        }, 50);
+                      }
+                    }}
+                  />
                   <div className="card-brands">
                     <img 
                       src="/visa.svg" 
@@ -1307,14 +1335,37 @@ const handleTrialNightBooking = async (e) => {
               <div className="card-fields-row">
                 <div className="card-field-wrapper">
                   <label>Expiration date</label>
-                  <div className="card-field-container">
-                    <CardExpiryElement options={ELEMENT_OPTIONS} />
+                  <div className={`card-field-container ${cardExpiryComplete ? 'complete' : ''}`}>
+                    <CardExpiryElement 
+                      ref={cardExpiryRef}
+                      options={ELEMENT_OPTIONS}
+                      onChange={(e) => {
+                        setCardExpiryComplete(e.complete);
+                        
+                        // ✨ Auto-advance to CVC when expiry is complete
+                        if (e.complete && cardCvcRef.current) {
+                          setTimeout(() => {
+                            try {
+                              cardCvcRef.current.focus();
+                            } catch (err) {
+                              console.log('Could not auto-focus CVC field');
+                            }
+                          }, 50);
+                        }
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="card-field-wrapper">
                   <label>CVC</label>
-                  <div className="card-field-container">
-                    <CardCvcElement options={ELEMENT_OPTIONS} />
+                  <div className={`card-field-container ${cardCvcComplete ? 'complete' : ''}`}>
+                    <CardCvcElement 
+                      ref={cardCvcRef}
+                      options={ELEMENT_OPTIONS}
+                      onChange={(e) => {
+                        setCardCvcComplete(e.complete);
+                      }}
+                    />
                   </div>
                 </div>
               </div>

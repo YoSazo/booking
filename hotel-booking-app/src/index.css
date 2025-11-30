@@ -2016,13 +2016,22 @@ padding: 6px 16px;
   padding: 14px;
   background-color: #fff; /* Changed from #fafafa to #fff */
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* ✨ Smoother transition */
 }
 
 .card-field-container:focus-within {
-  border-color: #0070f3;
-  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1);
+  border-color: #0070f3; /* ✨ Blue border */
+  box-shadow: 
+    0 0 0 3px rgba(0, 112, 243, 0.1), /* ✨ Outer glow */
+    0 4px 12px rgba(0, 112, 243, 0.15); /* ✨ Subtle drop shadow */
   background-color: #fff;
+  transform: translateY(-1px); /* ✨ Subtle lift effect */
+}
+
+/* ✨ Green border when field is complete */
+.card-field-container.complete {
+  border-color: #28a745;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
 }
 
 .card-brands {
@@ -2038,13 +2047,32 @@ padding: 6px 16px;
 .card-brand-icon {
   height: 30px;
   width: auto;
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
+  opacity: 0.3; /* ✨ Dimmed by default */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* ✨ Smooth easing */
+  transform: scale(0.95); /* ✨ Slightly smaller */
+  filter: grayscale(100%); /* ✨ Grayscale when inactive */
 }
 
 .card-brand-icon.active {
-  opacity: 1;
-  transform: scale(1.05);
+  opacity: 1; /* ✨ Full opacity when detected */
+  transform: scale(1.1); /* ✨ Slightly larger (pop effect) */
+  filter: grayscale(0%); /* ✨ Full color */
+  animation: cardBrandPulse 0.6s ease-out; /* ✨ Pulse when activated */
+}
+
+/* ✨ Pulse animation when card brand is detected */
+@keyframes cardBrandPulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.15); /* Bounce up */
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }
 
 
