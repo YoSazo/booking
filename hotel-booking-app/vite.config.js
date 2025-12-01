@@ -10,15 +10,5 @@ export default defineConfig({
     // --- ADD THIS ---
     // This explicitly tells Vite to trust requests from any ngrok free domain
     allowedHosts: ['.ngrok-free.app']
-  },
-  build: {
-    // ✅ Add hash to filenames for proper cache busting
-    rollupOptions: {
-      output: {
-        entryFileNames: `assets/[name].[hash].js`,
-        chunkFileNames: `assets/[name].[hash].js`,
-        assetFileNames: `assets/[name].[hash].[ext]`
-      }
-    }
   }
 })
