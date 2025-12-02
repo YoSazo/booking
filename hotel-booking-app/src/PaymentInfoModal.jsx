@@ -2,11 +2,17 @@ import React, { useEffect } from 'react';
 
 function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue }) {
   useEffect(() => {
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = 'hidden';
+    
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
+    
     return () => {
+      // Restore body scroll when modal closes
+      document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose]);
@@ -24,8 +30,8 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
   };
 
   return (
-    <div className="lightbox-overlay" onClick={onClose}>
-      <div className="lightbox-content payment-info-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="lightbox-overlay" onClick={onClose} style={{ overflowY: 'auto' }}>
+      <div className="lightbox-content payment-info-modal" onClick={(e) => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '90vh' }}>
         <button className="lightbox-close-btn" onClick={onClose}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>

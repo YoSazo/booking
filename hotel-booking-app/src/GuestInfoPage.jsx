@@ -1419,7 +1419,9 @@ const handleTrialNightBooking = async (e) => {
       <div style={{ 
         textAlign: 'center', 
         marginBottom: '12px',
-        padding: '0 20px'
+        padding: '0 20px',
+        width: '100%',
+        display: 'block'
       }}>
         <button
           type="button"
@@ -1438,7 +1440,7 @@ const handleTrialNightBooking = async (e) => {
           ❓ What happens after I pay?
         </button>
       </div>
-    <button
+      <button
       type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
       form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
       className="btn btn-confirm"
