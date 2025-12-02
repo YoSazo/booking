@@ -30,40 +30,52 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
   };
 
   return (
-    <div className="lightbox-overlay" onClick={onClose} style={{ overflowY: 'auto', display: 'flex', alignItems: 'flex-start', paddingTop: '20px', paddingBottom: '20px' }}>
+    <div onClick={onClose} style={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'white',
+      overflowY: 'auto',
+      zIndex: 1000
+    }}>
       <div onClick={(e) => e.stopPropagation()} style={{ 
         position: 'relative',
-        background: 'white', 
-        borderRadius: '16px', 
-        overflowY: 'auto', 
-        maxHeight: '95vh',
-        width: '100%',
-        maxWidth: '850px',
-        margin: '0 20px',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+        minHeight: '100vh',
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '80px 60px 60px 60px'
       }}>
-        <button className="lightbox-close-btn" onClick={onClose} style={{
-          position: 'absolute',
-          top: '12px',
-          right: '12px',
-          background: 'rgba(0, 0, 0, 0.5)',
-          border: 'none',
+        <button onClick={onClose} style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: '#f3f4f6',
+          border: '1px solid #e5e7eb',
           borderRadius: '50%',
-          width: '40px',
-          height: '40px',
+          width: '48px',
+          height: '48px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          zIndex: 10
+          zIndex: 10,
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.background = '#e5e7eb';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = '#f3f4f6';
         }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
         
-        <div style={{ padding: '60px 40px 40px 40px' }}>
+        <div>
           {/* Money Back Guarantee - Front and Center */}
           <div style={{ 
             background: '#d4edda',
