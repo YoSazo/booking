@@ -7,6 +7,7 @@ import TestimonialTrigger from './TestimonialTrigger.jsx';
 import TestimonialPlayer from './TestimonialPlayer.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
+import PaymentInfoModal from './PaymentInfoModal.jsx';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -52,6 +53,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // In GuestInfoPage.jsx, with your other state and refs
 const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
+const [isPaymentInfoModalOpen, setIsPaymentInfoModalOpen] = useState(false);
 const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
@@ -1412,6 +1414,30 @@ const handleTrialNightBooking = async (e) => {
       {currentStep === 3 && "Proceed to Payment"}
     </button>
   ) : (
+    <>
+      {/* What Happens Next Link - Opens Modal */}
+      <div style={{ 
+        textAlign: 'center', 
+        marginBottom: '12px',
+        padding: '0 20px'
+      }}>
+        <button
+          type="button"
+          onClick={() => setIsPaymentInfoModalOpen(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#007bff',
+            textDecoration: 'underline',
+            fontSize: '14px',
+            cursor: 'pointer',
+            padding: '8px',
+            fontWeight: '500'
+          }}
+        >
+          ❓ What happens after I pay?
+        </button>
+      </div>
     <button
       type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
       form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
@@ -1427,9 +1453,21 @@ const handleTrialNightBooking = async (e) => {
     >
       {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
     </button>
+    </>
   )}
 </div>
             </div>
+
+            {/* Payment Info Modal */}
+            {isPaymentInfoModalOpen && (
+                <PaymentInfoModal
+                    onClose={() => setIsPaymentInfoModalOpen(false)}
+                    hotel={hotel}
+                    selectedPlan={selectedPlan}
+                    priceToday={priceToday}
+                    balanceDue={balanceDue}
+                />
+            )}
         </>
     );
 }
