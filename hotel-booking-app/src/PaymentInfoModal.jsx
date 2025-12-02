@@ -64,86 +64,35 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
         </button>
         
         <div style={{ padding: '60px 30px 30px 30px' }}>
-          {/* Hero - How This Works */}
+          {/* Money Back Guarantee - Front and Center */}
           <div style={{ 
-            background: '#f7f8fa',
-            borderRadius: '16px', 
-            padding: '28px',
-            textAlign: 'center',
-            marginBottom: '24px',
-            border: '1px solid #e5e7eb'
-          }}>
-            <h2 style={{ 
-              fontSize: '24px', 
-              fontWeight: '700', 
-              marginBottom: '12px',
-              color: '#1a1a1a'
-            }}>
-              Here's How This Works
-            </h2>
-            <div style={{ fontSize: '16px', lineHeight: '1.6', color: '#495057' }}>
-              {selectedPlan === 'trial' 
-                ? "Try it for just $69. If you love it, your payment goes toward your stay."
-                : selectedPlan === 'reserve'
-                ? "Secure your room for $20. Pay the rest when you arrive and see it in person."
-                : `You're paying ${getPaymentAmount()} today to secure your room. The rest (${getRemainingAmount()}) is due when you check in — after you've seen the room and know it's perfect.`
-              }
-            </div>
-          </div>
-
-          {/* Your Money is Protected */}
-          <div style={{ 
-            background: '#f0f9ff', 
-            border: '2px solid #0ea5e9',
+            background: '#d4edda',
+            border: '2px solid #28a745',
             borderRadius: '12px', 
             padding: '24px',
-            marginBottom: '20px'
+            textAlign: 'center',
+            marginBottom: '24px'
           }}>
-            <h3 style={{ 
-              fontSize: '20px', 
-              fontWeight: '700', 
-              marginBottom: '16px',
-              color: '#0c4a6e',
-              textAlign: 'center'
-            }}>
-              🛡️ Your Money is Protected
-            </h3>
+            <div style={{ fontSize: '40px', marginBottom: '8px' }}>🛡️</div>
             <div style={{ 
-              fontSize: '15px',
-              lineHeight: '1.7',
-              color: '#0c4a6e',
-              textAlign: 'center',
-              marginBottom: '16px'
-            }}>
-              <strong>When you arrive and check in:</strong> If the room isn't <em>exactly</em> as promised — we refund you 100% on the spot. No forms, no waiting.
-            </div>
-            <div style={{ 
-              background: 'white',
-              borderRadius: '8px',
-              padding: '12px',
-              fontSize: '14px',
-              color: '#0c4a6e',
-              textAlign: 'center',
+              fontSize: '18px',
+              lineHeight: '1.6',
+              color: '#155724',
               fontWeight: '600'
             }}>
-              💳 Your payment is secure via Stripe<br/>
-              <span style={{ fontSize: '13px', fontWeight: '400', opacity: '0.8' }}>
-                (We never see or store your card details)
-              </span>
+              <strong>100% Money-Back Guarantee:</strong> If the room isn't exactly as promised when you arrive, we refund you on the spot. No forms, no waiting.
             </div>
           </div>
 
-          {/* Timeline - What Happens Next */}
+          {/* What Happens When You Pay */}
           <h3 style={{ 
-            fontSize: '19px', 
+            fontSize: '20px', 
             fontWeight: '700', 
-            marginBottom: '16px',
+            marginBottom: '20px',
             color: '#1a1a1a',
-            textAlign: 'center',
-            background: 'white',
-            padding: '0'
+            textAlign: 'center'
           }}>
-            Here's Exactly What Happens Next
+            What Happens After You Pay
           </h3>
 
           <div style={{ 
