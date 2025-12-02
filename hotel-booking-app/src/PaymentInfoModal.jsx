@@ -155,9 +155,9 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
                 </strong>
                 <span style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
                   {selectedPlan === 'trial' 
-                    ? 'You'll be charged $69 today to try the room for one night.'
+                    ? "You'll be charged $69 today to try the room for one night."
                     : selectedPlan === 'reserve'
-                    ? 'You'll be charged $20 to reserve your room. This guarantees your booking.'
+                    ? "You'll be charged $20 to reserve your room. This guarantees your booking."
                     : `You'll be charged ${getPaymentAmount()} today. The remaining ${getRemainingAmount()} is due when you arrive.`
                   }
                 </span>
@@ -224,7 +224,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
                 </strong>
                 <span style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
                   {selectedPlan === 'trial' 
-                    ? 'Come see your room. If you love it and want to extend, your $69 is fully credited toward your total stay.'
+                    ? "Come see your room. If you love it and want to extend, your $69 is fully credited toward your total stay."
                     : selectedPlan === 'reserve'
                     ? `Bring ${getRemainingAmount()} when you arrive. See the room first — if it's not perfect, instant 100% refund on the spot.`
                     : `Bring ${getRemainingAmount()} when you arrive. See the room first — if it's not exactly as promised, instant 100% refund on the spot.`
