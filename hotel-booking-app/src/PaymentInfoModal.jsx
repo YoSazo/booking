@@ -38,7 +38,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
         overflowY: 'auto', 
         maxHeight: '95vh',
         width: '100%',
-        maxWidth: '700px',
+        maxWidth: '850px',
         margin: '0 20px',
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
       }}>
@@ -63,7 +63,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
           </svg>
         </button>
         
-        <div style={{ padding: '60px 30px 30px 30px' }}>
+        <div style={{ padding: '60px 40px 40px 40px' }}>
           {/* Money Back Guarantee - Front and Center */}
           <div style={{ 
             background: '#d4edda',
