@@ -30,16 +30,40 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
   };
 
   return (
-    <div className="lightbox-overlay" onClick={onClose} style={{ overflowY: 'auto' }}>
-      <div className="lightbox-content payment-info-modal" onClick={(e) => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '90vh' }}>
-        <button className="lightbox-close-btn" onClick={onClose}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <div className="lightbox-overlay" onClick={onClose} style={{ overflowY: 'auto', display: 'flex', alignItems: 'flex-start', paddingTop: '40px', paddingBottom: '40px' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ 
+        position: 'relative',
+        background: 'white', 
+        borderRadius: '16px', 
+        overflowY: 'auto', 
+        maxHeight: '90vh',
+        width: '100%',
+        maxWidth: '600px',
+        margin: '0 auto',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+      }}>
+        <button className="lightbox-close-btn" onClick={onClose} style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          background: 'rgba(0, 0, 0, 0.5)',
+          border: 'none',
+          borderRadius: '50%',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 10
+        }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
         
-        <div style={{ padding: '40px 30px', maxWidth: '550px', margin: '0 auto' }}>
+        <div style={{ padding: '50px 30px 30px 30px' }}>
           {/* Hero - Why This Payment Makes Sense */}
           <div style={{ 
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -115,7 +139,9 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
             fontWeight: '700', 
             marginBottom: '16px',
             color: '#1a1a1a',
-            textAlign: 'center'
+            textAlign: 'center',
+            background: 'white',
+            padding: '0'
           }}>
             Here's Exactly What Happens Next
           </h3>
@@ -191,7 +217,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
                   Get Instant Confirmation (60 Seconds)
                 </strong>
                 <span style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
-                  You'll receive an email with your reservation code, check-in instructions, directions, and our direct phone line.
+                  You'll receive an email with your reservation code, check-in instructions, and directions.
                 </span>
               </div>
             </div>
@@ -200,7 +226,6 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
             <div style={{ 
               display: 'flex', 
               alignItems: 'flex-start', 
-              marginBottom: '24px',
               gap: '16px'
             }}>
               <div style={{ 
@@ -229,37 +254,6 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
                     ? `Bring ${getRemainingAmount()} when you arrive. See the room first — if it's not perfect, instant 100% refund on the spot.`
                     : `Bring ${getRemainingAmount()} when you arrive. See the room first — if it's not exactly as promised, instant 100% refund on the spot.`
                   }
-                </span>
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'flex-start', 
-              gap: '16px'
-            }}>
-              <div style={{ 
-                background: '#10b981',
-                color: 'white',
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: '700',
-                fontSize: '16px',
-                flexShrink: 0
-              }}>
-                4
-              </div>
-              <div>
-                <strong style={{ display: 'block', marginBottom: '6px', color: '#1a1a1a', fontSize: '16px' }}>
-                  Move In & Relax
-                </strong>
-                <span style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
-                  Fully furnished room with 60" smart TV, free parking, weekly housekeeping. No lease, no credit checks, no deposits, no hidden fees.
                 </span>
               </div>
             </div>
