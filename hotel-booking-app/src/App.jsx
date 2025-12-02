@@ -48,6 +48,13 @@ function ScrollToTop() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    
+    // ✅ CRITICAL: Notify Clarity of SPA route changes
+    // This ensures Clarity tracks each "virtual page" in your React app
+    if (typeof window.clarity === 'function') {
+      window.clarity('set', 'page', pathname);
+      console.log('📊 Clarity: Tracked route change to', pathname);
+    }
   }, [pathname]); // This effect runs every time the path changes
 
   return null;
