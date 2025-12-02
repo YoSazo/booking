@@ -38,7 +38,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
         overflowY: 'auto', 
         maxHeight: '95vh',
         width: '100%',
-        maxWidth: '600px',
+        maxWidth: '700px',
         margin: '0 20px',
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
       }}>
@@ -63,25 +63,25 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
           </svg>
         </button>
         
-        <div style={{ padding: '60px 20px 30px 20px' }}>
-          {/* Hero - Why This Payment Makes Sense */}
+        <div style={{ padding: '60px 30px 30px 30px' }}>
+          {/* Hero - How This Works */}
           <div style={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: '#f7f8fa',
             borderRadius: '16px', 
             padding: '28px',
             textAlign: 'center',
             marginBottom: '24px',
-            color: 'white'
+            border: '1px solid #e5e7eb'
           }}>
             <h2 style={{ 
               fontSize: '24px', 
               fontWeight: '700', 
               marginBottom: '12px',
-              color: 'white'
+              color: '#1a1a1a'
             }}>
-              You're Making a Smart Decision
+              Here's How This Works
             </h2>
-            <div style={{ fontSize: '16px', lineHeight: '1.6', opacity: '0.95' }}>
+            <div style={{ fontSize: '16px', lineHeight: '1.6', color: '#495057' }}>
               {selectedPlan === 'trial' 
                 ? "Try it for just $69. If you love it, your payment goes toward your stay."
                 : selectedPlan === 'reserve'
@@ -245,14 +245,14 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
               </div>
               <div>
                 <strong style={{ display: 'block', marginBottom: '6px', color: '#1a1a1a', fontSize: '16px' }}>
-                  Arrive & Check In
+                  Arrive & Check In (Super Easy!)
                 </strong>
                 <span style={{ color: '#6b7280', fontSize: '14px', lineHeight: '1.6' }}>
                   {selectedPlan === 'trial' 
-                    ? "Come see your room. If you love it and want to extend, your $69 is fully credited toward your total stay."
+                    ? "Come see your room first. Love it? Great! Come to the front desk and extend your stay — your $69 is fully credited. No credit checks, no lease, no paperwork. Just pay for your extended stay and you're all set."
                     : selectedPlan === 'reserve'
-                    ? `Bring ${getRemainingAmount()} when you arrive. See the room first — if it's not perfect, instant 100% refund on the spot.`
-                    : `Bring ${getRemainingAmount()} when you arrive. See the room first — if it's not exactly as promised, instant 100% refund on the spot.`
+                    ? `See the room first. If it's perfect (and it will be!), come to the front desk and pay ${getRemainingAmount()}. No credit checks, no lease, no forms — just a simple payment and you're checked in. If it's not perfect, instant 100% refund on the spot.`
+                    : `See the room first. If it's perfect (and it will be!), come to the front desk and pay ${getRemainingAmount()}. No credit checks, no lease, no forms — just a simple payment and you're checked in. If it's not exactly as promised, instant 100% refund on the spot.`
                   }
                 </span>
               </div>
