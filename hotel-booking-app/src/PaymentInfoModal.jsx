@@ -30,22 +30,22 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
   };
 
   return (
-    <div className="lightbox-overlay" onClick={onClose} style={{ overflowY: 'auto', display: 'flex', alignItems: 'flex-start', paddingTop: '40px', paddingBottom: '40px' }}>
+    <div className="lightbox-overlay" onClick={onClose} style={{ overflowY: 'auto', display: 'flex', alignItems: 'flex-start', paddingTop: '20px', paddingBottom: '20px' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ 
         position: 'relative',
         background: 'white', 
         borderRadius: '16px', 
         overflowY: 'auto', 
-        maxHeight: '90vh',
+        maxHeight: '95vh',
         width: '100%',
         maxWidth: '600px',
-        margin: '0 auto',
+        margin: '0 20px',
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
       }}>
         <button className="lightbox-close-btn" onClick={onClose} style={{
           position: 'absolute',
-          top: '16px',
-          right: '16px',
+          top: '12px',
+          right: '12px',
           background: 'rgba(0, 0, 0, 0.5)',
           border: 'none',
           borderRadius: '50%',
@@ -63,7 +63,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
           </svg>
         </button>
         
-        <div style={{ padding: '50px 30px 30px 30px' }}>
+        <div style={{ padding: '60px 20px 30px 20px' }}>
           {/* Hero - Why This Payment Makes Sense */}
           <div style={{ 
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
