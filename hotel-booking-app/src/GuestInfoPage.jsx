@@ -1414,14 +1414,18 @@ const handleTrialNightBooking = async (e) => {
       {currentStep === 3 && "Proceed to Payment"}
     </button>
   ) : (
-    <>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center',
+      width: '100%'
+    }}>
       {/* What Happens Next Link - Opens Modal */}
       <div style={{ 
         textAlign: 'center', 
         marginBottom: '12px',
         padding: '0 20px',
-        width: '100%',
-        display: 'block'
+        width: '100%'
       }}>
         <button
           type="button"
@@ -1455,7 +1459,7 @@ const handleTrialNightBooking = async (e) => {
     >
       {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
     </button>
-    </>
+    </div>
   )}
 </div>
             </div>
