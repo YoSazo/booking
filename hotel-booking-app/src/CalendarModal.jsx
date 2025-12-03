@@ -138,39 +138,226 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showUpsell = nights > 0 && nights < 7 && !upsellDeclined;
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
+  if (!isOpen) return null;
+
   return (
-    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
-      <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        <div className="calendar-scroll-area">
-          <div className="calendar-header">
-            <button onClick={() => changeMonth(-1)}>&lt;</button>
-            <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-            <button onClick={() => changeMonth(1)}>&gt;</button>
+    <div onClick={onClose} style={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'white',
+      overflowY: 'auto',
+      zIndex: 1000
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ 
+        position: 'relative',
+        minHeight: '100vh',
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '80px 40px 40px 40px'
+      }}>
+        {/* Close Button */}
+        <button onClick={onClose} style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: '#f3f4f6',
+          border: '1px solid #e5e7eb',
+          borderRadius: '50%',
+          width: '48px',
+          height: '48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 10,
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.background = '#e5e7eb';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = '#f3f4f6';
+        }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+
+        {/* Selected Dates Display - Top */}
+        {startDate && endDate && (
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '30px',
+            fontSize: '20px',
+            fontWeight: '600',
+            color: '#1a1a1a'
+          }}>
+            {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ({nights} {nights === 1 ? 'night' : 'nights'})
           </div>
-          <div className="calendar-grid">
-            <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
+        )}
+
+        {/* Calendar */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '16px',
+          border: '1px solid #e5e7eb',
+          padding: '30px',
+          marginBottom: '30px'
+        }}>
+          <div className="calendar-header" style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px'
+          }}>
+            <button onClick={() => changeMonth(-1)} style={{
+              background: '#f3f4f6',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '10px 20px',
+              fontSize: '18px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>&lt;</button>
+            <h3 style={{
+              fontSize: '22px',
+              fontWeight: '700',
+              margin: 0
+            }}>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+            <button onClick={() => changeMonth(1)} style={{
+              background: '#f3f4f6',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '10px 20px',
+              fontSize: '18px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>&gt;</button>
           </div>
-          <div className="calendar-grid">{renderDays()}</div>
+          <div className="calendar-grid" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '4px',
+            marginBottom: '8px'
+          }}>
+            <div className="calendar-day-name">Sun</div>
+            <div className="calendar-day-name">Mon</div>
+            <div className="calendar-day-name">Tue</div>
+            <div className="calendar-day-name">Wed</div>
+            <div className="calendar-day-name">Thu</div>
+            <div className="calendar-day-name">Fri</div>
+            <div className="calendar-day-name">Sat</div>
+          </div>
+          <div className="calendar-grid" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '4px'
+          }}>{renderDays()}</div>
         </div>
-        <div className="modal-actions-footer">
-          <div className="price-card">
-            <div className="calendar-price-badge">
-              {showUpsell ? (
-                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-              ) : showShortStayPrice ? (
-                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
-                </div>
-              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
+
+        {/* Upsell / Price Display - Below Calendar */}
+        <div style={{ marginBottom: '24px' }}>
+          {showUpsell ? (
+            <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+          ) : showShortStayPrice ? (
+            <div style={{ 
+              background: '#f0f9ff',
+              border: '2px solid #0ea5e9',
+              borderRadius: '12px',
+              padding: '20px', 
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745', marginTop: '8px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
             </div>
-          </div>
-          <div className="calendar-footer-buttons">
-            <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
-            <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
-            <button className="btn" onClick={handleDone}>Done</button>
-          </div>
+          ) : nights > 0 ? (
+            <PriceBadge nights={nights} rates={rates} />
+          ) : null}
         </div>
+
+        {/* Quick Book Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          marginBottom: '16px',
+          justifyContent: 'center'
+        }}>
+          <button onClick={handleBookWeek} style={{
+            flex: 1,
+            maxWidth: '200px',
+            padding: '14px 24px',
+            background: '#f3f4f6',
+            border: '2px solid #e5e7eb',
+            borderRadius: '10px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = '#e5e7eb';
+            e.target.style.borderColor = '#d1d5db';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = '#f3f4f6';
+            e.target.style.borderColor = '#e5e7eb';
+          }}>
+            📅 Book 1 Week
+          </button>
+          <button onClick={handleBookMonth} style={{
+            flex: 1,
+            maxWidth: '200px',
+            padding: '14px 24px',
+            background: '#f3f4f6',
+            border: '2px solid #e5e7eb',
+            borderRadius: '10px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = '#e5e7eb';
+            e.target.style.borderColor = '#d1d5db';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = '#f3f4f6';
+            e.target.style.borderColor = '#e5e7eb';
+          }}>
+            📅 Book 1 Month
+          </button>
+        </div>
+
+        {/* Done Button - Big and Prominent */}
+        <button onClick={handleDone} style={{
+          width: '100%',
+          padding: '18px',
+          background: '#28a745',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '12px',
+          fontSize: '18px',
+          fontWeight: '700',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          boxShadow: '0 4px 12px rgba(40, 167, 69, 0.3)'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.background = '#218838';
+          e.target.style.transform = 'translateY(-2px)';
+          e.target.style.boxShadow = '0 6px 16px rgba(40, 167, 69, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = '#28a745';
+          e.target.style.transform = 'translateY(0)';
+          e.target.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.3)';
+        }}>
+          ✓ Done - Continue to Booking
+        </button>
       </div>
     </div>
   );
