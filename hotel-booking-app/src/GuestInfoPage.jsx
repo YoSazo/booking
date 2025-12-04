@@ -1452,8 +1452,14 @@ const handlePayLaterBooking = async (e) => {
     <div className="guarantee-content">
       <div className="guarantee-icon">💳</div>
       <div className="guarantee-text">
-        <div className="guarantee-title" style={{ color: '#17a2b8' }}>Card Verification - No Charge Today</div>
-        <div className="guarantee-description">
+        <div className="guarantee-title" style={{ 
+          color: '#0c5460', 
+          textShadow: '0 0 1px rgba(0,0,0,0.1)',
+          fontWeight: '700'
+        }}>
+          Card Verification - No Charge Today
+        </div>
+        <div className="guarantee-description" style={{ color: '#1a1a1a' }}>
           We'll place a temporary <strong>$75.90 hold</strong> on your card to secure your reservation. This is NOT a charge.
           <br /><br />
           ✅ <strong>If you check in:</strong> Hold is released immediately (no charge)
