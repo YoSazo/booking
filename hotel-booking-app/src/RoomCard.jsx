@@ -60,7 +60,14 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
             <div className="price-balance">Balance (${displayBalanceDue.toFixed(2)}) When You Arrive</div>
           </div>
         ) : (
-          <div className="room-price">${rates?.NIGHTLY || 59} <span>/ night</span></div>
+          <div className="room-price-placeholder" style={{ 
+            fontSize: '15px', 
+            color: '#666', 
+            fontStyle: 'italic',
+            padding: '10px 0'
+          }}>
+            Select dates to see pricing
+          </div>
         )}
 
         {isSelected ? (
