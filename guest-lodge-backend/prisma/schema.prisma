@@ -28,4 +28,12 @@ model Booking {
   taxesAndFees          Float
   grandTotal            Float
   BookingType           String   @default("standard")
+  
+  // Fields for "Pay Later" bookings with pre-auth hold
+  amountPaidNow         Float?   @default(0)
+  preAuthHoldAmount     Float?
+  holdStatus            String?  // 'active', 'released', 'captured'
+  holdReleasedAt        DateTime?
+  holdCapturedAt        DateTime?
+  noShowFeePaid         Boolean  @default(false)
 }

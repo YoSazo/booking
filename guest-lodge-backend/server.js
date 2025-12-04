@@ -147,6 +147,266 @@ app.post('/api/update-payment-intent', async (req, res) => {
   }
 });
 
+// NEW: Create pre-authorization hold for "Reserve Now, Pay Later"
+app.post('/api/create-preauth-hold', async (req, res) => {
+    const { bookingDetails, guestInfo, hotelId } = req.body;
+    
+    const noShowFeeInCents = 7590; // $75.90
+
+    try {
+        // Create a PaymentIntent with manual capture
+        // This places a hold on the card without charging
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: noShowFeeInCents,
+            currency: 'usd',
+            capture_method: 'manual', // 🔑 KEY: This creates a hold instead of charging
+            automatic_payment_methods: {
+                enabled: true,
+            },
+            metadata: {
+                bookingDetails: JSON.stringify(bookingDetails),
+                guestInfo: JSON.stringify(guestInfo),
+                hotelId: hotelId,
+                bookingType: 'payLater',
+                noShowFeeAmount: '7590',
+                holdType: 'pre_authorization'
+            },
+            description: `Pre-authorization hold for ${bookingDetails.roomName} - ${bookingDetails.nights} nights`
+        });
+        
+        res.send({ 
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id
+        });
+    } catch (error) {
+        console.error("Stripe API Error creating pre-auth hold:", error.message);
+        res.status(400).send({ 
+            error: { message: error.message || "Failed to create pre-authorization hold." } 
+        });
+    }
+});
+
+// NEW: Complete pay later booking after pre-auth hold succeeds
+app.post('/api/complete-pay-later-booking', async (req, res) => {
+    const { paymentIntentId, guestInfo, bookingDetails, hotelId } = req.body;
+
+    try {
+        // Verify the payment intent is authorized (not captured)
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        
+        if (paymentIntent.status !== 'requires_capture') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Pre-authorization hold not successful.' 
+            });
+        }
+
+        // Create booking in Cloudbeds with "Pay at Hotel" status
+        const reservationData = {
+            propertyID: PROPERTY_ID,
+            startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
+            endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
+            guestFirstName: guestInfo.firstName,
+            guestLastName: guestInfo.lastName,
+            guestCountry: 'US',
+            guestZip: guestInfo.zip,
+            guestEmail: guestInfo.email,
+            guestPhone: guestInfo.phone,
+            paymentMethod: "cash", // Marked as pay at hotel
+            sendEmailConfirmation: "true",
+            rooms: JSON.stringify([{ 
+                roomTypeID: bookingDetails.roomTypeID, 
+                quantity: 1, 
+                roomRateID: bookingDetails.rateID 
+            }]),
+            adults: JSON.stringify([{ 
+                roomTypeID: bookingDetails.roomTypeID, 
+                quantity: bookingDetails.guests 
+            }]),
+            children: JSON.stringify([{ 
+                roomTypeID: bookingDetails.roomTypeID, 
+                quantity: 0 
+            }]),
+        };
+
+        const pmsResponse = await axios.post(
+            'https://api.cloudbeds.com/api/v1.3/postReservation',
+            new URLSearchParams(reservationData),
+            {
+                headers: {
+                    'accept': 'application/json',
+                    'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
+                    'content-type': 'application/x-www-form-urlencoded',
+                }
+            }
+        );
+
+        if (pmsResponse.data.success) {
+            // Save to database
+            await prisma.booking.create({
+                data: {
+                    stripePaymentIntentId: paymentIntentId,
+                    ourReservationCode: bookingDetails.reservationCode,
+                    pmsConfirmationCode: pmsResponse.data.reservationID,
+                    hotelId: hotelId,
+                    roomName: bookingDetails.name || bookingDetails.roomName,
+                    BookingType: 'payLater',
+                    checkinDate: new Date(bookingDetails.checkin),
+                    checkoutDate: new Date(bookingDetails.checkout),
+                    nights: bookingDetails.nights,
+                    guestFirstName: guestInfo.firstName,
+                    guestLastName: guestInfo.lastName,
+                    guestEmail: guestInfo.email,
+                    guestPhone: guestInfo.phone,
+                    subtotal: bookingDetails.subtotal,
+                    taxesAndFees: bookingDetails.taxes,
+                    grandTotal: bookingDetails.total,
+                    amountPaidNow: 0,
+                    preAuthHoldAmount: 75.90,
+                    holdStatus: 'active'
+                }
+            });
+
+            res.json({
+                success: true,
+                message: 'Reservation created successfully. $75.90 hold placed on card.',
+                reservationCode: pmsResponse.data.reservationID
+            });
+        } else {
+            // If booking fails, cancel the hold
+            await stripe.paymentIntents.cancel(paymentIntentId);
+            
+            res.status(400).json({
+                success: false,
+                message: pmsResponse.data.message || 'Failed to create reservation.'
+            });
+        }
+
+    } catch (error) {
+        console.error("Error completing pay later booking:", error.response?.data || error.message);
+        console.error("Full error stack:", error.stack);
+        
+        // Try to cancel hold if something went wrong
+        try {
+            await stripe.paymentIntents.cancel(paymentIntentId);
+        } catch (cancelError) {
+            console.error("Failed to cancel hold:", cancelError.message);
+        }
+        
+        // Return detailed error for debugging
+        res.status(500).json({ 
+            success: false, 
+            message: error.response?.data?.message || error.message || 'Failed to complete reservation.',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+// NEW: Release pre-auth hold when guest checks in
+app.post('/api/release-hold', async (req, res) => {
+    const { bookingId } = req.body;
+
+    try {
+        const booking = await prisma.booking.findUnique({
+            where: { id: bookingId }
+        });
+
+        if (!booking || booking.BookingType !== 'payLater') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid booking or not a pay-later reservation.' 
+            });
+        }
+
+        if (booking.holdStatus !== 'active') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Hold already released or captured.' 
+            });
+        }
+
+        // Cancel the payment intent to release the hold
+        await stripe.paymentIntents.cancel(booking.stripePaymentIntentId);
+
+        // Update booking record
+        await prisma.booking.update({
+            where: { id: bookingId },
+            data: {
+                holdStatus: 'released',
+                holdReleasedAt: new Date()
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'Pre-authorization hold released successfully.'
+        });
+
+    } catch (error) {
+        console.error("Error releasing hold:", error.message);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message || 'Failed to release hold.' 
+        });
+    }
+});
+
+// NEW: Capture pre-auth hold as no-show fee
+app.post('/api/capture-no-show-fee', async (req, res) => {
+    const { bookingId } = req.body;
+
+    try {
+        const booking = await prisma.booking.findUnique({
+            where: { id: bookingId }
+        });
+
+        if (!booking || booking.BookingType !== 'payLater') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid booking or not a pay-later reservation.' 
+            });
+        }
+
+        if (booking.holdStatus !== 'active') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Hold already released or captured.' 
+            });
+        }
+
+        // Capture the held funds
+        const paymentIntent = await stripe.paymentIntents.capture(
+            booking.stripePaymentIntentId,
+            {
+                amount_to_capture: 7590 // Capture the full $75.90
+            }
+        );
+
+        // Update booking record
+        await prisma.booking.update({
+            where: { id: bookingId },
+            data: {
+                holdStatus: 'captured',
+                holdCapturedAt: new Date(),
+                noShowFeePaid: true
+            }
+        });
+
+        res.json({
+            success: true,
+            message: 'No-show fee of $75.90 charged successfully.',
+            paymentIntentId: paymentIntent.id
+        });
+
+    } catch (error) {
+        console.error("Error capturing no-show fee:", error.message);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message || 'Failed to capture no-show fee.' 
+        });
+    }
+});
+
 
 
 // REPLACE your entire webhook with this one:
