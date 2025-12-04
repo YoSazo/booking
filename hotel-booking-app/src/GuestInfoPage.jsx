@@ -1282,35 +1282,7 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </label>
 
-                        {/* Full Booking Option - NOW SECONDARY */}
-                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
-                            <input 
-                                type="radio" 
-                                name="plan" 
-                                value="full" 
-                                checked={selectedPlan === 'full'}
-                                onChange={() => setSelectedPlan('full')}
-                            />
-                            <div className="payment-option secondary">
-                                <div className="option-header">
-                                    <span className="option-title">Complete Your Booking</span>
-                                </div>
-                                <div className="option-price">
-                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
-                                </div>
-                                <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
-                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
-                                    <br />
-                                    <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
-                                </div>
-                            </div>
-                        </label>
-
-                        {/* NEW: Pay Later Option - For 7+ nights only */}
+                        {/* NEW: Pay Later Option - SECOND OPTION (Most visible) */}
                         <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
                             <input 
                                 type="radio" 
@@ -1335,6 +1307,34 @@ const handlePayLaterBooking = async (e) => {
                                     Full payment ${bookingDetails.total.toFixed(2)} due at check-in
                                     <br />
                                     <strong style={{ color: '#ffc107' }}>⚠️ $75.90 hold on card (released when you arrive)</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        {/* Full Booking Option - NOW THIRD */}
+                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="full" 
+                                checked={selectedPlan === 'full'}
+                                onChange={() => setSelectedPlan('full')}
+                            />
+                            <div className="payment-option secondary">
+                                <div className="option-header">
+                                    <span className="option-title">Complete Your Booking</span>
+                                </div>
+                                <div className="option-price">
+                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
+                                    <br />
+                                    <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
                                 </div>
                             </div>
                         </label>
