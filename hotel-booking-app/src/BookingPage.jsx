@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
-import ReviewCard from './ReviewCard.jsx';
+// import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import HelpWidget from './HelpWidget.jsx';
 import { trackPageView } from './trackingService.js';
 
@@ -71,18 +71,8 @@ function BookingPage({
           <p>{hotel.subtitle}</p>
         </header>
         
-        <div className="reviews-section">
-          {hotel.reviews.map((review, index) => (
-            <ReviewCard 
-              key={index}
-              text={review.text}
-              author={review.author}
-              location={review.location}
-              rating={review.rating}
-            />
-          ))}
-          <img src="/google.png" alt="Google Reviews" className="reviews-google-logo" />
-        </div>
+        {/* Reviews section removed - blocking calendar/rooms visibility
+            Trust is already established through ad creative and Kenneth video */}
 
         <div className="booking-form">
           <div className="form-group">
