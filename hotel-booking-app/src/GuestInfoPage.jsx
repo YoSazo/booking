@@ -508,6 +508,12 @@ useEffect(() => {
             return;
         }
         
+        // If pay later plan selected, use pay later handler instead
+        if (selectedPlan === 'payLater') {
+            handlePayLaterBooking(e);
+            return;
+        }
+        
         if (!window.userInitiatedSubmit) {
         console.warn('Form submitted without user interaction - ignoring');
         return;
@@ -916,6 +922,195 @@ const handleTrialNightBooking = async (e) => {
     }
 };
 
+// NEW: Handle "Pay Later" booking with pre-authorization hold
+const handlePayLaterBooking = async (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
+    setHasAttemptedSubmit(true);
+
+    // Validate billing address first
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage('');
+
+    // Get original booking from sessionStorage
+    const originalBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
+    
+    const payLaterBooking = {
+        roomTypeID: originalBooking.roomTypeID,
+        rateID: originalBooking.rateID,
+        roomName: originalBooking.name,
+        checkin: originalBooking.checkin,
+        checkout: originalBooking.checkout,
+        nights: originalBooking.nights,
+        guests: originalBooking.guests,
+        subtotal: originalBooking.subtotal,
+        taxes: originalBooking.taxes,
+        total: originalBooking.total,
+        reservationCode: originalBooking.reservationCode,
+        bookingType: 'payLater',
+        amountPaidNow: 0,
+        amountDueAtArrival: originalBooking.total,
+        preAuthHoldAmount: 75.90,
+    };
+
+    try {
+        // Create pre-authorization hold (not a charge)
+        const response = await fetch(`${apiBaseUrl}/api/create-preauth-hold`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                bookingDetails: payLaterBooking,
+                guestInfo: formData,
+                hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!data.clientSecret) {
+            throw new Error("Failed to create pre-authorization hold");
+        }
+
+        // Process payment based on method
+        if (paymentMethod === 'card') {
+            // Authorize the hold (doesn't charge)
+            const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardNumberElement),
+                    billing_details: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        address: {
+                            line1: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postal_code: formData.zip,
+                            country: 'US',
+                        },
+                    },
+                },
+            });
+
+            if (error) {
+                setErrorMessage(error.message || "Card authorization failed");
+                setIsProcessing(false);
+            } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
+                // Hold successfully placed - now create the booking
+                const bookingResponse = await fetch(`${apiBaseUrl}/api/complete-pay-later-booking`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        paymentIntentId: paymentIntent.id,
+                        bookingDetails: payLaterBooking,
+                        guestInfo: formData,
+                        hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                    }),
+                });
+
+                const bookingResult = await bookingResponse.json();
+
+                if (bookingResult.success) {
+                    // Save pay later booking data for confirmation page
+                    sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
+                    
+                    // Complete the booking
+                    onComplete(formData, paymentIntent.id);
+                } else {
+                    setErrorMessage(bookingResult.message || "Failed to create booking");
+                    setIsProcessing(false);
+                }
+            }
+        } else if (paymentMethod === 'wallet') {
+            // Create payment request for $75.90 hold
+            const holdAmountInCents = 7590;
+            
+            const payLaterPaymentRequest = stripe.paymentRequest({
+                country: 'US',
+                currency: 'usd',
+                total: { label: 'Pre-Authorization Hold', amount: holdAmountInCents },
+                requestPayerName: true,
+                requestPayerEmail: true,
+            });
+
+            // Set up payment method handler
+            payLaterPaymentRequest.on('paymentmethod', async (ev) => {
+                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                    data.clientSecret, 
+                    { payment_method: ev.paymentMethod.id }, 
+                    { handleActions: false }
+                );
+                
+                if (confirmError) {
+                    ev.complete('fail');
+                    setErrorMessage(confirmError.message);
+                    setIsProcessing(false);
+                    return;
+                }
+                
+                if (paymentIntent && paymentIntent.status === 'requires_capture') {
+                    // Hold placed - create booking
+                    const bookingResponse = await fetch(`${apiBaseUrl}/api/complete-pay-later-booking`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            paymentIntentId: paymentIntent.id,
+                            bookingDetails: payLaterBooking,
+                            guestInfo: formData,
+                            hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                        }),
+                    });
+
+                    const bookingResult = await bookingResponse.json();
+
+                    if (bookingResult.success) {
+                        ev.complete('success');
+                        
+                        sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
+                        onComplete(formData, paymentIntent.id);
+                    } else {
+                        ev.complete('fail');
+                        setErrorMessage(bookingResult.message);
+                        setIsProcessing(false);
+                    }
+                } else {
+                    ev.complete('fail');
+                    setErrorMessage("Authorization failed");
+                    setIsProcessing(false);
+                }
+            });
+
+            // Show payment request
+            const canMakePayment = await payLaterPaymentRequest.canMakePayment();
+            
+            if (!canMakePayment) {
+                setErrorMessage("Digital wallet is not available. Please use card payment.");
+                setIsProcessing(false);
+                return;
+            }
+
+            try {
+                await payLaterPaymentRequest.show();
+            } catch (error) {
+                console.log('Payment cancelled:', error);
+                setErrorMessage("Payment cancelled");
+                setIsProcessing(false);
+            }
+        }
+
+    } catch (error) {
+        console.error("Pay later booking failed:", error);
+        setErrorMessage("Failed to process reservation. Please try again.");
+        setIsProcessing(false);
+    }
+};
+
     // Click handler for WALLET PAYMENTS
     const handleWalletPayment = () => {
     setHasAttemptedSubmit(true);
@@ -991,6 +1186,8 @@ const handleTrialNightBooking = async (e) => {
         return 'Book Trial Night - Pay $69 Now';
     } else if (selectedPlan === 'reserve') {
         return 'Reserve Room - Pay $20 Now';
+    } else if (selectedPlan === 'payLater') {
+        return 'Confirm Reservation - $0 Today';
     } else {
         const priceToday = bookingDetails.total / 2;
         return `Pay $${priceToday.toFixed(2)} and Complete Booking`;
@@ -1112,6 +1309,35 @@ const handleTrialNightBooking = async (e) => {
                                 </div>
                             </div>
                         </label>
+
+                        {/* NEW: Pay Later Option - For 7+ nights only */}
+                        <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="payLater" 
+                                checked={selectedPlan === 'payLater'}
+                                onChange={() => setSelectedPlan('payLater')}
+                            />
+                            <div className="payment-option secondary">
+                                <div className="option-header">
+                                    <span className="option-title">💳 Reserve Now, Pay Later</span>
+                                    <span className="option-badge" style={{ backgroundColor: '#17a2b8' }}>Flexible</span>
+                                </div>
+                                <div className="option-price" style={{ color: '#17a2b8' }}>
+                                    $0 Today
+                                </div>
+                                <div className="option-details">
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Full payment ${bookingDetails.total.toFixed(2)} due at check-in
+                                    <br />
+                                    <strong style={{ color: '#ffc107' }}>⚠️ $75.90 hold on card (released when you arrive)</strong>
+                                </div>
+                            </div>
+                        </label>
                     </div>
                 )}
 
@@ -1220,8 +1446,29 @@ const handleTrialNightBooking = async (e) => {
     <span>Guaranteed safe and secure Checkout</span>
   </div>
   
-  {/* Only show money-back guarantee for non-reserve bookings */}
-  {selectedPlan !== 'reserve' && (
+  {/* Show Pay Later explanation banner */}
+  {selectedPlan === 'payLater' && (
+  <div className="money-back-guarantee" style={{ backgroundColor: '#e7f3ff', borderColor: '#17a2b8' }}>
+    <div className="guarantee-content">
+      <div className="guarantee-icon">💳</div>
+      <div className="guarantee-text">
+        <div className="guarantee-title" style={{ color: '#17a2b8' }}>Card Verification - No Charge Today</div>
+        <div className="guarantee-description">
+          We'll place a temporary <strong>$75.90 hold</strong> on your card to secure your reservation. This is NOT a charge.
+          <br /><br />
+          ✅ <strong>If you check in:</strong> Hold is released immediately (no charge)
+          <br />
+          ❌ <strong>If you don't show up:</strong> Hold becomes a $75.90 no-show fee
+          <br /><br />
+          Full payment of <strong>${bookingDetails.total.toFixed(2)}</strong> is due at check-in.
+        </div>
+      </div>
+    </div>
+  </div>
+  )}
+  
+  {/* Only show money-back guarantee for non-reserve and non-payLater bookings */}
+  {selectedPlan !== 'reserve' && selectedPlan !== 'payLater' && (
   <div className="money-back-guarantee">
     <div className="guarantee-content">
       <div className="guarantee-icon">🛡️</div>

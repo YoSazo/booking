@@ -52,6 +52,121 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
               <span className="detail-value">{bookingDetails.nights} Night{bookingDetails.nights > 1 ? 's' : ''}</span>
             </div>
           </div>
+
+          {/* Payment Summary based on booking type */}
+          <div className="stay-details-card" style={{ marginTop: '20px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', color: '#1a1a1a' }}>
+              Payment Summary
+            </h3>
+            
+            {bookingDetails.bookingType === 'trial' && (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Paid Today</span>
+                  <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>$69.00</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Original Stay Total</span>
+                  <span className="detail-value">${bookingDetails.originalTotal?.toFixed(2)}</span>
+                </div>
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px', 
+                  background: '#e7f3ff', 
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  lineHeight: '1.6'
+                }}>
+                  <strong>🎉 Trial Night Booked!</strong>
+                  <br />
+                  Your $69 is <strong>100% credited</strong> toward any extended stay. Just come to the front desk to extend!
+                </div>
+              </>
+            )}
+
+            {bookingDetails.bookingType === 'reserve' && (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Paid Today</span>
+                  <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>$20.00</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Total Stay Cost</span>
+                  <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Due at Check-in</span>
+                  <span className="detail-value" style={{ fontWeight: '700' }}>${(bookingDetails.total - 20).toFixed(2)}</span>
+                </div>
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px', 
+                  background: '#fff3cd', 
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  lineHeight: '1.6'
+                }}>
+                  <strong>⚠️ Room Reserved!</strong>
+                  <br />
+                  Your room is guaranteed. Non-refundable $20 reservation fee applied.
+                </div>
+              </>
+            )}
+
+            {bookingDetails.bookingType === 'payLater' && (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Paid Today</span>
+                  <span className="detail-value" style={{ color: '#17a2b8', fontWeight: '700' }}>$0.00</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Hold on Card</span>
+                  <span className="detail-value" style={{ color: '#ffc107' }}>$75.90 (temporary)</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Total Stay Cost</span>
+                  <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Due at Check-in</span>
+                  <span className="detail-value" style={{ fontWeight: '700' }}>${bookingDetails.total?.toFixed(2)}</span>
+                </div>
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px', 
+                  background: '#e7f3ff', 
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  lineHeight: '1.6'
+                }}>
+                  <strong>💳 Pre-Authorization Hold</strong>
+                  <br />
+                  A temporary $75.90 hold has been placed on your card. This is NOT a charge.
+                  <br /><br />
+                  ✅ <strong>When you check in:</strong> Hold is released (no charge)
+                  <br />
+                  ❌ <strong>If you don't show:</strong> $75.90 no-show fee is charged
+                </div>
+              </>
+            )}
+
+            {(!bookingDetails.bookingType || bookingDetails.bookingType === 'standard' || bookingDetails.bookingType === 'full') && (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Paid Today</span>
+                  <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>${(bookingDetails.total / 2).toFixed(2)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Total Stay Cost</span>
+                  <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Due at Check-in</span>
+                  <span className="detail-value" style={{ fontWeight: '700' }}>${(bookingDetails.total / 2).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </>

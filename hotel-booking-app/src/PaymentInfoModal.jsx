@@ -20,12 +20,14 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
   const getPaymentAmount = () => {
     if (selectedPlan === 'trial') return '$69';
     if (selectedPlan === 'reserve') return '$20';
+    if (selectedPlan === 'payLater') return '$0';
     return `$${priceToday.toFixed(2)}`;
   };
 
   const getRemainingAmount = () => {
     if (selectedPlan === 'trial') return 'the remaining balance if you extend your stay';
     if (selectedPlan === 'reserve') return `$${(balanceDue + priceToday - 20).toFixed(2)}`;
+    if (selectedPlan === 'payLater') return `$${(balanceDue + priceToday).toFixed(2)}`;
     return `$${balanceDue.toFixed(2)}`;
   };
 
@@ -145,6 +147,8 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
                     ? "You'll be charged $69 today to try the room for one night."
                     : selectedPlan === 'reserve'
                     ? "You'll be charged $20 to reserve your room. This guarantees your booking."
+                    : selectedPlan === 'payLater'
+                    ? "We'll place a temporary $75.90 hold on your card. This is NOT a charge - it verifies your card and secures your reservation."
                     : `You'll be charged ${getPaymentAmount()} today. The remaining ${getRemainingAmount()} is due when you arrive.`
                   }
                 </span>
@@ -213,6 +217,8 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
                     ? "Come see your room first. Love it? Great! Come to the front desk and extend your stay — your $69 is fully credited. No credit checks, no lease, no paperwork. Just pay for your extended stay and you're all set."
                     : selectedPlan === 'reserve'
                     ? `See the room first. If it's perfect (and it will be!), come to the front desk and pay ${getRemainingAmount()}. No credit checks, no lease, no forms — just a simple payment and you're checked in. If it's not perfect, instant 100% refund on the spot.`
+                    : selectedPlan === 'payLater'
+                    ? `Check in and see your room first. Pay the full amount (${getRemainingAmount()}) at the front desk. The $75.90 hold on your card will be released immediately. If you don't show up, the hold becomes a $75.90 no-show fee.`
                     : `See the room first. If it's perfect (and it will be!), come to the front desk and pay ${getRemainingAmount()}. No credit checks, no lease, no forms — just a simple payment and you're checked in. If it's not exactly as promised, instant 100% refund on the spot.`
                   }
                 </span>
@@ -234,6 +240,8 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
               <div style={{ color: '#6b7280', fontSize: '14px' }}>
                 {selectedPlan === 'reserve'
                   ? 'Room reservations are non-refundable, but they guarantee your room is held for you.'
+                  : selectedPlan === 'payLater'
+                  ? 'Cancel up to 7 days before arrival - the hold will be released immediately. After that, a $75.90 no-show fee applies if you don\'t arrive.'
                   : 'Cancel up to 7 days before arrival for a full refund. No questions asked.'
                 }
               </div>
