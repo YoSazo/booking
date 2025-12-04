@@ -41,28 +41,7 @@ function BookingPage({
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
   return (
     <>
-      <div className="marquee-banner">
-  <div className="marquee-content">
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-    <span>Pay only 50%</span>
-  </div>
-</div>
+      {/* Marquee banner removed - taking up valuable above-fold space */}
 
       <div className="container">
         <header className="header">
@@ -74,15 +53,7 @@ function BookingPage({
         {/* Reviews section removed - blocking calendar/rooms visibility
             Trust is already established through ad creative and Kenneth video */}
 
-        <div className="booking-form">
-          <div className="form-group">
-            <label>Check-in / Check-out</label>
-            <div className="date-picker-button" onClick={onCalendarOpen}>
-                <span>{ checkinDate && checkoutDate ? `${formatDate(checkinDate)} - ${formatDate(checkoutDate)}` : `${formatDate(checkinDate)} - Select Checkout` }</span>
-                <span>&#128197;</span>
-            </div>
-          </div>
-        </div>
+        {/* Calendar widget removed - redundant, calendar opens when user clicks "Book Now" on room */}
 
         <main className="rooms-list">
           
