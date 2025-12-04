@@ -250,7 +250,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                     pmsConfirmationCode: pmsResponse.data.reservationID,
                     hotelId: hotelId,
                     roomName: bookingDetails.name || bookingDetails.roomName,
-                    BookingType: 'payLater',
+                    bookingType: 'payLater',
                     checkinDate: new Date(bookingDetails.checkin),
                     checkoutDate: new Date(bookingDetails.checkout),
                     nights: bookingDetails.nights,
@@ -311,7 +311,7 @@ app.post('/api/release-hold', async (req, res) => {
             where: { id: bookingId }
         });
 
-        if (!booking || booking.BookingType !== 'payLater') {
+        if (!booking || booking.bookingType !== 'payLater') {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Invalid booking or not a pay-later reservation.' 
@@ -360,7 +360,7 @@ app.post('/api/capture-no-show-fee', async (req, res) => {
             where: { id: bookingId }
         });
 
-        if (!booking || booking.BookingType !== 'payLater') {
+        if (!booking || booking.bookingType !== 'payLater') {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Invalid booking or not a pay-later reservation.' 
@@ -486,7 +486,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                         pmsConfirmationCode: pmsResponse.data.reservationID,
                         hotelId: hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
-                        BookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
+                        bookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,
@@ -629,7 +629,7 @@ app.post('/api/book', async (req, res) => {
                         pmsConfirmationCode: pmsResponse.data.reservationID,
                         hotelId: hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
-                        BookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
+                        bookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,

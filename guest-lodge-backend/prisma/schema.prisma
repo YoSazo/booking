@@ -27,7 +27,7 @@ model Booking {
   subtotal              Float
   taxesAndFees          Float
   grandTotal            Float
-  BookingType           String   @default("standard")
+  bookingType           String   @default("standard")
   
   // Fields for "Pay Later" bookings with pre-auth hold
   amountPaidNow         Float?   @default(0)
