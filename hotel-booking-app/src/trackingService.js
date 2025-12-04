@@ -233,21 +233,27 @@ export const trackInitiateCheckout = (bookingDetails) => {
     });
 };
 
-export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
+export const trackAddPaymentInfo = (bookingDetails, guestInfo, selectedPlan = null) => {
     if (!shouldFireEvent('AddPaymentInfo')) return;
     const eventID = `addpaymentinfo.${Date.now()}`;
+    
+    // Get plan from sessionStorage if not passed
+    const plan = selectedPlan || sessionStorage.getItem('selectedPlan') || 'complete';
+    
     const pixelPayload = {
         value: bookingDetails.subtotal,
         currency: 'USD',
         content_name: bookingDetails.name,
         num_items: bookingDetails.guests,
+        content_type: plan, // trial, reserve, or complete
     };
     const serverPayload = {
         ...pixelPayload,
         event_id: eventID,
         nights: bookingDetails.nights,
-        checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null, // ← Optional: add check-in date
-        checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null, // ← Optional: add check-out date
+        plan_selected: plan, // Track which plan they chose
+        checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
+        checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null,
         user_data: {
             em: guestInfo.email,
             ph: guestInfo.phone.replace(/\D/g, ''),
