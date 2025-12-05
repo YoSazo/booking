@@ -15,7 +15,16 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       setEndDate(initialCheckout);
       setCurrentDate(initialCheckin || new Date());
       setUpsellDeclined(false);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restore body scroll when modal closes
+      document.body.style.overflow = 'unset';
     }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen, initialCheckin, initialCheckout]);
 
   const handleDayClick = (day) => {
@@ -138,10 +147,74 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showUpsell = nights > 0 && nights < 7 && !upsellDeclined;
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
+  if (!isOpen) return null;
+
   return (
-    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
-      <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        <div className="calendar-scroll-area">
+    <div onClick={onClose} style={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'white',
+      overflowY: 'auto',
+      zIndex: 1000
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ 
+        position: 'relative',
+        minHeight: '100vh',
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '80px 20px 60px 20px'
+      }}>
+        {/* Close button */}
+        <button onClick={onClose} style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: '#f3f4f6',
+          border: '1px solid #e5e7eb',
+          borderRadius: '50%',
+          width: '48px',
+          height: '48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 10,
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.background = '#e5e7eb';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = '#f3f4f6';
+        }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+
+        {/* Calendar header */}
+        <h2 style={{
+          fontSize: '28px',
+          fontWeight: '700',
+          marginBottom: '32px',
+          color: '#1a1a1a',
+          textAlign: 'center'
+        }}>
+          Select Your Dates
+        </h2>
+
+        {/* Calendar container */}
+        <div style={{
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '24px'
+        }}>
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
             <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
@@ -152,25 +225,109 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </div>
           <div className="calendar-grid">{renderDays()}</div>
         </div>
-        <div className="modal-actions-footer">
-          <div className="price-card">
-            <div className="calendar-price-badge">
-              {showUpsell ? (
-                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-              ) : showShortStayPrice ? (
-                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
-                </div>
-              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
-            </div>
-          </div>
-          <div className="calendar-footer-buttons">
-            <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
-            <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
-            <button className="btn" onClick={handleDone}>Done</button>
-          </div>
+
+        {/* Quick book buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          marginBottom: '24px',
+          flexWrap: 'wrap'
+        }}>
+          <button className="quick-book-btn" onClick={handleBookWeek} style={{
+            flex: '1',
+            minWidth: '140px',
+            padding: '14px 20px',
+            background: '#f3f4f6',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            fontSize: '15px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}>
+            📅 Book 1 Week
+          </button>
+          <button className="quick-book-btn" onClick={handleBookMonth} style={{
+            flex: '1',
+            minWidth: '140px',
+            padding: '14px 20px',
+            background: '#f3f4f6',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            fontSize: '15px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}>
+            📅 Book 1 Month
+          </button>
         </div>
+
+        {/* Price display and upsell */}
+        {showUpsell ? (
+          <div style={{
+            background: '#fff7ed',
+            border: '2px solid #fb923c',
+            borderRadius: '12px',
+            padding: '24px',
+            marginBottom: '24px'
+          }}>
+            <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+          </div>
+        ) : showShortStayPrice ? (
+          <div style={{
+            background: '#f0fdf4',
+            border: '2px solid #10b981',
+            borderRadius: '12px',
+            padding: '24px',
+            textAlign: 'center',
+            marginBottom: '24px'
+          }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
+            <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#10b981', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
+          </div>
+        ) : nights > 0 ? (
+          <div style={{
+            background: '#f0fdf4',
+            border: '2px solid #10b981',
+            borderRadius: '12px',
+            padding: '24px',
+            marginBottom: '24px'
+          }}>
+            <PriceBadge nights={nights} rates={rates} />
+          </div>
+        ) : null}
+
+        {/* Done button */}
+        <button 
+          className="btn" 
+          onClick={handleDone}
+          style={{
+            width: '100%',
+            padding: '18px',
+            background: '#10b981',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '17px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = '#059669';
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = '#10b981';
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+          }}
+        >
+          {startDate && endDate ? `Continue with ${nights} Night${nights > 1 ? 's' : ''}` : 'Select Check-out Date'}
+        </button>
       </div>
     </div>
   );
