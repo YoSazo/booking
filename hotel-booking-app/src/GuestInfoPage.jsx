@@ -1460,13 +1460,13 @@ const handlePayLaterBooking = async (e) => {
           Card Verification - No Charge Today
         </div>
         <div className="guarantee-description" style={{ color: '#1a1a1a' }}>
-          We'll place a temporary <strong>$75.90 hold</strong> on your card to secure your reservation. This is NOT a charge.
+          We'll verify your card is valid to secure your reservation. <strong>You won't be charged anything today.</strong>
           <br /><br />
-          ✅ <strong>If you check in:</strong> Hold is released immediately (no charge)
+          ✅ <strong>If you check in:</strong> Nothing happens to your card
           <br />
-          ❌ <strong>If you don't show up:</strong> Hold becomes a $75.90 no-show fee
+          ❌ <strong>If you don't show up:</strong> A $75.90 no-show fee will be charged
           <br /><br />
-          Full payment of <strong>${bookingDetails.total.toFixed(2)}</strong> is due at check-in.
+          Full payment of <strong>${bookingDetails.total.toFixed(2)}</strong> is due when you arrive at the hotel.
         </div>
       </div>
     </div>
