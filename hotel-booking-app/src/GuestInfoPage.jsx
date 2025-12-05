@@ -1268,7 +1268,7 @@ const handlePayLaterBooking = async (e) => {
                                 boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
                             }}>
                                 <div className="option-header">
-                                    <span className="option-title" style={{ color: '#0c5460' }}>💳 Reserve Now, Pay Later</span>
+                                    <span className="option-title" style={{ color: '#0c5460' }}>⏱️ Reserve Now, Pay Later</span>
                                     <span className="option-badge" style={{ 
                                         backgroundColor: '#10b981',
                                         color: 'white'
