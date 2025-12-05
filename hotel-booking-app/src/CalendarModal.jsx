@@ -147,26 +147,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showUpsell = nights > 0 && nights < 7 && !upsellDeclined;
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
-  if (!isOpen) return null;
-
   return (
-    <div onClick={onClose} style={{ 
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'white',
-      overflowY: 'auto',
-      zIndex: 1000
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ 
-        position: 'relative',
-        minHeight: '100vh',
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '80px 60px 60px 60px'
-      }}>
+    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose} style={{ background: 'white' }}>
+      <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button onClick={onClose} style={{
           position: 'fixed',
@@ -196,25 +179,18 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </svg>
         </button>
 
-        {/* Calendar header */}
-        <h2 style={{
-          fontSize: '28px',
-          fontWeight: '700',
-          marginBottom: '32px',
-          color: '#1a1a1a',
-          textAlign: 'center'
-        }}>
-          Select Your Dates
-        </h2>
+        <div className="calendar-scroll-area">
+          {/* Calendar header title */}
+          <h2 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            marginBottom: '32px',
+            color: '#1a1a1a',
+            textAlign: 'center'
+          }}>
+            Select Your Dates
+          </h2>
 
-        {/* Calendar container */}
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '24px'
-        }}>
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
             <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
@@ -226,108 +202,66 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           <div className="calendar-grid">{renderDays()}</div>
         </div>
 
-        {/* Quick book buttons */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          marginBottom: '24px',
-          flexWrap: 'wrap'
-        }}>
-          <button className="quick-book-btn" onClick={handleBookWeek} style={{
-            flex: '1',
-            minWidth: '140px',
-            padding: '14px 20px',
-            background: '#f3f4f6',
-            border: '1px solid #e5e7eb',
-            borderRadius: '10px',
-            fontSize: '15px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
+        <div className="modal-actions-footer">
+          {/* Quick book buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            marginBottom: '16px',
+            padding: '0 8px'
           }}>
-            📅 Book 1 Week
-          </button>
-          <button className="quick-book-btn" onClick={handleBookMonth} style={{
-            flex: '1',
-            minWidth: '140px',
-            padding: '14px 20px',
-            background: '#f3f4f6',
-            border: '1px solid #e5e7eb',
-            borderRadius: '10px',
-            fontSize: '15px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}>
-            📅 Book 1 Month
-          </button>
+            <button className="quick-book-btn" onClick={handleBookWeek} style={{
+              flex: '1',
+              padding: '12px 20px',
+              background: '#f3f4f6',
+              border: '1px solid #e5e7eb',
+              borderRadius: '10px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>
+              📅 Book 1 Week
+            </button>
+            <button className="quick-book-btn" onClick={handleBookMonth} style={{
+              flex: '1',
+              padding: '12px 20px',
+              background: '#f3f4f6',
+              border: '1px solid #e5e7eb',
+              borderRadius: '10px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>
+              📅 Book 1 Month
+            </button>
+          </div>
+
+          <div className="price-card">
+            <div className="calendar-price-badge">
+              {showUpsell ? (
+                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+              ) : showShortStayPrice ? (
+                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
+                </div>
+              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
+            </div>
+          </div>
+
+          <div className="calendar-footer-buttons">
+            <button className="btn" onClick={handleDone} style={{
+              width: '100%',
+              padding: '16px',
+              background: '#10b981',
+              color: '#fff',
+              fontSize: '16px',
+              fontWeight: '700'
+            }}>
+              {startDate && endDate ? `Continue with ${nights} Night${nights > 1 ? 's' : ''}` : 'Select Check-out Date'}
+            </button>
+          </div>
         </div>
-
-        {/* Price display and upsell */}
-        {showUpsell ? (
-          <div style={{
-            background: '#fff7ed',
-            border: '2px solid #fb923c',
-            borderRadius: '12px',
-            padding: '24px',
-            marginBottom: '24px'
-          }}>
-            <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-          </div>
-        ) : showShortStayPrice ? (
-          <div style={{
-            background: '#f0fdf4',
-            border: '2px solid #10b981',
-            borderRadius: '12px',
-            padding: '24px',
-            textAlign: 'center',
-            marginBottom: '24px'
-          }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-            <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#10b981', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
-          </div>
-        ) : nights > 0 ? (
-          <div style={{
-            background: '#f0fdf4',
-            border: '2px solid #10b981',
-            borderRadius: '12px',
-            padding: '24px',
-            marginBottom: '24px'
-          }}>
-            <PriceBadge nights={nights} rates={rates} />
-          </div>
-        ) : null}
-
-        {/* Done button */}
-        <button 
-          className="btn" 
-          onClick={handleDone}
-          style={{
-            width: '100%',
-            padding: '18px',
-            background: '#10b981',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '10px',
-            fontSize: '17px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.background = '#059669';
-            e.target.style.transform = 'translateY(-2px)';
-            e.target.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.background = '#10b981';
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-          }}
-        >
-          {startDate && endDate ? `Continue with ${nights} Night${nights > 1 ? 's' : ''}` : 'Select Check-out Date'}
-        </button>
       </div>
     </div>
   );
