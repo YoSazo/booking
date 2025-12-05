@@ -405,7 +405,13 @@ const handleConfirmBooking = async (bookingDetails) => {
             hotel={currentHotel}
             bookingDetails={finalBooking}
             onBack={() => {
-              // Always go back to booking page
+              // Reset booking state when going back to booking page
+              setSelectedRoom(null);
+              setFinalBooking(null);
+              setClientSecret('');
+              sessionStorage.removeItem('finalBooking');
+              sessionStorage.removeItem('clientSecret');
+              sessionStorage.removeItem('selectedPlan');
               navigate('/');
             }}
             onComplete={handleCompleteBooking}
