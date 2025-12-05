@@ -15,10 +15,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       setEndDate(initialCheckout);
       setCurrentDate(initialCheckin || new Date());
       setUpsellDeclined(false);
-      // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
-      // Restore body scroll when modal closes
       document.body.style.overflow = 'unset';
     }
     
@@ -28,15 +26,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   }, [isOpen, initialCheckin, initialCheckout]);
 
   const handleDayClick = (day) => {
-    console.log('Clicked day:', day);
-    console.log('Current startDate:', startDate);
-    console.log('Current endDate:', endDate);
-    
-    // Normalize the clicked day to midnight
     const normalizedDay = new Date(day);
     normalizedDay.setHours(0, 0, 0, 0);
     
-    // If no start date OR both dates are already set, reset to new start
     if (!startDate || (startDate && endDate)) {
         setStartDate(normalizedDay);
         setEndDate(null);
@@ -44,24 +36,20 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         return;
     }
     
-    // Only start date is set
     if (startDate && !endDate) {
-        // Normalize start date for comparison
         const normalizedStart = new Date(startDate);
         normalizedStart.setHours(0, 0, 0, 0);
         
         if (normalizedDay.getTime() > normalizedStart.getTime()) {
-            // Set as end date
             setEndDate(normalizedDay);
             setUpsellDeclined(false);
         } else {
-            // Clicking same or earlier date resets
             setStartDate(normalizedDay);
             setEndDate(null);
             setUpsellDeclined(false);
         }
     }
-};
+  };
   
   const handleDone = () => {
     if (startDate && endDate) {
@@ -116,17 +104,24 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     const month = currentDate.getMonth();
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = new Date(); 
+    today.setHours(0, 0, 0, 0);
     let days = [];
-    for (let i = 0; i < firstDayOfMonth; i++) { days.push(<div key={`blank-${i}`} className="calendar-day other-month"></div>); }
+    
+    for (let i = 0; i < firstDayOfMonth; i++) { 
+      days.push(<div key={`blank-${i}`} className="calendar-day other-month"></div>); 
+    }
+    
     for (let i = 1; i <= daysInMonth; i++) {
       const day = new Date(year, month, i);
       let className = "calendar-day";
       if (day < today) className += " disabled";
       if (day.getTime() === today.getTime()) className += " today";
+      
       if (startDate) {
         const startTime = new Date(startDate).setHours(0,0,0,0);
         if (day.getTime() === startTime) className += " selected-start";
+        
         if(endDate) {
            const endTime = new Date(endDate).setHours(0,0,0,0);
            if (day.getTime() === endTime) className += " selected-end";
@@ -134,6 +129,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
            if (day.getTime() === startTime && day.getTime() === endTime) className += " selected-end";
         }
       }
+      
       days.push(
         <div key={i} className={className} onClick={() => !className.includes('disabled') && handleDayClick(day)}>
           <div className="calendar-day-content">{i}</div>
@@ -147,120 +143,67 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showUpsell = nights > 0 && nights < 7 && !upsellDeclined;
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
+  if (!isOpen) return null;
+
   return (
-    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose} style={{ background: 'white' }}>
+    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
       <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        {/* Close button */}
-        <button onClick={onClose} style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          background: '#f3f4f6',
-          border: '1px solid #e5e7eb',
-          borderRadius: '50%',
-          width: '48px',
-          height: '48px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 10,
-          transition: 'all 0.2s'
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.background = '#e5e7eb';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.background = '#f3f4f6';
-        }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-
-        <div className="calendar-scroll-area">
-          {/* Calendar header title */}
-          <h2 style={{
-            fontSize: '28px',
-            fontWeight: '700',
-            marginBottom: '32px',
-            color: '#1a1a1a',
-            textAlign: 'center'
-          }}>
-            Select Your Dates
-          </h2>
-
-          <div className="calendar-header">
-            <button onClick={() => changeMonth(-1)}>&lt;</button>
-            <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-            <button onClick={() => changeMonth(1)}>&gt;</button>
-          </div>
-          <div className="calendar-grid">
-            <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
-          </div>
-          <div className="calendar-grid">{renderDays()}</div>
-        </div>
-
-        <div className="modal-actions-footer">
-          {/* Quick book buttons */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            marginBottom: '16px',
-            padding: '0 8px'
-          }}>
-            <button className="quick-book-btn" onClick={handleBookWeek} style={{
-              flex: '1',
-              padding: '12px 20px',
-              background: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}>
-              📅 Book 1 Week
-            </button>
-            <button className="quick-book-btn" onClick={handleBookMonth} style={{
-              flex: '1',
-              padding: '12px 20px',
-              background: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}>
-              📅 Book 1 Month
-            </button>
-          </div>
-
-          <div className="price-card">
-            <div className="calendar-price-badge">
-              {showUpsell ? (
-                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-              ) : showShortStayPrice ? (
-                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
-                </div>
-              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
+        <div className="modal-scroll-content">
+          {/* Calendar card */}
+          <div className="calendar-card">
+            <div className="calendar-header">
+              <button onClick={() => changeMonth(-1)}>&lt;</button>
+              <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+              <button onClick={() => changeMonth(1)}>&gt;</button>
+            </div>
+            <div className="calendar-grid">
+              <div className="calendar-day-name">Sun</div>
+              <div className="calendar-day-name">Mon</div>
+              <div className="calendar-day-name">Tue</div>
+              <div className="calendar-day-name">Wed</div>
+              <div className="calendar-day-name">Thu</div>
+              <div className="calendar-day-name">Fri</div>
+              <div className="calendar-day-name">Sat</div>
+            </div>
+            <div className="calendar-grid">{renderDays()}</div>
+            
+            {/* Quick book buttons inside calendar card */}
+            <div className="calendar-card-footer">
+              <button className="quick-book-btn" onClick={handleBookWeek}>
+                📅 Book 1 Week
+              </button>
+              <button className="quick-book-btn" onClick={handleBookMonth}>
+                📅 Book 1 Month
+              </button>
             </div>
           </div>
 
-          <div className="calendar-footer-buttons">
-            <button className="btn" onClick={handleDone} style={{
-              width: '100%',
-              padding: '16px',
-              background: '#10b981',
-              color: '#fff',
-              fontSize: '16px',
-              fontWeight: '700'
-            }}>
-              {startDate && endDate ? `Continue with ${nights} Night${nights > 1 ? 's' : ''}` : 'Select Check-out Date'}
-            </button>
-          </div>
+          {/* Price display and upsell */}
+          {showUpsell ? (
+            <div className="price-card">
+              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+            </div>
+          ) : showShortStayPrice ? (
+            <div className="price-card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>
+                Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}
+              </div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#10b981', marginTop: '10px' }}>
+                Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today
+              </div>
+            </div>
+          ) : nights > 0 ? (
+            <div className="price-card">
+              <PriceBadge nights={nights} rates={rates} />
+            </div>
+          ) : null}
+        </div>
+
+        {/* Done button in fixed footer */}
+        <div className="modal-actions-footer">
+          <button className="btn-confirm" onClick={handleDone}>
+            {startDate && endDate ? `Continue with ${nights} Night${nights > 1 ? 's' : ''}` : 'Select Check-out Date'}
+          </button>
         </div>
       </div>
     </div>
