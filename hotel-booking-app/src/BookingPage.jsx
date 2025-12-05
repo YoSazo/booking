@@ -89,6 +89,7 @@ function BookingPage({
         room={room}
         rates={rates}
         onSelect={onRoomSelect}
+        onChangeDates={onCalendarOpen}
         isSelected={selectedRoom?.id === room.id}
         bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
         onGuestsChange={onGuestsChange}

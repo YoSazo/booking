@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable  }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
@@ -101,7 +101,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
             {nights > 0 && (
               <button 
                 className="btn-change-dates" 
-                onClick={() => onSelect(room)}
+                onClick={onChangeDates}
                 style={{
                   padding: '10px 20px',
                   background: '#f3f4f6',
