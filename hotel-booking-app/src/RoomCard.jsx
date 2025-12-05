@@ -97,9 +97,30 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, isSelected, bookingDe
             <button className="btn book-now-btn" onClick={onBookNow} disabled={isProcessing}>{isProcessing ? 'Processing' : 'Book Now'}</button>
           </div>
         ) : (
-          <button className="btn btn-select" onClick={() => onSelect(room)}>
-            {nights > 0 ? 'Continue Booking' : 'Select Room'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {nights > 0 && (
+              <button 
+                className="btn-change-dates" 
+                onClick={() => onSelect(room)}
+                style={{
+                  padding: '10px 20px',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📅 Change Dates
+              </button>
+            )}
+            <button className="btn btn-select" onClick={() => onSelect(room)}>
+              {nights > 0 ? 'Continue Booking' : 'Select Room'}
+            </button>
+          </div>
         )}
       </div>
     </div>
