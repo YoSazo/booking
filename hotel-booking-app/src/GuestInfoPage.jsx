@@ -1253,7 +1253,53 @@ const handlePayLaterBooking = async (e) => {
                 {/* Plan selection for 7+ nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
                     <div className="payment-options-container">
-                        {/* Trial Night Option - NOW ON TOP AND DEFAULT */}
+                        {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
+                        <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="payLater" 
+                                checked={selectedPlan === 'payLater'}
+                                onChange={() => setSelectedPlan('payLater')}
+                            />
+                            <div className="payment-option primary" style={{ 
+                                background: 'linear-gradient(135deg, #e7f3ff 0%, #ffffff 100%)',
+                                border: '3px solid #10b981',
+                                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)',
+                                transform: 'scale(1.02)'
+                            }}>
+                                <div className="option-header">
+                                    <span className="option-title" style={{ fontSize: '18px', color: '#0c5460', fontWeight: '700' }}>💳 Reserve Now, Pay Later</span>
+                                    <span className="option-badge" style={{ 
+                                        backgroundColor: '#10b981',
+                                        color: 'white',
+                                        fontSize: '13px',
+                                        fontWeight: '700',
+                                        padding: '6px 14px'
+                                    }}>⭐ Most Popular</span>
+                                </div>
+                                <div className="option-price" style={{ 
+                                    color: '#10b981', 
+                                    fontSize: '42px',
+                                    fontWeight: '800',
+                                    textShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                                    marginTop: '8px'
+                                }}>
+                                    $0 Today
+                                </div>
+                                <div className="option-details" style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    <br />
+                                    <strong style={{ fontSize: '16px' }}>{bookingDetails.nights} nights</strong>
+                                    <br />
+                                    Full payment ${bookingDetails.total.toFixed(2)} due at check-in
+                                    <br />
+                                    <strong style={{ color: '#10b981', fontSize: '16px' }}>🔒 Card verification only. No charge today.</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        {/* Trial Option - NOW SECOND */}
                         <label className={`payment-option-radio ${selectedPlan === 'trial' ? 'selected' : ''}`}>
                             <input 
                                 type="radio" 
@@ -1262,10 +1308,9 @@ const handlePayLaterBooking = async (e) => {
                                 checked={selectedPlan === 'trial'}
                                 onChange={() => setSelectedPlan('trial')}
                             />
-                            <div className="payment-option primary">
+                            <div className="payment-option secondary">
                                 <div className="option-header">
                                     <span className="option-title">🔍 Try 1 Night First</span>
-                                    <span className="option-badge">Most Popular</span>
                                 </div>
                                 <div className="option-price trial">
                                     Only $69
@@ -1278,35 +1323,6 @@ const handlePayLaterBooking = async (e) => {
                                     See the room, then extend to your full stay
                                     <br />
                                     <strong style={{ color: '#28a745' }}>Your $69 is 100% credited toward any longer stay</strong>
-                                </div>
-                            </div>
-                        </label>
-
-                        {/* NEW: Pay Later Option - SECOND OPTION (Most visible) */}
-                        <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
-                            <input 
-                                type="radio" 
-                                name="plan" 
-                                value="payLater" 
-                                checked={selectedPlan === 'payLater'}
-                                onChange={() => setSelectedPlan('payLater')}
-                            />
-                            <div className="payment-option secondary">
-                                <div className="option-header">
-                                    <span className="option-title">💳 Reserve Now, Pay Later</span>
-                                    <span className="option-badge" style={{ backgroundColor: '#17a2b8' }}>Flexible</span>
-                                </div>
-                                <div className="option-price" style={{ color: '#17a2b8' }}>
-                                    $0 Today
-                                </div>
-                                <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
-                                    Full payment ${bookingDetails.total.toFixed(2)} due at check-in
-                                    <br />
-                                    <strong style={{ color: '#ffc107' }}>🔒 Card verification only. No charge today.</strong>
                                 </div>
                             </div>
                         </label>
