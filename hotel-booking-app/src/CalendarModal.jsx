@@ -230,12 +230,10 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         <div style={{
           display: 'flex',
           gap: '12px',
-          marginBottom: '24px',
-          flexWrap: 'wrap'
+          marginBottom: '24px'
         }}>
           <button className="quick-book-btn" onClick={handleBookWeek} style={{
             flex: '1',
-            minWidth: '140px',
             padding: '14px 20px',
             background: '#f3f4f6',
             border: '1px solid #e5e7eb',
@@ -249,7 +247,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </button>
           <button className="quick-book-btn" onClick={handleBookMonth} style={{
             flex: '1',
-            minWidth: '140px',
             padding: '14px 20px',
             background: '#f3f4f6',
             border: '1px solid #e5e7eb',
