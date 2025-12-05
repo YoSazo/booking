@@ -1286,9 +1286,9 @@ const handlePayLaterBooking = async (e) => {
                                     <br />
                                     <strong>{bookingDetails.nights} nights</strong>
                                     <br />
-                                    Full payment ${bookingDetails.total.toFixed(2)} due at check-in
+                                    Pay the full ${bookingDetails.total.toFixed(2)} when you arrive
                                     <br />
-                                    <strong style={{ color: '#10b981' }}>🔒 Card verification only. No charge today.</strong>
+                                    <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
                                 </div>
                             </div>
                         </label>
