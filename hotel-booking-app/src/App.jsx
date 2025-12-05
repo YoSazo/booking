@@ -409,6 +409,9 @@ const handleConfirmBooking = async (bookingDetails) => {
               setSelectedRoom(null);
               setFinalBooking(null);
               setClientSecret('');
+              setCheckinDate(null);
+              setCheckoutDate(null);
+              setAvailableRooms(currentHotel.rooms);
               sessionStorage.removeItem('finalBooking');
               sessionStorage.removeItem('clientSecret');
               sessionStorage.removeItem('selectedPlan');
