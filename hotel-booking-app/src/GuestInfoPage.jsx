@@ -1306,7 +1306,7 @@ const handlePayLaterBooking = async (e) => {
                                     <br />
                                     Full payment ${bookingDetails.total.toFixed(2)} due at check-in
                                     <br />
-                                    <strong style={{ color: '#ffc107' }}>⚠️ $75.90 hold on card (released when you arrive)</strong>
+                                    <strong style={{ color: '#ffc107' }}>🔒 Card required for security. No charge today.</strong>
                                 </div>
                             </div>
                         </label>
