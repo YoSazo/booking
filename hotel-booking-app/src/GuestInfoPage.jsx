@@ -158,7 +158,7 @@ useEffect(() => {
     // Only auto-select if no plan was previously selected
     if (!savedPlan) {
       if (bookingDetails.nights >= 7) {
-        setSelectedPlan('trial'); // Default to trial for 7+ nights
+        setSelectedPlan('payLater'); // Default to pay later for 7+ nights
       } else {
         setSelectedPlan('reserve'); // Default to reserve for <7 nights
       }
@@ -1263,38 +1263,32 @@ const handlePayLaterBooking = async (e) => {
                                 onChange={() => setSelectedPlan('payLater')}
                             />
                             <div className="payment-option primary" style={{ 
-                                background: 'linear-gradient(135deg, #e7f3ff 0%, #ffffff 100%)',
-                                border: '3px solid #10b981',
-                                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)',
-                                transform: 'scale(1.02)'
+                                background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                                border: '2px solid #10b981',
+                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
                             }}>
                                 <div className="option-header">
-                                    <span className="option-title" style={{ fontSize: '18px', color: '#0c5460', fontWeight: '700' }}>💳 Reserve Now, Pay Later</span>
+                                    <span className="option-title" style={{ color: '#0c5460' }}>💳 Reserve Now, Pay Later</span>
                                     <span className="option-badge" style={{ 
                                         backgroundColor: '#10b981',
-                                        color: 'white',
-                                        fontSize: '13px',
-                                        fontWeight: '700',
-                                        padding: '6px 14px'
+                                        color: 'white'
                                     }}>⭐ Most Popular</span>
                                 </div>
                                 <div className="option-price" style={{ 
                                     color: '#10b981', 
-                                    fontSize: '42px',
-                                    fontWeight: '800',
-                                    textShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
-                                    marginTop: '8px'
+                                    fontSize: '32px',
+                                    fontWeight: '700'
                                 }}>
                                     $0 Today
                                 </div>
-                                <div className="option-details" style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                <div className="option-details">
                                     {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                     <br />
-                                    <strong style={{ fontSize: '16px' }}>{bookingDetails.nights} nights</strong>
+                                    <strong>{bookingDetails.nights} nights</strong>
                                     <br />
                                     Full payment ${bookingDetails.total.toFixed(2)} due at check-in
                                     <br />
-                                    <strong style={{ color: '#10b981', fontSize: '16px' }}>🔒 Card verification only. No charge today.</strong>
+                                    <strong style={{ color: '#10b981' }}>🔒 Card verification only. No charge today.</strong>
                                 </div>
                             </div>
                         </label>
