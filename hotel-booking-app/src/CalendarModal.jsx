@@ -158,14 +158,19 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       bottom: 0,
       background: 'white',
       overflowY: 'auto',
-      zIndex: 1000
+      zIndex: 1000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{ 
         position: 'relative',
-        minHeight: '100vh',
-        maxWidth: '1200px',
+        width: '100%',
+        maxWidth: '900px',
         margin: '0 auto',
-        padding: '80px 20px 60px 20px'
+        padding: '20px',
+        maxHeight: '95vh',
+        overflowY: 'auto'
       }}>
         {/* Close button */}
         <button onClick={onClose} style={{
@@ -198,9 +203,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
 
         {/* Calendar header */}
         <h2 style={{
-          fontSize: '28px',
+          fontSize: '24px',
           fontWeight: '700',
-          marginBottom: '32px',
+          marginBottom: '20px',
           color: '#1a1a1a',
           textAlign: 'center'
         }}>
@@ -212,8 +217,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '24px'
+          padding: '16px',
+          marginBottom: '16px'
         }}>
           <div className="calendar-header">
             <button onClick={() => changeMonth(-1)}>&lt;</button>
@@ -229,18 +234,18 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         {/* Quick book buttons */}
         <div style={{
           display: 'flex',
-          gap: '12px',
-          marginBottom: '24px',
+          gap: '10px',
+          marginBottom: '16px',
           flexWrap: 'wrap'
         }}>
           <button className="quick-book-btn" onClick={handleBookWeek} style={{
             flex: '1',
-            minWidth: '140px',
-            padding: '14px 20px',
+            minWidth: '130px',
+            padding: '12px 16px',
             background: '#f3f4f6',
             border: '1px solid #e5e7eb',
-            borderRadius: '10px',
-            fontSize: '15px',
+            borderRadius: '8px',
+            fontSize: '14px',
             fontWeight: '600',
             cursor: 'pointer',
             transition: 'all 0.2s'
@@ -249,12 +254,12 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           </button>
           <button className="quick-book-btn" onClick={handleBookMonth} style={{
             flex: '1',
-            minWidth: '140px',
-            padding: '14px 20px',
+            minWidth: '130px',
+            padding: '12px 16px',
             background: '#f3f4f6',
             border: '1px solid #e5e7eb',
-            borderRadius: '10px',
-            fontSize: '15px',
+            borderRadius: '8px',
+            fontSize: '14px',
             fontWeight: '600',
             cursor: 'pointer',
             transition: 'all 0.2s'
@@ -268,9 +273,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           <div style={{
             background: '#fff7ed',
             border: '2px solid #fb923c',
-            borderRadius: '12px',
-            padding: '24px',
-            marginBottom: '24px'
+            borderRadius: '10px',
+            padding: '16px',
+            marginBottom: '16px'
           }}>
             <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
           </div>
@@ -278,21 +283,21 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           <div style={{
             background: '#f0fdf4',
             border: '2px solid #10b981',
-            borderRadius: '12px',
-            padding: '24px',
+            borderRadius: '10px',
+            padding: '16px',
             textAlign: 'center',
-            marginBottom: '24px'
+            marginBottom: '16px'
           }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-            <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#10b981', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981', marginTop: '8px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
           </div>
         ) : nights > 0 ? (
           <div style={{
             background: '#f0fdf4',
             border: '2px solid #10b981',
-            borderRadius: '12px',
-            padding: '24px',
-            marginBottom: '24px'
+            borderRadius: '10px',
+            padding: '16px',
+            marginBottom: '16px'
           }}>
             <PriceBadge nights={nights} rates={rates} />
           </div>
@@ -304,12 +309,12 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           onClick={handleDone}
           style={{
             width: '100%',
-            padding: '18px',
+            padding: '16px',
             background: '#10b981',
             color: '#fff',
             border: 'none',
             borderRadius: '10px',
-            fontSize: '17px',
+            fontSize: '16px',
             fontWeight: '700',
             cursor: 'pointer',
             transition: 'all 0.2s',
