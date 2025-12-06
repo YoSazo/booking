@@ -688,11 +688,17 @@ app.post('/api/track', async (req, res) => {
         return res.status(500).json({ success: false, message: errorMessage });
     }
 
-    const enrichedPayload = { ...eventData, client_ip_address: req.ip, user_agent: req.headers['user-agent'] };
+    // Add event_time as Unix timestamp (required for accurate Meta tracking)
+    const enrichedPayload = { 
+        ...eventData, 
+        event_time: Math.floor(Date.now() / 1000), // Unix timestamp in seconds
+        client_ip_address: req.ip, 
+        user_agent: req.headers['user-agent'] 
+    };
     
     try {
         await axios.post(webhookUrl, enrichedPayload);
-        console.log(`Successfully forwarded '${event_name}' event to Zapier with IP: ${req.ip}`);
+        console.log(`Successfully forwarded '${event_name}' event to Zapier with IP: ${req.ip} and event_time: ${enrichedPayload.event_time}`);
         res.status(200).json({ success: true, message: 'Event tracked.' });
     } catch (error) {
         console.error(`Failed to forward event to Zapier for '${event_name}'. Status: ${error.response?.status}. Message: ${error.message}`);
