@@ -57,6 +57,7 @@ const [isPaymentInfoModalOpen, setIsPaymentInfoModalOpen] = useState(false);
 const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
+const errorMessageRef = useRef(null);
 
 // Plan selection state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
 // For 7+ nights, plan selection page will let them choose between 'trial' and 'full'
@@ -165,6 +166,19 @@ useEffect(() => {
     }
   }
 }, [currentStep, bookingDetails]);
+
+// Auto-scroll to error message when it appears
+useEffect(() => {
+  if (errorMessage && hasAttemptedSubmit && errorMessageRef.current) {
+    // Small delay to ensure DOM has updated
+    setTimeout(() => {
+      errorMessageRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }, 100);
+  }
+}, [errorMessage, hasAttemptedSubmit]);
 
 
 
@@ -1663,7 +1677,23 @@ const handlePayLaterBooking = async (e) => {
       </div>
     </>
   )}
-  {errorMessage && hasAttemptedSubmit && <div className="error-message payment-error">{errorMessage}</div>}
+  {errorMessage && hasAttemptedSubmit && (
+  <div 
+    ref={errorMessageRef}
+    className="error-message payment-error"
+    style={{
+      padding: '16px',
+      marginTop: '20px',
+      backgroundColor: '#fee',
+      border: '2px solid #dc3545',
+      borderRadius: '8px',
+      fontSize: '15px',
+      fontWeight: '600'
+    }}
+  >
+    ⚠️ {errorMessage}
+  </div>
+)}
 </div>
                 </form>
                 
