@@ -611,6 +611,9 @@ app.post('/api/book', async (req, res) => {
         }]),
     };
 
+    console.log('Raw reservationData:', reservationData);
+    console.log('URLSearchParams result:', new URLSearchParams(reservationData).toString());
+
     try {
         const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
             headers: {
