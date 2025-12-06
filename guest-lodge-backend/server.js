@@ -584,49 +584,40 @@ app.post('/api/book', async (req, res) => {
     }
     
     const reservationData = {
-    propertyID: PROPERTY_ID,
-    startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
-    endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
-    guestFirstName: guestInfo.firstName,
-    guestLastName: guestInfo.lastName,
-    guestCountry: 'US',
-    guestZip: guestInfo.zip,
-    guestEmail: guestInfo.email,
-    guestPhone: guestInfo.phone,
-    sourceID: "ss-174429775667395-1",  // ✅ Add this line
-    paymentMethod: "cash",
-    sendEmailConfirmation: "true",
-    rooms: JSON.stringify([{ 
-        roomTypeID: bookingDetails.roomTypeID, 
-        quantity: 1, 
-        roomRateID: rateIDToUse  
-    }]),
-    adults: JSON.stringify([{ 
-        roomTypeID: bookingDetails.roomTypeID, 
-        quantity: bookingDetails.guests 
-    }]),
-    children: JSON.stringify([{ 
-        roomTypeID: bookingDetails.roomTypeID, 
-        quantity: 0 
-    }]),
-};
+        propertyID: PROPERTY_ID,
+        startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
+        endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
+        guestFirstName: guestInfo.firstName,
+        guestLastName: guestInfo.lastName,
+        guestCountry: 'US',
+        guestZip: guestInfo.zip,
+        guestEmail: guestInfo.email,
+        guestPhone: guestInfo.phone,
+        paymentMethod: "cash",
+        sendEmailConfirmation: "true",
+        rooms: JSON.stringify([{ 
+            roomTypeID: bookingDetails.roomTypeID, 
+            quantity: 1, 
+            roomRateID: rateIDToUse  
+        }]),
+        adults: JSON.stringify([{ 
+            roomTypeID: bookingDetails.roomTypeID, 
+            quantity: bookingDetails.guests 
+        }]),
+        children: JSON.stringify([{ 
+            roomTypeID: bookingDetails.roomTypeID, 
+            quantity: 0 
+        }]),
+    };
 
-try {
-    console.log('📤 Sending reservation data to Cloudbeds:', reservationData); // Add debug logging
-    
-    const pmsResponse = await axios.post(
-        'https://api.cloudbeds.com/api/v1.3/postReservation', 
-        new URLSearchParams(reservationData),  // This converts to x-www-form-urlencoded
-        {
+    try {
+        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
             headers: {
                 'accept': 'application/json',
                 'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
                 'content-type': 'application/x-www-form-urlencoded',
             }
-        }
-    );
-
-    console.log('📥 Cloudbeds response:', pmsResponse.data); // Add debug logging
+        });
 
         if (pmsResponse.data.success) {
             // Save to database
