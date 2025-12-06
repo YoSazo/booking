@@ -201,6 +201,10 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
             });
         }
 
+        console.log('========== /api/complete-pay-later-booking ==========');
+        console.log('Creating pay later booking for payment intent:', paymentIntentId);
+        console.log('Reservation code:', bookingDetails.reservationCode);
+        
         // Create booking in Cloudbeds with "Pay at Hotel" status
         const reservationData = {
             propertyID: PROPERTY_ID,
@@ -242,6 +246,9 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         );
 
         if (pmsResponse.data.success) {
+            console.log('✅ Cloudbeds booking created:', pmsResponse.data.reservationID);
+            console.log('Now saving to database with reservationCode:', bookingDetails.reservationCode);
+            
             // Save to database
             await prisma.booking.create({
                 data: {
@@ -425,13 +432,17 @@ app.post('/api/stripe-webhook', async (req, res) => {
     if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
         console.log('💰 Payment succeeded via webhook:', paymentIntent.id);
+        console.log('Webhook metadata:', JSON.stringify(paymentIntent.metadata, null, 2));
+        console.log('bookingType from metadata:', paymentIntent.metadata?.bookingType);
 
         try {
             // ✅ SKIP pay later bookings - they're handled by /api/complete-pay-later-booking
-            if (paymentIntent.metadata.bookingType === 'payLater') {
+            if (paymentIntent.metadata?.bookingType === 'payLater') {
                 console.log('✅ Pay Later booking detected. Skipping webhook processing (handled by frontend).');
                 return res.json({ received: true });
             }
+            
+            console.log('⚠️ NOT a pay later booking. Proceeding with webhook flow...');
 
             // --- THIS IS THE CRUCIAL FIX ---
             // Wait for 5 seconds to give the frontend API call a head start to finish.
