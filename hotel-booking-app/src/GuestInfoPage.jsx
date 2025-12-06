@@ -963,12 +963,6 @@ const handlePayLaterBooking = async (e) => {
     
     setHasAttemptedSubmit(true);
 
-    // ✅ PREVENT DOUBLE SUBMISSION
-    if (isProcessing) {
-        console.warn('Pay later booking already in progress - ignoring duplicate call');
-        return;
-    }
-
     // Process payment based on method
     if (paymentMethod === 'card') {
         // ✅ CHECK 1: Validate card is filled out FIRST
