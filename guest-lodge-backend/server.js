@@ -427,6 +427,12 @@ app.post('/api/stripe-webhook', async (req, res) => {
         console.log('💰 Payment succeeded via webhook:', paymentIntent.id);
 
         try {
+            // ✅ SKIP pay later bookings - they're handled by /api/complete-pay-later-booking
+            if (paymentIntent.metadata.bookingType === 'payLater') {
+                console.log('✅ Pay Later booking detected. Skipping webhook processing (handled by frontend).');
+                return res.json({ received: true });
+            }
+
             // --- THIS IS THE CRUCIAL FIX ---
             // Wait for 5 seconds to give the frontend API call a head start to finish.
             console.log('Webhook is pausing for 5 seconds to allow frontend to complete...');
