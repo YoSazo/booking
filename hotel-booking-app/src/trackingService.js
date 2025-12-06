@@ -282,7 +282,7 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     const eventID = reservationCode;
     const totalAmount = (bookingDetails.subtotal || 0) + (bookingDetails.taxes || 0);
     
-    // Pixel payload (browser-side)
+    // Pixel payload (browser-side) - doesn't include PII
     const pixelPayload = {
         value: totalAmount,
         currency: 'USD',
@@ -292,7 +292,7 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         num_items: bookingDetails.guests,
     };
     
-    // Server payload (includes PII)
+    // Server payload (includes PII for better matching)
     const serverPayload = {
         value: totalAmount,
         currency: 'USD',
@@ -311,10 +311,10 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         }
     };
     
-    // Send to both browser pixel AND server
+    // Send to BOTH browser pixel AND server (Meta deduplicates using eventID)
     sendEventToPixel('Purchase', pixelPayload, eventID);
     sendEventToServer('Purchase', serverPayload);
-    console.log('Purchase event sent to both browser pixel and server with event_id:', eventID);
+    console.log('Purchase event sent to both browser and server with event_id:', eventID);
 
     sendEventToGA4('purchase', {
         transaction_id: reservationCode,
