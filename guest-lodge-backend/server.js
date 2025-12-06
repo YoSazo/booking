@@ -613,14 +613,27 @@ app.post('/api/book', async (req, res) => {
         }]),
     };
 
+    console.log('========== /api/book - CLOUDBEDS REQUEST ==========');
+    console.log('Raw reservationData object:', JSON.stringify(reservationData, null, 2));
+    
+    const urlEncodedData = new URLSearchParams(reservationData);
+    console.log('URL-encoded body:', urlEncodedData.toString());
+    console.log('sourceID in encoded body:', urlEncodedData.get('sourceID'));
+    console.log('====================================================');
+
     try {
-        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
+        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', urlEncodedData, {
             headers: {
                 'accept': 'application/json',
                 'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
                 'content-type': 'application/x-www-form-urlencoded',
             }
         });
+        
+        console.log('========== /api/book - CLOUDBEDS RESPONSE ==========');
+        console.log('Response status:', pmsResponse.status);
+        console.log('Response data:', JSON.stringify(pmsResponse.data, null, 2));
+        console.log('====================================================');
 
         if (pmsResponse.data.success) {
             // Save to database
