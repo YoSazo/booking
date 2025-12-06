@@ -204,6 +204,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         // Create booking in Cloudbeds with "Pay at Hotel" status
         const reservationData = {
             propertyID: PROPERTY_ID,
+            sourceID: "ss-174429775667395-1",
             startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
             endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
             guestFirstName: guestInfo.firstName,
@@ -454,6 +455,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
             // 1. Create the booking in Cloudbeds
             const reservationData = {
                 propertyID: PROPERTY_ID,
+                sourceID: "ss-174429775667395-1",
                 startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
                 endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
                 guestFirstName: guestInfo.firstName,
@@ -585,6 +587,7 @@ app.post('/api/book', async (req, res) => {
     
     const reservationData = {
         propertyID: PROPERTY_ID,
+        sourceID: "ss-174429775667395-1",
         startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
         guestFirstName: guestInfo.firstName,
