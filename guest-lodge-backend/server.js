@@ -204,7 +204,6 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         // Create booking in Cloudbeds with "Pay at Hotel" status
         const reservationData = {
             propertyID: PROPERTY_ID,
-            sourceID: "ss-174429775667395-1",
             startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
             endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
             guestFirstName: guestInfo.firstName,
@@ -455,7 +454,6 @@ app.post('/api/stripe-webhook', async (req, res) => {
             // 1. Create the booking in Cloudbeds
             const reservationData = {
                 propertyID: PROPERTY_ID,
-                sourceID: "ss-174429775667395-1",
                 startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
                 endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
                 guestFirstName: guestInfo.firstName,
@@ -559,13 +557,9 @@ app.post('/api/availability', async (req, res) => {
 });
 
 app.post('/api/book', async (req, res) => {
-    console.log('========== /api/book ENDPOINT HIT ==========');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    
     const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
     
     if (hotelId !== 'suite-stay') {
-         console.log('❌ Invalid hotelId:', hotelId);
          return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
     }
 
@@ -591,7 +585,6 @@ app.post('/api/book', async (req, res) => {
     
     const reservationData = {
         propertyID: PROPERTY_ID,
-        sourceID: "ss-174429775667395-1",
         startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
         guestFirstName: guestInfo.firstName,
@@ -617,27 +610,14 @@ app.post('/api/book', async (req, res) => {
         }]),
     };
 
-    console.log('========== /api/book - CLOUDBEDS REQUEST ==========');
-    console.log('Raw reservationData object:', JSON.stringify(reservationData, null, 2));
-    
-    const urlEncodedData = new URLSearchParams(reservationData);
-    console.log('URL-encoded body:', urlEncodedData.toString());
-    console.log('sourceID in encoded body:', urlEncodedData.get('sourceID'));
-    console.log('====================================================');
-
     try {
-        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', urlEncodedData, {
+        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
             headers: {
                 'accept': 'application/json',
                 'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
                 'content-type': 'application/x-www-form-urlencoded',
             }
         });
-        
-        console.log('========== /api/book - CLOUDBEDS RESPONSE ==========');
-        console.log('Response status:', pmsResponse.status);
-        console.log('Response data:', JSON.stringify(pmsResponse.data, null, 2));
-        console.log('====================================================');
 
         if (pmsResponse.data.success) {
             // Save to database
@@ -675,15 +655,8 @@ app.post('/api/book', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("========== /api/book ERROR ==========");
         console.error("Error creating reservation:", error.response?.data || error.message);
-        console.error("Full error:", error);
-        console.error("=====================================");
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to create reservation.',
-            error: error.response?.data || error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to create reservation.' });
     }
 });
 
