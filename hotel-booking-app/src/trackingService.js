@@ -133,7 +133,8 @@ const sendEventToGA4 = (eventName, payload) => {
 export const trackPageView = () => {
     if (!shouldFireEvent('PageView')) return;
     const eventID = `pageview.${Date.now()}`;
-    sendEventToServer('PageView', { event_id: eventID });
+    const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+    sendEventToServer('PageView', { event_id: eventID, event_time: eventTime });
     sendEventToPixel('PageView', {}, eventID); 
 
     sendEventToGA4('page_view', {
@@ -170,12 +171,13 @@ const sendEventToPixel = (pixelEventName, payload, eventID) => {
 export const trackSearch = (checkinDate, checkoutDate) => {
     if (!shouldFireEvent('Search')) return;
     const eventID = `search.${Date.now()}`;
+    const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const searchData = {
         checkin_date: checkinDate.toISOString().split('T')[0],
         checkout_date: checkoutDate.toISOString().split('T')[0],
     };
     sendEventToPixel('Search', searchData, eventID);
-    sendEventToServer('Search', { ...searchData, event_id: eventID });
+    sendEventToServer('Search', { ...searchData, event_id: eventID, event_time: eventTime });
 
     sendEventToGA4('search', {
         search_term: `${searchData.checkin_date} to ${searchData.checkout_date}`,
@@ -187,6 +189,7 @@ export const trackSearch = (checkinDate, checkoutDate) => {
 export const trackAddToCart = (bookingDetails) => {
     if (!shouldFireEvent('AddToCart')) return;
     const eventID = `addtocart.${Date.now()}`;
+    const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const cartData = {
         value: bookingDetails.subtotal,
         currency: 'USD',
@@ -195,7 +198,7 @@ export const trackAddToCart = (bookingDetails) => {
         num_items: bookingDetails.guests,
     };
     sendEventToPixel('AddToCart', cartData, eventID);
-    sendEventToServer('AddToCart', { ...cartData, event_id: eventID });
+    sendEventToServer('AddToCart', { ...cartData, event_id: eventID, event_time: eventTime });
 
     sendEventToGA4('add_to_cart', {
         currency: 'USD',
@@ -212,6 +215,7 @@ export const trackAddToCart = (bookingDetails) => {
 export const trackInitiateCheckout = (bookingDetails) => {
     if (!shouldFireEvent('InitiateCheckout')) return;
     const eventID = `initiatecheckout.${Date.now()}`;
+    const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const checkoutData = {
         value: bookingDetails.subtotal,
         currency: 'USD',
@@ -219,7 +223,7 @@ export const trackInitiateCheckout = (bookingDetails) => {
         num_items: bookingDetails.guests,
     };
     sendEventToPixel('InitiateCheckout', checkoutData, eventID);
-    sendEventToServer('InitiateCheckout', { ...checkoutData, event_id: eventID });
+    sendEventToServer('InitiateCheckout', { ...checkoutData, event_id: eventID, event_time: eventTime });
 
     sendEventToGA4('begin_checkout', {
         currency: 'USD',
@@ -236,6 +240,7 @@ export const trackInitiateCheckout = (bookingDetails) => {
 export const trackAddPaymentInfo = (bookingDetails, guestInfo, selectedPlan = null) => {
     if (!shouldFireEvent('AddPaymentInfo')) return;
     const eventID = `addpaymentinfo.${Date.now()}`;
+    const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     
     // Get plan from sessionStorage if not passed
     const plan = selectedPlan || sessionStorage.getItem('selectedPlan') || 'complete';
@@ -250,6 +255,7 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo, selectedPlan = nu
     const serverPayload = {
         ...pixelPayload,
         event_id: eventID,
+        event_time: eventTime,
         nights: bookingDetails.nights,
         plan_selected: plan, // Track which plan they chose
         checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
@@ -280,6 +286,7 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo, selectedPlan = nu
 export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     if (!shouldFireEvent('Purchase')) return;
     const eventID = reservationCode;
+    const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const totalAmount = (bookingDetails.subtotal || 0) + (bookingDetails.taxes || 0);
     
     // Pixel payload (browser-side) - doesn't include PII
@@ -297,6 +304,7 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         value: totalAmount,
         currency: 'USD',
         event_id: eventID,
+        event_time: eventTime,
         user_data: {
             em: guestInfo.email,
             ph: guestInfo.phone.replace(/\D/g, ''),
