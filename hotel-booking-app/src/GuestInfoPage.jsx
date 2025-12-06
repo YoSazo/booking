@@ -540,7 +540,7 @@ useEffect(() => {
             return;
         }
 
-        // --- Address validation is now ONLY here ---
+        // Validate card details first (card validation already done at line 536, but keeping address validation clear)
         if (!formData.address || !formData.city || !formData.state || !formData.zip) {
             setErrorMessage("Please fill out your billing address before proceeding.");
             return;
@@ -600,7 +600,13 @@ useEffect(() => {
     
     setHasAttemptedSubmit(true);
 
-    // Validate billing address first
+    // Validate card first
+    if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
+        setErrorMessage("Please fill out your card details first.");
+        return;
+    }
+
+    // Then validate billing address
     if (!formData.address || !formData.city || !formData.state || !formData.zip) {
         setErrorMessage("Please fill out your billing address before proceeding.");
         return;
@@ -756,7 +762,13 @@ const handleTrialNightBooking = async (e) => {
     
     setHasAttemptedSubmit(true);
 
-    // Validate billing address first
+    // Validate card first
+    if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
+        setErrorMessage("Please fill out your card details first.");
+        return;
+    }
+
+    // Then validate billing address
     if (!formData.address || !formData.city || !formData.state || !formData.zip) {
         setErrorMessage("Please fill out your billing address before proceeding.");
         return;
@@ -943,7 +955,13 @@ const handlePayLaterBooking = async (e) => {
     
     setHasAttemptedSubmit(true);
 
-    // Validate billing address first
+    // Validate card first
+    if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
+        setErrorMessage("Please fill out your card details first.");
+        return;
+    }
+
+    // Then validate billing address
     if (!formData.address || !formData.city || !formData.state || !formData.zip) {
         setErrorMessage("Please fill out your billing address before proceeding.");
         return;
