@@ -593,7 +593,6 @@ app.post('/api/book', async (req, res) => {
         guestZip: guestInfo.zip,
         guestEmail: guestInfo.email,
         guestPhone: guestInfo.phone,
-        sourceID: "ss-174429775667395-1",
         paymentMethod: "cash",
         sendEmailConfirmation: "true",
         rooms: JSON.stringify([{ 
@@ -610,9 +609,6 @@ app.post('/api/book', async (req, res) => {
             quantity: 0 
         }]),
     };
-
-    console.log('Raw reservationData:', reservationData);
-    console.log('URLSearchParams result:', new URLSearchParams(reservationData).toString());
 
     try {
         const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
