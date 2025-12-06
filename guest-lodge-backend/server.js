@@ -212,7 +212,6 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
             guestZip: guestInfo.zip,
             guestEmail: guestInfo.email,
             guestPhone: guestInfo.phone,
-            sourceID: "ss-174429775667395-1",
             paymentMethod: "cash", // Marked as pay at hotel
             sendEmailConfirmation: "true",
             rooms: JSON.stringify([{ 
@@ -463,7 +462,6 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 guestZip: guestInfo.zip,
                 guestEmail: guestInfo.email,
                 guestPhone: guestInfo.phone,
-                sourceID: "ss-174429775667395-1",
                 paymentMethod: "cash",
                 sendEmailConfirmation: "true",
                 rooms: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 1, roomRateID: bookingDetails.rateID }]),
