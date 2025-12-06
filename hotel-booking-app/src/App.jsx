@@ -6,7 +6,7 @@ import ConfirmationPage from './ConfirmationPage.jsx';
 import CheckoutReturnPage from './CheckoutReturnPage.jsx';
 import HelpWidget from './HelpWidget.jsx';
 import ImageLightbox from './ImageLightbox.jsx';
-import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
+import { trackAddToCart, trackInitiateCheckout, trackPurchase, trackPageView } from './trackingService.js';
 import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -87,6 +87,11 @@ function App() {
   const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
   const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
   const [clientSecret, setClientSecret] = useState(() => sessionStorage.getItem('clientSecret') || '');
+
+  // Track PageView once when app mounts (not on route changes)
+  useEffect(() => {
+    trackPageView();
+  }, []);
 
   useEffect(() => {
     const today = new Date();

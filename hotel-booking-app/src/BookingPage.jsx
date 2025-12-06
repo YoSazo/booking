@@ -3,7 +3,6 @@ import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
 // import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import HelpWidget from './HelpWidget.jsx';
-import { trackPageView } from './trackingService.js';
 
 
 function BookingPage({ 
@@ -27,10 +26,6 @@ function BookingPage({
   setIsProcessingBooking
 }) {
   console.log('isProcessingBooking in BookingPage:', isProcessingBooking);
-  useEffect(() => {
-    // This will run once when the application sstarts
-    trackPageView(); 
-  }, []);
   useEffect(() => {
     setIsProcessingBooking(false);
   }, []);
