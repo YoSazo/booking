@@ -661,7 +661,7 @@ app.post('/api/book', async (req, res) => {
 });
 
 
-app.post('/api/track', async (req, res) => {
+app.post('/api/e', async (req, res) => {
     let body;
     try {
         body = (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
