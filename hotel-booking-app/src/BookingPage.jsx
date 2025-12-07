@@ -59,7 +59,10 @@ function BookingPage({
           
           {/* Conditional rendering based on loading and availability */}
           {isLoading ? (
-            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>Checking for available rooms...</strong></p>
+            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}>
+              <strong>Checking for available rooms...</strong>
+              <span className="spinner"></span>
+            </p>
           ) : roomData && roomData.length > 0 ? (
   roomData.map(room => {
     const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
