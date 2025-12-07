@@ -59,6 +59,7 @@ const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
 const errorMessageRef = useRef(null);
 const addressFieldsRef = useRef(null);
+const zipFieldRef = useRef(null);
 
 // Plan selection state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
 // For 7+ nights, plan selection page will let them choose between 'trial' and 'full'
@@ -181,16 +182,16 @@ useEffect(() => {
   }
 }, [errorMessage, hasAttemptedSubmit]);
 
-// Auto-scroll to address fields when they appear - scroll to the BOTTOM (zip field)
+// Auto-scroll to zip field when address fields appear
 useEffect(() => {
-  if (isAddressSelected && addressFieldsRef.current) {
-    // Wait for animation to start, then scroll to bottom of the container
+  if (isAddressSelected && zipFieldRef.current) {
+    // Wait for animation to complete, then scroll to zip field
     setTimeout(() => {
-      addressFieldsRef.current?.scrollIntoView({ 
+      zipFieldRef.current?.scrollIntoView({ 
         behavior: 'smooth', 
-        block: 'end' // Scroll to bottom of container (zip field visible)
+        block: 'center' // Center the zip field in viewport
       });
-    }, 200); // Slightly longer delay for smoother effect
+    }, 450); // Wait for 0.4s animation + 50ms buffer
   }
 }, [isAddressSelected]);
 
@@ -1668,7 +1669,7 @@ const handlePayLaterBooking = async (e) => {
                 {walletType} Selected
               </p>
               <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
-                A payment sheet will appear after clicking the final button
+                A payment modal will appear after clicking the final button
               </p>
             </div>
           </div>
@@ -1726,6 +1727,7 @@ const handlePayLaterBooking = async (e) => {
               <div className="form-field">
                 <label>Zip</label>
                 <input 
+                  ref={zipFieldRef}
                   type="text" 
                   name="zip" 
                   value={formData.zip} 
