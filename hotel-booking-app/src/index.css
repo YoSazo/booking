@@ -2821,5 +2821,5 @@ padding: 6px 16px;
 
 /* Add extra scroll space at bottom of payment wrapper (between form and sticky button) */
 .payment-wrapper {
-    margin-bottom: 100px; /* Space between payment form and sticky CTA at bottom */
+    margin-bottom: 60px; /* Space between payment form and sticky CTA at bottom */
 }
