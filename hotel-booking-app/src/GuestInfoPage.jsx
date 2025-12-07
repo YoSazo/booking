@@ -58,6 +58,7 @@ const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
 const errorMessageRef = useRef(null);
+const addressFieldsRef = useRef(null);
 
 // Plan selection state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
 // For 7+ nights, plan selection page will let them choose between 'trial' and 'full'
@@ -179,6 +180,19 @@ useEffect(() => {
     }, 100);
   }
 }, [errorMessage, hasAttemptedSubmit]);
+
+// Auto-scroll to address fields when they appear
+useEffect(() => {
+  if (isAddressSelected && addressFieldsRef.current) {
+    // Wait for animation to start, then scroll
+    setTimeout(() => {
+      addressFieldsRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest' 
+      });
+    }, 150); // Delay to let slide-down animation begin
+  }
+}, [isAddressSelected]);
 
 
 
@@ -1632,23 +1646,6 @@ const handlePayLaterBooking = async (e) => {
           </div>
         </div>
 
-        {/* Wallet indicator with animation */}
-        {paymentMethod === 'wallet' && walletType && (
-          <div className={`wallet-indicator ${paymentMethod === 'wallet' ? 'visible' : ''}`}>
-            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} style={{height: '48px'}} />
-          </div>
-        )}
-
-        {paymentMethod === 'wallet' && walletType && (
-          <div className="wallet-selection-message">
-            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={`${getWalletLogoInfo().className} large-wallet-logo`} />
-            <p className="wallet-selected-text">{walletType} selected.</p>
-            <div className="wallet-info-box">
-              <img src="/exit.svg" alt="Transfer to wallet" className="transfer-icon"/>
-              <span>Another step will appear to securely submit your payment information.</span>
-            </div>
-          </div>
-        )}
 
         {paymentMethod === 'wallet' && !walletType && (
           <div className="wallet-info-box">
@@ -1678,7 +1675,7 @@ const handlePayLaterBooking = async (e) => {
             </Autocomplete>
           </div>
           {/* Address fields with slide-down animation */}
-          <div className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
+          <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
               <div className="form-field">
                 <label>City</label>
                 <input 
