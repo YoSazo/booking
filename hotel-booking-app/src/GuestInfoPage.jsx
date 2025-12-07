@@ -1586,7 +1586,8 @@ const handlePayLaterBooking = async (e) => {
       )}
       
       <div className="payment-content">
-        {paymentMethod === 'card' && (
+        {/* Card fields with animation */}
+        <div className={`card-fields-section ${paymentMethod === 'card' ? 'visible' : ''}`}>
           <div className="card-and-billing-container">
             <div className="split-card-fields">
               <div className="card-field-wrapper">
@@ -1629,6 +1630,13 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Wallet indicator with animation */}
+        {paymentMethod === 'wallet' && walletType && (
+          <div className={`wallet-indicator ${paymentMethod === 'wallet' ? 'visible' : ''}`}>
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} style={{height: '48px'}} />
+          </div>
         )}
 
         {paymentMethod === 'wallet' && walletType && (
@@ -1669,8 +1677,8 @@ const handlePayLaterBooking = async (e) => {
               />
             </Autocomplete>
           </div>
-          {isAddressSelected && (
-            <div className="address-reveal-container visible">
+          {/* Address fields with slide-down animation */}
+          <div className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
               <div className="form-field">
                 <label>City</label>
                 <input 
@@ -1701,8 +1709,7 @@ const handlePayLaterBooking = async (e) => {
                   autoComplete="postal-code"
                 />
               </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </>

@@ -2765,3 +2765,56 @@ padding: 6px 16px;
   flex: 1;
 }
 
+
+/* ANIMATION 1: Address fields slide-down */
+.address-fields-container {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.address-fields-container.visible {
+    max-height: 300px;
+    opacity: 1;
+}
+
+/* ANIMATION 2: Payment form card/wallet toggle */
+.card-fields-section {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease, margin 0.4s ease;
+    margin-bottom: 0;
+}
+
+.card-fields-section.visible {
+    max-height: 400px;
+    opacity: 1;
+    margin-bottom: 24px;
+}
+
+/* Wallet selected indicator */
+.wallet-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.wallet-indicator.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.wallet-indicator svg,
+.wallet-indicator img {
+    height: 48px;
+    filter: brightness(0) invert(1);
+}
