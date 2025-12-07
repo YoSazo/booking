@@ -2818,3 +2818,13 @@ padding: 6px 16px;
     height: 48px;
     filter: brightness(0) invert(1);
 }
+
+/* Add extra scroll space at bottom of payment section */
+.payment-content {
+    padding-bottom: 100px; /* Extra space at bottom for comfortable scrolling */
+}
+
+/* Alternative: Add to the entire payment step container */
+.guest-info-container[data-step="payment"] {
+    padding-bottom: 150px;
+}
