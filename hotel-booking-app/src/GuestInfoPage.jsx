@@ -181,16 +181,16 @@ useEffect(() => {
   }
 }, [errorMessage, hasAttemptedSubmit]);
 
-// Auto-scroll to address fields when they appear
+// Auto-scroll to address fields when they appear - scroll to the BOTTOM (zip field)
 useEffect(() => {
   if (isAddressSelected && addressFieldsRef.current) {
-    // Wait for animation to start, then scroll
+    // Wait for animation to start, then scroll to bottom of the container
     setTimeout(() => {
       addressFieldsRef.current?.scrollIntoView({ 
         behavior: 'smooth', 
-        block: 'nearest' 
+        block: 'end' // Scroll to bottom of container (zip field visible)
       });
-    }, 150); // Delay to let slide-down animation begin
+    }, 200); // Slightly longer delay for smoother effect
   }
 }, [isAddressSelected]);
 
@@ -1646,6 +1646,33 @@ const handlePayLaterBooking = async (e) => {
           </div>
         </div>
 
+        {/* Wallet selected indicator - clean message */}
+        {paymentMethod === 'wallet' && walletType && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '16px',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px',
+            marginBottom: '20px'
+          }}>
+            <img 
+              src={getWalletLogoInfo().src} 
+              alt={getWalletLogoInfo().alt} 
+              style={{ height: '32px' }} 
+            />
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontWeight: '600', color: '#333' }}>
+                {walletType} Selected
+              </p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
+                A payment sheet will appear after clicking the final button
+              </p>
+            </div>
+          </div>
+        )}
 
         {paymentMethod === 'wallet' && !walletType && (
           <div className="wallet-info-box">
