@@ -61,7 +61,7 @@ const errorMessageRef = useRef(null);
 const addressFieldsRef = useRef(null);
 const zipFieldRef = useRef(null);
 
-// Plan selection state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
+// Plan seletion state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
 // For 7+ nights, plan selection page will let them choose between 'trial' and 'full'
 // For <7 nights, plan selection page will let them choose between 'reserve' and 'full'
 const [selectedPlan, setSelectedPlan] = useState('reserve');
