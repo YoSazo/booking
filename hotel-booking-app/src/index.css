@@ -2190,35 +2190,34 @@ padding: 6px 16px;
 
 /* --- Testimonial Trigger Styles --- */
 .testimonial-trigger-container {
-  margin: 30px auto; /* This centers it */
-  max-width: 600px;
-  display: block; /* Ensure it's a block element */
+  margin: 20px auto; /* Reduced from 30px */
+  max-width: 350px; /* Much smaller - reduced from 600px */
+  display: block;
 }
 
 .testimonial-trigger-card {
   background-color: #fff;
   border: 1px solid #212529;
-  border-radius: 16px;
-  padding: 16px; /* Reduced from 20px */
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  border-radius: 12px; /* Reduced from 16px */
+  padding: 10px; /* Reduced from 16px */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .testimonial-trigger-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
 }
 
 .testimonial-thumbnail-wrapper {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 12px;
+  border-radius: 8px; /* Reduced from 12px */
   overflow: hidden;
-  margin-bottom: 12px; /* Reduced from 16px */
+  margin-bottom: 8px; /* Reduced from 12px */
 }
-
 
 .testimonial-thumbnail {
   width: 100%;
@@ -2231,16 +2230,17 @@ padding: 6px 16px;
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(0.7); /* Made play button smaller */
   pointer-events: none;
 }
 
 .testimonial-trigger-text {
   text-align: center;
-  font-size: 1em; /* Reduced from 1.1em */
+  font-size: 0.85em; /* Reduced from 1em */
   font-weight: 600;
   color: #333;
   margin: 0;
+  line-height: 1.3;
 }
 
 /* --- Testimonial Player Modal Styles --- */
