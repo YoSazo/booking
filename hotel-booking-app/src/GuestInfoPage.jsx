@@ -384,6 +384,21 @@ useEffect(() => {
 
     if (formData.phone.replace(/\D/g, '').length < 11) errors.phone = "A valid phone number is required.";
     setFormErrors(errors);
+    
+    // If there are errors, scroll to bottom to see phone field (last field) with errors
+    if (Object.keys(errors).length > 0) {
+        setTimeout(() => {
+            // Scroll to phone field (bottom field) to show all error messages
+            const phoneField = document.querySelector('input[name="phone"]');
+            if (phoneField) {
+                phoneField.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+            }
+        }, 100);
+    }
+    
     return Object.keys(errors).length === 0;
 };
 
