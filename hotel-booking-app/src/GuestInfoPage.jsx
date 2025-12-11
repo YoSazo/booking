@@ -61,10 +61,10 @@ const errorMessageRef = useRef(null);
 const addressFieldsRef = useRef(null);
 const zipFieldRef = useRef(null);
 
-// Plan selection state - Default to 'reserve' for <7 nights, 'full' for 7+ nights initially
-// For 7+ nights, plan selection page will let them choose between 'trial' and 'full'
-// For <7 nights, plan selection page will let them choose between 'reserve' and 'full'
-const [selectedPlan, setSelectedPlan] = useState('reserve');
+// Plan selection state - Default to 'payLater' for all stays
+// For 7+ nights: payLater, trial, full options
+// For <7 nights: payLater, full options (same as 7+ but without trial)
+const [selectedPlan, setSelectedPlan] = useState('payLater');
 
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
@@ -146,9 +146,9 @@ useEffect(() => {
     if (savedPlan) {
       setSelectedPlan(savedPlan);
     } else {
-      // Default to 'reserve' for <7 nights, keep 'reserve' as initial state
+      // Default to 'payLater' for <7 nights (same as 7+ nights)
       if (bookingDetails.nights < 7) {
-        setSelectedPlan('reserve');
+        setSelectedPlan('payLater');
       }
     }
   }
@@ -163,7 +163,7 @@ useEffect(() => {
       if (bookingDetails.nights >= 7) {
         setSelectedPlan('payLater'); // Default to pay later for 7+ nights
       } else {
-        setSelectedPlan('reserve'); // Default to reserve for <7 nights
+        setSelectedPlan('payLater'); // Default to pay later for <7 nights (same as 7+)
       }
     }
   }
@@ -1428,29 +1428,31 @@ const handlePayLaterBooking = async (e) => {
                 {/* Plan selection for <7 nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
                     <div className="payment-options-container">
-                        {/* Reserve for $20 Option - DEFAULT */}
-                        <label className={`payment-option-radio ${selectedPlan === 'reserve' ? 'selected' : ''}`}>
+                        {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
+                        <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
                             <input 
                                 type="radio" 
                                 name="plan" 
-                                value="reserve" 
-                                checked={selectedPlan === 'reserve'}
-                                onChange={() => setSelectedPlan('reserve')}
+                                value="payLater" 
+                                checked={selectedPlan === 'payLater'}
+                                onChange={() => setSelectedPlan('payLater')}
                             />
                             <div className="payment-option primary">
                                 <div className="option-header">
-                                    <span className="option-title">💰 Reserve for $20</span>
+                                    <span className="option-title">💳 Pay Later</span>
                                     <span className="option-badge">Most Popular</span>
                                 </div>
                                 <div className="option-price trial">
-                                    Only $20
+                                    $0 Today
                                 </div>
                                 <div className="option-details">
-                                    Secure your booking with $20 deposit
+                                    🔒 We don't charge you anything today
                                     <br />
-                                    Pay remaining ${(bookingDetails.total - 20).toFixed(2)} at check-in
+                                    ✅ When you check in: Nothing happens
                                     <br />
-                                    <strong style={{ color: '#6c757d' }}>$20 deposit is non-refundable</strong>
+                                    ❌ If you don't show: $75.90 no-show fee
+                                    <br />
+                                    <strong style={{ color: '#28a745' }}>Pay full amount at arrival</strong>
                                 </div>
                             </div>
                         </label>
