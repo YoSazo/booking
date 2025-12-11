@@ -2904,30 +2904,3 @@ padding: 6px 16px;
     to { transform: rotate(360deg); }
 }
 
-/* 7. HIDE GOOGLE MAPS ERROR MODAL */
-/* This hides the annoying "This page can't load Google Maps correctly" popup */
-/* Target the outer container */
-div[style*="background-color: white"][style*="padding: 15px 25px"],
-div[style*="background-color: rgb(255, 255, 255)"][style*="padding: 15px 25px"],
-/* Target inner content */
-div[style*="background-color: white"] img[src*="google_gray.svg"],
-div[style*="This page can't load Google Maps correctly"],
-.dismissButton,
-.gm-err-container,
-.gm-err-content,
-.gm-err-message,
-[src*="icon_error"],
-/* Target any div with Google logo + error text */
-div > img[src*="google_gray.svg"]:first-child,
-div:has(> img[src*="google_gray.svg"]) {
-    display: none !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    height: 0 !important;
-    width: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-    visibility: hidden !important;
-    position: absolute !important;
-    z-index: -9999 !important;
-}
