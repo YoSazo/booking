@@ -45,6 +45,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
+    const [googleMapsError, setGoogleMapsError] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isProcessingTrial, setIsProcessingTrial] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -501,7 +502,23 @@ useEffect(() => {
         }
     };
 
-    const onLoad = (autoC) => setAutocomplete(autoC);
+    const onLoad = (autoC) => {
+        setAutocomplete(autoC);
+        setGoogleMapsError(false); // Google Maps loaded successfully
+    };
+    
+    // Detect if Google Maps failed to load
+    useEffect(() => {
+        const checkGoogleMaps = setTimeout(() => {
+            if (!window.google || !window.google.maps) {
+                console.warn('Google Maps failed to load - enabling manual entry fallback');
+                setGoogleMapsError(true);
+                setIsAddressSelected(true); // Show address fields immediately
+            }
+        }, 3000); // Wait 3 seconds for Google Maps to load
+        
+        return () => clearTimeout(checkGoogleMaps);
+    }, []);
     const onPlaceChanged = () => {
     // Set flag to prevent scrolling during place selection
     isInteractingWithAutocomplete.current = true;
@@ -1712,23 +1729,84 @@ const handlePayLaterBooking = async (e) => {
 
       <div className="billing-address-section">
         <label className="billing-address-label">Billing Address</label>
+        {googleMapsError && (
+          <div style={{
+            padding: '8px 12px',
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '4px',
+            fontSize: '13px',
+            marginBottom: '10px',
+            color: '#856404'
+          }}>
+            ℹ️ Address suggestions unavailable. Please enter your address manually.
+          </div>
+        )}
         <div className="form-grid">
           <div className="form-field full-width">
-            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+            {!googleMapsError ? (
+              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input 
+                  type="text" 
+                  name="address" 
+                  value={formData.address} 
+                  onChange={(e) => {
+                    handleChange(e);
+                    // Allow manual entry after typing if no suggestions appear
+                    if (e.target.value.length > 5 && !isAddressSelected) {
+                      setTimeout(() => {
+                        setIsAddressSelected(true);
+                      }, 2000);
+                    }
+                  }}
+                  onBlur={() => {
+                    // If user leaves field with text, show address fields
+                    if (formData.address.length > 5 && !isAddressSelected) {
+                      setIsAddressSelected(true);
+                    }
+                  }}
+                  placeholder="Start typing your address..." 
+                  autoComplete="street-address"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      // Show address fields on Enter key if user has typed something
+                      if (formData.address.length > 5) {
+                        setIsAddressSelected(true);
+                      }
+                    }
+                  }}
+                />
+              </Autocomplete>
+            ) : (
               <input 
                 type="text" 
                 name="address" 
                 value={formData.address} 
-                onChange={handleChange} 
-                placeholder="Start typing your address..." 
+                onChange={handleChange}
+                placeholder="Enter your street address..." 
                 autoComplete="street-address"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                  }
-                }}
               />
-            </Autocomplete>
+            )}
+            {!googleMapsError && formData.address.length > 5 && !isAddressSelected && (
+              <button
+                type="button"
+                onClick={() => setIsAddressSelected(true)}
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Enter address manually
+              </button>
+            )}
           </div>
           {/* Address fields with slide-down animation */}
           <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
