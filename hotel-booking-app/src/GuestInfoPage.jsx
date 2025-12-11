@@ -1437,22 +1437,33 @@ const handlePayLaterBooking = async (e) => {
                                 checked={selectedPlan === 'payLater'}
                                 onChange={() => setSelectedPlan('payLater')}
                             />
-                            <div className="payment-option primary">
+                            <div className="payment-option primary" style={{ 
+                                background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                                border: '2px solid #10b981',
+                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
+                            }}>
                                 <div className="option-header">
-                                    <span className="option-title">💳 Pay Later</span>
-                                    <span className="option-badge">Most Popular</span>
+                                    <span className="option-title" style={{ color: '#0c5460' }}>💳 Pay Later</span>
+                                    <span className="option-badge" style={{ 
+                                        backgroundColor: '#10b981',
+                                        color: 'white'
+                                    }}>⭐ Most Popular</span>
                                 </div>
-                                <div className="option-price trial">
+                                <div className="option-price" style={{ 
+                                    color: '#10b981', 
+                                    fontSize: '32px',
+                                    fontWeight: '700'
+                                }}>
                                     $0 Today
                                 </div>
                                 <div className="option-details">
-                                    🔒 We don't charge you anything today
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                     <br />
-                                    ✅ When you check in: Nothing happens
+                                    <strong>{bookingDetails.nights} nights</strong>
                                     <br />
-                                    ❌ If you don't show: $75.90 no-show fee
+                                    Pay the full ${bookingDetails.total.toFixed(2)} when you arrive
                                     <br />
-                                    <strong style={{ color: '#28a745' }}>Pay full amount at arrival</strong>
+                                    <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
                                 </div>
                             </div>
                         </label>
