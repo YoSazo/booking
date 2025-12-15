@@ -61,27 +61,25 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           </div>
         ) : (
           <div style={{ padding: '10px 0' }}>
-            <div className="room-price-placeholder" style={{ 
-              fontSize: '15px', 
-              color: '#666', 
-              fontStyle: 'italic',
-              display: 'inline-block'
-            }}>
-              Select dates to see pricing
-            </div>
             <span style={{
               display: 'inline-block',
-              marginLeft: '10px',
+              marginBottom: '8px',
               padding: '4px 12px',
               backgroundColor: '#10b981',
               color: 'white',
               fontSize: '13px',
               fontWeight: '600',
-              borderRadius: '12px',
-              verticalAlign: 'middle'
+              borderRadius: '12px'
             }}>
               Reserve for $0 Today
             </span>
+            <div className="room-price-placeholder" style={{ 
+              fontSize: '15px', 
+              color: '#666', 
+              fontStyle: 'italic'
+            }}>
+              Select dates to see pricing
+            </div>
           </div>
         )}
 
