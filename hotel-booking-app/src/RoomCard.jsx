@@ -60,13 +60,28 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             <div className="price-balance">Pay ${displayBalanceDue.toFixed(2)} When You Arrive</div>
           </div>
         ) : (
-          <div className="room-price-placeholder" style={{ 
-            fontSize: '15px', 
-            color: '#666', 
-            fontStyle: 'italic',
-            padding: '10px 0'
-          }}>
-            Reserve for $0 Today - Select dates to see total
+          <div style={{ padding: '10px 0' }}>
+            <div className="room-price-placeholder" style={{ 
+              fontSize: '15px', 
+              color: '#666', 
+              fontStyle: 'italic',
+              display: 'inline-block'
+            }}>
+              Select dates to see pricing
+            </div>
+            <span style={{
+              display: 'inline-block',
+              marginLeft: '10px',
+              padding: '4px 12px',
+              backgroundColor: '#10b981',
+              color: 'white',
+              fontSize: '13px',
+              fontWeight: '600',
+              borderRadius: '12px',
+              verticalAlign: 'middle'
+            }}>
+              Reserve for $0 Today
+            </span>
           </div>
         )}
 
