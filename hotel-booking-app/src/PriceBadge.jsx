@@ -42,7 +42,10 @@ function PriceBadge({ nights, rates }) {
         Your Discounted Total: ${discountedTotal}
       </div>
       <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>
-        Only Pay ${half} today
+        Reserve for $0 Today
+      </div>
+      <div style={{ fontSize: '16px', color: '#666', marginTop: '8px' }}>
+        Pay ${discountedTotal} When You Arrive
       </div>
     </div>
   );

@@ -169,7 +169,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               ) : showShortStayPrice ? (
                 <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
                   <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Only Pay ${(nights * rates.NIGHTLY / 2).toFixed(2)} Today</div>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Reserve for $0 Today</div>
+                  <div style={{ fontSize: '16px', color: '#666', marginTop: '8px' }}>Pay ${(nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
                 </div>
               ) : ( <PriceBadge nights={nights} rates={rates} /> )}
             </div>

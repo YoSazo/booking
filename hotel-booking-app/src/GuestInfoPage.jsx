@@ -1510,8 +1510,8 @@ const handlePayLaterBooking = async (e) => {
                             <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
                             <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
                             <div className="total-breakdown">
-                                <p className="pay-today">Only Pay ${priceToday.toFixed(2)} Today</p>
-                                <p className="balance-due">Balance (${balanceDue.toFixed(2)}) When you arrive</p>
+                                <p className="pay-today">Reserve for $0 Today</p>
+                                <p className="balance-due">Pay ${bookingDetails.total.toFixed(2)} When You Arrive</p>
                             </div>
                         </div>
                     </div>

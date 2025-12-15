@@ -56,8 +56,8 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
         {nights > 0 ? (
           <div className="dynamic-price-display">
-            <div className="price-today">Only Pay ${displayPayToday.toFixed(2)} Today</div>
-            <div className="price-balance">Balance (${displayBalanceDue.toFixed(2)}) When You Arrive</div>
+            <div className="price-today">Reserve for $0 Today</div>
+            <div className="price-balance">Pay ${displayBalanceDue.toFixed(2)} When You Arrive</div>
           </div>
         ) : (
           <div className="room-price-placeholder" style={{ 
