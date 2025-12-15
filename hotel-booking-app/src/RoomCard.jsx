@@ -66,7 +66,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             fontStyle: 'italic',
             padding: '10px 0'
           }}>
-            Select dates to see pricing
+            Reserve for $0 Today - Select dates to see total
           </div>
         )}
 
