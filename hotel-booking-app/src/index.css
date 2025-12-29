@@ -2608,12 +2608,40 @@ padding: 6px 16px;
   }
 }
 
+/* Booking Summary Banner */
+.booking-summary-banner {
+  background-color: #f0f4f8;
+  border: 1px solid #d0dae6;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.booking-summary-banner .summary-label {
+  font-size: 0.85em;
+  color: #666;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.booking-summary-banner .summary-dates {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.booking-summary-banner .summary-nights {
+  font-size: 0.9em;
+  color: #555;
+}
+
 /* Payment Options Container - COMPACT VERSION */
 .payment-options-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    /* Removed: margin-top, padding, border, border-radius, background-color */
+    gap: 12px;
 }
 
 @media (min-width: 769px) {
@@ -2628,7 +2656,7 @@ padding: 6px 16px;
     background-color: #fff;
     border: 2px solid #e0e0e0;
     border-radius: 12px;
-    padding: 24px;
+    padding: 18px;
     display: flex;
     flex-direction: column;
     transition: all 0.2s ease;
@@ -2659,7 +2687,7 @@ padding: 6px 16px;
 }
 
 .option-title {
-    font-size: 1.1em;
+    font-size: 1em;
     font-weight: 600;
     color: #333;
 }
@@ -2675,10 +2703,10 @@ padding: 6px 16px;
 
 /* Option Price - BIGGER */
 .option-price {
-    font-size: 2em;
+    font-size: 1.8em;
     font-weight: 700;
     color: var(--success-color);
-    margin: 12px 0 8px 0;
+    margin: 8px 0 6px 0;
     line-height: 1.1;
 }
 
@@ -2688,9 +2716,9 @@ padding: 6px 16px;
 
 /* Option Details - BIGGER */
 .option-details {
-    font-size: 0.95em;
+    font-size: 0.85em;
     color: #666;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     line-height: 1.4;
 }
 

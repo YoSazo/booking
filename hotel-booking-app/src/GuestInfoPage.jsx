@@ -1326,7 +1326,15 @@ const handlePayLaterBooking = async (e) => {
 
                 {/* Plan selection for 7+ nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
-                    <div className="payment-options-container">
+                    <>
+                        <div className="booking-summary-banner">
+                            <div className="summary-label">Your Stay</div>
+                            <div className="summary-dates">
+                                {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                            <div className="summary-nights">{bookingDetails.nights} nights</div>
+                        </div>
+                        <div className="payment-options-container">
                         {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
                         <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
                             <input 
@@ -1356,10 +1364,6 @@ const handlePayLaterBooking = async (e) => {
                                     $0 Today
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
                                     Pay the full ${bookingDetails.total.toFixed(2)} when you arrive
                                     <br />
                                     <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
@@ -1384,9 +1388,7 @@ const handlePayLaterBooking = async (e) => {
                                     Only $69
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>1 night trial</strong>
+                                    Trial dates: {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                     <br />
                                     See the room, then extend to your full stay
                                     <br />
@@ -1412,10 +1414,6 @@ const handlePayLaterBooking = async (e) => {
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
                                     Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
                                     <br />
                                     <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
@@ -1423,11 +1421,20 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </label>
                     </div>
+                    </>
                 )}
 
                 {/* Plan selection for <7 nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
-                    <div className="payment-options-container">
+                    <>
+                        <div className="booking-summary-banner">
+                            <div className="summary-label">Your Stay</div>
+                            <div className="summary-dates">
+                                {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                            <div className="summary-nights">{bookingDetails.nights} nights</div>
+                        </div>
+                        <div className="payment-options-container">
                         {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
                         <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
                             <input 
@@ -1457,10 +1464,6 @@ const handlePayLaterBooking = async (e) => {
                                     $0 Today
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
                                     Pay the full ${bookingDetails.total.toFixed(2)} when you arrive
                                     <br />
                                     <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
@@ -1485,10 +1488,6 @@ const handlePayLaterBooking = async (e) => {
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
                                 </div>
                                 <div className="option-details">
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    <br />
-                                    <strong>{bookingDetails.nights} nights</strong>
-                                    <br />
                                     Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
                                     <br />
                                     <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
@@ -1496,6 +1495,7 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </label>
                     </div>
+                    </>
                 )}
 
                 {currentStep === 1 && (
