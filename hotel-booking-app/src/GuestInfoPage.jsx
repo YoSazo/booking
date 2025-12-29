@@ -1326,15 +1326,7 @@ const handlePayLaterBooking = async (e) => {
 
                 {/* Plan selection for 7+ nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
-                    <>
-                        <div className="booking-summary-banner">
-                            <div className="summary-label">Your Stay</div>
-                            <div className="summary-dates">
-                                {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                            <div className="summary-nights">{bookingDetails.nights} nights</div>
-                        </div>
-                        <div className="payment-options-container">
+                    <div className="payment-options-container">
                         {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
                         <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
                             <input 
@@ -1421,20 +1413,11 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </label>
                     </div>
-                    </>
                 )}
 
                 {/* Plan selection for <7 nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
-                    <>
-                        <div className="booking-summary-banner">
-                            <div className="summary-label">Your Stay</div>
-                            <div className="summary-dates">
-                                {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                            <div className="summary-nights">{bookingDetails.nights} nights</div>
-                        </div>
-                        <div className="payment-options-container">
+                    <div className="payment-options-container">
                         {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
                         <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
                             <input 
@@ -1495,7 +1478,6 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </label>
                     </div>
-                    </>
                 )}
 
                 {currentStep === 1 && (
