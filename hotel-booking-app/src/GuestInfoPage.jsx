@@ -1332,7 +1332,7 @@ const handlePayLaterBooking = async (e) => {
                             <div className="summary-dates">
                                 {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </div>
-                            <div className="summary-nights">{bookingDetails.nights} nights • Total: ${bookingDetails.totalPrice.toFixed(2)}</div>
+                            <div className="summary-nights">{bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}</div>
                             <div className="payment-plan-prompt">Choose Your Payment Plan</div>
                         </div>
                         <div className="payment-options-container">
@@ -1433,7 +1433,7 @@ const handlePayLaterBooking = async (e) => {
                             <div className="summary-dates">
                                 {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </div>
-                            <div className="summary-nights">{bookingDetails.nights} nights • Total: ${bookingDetails.totalPrice.toFixed(2)}</div>
+                            <div className="summary-nights">{bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}</div>
                             <div className="payment-plan-prompt">Choose Your Payment Plan</div>
                         </div>
                         <div className="payment-options-container">
