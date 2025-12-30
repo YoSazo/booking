@@ -191,6 +191,25 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
     const { paymentIntentId, guestInfo, bookingDetails, hotelId } = req.body;
 
     try {
+        // Check if booking already exists (idempotency check)
+        const existingBooking = await prisma.booking.findFirst({
+            where: {
+                OR: [
+                    { stripePaymentIntentId: paymentIntentId },
+                    { ourReservationCode: bookingDetails.reservationCode }
+                ]
+            }
+        });
+
+        if (existingBooking) {
+            console.log('⚠️ Booking already exists. Returning success without creating duplicate.');
+            return res.json({
+                success: true,
+                message: 'Reservation already created.',
+                reservationCode: existingBooking.pmsConfirmationCode
+            });
+        }
+
         // Verify the payment intent is authorized (not captured)
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
         
