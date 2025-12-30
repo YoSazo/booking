@@ -166,6 +166,11 @@ useEffect(() => {
         setSelectedPlan('payLater'); // Default to pay later for <7 nights (same as 7+)
       }
     }
+    
+    // Smooth scroll to top when plan page loads, after DOM renders
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   }
 }, [currentStep, bookingDetails]);
 
