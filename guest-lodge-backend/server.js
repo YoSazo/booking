@@ -428,14 +428,25 @@ app.post('/api/stripe-webhook', async (req, res) => {
 
         try {
             // --- THIS IS THE CRUCIAL FIX ---
-            // Wait for 10 seconds to give the frontend API call a head start to finish.
-            console.log('Webhook is pausing for 10 seconds to allow frontend to complete...');
-            await new Promise(resolve => setTimeout(resolve, 10000));
-
-            // Now, check if the frontend already created the booking record.
-            const existingBooking = await prisma.booking.findUnique({
-                where: { stripePaymentIntentId: paymentIntent.id }
-            });
+            // Poll for the booking with retries (max 10 seconds total)
+            console.log('Webhook checking if frontend already created booking...');
+            let existingBooking = null;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!existingBooking && attempts < maxAttempts) {
+                existingBooking = await prisma.booking.findUnique({
+                    where: { stripePaymentIntentId: paymentIntent.id }
+                });
+                
+                if (!existingBooking) {
+                    attempts++;
+                    console.log(`Attempt ${attempts}/${maxAttempts}: Booking not found yet. Waiting 1 second...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                    console.log(`✅ Found existing booking after ${attempts} attempts.`);
+                }
+            }
 
             if (existingBooking) {
                 // If the record exists, the frontend was successful. Our job is done.
