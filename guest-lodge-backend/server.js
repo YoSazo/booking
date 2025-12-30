@@ -434,9 +434,13 @@ app.post('/api/stripe-webhook', async (req, res) => {
             const guestInfo = JSON.parse(metadata.guestInfo);
             const hotelId = metadata.hotelId;
 
-            // Wait for 3 seconds to give the frontend API call a head start to finish.
-            console.log('Webhook is pausing for 3 seconds to allow frontend to complete...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Wait for 5 seconds while keeping the DB connection alive
+            console.log('Webhook is pausing for 5 seconds to allow frontend to complete...');
+            for (let i = 1; i <= 5; i++) {
+                await prisma.$queryRaw`SELECT 1`; // Keep connection alive
+                console.log(`Webhook waiting... ${i}/5 seconds`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
 
             // Now, check if the frontend already created the booking record.
             // Check by BOTH PaymentIntent ID AND reservation code to catch race conditions
