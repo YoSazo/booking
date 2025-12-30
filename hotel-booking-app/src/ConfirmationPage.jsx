@@ -120,10 +120,6 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                   <span className="detail-value" style={{ color: '#17a2b8', fontWeight: '700' }}>$0.00</span>
                 </div>
                 <div className="detail-row">
-                  <span className="detail-label">Hold on Card</span>
-                  <span className="detail-value" style={{ color: '#ffc107' }}>$75.90 (temporary)</span>
-                </div>
-                <div className="detail-row">
                   <span className="detail-label">Total Stay Cost</span>
                   <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
                 </div>
@@ -134,18 +130,18 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                 <div style={{ 
                   marginTop: '16px', 
                   padding: '12px', 
-                  background: '#e7f3ff', 
+                  background: '#fff3cd', 
                   borderRadius: '8px',
                   fontSize: '14px',
                   lineHeight: '1.6'
                 }}>
-                  <strong>💳 Pre-Authorization Hold</strong>
+                  <strong>⚠️ No-Show Policy</strong>
                   <br />
-                  A temporary $75.90 hold has been placed on your card. This is NOT a charge.
+                  Your card has been validated. If you don't show up for your reservation, a $75.90 no-show fee will be charged.
                   <br /><br />
-                  ✅ <strong>When you check in:</strong> Hold is released (no charge)
+                  ✅ <strong>When you check in:</strong> Pay ${bookingDetails.total?.toFixed(2)} at the front desk
                   <br />
-                  ❌ <strong>If you don't show:</strong> $75.90 no-show fee is charged
+                  ❌ <strong>If you don't show:</strong> $75.90 no-show fee applies
                 </div>
               </>
             )}

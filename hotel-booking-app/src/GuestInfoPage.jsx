@@ -840,9 +840,9 @@ const handleTrialNightBooking = async (e) => {
         checkout: checkoutDate.toISOString(), // ✅ Now safe
         nights: 1,
         guests: originalBooking.guests,
-        subtotal: 69,
-        taxes: 6.90,
-        total: 75.90,
+        subtotal: 1,
+        taxes: 0,
+        total: 1.00,
         reservationCode: originalBooking.reservationCode,
         bookingType: 'trial',
         intendedNights: originalBooking.nights,  // ✅ Preserve original nights
@@ -856,7 +856,7 @@ const handleTrialNightBooking = async (e) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                amount: 75.90,
+                amount: 1.00,
                 bookingDetails: trialBooking,
                 guestInfo: formData,
                 hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
@@ -909,9 +909,9 @@ const handleTrialNightBooking = async (e) => {
                     checkin: checkinDate.toISOString(),
                     checkout: checkoutDate.toISOString(),
                     nights: 1,
-                    total: 75.90,
-                    subtotal: 69,
-                    taxes: 6.90,
+                    total: 1.00,
+                    subtotal: 1,
+                    taxes: 0,
                     bookingType: 'trial',
                     intendedNights: originalBooking.nights,
                     originalTotal: originalBooking.total
@@ -922,7 +922,7 @@ const handleTrialNightBooking = async (e) => {
             }
         } else if (paymentMethod === 'wallet') {
             // Create a NEW payment request for the trial amount
-            const trialAmountInCents = Math.round(75.90 * 100);
+            const trialAmountInCents = Math.round(1.00 * 100);
             
             const trialPaymentRequest = stripe.paymentRequest({
                 country: 'US',
@@ -955,9 +955,9 @@ const handleTrialNightBooking = async (e) => {
                     checkin: checkinDate.toISOString(),
                     checkout: checkoutDate.toISOString(),
                     nights: 1,
-                    total: 75.90,
-                    subtotal: 69,
-                    taxes: 6.90,
+                    total: 1.00,
+                    subtotal: 1,
+                    taxes: 0,
                     bookingType: 'trial',
                     intendedNights: originalBooking.nights,
                     originalTotal: originalBooking.total
@@ -1035,7 +1035,7 @@ const handlePayLaterBooking = async (e) => {
         bookingType: 'payLater',
         amountPaidNow: 0,
         amountDueAtArrival: originalBooking.total,
-        preAuthHoldAmount: 75.90,
+        preAuthHoldAmount: 1.00,
     };
 
     try {
@@ -1107,8 +1107,8 @@ const handlePayLaterBooking = async (e) => {
                 }
             }
         } else if (paymentMethod === 'wallet') {
-            // Create payment request for $75.90 hold
-            const holdAmountInCents = 7590;
+            // Create payment request for $1.00 hold
+            const holdAmountInCents = 100;
             
             const payLaterPaymentRequest = stripe.paymentRequest({
                 country: 'US',
