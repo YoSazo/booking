@@ -433,8 +433,14 @@ app.post('/api/stripe-webhook', async (req, res) => {
             await new Promise(resolve => setTimeout(resolve, 5000));
 
             // Now, check if the frontend already created the booking record.
-            const existingBooking = await prisma.booking.findUnique({
-                where: { stripePaymentIntentId: paymentIntent.id }
+            // Check by BOTH PaymentIntent ID AND reservation code to catch race conditions
+            const existingBooking = await prisma.booking.findFirst({
+                where: {
+                    OR: [
+                        { stripePaymentIntentId: paymentIntent.id },
+                        { ourReservationCode: bookingDetails.reservationCode }
+                    ]
+                }
             });
 
             if (existingBooking) {
