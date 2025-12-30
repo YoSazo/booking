@@ -428,6 +428,12 @@ app.post('/api/stripe-webhook', async (req, res) => {
 
         try {
             // --- THIS IS THE CRUCIAL FIX ---
+            // Parse metadata first so we can check by reservation code
+            const metadata = paymentIntent.metadata;
+            const bookingDetails = JSON.parse(metadata.bookingDetails);
+            const guestInfo = JSON.parse(metadata.guestInfo);
+            const hotelId = metadata.hotelId;
+
             // Wait for 5 seconds to give the frontend API call a head start to finish.
             console.log('Webhook is pausing for 5 seconds to allow frontend to complete...');
             await new Promise(resolve => setTimeout(resolve, 5000));
@@ -452,10 +458,6 @@ app.post('/api/stripe-webhook', async (req, res) => {
             // If no record exists, it means the frontend call failed.
             // The webhook must now create the booking as a backup.
             console.log('⚠️ Frontend booking record not found. Creating backup booking...');
-            const metadata = paymentIntent.metadata;
-            const bookingDetails = JSON.parse(metadata.bookingDetails);
-            const guestInfo = JSON.parse(metadata.guestInfo);
-            const hotelId = metadata.hotelId;
 
             // 1. Create the booking in Cloudbeds
             const reservationData = {
