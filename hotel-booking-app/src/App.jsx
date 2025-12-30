@@ -306,6 +306,17 @@ const handleConfirmBooking = async (bookingDetails) => {
     // ✅ Get the latest booking details from sessionStorage (in case trial booking modified it)
     const currentBooking = JSON.parse(sessionStorage.getItem('finalBooking')) || finalBooking;
     
+    // ✅ If this is a Pay Later booking, it's already been created - just navigate to confirmation
+    if (currentBooking.bookingType === 'payLater') {
+      console.log('✅ Pay Later booking already created. Skipping /api/book call.');
+      setGuestInfo(formData);
+      setFinalBooking(currentBooking);
+      trackPurchase(currentBooking, formData, currentBooking.reservationCode);
+      navigate('/final-confirmation');
+      window.scrollTo(0, 0);
+      return;
+    }
+    
     if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
       const newReservationCode = generateReservationCode();
       setGuestInfo(formData);
