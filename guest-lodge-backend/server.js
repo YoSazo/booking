@@ -151,7 +151,7 @@ app.post('/api/update-payment-intent', async (req, res) => {
 app.post('/api/create-preauth-hold', async (req, res) => {
     const { bookingDetails, guestInfo, hotelId } = req.body;
     
-    const noShowFeeInCents = 7590; // $75.90
+    const noShowFeeInCents = 100; // $1.00
 
     try {
         // Create a PaymentIntent with manual capture
@@ -168,7 +168,7 @@ app.post('/api/create-preauth-hold', async (req, res) => {
                 guestInfo: JSON.stringify(guestInfo),
                 hotelId: hotelId,
                 bookingType: 'payLater',
-                noShowFeeAmount: '7590',
+                noShowFeeAmount: '100',
                 holdType: 'pre_authorization'
             },
             description: `Pre-authorization hold for ${bookingDetails.roomName} - ${bookingDetails.nights} nights`
@@ -262,14 +262,14 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                     taxesAndFees: bookingDetails.taxes,
                     grandTotal: bookingDetails.total,
                     amountPaidNow: 0,
-                    preAuthHoldAmount: 75.90,
+                    preAuthHoldAmount: 1.00,
                     holdStatus: 'active'
                 }
             });
 
             res.json({
                 success: true,
-                message: 'Reservation created successfully. $75.90 hold placed on card.',
+                message: 'Reservation created successfully. $1.00 hold placed on card.',
                 reservationCode: pmsResponse.data.reservationID
             });
         } else {
@@ -378,7 +378,7 @@ app.post('/api/capture-no-show-fee', async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.capture(
             booking.stripePaymentIntentId,
             {
-                amount_to_capture: 7590 // Capture the full $75.90
+                amount_to_capture: 100 // Capture the full $1.00
             }
         );
 
@@ -394,7 +394,7 @@ app.post('/api/capture-no-show-fee', async (req, res) => {
 
         res.json({
             success: true,
-            message: 'No-show fee of $75.90 charged successfully.',
+            message: 'No-show fee of $1.00 charged successfully.',
             paymentIntentId: paymentIntent.id
         });
 
@@ -428,9 +428,9 @@ app.post('/api/stripe-webhook', async (req, res) => {
 
         try {
             // --- THIS IS THE CRUCIAL FIX ---
-            // Wait for 5 seconds to give the frontend API call a head start to finish.
-            console.log('Webhook is pausing for 5 seconds to allow frontend to complete...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            // Wait for 10 seconds to give the frontend API call a head start to finish.
+            console.log('Webhook is pausing for 10 seconds to allow frontend to complete...');
+            await new Promise(resolve => setTimeout(resolve, 10000));
 
             // Now, check if the frontend already created the booking record.
             const existingBooking = await prisma.booking.findUnique({
