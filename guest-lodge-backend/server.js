@@ -192,14 +192,20 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
 
     try {
         // Check if booking already exists (idempotency check)
-        const existingBooking = await prisma.booking.findFirst({
-            where: {
-                OR: [
-                    { stripePaymentIntentId: paymentIntentId },
-                    { ourReservationCode: bookingDetails.reservationCode }
-                ]
-            }
-        });
+        // Wrap in try-catch in case DB is cold starting
+        let existingBooking = null;
+        try {
+            existingBooking = await prisma.booking.findFirst({
+                where: {
+                    OR: [
+                        { stripePaymentIntentId: paymentIntentId },
+                        { ourReservationCode: bookingDetails.reservationCode }
+                    ]
+                }
+            });
+        } catch (dbError) {
+            console.log('⚠️ DB connection slow (cold start). Proceeding with booking creation.');
+        }
 
         if (existingBooking) {
             console.log('⚠️ Booking already exists. Returning success without creating duplicate.');
@@ -261,30 +267,53 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         );
 
         if (pmsResponse.data.success) {
-            // Save to database
-            await prisma.booking.create({
-                data: {
-                    stripePaymentIntentId: paymentIntentId,
-                    ourReservationCode: bookingDetails.reservationCode,
-                    pmsConfirmationCode: pmsResponse.data.reservationID,
-                    hotelId: hotelId,
-                    roomName: bookingDetails.name || bookingDetails.roomName,
-                    bookingType: 'payLater',
-                    checkinDate: new Date(bookingDetails.checkin),
-                    checkoutDate: new Date(bookingDetails.checkout),
-                    nights: bookingDetails.nights,
-                    guestFirstName: guestInfo.firstName,
-                    guestLastName: guestInfo.lastName,
-                    guestEmail: guestInfo.email,
-                    guestPhone: guestInfo.phone,
-                    subtotal: bookingDetails.subtotal,
-                    taxesAndFees: bookingDetails.taxes,
-                    grandTotal: bookingDetails.total,
-                    amountPaidNow: 0,
-                    preAuthHoldAmount: 1.00,
-                    holdStatus: 'active'
+            // Save to database with retry logic for cold starts
+            let dbSaveSuccess = false;
+            let retries = 3;
+            
+            while (!dbSaveSuccess && retries > 0) {
+                try {
+                    await prisma.booking.create({
+                        data: {
+                            stripePaymentIntentId: paymentIntentId,
+                            ourReservationCode: bookingDetails.reservationCode,
+                            pmsConfirmationCode: pmsResponse.data.reservationID,
+                            hotelId: hotelId,
+                            roomName: bookingDetails.name || bookingDetails.roomName,
+                            bookingType: 'payLater',
+                            checkinDate: new Date(bookingDetails.checkin),
+                            checkoutDate: new Date(bookingDetails.checkout),
+                            nights: bookingDetails.nights,
+                            guestFirstName: guestInfo.firstName,
+                            guestLastName: guestInfo.lastName,
+                            guestEmail: guestInfo.email,
+                            guestPhone: guestInfo.phone,
+                            subtotal: bookingDetails.subtotal,
+                            taxesAndFees: bookingDetails.taxes,
+                            grandTotal: bookingDetails.total,
+                            amountPaidNow: 0,
+                            preAuthHoldAmount: 1.00,
+                            holdStatus: 'active'
+                        }
+                    });
+                    dbSaveSuccess = true;
+                    console.log('✅ Booking saved to database');
+                } catch (dbError) {
+                    retries--;
+                    if (dbError.code === 'P2002') {
+                        // Unique constraint - booking already exists, that's OK
+                        console.log('ℹ️ Booking already in database (duplicate prevented)');
+                        dbSaveSuccess = true;
+                    } else if (retries > 0) {
+                        console.log(`⚠️ DB save failed, retrying... (${retries} attempts left)`);
+                        await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds before retry
+                    } else {
+                        console.error('❌ Failed to save to database after retries:', dbError.message);
+                        // Don't fail the whole booking - Cloudbeds booking succeeded
+                        // Webhook will handle saving to DB as backup
+                    }
                 }
-            });
+            }
 
             res.json({
                 success: true,
