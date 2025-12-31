@@ -1321,30 +1321,6 @@ const handlePayLaterBooking = async (e) => {
                     </div>
                     </div>
 
-                {currentStep === 2 && (
-                    <>
-                        <TestimonialTrigger 
-                        onClick={() => setIsTestimonialOpen(true)}
-                        thumbnailUrl={testimonials[0].thumbnailUrl}
-                        />
-                        {isTestimonialOpen && (
-                        <TestimonialPlayer
-                            testimonials={testimonials}
-                            startIndex={0}
-                            onClose={() => {
-                            setIsTestimonialOpen(false);
-                            // Scroll to payment form after a tiny delay (lets modal close first)
-                            setTimeout(() => {
-                                paymentFormRef.current?.scrollIntoView({ 
-                                behavior: 'smooth', 
-                                block: 'start' 
-                                });
-                            }, 100);
-                            }}
-                        />
-                        )}
-                    </>
-                    )}
 
                 {/* Plan selection for 7+ nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
