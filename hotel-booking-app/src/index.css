@@ -3318,7 +3318,7 @@ padding: 6px 16px;
 
 .info-form-fields .form-field input {
   padding: 12px 14px;
-  font-size: 0.95rem;
+  font-size: 16px; /* Must be at least 16px to prevent iOS zoom */
   border: 1.5px solid #d1d5db;
   border-radius: 8px;
   transition: all 0.2s ease;
