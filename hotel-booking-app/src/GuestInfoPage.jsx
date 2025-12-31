@@ -477,6 +477,16 @@ useEffect(() => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
         
+        // Fallback: Show city/state/zip if user types address manually (autocomplete might not work)
+        if (name === 'address' && value.length >= 10 && !isAddressSelected) {
+            setTimeout(() => {
+                // Only reveal if still not selected (autocomplete didn't trigger)
+                if (!isAddressSelected && formData.address.length >= 10) {
+                    setIsAddressSelected(true);
+                }
+            }, 2000); // Wait 2 seconds to give autocomplete a chance
+        }
+        
         // Real-time validation feedback - clear errors as user types valid data
         if (formErrors[name]) {
             // Check if the field now has valid content
