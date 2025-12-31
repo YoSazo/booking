@@ -68,6 +68,27 @@ function ScrollToTop() {
   return null;
 }
 
+// Prevent Meta Pixel from firing automatic PageView on route changes
+function PreventAutoPageView() {
+  const location = useLocation();
+  const isFirstRender = React.useRef(true);
+
+  useEffect(() => {
+    // Skip the first render (initial PageView already fired in index.html)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      console.log('🎯 Meta Pixel: Initial PageView tracked');
+      return;
+    }
+
+    // On subsequent route changes, DON'T fire automatic PageView
+    // Your custom events (Search, AddToCart, InitiateCheckout, Purchase) fire from trackingService.js
+    console.log('🚫 Route changed to', location.pathname, '- NOT firing automatic PageView');
+  }, [location]);
+
+  return null;
+}
+
 
 function App() {
   const navigate = useNavigate();
@@ -387,6 +408,7 @@ const handleConfirmBooking = async (bookingDetails) => {
   return (
     <>
     <ScrollToTop />
+    <PreventAutoPageView />
       <Routes>
         <Route path="/" element={
           <BookingPage
