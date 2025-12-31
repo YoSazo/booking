@@ -5,6 +5,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
 import TestimonialTrigger from './TestimonialTrigger.jsx';
 import TestimonialPlayer from './TestimonialPlayer.jsx';
+import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PaymentInfoModal from './PaymentInfoModal.jsx';
@@ -47,6 +48,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isProcessingTrial, setIsProcessingTrial] = useState(false);
+    const [showLoadingScreen, setShowLoadingScreen] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
@@ -1056,6 +1058,9 @@ const handlePayLaterBooking = async (e) => {
             throw new Error("Failed to create pre-authorization hold");
         }
 
+        // Show loading screen
+        setShowLoadingScreen(true);
+        
         // Process payment based on method
         if (paymentMethod === 'card') {
             // Authorize the hold (doesn't charge)
@@ -1080,6 +1085,7 @@ const handlePayLaterBooking = async (e) => {
             if (error) {
                 setErrorMessage(error.message || "Card authorization failed");
                 setIsProcessing(false);
+                setShowLoadingScreen(false);
             } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
                 // Hold successfully placed - now create the booking
                 const bookingResponse = await fetch(`${apiBaseUrl}/api/complete-pay-later-booking`, {
@@ -1104,6 +1110,7 @@ const handlePayLaterBooking = async (e) => {
                 } else {
                     setErrorMessage(bookingResult.message || "Failed to create booking");
                     setIsProcessing(false);
+                    setShowLoadingScreen(false);
                 }
             }
         } else if (paymentMethod === 'wallet') {
@@ -1279,6 +1286,8 @@ const handlePayLaterBooking = async (e) => {
 
     return (
         <>
+            {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
+            
             <div className="static-banner">
                 ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
             </div>
@@ -1506,19 +1515,147 @@ const handlePayLaterBooking = async (e) => {
                 )}
 
                 {currentStep === 1 && (
-                    <div className="info-summary-wrapper">
-                        <div className="summary-card-details">
-                            <p className="detail-line">{bookingDetails.name}</p>
-                            <p className="detail-line">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</p>
-                            <p className="detail-line">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</p>
+                    <div className="modern-review-cart-wrapper">
+                        {/* Reservation Details Card */}
+                        <div className="modern-card reservation-details-card">
+                            <div className="card-header">
+                                <h2>Reservation Details</h2>
+                                <button 
+                                    type="button"
+                                    onClick={handleBackStep} 
+                                    className="edit-button"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                    Edit
+                                </button>
+                            </div>
+                            
+                            <div className="details-grid">
+                                <div className="detail-item">
+                                    <div className="detail-icon calendar-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                            <line x1="16" y1="2" x2="16" y2="6"/>
+                                            <line x1="8" y1="2" x2="8" y2="6"/>
+                                            <line x1="3" y1="10" x2="21" y2="10"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="detail-label">Room Type</div>
+                                        <div className="detail-value">{bookingDetails.name}</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="detail-item">
+                                    <div className="detail-icon users-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                            <circle cx="9" cy="7" r="4"/>
+                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="detail-label">Guests</div>
+                                        <div className="detail-value">{bookingDetails.guests} {bookingDetails.guests > 1 ? 'Guests' : 'Guest'}</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="detail-item">
+                                    <div className="detail-icon pets-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <circle cx="11" cy="4" r="2"/>
+                                            <circle cx="18" cy="8" r="2"/>
+                                            <circle cx="20" cy="16" r="2"/>
+                                            <circle cx="9" cy="10" r="2"/>
+                                            <path d="M8.5 13.5c0 0-1.5 2-1.5 4.5s1.5 2.5 2.5 2.5 2.5 0 2.5-2.5-1.5-4.5-1.5-4.5"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="detail-label">Pets</div>
+                                        <div className="detail-value">{bookingDetails.pets} {bookingDetails.pets === 1 ? 'Pet' : 'Pets'}</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="detail-item">
+                                    <div className="detail-icon nights-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="detail-label">Duration</div>
+                                        <div className="detail-value">{bookingDetails.nights} Nights</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="dates-section">
+                                <div className="date-row">
+                                    <span className="date-label">Check-in</span>
+                                    <span className="date-value">{new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                </div>
+                                <div className="date-row">
+                                    <span className="date-label">Check-out</span>
+                                    <span className="date-value">{new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="summary-card-price">
-                            <p className="price-line"><strong>{bookingDetails.nights}</strong> Nights</p>
-                            <p className="price-line">Subtotal: <strong>${bookingDetails.subtotal.toFixed(2)}</strong></p>
-                            <p className="price-line">Taxes & Fees: <strong>${bookingDetails.taxes.toFixed(2)}</strong></p>
-                            <div className="total-breakdown">
-                                <p className="pay-today">Reserve for $0 Today</p>
-                                <p className="balance-due">Pay ${bookingDetails.total.toFixed(2)} When You Arrive</p>
+                        
+                        {/* Price Breakdown Card */}
+                        <div className="modern-card price-breakdown-card">
+                            <div className="card-header">
+                                <h2>Price Breakdown</h2>
+                            </div>
+                            
+                            <div className="price-items">
+                                <div className="price-row">
+                                    <span>Room ({bookingDetails.nights} nights)</span>
+                                    <span className="price-value">${bookingDetails.subtotal.toFixed(2)}</span>
+                                </div>
+                                
+                                <div className="price-row">
+                                    <div className="price-label-with-info">
+                                        <span>Taxes & Fees</span>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <line x1="12" y1="16" x2="12" y2="12"/>
+                                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                                        </svg>
+                                    </div>
+                                    <span className="price-value">${bookingDetails.taxes.toFixed(2)}</span>
+                                </div>
+                                
+                                <div className="price-total-row">
+                                    <span className="total-label">Total</span>
+                                    <span className="total-value">${bookingDetails.total.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            
+                            {/* Reserve for $0 Box */}
+                            <div className="reserve-zero-box">
+                                <div className="reserve-header">
+                                    <div className="shield-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="reserve-title">Reserve for $0 Today</div>
+                                        <div className="reserve-subtitle">No payment required now</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="due-at-arrival">
+                                    <div className="due-row">
+                                        <span>Due at arrival:</span>
+                                        <span className="due-amount">${bookingDetails.total.toFixed(2)}</span>
+                                    </div>
+                                    <div className="due-date">Pay when you check in on {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
