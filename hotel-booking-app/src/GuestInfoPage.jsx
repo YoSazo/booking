@@ -1662,12 +1662,35 @@ const handlePayLaterBooking = async (e) => {
                 )}
                 
                 <form id="main-checkout-form" onSubmit={handleCardSubmit} noValidate>
-                    <div className="form-wrapper" style={{ display: currentStep === 2 ? 'block' : 'none' }}>
-                        <div className="form-field"><label>First Name <span style={{ color: 'red' }}>*</span></label><input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />{formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}</div>
-                        <div className="form-field"><label>Last Name <span style={{ color: 'red' }}>*</span></label><input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />{formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}</div>
-                        <div className="form-field"><label>Phone Number <span style={{ color: 'red' }}>*</span></label><input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} required />{formErrors.phone && <span className="error-message">{formErrors.phone}</span>}</div>
-                        <div className="form-field"><label>Email Address <span style={{ color: 'red' }}>*</span></label><input type="email" name="email" value={formData.email} onChange={handleChange} required />{formErrors.email && <span className="error-message">{formErrors.email}</span>}</div>
-                    </div>
+                    {currentStep === 2 && (
+                        <div className="modern-card guest-info-card">
+                            <div className="card-header">
+                                <h2>Contact Information</h2>
+                            </div>
+                            <div className="info-form-fields">
+                                <div className="form-field">
+                                    <label>First Name <span style={{ color: 'red' }}>*</span></label>
+                                    <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
+                                    {formErrors.firstName && <span className="error-message">{formErrors.firstName}</span>}
+                                </div>
+                                <div className="form-field">
+                                    <label>Last Name <span style={{ color: 'red' }}>*</span></label>
+                                    <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />
+                                    {formErrors.lastName && <span className="error-message">{formErrors.lastName}</span>}
+                                </div>
+                                <div className="form-field">
+                                    <label>Phone Number <span style={{ color: 'red' }}>*</span></label>
+                                    <input type="tel" name="phone" value={formData.phone} onChange={handlePhoneChange} required />
+                                    {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
+                                </div>
+                                <div className="form-field">
+                                    <label>Email Address <span style={{ color: 'red' }}>*</span></label>
+                                    <input type="email" name="email" value={formData.email} onChange={handleChange} required />
+                                    {formErrors.email && <span className="error-message">{formErrors.email}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="payment-wrapper" style={{ display: currentStep === 4 ? 'block' : 'none' }}>
   <div className="stripe-badge-container">

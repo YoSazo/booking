@@ -3292,3 +3292,58 @@ padding: 6px 16px;
   .loading-spinner { width: 60px; height: 60px; }
   .loading-message { font-size: 1.25rem; }
 }
+
+/* Info Form Card Styles */
+.guest-info-card {
+  margin-bottom: 20px;
+}
+
+.info-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.info-form-fields .form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-form-fields .form-field label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.info-form-fields .form-field input {
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.info-form-fields .form-field input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.info-form-fields .form-field input:hover {
+  border-color: #9ca3af;
+}
+
+.info-form-fields .error-message {
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .info-form-fields {
+    grid-template-columns: 1fr;
+  }
+}
