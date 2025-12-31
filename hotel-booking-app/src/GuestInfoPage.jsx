@@ -49,6 +49,13 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isProcessing, setIsProcessing] = useState(false);
     const [isProcessingTrial, setIsProcessingTrial] = useState(false);
     const [showLoadingScreen, setShowLoadingScreen] = useState(false);
+    
+    // Auto-hide loading screen when processing finishes
+    useEffect(() => {
+        if (!isProcessing && !isProcessingTrial) {
+            setShowLoadingScreen(false);
+        }
+    }, [isProcessing, isProcessingTrial]);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
@@ -592,6 +599,7 @@ useEffect(() => {
         }
 
         setIsProcessing(true);
+        setShowLoadingScreen(true);
         setErrorMessage(''); // Clear previous errors before a new attempt
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(formData));
@@ -634,6 +642,7 @@ useEffect(() => {
         if (error) {
             setErrorMessage(error.message || "An unexpected error occurred.");
             setIsProcessing(false);
+            setShowLoadingScreen(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
             onComplete(formData, paymentIntent.id);
         }
@@ -662,6 +671,7 @@ useEffect(() => {
     }
 
     setIsProcessing(true);
+    setShowLoadingScreen(true);
     setErrorMessage('');
 
     // Get original booking from sessionStorage
@@ -828,6 +838,7 @@ const handleTrialNightBooking = async (e) => {
     }
 
     setIsProcessingTrial(true);
+    setShowLoadingScreen(true);
     setErrorMessage('');
 
     // ✅ CRITICAL FIX: Get ORIGINAL booking from sessionStorage to preserve full stay data
