@@ -176,10 +176,11 @@ useEffect(() => {
   }
   
   // Smooth scroll down on Step 2 (Info page) to show form better
+  // Wait longer to ensure DOM is fully loaded (especially on Android)
   if (currentStep === 2) {
     setTimeout(() => {
       window.scrollTo({ top: 200, behavior: 'smooth' });
-    }, 100);
+    }, 300);
   }
 }, [currentStep, bookingDetails]);
 
