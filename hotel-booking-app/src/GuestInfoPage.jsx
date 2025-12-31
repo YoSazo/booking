@@ -175,6 +175,13 @@ useEffect(() => {
     }, 100);
   }
   
+  // Smooth scroll to top on Step 2 (Info page) so form is visible
+  if (currentStep === 2) {
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+  }
+  
 }, [currentStep, bookingDetails]);
 
 // Auto-scroll to error message when it appears
