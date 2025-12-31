@@ -3,7 +3,7 @@ export const hotelData = {
   'guest-lodge-minot': {
     name: 'Guest Lodge Minot',
     url: 'https://www.myhomeplacesuites.com',
-    subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
+    subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
     address: '1937 N Broadway, Minot, ND 58703',
     phone: '(701) 289-5992',
     pms: 'bookingcenter',
@@ -50,7 +50,7 @@ export const hotelData = {
   'home-place-suites': {
     name: 'Home Place Suites',
     url: 'https://www.myhomeplacesuites.com',
-    subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
+    subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
     phone: '(918) 212-6296',
     address: '1410 SE Washington Blvd Suite 2, Bartlesville, OK 74006',
     pms: 'Cloudbeds',
@@ -132,7 +132,7 @@ export const hotelData = {
   'suite-stay': {
     name: 'Suite Stay',
     url: 'clickinns.com',
-    subtitle: 'No Leases. No Background Checks. No Credit Checks. Just Simple Extended Living.',
+    subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
     phone: '256-207-8086',
     address: '65600 AL-77, Talladega, AL 35160',
     pms: 'Cloudbeds',
