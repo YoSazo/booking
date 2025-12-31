@@ -191,31 +191,6 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
     const { paymentIntentId, guestInfo, bookingDetails, hotelId } = req.body;
 
     try {
-        // Check if booking already exists (idempotency check)
-        // Wrap in try-catch in case DB is cold starting
-        let existingBooking = null;
-        try {
-            existingBooking = await prisma.booking.findFirst({
-                where: {
-                    OR: [
-                        { stripePaymentIntentId: paymentIntentId },
-                        { ourReservationCode: bookingDetails.reservationCode }
-                    ]
-                }
-            });
-        } catch (dbError) {
-            console.log('⚠️ DB connection slow (cold start). Proceeding with booking creation.');
-        }
-
-        if (existingBooking) {
-            console.log('⚠️ Booking already exists. Returning success without creating duplicate.');
-            return res.json({
-                success: true,
-                message: 'Reservation already created.',
-                reservationCode: existingBooking.pmsConfirmationCode
-            });
-        }
-
         // Verify the payment intent is authorized (not captured)
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
         
@@ -269,7 +244,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         if (pmsResponse.data.success) {
             // Save to database with retry logic for cold starts
             let dbSaveSuccess = false;
-            let retries = 3;
+            let retries = 2; // Reduced from 3 to 2 for faster booking
             
             while (!dbSaveSuccess && retries > 0) {
                 try {
@@ -306,7 +281,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         dbSaveSuccess = true;
                     } else if (retries > 0) {
                         console.log(`⚠️ DB save failed, retrying... (${retries} attempts left)`);
-                        await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds before retry
+                        await new Promise(r => setTimeout(r, 500)); // Wait 0.5 seconds before retry
                     } else {
                         console.error('❌ Failed to save to database after retries:', dbError.message);
                         // Don't fail the whole booking - Cloudbeds booking succeeded
