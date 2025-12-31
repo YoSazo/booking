@@ -72,8 +72,45 @@ function ScrollToTop() {
 function PreventAutoPageView() {
   const location = useLocation();
   const isFirstRender = React.useRef(true);
+  const hasOverridden = React.useRef(false);
 
   useEffect(() => {
+    // Override Meta Pixel's automatic PageView tracking (only once)
+    if (!hasOverridden.current && typeof window !== 'undefined' && window.fbq) {
+      hasOverridden.current = true;
+      
+      // Store original fbq function
+      const originalFbq = window.fbq;
+      
+      // Override fbq to block automatic PageView events
+      window.fbq = function() {
+        const command = arguments[0];
+        const eventName = arguments[1];
+        
+        // Block automatic PageView events, but allow manual ones and other events
+        if (command === 'track' && eventName === 'PageView' && arguments.length === 2) {
+          // This is an automatic PageView (no parameters)
+          // Check if it's from a route change (not the initial load)
+          if (!isFirstRender.current) {
+            console.log('🚫 Blocked automatic PageView from SPA route change');
+            return;
+          }
+        }
+        
+        // Allow all other fbq calls through
+        return originalFbq.apply(this, arguments);
+      };
+      
+      // Preserve fbq properties
+      for (let prop in originalFbq) {
+        if (originalFbq.hasOwnProperty(prop)) {
+          window.fbq[prop] = originalFbq[prop];
+        }
+      }
+      
+      console.log('✅ Meta Pixel: Automatic PageView blocking enabled for SPA');
+    }
+
     // Skip the first render (initial PageView already fired in index.html)
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -81,9 +118,8 @@ function PreventAutoPageView() {
       return;
     }
 
-    // On subsequent route changes, DON'T fire automatic PageView
-    // Your custom events (Search, AddToCart, InitiateCheckout, Purchase) fire from trackingService.js
-    console.log('🚫 Route changed to', location.pathname, '- NOT firing automatic PageView');
+    // On subsequent route changes, automatic PageView is now blocked
+    console.log('🚫 Route changed to', location.pathname, '- Automatic PageView blocked');
   }, [location]);
 
   return null;

@@ -113,12 +113,11 @@
     t.src=v;s=b.getElementsByTagName(e)[0];
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '1199632701644095', {
-      autoConfig: false,  // Disable automatic event tracking
-      debug: false
-    });
-    // Only track PageView on initial load, not on every route change
+    fbq('init', '1199632701644095');
     fbq('track', 'PageView');
+    
+    // Disable automatic PageView tracking for SPA route changes
+    fbq('set', 'autoConfig', false, '1199632701644095');
     </script>
     <!-- The <noscript> tag will be moved to the body -->
     <!-- End Meta Pixel Code -->
