@@ -147,6 +147,29 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showUpsell = nights > 0 && nights < 7 && !upsellDeclined;
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
+  // Dynamically adjust calendar body padding based on footer height
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const adjustPadding = () => {
+      const footer = document.querySelector('.calendar-modal-footer');
+      const body = document.querySelector('.calendar-modal-body');
+      
+      if (footer && body) {
+        const footerHeight = footer.offsetHeight;
+        body.style.paddingBottom = `${footerHeight + 20}px`; // Footer height + 20px buffer
+      }
+    };
+    
+    // Adjust on open and when content changes
+    adjustPadding();
+    
+    // Re-adjust after a short delay (for animations/rendering)
+    const timer = setTimeout(adjustPadding, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isOpen, showUpsell, showShortStayPrice, nights]);
+
   return (
     <div className={`calendar-modal-fullscreen ${isOpen ? 'open' : ''}`}>
       <div className="calendar-modal-overlay" onClick={onClose}></div>
