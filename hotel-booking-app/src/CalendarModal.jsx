@@ -198,22 +198,19 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   useEffect(() => {
     if (!isOpen || nights === 0) return;
     
+    // Don't scroll if upsell is showing - wait for user response
+    if (showUpsell) return;
+    
     const scrollToPricing = () => {
       const body = document.querySelector('.calendar-modal-body');
       const pricingSection = document.querySelector('.calendar-price-breakdown');
       
       if (body && pricingSection) {
-        // Scroll to show the pricing section
+        // Scroll to show the pricing section (weekly/monthly discount or short stay total)
         pricingSection.scrollIntoView({ 
           behavior: 'smooth', 
           block: 'nearest',
           inline: 'nearest'
-        });
-      } else if (body && nights > 0) {
-        // If no pricing section yet (short stay before declining), scroll to bottom
-        body.scrollTo({
-          top: body.scrollHeight,
-          behavior: 'smooth'
         });
       }
     };
