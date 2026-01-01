@@ -148,22 +148,44 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
 
   return (
-    <div className={`calendar-modal ${isOpen ? 'open' : ''}`} onClick={onClose}>
-      <div className="calendar-container" onClick={(e) => e.stopPropagation()}>
-        <div className="calendar-scroll-area">
-          <div className="calendar-header">
-            <button onClick={() => changeMonth(-1)}>&lt;</button>
-            <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-            <button onClick={() => changeMonth(1)}>&gt;</button>
-          </div>
-          <div className="calendar-grid">
-            <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
-          </div>
-          <div className="calendar-grid">{renderDays()}</div>
+    <div className={`calendar-modal-fullscreen ${isOpen ? 'open' : ''}`}>
+      <div className="calendar-modal-overlay" onClick={onClose}></div>
+      <div className="calendar-modal-content">
+        {/* Header with Close Button */}
+        <div className="calendar-modal-header">
+          <h2>Select Your Dates</h2>
+          <button className="calendar-close-btn" onClick={onClose}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
-        <div className="modal-actions-footer">
-          <div className="price-card">
-            <div className="calendar-price-badge">
+
+        {/* Scrollable Content Area */}
+        <div className="calendar-modal-body">
+          <div className="calendar-content-wrapper">
+            {/* Month Navigation */}
+            <div className="calendar-header">
+              <button onClick={() => changeMonth(-1)}>&lt;</button>
+              <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+              <button onClick={() => changeMonth(1)}>&gt;</button>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="calendar-grid">
+              <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
+            </div>
+            <div className="calendar-grid">{renderDays()}</div>
+
+            {/* Quick Book Buttons */}
+            <div className="calendar-quick-book-buttons">
+              <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
+              <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
+            </div>
+
+            {/* Pricing Display */}
+            <div className="calendar-price-section">
               {showUpsell ? (
                 <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
               ) : showShortStayPrice ? (
@@ -192,11 +214,13 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               ) : ( <PriceBadge nights={nights} rates={rates} /> )}
             </div>
           </div>
-          <div className="calendar-footer-buttons">
-            <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
-            <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
-            <button className="btn" onClick={handleDone}>Done</button>
-          </div>
+        </div>
+
+        {/* Sticky Footer with Done Button */}
+        <div className="calendar-modal-footer">
+          <button className="calendar-done-btn" onClick={handleDone}>
+            Done
+          </button>
         </div>
       </div>
     </div>
