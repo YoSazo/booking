@@ -3622,19 +3622,39 @@ padding: 6px 16px;
   width: 100%;
 }
 
-.calendar-day {
+/* Calendar day cells in modal - override old styles */
+.calendar-modal-fullscreen .calendar-day {
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
+  border-radius: 6px; /* Slightly rounded for modern look */
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 500;
-  transition: all 0.2s ease;
-  min-height: 32px; /* Extra compact */
+  transition: all 0.15s ease;
+  min-height: 32px;
   max-width: 100%;
-  overflow: hidden;
+  position: relative;
+  background: transparent;
+}
+
+/* Remove the calendar-day-content wrapper interference */
+.calendar-modal-fullscreen .calendar-day-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: transparent;
+  z-index: 1;
+}
+
+/* Remove pseudo-element interference */
+.calendar-modal-fullscreen .calendar-day::before,
+.calendar-modal-fullscreen .calendar-day::after {
+  display: none;
 }
 
 .calendar-day-name {
@@ -3645,29 +3665,34 @@ padding: 6px 16px;
   text-align: center;
 }
 
-.calendar-day:hover:not(.disabled) {
+.calendar-modal-fullscreen .calendar-day:hover:not(.disabled):not(.selected-start):not(.selected-end):not(.in-range) {
   background: #f3f4f6;
   transform: scale(1.05);
 }
 
-.calendar-day.selected-start,
-.calendar-day.selected-end {
+/* Selected dates - clean square design */
+.calendar-modal-fullscreen .calendar-day.selected-start,
+.calendar-modal-fullscreen .calendar-day.selected-end {
   background: #3b82f6;
   color: white;
+  border-radius: 6px; /* Consistent rounded corners */
 }
 
-.calendar-day.in-range {
+.calendar-modal-fullscreen .calendar-day.in-range {
   background: #dbeafe;
   color: #1e40af;
+  border-radius: 6px;
 }
 
-.calendar-day.today {
+.calendar-modal-fullscreen .calendar-day.today {
   border: 2px solid #3b82f6;
+  box-sizing: border-box;
 }
 
-.calendar-day.disabled {
+.calendar-modal-fullscreen .calendar-day.disabled {
   color: #d1d5db;
   cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* Quick Book Buttons - In Footer */
