@@ -200,47 +200,65 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
             </div>
             <div className="calendar-grid">{renderDays()}</div>
+
+            {/* Price Comparison in Body (Scrollable) */}
+            {nights >= 7 && (
+              <div className="calendar-price-breakdown">
+                <div className="calendar-price-comparison">
+                  <div className="calendar-original-price">
+                    <span className="price-label">Original Price (at ${rates.NIGHTLY}/night):</span>
+                    <span className="strikethrough-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
+                  </div>
+                  <div className="calendar-savings-badge">
+                    ⬇️ Save ${((nights * rates.NIGHTLY) - (nights >= 30 ? rates.MONTHLY : rates.WEEKLY)).toFixed(2)}!
+                  </div>
+                  <div className="calendar-discounted-price">
+                    <span className="price-label">{nights >= 30 ? 'Monthly' : 'Weekly'} Discount Total:</span>
+                    <span className="discount-price">${(nights >= 30 ? rates.MONTHLY : rates.WEEKLY).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Short Stay Total in Body (Scrollable) */}
+            {nights > 0 && nights < 7 && upsellDeclined && (
+              <div className="calendar-price-breakdown">
+                <div className="calendar-price-comparison">
+                  <div className="calendar-total-price">
+                    <span className="price-label">Total Price:</span>
+                    <span className="total-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Sticky Footer with Quick Book Buttons + Pricing + Done Button */}
+        {/* Sticky Footer with Quick Book Buttons + Reserve CTA + Done Button */}
         <div className="calendar-modal-footer">
           <div className="calendar-footer-content">
-            {/* Quick Book Buttons - Always visible at top of footer */}
+            {/* Quick Book Buttons */}
             <div className="calendar-quick-book-buttons">
               <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
               <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
             </div>
             
-            {/* Pricing Display */}
-            <div className="calendar-price-section">
-              {showUpsell ? (
-                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-              ) : showShortStayPrice ? (
-                <div className="calendar-pricing-wrapper">
-                  {/* Short Stay Pricing */}
-                  <div className="calendar-price-comparison">
-                    <div className="calendar-total-price">
-                      <span className="price-label">Total Price:</span>
-                      <span className="total-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
-                    </div>
-                  </div>
-                  
-                  {/* Reserve for $0 Box */}
-                  <div className="calendar-reserve-zero-box">
-                    <div className="reserve-icon-circle">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="reserve-title">Reserve for $0 Today</div>
-                      <div className="reserve-subtitle">Pay ${(nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
-                    </div>
-                  </div>
+            {/* Upsell OR Reserve CTA */}
+            {showUpsell ? (
+              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+            ) : nights > 0 && (
+              <div className="calendar-reserve-zero-box">
+                <div className="reserve-icon-circle">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                  </svg>
                 </div>
-              ) : ( <PriceBadge nights={nights} rates={rates} /> )}
-            </div>
+                <div>
+                  <div className="reserve-title">Reserve for $0 Today</div>
+                  <div className="reserve-subtitle">Pay ${nights >= 7 ? (nights >= 30 ? rates.MONTHLY : rates.WEEKLY).toFixed(2) : (nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
+                </div>
+              </div>
+            )}
             
             {/* Done Button */}
             <button className="calendar-done-btn" onClick={handleDone}>
