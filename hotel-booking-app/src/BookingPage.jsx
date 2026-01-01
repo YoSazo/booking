@@ -123,8 +123,6 @@ function BookingPage({
         checkoutDate={checkoutDate}
         rates={rates}
       />
-
-      {!isCalendarOpen && <HelpWidget phone={hotel.phone} />}
     </>
   );
 }
