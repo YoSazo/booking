@@ -3347,3 +3347,144 @@ padding: 6px 16px;
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================
+   CALENDAR MODAL PRICING STYLES
+======================================== */
+
+.calendar-pricing-wrapper {
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+}
+
+/* Price Comparison Card */
+.calendar-price-comparison {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.calendar-original-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.calendar-original-price .price-label {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.strikethrough-price {
+  font-size: 1rem;
+  color: #dc2626;
+  text-decoration: line-through;
+  font-weight: 600;
+}
+
+.calendar-savings-badge {
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #059669;
+  padding: 6px;
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.calendar-discounted-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.calendar-discounted-price .price-label {
+  font-size: 0.85rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.discount-price {
+  font-size: 1.3rem;
+  color: #059669;
+  font-weight: 700;
+}
+
+/* Short Stay Total Price */
+.calendar-total-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-total-price .price-label {
+  font-size: 0.9rem;
+  color: #374151;
+  font-weight: 600;
+}
+
+.total-price {
+  font-size: 1.3rem;
+  color: #111827;
+  font-weight: 700;
+}
+
+/* Reserve for  Box */
+.calendar-reserve-zero-box {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.reserve-icon-circle {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.calendar-reserve-zero-box .reserve-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 2px;
+}
+
+.calendar-reserve-zero-box .reserve-subtitle {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .calendar-pricing-wrapper {
+    padding: 12px;
+  }
+  
+  .calendar-reserve-zero-box {
+    padding: 12px;
+  }
+  
+  .reserve-icon-circle {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .calendar-reserve-zero-box .reserve-title {
+    font-size: 1rem;
+  }
+}

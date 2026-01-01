@@ -167,10 +167,27 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               {showUpsell ? (
                 <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
               ) : showShortStayPrice ? (
-                <div style={{ padding: '12px', textAlign: 'center', fontSize: '16px', lineHeight: '1.4' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>Total Price: ${(nights * rates.NIGHTLY).toFixed(2)}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>Reserve for $0 Today</div>
-                  <div style={{ fontSize: '16px', color: '#666', marginTop: '8px' }}>Pay ${(nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
+                <div className="calendar-pricing-wrapper">
+                  {/* Short Stay Pricing */}
+                  <div className="calendar-price-comparison">
+                    <div className="calendar-total-price">
+                      <span className="price-label">Total Price:</span>
+                      <span className="total-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Reserve for $0 Box */}
+                  <div className="calendar-reserve-zero-box">
+                    <div className="reserve-icon-circle">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="reserve-title">Reserve for $0 Today</div>
+                      <div className="reserve-subtitle">Pay ${(nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
+                    </div>
+                  </div>
                 </div>
               ) : ( <PriceBadge nights={nights} rates={rates} /> )}
             </div>

@@ -33,19 +33,36 @@ function PriceBadge({ nights, rates }) {
   const originalTotal = (nights * rates.NIGHTLY).toFixed(2);
   const half = (discountedTotal / 2).toFixed(2);
 
+  const savings = (originalTotal - discountedTotal).toFixed(2);
+  
   return (
-    <div style={{ padding: '12px', background: '#f8f9fa', textAlign: 'center', fontSize: '16px', lineHeight: '1.4', borderRadius: '6px' }}>
-      <div style={{ fontSize: '14px', color: '#888', marginBottom: '5px' }}>
-        Original Price (at ${rates.NIGHTLY}/night): <del>${originalTotal}</del>
+    <div className="calendar-pricing-wrapper">
+      {/* Price Comparison */}
+      <div className="calendar-price-comparison">
+        <div className="calendar-original-price">
+          <span className="price-label">Original Price (at ${rates.NIGHTLY}/night):</span>
+          <span className="strikethrough-price">${originalTotal}</span>
+        </div>
+        <div className="calendar-savings-badge">
+          ⬇️ Save ${savings}!
+        </div>
+        <div className="calendar-discounted-price">
+          <span className="price-label">Weekly Discount Total:</span>
+          <span className="discount-price">${discountedTotal}</span>
+        </div>
       </div>
-      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>
-        Your Discounted Total: ${discountedTotal}
-      </div>
-      <div style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--success-color)', marginTop: '10px' }}>
-        Reserve for $0 Today
-      </div>
-      <div style={{ fontSize: '16px', color: '#666', marginTop: '8px' }}>
-        Pay ${discountedTotal} When You Arrive
+      
+      {/* Reserve for $0 Box */}
+      <div className="calendar-reserve-zero-box">
+        <div className="reserve-icon-circle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+          </svg>
+        </div>
+        <div>
+          <div className="reserve-title">Reserve for $0 Today</div>
+          <div className="reserve-subtitle">Pay ${discountedTotal} When You Arrive</div>
+        </div>
       </div>
     </div>
   );
