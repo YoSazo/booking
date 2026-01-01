@@ -3689,6 +3689,11 @@ padding: 6px 16px;
   color: white;
 }
 
+.calendar-quick-book-buttons .quick-book-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
 /* Sticky Footer - Compact */
 .calendar-modal-footer {
   position: sticky;
@@ -3709,10 +3714,13 @@ padding: 6px 16px;
   margin: 0 auto;
 }
 
-/* Price Section - Inside Footer (After Quick Book Buttons) */
-.calendar-modal-footer .calendar-price-section {
-  margin-bottom: 12px;
-  margin-top: 0; /* No extra margin since buttons are above */
+/* Reserve Box in Footer - Add Spacing from Done Button */
+.calendar-modal-footer .calendar-reserve-zero-box {
+  margin-bottom: 16px; /* Space above Done button */
+}
+
+.calendar-modal-footer .upsell-prompt {
+  margin-bottom: 16px; /* Space for upsell too */
 }
 
 .calendar-done-btn {

@@ -8,6 +8,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
   const [upsellDeclined, setUpsellDeclined] = useState(false);
+  const [activeQuickBook, setActiveQuickBook] = useState(null); // Track which quick book button was clicked
 
   useEffect(() => {
     if (isOpen) {
@@ -15,6 +16,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       setEndDate(initialCheckout);
       setCurrentDate(initialCheckin || new Date());
       setUpsellDeclined(false);
+      setActiveQuickBook(null); // Reset quick book highlighting
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
@@ -41,6 +43,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         setStartDate(normalizedDay);
         setEndDate(null);
         setUpsellDeclined(false);
+        setActiveQuickBook(null); // Clear quick book highlighting when manually selecting
         return;
     }
     
@@ -54,11 +57,13 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
             // Set as end date
             setEndDate(normalizedDay);
             setUpsellDeclined(false);
+            setActiveQuickBook(null); // Clear quick book highlighting
         } else {
             // Clicking same or earlier date resets
             setStartDate(normalizedDay);
             setEndDate(null);
             setUpsellDeclined(false);
+            setActiveQuickBook(null); // Clear quick book highlighting
         }
     }
 };
@@ -83,6 +88,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     setStartDate(start);
     setEndDate(newEndDate);
     setUpsellDeclined(false);
+    setActiveQuickBook('month'); // Mark month button as active
   };
 
   const handleBookWeek = () => {
@@ -93,6 +99,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     setStartDate(start);
     setEndDate(newEndDate);
     setUpsellDeclined(false);
+    setActiveQuickBook('week'); // Mark week button as active
   };
 
   const handleUpsellConfirm = () => {
@@ -239,8 +246,18 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
           <div className="calendar-footer-content">
             {/* Quick Book Buttons */}
             <div className="calendar-quick-book-buttons">
-              <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
-              <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
+              <button 
+                className={`quick-book-btn ${activeQuickBook === 'week' ? 'active' : ''}`} 
+                onClick={handleBookWeek}
+              >
+                Book 1 Week
+              </button>
+              <button 
+                className={`quick-book-btn ${activeQuickBook === 'month' ? 'active' : ''}`} 
+                onClick={handleBookMonth}
+              >
+                Book 1 Month
+              </button>
             </div>
             
             {/* Upsell OR Reserve CTA */}
