@@ -194,12 +194,16 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     return () => clearTimeout(timer);
   }, [isOpen, showUpsell, showShortStayPrice, nights]);
 
-  // Smooth scroll to pricing section when dates are selected
+  // Smooth scroll to pricing section when dates are selected (mobile only)
   useEffect(() => {
     if (!isOpen || nights === 0) return;
     
     // Don't scroll if upsell is showing - wait for user response
     if (showUpsell) return;
+    
+    // Only auto-scroll on mobile devices (where screen space is limited)
+    const isMobile = window.innerWidth <= 768;
+    if (!isMobile) return;
     
     const scrollToPricing = () => {
       const body = document.querySelector('.calendar-modal-body');
