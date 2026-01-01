@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PriceBadge from './PriceBadge.jsx';
 import UpsellPrompt from './UpsellPrompt.jsx';
 import { trackSearch } from './trackingService.js';
+import { calculateTieredPrice } from './priceCalculator.js';
 
 function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initialCheckout, rates }) {
   const [startDate, setStartDate] = useState(initialCheckin);
@@ -265,23 +266,29 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
             )}
 
             {/* Price Comparison in Body (Scrollable) */}
-            {nights >= 7 && (
-              <div className="calendar-price-breakdown">
-                <div className="calendar-price-comparison">
-                  <div className="calendar-original-price">
-                    <span className="price-label">Original Price (at ${rates.NIGHTLY}/night):</span>
-                    <span className="strikethrough-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
-                  </div>
-                  <div className="calendar-savings-badge">
-                    ⬇️ Save ${((nights * rates.NIGHTLY) - (nights >= 28 ? rates.MONTHLY : rates.WEEKLY)).toFixed(2)}!
-                  </div>
-                  <div className="calendar-discounted-price">
-                    <span className="price-label">{nights >= 28 ? 'Monthly' : 'Weekly'} Discount Total:</span>
-                    <span className="discount-price">${(nights >= 28 ? rates.MONTHLY : rates.WEEKLY).toFixed(2)}</span>
+            {nights >= 7 && (() => {
+              const originalPrice = nights * rates.NIGHTLY;
+              const discountedPrice = calculateTieredPrice(nights, rates);
+              const savings = originalPrice - discountedPrice;
+              
+              return (
+                <div className="calendar-price-breakdown">
+                  <div className="calendar-price-comparison">
+                    <div className="calendar-original-price">
+                      <span className="price-label">Original Price (at ${rates.NIGHTLY}/night):</span>
+                      <span className="strikethrough-price">${originalPrice.toFixed(2)}</span>
+                    </div>
+                    <div className="calendar-savings-badge">
+                      ⬇️ Save ${savings.toFixed(2)}!
+                    </div>
+                    <div className="calendar-discounted-price">
+                      <span className="price-label">{nights >= 28 ? 'Monthly' : 'Weekly'} Discount Total:</span>
+                      <span className="discount-price">${discountedPrice.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Short Stay Total in Body (Scrollable) */}
             {nights > 0 && nights < 7 && upsellDeclined && (
@@ -328,7 +335,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
                 </div>
                 <div>
                   <div className="reserve-title">Reserve for $0 Today</div>
-                  <div className="reserve-subtitle">Pay ${nights >= 7 ? (nights >= 28 ? rates.MONTHLY : rates.WEEKLY).toFixed(2) : (nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
+                  <div className="reserve-subtitle">Pay ${nights >= 7 ? calculateTieredPrice(nights, rates).toFixed(2) : (nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
                 </div>
               </div>
             )}

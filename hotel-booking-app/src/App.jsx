@@ -10,6 +10,7 @@ import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './tracking
 import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { calculateTieredPrice } from './priceCalculator.js';
 
 
 const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
@@ -18,30 +19,6 @@ const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
-const calculateTieredPrice = (nights, rates) => {
-  if (nights <= 0 || !rates) return 0;
-  if (nights < 7) return nights * rates.NIGHTLY;
-
-  const WEEK_N = +(rates.WEEKLY / 7).toFixed(2);
-  const MONTHLY_NIGHTS_THRESHOLD = 28;  // ✅ Fixed from 30
-
-  let discountedTotalRem = nights;
-  let discountedTotal = 0;
-
-  // Apply monthly rates first
-  discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * rates.MONTHLY;
-  discountedTotalRem %= MONTHLY_NIGHTS_THRESHOLD;
-
-  // Apply weekly rates next
-  discountedTotal += Math.floor(discountedTotalRem / 7) * rates.WEEKLY;
-  discountedTotalRem %= 7;
-
-  // Apply nightly rate for remaining days
-  discountedTotal += discountedTotalRem * WEEK_N;
-
-  return +discountedTotal.toFixed(2);
-};
 
 function ScrollToTop() {
   const { pathname } = useLocation();

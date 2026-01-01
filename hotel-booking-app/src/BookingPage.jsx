@@ -4,6 +4,7 @@ import CalendarModal from './CalendarModal.jsx';
 // import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import HelpWidget from './HelpWidget.jsx';
 import { trackPageView } from './trackingService.js';
+import { calculateTieredPrice } from './priceCalculator.js';
 
 
 function BookingPage({ 
@@ -128,22 +129,5 @@ function BookingPage({
     </>
   );
 }
-
-// A local copy of the calculator is needed here for the RoomCard's fallback display
-const calculateTieredPrice = (nights, rates) => {
-  if (nights <= 0 || !rates) return 0;
-  if (nights === 28) { return rates.MONTHLY; }
-  if (nights < 7) { return nights * rates.NIGHTLY; }
-  const WEEK_N = +(rates.WEEKLY / 7).toFixed(2);
-  const MONTHLY_NIGHTS_THRESHOLD = 30;
-  let discountedTotalRem = nights;
-  let discountedTotal = 0;
-  discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * rates.MONTHLY;
-  discountedTotalRem %= MONTHLY_NIGHTS_THRESHOLD;
-  discountedTotal += Math.floor(discountedTotalRem / 7) * rates.WEEKLY;
-  discountedTotalRem %= 7;
-  discountedTotal += discountedTotalRem * WEEK_N;
-  return +discountedTotal.toFixed(2);
-};
 
 export default BookingPage;
