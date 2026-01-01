@@ -308,9 +308,15 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               </button>
             </div>
             
-            {/* Upsell OR Reserve CTA */}
+            {/* Upsell with Current Price OR Reserve CTA */}
             {showUpsell ? (
-              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+              <>
+                {/* Show current selection total price */}
+                <div className="calendar-current-price-small">
+                  Current selection: <strong>${(nights * rates.NIGHTLY).toFixed(2)}</strong> ({nights} night{nights > 1 ? 's' : ''})
+                </div>
+                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
+              </>
             ) : nights > 0 && (
               <div className="calendar-reserve-zero-box">
                 <div className="reserve-icon-circle">
