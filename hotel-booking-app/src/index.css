@@ -218,8 +218,8 @@ body {
 /* View Photos Button */
 .view-photos-button {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
+  top: 12px;      /* Changed from bottom to top */
+  left: 12px;     /* Changed from right to left */
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   color: white;
