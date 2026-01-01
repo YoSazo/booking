@@ -3787,8 +3787,8 @@ padding: 6px 16px;
     max-width: 700px;
     margin: 0 auto;
     height: auto;
-    max-height: 90vh;
-    margin-top: 5vh;
+    max-height: 95vh; /* Increased from 90vh to give more vertical space */
+    margin-top: 2.5vh; /* Reduced from 5vh to use saved space */
     border-radius: 16px;
     overflow: hidden;
   }
@@ -3803,6 +3803,7 @@ padding: 6px 16px;
   
   .calendar-modal-body {
     padding-bottom: 20px;
+    max-height: none; /* Allow body to expand fully on desktop */
   }
 }
 
