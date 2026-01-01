@@ -273,11 +273,11 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
                     <span className="strikethrough-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
                   </div>
                   <div className="calendar-savings-badge">
-                    ⬇️ Save ${((nights * rates.NIGHTLY) - (nights >= 30 ? rates.MONTHLY : rates.WEEKLY)).toFixed(2)}!
+                    ⬇️ Save ${((nights * rates.NIGHTLY) - (nights >= 28 ? rates.MONTHLY : rates.WEEKLY)).toFixed(2)}!
                   </div>
                   <div className="calendar-discounted-price">
-                    <span className="price-label">{nights >= 30 ? 'Monthly' : 'Weekly'} Discount Total:</span>
-                    <span className="discount-price">${(nights >= 30 ? rates.MONTHLY : rates.WEEKLY).toFixed(2)}</span>
+                    <span className="price-label">{nights >= 28 ? 'Monthly' : 'Weekly'} Discount Total:</span>
+                    <span className="discount-price">${(nights >= 28 ? rates.MONTHLY : rates.WEEKLY).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -328,7 +328,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
                 </div>
                 <div>
                   <div className="reserve-title">Reserve for $0 Today</div>
-                  <div className="reserve-subtitle">Pay ${nights >= 7 ? (nights >= 30 ? rates.MONTHLY : rates.WEEKLY).toFixed(2) : (nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
+                  <div className="reserve-subtitle">Pay ${nights >= 7 ? (nights >= 28 ? rates.MONTHLY : rates.WEEKLY).toFixed(2) : (nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
                 </div>
               </div>
             )}
