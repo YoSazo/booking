@@ -3292,7 +3292,7 @@ padding: 6px 16px;
 .loading-reassurance { font-size: 0.875rem; color: #10b981; font-weight: 600; margin: 0; }
 
 @media (max-width: 768px) {
-  .details-grid { grid-template-columns: 1fr; }
+  /* Keep 2-column grid on mobile for compact layout */
   .loading-screen-content { padding: 30px 20px; }
   .loading-spinner { width: 60px; height: 60px; }
   .loading-message { font-size: 1.25rem; }
