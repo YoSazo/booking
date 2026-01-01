@@ -194,6 +194,36 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     return () => clearTimeout(timer);
   }, [isOpen, showUpsell, showShortStayPrice, nights]);
 
+  // Smooth scroll to pricing section when dates are selected
+  useEffect(() => {
+    if (!isOpen || nights === 0) return;
+    
+    const scrollToPricing = () => {
+      const body = document.querySelector('.calendar-modal-body');
+      const pricingSection = document.querySelector('.calendar-price-breakdown');
+      
+      if (body && pricingSection) {
+        // Scroll to show the pricing section
+        pricingSection.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'nearest',
+          inline: 'nearest'
+        });
+      } else if (body && nights > 0) {
+        // If no pricing section yet (short stay before declining), scroll to bottom
+        body.scrollTo({
+          top: body.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    };
+    
+    // Delay to ensure content is rendered
+    const timer = setTimeout(scrollToPricing, 150);
+    
+    return () => clearTimeout(timer);
+  }, [isOpen, nights, showUpsell, showShortStayPrice]);
+
   return (
     <div className={`calendar-modal-fullscreen ${isOpen ? 'open' : ''}`}>
       <div className="calendar-modal-overlay" onClick={onClose}></div>
