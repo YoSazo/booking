@@ -198,9 +198,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   useEffect(() => {
     if (!isOpen || nights === 0) return;
     
-    // Don't scroll if upsell is showing - wait for user response
-    if (showUpsell) return;
-    
     // Only auto-scroll on mobile devices (where screen space is limited)
     const isMobile = window.innerWidth <= 768;
     if (!isMobile) return;
@@ -210,7 +207,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       const pricingSection = document.querySelector('.calendar-price-breakdown');
       
       if (body && pricingSection) {
-        // Scroll to show the pricing section (weekly/monthly discount or short stay total)
+        // Scroll to show the pricing section (current price, discount, or short stay total)
         pricingSection.scrollIntoView({ 
           behavior: 'smooth', 
           block: 'nearest',
@@ -255,6 +252,17 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
             </div>
             <div className="calendar-grid">{renderDays()}</div>
+
+            {/* Current Selection Price (shown when upsell is active) */}
+            {showUpsell && (
+              <div className="calendar-price-breakdown">
+                <div className="calendar-current-selection">
+                  <span className="price-label">Current selection:</span>
+                  <span className="current-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
+                  <span className="night-count">({nights} night{nights > 1 ? 's' : ''})</span>
+                </div>
+              </div>
+            )}
 
             {/* Price Comparison in Body (Scrollable) */}
             {nights >= 7 && (
@@ -308,15 +316,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               </button>
             </div>
             
-            {/* Upsell with Current Price OR Reserve CTA */}
+            {/* Upsell OR Reserve CTA */}
             {showUpsell ? (
-              <>
-                {/* Show current selection total price */}
-                <div className="calendar-current-price-small">
-                  Current selection: <strong>${(nights * rates.NIGHTLY).toFixed(2)}</strong> ({nights} night{nights > 1 ? 's' : ''})
-                </div>
-                <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-              </>
+              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
             ) : nights > 0 && (
               <div className="calendar-reserve-zero-box">
                 <div className="reserve-icon-circle">

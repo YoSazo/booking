@@ -3766,22 +3766,33 @@ padding: 6px 16px;
   border-radius: 10px;
 }
 
-/* Current price display above upsell */
-.calendar-current-price-small {
-  text-align: center;
-  font-size: 13px;
-  color: #374151;
-  padding: 8px 12px;
+/* Current selection price in scrollable body (when upsell is showing) */
+.calendar-current-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  margin-bottom: 10px;
+  border-radius: 10px;
+  font-size: 14px;
 }
 
-.calendar-current-price-small strong {
+.calendar-current-selection .price-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.calendar-current-selection .current-price {
   color: #1f2937;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
+}
+
+.calendar-current-selection .night-count {
+  color: #9ca3af;
+  font-size: 13px;
 }
 
 .calendar-done-btn {
