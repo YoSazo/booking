@@ -3353,17 +3353,17 @@ padding: 6px 16px;
 ======================================== */
 
 .calendar-pricing-wrapper {
-  padding: 16px;
+  padding: 10px;
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
-/* Price Comparison Card */
+/* Price Comparison Card - Compact */
 .calendar-price-comparison {
   background: #f8f9fa;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
 }
 
 .calendar-original-price {
@@ -3374,12 +3374,12 @@ padding: 6px 16px;
 }
 
 .calendar-original-price .price-label {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: #888;
 }
 
 .strikethrough-price {
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: #dc2626;
   text-decoration: line-through;
   font-weight: 600;
@@ -3387,30 +3387,30 @@ padding: 6px 16px;
 
 .calendar-savings-badge {
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #059669;
-  padding: 6px;
+  padding: 4px;
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border-radius: 8px;
-  margin: 8px 0;
+  border-radius: 6px;
+  margin: 6px 0;
 }
 
 .calendar-discounted-price {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .calendar-discounted-price .price-label {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #059669;
   font-weight: 600;
 }
 
 .discount-price {
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   color: #059669;
   font-weight: 700;
 }
@@ -3434,20 +3434,20 @@ padding: 6px 16px;
   font-weight: 700;
 }
 
-/* Reserve for  Box */
+/* Reserve for $0 Box - Compact */
 .calendar-reserve-zero-box {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 10px;
+  padding: 10px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  gap: 10px;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
 }
 
 .reserve-icon-circle {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
@@ -3457,15 +3457,20 @@ padding: 6px 16px;
   flex-shrink: 0;
 }
 
+.reserve-icon-circle svg {
+  width: 16px;
+  height: 16px;
+}
+
 .calendar-reserve-zero-box .reserve-title {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: white;
   margin-bottom: 2px;
 }
 
 .calendar-reserve-zero-box .reserve-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
 }
@@ -3592,15 +3597,18 @@ padding: 6px 16px;
 .calendar-content-wrapper {
   max-width: 600px;
   margin: 0 auto;
+  width: 100%;
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
-/* Calendar Grid - Bigger Touch Targets */
+/* Calendar Grid - Compact & Responsive */
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  margin-bottom: 20px;
-  padding: 0 4px; /* Prevent dates from touching edges */
+  gap: 4px;
+  margin-bottom: 16px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .calendar-day {
@@ -3608,12 +3616,13 @@ padding: 6px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 500;
   transition: all 0.2s ease;
-  min-height: 48px; /* Better touch target for mobile */
+  min-height: 40px; /* Compact but still tappable */
+  width: 100%;
 }
 
 .calendar-day:hover:not(.disabled) {
@@ -3666,7 +3675,7 @@ padding: 6px 16px;
   color: white;
 }
 
-/* Sticky Footer */
+/* Sticky Footer - Compact */
 .calendar-modal-footer {
   position: sticky;
   bottom: 0;
@@ -3674,9 +3683,11 @@ padding: 6px 16px;
   right: 0;
   background: white;
   border-top: 1px solid #e5e7eb;
-  padding: 16px 20px;
+  padding: 12px 16px;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
   z-index: 10;
+  max-height: 50vh; /* Don't take up more than half the screen */
+  overflow-y: auto;
 }
 
 .calendar-footer-content {
@@ -3686,18 +3697,18 @@ padding: 6px 16px;
 
 /* Price Section - Inside Footer */
 .calendar-modal-footer .calendar-price-section {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .calendar-done-btn {
   width: 100%;
   display: block;
-  padding: 16px 32px;
+  padding: 14px 24px;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   border: none;
-  border-radius: 12px;
-  font-size: 1.1rem;
+  border-radius: 10px;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
