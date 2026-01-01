@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Wifi, Tv, Refrigerator, Briefcase, Bath, Car, Sparkles, Users, PawPrint, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
@@ -22,115 +23,200 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     setCurrentImageIndex(newIndex);
   };
 
+  // Parse amenities from text into icons
+  const amenityIcons = {
+    'wifi': { icon: Wifi, label: 'Free WiFi' },
+    'tv': { icon: Tv, label: 'Smart TV' },
+    'kitchen': { icon: Refrigerator, label: 'Kitchen' },
+    'fridge': { icon: Refrigerator, label: 'Fridge' },
+    'workspace': { icon: Briefcase, label: 'Workspace' },
+    'workstation': { icon: Briefcase, label: 'Workstation' },
+    'bath': { icon: Bath, label: 'Private Bath' },
+    'parking': { icon: Car, label: 'Free Parking' },
+    'cleaning': { icon: Sparkles, label: 'Weekly Cleaning' }
+  };
+
+  // Extract amenities from room.amenities string
+  const getAmenityList = () => {
+    const amenitiesText = room.amenities.toLowerCase();
+    const foundAmenities = [];
+    
+    Object.keys(amenityIcons).forEach(key => {
+      if (amenitiesText.includes(key)) {
+        foundAmenities.push(amenityIcons[key]);
+      }
+    });
+    
+    // If we don't find enough, add default ones
+    if (foundAmenities.length < 4) {
+      const defaults = [
+        { icon: Wifi, label: 'Free WiFi' },
+        { icon: Tv, label: 'Smart TV' },
+        { icon: Car, label: 'Free Parking' },
+        { icon: Sparkles, label: 'Weekly Cleaning' }
+      ];
+      return defaults.slice(0, 4);
+    }
+    
+    return foundAmenities.slice(0, 7);
+  };
+
+  const amenityList = getAmenityList();
+
   return (
   <div className="room-card">
+    {/* Image Gallery */}
     <div className="room-image-container">
-
-      {/* 1. The overlay container is now the FIRST child */}
-      <div className="image-overlay-container">
-        <a onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.imageUrls, 0); }} className="view-photos-pill">
-          View Photos
-        </a>
-        
-        {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
-          <div className="availability-pill">{roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!</div>
-        )}
-      </div>
-
-      {/* The image is now the only other element here */}
       <img 
-        src={room.imageUrls[0]} 
+        src={room.imageUrls[currentImageIndex]} 
         alt={`${room.name} preview`} 
+        className="room-gallery-image"
       />
       
-      {/* 2. The old <button> that was here has been REMOVED */}
+      {/* Navigation Arrows - Only show if multiple images */}
+      {room.imageUrls.length > 1 && (
+        <>
+          <button 
+            onClick={handlePrevImage}
+            className="image-nav-arrow image-nav-left"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button 
+            onClick={handleNextImage}
+            className="image-nav-arrow image-nav-right"
+          >
+            <ChevronRight size={20} />
+          </button>
 
+          {/* Image Dots */}
+          <div className="image-dots">
+            {room.imageUrls.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }}
+                className={`image-dot ${idx === currentImageIndex ? 'active' : ''}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Availability Badge */}
+      {(typeof roomsAvailable === 'number' && roomsAvailable > 0 && roomsAvailable <= 5) && (
+        <div className="availability-badge-gradient">
+          {roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!
+        </div>
+      )}
+
+      {/* View Photos Button */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.imageUrls, 0); }} 
+        className="view-photos-button"
+      >
+        View All Photos
+      </button>
     </div>
 
 
 
       <div className="room-details">
-        <h3>{room.name}</h3>
-        <p className="room-amenities">{room.amenities}</p>
-        <p>{room.description}</p>
+        {/* Header */}
+        <div className="room-header">
+          <div>
+            <h3>{room.name}</h3>
+            <p className="room-subtitle">Spacious • Fully Furnished</p>
+          </div>
+        </div>
 
+        {/* Amenities Grid */}
+        <div className="amenities-grid">
+          {amenityList.map((amenity, idx) => (
+            <div key={idx} className="amenity-item">
+              <div className="amenity-icon-box">
+                <amenity.icon size={18} className="amenity-icon" />
+              </div>
+              <span className="amenity-label">{amenity.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Description */}
+        <p className="room-description">{room.description}</p>
+
+        {/* Premium Pricing Card */}
         {nights > 0 ? (
-          <div className="dynamic-price-display">
-            <div className="price-today">Reserve for $0 Today</div>
-            <div className="price-balance">Pay ${displayBalanceDue.toFixed(2)} When You Arrive</div>
+          <div className="premium-pricing-card">
+            <div className="pricing-main">
+              <span className="price-today-large">${displayPayToday.toFixed(0)}</span>
+              <span className="price-today-label">today</span>
+            </div>
+            <p className="pricing-subtitle">
+              Pay <span className="price-balance-highlight">${displayBalanceDue.toFixed(2)}</span> when you arrive
+            </p>
           </div>
         ) : (
-          <div style={{ padding: '10px 0' }}>
-            <span style={{
-              display: 'inline-block',
-              marginBottom: '8px',
-              padding: '4px 12px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              fontSize: '13px',
-              fontWeight: '600',
-              borderRadius: '12px'
-            }}>
-              Reserve for $0 Today
-            </span>
-            <div className="room-price-placeholder" style={{ 
-              fontSize: '15px', 
-              color: '#666', 
-              fontStyle: 'italic'
-            }}>
-              Select dates to see pricing
+          <div className="premium-pricing-card">
+            <div className="pricing-main">
+              <span className="price-today-large">$0</span>
+              <span className="price-today-label">today</span>
             </div>
+            <p className="pricing-subtitle">
+              Select dates to see pricing
+            </p>
           </div>
         )}
 
+        {/* Booking Controls */}
         {isSelected ? (
-          <div className="card-actions">
-            <div className="actions-left">
-              <div className="action-item">
-                <span className="action-item-label">Guests</span>
+          <div className="booking-controls-section">
+            <div className="inline-selectors">
+              <div className="inline-selector-item">
+                <div className="selector-label">
+                  <Users size={18} />
+                  <span>Guests</span>
+                </div>
                 <select
                   id={`guests-${room.id}`}
                   value={bookingDetails.guests}
                   onChange={(e) => onGuestsChange(parseInt(e.target.value))}
+                  className="premium-select"
                 >
                   {guestOptions.map(number => <option key={number} value={number}>{number}</option>)}
                 </select>
               </div>
-              <div className="action-item">
-                <span className="action-item-label">Pets</span>
+
+              <div className="inline-selector-item">
+                <div className="selector-label">
+                  <PawPrint size={18} />
+                  <span>Pets</span>
+                </div>
                 <select
                   id={`pets-${room.id}`}
                   value={bookingDetails.pets}
                   onChange={(e) => onPetsChange(parseInt(e.target.value))}
+                  className="premium-select"
                 >
                   {petOptions.map(number => <option key={number} value={number}>{number}</option>)}
                 </select>
               </div>
             </div>
-            <button className="btn book-now-btn" onClick={onBookNow} disabled={isProcessing}>{isProcessing ? 'Processing' : 'Book Now'}</button>
+
+            <button className="premium-book-button" onClick={onBookNow} disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Book Now'}
+            </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="booking-controls-section">
             {nights > 0 && (
               <button 
-                className="btn-change-dates" 
+                className="change-dates-button" 
                 onClick={onChangeDates}
-                style={{
-                  padding: '10px 20px',
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
               >
                 📅 Change Dates
               </button>
             )}
-            <button className="btn btn-select" onClick={() => onSelect(room)}>
+            <button className="premium-select-button" onClick={() => onSelect(room)}>
               {nights > 0 ? 'Continue Booking' : 'Select Room'}
             </button>
           </div>

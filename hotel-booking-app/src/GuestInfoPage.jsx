@@ -863,6 +863,11 @@ const handleTrialNightBooking = async (e) => {
     const checkoutDate = new Date(checkinDate);
     checkoutDate.setDate(checkoutDate.getDate() + 1);
 
+    // Calculate nightly rate with taxes (10% tax rate)
+    const nightlyRate = originalBooking.subtotal / originalBooking.nights; // Get per-night subtotal
+    const nightlyTaxes = nightlyRate * 0.10; // 10% tax
+    const trialTotal = nightlyRate + nightlyTaxes;
+
     const trialBooking = {
         roomTypeID: originalBooking.roomTypeID,
         rateID: originalBooking.rateID,
@@ -871,9 +876,9 @@ const handleTrialNightBooking = async (e) => {
         checkout: checkoutDate.toISOString(), // ✅ Now safe
         nights: 1,
         guests: originalBooking.guests,
-        subtotal: 1,
-        taxes: 0,
-        total: 1.00,
+        subtotal: nightlyRate,
+        taxes: nightlyTaxes,
+        total: trialTotal,
         reservationCode: originalBooking.reservationCode,
         bookingType: 'trial',
         intendedNights: originalBooking.nights,  // ✅ Preserve original nights
@@ -882,12 +887,12 @@ const handleTrialNightBooking = async (e) => {
     };
 
     try {
-        // Create new payment intent for trial amount
+        // Create new payment intent for trial amount (1 night with taxes)
         const response = await fetch(`${apiBaseUrl}/api/create-payment-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                amount: 1.00,
+                amount: trialTotal,
                 bookingDetails: trialBooking,
                 guestInfo: formData,
                 hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
@@ -940,9 +945,9 @@ const handleTrialNightBooking = async (e) => {
                     checkin: checkinDate.toISOString(),
                     checkout: checkoutDate.toISOString(),
                     nights: 1,
-                    total: 1.00,
-                    subtotal: 1,
-                    taxes: 0,
+                    total: trialTotal,
+                    subtotal: nightlyRate,
+                    taxes: nightlyTaxes,
                     bookingType: 'trial',
                     intendedNights: originalBooking.nights,
                     originalTotal: originalBooking.total
@@ -953,7 +958,7 @@ const handleTrialNightBooking = async (e) => {
             }
         } else if (paymentMethod === 'wallet') {
             // Create a NEW payment request for the trial amount
-            const trialAmountInCents = Math.round(1.00 * 100);
+            const trialAmountInCents = Math.round(trialTotal * 100);
             
             const trialPaymentRequest = stripe.paymentRequest({
                 country: 'US',
@@ -986,9 +991,9 @@ const handleTrialNightBooking = async (e) => {
                     checkin: checkinDate.toISOString(),
                     checkout: checkoutDate.toISOString(),
                     nights: 1,
-                    total: 1.00,
-                    subtotal: 1,
-                    taxes: 0,
+                    total: trialTotal,
+                    subtotal: nightlyRate,
+                    taxes: nightlyTaxes,
                     bookingType: 'trial',
                     intendedNights: originalBooking.nights,
                     originalTotal: originalBooking.total
