@@ -692,62 +692,67 @@ body {
 }
 
 
-/* --- NEW Styles for Upsell Prompt --- */
+/* --- COMPACT Styles for Upsell Prompt --- */
 .upsell-prompt {
   text-align: center;
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
-.upsell-prompt h4 {
-  font-size: 18px;
+.upsell-message {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  color: #374151;
+}
+
+.upsell-message strong {
+  color: #059669;
   font-weight: 700;
-  margin: 0 0 12px 0;
-}
-
-.upsell-prompt .highlight-green {
-  color: var(--success-color);
-  font-weight: 700;
-}
-
-.upsell-prompt .highlight-gray {
-  color: #888;
-  font-weight: 500;
 }
 
 .upsell-actions {
-  margin-top: 20px;
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .upsell-actions button {
-  background: none;
-  border: 1px solid #ccc;
-  border-radius: 999px;
-  padding: 8px 28px;
+  flex: 1;
+  max-width: 160px;
+  background: white;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  padding: 10px 16px;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .upsell-actions .yes-btn {
-  border-color: var(--success-color);
-  color: var(--success-color);
+  border-color: #059669;
+  color: white;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
+
 .upsell-actions .yes-btn:hover {
-    background-color: #eaf8ee;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
 }
 
 .upsell-actions .no-btn {
-  border-color: #ccc;
-  color: #888;
+  border-color: #d1d5db;
+  color: #6b7280;
+  background: white;
 }
+
 .upsell-actions .no-btn:hover {
-    background-color: #f1f1f1;
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 /* --- NEW Styles for Dynamic Price on Room Card --- */
@@ -3754,7 +3759,11 @@ padding: 6px 16px;
 }
 
 .calendar-modal-footer .upsell-prompt {
-  margin-bottom: 16px; /* Space for upsell too */
+  margin-bottom: 12px; /* Reduced space - more compact */
+  padding: 10px;
+  background: #f0fdf4;
+  border: 1px solid #d1fae5;
+  border-radius: 10px;
 }
 
 .calendar-done-btn {

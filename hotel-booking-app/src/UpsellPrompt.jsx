@@ -14,18 +14,12 @@ function UpsellPrompt({ nights, onConfirm, onDecline, rates }) {
 
     return (
       <div className="upsell-prompt">
-        <h4>You're {nightsToAdd} Night{nightsToAdd > 1 ? 's' : ''} Away From a Deal!</h4>
-        <p>
-          Add {nightsToAdd} more night{nightsToAdd > 1 ? 's' : ''} to your stay and{' '}
-          <span className="highlight-green">SAVE ${savings}</span>.
-        </p>
-        <p>
-          Get a full week for <span className="highlight-green">${rates.WEEKLY.toFixed(2)}</span> instead of paying{' '}
-          <span className="highlight-gray">${currentCost.toFixed(2)} for {nights} nights</span>.
-        </p>
+        <div className="upsell-message">
+          <strong>💰 Save ${savings}!</strong> Add {nightsToAdd} night{nightsToAdd > 1 ? 's' : ''} → Get 7 nights for ${rates.WEEKLY.toFixed(2)}
+        </div>
         <div className="upsell-actions">
-          <button className="yes-btn" onClick={onConfirm}>YES!</button>
-          <button className="no-btn" onClick={onDecline}>No</button>
+          <button className="yes-btn" onClick={onConfirm}>Book 7 Nights</button>
+          <button className="no-btn" onClick={onDecline}>No Thanks</button>
         </div>
       </div>
     );
@@ -40,18 +34,12 @@ function UpsellPrompt({ nights, onConfirm, onDecline, rates }) {
 
     return (
       <div className="upsell-prompt">
-        <h4>💡 Unlock a Weekly Discount!</h4>
-        <p>
-          Add {nightsToAdd} more nights for only{' '}
-          <span className="highlight-green">${costDifference.toFixed(2)} more</span> and stay a full week.
-        </p>
-        <p>
-          That's like getting your extra nights for{' '}
-          <span className="highlight-green">just ${pricePerExtraNight} each!</span>
-        </p>
+        <div className="upsell-message">
+          <strong>💡 Weekly Deal!</strong> Add {nightsToAdd} nights for ${costDifference.toFixed(2)} more (${pricePerExtraNight}/night)
+        </div>
         <div className="upsell-actions">
-          <button className="yes-btn" onClick={onConfirm}>YES!</button>
-          <button className="no-btn" onClick={onDecline}>No</button>
+          <button className="yes-btn" onClick={onConfirm}>Book 7 Nights</button>
+          <button className="no-btn" onClick={onDecline}>No Thanks</button>
         </div>
       </div>
     );
