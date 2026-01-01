@@ -4,7 +4,6 @@ import BookingPage from './BookingPage.jsx';
 import GuestInfoPageWrapper from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
 import CheckoutReturnPage from './CheckoutReturnPage.jsx';
-import HelpWidget from './HelpWidget.jsx';
 import ImageLightbox from './ImageLightbox.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
