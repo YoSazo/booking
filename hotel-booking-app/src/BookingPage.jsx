@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
 import CalendarModal from './CalendarModal.jsx';
 // import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
-import HelpWidget from './HelpWidget.jsx';
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 
