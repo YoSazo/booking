@@ -3012,17 +3012,17 @@ padding: 6px 16px;
 .details-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .detail-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: #f9fafb;
-  padding: 12px;
-  border-radius: 10px;
+  padding: 10px;
+  border-radius: 8px;
 }
 
 .detail-icon {

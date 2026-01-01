@@ -189,22 +189,6 @@ useEffect(() => {
     }, 100);
   }
   
-  // Smooth scroll to checkout progress bar on Step 1 (Review Cart)
-  if (currentStep === 1) {
-    setTimeout(() => {
-      const progressBar = document.querySelector('.checkout-progress-bar');
-      if (progressBar) {
-        progressBar.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start'
-        });
-      } else {
-        // Fallback to top if progress bar not found
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }, 150);
-  }
-  
 }, [currentStep, bookingDetails]);
 
 // Auto-scroll to error message when it appears
