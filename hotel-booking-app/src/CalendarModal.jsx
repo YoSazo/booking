@@ -183,7 +183,12 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
               <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
             </div>
+          </div>
+        </div>
 
+        {/* Sticky Footer with Pricing + Done Button */}
+        <div className="calendar-modal-footer">
+          <div className="calendar-footer-content">
             {/* Pricing Display */}
             <div className="calendar-price-section">
               {showUpsell ? (
@@ -213,14 +218,12 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
                 </div>
               ) : ( <PriceBadge nights={nights} rates={rates} /> )}
             </div>
+            
+            {/* Done Button */}
+            <button className="calendar-done-btn" onClick={handleDone}>
+              Done
+            </button>
           </div>
-        </div>
-
-        {/* Sticky Footer with Done Button */}
-        <div className="calendar-modal-footer">
-          <button className="calendar-done-btn" onClick={handleDone}>
-            Done
-          </button>
         </div>
       </div>
     </div>
