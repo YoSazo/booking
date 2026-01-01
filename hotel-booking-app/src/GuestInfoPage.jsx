@@ -189,6 +189,22 @@ useEffect(() => {
     }, 100);
   }
   
+  // Smooth scroll to reservation details on Step 1 (Review Cart)
+  if (currentStep === 1) {
+    setTimeout(() => {
+      const reservationCard = document.querySelector('.reservation-details-card');
+      if (reservationCard) {
+        reservationCard.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start'
+        });
+      } else {
+        // Fallback to top if card not found
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 150);
+  }
+  
 }, [currentStep, bookingDetails]);
 
 // Auto-scroll to error message when it appears

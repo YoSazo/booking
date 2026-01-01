@@ -1,4 +1,5 @@
 import React from 'react';
+import { calculateTieredPrice } from './priceCalculator.js';
 
 // This component no longer holds its own constants.
 // It receives them as props.
@@ -13,26 +14,9 @@ function PriceBadge({ nights, rates }) {
     );
   }
 
-  // Use the passed-in rates to perform calculations
-  const WEEK_N = +(rates.WEEKLY / 7).toFixed(2);
-  const MONTHLY_NIGHTS_THRESHOLD = 30;
-
-  let discountedTotal = 0;
-  if (nights === 28) {
-    discountedTotal = rates.MONTHLY;
-  } else {
-    let discountedTotalRem = nights;
-    discountedTotal += Math.floor(discountedTotalRem / MONTHLY_NIGHTS_THRESHOLD) * rates.MONTHLY;
-    discountedTotalRem %= MONTHLY_NIGHTS_THRESHOLD;
-    discountedTotal += Math.floor(discountedTotalRem / 7) * rates.WEEKLY;
-    discountedTotalRem %= 7;
-    discountedTotal += discountedTotalRem * WEEK_N;
-  }
-
-  discountedTotal = +discountedTotal.toFixed(2);
+  // Use shared calculation utility
+  const discountedTotal = calculateTieredPrice(nights, rates);
   const originalTotal = (nights * rates.NIGHTLY).toFixed(2);
-  const half = (discountedTotal / 2).toFixed(2);
-
   const savings = (originalTotal - discountedTotal).toFixed(2);
   
   return (
