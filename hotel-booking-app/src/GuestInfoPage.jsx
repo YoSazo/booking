@@ -189,17 +189,17 @@ useEffect(() => {
     }, 100);
   }
   
-  // Smooth scroll to reservation details on Step 1 (Review Cart)
+  // Smooth scroll to checkout progress bar on Step 1 (Review Cart)
   if (currentStep === 1) {
     setTimeout(() => {
-      const reservationCard = document.querySelector('.reservation-details-card');
-      if (reservationCard) {
-        reservationCard.scrollIntoView({ 
+      const progressBar = document.querySelector('.checkout-progress-bar');
+      if (progressBar) {
+        progressBar.scrollIntoView({ 
           behavior: 'smooth', 
           block: 'start'
         });
       } else {
-        // Fallback to top if card not found
+        // Fallback to top if progress bar not found
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }, 150);
