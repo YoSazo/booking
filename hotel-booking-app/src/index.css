@@ -3664,11 +3664,11 @@ padding: 6px 16px;
   cursor: not-allowed;
 }
 
-/* Quick Book Buttons - Compact */
+/* Quick Book Buttons - In Footer */
 .calendar-quick-book-buttons {
   display: flex;
   gap: 8px;
-  margin: 12px 0;
+  margin-bottom: 12px;
 }
 
 .calendar-quick-book-buttons .quick-book-btn {
@@ -3709,9 +3709,10 @@ padding: 6px 16px;
   margin: 0 auto;
 }
 
-/* Price Section - Inside Footer */
+/* Price Section - Inside Footer (After Quick Book Buttons) */
 .calendar-modal-footer .calendar-price-section {
   margin-bottom: 12px;
+  margin-top: 0; /* No extra margin since buttons are above */
 }
 
 .calendar-done-btn {

@@ -177,18 +177,18 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
               <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
             </div>
             <div className="calendar-grid">{renderDays()}</div>
+          </div>
+        </div>
 
-            {/* Quick Book Buttons */}
+        {/* Sticky Footer with Quick Book Buttons + Pricing + Done Button */}
+        <div className="calendar-modal-footer">
+          <div className="calendar-footer-content">
+            {/* Quick Book Buttons - Always visible at top of footer */}
             <div className="calendar-quick-book-buttons">
               <button className="quick-book-btn" onClick={handleBookWeek}>Book 1 Week</button>
               <button className="quick-book-btn" onClick={handleBookMonth}>Book 1 Month</button>
             </div>
-          </div>
-        </div>
-
-        {/* Sticky Footer with Pricing + Done Button */}
-        <div className="calendar-modal-footer">
-          <div className="calendar-footer-content">
+            
             {/* Pricing Display */}
             <div className="calendar-price-section">
               {showUpsell ? (
