@@ -1721,14 +1721,39 @@ const handlePayLaterBooking = async (e) => {
 
                     <div className="payment-wrapper" style={{ display: currentStep === 4 ? 'block' : 'none' }}>
   {/* Stripe Badge & Security - Combined Header */}
-  <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-    <div className="flex items-center gap-2 text-slate-600">
-      <img src="/lock.svg" alt="Secure" style={{ width: '20px', height: '20px' }} />
-      <span className="text-sm font-medium">Guaranteed safe and secure checkout</span>
+  <div style={{
+    background: 'linear-gradient(to right, rgb(248, 250, 252), white)',
+    borderBottom: '1px solid rgb(226, 232, 240)',
+    padding: '16px 24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopLeftRadius: '24px',
+    borderTopRightRadius: '24px'
+  }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      color: '#475569'
+    }}>
+      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+      <span style={{ fontSize: '14px', fontWeight: '500' }}>Guaranteed safe and secure checkout</span>
     </div>
-    <div className="bg-slate-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-2">
-      <span className="text-xs font-medium">Powered by</span>
-      <img src="/stripe.svg" alt="Stripe" style={{ height: '14px', filter: 'brightness(0) invert(1)' }} />
+    
+    <div style={{
+      background: '#334155',
+      color: 'white',
+      padding: '6px 16px',
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }}>
+      <span style={{ fontSize: '12px', fontWeight: '500' }}>Powered by</span>
+      <span style={{ fontSize: '14px', fontWeight: '700', letterSpacing: '-0.5px' }}>stripe</span>
     </div>
   </div>
   
