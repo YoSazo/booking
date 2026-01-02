@@ -2094,7 +2094,6 @@ const handlePayLaterBooking = async (e) => {
           </div>
         )}
       </div>
-
     </>
   )}
   {errorMessage && hasAttemptedSubmit && (
