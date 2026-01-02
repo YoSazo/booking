@@ -583,7 +583,10 @@ useEffect(() => {
         }
 
         setIsProcessing(true);
-        setShowLoadingScreen(true);
+        // Only show loading screen for CARD payments, not wallet (wallet has its own modal)
+        if (paymentMethod === 'card') {
+            setShowLoadingScreen(true);
+        }
         setErrorMessage(''); // Clear previous errors before a new attempt
         sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
         sessionStorage.setItem('guestInfo', JSON.stringify(formData));
@@ -601,6 +604,9 @@ useEffect(() => {
         } catch (updateError) {
             setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
             setIsProcessing(false);
+            if (paymentMethod === 'card') {
+                setShowLoadingScreen(false);
+            }
             return;
         }
 
@@ -708,7 +714,10 @@ useEffect(() => {
     }
 
     setIsProcessing(true);
-    setShowLoadingScreen(true);
+    // Only show loading screen for card payments, not wallet
+    if (paymentMethod === 'card') {
+        setShowLoadingScreen(true);
+    }
     setErrorMessage('');
 
     // Get original booking from sessionStorage
@@ -875,7 +884,10 @@ const handleTrialNightBooking = async (e) => {
     }
 
     setIsProcessingTrial(true);
-    setShowLoadingScreen(true);
+    // Only show loading screen for card payments, not wallet
+    if (paymentMethod === 'card') {
+        setShowLoadingScreen(true);
+    }
     setErrorMessage('');
 
     // ✅ CRITICAL FIX: Get ORIGINAL booking from sessionStorage to preserve full stay data
@@ -1119,8 +1131,10 @@ const handlePayLaterBooking = async (e) => {
             throw new Error("Failed to create pre-authorization hold");
         }
 
-        // Show loading screen
-        setShowLoadingScreen(true);
+        // Only show loading screen for card payments, not wallet
+        if (paymentMethod === 'card') {
+            setShowLoadingScreen(true);
+        }
         
         // Process payment based on method
         if (paymentMethod === 'card') {
