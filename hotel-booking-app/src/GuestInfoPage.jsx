@@ -2195,7 +2195,11 @@ const handlePayLaterBooking = async (e) => {
           ? (e) => handleTrialNightBooking(e)
           : selectedPlan === 'reserve'
             ? (e) => handleReserveBooking(e)
-            : (paymentMethod === 'wallet' ? handleWalletPayment : () => { window.userInitiatedSubmit = true; })
+            : selectedPlan === 'payLater'
+              ? (e) => handlePayLaterBooking(e)
+              : selectedPlan === 'full'
+                ? (e) => handleCardSubmit(e)
+                : () => { window.userInitiatedSubmit = true; }
       }
       disabled={isProcessing || isProcessingTrial || !clientSecret || !stripe || !elements}
     >
