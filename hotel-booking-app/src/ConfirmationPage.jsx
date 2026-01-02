@@ -67,7 +67,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Original Stay Total</span>
-                  <span className="detail-value">${bookingDetails.originalTotal?.toFixed(2)}</span>
+                  <span className="detail-value">{"$" + bookingDetails.originalTotal?.toFixed(2)}</span>
                 </div>
                 <div style={{ 
                   marginTop: '16px', 
@@ -92,11 +92,11 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Total Stay Cost</span>
-                  <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
+                  <span className="detail-value">{"$" + bookingDetails.total?.toFixed(2)}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Due at Check-in</span>
-                  <span className="detail-value" style={{ fontWeight: '700' }}>${(bookingDetails.total - 20).toFixed(2)}</span>
+                  <span className="detail-value" style={{ fontWeight: '700' }}>{"$" + (bookingDetails.total - 20).toFixed(2)}</span>
                 </div>
                 <div style={{ 
                   marginTop: '16px', 
@@ -121,11 +121,11 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Total Stay Cost</span>
-                  <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
+                  <span className="detail-value">{"$" + bookingDetails.total?.toFixed(2)}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Due at Check-in</span>
-                  <span className="detail-value" style={{ fontWeight: '700' }}>${bookingDetails.total?.toFixed(2)}</span>
+                  <span className="detail-value" style={{ fontWeight: '700' }}>{"$" + bookingDetails.total?.toFixed(2)}</span>
                 </div>
                 <div style={{ 
                   marginTop: '16px', 
@@ -139,7 +139,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                   <br />
                   Your card has been validated. If you don't show up for your reservation, a $75.90 no-show fee will be charged.
                   <br /><br />
-                  ✅ <strong>When you check in:</strong> Pay ${bookingDetails.total?.toFixed(2)} at the front desk
+                  ✅ <strong>When you check in:</strong> Pay {"$" + bookingDetails.total?.toFixed(2)} at the front desk
                   <br />
                   ❌ <strong>If you don't show:</strong> $75.90 no-show fee applies
                 </div>
@@ -150,15 +150,15 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
               <>
                 <div className="detail-row">
                   <span className="detail-label">Paid Today</span>
-                  <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>${(bookingDetails.total / 2).toFixed(2)}</span>
+                  <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>{"$" + (bookingDetails.total / 2).toFixed(2)}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Total Stay Cost</span>
-                  <span className="detail-value">${bookingDetails.total?.toFixed(2)}</span>
+                  <span className="detail-value">{"$" + bookingDetails.total?.toFixed(2)}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Due at Check-in</span>
-                  <span className="detail-value" style={{ fontWeight: '700' }}>${(bookingDetails.total / 2).toFixed(2)}</span>
+                  <span className="detail-value" style={{ fontWeight: '700' }}>{"$" + (bookingDetails.total / 2).toFixed(2)}</span>
                 </div>
               </>
             )}

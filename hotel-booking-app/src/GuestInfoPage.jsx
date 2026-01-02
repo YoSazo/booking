@@ -2058,7 +2058,6 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
           </div>
-        </div>
 
         {/* Wallet selected indicator - clean message */}
         {paymentMethod === 'wallet' && walletType && (
