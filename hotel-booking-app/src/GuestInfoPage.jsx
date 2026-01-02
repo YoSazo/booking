@@ -1912,95 +1912,138 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
 
-            {/* Billing Address - Now part of the same form */}
-            <div className="card-field-wrapper" style={{ marginTop: '16px' }}>
-              <label>Billing Address</label>
-              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                <input 
-                  type="text" 
-                  name="address" 
-                  value={formData.address} 
-                  onChange={handleChange} 
-                  placeholder="Start typing your address..." 
-                  autoComplete="street-address"
-                  className="card-field-container"
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    fontSize: '16px',
-                    backgroundColor: '#f9f9f9'
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </Autocomplete>
-            </div>
-            
-            {/* Address fields with slide-down animation */}
-            <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`} style={{ marginTop: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', width: '100%' }}>
-                <div className="card-field-wrapper">
-                  <label>City</label>
+            {/* Billing Address Section - Integrated with card fields */}
+            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0' }}>
+              <div className="card-field-wrapper">
+                <label>Billing Address</label>
+                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                   <input 
                     type="text" 
-                    name="city" 
-                    value={formData.city} 
+                    name="address" 
+                    value={formData.address} 
                     onChange={handleChange} 
-                    autoComplete="address-level2"
-                    className="card-field-container"
+                    placeholder="Start typing your address..." 
+                    autoComplete="street-address"
                     style={{
                       width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
+                      padding: '14px',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
                       fontSize: '16px',
-                      backgroundColor: '#f9f9f9'
+                      backgroundColor: '#fff',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'Inter, sans-serif'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#0070f3';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e0e0e0';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                      }
                     }}
                   />
-                </div>
-                <div className="card-field-wrapper">
-                  <label>State</label>
-                  <input 
-                    type="text" 
-                    name="state" 
-                    value={formData.state} 
-                    onChange={handleChange} 
-                    autoComplete="address-level1"
-                    className="card-field-container"
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      fontSize: '16px',
-                      backgroundColor: '#f9f9f9'
-                    }}
-                  />
-                </div>
-                <div className="card-field-wrapper">
-                  <label>Zip</label>
-                  <input 
-                    ref={zipFieldRef}
-                    type="text" 
-                    name="zip" 
-                    value={formData.zip} 
-                    onChange={handleChange} 
-                    autoComplete="postal-code"
-                    className="card-field-container"
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      fontSize: '16px',
-                      backgroundColor: '#f9f9f9'
-                    }}
-                  />
+                </Autocomplete>
+              </div>
+              
+              {/* Address fields with slide-down animation */}
+              <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '2fr 1fr 1fr', 
+                  gap: '12px', 
+                  marginTop: '12px'
+                }}>
+                  <div className="card-field-wrapper">
+                    <label>City</label>
+                    <input 
+                      type="text" 
+                      name="city" 
+                      value={formData.city} 
+                      onChange={handleChange} 
+                      autoComplete="address-level2"
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        backgroundColor: '#fff',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#0070f3';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e0e0e0';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="card-field-wrapper">
+                    <label>State</label>
+                    <input 
+                      type="text" 
+                      name="state" 
+                      value={formData.state} 
+                      onChange={handleChange} 
+                      autoComplete="address-level1"
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        backgroundColor: '#fff',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#0070f3';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e0e0e0';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="card-field-wrapper">
+                    <label>Zip</label>
+                    <input 
+                      ref={zipFieldRef}
+                      type="text" 
+                      name="zip" 
+                      value={formData.zip} 
+                      onChange={handleChange} 
+                      autoComplete="postal-code"
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        backgroundColor: '#fff',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#0070f3';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e0e0e0';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
