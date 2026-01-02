@@ -566,10 +566,6 @@ useEffect(() => {
             return;
         }
         
-        if (!window.userInitiatedSubmit) {
-        console.warn('Form submitted without user interaction - ignoring');
-        return;
-    }
         setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
         // For CARD payment, validate card fields
