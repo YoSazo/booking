@@ -1911,19 +1911,68 @@ const handlePayLaterBooking = async (e) => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Billing Address Section - Integrated with card fields */}
-            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
-              <div className="card-field-wrapper">
-                <label>Billing Address</label>
-                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+        {/* Billing Address Section - Outside card-fields-section to prevent collapse */}
+        {paymentMethod === 'card' && (
+          <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
+            <div className="card-field-wrapper">
+              <label>Billing Address</label>
+              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input 
+                  type="text" 
+                  name="address" 
+                  value={formData.address} 
+                  onChange={handleChange} 
+                  placeholder="Start typing your address..." 
+                  autoComplete="street-address"
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    padding: '14px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    backgroundColor: '#fff',
+                    transition: 'all 0.2s ease',
+                    fontFamily: 'Inter, sans-serif',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#0070f3';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e0e0e0';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+              </Autocomplete>
+            </div>
+            
+            {/* Address fields with slide-down animation - Now stacked vertically */}
+            <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '12px', 
+                marginTop: '12px',
+                maxWidth: '100%'
+              }}>
+                <div className="card-field-wrapper">
+                  <label>City</label>
                   <input 
                     type="text" 
-                    name="address" 
-                    value={formData.address} 
+                    name="city" 
+                    value={formData.city} 
                     onChange={handleChange} 
-                    placeholder="Start typing your address..." 
-                    autoComplete="street-address"
+                    autoComplete="address-level2"
                     style={{
                       width: '100%',
                       maxWidth: '100%',
@@ -1944,120 +1993,73 @@ const handlePayLaterBooking = async (e) => {
                       e.target.style.borderColor = '#e0e0e0';
                       e.target.style.boxShadow = 'none';
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                      }
+                  />
+                </div>
+                <div className="card-field-wrapper">
+                  <label>State</label>
+                  <input 
+                    type="text" 
+                    name="state" 
+                    value={formData.state} 
+                    onChange={handleChange} 
+                    autoComplete="address-level1"
+                    style={{
+                      width: '100%',
+                      maxWidth: '100%',
+                      padding: '14px',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      backgroundColor: '#fff',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'Inter, sans-serif',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#0070f3';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e0e0e0';
+                      e.target.style.boxShadow = 'none';
                     }}
                   />
-                </Autocomplete>
-              </div>
-              
-              {/* Address fields with slide-down animation - Now stacked vertically */}
-              <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  gap: '12px', 
-                  marginTop: '12px',
-                  maxWidth: '100%'
-                }}>
-                  <div className="card-field-wrapper">
-                    <label>City</label>
-                    <input 
-                      type="text" 
-                      name="city" 
-                      value={formData.city} 
-                      onChange={handleChange} 
-                      autoComplete="address-level2"
-                      style={{
-                        width: '100%',
-                        maxWidth: '100%',
-                        padding: '14px',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '8px',
-                        fontSize: '16px',
-                        backgroundColor: '#fff',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'Inter, sans-serif',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#0070f3';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e0e0e0';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
-                  <div className="card-field-wrapper">
-                    <label>State</label>
-                    <input 
-                      type="text" 
-                      name="state" 
-                      value={formData.state} 
-                      onChange={handleChange} 
-                      autoComplete="address-level1"
-                      style={{
-                        width: '100%',
-                        maxWidth: '100%',
-                        padding: '14px',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '8px',
-                        fontSize: '16px',
-                        backgroundColor: '#fff',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'Inter, sans-serif',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#0070f3';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e0e0e0';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
-                  <div className="card-field-wrapper">
-                    <label>Zip</label>
-                    <input 
-                      ref={zipFieldRef}
-                      type="text" 
-                      name="zip" 
-                      value={formData.zip} 
-                      onChange={handleChange} 
-                      autoComplete="postal-code"
-                      style={{
-                        width: '100%',
-                        maxWidth: '100%',
-                        padding: '14px',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '8px',
-                        fontSize: '16px',
-                        backgroundColor: '#fff',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'Inter, sans-serif',
-                        boxSizing: 'border-box'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#0070f3';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e0e0e0';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
+                </div>
+                <div className="card-field-wrapper">
+                  <label>Zip</label>
+                  <input 
+                    ref={zipFieldRef}
+                    type="text" 
+                    name="zip" 
+                    value={formData.zip} 
+                    onChange={handleChange} 
+                    autoComplete="postal-code"
+                    style={{
+                      width: '100%',
+                      maxWidth: '100%',
+                      padding: '14px',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      backgroundColor: '#fff',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'Inter, sans-serif',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#0070f3';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(0, 112, 243, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e0e0e0';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Wallet selected indicator - clean message */}
         {paymentMethod === 'wallet' && walletType && (
