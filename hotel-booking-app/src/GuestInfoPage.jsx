@@ -568,16 +568,16 @@ useEffect(() => {
         
         setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
+        // Validate billing address for BOTH card and wallet payments
+        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+            setErrorMessage("Please fill out your billing address before proceeding.");
+            return;
+        }
+
         // For CARD payment, validate card fields
         if (paymentMethod === 'card') {
             if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
                 setErrorMessage("Payment components are not ready. Please refresh the page.");
-                return;
-            }
-
-            // Validate card details and billing address
-            if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-                setErrorMessage("Please fill out your billing address before proceeding.");
                 return;
             }
         }
