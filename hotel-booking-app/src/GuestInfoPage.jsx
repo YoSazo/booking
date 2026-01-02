@@ -1915,7 +1915,7 @@ const handlePayLaterBooking = async (e) => {
         </div>
 
         {/* Billing Address Section - Always visible for both card and wallet */}
-        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
             <div className="card-field-wrapper">
               <label>Billing Address</label>
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
