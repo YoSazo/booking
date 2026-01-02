@@ -1914,9 +1914,8 @@ const handlePayLaterBooking = async (e) => {
           </div>
         </div>
 
-        {/* Billing Address Section - Outside card-fields-section to prevent collapse */}
-        {paymentMethod === 'card' && (
-          <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
+        {/* Billing Address Section - Always visible for both card and wallet */}
+        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
             <div className="card-field-wrapper">
               <label>Billing Address</label>
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
@@ -2059,7 +2058,7 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Wallet selected indicator - clean message */}
         {paymentMethod === 'wallet' && walletType && (
