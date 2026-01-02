@@ -544,7 +544,7 @@ useEffect(() => {
         isInteractingWithAutocomplete.current = false;
     }, 1000);
 };
-    // Main submit handler for CARD PAYMENTS
+    // Main submit handler for FULL PAYMENT (handles both card and wallet)
     const handleCardSubmit = async (e) => {
         e.preventDefault();
         
@@ -572,16 +572,18 @@ useEffect(() => {
     }
         setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
-        if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
-            // This is an unexpected error, but good to have a safeguard
-            setErrorMessage("Payment components are not ready. Please refresh the page.");
-            return;
-        }
+        // For CARD payment, validate card fields
+        if (paymentMethod === 'card') {
+            if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
+                setErrorMessage("Payment components are not ready. Please refresh the page.");
+                return;
+            }
 
-        // Validate card details first (card validation already done at line 536, but keeping address validation clear)
-        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
+            // Validate card details and billing address
+            if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+                setErrorMessage("Please fill out your billing address before proceeding.");
+                return;
+            }
         }
 
         setIsProcessing(true);
@@ -591,46 +593,99 @@ useEffect(() => {
         sessionStorage.setItem('guestInfo', JSON.stringify(formData));
 
         try {
-      const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
-      });
-      const updateData = await updateRes.json();
-      if (!updateData.success) {
-        throw new Error('Failed to update payment details.');
-      }
-    } catch (updateError) {
-      setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
-      setIsProcessing(false);
-      return;
-    }
+            const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
+            });
+            const updateData = await updateRes.json();
+            if (!updateData.success) {
+                throw new Error('Failed to update payment details.');
+            }
+        } catch (updateError) {
+            setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
+            setIsProcessing(false);
+            return;
+        }
 
-
-        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: {
-                card: elements.getElement(CardNumberElement),
-                billing_details: {
-                    name: `${formData.firstName} ${formData.lastName}`,
-                    email: formData.email,
-                    phone: formData.phone,
-                    address: {
-                        line1: formData.address,
-                        city: formData.city,
-                        state: formData.state,
-                        postal_code: formData.zip,
-                        country: 'US',
+        // Process based on payment method
+        if (paymentMethod === 'card') {
+            // CARD PAYMENT
+            const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardNumberElement),
+                    billing_details: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        address: {
+                            line1: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postal_code: formData.zip,
+                            country: 'US',
+                        },
                     },
                 },
-            },
-        });
+            });
 
-        if (error) {
-            setErrorMessage(error.message || "An unexpected error occurred.");
-            setIsProcessing(false);
-            setShowLoadingScreen(false);
-        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-            onComplete(formData, paymentIntent.id);
+            if (error) {
+                setErrorMessage(error.message || "An unexpected error occurred.");
+                setIsProcessing(false);
+                setShowLoadingScreen(false);
+            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+                onComplete(formData, paymentIntent.id);
+            }
+        } else if (paymentMethod === 'wallet') {
+            // WALLET PAYMENT
+            const fullAmountInCents = Math.round((bookingDetails.total / 2) * 100);
+            
+            const fullPaymentRequest = stripe.paymentRequest({
+                country: 'US',
+                currency: 'usd',
+                total: { label: 'Booking Payment', amount: fullAmountInCents },
+                requestPayerName: true,
+                requestPayerEmail: true,
+            });
+
+            // Set up payment method handler
+            fullPaymentRequest.on('paymentmethod', async (ev) => {
+                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                    clientSecret, 
+                    { payment_method: ev.paymentMethod.id }, 
+                    { handleActions: false }
+                );
+                
+                if (confirmError) {
+                    ev.complete('fail');
+                    setErrorMessage(confirmError.message);
+                    setIsProcessing(false);
+                    setShowLoadingScreen(false);
+                    return;
+                }
+                
+                ev.complete('success');
+                onComplete(formData, paymentIntent.id);
+            });
+
+            // Show payment request
+            const canMakePayment = await fullPaymentRequest.canMakePayment();
+            
+            if (!canMakePayment) {
+                setErrorMessage("Digital wallet is not available. Please use card payment.");
+                setIsProcessing(false);
+                setShowLoadingScreen(false);
+                return;
+            }
+
+            try {
+                await fullPaymentRequest.show();
+            } catch (error) {
+                console.log('Payment cancelled:', error);
+                setErrorMessage("Payment cancelled");
+                setIsProcessing(false);
+                setShowLoadingScreen(false);
+            }
         }
     };
 
