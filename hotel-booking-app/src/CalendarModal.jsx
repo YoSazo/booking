@@ -279,7 +279,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
                       <span className="strikethrough-price">${originalPrice.toFixed(2)}</span>
                     </div>
                     <div className="calendar-savings-badge">
-                      ⬇️ Save ${savings.toFixed(2)}!
+                      ⬇️ You Saved ${savings.toFixed(2)}!
                     </div>
                     <div className="calendar-discounted-price">
                       <span className="price-label">{nights >= 28 ? 'Monthly' : 'Weekly'} Discount Total:</span>
