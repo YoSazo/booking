@@ -2057,35 +2057,35 @@ const handlePayLaterBooking = async (e) => {
                 </div>
               </div>
             </div>
-          </div>
 
-        {/* Wallet selected indicator - clean message */}
-        {paymentMethod === 'wallet' && walletType && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px',
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px',
-            marginBottom: '24px'
-          }}>
-            <img 
-              src={getWalletLogoInfo().src} 
-              alt={getWalletLogoInfo().alt} 
-              style={{ height: '32px' }} 
-            />
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontWeight: '600', color: '#333' }}>
-                {walletType} Selected
-              </p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
-                A payment modal will appear after clicking the final button
-              </p>
-            </div>
+            {/* Wallet selected indicator - inside card section */}
+            {paymentMethod === 'wallet' && walletType && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '16px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                marginTop: '16px'
+              }}>
+                <img 
+                  src={getWalletLogoInfo().src} 
+                  alt={getWalletLogoInfo().alt} 
+                  style={{ height: '32px' }} 
+                />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: '600', color: '#333' }}>
+                    {walletType} Selected
+                  </p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
+                    A payment modal will appear after clicking the final button
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
 
         {paymentMethod === 'wallet' && !walletType && (
           <div className="wallet-info-box">
