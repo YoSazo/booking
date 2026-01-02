@@ -1720,21 +1720,18 @@ const handlePayLaterBooking = async (e) => {
                     )}
 
                     <div className="payment-wrapper" style={{ display: currentStep === 4 ? 'block' : 'none' }}>
-  <div className="stripe-badge-container">
-    <img 
-      src="stripe.svg" 
-      alt="Powered by Stripe" 
-      className="stripe-badge"
-      onError={(e) => {
-        console.log('Stripe badge failed to load');
-        e.target.style.display = 'none';
-      }}
-    />
-  </div>
-  
-  <div className="secure-checkout-badge">
-    <img src="/lock.svg" alt="Secure Checkout" className="lock-icon" />
-    <span>Guaranteed safe and secure Checkout</span>
+  {/* Stripe Badge & Security - Combined Header */}
+  <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+    <div className="flex items-center gap-2 text-slate-600">
+      <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+      <span className="text-sm font-medium">Guaranteed safe and secure checkout</span>
+    </div>
+    <div className="bg-slate-700 text-white px-4 py-1.5 rounded-lg flex items-center gap-2">
+      <span className="text-xs font-medium">Powered by</span>
+      <span className="font-bold text-sm">stripe</span>
+    </div>
   </div>
   
   {/* Show Pay Later explanation banner */}
