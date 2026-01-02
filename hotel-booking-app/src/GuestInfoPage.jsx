@@ -1724,36 +1724,61 @@ const handlePayLaterBooking = async (e) => {
   <div style={{
     background: 'linear-gradient(to right, rgb(248, 250, 252), white)',
     borderBottom: '1px solid rgb(226, 232, 240)',
-    padding: '16px 24px',
+    padding: '20px 24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopLeftRadius: '24px',
-    borderTopRightRadius: '24px'
+    borderTopRightRadius: '24px',
+    gap: '16px',
+    flexWrap: 'wrap'
   }}>
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      color: '#475569'
+      gap: '10px',
+      color: '#475569',
+      flex: '1 1 auto',
+      minWidth: '200px'
     }}>
-      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg 
+        width="22" 
+        height="22" 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+        style={{ flexShrink: 0 }}
+      >
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
       </svg>
-      <span style={{ fontSize: '14px', fontWeight: '500' }}>Guaranteed safe and secure checkout</span>
+      <span style={{ 
+        fontSize: '14px', 
+        fontWeight: '500',
+        lineHeight: '1.4'
+      }}>
+        Guaranteed safe and secure checkout
+      </span>
     </div>
     
     <div style={{
       background: '#334155',
       color: 'white',
-      padding: '6px 16px',
+      padding: '8px 16px',
       borderRadius: '8px',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: '8px',
+      flexShrink: 0,
+      whiteSpace: 'nowrap'
     }}>
       <span style={{ fontSize: '12px', fontWeight: '500' }}>Powered by</span>
-      <span style={{ fontSize: '14px', fontWeight: '700', letterSpacing: '-0.5px' }}>stripe</span>
+      <span style={{ 
+        fontSize: '16px', 
+        fontWeight: '700', 
+        letterSpacing: '-0.5px' 
+      }}>
+        stripe
+      </span>
     </div>
   </div>
   
