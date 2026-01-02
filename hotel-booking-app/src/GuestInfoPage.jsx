@@ -1913,103 +1913,94 @@ const handlePayLaterBooking = async (e) => {
             </div>
 
             {/* Billing Address - Now part of the same form */}
-            <div style={{ marginTop: '20px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#334155', marginBottom: '8px' }}>
-                Billing Address
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+            <div className="card-field-wrapper" style={{ marginTop: '16px' }}>
+              <label>Billing Address</label>
+              <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                <input 
+                  type="text" 
+                  name="address" 
+                  value={formData.address} 
+                  onChange={handleChange} 
+                  placeholder="Start typing your address..." 
+                  autoComplete="street-address"
+                  className="card-field-container"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontSize: '16px',
+                    backgroundColor: '#f9f9f9'
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+              </Autocomplete>
+            </div>
+            
+            {/* Address fields with slide-down animation */}
+            <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`} style={{ marginTop: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', width: '100%' }}>
+                <div className="card-field-wrapper">
+                  <label>City</label>
                   <input 
                     type="text" 
-                    name="address" 
-                    value={formData.address} 
+                    name="city" 
+                    value={formData.city} 
                     onChange={handleChange} 
-                    placeholder="Start typing your address..." 
-                    autoComplete="street-address"
+                    autoComplete="address-level2"
+                    className="card-field-container"
                     style={{
                       width: '100%',
-                      padding: '12px',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      transition: 'border-color 0.2s'
+                      padding: '10px',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      backgroundColor: '#f9f9f9'
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                      }
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = '#334155'}
-                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                   />
-                </Autocomplete>
-                
-                {/* Address fields with slide-down animation */}
-                <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                        City
-                      </label>
-                      <input 
-                        type="text" 
-                        name="city" 
-                        value={formData.city} 
-                        onChange={handleChange} 
-                        autoComplete="address-level2"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '12px',
-                          fontSize: '14px',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                        State
-                      </label>
-                      <input 
-                        type="text" 
-                        name="state" 
-                        value={formData.state} 
-                        onChange={handleChange} 
-                        autoComplete="address-level1"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '12px',
-                          fontSize: '14px',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                        Zip
-                      </label>
-                      <input 
-                        ref={zipFieldRef}
-                        type="text" 
-                        name="zip" 
-                        value={formData.zip} 
-                        onChange={handleChange} 
-                        autoComplete="postal-code"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '12px',
-                          fontSize: '14px',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
+                </div>
+                <div className="card-field-wrapper">
+                  <label>State</label>
+                  <input 
+                    type="text" 
+                    name="state" 
+                    value={formData.state} 
+                    onChange={handleChange} 
+                    autoComplete="address-level1"
+                    className="card-field-container"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      backgroundColor: '#f9f9f9'
+                    }}
+                  />
+                </div>
+                <div className="card-field-wrapper">
+                  <label>Zip</label>
+                  <input 
+                    ref={zipFieldRef}
+                    type="text" 
+                    name="zip" 
+                    value={formData.zip} 
+                    onChange={handleChange} 
+                    autoComplete="postal-code"
+                    className="card-field-container"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      backgroundColor: '#f9f9f9'
+                    }}
+                  />
                 </div>
               </div>
             </div>
