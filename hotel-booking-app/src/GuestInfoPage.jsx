@@ -1913,7 +1913,7 @@ const handlePayLaterBooking = async (e) => {
             </div>
 
             {/* Billing Address Section - Integrated with card fields */}
-            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
               <div className="card-field-wrapper">
                 <label>Billing Address</label>
                 <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
@@ -1926,13 +1926,15 @@ const handlePayLaterBooking = async (e) => {
                     autoComplete="street-address"
                     style={{
                       width: '100%',
+                      maxWidth: '100%',
                       padding: '14px',
                       border: '1px solid #e0e0e0',
                       borderRadius: '8px',
                       fontSize: '16px',
                       backgroundColor: '#fff',
                       transition: 'all 0.2s ease',
-                      fontFamily: 'Inter, sans-serif'
+                      fontFamily: 'Inter, sans-serif',
+                      boxSizing: 'border-box'
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = '#0070f3';
@@ -1951,13 +1953,14 @@ const handlePayLaterBooking = async (e) => {
                 </Autocomplete>
               </div>
               
-              {/* Address fields with slide-down animation */}
+              {/* Address fields with slide-down animation - Now stacked vertically */}
               <div ref={addressFieldsRef} className={`address-fields-container ${isAddressSelected ? 'visible' : ''}`}>
                 <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '2fr 1fr 1fr', 
+                  display: 'flex', 
+                  flexDirection: 'column',
                   gap: '12px', 
-                  marginTop: '12px'
+                  marginTop: '12px',
+                  maxWidth: '100%'
                 }}>
                   <div className="card-field-wrapper">
                     <label>City</label>
@@ -1969,13 +1972,15 @@ const handlePayLaterBooking = async (e) => {
                       autoComplete="address-level2"
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
                         padding: '14px',
                         border: '1px solid #e0e0e0',
                         borderRadius: '8px',
                         fontSize: '16px',
                         backgroundColor: '#fff',
                         transition: 'all 0.2s ease',
-                        fontFamily: 'Inter, sans-serif'
+                        fontFamily: 'Inter, sans-serif',
+                        boxSizing: 'border-box'
                       }}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#0070f3';
@@ -1997,13 +2002,15 @@ const handlePayLaterBooking = async (e) => {
                       autoComplete="address-level1"
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
                         padding: '14px',
                         border: '1px solid #e0e0e0',
                         borderRadius: '8px',
                         fontSize: '16px',
                         backgroundColor: '#fff',
                         transition: 'all 0.2s ease',
-                        fontFamily: 'Inter, sans-serif'
+                        fontFamily: 'Inter, sans-serif',
+                        boxSizing: 'border-box'
                       }}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#0070f3';
@@ -2026,13 +2033,15 @@ const handlePayLaterBooking = async (e) => {
                       autoComplete="postal-code"
                       style={{
                         width: '100%',
+                        maxWidth: '100%',
                         padding: '14px',
                         border: '1px solid #e0e0e0',
                         borderRadius: '8px',
                         fontSize: '16px',
                         backgroundColor: '#fff',
                         transition: 'all 0.2s ease',
-                        fontFamily: 'Inter, sans-serif'
+                        fontFamily: 'Inter, sans-serif',
+                        boxSizing: 'border-box'
                       }}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#0070f3';
