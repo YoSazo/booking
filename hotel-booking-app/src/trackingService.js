@@ -169,7 +169,7 @@ const sendEventToPixel = (pixelEventName, payload, eventID) => {
 };
 
 export const trackSearch = (checkinDate, checkoutDate) => {
-    if (!shouldFireEvent('Search')) return;
+    // Don't use shouldFireEvent for Search - allow multiple searches per session
     const eventID = `search.${Date.now()}`;
     const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const searchData = {
@@ -184,6 +184,8 @@ export const trackSearch = (checkinDate, checkoutDate) => {
         checkin_date: searchData.checkin_date,
         checkout_date: searchData.checkout_date
     });
+    
+    console.log(`✅ Search event fired for ${searchData.checkin_date} to ${searchData.checkout_date}`);
 };
 
 export const trackAddToCart = (bookingDetails) => {
