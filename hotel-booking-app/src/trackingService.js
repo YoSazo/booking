@@ -189,7 +189,7 @@ export const trackSearch = (checkinDate, checkoutDate) => {
 };
 
 export const trackAddToCart = (bookingDetails) => {
-    if (!shouldFireEvent('AddToCart')) return;
+    // Don't use shouldFireEvent for AddToCart - allow multiple room selections per session
     const eventID = `addtocart.${Date.now()}`;
     const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const cartData = {
@@ -212,6 +212,8 @@ export const trackAddToCart = (bookingDetails) => {
             price: bookingDetails.subtotal
         }]
     });
+    
+    console.log(`✅ AddToCart event fired for ${bookingDetails.name} - $${bookingDetails.subtotal}`);
 };
 
 export const trackInitiateCheckout = (bookingDetails) => {
