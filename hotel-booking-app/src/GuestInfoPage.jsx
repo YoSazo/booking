@@ -321,13 +321,15 @@ useEffect(() => {
             }, [elements]);
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
+    // NOTE: This is ONLY used to detect if wallet is available and which type
+    // Each payment plan (payLater, trial, reserve, full) creates its OWN payment request with correct amount
     useEffect(() => {
         if (stripe && clientSecret && bookingDetails) {
-            const amountInCents = Math.round((bookingDetails.total / 2) * 100);
+            // Use a minimal amount just to check wallet availability - this won't be used for actual payment
             const pr = stripe.paymentRequest({
                 country: 'US',
                 currency: 'usd',
-                total: { label: 'Booking Payment', amount: amountInCents },
+                total: { label: 'Booking Payment', amount: 100 }, // Minimal amount just for detection
                 requestPayerName: true,
                 requestPayerEmail: true,
             });
@@ -360,33 +362,7 @@ useEffect(() => {
     setWalletType(null);
 });
 
-            // Add this helper function
-
-            pr.on('paymentmethod', async (ev) => {
-                // Save form data to sessionStorage
-                sessionStorage.setItem('guestInfo', JSON.stringify(latestFormData.current));
-                sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-
-                // Confirm the payment with Stripe
-                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-                    clientSecret, 
-                    { payment_method: ev.paymentMethod.id }, 
-                    { handleActions: false }
-                );
-                
-                if (confirmError) {
-                    ev.complete('fail');
-                    setHasAttemptedSubmit(true);
-                    setErrorMessage(confirmError.message);
-                    setIsProcessing(false);
-                    return;
-                }
-                
-                ev.complete('success');
-                
-                // ✅ Call onComplete directly (just like card payments do)
-                onComplete(latestFormData.current, paymentIntent.id);
-            });
+            // NOTE: No payment handler here - each plan creates its own payment request with proper handler
         }
     }, [stripe, clientSecret, bookingDetails]);
 
