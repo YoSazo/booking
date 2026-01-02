@@ -116,12 +116,19 @@ body {
   .room-card {
     flex-direction: row;
     max-width: 1000px;
+    min-height: 450px; /* Ensure card has good height */
   }
   
   .room-image-container {
     width: 45%;
     min-width: 400px;
-    height: auto;
+    height: 100%; /* Fill full card height */
+    min-height: 450px;
+  }
+  
+  .room-gallery-image {
+    height: 100%; /* Image fills container */
+    object-fit: cover; /* Crop to fill without distortion */
   }
   
   .room-content {
