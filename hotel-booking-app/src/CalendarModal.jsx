@@ -23,16 +23,14 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
+      document.body.style.width = '100%'; // Prevent horizontal shift
       document.body.style.overflow = 'hidden';
     } else {
       // Restore body scroll when modal closes
       const scrollY = document.body.style.top;
       document.body.style.position = '';
       document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
+      document.body.style.width = '';
       document.body.style.overflow = '';
       window.scrollTo(0, parseInt(scrollY || '0') * -1);
     }
@@ -41,8 +39,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       // Cleanup on unmount
       document.body.style.position = '';
       document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
+      document.body.style.width = '';
       document.body.style.overflow = '';
     };
   }, [isOpen, initialCheckin, initialCheckout]);
