@@ -110,11 +110,9 @@ body {
   }
   
   /* Facebook/Instagram browsers ONLY: More padding */
-  /* TEMPORARILY DISABLED FOR TESTING
   .fb-browser .rooms-list {
     padding-bottom: 120px;
   }
-  */
 }
 
 /* ========== PREMIUM ROOM CARD STYLES ========== */
@@ -2150,17 +2148,15 @@ padding: 6px 16px;
   }
   
   /* Facebook/Instagram browsers ONLY: Static positioning, not sticky */
-  /* TEMPORARILY DISABLED FOR TESTING
   .fb-browser .checkout-cta-container.sticky,
   .fb-browser .checkout-cta-container {
-    position: static;
+    position: static; /* Not sticky - stays in normal document flow */
     bottom: auto;
-    padding: 16px 20px;
-    background: transparent;
-    border-top: none;
-    box-shadow: none;
+    padding: 16px 20px; /* Normal padding */
+    background: transparent; /* Remove gradient background */
+    border-top: none; /* Remove border */
+    box-shadow: none; /* Remove shadow */
   }
-  */
   
   /* Add extra padding to container pages */
   .guest-info-container {
@@ -2172,15 +2168,13 @@ padding: 6px 16px;
   }
   
   /* Facebook/Instagram browsers ONLY: Extra padding for content */
-  /* TEMPORARILY DISABLED FOR TESTING
   .fb-browser .guest-info-container {
-    padding-bottom: 200px;
+    padding-bottom: 200px; /* FB/IG: Extra padding since button is higher up */
   }
   
   .fb-browser .container {
-    padding-bottom: 140px;
+    padding-bottom: 140px; /* FB/IG: More padding but not excessive */
   }
-  */
   
   /* Make progress bar even more compact on mobile */
   .checkout-progress-bar {
@@ -4288,11 +4282,9 @@ padding: 6px 16px;
 }
 
 /* Facebook/Instagram browsers ONLY: Extra bottom padding */
-/* TEMPORARILY DISABLED FOR TESTING
 .fb-browser .calendar-modal-footer {
-  padding-bottom: 95px;
+  padding-bottom: 95px; /* UPDATED: One more push up to fully clear toolbar */
 }
-*/
 
 .calendar-footer-content {
   max-width: 600px;
