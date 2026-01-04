@@ -2123,16 +2123,18 @@ padding: 6px 16px;
   .checkout-cta-container.sticky,
   .checkout-cta-container {
     position: fixed;
-    bottom: 60px; /* UPDATED: Move button 60px UP from bottom to clear browser chrome */
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px)); /* UPDATED: Use safe-area for FB/IG */
     left: 0;
     right: 0;
     margin: 0;
     padding: 16px 20px;
-    padding-bottom: 20px; /* UPDATED: Reduced since we're using bottom: 60px instead */
+    padding-bottom: 20px;
     background: linear-gradient(to top, #ffffff 80%, rgba(255,255,255,0.95) 95%, transparent);
     border-top: 1px solid var(--border-color);
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     z-index: 100;
+    /* Force height constraint for FB browser */
+    max-height: calc(var(--real-vh, 1vh) * 100 - 60px);
   }
   
   /* Add extra padding to ALL container pages so content doesn't hide under button */

@@ -4,7 +4,8 @@ import App from './App.jsx';
 import './index.css';
 import { LoadScript } from '@react-google-maps/api';
 import { BrowserRouter } from 'react-router-dom';
-import { Analytics } from '@vercel/analytics/react';  // ← Add this
+import { Analytics } from '@vercel/analytics/react';
+import './fixFacebookViewport.js'; // Fix Facebook in-app browser viewport bug
 
 const libraries = ['places'];
 
