@@ -4185,11 +4185,12 @@ padding: 6px 16px;
   background: white;
   border-top: 1px solid #e5e7eb;
   padding: 16px 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom)); /* Account for iOS home indicator */
+  /* UPDATED: Add MUCH more padding for Facebook/Instagram in-app browsers */
+  padding-bottom: max(80px, env(safe-area-inset-bottom)); /* 80px to clear FB/IG toolbar */
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
   z-index: 10;
-  flex-shrink: 0; /* Don't let footer shrink */
-  overflow-y: visible; /* No scrolling in footer */
+  flex-shrink: 0;
+  overflow-y: visible;
 }
 
 .calendar-footer-content {
