@@ -2123,13 +2123,12 @@ padding: 6px 16px;
   .checkout-cta-container.sticky,
   .checkout-cta-container {
     position: fixed;
-    bottom: 0;
+    bottom: 60px; /* UPDATED: Move button 60px UP from bottom to clear browser chrome */
     left: 0;
     right: 0;
     margin: 0;
     padding: 16px 20px;
-    /* UPDATED: Add much more bottom padding for Facebook/Instagram toolbar */
-    padding-bottom: max(80px, env(safe-area-inset-bottom)); /* 80px to clear FB/IG toolbar */
+    padding-bottom: 20px; /* UPDATED: Reduced since we're using bottom: 60px instead */
     background: linear-gradient(to top, #ffffff 80%, rgba(255,255,255,0.95) 95%, transparent);
     border-top: 1px solid var(--border-color);
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
