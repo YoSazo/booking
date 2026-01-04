@@ -2143,8 +2143,9 @@ padding: 6px 16px;
   /* Facebook/Instagram browsers ONLY: Move button up to clear toolbar */
   .fb-browser .checkout-cta-container.sticky,
   .fb-browser .checkout-cta-container {
-    bottom: 90px; /* UPDATED: Higher to fully clear toolbar */
-    padding: 12px 20px; /* Less padding, no gradient background needed */
+    position: static; /* UPDATED: Not sticky, stays in flow */
+    bottom: auto;
+    padding: 16px 20px; /* Match normal padding */
     background: transparent; /* Remove gradient background */
     border-top: none; /* Remove border */
     box-shadow: none; /* Remove shadow */

@@ -47,7 +47,7 @@ function PaymentInfoModal({ onClose, hotel, selectedPlan, priceToday, balanceDue
         minHeight: '100vh',
         maxWidth: '1200px',
         margin: '0 auto',
-        padding: '80px 60px 60px 60px'
+        padding: '80px 60px 120px 60px' // Increased bottom padding from 60px to 120px for better spacing
       }}>
         <button onClick={onClose} style={{
           position: 'fixed',
