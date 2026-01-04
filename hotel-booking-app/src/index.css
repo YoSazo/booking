@@ -99,7 +99,12 @@ body {
 /* Mobile - Add bottom padding so last room card button isn't smooshed */
 @media (max-width: 768px) {
   .rooms-list {
-    padding-bottom: 120px; /* Extra space for Facebook/Instagram in-app browser toolbar */
+    padding-bottom: 80px; /* Normal browsers: moderate padding */
+  }
+  
+  /* Facebook/Instagram browsers ONLY: More padding */
+  .fb-browser .rooms-list {
+    padding-bottom: 120px;
   }
 }
 
@@ -2138,19 +2143,27 @@ padding: 6px 16px;
   /* Facebook/Instagram browsers ONLY: Move button up to clear toolbar */
   .fb-browser .checkout-cta-container.sticky,
   .fb-browser .checkout-cta-container {
-    bottom: 80px; /* UPDATED: Move even higher for FB/IG toolbar */
+    bottom: 80px; /* UPDATED: One more push up to fully clear toolbar */
     padding-bottom: 20px;
     max-height: calc(var(--real-vh, 1vh) * 100 - 80px);
   }
   
-  /* Add extra padding to ALL container pages so content doesn't hide under button */
+  /* Add extra padding to container pages */
   .guest-info-container {
-    padding-bottom: 180px; /* UPDATED: Extra padding so button is always 100% visible */
+    padding-bottom: 100px; /* Normal browsers: standard padding */
   }
   
-  /* Also add padding to booking page container */
   .container {
-    padding-bottom: 180px;
+    padding-bottom: 100px; /* Normal browsers: standard padding */
+  }
+  
+  /* Facebook/Instagram browsers ONLY: Extra padding for content */
+  .fb-browser .guest-info-container {
+    padding-bottom: 140px; /* FB/IG: More padding but not excessive */
+  }
+  
+  .fb-browser .container {
+    padding-bottom: 140px; /* FB/IG: More padding but not excessive */
   }
   
   /* Make progress bar even more compact on mobile */
@@ -4248,7 +4261,7 @@ padding: 6px 16px;
 
 /* Facebook/Instagram browsers ONLY: Extra bottom padding */
 .fb-browser .calendar-modal-footer {
-  padding-bottom: 100px; /* UPDATED: Even more padding for FB/IG toolbar */
+  padding-bottom: 95px; /* UPDATED: One more push up to fully clear toolbar */
 }
 
 .calendar-footer-content {
