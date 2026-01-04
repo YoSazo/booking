@@ -2138,9 +2138,9 @@ padding: 6px 16px;
   /* Facebook/Instagram browsers ONLY: Move button up to clear toolbar */
   .fb-browser .checkout-cta-container.sticky,
   .fb-browser .checkout-cta-container {
-    bottom: 60px;
+    bottom: 80px; /* UPDATED: Move even higher for FB/IG toolbar */
     padding-bottom: 20px;
-    max-height: calc(var(--real-vh, 1vh) * 100 - 60px);
+    max-height: calc(var(--real-vh, 1vh) * 100 - 80px);
   }
   
   /* Add extra padding to ALL container pages so content doesn't hide under button */
@@ -4248,7 +4248,7 @@ padding: 6px 16px;
 
 /* Facebook/Instagram browsers ONLY: Extra bottom padding */
 .fb-browser .calendar-modal-footer {
-  padding-bottom: 80px;
+  padding-bottom: 100px; /* UPDATED: Even more padding for FB/IG toolbar */
 }
 
 .calendar-footer-content {
