@@ -2164,35 +2164,6 @@ const handlePayLaterBooking = async (e) => {
                 
                 
 
-{/* What Happens Next Link - Opens Modal - OUTSIDE sticky container for FB/IG */}
-{currentStep === 4 && (
-  <div style={{ 
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: '12px',
-    padding: '0 20px',
-    width: '100%'
-  }}>
-    <button
-      type="button"
-      onClick={() => setIsPaymentInfoModalOpen(true)}
-      style={{
-        background: 'none',
-        border: 'none',
-        color: '#007bff',
-        textDecoration: 'underline',
-        fontSize: '14px',
-        cursor: 'pointer',
-        padding: '8px',
-        fontWeight: '500'
-      }}
-    >
-      ❓ What happens after I pay?
-    </button>
-  </div>
-)}
-
 <div className={`checkout-cta-container sticky`} ref={currentStep === 4 ? paymentOptionsRef : null}>
   {currentStep !== 4 ? (
     <button type="button" className="btn btn-confirm btn-wider" onClick={handleNextStep}>
@@ -2201,25 +2172,56 @@ const handlePayLaterBooking = async (e) => {
       {currentStep === 3 && "Continue to Payment"}
     </button>
   ) : (
-    <button
-      type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
-      form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
-      className="btn btn-confirm btn-wider"
-      onClick={
-        selectedPlan === 'trial' 
-          ? (e) => handleTrialNightBooking(e)
-          : selectedPlan === 'reserve'
-            ? (e) => handleReserveBooking(e)
-            : selectedPlan === 'payLater'
-              ? (e) => handlePayLaterBooking(e)
-              : selectedPlan === 'full'
-                ? (e) => handleCardSubmit(e)
-                : () => { window.userInitiatedSubmit = true; }
-      }
-      disabled={isProcessing || isProcessingTrial || !clientSecret || !stripe || !elements}
-    >
-      {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
-    </button>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center',
+      width: '100%',
+      gap: '12px'
+    }}>
+      {/* What Happens Next Link - Inside footer with the button */}
+      <div style={{ 
+        textAlign: 'center',
+        width: '100%'
+      }}>
+        <button
+          type="button"
+          onClick={() => setIsPaymentInfoModalOpen(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#007bff',
+            textDecoration: 'underline',
+            fontSize: '14px',
+            cursor: 'pointer',
+            padding: '8px',
+            fontWeight: '500'
+          }}
+        >
+          ❓ What happens after I pay?
+        </button>
+      </div>
+      
+      <button
+        type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
+        form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
+        className="btn btn-confirm btn-wider"
+        onClick={
+          selectedPlan === 'trial' 
+            ? (e) => handleTrialNightBooking(e)
+            : selectedPlan === 'reserve'
+              ? (e) => handleReserveBooking(e)
+              : selectedPlan === 'payLater'
+                ? (e) => handlePayLaterBooking(e)
+                : selectedPlan === 'full'
+                  ? (e) => handleCardSubmit(e)
+                  : () => { window.userInitiatedSubmit = true; }
+        }
+        disabled={isProcessing || isProcessingTrial || !clientSecret || !stripe || !elements}
+      >
+        {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
+      </button>
+    </div>
   )}
 </div>
             </div>
