@@ -2123,17 +2123,23 @@ padding: 6px 16px;
   .checkout-cta-container.sticky,
   .checkout-cta-container {
     position: fixed;
-    bottom: calc(60px + env(safe-area-inset-bottom, 0px)); /* UPDATED: Use safe-area for FB/IG */
+    bottom: 0; /* Normal browsers: sit at bottom */
     left: 0;
     right: 0;
     margin: 0;
     padding: 16px 20px;
-    padding-bottom: 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
     background: linear-gradient(to top, #ffffff 80%, rgba(255,255,255,0.95) 95%, transparent);
     border-top: 1px solid var(--border-color);
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     z-index: 100;
-    /* Force height constraint for FB browser */
+  }
+  
+  /* Facebook/Instagram browsers ONLY: Move button up to clear toolbar */
+  .fb-browser .checkout-cta-container.sticky,
+  .fb-browser .checkout-cta-container {
+    bottom: 60px;
+    padding-bottom: 20px;
     max-height: calc(var(--real-vh, 1vh) * 100 - 60px);
   }
   
@@ -4233,12 +4239,16 @@ padding: 6px 16px;
   background: white;
   border-top: 1px solid #e5e7eb;
   padding: 16px 16px;
-  /* UPDATED: Add MUCH more padding for Facebook/Instagram in-app browsers */
-  padding-bottom: max(80px, env(safe-area-inset-bottom)); /* 80px to clear FB/IG toolbar */
+  padding-bottom: max(20px, env(safe-area-inset-bottom)); /* Normal browsers */
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
   z-index: 10;
   flex-shrink: 0;
   overflow-y: visible;
+}
+
+/* Facebook/Instagram browsers ONLY: Extra bottom padding */
+.fb-browser .calendar-modal-footer {
+  padding-bottom: 80px;
 }
 
 .calendar-footer-content {

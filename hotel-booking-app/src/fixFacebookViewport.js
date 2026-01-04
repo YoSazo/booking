@@ -6,10 +6,15 @@ function fixFacebookViewport() {
   
   if (!isFBBrowser) {
     console.log('Not Facebook browser, skipping viewport fix');
+    // Add class to body for normal browsers
+    document.documentElement.classList.add('normal-browser');
     return;
   }
   
   console.log('Facebook/Instagram browser detected - applying viewport fix');
+  
+  // Add class to body for FB/IG browsers
+  document.documentElement.classList.add('fb-browser');
   
   // Force correct viewport height
   const setHeight = () => {
