@@ -2128,15 +2128,22 @@ padding: 6px 16px;
     right: 0;
     margin: 0;
     padding: 16px 20px;
+    /* UPDATED: Add much more bottom padding for Facebook/Instagram toolbar */
+    padding-bottom: max(80px, env(safe-area-inset-bottom)); /* 80px to clear FB/IG toolbar */
     background: linear-gradient(to top, #ffffff 80%, rgba(255,255,255,0.95) 95%, transparent);
     border-top: 1px solid var(--border-color);
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     z-index: 100;
   }
   
-  /* More padding needed because forms are longer */
+  /* Add extra padding to ALL container pages so content doesn't hide under button */
   .guest-info-container {
-    padding-bottom: 100px; /* Ensure content doesn't hide under sticky button */
+    padding-bottom: 140px; /* UPDATED: Increased from 100px to account for taller sticky footer */
+  }
+  
+  /* Also add padding to booking page container */
+  .container {
+    padding-bottom: 140px;
   }
   
   /* Make progress bar even more compact on mobile */
