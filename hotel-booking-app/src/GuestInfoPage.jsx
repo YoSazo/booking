@@ -400,7 +400,13 @@ useEffect(() => {
     return Object.keys(errors).length === 0;
 };
 
-    const handleNextStep = () => {
+    const handleNextStep = (e) => {
+  // Prevent form submission when clicking navigation buttons
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  
   if (currentStep === 1) {
     setCurrentStep(2);
     trackInitiateCheckout(bookingDetails);
@@ -2161,7 +2167,9 @@ const handlePayLaterBooking = async (e) => {
 {/* What Happens Next Link - Opens Modal - OUTSIDE sticky container for FB/IG */}
 {currentStep === 4 && (
   <div style={{ 
-    textAlign: 'center', 
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: '12px',
     padding: '0 20px',
     width: '100%'
@@ -2187,7 +2195,7 @@ const handlePayLaterBooking = async (e) => {
 
 <div className={`checkout-cta-container sticky`} ref={currentStep === 4 ? paymentOptionsRef : null}>
   {currentStep !== 4 ? (
-    <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
+    <button type="button" className="btn btn-confirm btn-wider" onClick={handleNextStep}>
       {currentStep === 1 && "Continue to Info"}
       {currentStep === 2 && "Continue to Plan"}
       {currentStep === 3 && "Continue to Payment"}
@@ -2196,7 +2204,7 @@ const handlePayLaterBooking = async (e) => {
     <button
       type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
       form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
-      className="btn btn-confirm"
+      className="btn btn-confirm btn-wider"
       onClick={
         selectedPlan === 'trial' 
           ? (e) => handleTrialNightBooking(e)

@@ -3,6 +3,10 @@ html, body, #root {
   /* This prevents the "rubber band" scrolling bounce effect on mobile,
      especially on iOS, and stops the grey background from appearing. */
   overscroll-behavior-y: contain;
+  /* Prevent horizontal scrolling and overflow */
+  overflow-x: hidden;
+  max-width: 100vw;
+  position: relative;
 }
 
 /* --- Basic Styles & Fonts --- */
@@ -21,6 +25,9 @@ body {
     background-color: #f4f7f9;
     color: var(--text-color);
     line-height: 1.6;
+    /* Prevent viewport shifting on input focus */
+    width: 100%;
+    overflow-x: hidden;
 }
 
 /* --- Main Container --- */
@@ -2202,6 +2209,13 @@ padding: 6px 16px;
   transition: all 0.2s ease;
 }
 
+/* Make buttons wider/longer horizontally */
+.checkout-cta-container .btn-confirm.btn-wider {
+  width: 95%;
+  max-width: 480px; /* Increased from 380px to 480px */
+  padding: 18px; /* Increased from 16px to 18px */
+}
+
 .checkout-cta-container .btn-confirm:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(40, 167, 69, 0.35);
@@ -2430,6 +2444,8 @@ padding: 6px 16px;
 .card-field-wrapper {
   width: 100%;
   position: relative;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 
@@ -2467,6 +2483,9 @@ padding: 6px 16px;
   background-color: #fff; /* Changed from #fafafa to #fff */
   position: relative;
   transition: all 0.2s ease;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent content from overflowing */
 }
 
 .card-field-container:focus-within {
