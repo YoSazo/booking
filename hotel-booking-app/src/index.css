@@ -2138,12 +2138,12 @@ padding: 6px 16px;
   
   /* Add extra padding to ALL container pages so content doesn't hide under button */
   .guest-info-container {
-    padding-bottom: 140px; /* UPDATED: Increased from 100px to account for taller sticky footer */
+    padding-bottom: 180px; /* UPDATED: Extra padding so button is always 100% visible */
   }
   
   /* Also add padding to booking page container */
   .container {
-    padding-bottom: 140px;
+    padding-bottom: 180px;
   }
   
   /* Make progress bar even more compact on mobile */
