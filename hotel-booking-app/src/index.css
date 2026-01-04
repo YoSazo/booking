@@ -2159,7 +2159,7 @@ padding: 6px 16px;
   
   /* Facebook/Instagram browsers ONLY: Extra padding for content */
   .fb-browser .guest-info-container {
-    padding-bottom: 140px; /* FB/IG: More padding but not excessive */
+    padding-bottom: 170px; /* FB/IG: Extra padding since button is higher up */
   }
   
   .fb-browser .container {
