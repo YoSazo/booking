@@ -96,6 +96,13 @@ body {
     gap: 20px;
 }
 
+/* Mobile - Add bottom padding so last room card button isn't smooshed */
+@media (max-width: 768px) {
+  .rooms-list {
+    padding-bottom: 120px; /* Extra space for Facebook/Instagram in-app browser toolbar */
+  }
+}
+
 /* ========== PREMIUM ROOM CARD STYLES ========== */
 
 .room-card {
@@ -3970,7 +3977,7 @@ padding: 6px 16px;
   }
 }
 
-/* Modal Header - Compact */
+/* Modal Header - Compact with Month Navigation */
 .calendar-modal-header {
   display: flex;
   justify-content: space-between;
@@ -3981,6 +3988,39 @@ padding: 6px 16px;
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.calendar-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.month-nav-btn {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.month-nav-btn:hover {
+  background: #e5e7eb;
+}
+
+.month-year-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
 }
 
 .calendar-modal-header h2 {

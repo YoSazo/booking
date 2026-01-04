@@ -225,8 +225,13 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       <div className="calendar-modal-overlay" onClick={onClose}></div>
       <div className="calendar-modal-content">
         {/* Header with Close Button */}
+        {/* Combined Header with Month Navigation and Close Button */}
         <div className="calendar-modal-header">
-          <h2>Select Your Dates</h2>
+          <div className="calendar-header-nav">
+            <button onClick={() => changeMonth(-1)} className="month-nav-btn">&lt;</button>
+            <h3 className="month-year-text">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+            <button onClick={() => changeMonth(1)} className="month-nav-btn">&gt;</button>
+          </div>
           <button className="calendar-close-btn" onClick={onClose}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
@@ -238,12 +243,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         {/* Scrollable Content Area */}
         <div className="calendar-modal-body">
           <div className="calendar-content-wrapper">
-            {/* Month Navigation */}
-            <div className="calendar-header">
-              <button onClick={() => changeMonth(-1)}>&lt;</button>
-              <h3>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-              <button onClick={() => changeMonth(1)}>&gt;</button>
-            </div>
 
             {/* Calendar Grid */}
             <div className="calendar-grid">
