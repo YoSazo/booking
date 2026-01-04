@@ -2140,11 +2140,12 @@ padding: 6px 16px;
     z-index: 100;
   }
   
-  /* Facebook/Instagram browsers ONLY: Move button up to clear toolbar */
+  /* Facebook/Instagram browsers ONLY: Static positioning, not sticky */
   .fb-browser .checkout-cta-container.sticky,
   .fb-browser .checkout-cta-container {
-    bottom: 90px; /* UPDATED: Higher to fully clear toolbar */
-    padding: 12px 20px; /* Less padding, no gradient background needed */
+    position: static; /* Not sticky - stays in normal document flow */
+    bottom: auto;
+    padding: 16px 20px; /* Normal padding */
     background: transparent; /* Remove gradient background */
     border-top: none; /* Remove border */
     box-shadow: none; /* Remove shadow */
