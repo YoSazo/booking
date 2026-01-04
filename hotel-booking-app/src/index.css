@@ -3932,49 +3932,41 @@ padding: 6px 16px;
 }
 
 .calendar-modal-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 1000;
+  touch-action: none;
 }
 
 .calendar-modal-content {
   position: relative;
   width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
+  height: 100%;
+  max-height: 100%;
   background: white;
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
-  animation: scaleIn 0.3s ease;
-  overflow: hidden;
+  animation: slideUp 0.3s ease;
 }
 
-/* Desktop: Slightly larger */
+/* Desktop: Limit height to 95vh so it doesn't touch top/bottom */
 @media (min-width: 768px) {
   .calendar-modal-content {
-    max-width: 700px;
+    height: 95vh;
     max-height: 95vh;
   }
 }
 
-@keyframes scaleIn {
+@keyframes slideUp {
   from {
-    transform: scale(0.9);
-    opacity: 0;
+    transform: translateY(100%);
   }
   to {
-    transform: scale(1);
-    opacity: 1;
+    transform: translateY(0);
   }
 }
 
