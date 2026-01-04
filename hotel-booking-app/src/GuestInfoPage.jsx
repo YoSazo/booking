@@ -2158,6 +2158,33 @@ const handlePayLaterBooking = async (e) => {
                 
                 
 
+{/* What Happens Next Link - Opens Modal - OUTSIDE sticky container for FB/IG */}
+{currentStep === 4 && (
+  <div style={{ 
+    textAlign: 'center', 
+    marginBottom: '12px',
+    padding: '0 20px',
+    width: '100%'
+  }}>
+    <button
+      type="button"
+      onClick={() => setIsPaymentInfoModalOpen(true)}
+      style={{
+        background: 'none',
+        border: 'none',
+        color: '#007bff',
+        textDecoration: 'underline',
+        fontSize: '14px',
+        cursor: 'pointer',
+        padding: '8px',
+        fontWeight: '500'
+      }}
+    >
+      ❓ What happens after I pay?
+    </button>
+  </div>
+)}
+
 <div className={`checkout-cta-container sticky`} ref={currentStep === 4 ? paymentOptionsRef : null}>
   {currentStep !== 4 ? (
     <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
@@ -2166,37 +2193,7 @@ const handlePayLaterBooking = async (e) => {
       {currentStep === 3 && "Continue to Payment"}
     </button>
   ) : (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center',
-      width: '100%'
-    }}>
-      {/* What Happens Next Link - Opens Modal */}
-      <div style={{ 
-        textAlign: 'center', 
-        marginBottom: '12px',
-        padding: '0 20px',
-        width: '100%'
-      }}>
-        <button
-          type="button"
-          onClick={() => setIsPaymentInfoModalOpen(true)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#007bff',
-            textDecoration: 'underline',
-            fontSize: '14px',
-            cursor: 'pointer',
-            padding: '8px',
-            fontWeight: '500'
-          }}
-        >
-          ❓ What happens after I pay?
-        </button>
-      </div>
-      <button
+    <button
       type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
       form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
       className="btn btn-confirm"
@@ -2215,7 +2212,6 @@ const handlePayLaterBooking = async (e) => {
     >
       {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
     </button>
-    </div>
   )}
 </div>
             </div>
