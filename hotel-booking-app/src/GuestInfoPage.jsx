@@ -2161,9 +2161,9 @@ const handlePayLaterBooking = async (e) => {
 <div className={`checkout-cta-container sticky`} ref={currentStep === 4 ? paymentOptionsRef : null}>
   {currentStep !== 4 ? (
     <button type="button" className="btn btn-confirm" onClick={handleNextStep}>
-      {currentStep === 1 && "Proceed to Info"}
-      {currentStep === 2 && "Proceed to Plan"}
-      {currentStep === 3 && "Proceed to Payment"}
+      {currentStep === 1 && "Continue to Info"}
+      {currentStep === 2 && "Continue to Plan"}
+      {currentStep === 3 && "Continue to Payment"}
     </button>
   ) : (
     <div style={{ 

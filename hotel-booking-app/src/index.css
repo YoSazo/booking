@@ -2143,9 +2143,11 @@ padding: 6px 16px;
   /* Facebook/Instagram browsers ONLY: Move button up to clear toolbar */
   .fb-browser .checkout-cta-container.sticky,
   .fb-browser .checkout-cta-container {
-    bottom: 80px; /* UPDATED: One more push up to fully clear toolbar */
-    padding-bottom: 20px;
-    max-height: calc(var(--real-vh, 1vh) * 100 - 80px);
+    bottom: 90px; /* UPDATED: Higher to fully clear toolbar */
+    padding: 12px 20px; /* Less padding, no gradient background needed */
+    background: transparent; /* Remove gradient background */
+    border-top: none; /* Remove border */
+    box-shadow: none; /* Remove shadow */
   }
   
   /* Add extra padding to container pages */
@@ -2159,7 +2161,7 @@ padding: 6px 16px;
   
   /* Facebook/Instagram browsers ONLY: Extra padding for content */
   .fb-browser .guest-info-container {
-    padding-bottom: 170px; /* FB/IG: Extra padding since button is higher up */
+    padding-bottom: 200px; /* FB/IG: Extra padding since button is higher up */
   }
   
   .fb-browser .container {
