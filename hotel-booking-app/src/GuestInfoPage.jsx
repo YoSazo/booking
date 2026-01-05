@@ -2134,6 +2134,31 @@ const handlePayLaterBooking = async (e) => {
                 </div>
               </div>
             </div>
+            
+            {/* Pay Later reminder banner - after billing address, visible to all payment methods */}
+            {selectedPlan === 'payLater' && (
+              <div style={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #10b981',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                marginTop: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}>
+                <ShieldCheck size={16} color="#10b981" strokeWidth={2.5} />
+                <span style={{
+                  color: '#047857',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  lineHeight: '1.3'
+                }}>
+                  $0 charged today • $1.00 verification only
+                </span>
+              </div>
+            )}
 
             {/* Wallet selected indicator - inside card section */}
             {paymentMethod === 'wallet' && walletType && (
