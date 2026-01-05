@@ -590,18 +590,25 @@ useEffect(() => {
         
         setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
-        // Validate billing address for BOTH card and wallet payments
-        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
-        }
-
-        // For CARD payment, validate card fields
+        // For CARD payment, validate card fields FIRST
         if (paymentMethod === 'card') {
             if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
                 setErrorMessage("Payment components are not ready. Please refresh the page.");
                 return;
             }
+            
+            // Validate card is filled out
+            const cardNumberElement = elements.getElement(CardNumberElement);
+            if (!cardNumberElement || !cardNumberElement._complete) {
+                setErrorMessage("Please fill out your card information before proceeding.");
+                return;
+            }
+        }
+
+        // Validate billing address for BOTH card and wallet payments (checked AFTER card info)
+        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+            setErrorMessage("Please fill out your billing address before proceeding.");
+            return;
         }
 
         setIsProcessing(true);
@@ -719,20 +726,20 @@ useEffect(() => {
     
     setHasAttemptedSubmit(true);
 
-    // ✅ Validate billing address for BOTH card and wallet
-    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        return;
-    }
-
     // Process payment based on method
     if (paymentMethod === 'card') {
-        // ✅ Validate card is filled out
+        // ✅ Validate card is filled out FIRST
         const cardNumberElement = elements.getElement(CardNumberElement);
         if (!cardNumberElement || !cardNumberElement._complete) {
             setErrorMessage("Please fill out your card information before proceeding.");
             return;
         }
+    }
+
+    // ✅ Validate billing address for BOTH card and wallet (checked AFTER card info)
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
     }
 
     setIsProcessing(true);
@@ -889,20 +896,20 @@ const handleTrialNightBooking = async (e) => {
     
     setHasAttemptedSubmit(true);
 
-    // ✅ Validate billing address for BOTH card and wallet
-    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        return;
-    }
-
     // Process payment based on method
     if (paymentMethod === 'card') {
-        // ✅ Validate card is filled out
+        // ✅ Validate card is filled out FIRST
         const cardNumberElement = elements.getElement(CardNumberElement);
         if (!cardNumberElement || !cardNumberElement._complete) {
             setErrorMessage("Please fill out your card information before proceeding.");
             return;
         }
+    }
+
+    // ✅ Validate billing address for BOTH card and wallet (checked AFTER card info)
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
     }
 
     setIsProcessingTrial(true);
@@ -1095,20 +1102,20 @@ const handlePayLaterBooking = async (e) => {
     
     setHasAttemptedSubmit(true);
 
-    // ✅ Validate billing address for BOTH card and wallet
-    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        return;
-    }
-
     // Process payment based on method
     if (paymentMethod === 'card') {
-        // ✅ Validate card is filled out
+        // ✅ Validate card is filled out FIRST
         const cardNumberElement = elements.getElement(CardNumberElement);
         if (!cardNumberElement || !cardNumberElement._complete) {
             setErrorMessage("Please fill out your card information before proceeding.");
             return;
         }
+    }
+
+    // ✅ Validate billing address for BOTH card and wallet (checked AFTER card info)
+    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
+        setErrorMessage("Please fill out your billing address before proceeding.");
+        return;
     }
 
     setIsProcessing(true);
