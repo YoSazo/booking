@@ -1,23 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import PriceBadge from './PriceBadge.jsx';
-import UpsellPrompt from './UpsellPrompt.jsx';
 import { trackSearch } from './trackingService.js';
-import { calculateTieredPrice } from './priceCalculator.js';
 
 function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initialCheckout, rates }) {
   const [startDate, setStartDate] = useState(initialCheckin);
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
-  const [upsellDeclined, setUpsellDeclined] = useState(false);
-  const [activeQuickBook, setActiveQuickBook] = useState(null); // Track which quick book button was clicked
 
   useEffect(() => {
     if (isOpen) {
       setStartDate(initialCheckin);
       setEndDate(initialCheckout);
       setCurrentDate(initialCheckin || new Date());
-      setUpsellDeclined(false);
-      setActiveQuickBook(null); // Reset quick book highlighting
       
       // Prevent body scroll when modal is open - iOS Safari fix
       const scrollY = window.scrollY;
@@ -45,10 +38,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   }, [isOpen, initialCheckin, initialCheckout]);
 
   const handleDayClick = (day) => {
-    console.log('Clicked day:', day);
-    console.log('Current startDate:', startDate);
-    console.log('Current endDate:', endDate);
-    
     // Normalize the clicked day to midnight
     const normalizedDay = new Date(day);
     normalizedDay.setHours(0, 0, 0, 0);
@@ -57,8 +46,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     if (!startDate || (startDate && endDate)) {
         setStartDate(normalizedDay);
         setEndDate(null);
-        setUpsellDeclined(false);
-        setActiveQuickBook(null); // Clear quick book highlighting when manually selecting
         return;
     }
     
@@ -71,39 +58,34 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         if (normalizedDay.getTime() > normalizedStart.getTime()) {
             // Set as end date
             setEndDate(normalizedDay);
-            setUpsellDeclined(false);
-            setActiveQuickBook(null); // Clear quick book highlighting
         } else {
             // Clicking same or earlier date resets
             setStartDate(normalizedDay);
             setEndDate(null);
-            setUpsellDeclined(false);
-            setActiveQuickBook(null); // Clear quick book highlighting
         }
     }
 };
   
-  const handleDone = () => {
+  const handleApply = () => {
     if (startDate && endDate) {
       trackSearch(startDate, endDate);
       onDatesChange({ start: startDate, end: endDate });
       onClose();
     } else {
-      alert("Please select a check-out date.");
+      alert("Please select check-in and check-out dates.");
     }
   };
-
-  const handleUpsellDecline = () => { setUpsellDeclined(true); };
 
   const handleBookMonth = () => {
     const start = startDate || new Date();
     start.setHours(0,0,0,0);
     const newEndDate = new Date(start);
     newEndDate.setDate(newEndDate.getDate() + 28);
-    setStartDate(start);
-    setEndDate(newEndDate);
-    setUpsellDeclined(false);
-    setActiveQuickBook('month'); // Mark month button as active
+    
+    // Immediately apply and search
+    trackSearch(start, newEndDate);
+    onDatesChange({ start: start, end: newEndDate });
+    onClose();
   };
 
   const handleBookWeek = () => {
@@ -111,18 +93,11 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     start.setHours(0,0,0,0);
     const newEndDate = new Date(start);
     newEndDate.setDate(newEndDate.getDate() + 7);
-    setStartDate(start);
-    setEndDate(newEndDate);
-    setUpsellDeclined(false);
-    setActiveQuickBook('week'); // Mark week button as active
-  };
-
-  const handleUpsellConfirm = () => {
-    if (!startDate) return;
-    const newEndDate = new Date(startDate);
-    newEndDate.setDate(newEndDate.getDate() + 7);
-    setEndDate(newEndDate);
-    setUpsellDeclined(false);
+    
+    // Immediately apply and search
+    trackSearch(start, newEndDate);
+    onDatesChange({ start: start, end: newEndDate });
+    onClose();
   };
 
   const changeMonth = (amount) => {
@@ -166,59 +141,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   };
 
   const nights = (startDate && endDate) ? Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) : 0;
-  const showUpsell = nights > 0 && nights < 7 && !upsellDeclined;
-  const showShortStayPrice = nights > 0 && nights < 7 && upsellDeclined;
-
-  // Dynamically adjust calendar body padding based on footer height
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const adjustPadding = () => {
-      const footer = document.querySelector('.calendar-modal-footer');
-      const body = document.querySelector('.calendar-modal-body');
-      
-      if (footer && body) {
-        const footerHeight = footer.offsetHeight;
-        body.style.paddingBottom = `${footerHeight + 20}px`; // Footer height + 20px buffer
-      }
-    };
-    
-    // Adjust on open and when content changes
-    adjustPadding();
-    
-    // Re-adjust after a short delay (for animations/rendering)
-    const timer = setTimeout(adjustPadding, 100);
-    
-    return () => clearTimeout(timer);
-  }, [isOpen, showUpsell, showShortStayPrice, nights]);
-
-  // Smooth scroll to pricing section when dates are selected (mobile only)
-  useEffect(() => {
-    if (!isOpen || nights === 0) return;
-    
-    // Only auto-scroll on mobile devices (where screen space is limited)
-    const isMobile = window.innerWidth <= 768;
-    if (!isMobile) return;
-    
-    const scrollToPricing = () => {
-      const body = document.querySelector('.calendar-modal-body');
-      const pricingSection = document.querySelector('.calendar-price-breakdown');
-      
-      if (body && pricingSection) {
-        // Scroll to show the pricing section (current price, discount, or short stay total)
-        pricingSection.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'nearest',
-          inline: 'nearest'
-        });
-      }
-    };
-    
-    // Delay to ensure content is rendered
-    const timer = setTimeout(scrollToPricing, 150);
-    
-    return () => clearTimeout(timer);
-  }, [isOpen, nights, showUpsell, showShortStayPrice]);
 
   return (
     <div className={`calendar-modal-fullscreen ${isOpen ? 'open' : ''}`}>
@@ -250,98 +172,40 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
             </div>
             <div className="calendar-grid">{renderDays()}</div>
 
-            {/* Current Selection Price (shown when upsell is active) */}
-            {showUpsell && (
-              <div className="calendar-price-breakdown">
-                <div className="calendar-current-selection">
-                  <span className="price-label">Current selection:</span>
-                  <span className="current-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
-                  <span className="night-count">({nights} night{nights > 1 ? 's' : ''})</span>
-                </div>
+            {/* Show nights selected */}
+            {nights > 0 && (
+              <div className="calendar-nights-selected">
+                {nights} night{nights !== 1 ? 's' : ''} selected
               </div>
             )}
 
-            {/* Price Comparison in Body (Scrollable) */}
-            {nights >= 7 && (() => {
-              const originalPrice = nights * rates.NIGHTLY;
-              const discountedPrice = calculateTieredPrice(nights, rates);
-              const savings = originalPrice - discountedPrice;
-              
-              return (
-                <div className="calendar-price-breakdown">
-                  <div className="calendar-price-comparison">
-                    <div className="calendar-original-price">
-                      <span className="price-label">Original Price (at ${rates.NIGHTLY}/night):</span>
-                      <span className="strikethrough-price">${originalPrice.toFixed(2)}</span>
-                    </div>
-                    <div className="calendar-savings-badge">
-                      ⬇️ You Saved ${savings.toFixed(2)}!
-                    </div>
-                    <div className="calendar-discounted-price">
-                      <span className="price-label">{nights >= 28 ? 'Monthly' : 'Weekly'} Discount Total:</span>
-                      <span className="discount-price">${discountedPrice.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Short Stay Total in Body (Scrollable) */}
-            {nights > 0 && nights < 7 && upsellDeclined && (
-              <div className="calendar-price-breakdown">
-                <div className="calendar-price-comparison">
-                  <div className="calendar-total-price">
-                    <span className="price-label">Total Price:</span>
-                    <span className="total-price">${(nights * rates.NIGHTLY).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sticky Footer with Quick Book Buttons + Reserve CTA + Done Button */}
-        <div className="calendar-modal-footer">
-          <div className="calendar-footer-content">
-            {/* Quick Book Buttons */}
-            <div className="calendar-quick-book-buttons">
+            {/* Quick Book Buttons - styled as buttons that trigger search */}
+            <div className="calendar-quick-book-section">
               <button 
-                className={`quick-book-btn ${activeQuickBook === 'week' ? 'active' : ''}`} 
+                className="quick-book-action-btn" 
                 onClick={handleBookWeek}
               >
                 Book 1 Week
               </button>
               <button 
-                className={`quick-book-btn ${activeQuickBook === 'month' ? 'active' : ''}`} 
+                className="quick-book-action-btn" 
                 onClick={handleBookMonth}
               >
                 Book 1 Month
               </button>
             </div>
-            
-            {/* Upsell OR Reserve CTA */}
-            {showUpsell ? (
-              <UpsellPrompt nights={nights} onConfirm={handleUpsellConfirm} onDecline={handleUpsellDecline} rates={rates} />
-            ) : nights > 0 && (
-              <div className="calendar-reserve-zero-box">
-                <div className="reserve-icon-circle">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
-                  </svg>
-                </div>
-                <div>
-                  <div className="reserve-title">Reserve for $0 Today</div>
-                  <div className="reserve-subtitle">Pay ${nights >= 7 ? calculateTieredPrice(nights, rates).toFixed(2) : (nights * rates.NIGHTLY).toFixed(2)} When You Arrive</div>
-                </div>
-              </div>
-            )}
-            
-            {/* Done Button */}
-            <button className="calendar-done-btn" onClick={handleDone}>
-              Done
+
+            {/* Apply Button */}
+            <button 
+              className="calendar-apply-btn" 
+              onClick={handleApply}
+              disabled={!startDate || !endDate}
+            >
+              Apply
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );

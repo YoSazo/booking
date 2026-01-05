@@ -4235,135 +4235,84 @@ padding: 6px 16px;
   opacity: 0.5;
 }
 
-/* Quick Book Buttons - In Footer */
-.calendar-quick-book-buttons {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+/* Nights Selected Message */
+.calendar-nights-selected {
+  text-align: center;
+  padding: 16px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-top: 12px;
 }
 
-.calendar-quick-book-buttons .quick-book-btn {
+/* Quick Book Section - In Body */
+.calendar-quick-book-section {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 0 16px;
+}
+
+.quick-book-action-btn {
   flex: 1;
-  padding: 10px 16px;
+  padding: 14px 20px;
   background: white;
   border: 2px solid #3b82f6;
   color: #3b82f6;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.calendar-quick-book-buttons .quick-book-btn:hover {
+.quick-book-action-btn:hover {
   background: #3b82f6;
   color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2);
 }
 
-.calendar-quick-book-buttons .quick-book-btn.active {
-  background: #3b82f6;
-  color: white;
+.quick-book-action-btn:active {
+  transform: translateY(0);
 }
 
-/* Sticky Footer - Compact */
-.calendar-modal-footer {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  border-top: 1px solid #e5e7eb;
-  padding: 16px 16px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom)); /* Normal browsers */
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-  z-index: 10;
-  flex-shrink: 0;
-  overflow-y: visible;
-}
-
-/* Facebook/Instagram browsers ONLY: Extra bottom padding */
-.fb-browser .calendar-modal-footer {
-  padding-bottom: 95px; /* UPDATED: One more push up to fully clear toolbar */
-}
-
-.calendar-footer-content {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-/* Reserve Box in Footer - Add Spacing from Done Button */
-.calendar-modal-footer .calendar-reserve-zero-box {
-  margin-bottom: 16px; /* Space above Done button */
-}
-
-.calendar-modal-footer .upsell-prompt {
-  margin-bottom: 12px; /* Reduced space - more compact */
-  padding: 10px;
-  background: #f0fdf4;
-  border: 1px solid #d1fae5;
-  border-radius: 10px;
-}
-
-/* Current selection price in scrollable body (when upsell is showing) */
-.calendar-current-selection {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.calendar-current-selection .price-label {
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.calendar-current-selection .current-price {
-  color: #1f2937;
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.calendar-current-selection .night-count {
-  color: #9ca3af;
-  font-size: 13px;
-}
-
-.calendar-done-btn {
-  width: 100%;
-  display: block;
-  padding: 14px 24px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+/* Apply Button */
+.calendar-apply-btn {
+  width: calc(100% - 32px);
+  margin: 16px 16px 24px 16px;
+  padding: 16px;
+  background: #28a745;
   color: white;
   border: none;
   border-radius: 10px;
-  font-size: 1rem;
   font-weight: 700;
+  font-size: 1.1rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 
-.calendar-done-btn:hover {
+.calendar-apply-btn:hover:not(:disabled) {
+  background: #218838;
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
 }
 
-.calendar-done-btn:active {
+.calendar-apply-btn:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.calendar-apply-btn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Desktop - Additional adjustments */
 @media (min-width: 768px) {
   .calendar-modal-header {
-    position: static;
-  }
-  
-  .calendar-modal-footer {
     position: static;
   }
   
@@ -4404,8 +4353,13 @@ padding: 6px 16px;
     padding: 8px 10px;
   }
   
-  .calendar-quick-book-buttons .quick-book-btn {
-    padding: 8px 12px;
-    font-size: 0.8rem;
+  .quick-book-action-btn {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+  }
+  
+  .calendar-apply-btn {
+    font-size: 1rem;
+    padding: 14px;
   }
 }
