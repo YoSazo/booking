@@ -354,6 +354,60 @@ body {
   margin: 0;
 }
 
+/* Selected Dates Display */
+.selected-dates-display {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.dates-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.date-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.date-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.date-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.date-separator {
+  font-size: 1.2rem;
+  color: #3b82f6;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.nights-display {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #3b82f6;
+  padding-top: 8px;
+  border-top: 1px solid #bfdbfe;
+}
+
 /* Premium Pricing Card */
 .premium-pricing-card {
   background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);

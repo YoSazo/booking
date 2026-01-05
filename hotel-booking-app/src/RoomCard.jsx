@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Wifi, Tv, Refrigerator, Briefcase, Bath, Car, Sparkles, Users, PawPrint, ChevronLeft, ChevronRight } from 'lucide-react';
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable  }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
@@ -143,6 +143,24 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
         {/* Description */}
         <p className="room-description">{room.description}</p>
+
+        {/* Selected Dates Display */}
+        {nights > 0 && checkinDate && checkoutDate && (
+          <div className="selected-dates-display">
+            <div className="dates-row">
+              <div className="date-item">
+                <span className="date-label">Check-in</span>
+                <span className="date-value">{new Date(checkinDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              </div>
+              <div className="date-separator">→</div>
+              <div className="date-item">
+                <span className="date-label">Check-out</span>
+                <span className="date-value">{new Date(checkoutDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              </div>
+            </div>
+            <div className="nights-display">{nights} night{nights !== 1 ? 's' : ''}</div>
+          </div>
+        )}
 
         {/* Premium Pricing Card */}
         {nights > 0 ? (

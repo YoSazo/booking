@@ -106,6 +106,8 @@ function BookingPage({
         balanceDue={balanceDue}
         isProcessing={isProcessingBooking}
         roomsAvailable={currentRoomData.roomsAvailable}
+        checkinDate={checkinDate}
+        checkoutDate={checkoutDate}
       />
     ); // <-- 5. Closed the return statement
   }) // <-- 6. Closed the map function with a curly brace
