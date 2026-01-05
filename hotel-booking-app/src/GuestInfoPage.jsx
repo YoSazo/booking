@@ -51,22 +51,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [showLoadingScreen, setShowLoadingScreen] = useState(false);
     
     // Auto-hide loading screen when processing finishes
-    // Smooth scroll to top when component mounts (after DOM is fully loaded)
-    useEffect(() => {
-        // Wait for DOM to be fully loaded and rendered
-        const scrollToTop = () => {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        };
-        
-        // Use requestAnimationFrame to ensure DOM is painted
-        requestAnimationFrame(() => {
-            setTimeout(scrollToTop, 100); // Small delay to ensure everything is rendered
-        });
-    }, []); // Empty dependency array means this runs once on mount
-
     useEffect(() => {
         if (!isProcessing && !isProcessingTrial) {
             setShowLoadingScreen(false);
@@ -200,6 +184,13 @@ useEffect(() => {
   
   // Smooth scroll to top on Step 2 (Info page) so form is visible
   if (currentStep === 2) {
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+  }
+  
+  // Smooth scroll to top on Step 4 (Payment page) so payment form is visible
+  if (currentStep === 4) {
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
