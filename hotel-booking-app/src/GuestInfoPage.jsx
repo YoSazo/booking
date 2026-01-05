@@ -2228,9 +2228,34 @@ const handlePayLaterBooking = async (e) => {
             fontWeight: '500'
           }}
         >
-          ❓ What happens after I pay?
+           What happens after I pay?
         </button>
       </div>
+      
+      {/* Simplified reminder banner for Pay Later - right before submit button */}
+      {selectedPlan === 'payLater' && (
+        <div style={{
+          backgroundColor: '#f0fdf4',
+          border: '2px solid #10b981',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px'
+        }}>
+          <ShieldCheck size={20} color="#10b981" strokeWidth={2.5} />
+          <span style={{
+            color: '#047857',
+            fontSize: '15px',
+            fontWeight: '600',
+            lineHeight: '1.4'
+          }}>
+            $0 charged today • $1.00 verification only
+          </span>
+        </div>
+      )}
       
       <button
         type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
