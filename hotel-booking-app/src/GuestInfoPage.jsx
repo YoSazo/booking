@@ -1846,12 +1846,7 @@ const handlePayLaterBooking = async (e) => {
   
   {/* Show Pay Later explanation banner */}
   {selectedPlan === 'payLater' && (
-  <div className="money-back-guarantee" style={{ 
-    backgroundColor: '#ffffff', 
-    borderColor: '#10b981',
-    border: '2px solid #10b981',
-    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)'
-  }}>
+  <div className="money-back-guarantee" style={{ backgroundColor: '#f0fdf4', borderColor: '#10b981' }}>
     <div className="guarantee-content">
       <div className="guarantee-icon" style={{ 
         display: 'flex', 
@@ -1867,45 +1862,24 @@ const handlePayLaterBooking = async (e) => {
       </div>
       <div className="guarantee-text">
         <div className="guarantee-title" style={{ 
-          color: '#047857', 
+          color: '#065f46', 
           fontWeight: '700',
-          fontSize: '18px',
-          marginBottom: '12px'
+          fontSize: '18px'
         }}>
           Secure Your Reservation - 100% Free
         </div>
-        <div className="guarantee-description" style={{ color: '#1f2937', lineHeight: '1.7', fontSize: '15px' }}>
-          We'll place a temporary <strong style={{ color: '#047857' }}>$1.00 authorization</strong> to verify your card is valid. This hold is released immediately after booking.
+        <div className="guarantee-description" style={{ color: '#1a1a1a', lineHeight: '1.6' }}>
+          We'll place a temporary <strong>$1.00 authorization</strong> to verify your card is valid. This hold is released immediately after booking.
           <br /><br />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={18} color="#10b981" strokeWidth={2.5} />
-              <strong style={{ color: '#1f2937' }}>$0 charged today</strong>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={18} color="#10b981" strokeWidth={2.5} />
-              <strong style={{ color: '#1f2937' }}>$0 charged when you check in</strong>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={18} color="#10b981" strokeWidth={2.5} />
-              <strong style={{ color: '#1f2937' }}>Pay ${bookingDetails.total.toFixed(2)} at the hotel</strong> with any payment method
-            </div>
-          </div>
+          ✅ <strong>$0 charged today</strong>
           <br />
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'flex-start', 
-            gap: '8px',
-            backgroundColor: '#f0fdf4',
-            padding: '12px',
-            borderRadius: '8px',
-            border: '1px solid #d1fae5'
-          }}>
-            <Lightbulb size={18} color="#059669" strokeWidth={2} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <span style={{ fontSize: '13px', color: '#047857', lineHeight: '1.5' }}>
-              The $1 authorization confirms your card works and holds your room. Only charged if you don't show up.
-            </span>
-          </div>
+          ✅ <strong>$0 charged when you check in</strong>
+          <br />
+          ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} at the hotel</strong> with any payment method
+          <br /><br />
+          <span style={{ fontSize: '13px', color: '#4b5563' }}>
+            💡 The $1 authorization confirms your card works and holds your room. Only charged if you don't show up.
+          </span>
         </div>
       </div>
     </div>
