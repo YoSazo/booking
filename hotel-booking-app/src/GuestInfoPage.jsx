@@ -1845,25 +1845,30 @@ const handlePayLaterBooking = async (e) => {
   
   {/* Show Pay Later explanation banner */}
   {selectedPlan === 'payLater' && (
-  <div className="money-back-guarantee" style={{ backgroundColor: '#e7f3ff', borderColor: '#17a2b8' }}>
+  <div className="money-back-guarantee" style={{ backgroundColor: '#f0fdf4', borderColor: '#10b981' }}>
     <div className="guarantee-content">
-      <div className="guarantee-icon">💳</div>
+      <div className="guarantee-icon" style={{ fontSize: '28px' }}>🔒</div>
       <div className="guarantee-text">
         <div className="guarantee-title" style={{ 
-          color: '#0c5460', 
+          color: '#059669', 
           textShadow: '0 0 1px rgba(0,0,0,0.1)',
-          fontWeight: '700'
+          fontWeight: '700',
+          fontSize: '18px'
         }}>
-          Card Verification - No Charge Today
+          Secure Your Reservation - 100% Free
         </div>
-        <div className="guarantee-description" style={{ color: '#1a1a1a' }}>
-          We'll verify your card is valid to secure your reservation. <strong>You won't be charged anything today.</strong>
+        <div className="guarantee-description" style={{ color: '#1a1a1a', lineHeight: '1.6' }}>
+          We'll place a temporary <strong>$1.00 authorization</strong> to verify your card is valid. This hold is released immediately after booking.
           <br /><br />
-          ✅ <strong>If you check in:</strong> Nothing happens to your card
+          ✅ <strong>$0 charged today</strong>
           <br />
-          ❌ <strong>If you don't show up:</strong> A $75.90 no-show fee will be charged
+          ✅ <strong>$0 charged when you check in</strong>
+          <br />
+          ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} at the hotel</strong> with any payment method
           <br /><br />
-          Full payment of <strong>${bookingDetails.total.toFixed(2)}</strong> is due when you arrive at the hotel.
+          <span style={{ fontSize: '13px', color: '#6b7280' }}>
+            💡 The $1 authorization confirms your card works and holds your room. Only charged if you don't show up.
+          </span>
         </div>
       </div>
     </div>

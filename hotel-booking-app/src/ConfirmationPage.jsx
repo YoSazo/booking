@@ -137,11 +137,11 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
                 }}>
                   <strong>⚠️ No-Show Policy</strong>
                   <br />
-                  Your card has been validated. If you don't show up for your reservation, a $75.90 no-show fee will be charged.
+                  Your card has been validated with a $1 temporary hold (released immediately). If you don't show up, only the $1 verification fee applies.
                   <br /><br />
                   ✅ <strong>When you check in:</strong> Pay {"$" + bookingDetails.total?.toFixed(2)} at the front desk
                   <br />
-                  ❌ <strong>If you don't show:</strong> $75.90 no-show fee applies
+                  ❌ <strong>If you don't show:</strong> $1 verification fee applies
                 </div>
               </>
             )}
