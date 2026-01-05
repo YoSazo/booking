@@ -2236,21 +2236,21 @@ const handlePayLaterBooking = async (e) => {
       {selectedPlan === 'payLater' && (
         <div style={{
           backgroundColor: '#f0fdf4',
-          border: '2px solid #10b981',
-          borderRadius: '12px',
-          padding: '14px 18px',
+          border: '1px solid #10b981',
+          borderRadius: '8px',
+          padding: '10px 14px',
           width: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '10px'
+          gap: '8px'
         }}>
-          <ShieldCheck size={20} color="#10b981" strokeWidth={2.5} />
+          <ShieldCheck size={16} color="#10b981" strokeWidth={2.5} />
           <span style={{
             color: '#047857',
-            fontSize: '15px',
+            fontSize: '13px',
             fontWeight: '600',
-            lineHeight: '1.4'
+            lineHeight: '1.3'
           }}>
             $0 charged today • $1.00 verification only
           </span>
