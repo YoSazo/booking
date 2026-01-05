@@ -2257,31 +2257,6 @@ const handlePayLaterBooking = async (e) => {
         </button>
       </div>
       
-      {/* Simplified reminder banner for Pay Later - right before submit button */}
-      {selectedPlan === 'payLater' && (
-        <div style={{
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #10b981',
-          borderRadius: '8px',
-          padding: '10px 14px',
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }}>
-          <ShieldCheck size={16} color="#10b981" strokeWidth={2.5} />
-          <span style={{
-            color: '#047857',
-            fontSize: '13px',
-            fontWeight: '600',
-            lineHeight: '1.3'
-          }}>
-            $0 charged today • $1.00 verification only
-          </span>
-        </div>
-      )}
-      
       <button
         type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
         form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
