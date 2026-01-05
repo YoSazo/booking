@@ -9,6 +9,7 @@ import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PaymentInfoModal from './PaymentInfoModal.jsx';
+import { ShieldCheck, CheckCircle2, Lightbulb } from 'lucide-react';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -1845,30 +1846,66 @@ const handlePayLaterBooking = async (e) => {
   
   {/* Show Pay Later explanation banner */}
   {selectedPlan === 'payLater' && (
-  <div className="money-back-guarantee" style={{ backgroundColor: '#f0fdf4', borderColor: '#10b981' }}>
+  <div className="money-back-guarantee" style={{ 
+    backgroundColor: '#ffffff', 
+    borderColor: '#10b981',
+    border: '2px solid #10b981',
+    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)'
+  }}>
     <div className="guarantee-content">
-      <div className="guarantee-icon" style={{ fontSize: '28px' }}>🔒</div>
+      <div className="guarantee-icon" style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        width: '48px',
+        height: '48px',
+        borderRadius: '12px',
+        backgroundColor: '#10b981',
+        flexShrink: 0
+      }}>
+        <ShieldCheck size={28} color="#ffffff" strokeWidth={2.5} />
+      </div>
       <div className="guarantee-text">
         <div className="guarantee-title" style={{ 
-          color: '#059669', 
-          textShadow: '0 0 1px rgba(0,0,0,0.1)',
+          color: '#047857', 
           fontWeight: '700',
-          fontSize: '18px'
+          fontSize: '18px',
+          marginBottom: '12px'
         }}>
           Secure Your Reservation - 100% Free
         </div>
-        <div className="guarantee-description" style={{ color: '#1a1a1a', lineHeight: '1.6' }}>
-          We'll place a temporary <strong>$1.00 authorization</strong> to verify your card is valid. This hold is released immediately after booking.
+        <div className="guarantee-description" style={{ color: '#1f2937', lineHeight: '1.7', fontSize: '15px' }}>
+          We'll place a temporary <strong style={{ color: '#047857' }}>$1.00 authorization</strong> to verify your card is valid. This hold is released immediately after booking.
           <br /><br />
-          ✅ <strong>$0 charged today</strong>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} color="#10b981" strokeWidth={2.5} />
+              <strong style={{ color: '#1f2937' }}>$0 charged today</strong>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} color="#10b981" strokeWidth={2.5} />
+              <strong style={{ color: '#1f2937' }}>$0 charged when you check in</strong>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} color="#10b981" strokeWidth={2.5} />
+              <strong style={{ color: '#1f2937' }}>Pay ${bookingDetails.total.toFixed(2)} at the hotel</strong> with any payment method
+            </div>
+          </div>
           <br />
-          ✅ <strong>$0 charged when you check in</strong>
-          <br />
-          ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} at the hotel</strong> with any payment method
-          <br /><br />
-          <span style={{ fontSize: '13px', color: '#6b7280' }}>
-            💡 The $1 authorization confirms your card works and holds your room. Only charged if you don't show up.
-          </span>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            gap: '8px',
+            backgroundColor: '#f0fdf4',
+            padding: '12px',
+            borderRadius: '8px',
+            border: '1px solid #d1fae5'
+          }}>
+            <Lightbulb size={18} color="#059669" strokeWidth={2} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <span style={{ fontSize: '13px', color: '#047857', lineHeight: '1.5' }}>
+              The $1 authorization confirms your card works and holds your room. Only charged if you don't show up.
+            </span>
+          </div>
         </div>
       </div>
     </div>
