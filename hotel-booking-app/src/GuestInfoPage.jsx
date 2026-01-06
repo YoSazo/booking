@@ -2252,19 +2252,6 @@ const handlePayLaterBooking = async (e) => {
       width: '100%',
       gap: '12px'
     }}>
-      {/* Pay Later final reminder - right before CTA */}
-      {selectedPlan === 'payLater' && (
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '12px',
-          color: '#047857',
-          fontSize: '13px',
-          fontWeight: '600'
-        }}>
-          $0 charged today • $1.00 verification only
-        </div>
-      )}
-      
       <button
         type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
         form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
@@ -2284,6 +2271,19 @@ const handlePayLaterBooking = async (e) => {
       >
         {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
       </button>
+      
+      {/* Pay Later reassurance text - below button */}
+      {selectedPlan === 'payLater' && (
+        <div style={{
+          textAlign: 'center',
+          marginTop: '10px',
+          color: '#047857',
+          fontSize: '13px',
+          fontWeight: '600'
+        }}>
+          $0 charged today • $1.00 verification only
+        </div>
+      )}
     </div>
   )}
 </div>
