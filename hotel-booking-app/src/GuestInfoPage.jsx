@@ -9,7 +9,7 @@ import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PaymentInfoModal from './PaymentInfoModal.jsx';
-import { ShieldCheck, CheckCircle2, Lightbulb } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, Lightbulb, AlertCircle } from 'lucide-react';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -190,12 +190,7 @@ useEffect(() => {
     }, 100);
   }
   
-  // Smooth scroll to top on Step 4 (Payment page) so payment form is visible
-  if (currentStep === 4) {
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
-  }
+  // Removed scroll on payment page - banner visible at billing address explains $1 verification
   
 }, [currentStep, bookingDetails]);
 
@@ -1947,6 +1942,29 @@ const handlePayLaterBooking = async (e) => {
       <div className="payment-content">
         {/* Card fields with animation */}
         <div className={`card-fields-section ${paymentMethod === 'card' ? 'visible' : ''}`}>
+          {/* Green helper text for Pay Later - right before card fields */}
+          {selectedPlan === 'payLater' && paymentMethod === 'card' && (
+            <div style={{
+              backgroundColor: '#f0fdf4',
+              borderLeft: '3px solid #10b981',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              borderRadius: '4px'
+            }}>
+              <span style={{
+                color: '#047857',
+                fontSize: '13px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <ShieldCheck size={14} color="#10b981" strokeWidth={2.5} />
+                Enter your card below to verify ($1 hold, released immediately)
+              </span>
+            </div>
+          )}
+
           <div className="card-and-billing-container">
             <div className="split-card-fields">
               <div className="card-field-wrapper">
