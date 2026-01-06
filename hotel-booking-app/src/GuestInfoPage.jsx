@@ -2255,27 +2255,13 @@ const handlePayLaterBooking = async (e) => {
       {/* Pay Later final reminder - right before CTA */}
       {selectedPlan === 'payLater' && (
         <div style={{
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #10b981',
-          borderRadius: '8px',
-          padding: '10px 14px',
+          textAlign: 'center',
           marginBottom: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          maxWidth: '90%',
-          margin: '0 auto 12px auto'
+          color: '#047857',
+          fontSize: '13px',
+          fontWeight: '600'
         }}>
-          <ShieldCheck size={16} color="#10b981" strokeWidth={2.5} />
-          <span style={{
-            color: '#047857',
-            fontSize: '13px',
-            fontWeight: '600',
-            lineHeight: '1.3'
-          }}>
-            $0 charged today • $1.00 verification only
-          </span>
+          $0 charged today • $1.00 verification only
         </div>
       )}
       
