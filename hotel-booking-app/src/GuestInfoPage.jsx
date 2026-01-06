@@ -2250,7 +2250,7 @@ const handlePayLaterBooking = async (e) => {
       flexDirection: 'column', 
       alignItems: 'center',
       width: '100%',
-      gap: '12px'
+      gap: '4px'
     }}>
       <button
         type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
