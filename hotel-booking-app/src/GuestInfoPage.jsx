@@ -2153,28 +2153,28 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
             
-            {/* Pay Later reminder banner - after billing address, visible to all payment methods */}
+            {/* Payment Info Modal Link - after billing address */}
             {selectedPlan === 'payLater' && (
-              <div style={{
-                backgroundColor: '#f0fdf4',
-                border: '1px solid #10b981',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                marginTop: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
+              <div style={{ 
+                textAlign: 'center',
+                marginTop: '16px'
               }}>
-                <ShieldCheck size={16} color="#10b981" strokeWidth={2.5} />
-                <span style={{
-                  color: '#047857',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  lineHeight: '1.3'
-                }}>
-                  $0 charged today • $1.00 verification only
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentInfoModalOpen(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#007bff',
+                    textDecoration: 'underline',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    fontWeight: '500'
+                  }}
+                >
+                  What happens after I pay?
+                </button>
               </div>
             )}
 
@@ -2252,28 +2252,32 @@ const handlePayLaterBooking = async (e) => {
       width: '100%',
       gap: '12px'
     }}>
-      {/* What Happens Next Link - Inside footer with the button */}
-      <div style={{ 
-        textAlign: 'center',
-        width: '100%'
-      }}>
-        <button
-          type="button"
-          onClick={() => setIsPaymentInfoModalOpen(true)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#007bff',
-            textDecoration: 'underline',
-            fontSize: '14px',
-            cursor: 'pointer',
-            padding: '8px',
-            fontWeight: '500'
-          }}
-        >
-           What happens after I pay?
-        </button>
-      </div>
+      {/* Pay Later final reminder - right before CTA */}
+      {selectedPlan === 'payLater' && (
+        <div style={{
+          backgroundColor: '#f0fdf4',
+          border: '1px solid #10b981',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          marginBottom: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          maxWidth: '90%',
+          margin: '0 auto 12px auto'
+        }}>
+          <ShieldCheck size={16} color="#10b981" strokeWidth={2.5} />
+          <span style={{
+            color: '#047857',
+            fontSize: '13px',
+            fontWeight: '600',
+            lineHeight: '1.3'
+          }}>
+            $0 charged today • $1.00 verification only
+          </span>
+        </div>
+      )}
       
       <button
         type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
