@@ -2276,7 +2276,7 @@ const handlePayLaterBooking = async (e) => {
       {selectedPlan === 'payLater' && (
         <div style={{
           textAlign: 'center',
-          marginTop: '6px',
+          marginTop: '4px',
           color: '#047857',
           fontSize: '13px',
           fontWeight: '600'
