@@ -2105,20 +2105,28 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
             
-            {/* WHY WE NEED YOUR CARD - Compact banner */}
+            {/* WHY WE NEED YOUR CARD - Critical explanation banner */}
             {selectedPlan === 'payLater' && (
               <div style={{
                 backgroundColor: '#f0fdf4',
                 border: '2px solid #10b981',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                marginTop: '16px',
-                marginBottom: '12px'
+                borderRadius: '12px',
+                padding: '16px 18px',
+                marginTop: '20px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <ShieldCheck size={18} color="#10b981" strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                  <div style={{ fontSize: '13px', color: '#047857', lineHeight: '1.4' }}>
-                    <strong style={{ color: '#065f46' }}>Please fill out payment details above.</strong> $1 hold to secure your room (released immediately). Pay ${bookingDetails.total.toFixed(2)} at hotel.
+                <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
+                  <ShieldCheck size={24} color="#10b981" strokeWidth={2.5} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: '700', fontSize: '16px', color: '#065f46', marginBottom: '8px' }}>
+                      Why we need your card
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#047857', lineHeight: '1.6' }}>
+                      <strong>Please fill out your payment details above.</strong> We place a $1 hold to confirm you're a real person with a valid card - this secures your room and prevents fake bookings.
+                      <br /><br />
+                      ✅ <strong>$1 hold released immediately</strong><br />
+                      ✅ <strong>You won't be charged today</strong><br />
+                      ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} when you arrive</strong>
+                    </div>
                   </div>
                 </div>
               </div>
