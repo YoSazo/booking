@@ -216,12 +216,14 @@ useEffect(() => {
     // Wait for animation to complete
     setTimeout(() => {
       if (isFacebookBrowser && selectedPlan === 'payLater') {
-        // For Facebook/Instagram users on Pay Later, scroll all the way to button
+        // For Facebook/Instagram users on Pay Later, scroll to bottom of reassurance text
         const buttonContainer = document.querySelector('.checkout-cta-container');
         if (buttonContainer) {
-          buttonContainer.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'end' // Show button at bottom of viewport
+          // Calculate position: bottom of container + 50px buffer
+          const containerBottom = buttonContainer.offsetTop + buttonContainer.offsetHeight;
+          window.scrollTo({ 
+            top: containerBottom - window.innerHeight + 50, // Show all content with 50px buffer
+            behavior: 'smooth'
           });
         }
       } else if (zipFieldRef.current) {
