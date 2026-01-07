@@ -1839,47 +1839,6 @@ const handlePayLaterBooking = async (e) => {
     </div>
   </div>
   
-  {/* Show Pay Later explanation banner */}
-  {selectedPlan === 'payLater' && (
-  <div className="money-back-guarantee" style={{ backgroundColor: '#f0fdf4', borderColor: '#10b981' }}>
-    <div className="guarantee-content">
-      <div className="guarantee-icon" style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        width: '48px',
-        height: '48px',
-        borderRadius: '12px',
-        backgroundColor: '#10b981',
-        flexShrink: 0
-      }}>
-        <ShieldCheck size={28} color="#ffffff" strokeWidth={2.5} />
-      </div>
-      <div className="guarantee-text">
-        <div className="guarantee-title" style={{ 
-          color: '#065f46', 
-          fontWeight: '700',
-          fontSize: '18px'
-        }}>
-          Secure Your Reservation - 100% Free
-        </div>
-        <div className="guarantee-description" style={{ color: '#1a1a1a', lineHeight: '1.6' }}>
-          We'll place a temporary <strong>$1.00 authorization</strong> to verify your card is valid. This hold is released immediately after booking.
-          <br /><br />
-          ✅ <strong>$0 charged today</strong>
-          <br />
-          ✅ <strong>$0 charged when you check in</strong>
-          <br />
-          ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} at the hotel</strong> with any payment method
-          <br /><br />
-          <span style={{ fontSize: '13px', color: '#4b5563' }}>
-            💡 The $1 authorization confirms your card works and holds your room. Only charged if you don't show up.
-          </span>
-        </div>
-      </div>
-    </div>
-  </div>
-  )}
   
   {/* Only show money-back guarantee for non-reserve and non-payLater bookings */}
   {selectedPlan !== 'reserve' && selectedPlan !== 'payLater' && (
@@ -1942,28 +1901,6 @@ const handlePayLaterBooking = async (e) => {
       <div className="payment-content">
         {/* Card fields with animation */}
         <div className={`card-fields-section ${paymentMethod === 'card' ? 'visible' : ''}`}>
-          {/* Green helper text for Pay Later - right before card fields */}
-          {selectedPlan === 'payLater' && paymentMethod === 'card' && (
-            <div style={{
-              backgroundColor: '#f0fdf4',
-              borderLeft: '3px solid #10b981',
-              padding: '10px 14px',
-              marginBottom: '16px',
-              borderRadius: '4px'
-            }}>
-              <span style={{
-                color: '#047857',
-                fontSize: '13px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <ShieldCheck size={14} color="#10b981" strokeWidth={2.5} />
-                Enter your card below to verify ($1 hold, released immediately)
-              </span>
-            </div>
-          )}
 
           <div className="card-and-billing-container">
             <div className="split-card-fields">
@@ -2153,28 +2090,30 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
             
-            {/* Payment Info Modal Link - after billing address */}
+            {/* WHY WE NEED YOUR CARD - Critical explanation banner */}
             {selectedPlan === 'payLater' && (
-              <div style={{ 
-                textAlign: 'center',
-                marginTop: '16px'
+              <div style={{
+                backgroundColor: '#f0fdf4',
+                border: '2px solid #10b981',
+                borderRadius: '12px',
+                padding: '16px 18px',
+                marginTop: '20px'
               }}>
-                <button
-                  type="button"
-                  onClick={() => setIsPaymentInfoModalOpen(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#007bff',
-                    textDecoration: 'underline',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    padding: '8px',
-                    fontWeight: '500'
-                  }}
-                >
-                  What happens after I pay?
-                </button>
+                <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
+                  <ShieldCheck size={24} color="#10b981" strokeWidth={2.5} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: '700', fontSize: '16px', color: '#065f46', marginBottom: '8px' }}>
+                      Why we need your card
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#047857', lineHeight: '1.6' }}>
+                      To secure your room and prevent fake bookings. We place a $1 hold to confirm you're a real person with a valid card.
+                      <br /><br />
+                      ✅ <strong>$1 hold released immediately</strong><br />
+                      ✅ <strong>You won't be charged today</strong><br />
+                      ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} when you arrive</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
