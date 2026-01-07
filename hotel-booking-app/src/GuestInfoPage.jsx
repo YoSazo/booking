@@ -216,13 +216,16 @@ useEffect(() => {
     // Wait for animation to complete
     setTimeout(() => {
       if (isFacebookBrowser && selectedPlan === 'payLater') {
-        // For Facebook/Instagram users on Pay Later, scroll to bottom of reassurance text
+        // For Facebook/Instagram users on Pay Later, scroll to show button and text below
         const buttonContainer = document.querySelector('.checkout-cta-container');
         if (buttonContainer) {
-          // Calculate position: bottom of container + 50px buffer
-          const containerBottom = buttonContainer.offsetTop + buttonContainer.offsetHeight;
+          // Scroll so the entire button container fits in viewport with buffer at bottom
+          const containerTop = buttonContainer.offsetTop;
+          const containerHeight = buttonContainer.offsetHeight;
+          const scrollPosition = containerTop - (window.innerHeight - containerHeight) / 2;
+          
           window.scrollTo({ 
-            top: containerBottom - window.innerHeight + 50, // Show all content with 50px buffer
+            top: scrollPosition,
             behavior: 'smooth'
           });
         }
