@@ -787,30 +787,6 @@ body {
     }
 }
 
-/* Ultra-narrow screens (like 320px width) - reduce padding */
-@media (max-width: 400px) {
-    .container {
-        padding: 12px 8px;
-        margin: 10px auto;
-    }
-    
-    .room-card {
-        border-radius: 12px;
-    }
-    
-    .room-details {
-        padding: 16px 12px;
-    }
-    
-    .header {
-        padding-bottom: 16px;
-    }
-    
-    .header h1 {
-        font-size: 2em;
-    }
-}
-
 /* --- NEW STYLES for Calendar Modal and Date Display --- */
 
 /* The new button on the main page that opens the calendar */
