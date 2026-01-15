@@ -4470,3 +4470,42 @@ padding: 6px 16px;
     padding: 14px;
   }
 }
+
+/* ========================================
+   STRIPE ELEMENT PERFORMANCE OPTIMIZATIONS
+======================================== */
+
+/* Base Stripe Element Styling - Instant Transitions */
+.StripeElement {
+  transition: none !important; /* No transition delay */
+  will-change: border-color, box-shadow;
+}
+
+/* Make the parent container respond instantly to focus */
+.card-field-container {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Instant blue focus feedback when Stripe element is focused */
+.card-field-container:has(.StripeElement--focus) {
+  border-color: #0070f3 !important;
+  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1) !important;
+  transition-duration: 0s !important; /* Instant on focus */
+}
+
+/* Complete state - keep blue (matching your design) */
+.card-field-container:has(.StripeElement--complete) {
+  border-color: #0070f3 !important;
+}
+
+/* Invalid state - red border */
+.card-field-container:has(.StripeElement--invalid) {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+/* Improve rendering performance */
+.StripeElement iframe {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}

@@ -20,20 +20,35 @@ const ELEMENT_OPTIONS = {
     base: {
       fontSize: '16px',
       color: '#424770',
+      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontSmoothing: 'antialiased',
+      lineHeight: '1.5',
       '::placeholder': {
         color: '#aab7c4',
       },
+      iconColor: '#424770',
     },
     invalid: {
       color: '#9e2146',
+      iconColor: '#9e2146',
+    },
+    complete: {
+      iconColor: '#10b981', // Green checkmark when complete
     },
   },
+  showIcon: true,
+  iconStyle: 'solid',
 };
 
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     // Add this at the very top of your component, before any other code
     const [cardBrand, setCardBrand] = useState('');
+    const [cardComplete, setCardComplete] = useState({
+        cardNumber: false,
+        cardExpiry: false,
+        cardCvc: false
+    });
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
@@ -1976,7 +1991,22 @@ const handlePayLaterBooking = async (e) => {
               <div className="card-field-wrapper">
                 <label>Card number</label>
                 <div className="card-field-container">
-                  <CardNumberElement options={ELEMENT_OPTIONS} />
+                  <CardNumberElement 
+                    options={ELEMENT_OPTIONS}
+                    onChange={(e) => {
+                      setCardBrand(e.brand);
+                      setCardComplete(prev => ({ ...prev, cardNumber: e.complete }));
+                      if (e.error) {
+                        setFormErrors(prev => ({ ...prev, cardNumber: e.error.message }));
+                      } else {
+                        setFormErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors.cardNumber;
+                          return newErrors;
+                        });
+                      }
+                    }}
+                  />
                   <div className="card-brands">
                     <img 
                       src="/visa.svg" 
@@ -2001,13 +2031,41 @@ const handlePayLaterBooking = async (e) => {
                 <div className="card-field-wrapper">
                   <label>Expiration date</label>
                   <div className="card-field-container">
-                    <CardExpiryElement options={ELEMENT_OPTIONS} />
+                    <CardExpiryElement 
+                      options={ELEMENT_OPTIONS}
+                      onChange={(e) => {
+                        setCardComplete(prev => ({ ...prev, cardExpiry: e.complete }));
+                        if (e.error) {
+                          setFormErrors(prev => ({ ...prev, cardExpiry: e.error.message }));
+                        } else {
+                          setFormErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.cardExpiry;
+                            return newErrors;
+                          });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="card-field-wrapper">
                   <label>CVC</label>
                   <div className="card-field-container">
-                    <CardCvcElement options={ELEMENT_OPTIONS} />
+                    <CardCvcElement 
+                      options={ELEMENT_OPTIONS}
+                      onChange={(e) => {
+                        setCardComplete(prev => ({ ...prev, cardCvc: e.complete }));
+                        if (e.error) {
+                          setFormErrors(prev => ({ ...prev, cardCvc: e.error.message }));
+                        } else {
+                          setFormErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.cardCvc;
+                            return newErrors;
+                          });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -2313,10 +2371,27 @@ const handlePayLaterBooking = async (e) => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    // The Elements provider just needs the stripePromise.
-    // The options are not needed for individual elements.
+    const [elementsOptions] = useState({
+        fonts: [
+            {
+                cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap',
+            },
+        ],
+        appearance: {
+            theme: 'stripe',
+            variables: {
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontSizeBase: '16px',
+                colorPrimary: '#10b981',
+                colorDanger: '#dc2626',
+                spacingUnit: '4px',
+                borderRadius: '8px',
+            },
+        },
+    });
+
     return (
-        <Elements stripe={stripePromise}>
+        <Elements stripe={stripePromise} options={elementsOptions}>
             <GuestInfoPage {...props} />
         </Elements>
     );
