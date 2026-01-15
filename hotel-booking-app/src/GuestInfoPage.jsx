@@ -1399,9 +1399,9 @@ const handlePayLaterBooking = async (e) => {
         <>
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
             
-            <div style={{ position: 'sticky', top: '0', zIndex: 1001, paddingTop: '8px', paddingBottom: '2px', marginBottom: '4px' }}>
+            <div style={{ position: 'sticky', top: '0', zIndex: 1001, paddingTop: '8px', paddingBottom: '2px', marginBottom: '8px' }}>
                 {/* Back Button - Green Pill */}
-                <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '6px' }}>
+                <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '12px' }}>
                     {getBackButtonText()}
                 </button>
                 
