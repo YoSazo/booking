@@ -2600,6 +2600,21 @@ padding: 6px 16px;
   pointer-events: none;
 }
 
+/* Custom error icon on the right (replaces card brand) */
+.card-error-icon {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: errorShake 0.4s ease;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateY(-50%) translateX(0); }
+  25% { transform: translateY(-50%) translateX(-4px); }
+  75% { transform: translateY(-50%) translateX(4px); }
+}
+
 
 .card-field-container .__PrivateStripeElement {
   padding: 0;
@@ -4525,4 +4540,9 @@ padding: 6px 16px;
 .StripeElement iframe {
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+
+/* Hide Stripe's built-in icon (we show it on the right) */
+.card-field-container .__PrivateStripeElement-input-card-icon {
+  display: none !important;
 }
