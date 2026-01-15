@@ -2188,59 +2188,29 @@ padding: 6px 16px;
 
 /* Styles for the main action button at the bottom */
 
-/* --- UPDATED: This is the style for the button when it's NOT sticky (on the payment step) --- */
+/* --- UPDATED: Inline CTA (No Sticky) --- */
 .checkout-cta-container {
-    margin-top: 40px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border-color);
+    margin-top: 32px;
+    padding-top: 20px;
     display: flex;
     justify-content: center;
+    position: relative; /* Always inline, never sticky */
 }
 
 @media (max-width: 768px) {
-  /* Sticky behavior for ALL pages including payment */
-  .checkout-cta-container.sticky,
+  /* No sticky behavior - just normal inline button */
   .checkout-cta-container {
-    position: fixed;
-    bottom: 0; /* Normal browsers: sit at bottom */
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 16px 20px;
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
-    background: linear-gradient(to top, #ffffff 80%, rgba(255,255,255,0.95) 95%, transparent);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
-    z-index: 100;
+    margin-top: 24px;
+    padding: 0 20px;
   }
   
-  /* Facebook/Instagram browsers ONLY: Static positioning, not sticky */
-  .fb-browser .checkout-cta-container.sticky,
-  .fb-browser .checkout-cta-container {
-    position: static; /* Not sticky - stays in normal document flow */
-    bottom: auto;
-    padding: 16px 20px; /* Normal padding */
-    background: transparent; /* Remove gradient background */
-    border-top: none; /* Remove border */
-    box-shadow: none; /* Remove shadow */
-  }
-  
-  /* Add extra padding to container pages */
+  /* Reduced bottom padding since no sticky button */
   .guest-info-container {
-    padding-bottom: 100px; /* Normal browsers: standard padding */
+    padding-bottom: 40px;
   }
   
   .container {
-    padding-bottom: 100px; /* Normal browsers: standard padding */
-  }
-  
-  /* Facebook/Instagram browsers ONLY: Extra padding for content */
-  .fb-browser .guest-info-container {
-    padding-bottom: 200px; /* FB/IG: Extra padding since button is higher up */
-  }
-  
-  .fb-browser .container {
-    padding-bottom: 140px; /* FB/IG: More padding but not excessive */
+    padding-bottom: 40px;
   }
   
   /* Make progress bar even more compact on mobile */
@@ -2266,26 +2236,40 @@ padding: 6px 16px;
 /* --- NEW: This class applies the sticky styles ONLY when needed --- */
 
 
-/* --- UPDATED: This rule now controls the button's size in ALL states --- */
+/* --- UPDATED: Bigger, more prominent inline CTA --- */
 .checkout-cta-container .btn-confirm {
-  width: 90%; 
-  max-width: 380px;
-  padding: 16px; /* Slightly larger */
-  font-size: 1.05em;
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.25); /* Green shadow */
+  width: 95%; 
+  max-width: 500px;
+  padding: 18px 32px; /* Bigger tap target */
+  font-size: 1.15em;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
   transition: all 0.2s ease;
+  animation: subtlePulse 3s ease-in-out infinite; /* Subtle pulse */
 }
 
 /* Make buttons wider/longer horizontally */
 .checkout-cta-container .btn-confirm.btn-wider {
-  width: 95%;
-  max-width: 480px; /* Increased from 380px to 480px */
-  padding: 18px; /* Increased from 16px to 18px */
+  width: 100%;
+  max-width: 500px;
+  padding: 20px 32px;
 }
 
 .checkout-cta-container .btn-confirm:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(40, 167, 69, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+  animation: none; /* Stop pulse on hover */
+}
+
+/* Subtle pulse animation */
+@keyframes subtlePulse {
+  0%, 100% { 
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); 
+  }
+  50% { 
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    transform: scale(1.01);
+  }
 }
 
 .error-message {
