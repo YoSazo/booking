@@ -1463,26 +1463,6 @@ const handlePayLaterBooking = async (e) => {
                                     {bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}
                                 </div>
                             </div>
-                            
-                            <h1 style={{
-                                fontSize: '32px',
-                                fontWeight: '800',
-                                color: '#111827',
-                                margin: '0 0 12px 0',
-                                letterSpacing: '-0.5px'
-                            }}>
-                                Choose Your Payment Plan
-                            </h1>
-                            <p style={{
-                                fontSize: '16px',
-                                color: '#6b7280',
-                                margin: 0,
-                                maxWidth: '600px',
-                                marginLeft: 'auto',
-                                marginRight: 'auto'
-                            }}>
-                                Select the option that works best for you. All plans include our 100% satisfaction guarantee.
-                            </p>
                         </div>
 
                         {/* Premium Plan Cards Grid */}
@@ -1844,26 +1824,6 @@ const handlePayLaterBooking = async (e) => {
                                     {bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}
                                 </div>
                             </div>
-                            
-                            <h1 style={{
-                                fontSize: '32px',
-                                fontWeight: '800',
-                                color: '#111827',
-                                margin: '0 0 12px 0',
-                                letterSpacing: '-0.5px'
-                            }}>
-                                Choose Your Payment Plan
-                            </h1>
-                            <p style={{
-                                fontSize: '16px',
-                                color: '#6b7280',
-                                margin: 0,
-                                maxWidth: '600px',
-                                marginLeft: 'auto',
-                                marginRight: 'auto'
-                            }}>
-                                Select the option that works best for you. All plans include our 100% satisfaction guarantee.
-                            </p>
                         </div>
 
                         {/* Premium Plan Cards Grid - Only 2 Plans */}
