@@ -3201,7 +3201,7 @@ padding: 6px 16px;
 }
 
 /* Pay Later - Green gradient when selected */
-.payment-option-clickable.selected .payment-option.primary {
+.payment-option-clickable.payLater.selected .payment-option.primary {
     background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
     border-color: #10b981;
     border-width: 3px;

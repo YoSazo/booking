@@ -1449,7 +1449,7 @@ const handlePayLaterBooking = async (e) => {
                             <div className="payment-options-container">
                             {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
                             <div 
-                                className={`payment-option-clickable ${selectedPlan === 'payLater' ? 'selected' : ''}`}
+                                className={`payment-option-clickable payLater ${selectedPlan === 'payLater' ? 'selected' : ''}`}
                                 onClick={() => setSelectedPlan('payLater')}
                             >
                                 <div className="payment-option primary" style={{ 
@@ -1565,7 +1565,7 @@ const handlePayLaterBooking = async (e) => {
                             <div className="payment-options-container">
                             {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
                             <div 
-                                className={`payment-option-clickable ${selectedPlan === 'payLater' ? 'selected' : ''}`}
+                                className={`payment-option-clickable payLater ${selectedPlan === 'payLater' ? 'selected' : ''}`}
                                 onClick={() => setSelectedPlan('payLater')}
                             >
                                 <div className="payment-option primary" style={{ 
