@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Shield, Clock, Zap, CheckCircle, AlertCircle } from 'lucide-react';
 import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -1440,226 +1441,678 @@ const handlePayLaterBooking = async (e) => {
                     </div>
 
 
-                {/* Plan selection for 7+ nights */}
+                {/* Plan selection for 7+ nights - DESKTOP PREMIUM DESIGN */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
                     <>
-                        {/* Clean Simple Header - No Container */}
-                        <div style={{ marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                        {/* Premium Header */}
+                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                            <div style={{
+                                display: 'inline-block',
+                                background: 'white',
+                                borderRadius: '12px',
+                                padding: '16px 24px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                                marginBottom: '24px'
+                            }}>
+                                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
+                                    Your Stay
+                                </div>
+                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>
                                     {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '600' }}>
-                                    {bookingDetails.nights} nights
-                                </span>
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+                                    {bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Payment</span>
-                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>
-                                    ${bookingDetails.total.toFixed(2)}
-                                </span>
+                            
+                            <h1 style={{
+                                fontSize: '32px',
+                                fontWeight: '800',
+                                color: '#111827',
+                                margin: '0 0 12px 0',
+                                letterSpacing: '-0.5px'
+                            }}>
+                                Choose Your Payment Plan
+                            </h1>
+                            <p style={{
+                                fontSize: '16px',
+                                color: '#6b7280',
+                                margin: 0,
+                                maxWidth: '600px',
+                                marginLeft: 'auto',
+                                marginRight: 'auto'
+                            }}>
+                                Select the option that works best for you. All plans include our 100% satisfaction guarantee.
+                            </p>
+                        </div>
+
+                        {/* Premium Plan Cards Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '20px',
+                            marginBottom: '32px'
+                        }}>
+                            {/* Pay Later Plan */}
+                            <div
+                                onClick={() => setSelectedPlan('payLater')}
+                                style={{
+                                    background: selectedPlan === 'payLater' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : 'white',
+                                    border: `3px solid ${selectedPlan === 'payLater' ? '#10b981' : '#e5e7eb'}`,
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    transform: selectedPlan === 'payLater' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: selectedPlan === 'payLater' ? '0 12px 24px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-12px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#10b981',
+                                    color: 'white',
+                                    padding: '6px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                }}>
+                                    ⭐ Most Popular
+                                </div>
+                                <div style={{
+                                    width: '56px',
+                                    height: '56px',
+                                    background: selectedPlan === 'payLater' ? 'white' : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '16px',
+                                    marginTop: '8px'
+                                }}>
+                                    <Clock size={28} color="#10b981" strokeWidth={2.5} />
+                                </div>
+                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                                    Pay Later
+                                </h3>
+                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#10b981', margin: '8px 0', lineHeight: '1' }}>
+                                    $0
+                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
+                                </div>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                    Pay when you arrive
+                                </p>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Zero payment today</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>$1 card verification (released immediately)</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Cancel free up to 7 days before</span>
+                                    </div>
+                                </div>
+                                {selectedPlan === 'payLater' && (
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '12px',
+                                        background: 'white',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        fontWeight: '700',
+                                        color: '#10b981',
+                                        fontSize: '14px'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Try 1 Night Plan */}
+                            <div
+                                onClick={() => setSelectedPlan('trial')}
+                                style={{
+                                    background: selectedPlan === 'trial' ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : 'white',
+                                    border: `3px solid ${selectedPlan === 'trial' ? '#3b82f6' : '#e5e7eb'}`,
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    transform: selectedPlan === 'trial' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: selectedPlan === 'trial' ? '0 12px 24px rgba(59, 130, 246, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-12px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#3b82f6',
+                                    color: 'white',
+                                    padding: '6px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                }}>
+                                    ⭐ Try Risk-Free
+                                </div>
+                                <div style={{
+                                    width: '56px',
+                                    height: '56px',
+                                    background: selectedPlan === 'trial' ? 'white' : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '16px',
+                                    marginTop: '8px'
+                                }}>
+                                    <Zap size={28} color="#3b82f6" strokeWidth={2.5} />
+                                </div>
+                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                                    Try 1 Night First
+                                </h3>
+                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#3b82f6', margin: '8px 0', lineHeight: '1' }}>
+                                    $69
+                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
+                                </div>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                    See it before committing
+                                </p>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Book just the first night</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% credit toward longer stay</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>No commitment, no risk</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Extend at front desk if you love it</span>
+                                    </div>
+                                </div>
+                                {selectedPlan === 'trial' && (
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '12px',
+                                        background: 'white',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        fontWeight: '700',
+                                        color: '#3b82f6',
+                                        fontSize: '14px'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Complete Booking Plan */}
+                            <div
+                                onClick={() => setSelectedPlan('full')}
+                                style={{
+                                    background: selectedPlan === 'full' ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'white',
+                                    border: `3px solid ${selectedPlan === 'full' ? '#8b5cf6' : '#e5e7eb'}`,
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    transform: selectedPlan === 'full' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: selectedPlan === 'full' ? '0 12px 24px rgba(139, 92, 246, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-12px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#8b5cf6',
+                                    color: 'white',
+                                    padding: '6px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                }}>
+                                    ⭐ Secure & Save
+                                </div>
+                                <div style={{
+                                    width: '56px',
+                                    height: '56px',
+                                    background: selectedPlan === 'full' ? 'white' : 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '16px',
+                                    marginTop: '8px'
+                                }}>
+                                    <Shield size={28} color="#8b5cf6" strokeWidth={2.5} />
+                                </div>
+                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                                    Complete Booking
+                                </h3>
+                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#8b5cf6', margin: '8px 0', lineHeight: '1' }}>
+                                    ${(bookingDetails.total / 2).toFixed(2)}
+                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
+                                </div>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                    Pay half now, half later
+                                </p>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Lock in your rate today</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Balance due at check-in</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% refund if room not as promised</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Best for advance planning</span>
+                                    </div>
+                                </div>
+                                {selectedPlan === 'full' && (
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '12px',
+                                        background: 'white',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        fontWeight: '700',
+                                        color: '#8b5cf6',
+                                        fontSize: '14px'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        
-                        <div className="payment-options-container">
-                            {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
-                            <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
-                                <input 
-                                    type="radio" 
-                                    name="plan" 
-                                    value="payLater" 
-                                    checked={selectedPlan === 'payLater'}
-                                    onChange={() => setSelectedPlan('payLater')}
-                                />
-                                <div className="payment-option primary" style={{ 
-                                background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-                                border: '2px solid #10b981',
-                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
+
+                        {/* Trust Signals */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                            marginBottom: '32px'
+                        }}>
+                            <div style={{
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                textAlign: 'center'
                             }}>
-                                <div className="option-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <polyline points="12 6 12 12 16 14"/>
-                                        </svg>
-                                        <span className="option-title" style={{ color: '#0c5460' }}>Pay Later</span>
-                                    </div>
-                                    <span className="option-badge" style={{ 
-                                        backgroundColor: '#10b981',
-                                        color: 'white'
-                                    }}>⭐ Most Popular</span>
+                                <Shield size={24} color="#10b981" style={{ margin: '0 auto 8px' }} />
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                                    100% Secure
                                 </div>
-                                <div className="option-price" style={{ 
-                                    color: '#10b981', 
-                                    fontSize: '32px',
-                                    fontWeight: '700'
-                                }}>
-                                    $0 Today
-                                </div>
-                                <div className="option-details">
-                                    Pay the full ${bookingDetails.total.toFixed(2)} when you arrive
-                                    <br />
-                                    <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    256-bit encryption
                                 </div>
                             </div>
-                        </label>
-
-                        {/* Trial Option - NOW SECOND */}
-                        <label className={`payment-option-radio ${selectedPlan === 'trial' ? 'selected' : ''}`}>
-                            <input 
-                                type="radio" 
-                                name="plan" 
-                                value="trial" 
-                                checked={selectedPlan === 'trial'}
-                                onChange={() => setSelectedPlan('trial')}
-                            />
-                            <div className="payment-option secondary">
-                                <div className="option-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                                        </svg>
-                                        <span className="option-title">Try 1 Night First</span>
-                                    </div>
+                            
+                            <div style={{
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                textAlign: 'center'
+                            }}>
+                                <AlertCircle size={24} color="#3b82f6" style={{ margin: '0 auto 8px' }} />
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                                    Free Cancellation
                                 </div>
-                                <div className="option-price trial">
-                                    Only $69
-                                </div>
-                                <div className="option-details">
-                                    Trial dates: {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                    <br />
-                                    See the room, then extend to your full stay
-                                    <br />
-                                    <strong style={{ color: '#28a745' }}>Your $69 is 100% credited toward any longer stay</strong>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    Up to 7 days before
                                 </div>
                             </div>
-                        </label>
-
-                        {/* Full Booking Option - NOW THIRD */}
-                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
-                            <input 
-                                type="radio" 
-                                name="plan" 
-                                value="full" 
-                                checked={selectedPlan === 'full'}
-                                onChange={() => setSelectedPlan('full')}
-                            />
-                            <div className="payment-option secondary">
-                                <div className="option-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                                        </svg>
-                                        <span className="option-title">Complete Your Booking</span>
-                                    </div>
+                            
+                            <div style={{
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                textAlign: 'center'
+                            }}>
+                                <CheckCircle size={24} color="#8b5cf6" style={{ margin: '0 auto 8px' }} />
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                                    Money-Back Guarantee
                                 </div>
-                                <div className="option-price">
-                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
-                                </div>
-                                <div className="option-details">
-                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
-                                    <br />
-                                    <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    100% refund if not as promised
                                 </div>
                             </div>
-                        </label>
-                    </div>
+                        </div>
                     </>
                 )}
 
-                {/* Plan selection for <7 nights */}
+                {/* Plan selection for <7 nights - DESKTOP PREMIUM DESIGN */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
                     <>
-                        {/* Clean Simple Header - No Container */}
-                        <div style={{ marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                        {/* Premium Header */}
+                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                            <div style={{
+                                display: 'inline-block',
+                                background: 'white',
+                                borderRadius: '12px',
+                                padding: '16px 24px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                                marginBottom: '24px'
+                            }}>
+                                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
+                                    Your Stay
+                                </div>
+                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>
                                     {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '600' }}>
-                                    {bookingDetails.nights} nights
-                                </span>
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+                                    {bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Payment</span>
-                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>
-                                    ${bookingDetails.total.toFixed(2)}
-                                </span>
+                            
+                            <h1 style={{
+                                fontSize: '32px',
+                                fontWeight: '800',
+                                color: '#111827',
+                                margin: '0 0 12px 0',
+                                letterSpacing: '-0.5px'
+                            }}>
+                                Choose Your Payment Plan
+                            </h1>
+                            <p style={{
+                                fontSize: '16px',
+                                color: '#6b7280',
+                                margin: 0,
+                                maxWidth: '600px',
+                                marginLeft: 'auto',
+                                marginRight: 'auto'
+                            }}>
+                                Select the option that works best for you. All plans include our 100% satisfaction guarantee.
+                            </p>
+                        </div>
+
+                        {/* Premium Plan Cards Grid - Only 2 Plans */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '20px',
+                            marginBottom: '32px',
+                            maxWidth: '700px',
+                            marginLeft: 'auto',
+                            marginRight: 'auto'
+                        }}>
+                            {/* Pay Later Plan */}
+                            <div
+                                onClick={() => setSelectedPlan('payLater')}
+                                style={{
+                                    background: selectedPlan === 'payLater' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : 'white',
+                                    border: `3px solid ${selectedPlan === 'payLater' ? '#10b981' : '#e5e7eb'}`,
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    transform: selectedPlan === 'payLater' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: selectedPlan === 'payLater' ? '0 12px 24px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-12px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#10b981',
+                                    color: 'white',
+                                    padding: '6px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                }}>
+                                    ⭐ Most Popular
+                                </div>
+                                <div style={{
+                                    width: '56px',
+                                    height: '56px',
+                                    background: selectedPlan === 'payLater' ? 'white' : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '16px',
+                                    marginTop: '8px'
+                                }}>
+                                    <Clock size={28} color="#10b981" strokeWidth={2.5} />
+                                </div>
+                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                                    Pay Later
+                                </h3>
+                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#10b981', margin: '8px 0', lineHeight: '1' }}>
+                                    $0
+                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
+                                </div>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                    Pay when you arrive
+                                </p>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Zero payment today</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>$1 card verification (released immediately)</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Cancel free up to 7 days before</span>
+                                    </div>
+                                </div>
+                                {selectedPlan === 'payLater' && (
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '12px',
+                                        background: 'white',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        fontWeight: '700',
+                                        color: '#10b981',
+                                        fontSize: '14px'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Complete Booking Plan */}
+                            <div
+                                onClick={() => setSelectedPlan('full')}
+                                style={{
+                                    background: selectedPlan === 'full' ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'white',
+                                    border: `3px solid ${selectedPlan === 'full' ? '#8b5cf6' : '#e5e7eb'}`,
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    transform: selectedPlan === 'full' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: selectedPlan === 'full' ? '0 12px 24px rgba(139, 92, 246, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-12px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#8b5cf6',
+                                    color: 'white',
+                                    padding: '6px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                }}>
+                                    ⭐ Secure & Save
+                                </div>
+                                <div style={{
+                                    width: '56px',
+                                    height: '56px',
+                                    background: selectedPlan === 'full' ? 'white' : 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                                    borderRadius: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '16px',
+                                    marginTop: '8px'
+                                }}>
+                                    <Shield size={28} color="#8b5cf6" strokeWidth={2.5} />
+                                </div>
+                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                                    Complete Booking
+                                </h3>
+                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#8b5cf6', margin: '8px 0', lineHeight: '1' }}>
+                                    ${(bookingDetails.total / 2).toFixed(2)}
+                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
+                                </div>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                    Pay half now, half later
+                                </p>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Lock in your rate today</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Balance due at check-in</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% refund if room not as promised</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Best for advance planning</span>
+                                    </div>
+                                </div>
+                                {selectedPlan === 'full' && (
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '12px',
+                                        background: 'white',
+                                        borderRadius: '8px',
+                                        textAlign: 'center',
+                                        fontWeight: '700',
+                                        color: '#8b5cf6',
+                                        fontSize: '14px'
+                                    }}>
+                                        ✓ Selected
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        
-                        <div className="payment-options-container">
-                            {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
-                            <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
-                                <input 
-                                    type="radio" 
-                                    name="plan" 
-                                    value="payLater" 
-                                    checked={selectedPlan === 'payLater'}
-                                    onChange={() => setSelectedPlan('payLater')}
-                                />
-                                <div className="payment-option primary" style={{ 
-                                background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-                                border: '2px solid #10b981',
-                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
-                            }}>
-                                <div className="option-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <polyline points="12 6 12 12 16 14"/>
-                                        </svg>
-                                        <span className="option-title" style={{ color: '#0c5460' }}>Pay Later</span>
-                                    </div>
-                                    <span className="option-badge" style={{ 
-                                        backgroundColor: '#10b981',
-                                        color: 'white'
-                                    }}>⭐ Most Popular</span>
-                                </div>
-                                <div className="option-price" style={{ 
-                                    color: '#10b981', 
-                                    fontSize: '32px',
-                                    fontWeight: '700'
-                                }}>
-                                    $0 Today
-                                </div>
-                                <div className="option-details">
-                                    Pay the full ${bookingDetails.total.toFixed(2)} when you arrive
-                                    <br />
-                                    <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
-                                </div>
-                            </div>
-                        </label>
 
-                        {/* Standard Booking Option - SECONDARY */}
-                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
-                            <input 
-                                type="radio" 
-                                name="plan" 
-                                value="full" 
-                                checked={selectedPlan === 'full'}
-                                onChange={() => setSelectedPlan('full')}
-                            />
-                            <div className="payment-option secondary">
-                                <div className="option-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                                        </svg>
-                                        <span className="option-title">Complete Your Booking</span>
-                                    </div>
+                        {/* Trust Signals */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '16px',
+                            marginBottom: '32px'
+                        }}>
+                            <div style={{
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                textAlign: 'center'
+                            }}>
+                                <Shield size={24} color="#10b981" style={{ margin: '0 auto 8px' }} />
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                                    100% Secure
                                 </div>
-                                <div className="option-price">
-                                    Pay ${(bookingDetails.total / 2).toFixed(2)} Today
-                                </div>
-                                <div className="option-details">
-                                    Balance ${(bookingDetails.total / 2).toFixed(2)} due at check-in
-                                    <br />
-                                    <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    256-bit encryption
                                 </div>
                             </div>
-                        </label>
-                    </div>
+                            
+                            <div style={{
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                textAlign: 'center'
+                            }}>
+                                <AlertCircle size={24} color="#3b82f6" style={{ margin: '0 auto 8px' }} />
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                                    Free Cancellation
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    Up to 7 days before
+                                </div>
+                            </div>
+                            
+                            <div style={{
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                textAlign: 'center'
+                            }}>
+                                <CheckCircle size={24} color="#8b5cf6" style={{ margin: '0 auto 8px' }} />
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                                    Money-Back Guarantee
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    100% refund if not as promised
+                                </div>
+                            </div>
+                        </div>
                     </>
                 )}
 
