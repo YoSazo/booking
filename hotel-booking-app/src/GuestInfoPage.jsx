@@ -26,18 +26,15 @@ const ELEMENT_OPTIONS = {
       '::placeholder': {
         color: '#aab7c4',
       },
-      iconColor: '#424770',
     },
     invalid: {
       color: '#9e2146',
-      iconColor: '#9e2146',
     },
     complete: {
-      iconColor: '#10b981', // Green checkmark when complete
+      color: '#424770',
     },
   },
-  showIcon: true,
-  iconStyle: 'solid',
+  showIcon: false, // Disable Stripe's icon - we use custom SVGs on the right
 };
 
 // This is the main component that controls the multi-step flow.
