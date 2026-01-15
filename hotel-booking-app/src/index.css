@@ -1674,21 +1674,33 @@ body {
 
 /* --- NEW Styles for Static Banner on Guest Info Page --- */
 .static-banner {
-  background-color: #212529; /* Dark background */
-  color: #ffffff;
+  background: white;
+  color: #111827;
   padding: 12px 20px;
   position: sticky;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000; /* Ensure it stays on top of all other content */
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+  width: fit-content;
+  z-index: 1000;
   text-align: center;
-  font-size: 0.95em;
-  box-sizing: border-box; /* Important for full-width sticky banners */
+  font-size: 0.9em;
+  box-sizing: border-box;
+  border-radius: 24px; /* Pill shape */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.static-banner:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  transform: translateX(-50%) translateY(-2px);
 }
 
 .static-banner strong {
-  font-weight: 700; /* Make sure the bold text is prominent */
+  font-weight: 700;
+  color: #059669; /* Green for emphasis */
 }
 
 @media (max-width: 768px) {
