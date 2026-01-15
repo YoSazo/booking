@@ -46,6 +46,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
         cardExpiry: false,
         cardCvc: false
     });
+    const [cardNumberError, setCardNumberError] = useState(false);
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
@@ -1993,6 +1994,7 @@ const handlePayLaterBooking = async (e) => {
                     onChange={(e) => {
                       setCardBrand(e.brand);
                       setCardComplete(prev => ({ ...prev, cardNumber: e.complete }));
+                      setCardNumberError(!!e.error); // Track if there's an error
                       if (e.error) {
                         setFormErrors(prev => ({ ...prev, cardNumber: e.error.message }));
                       } else {
@@ -2005,21 +2007,26 @@ const handlePayLaterBooking = async (e) => {
                     }}
                   />
                   <div className="card-brands">
-                    <img 
-                      src="/visa.svg" 
-                      alt="Visa" 
-                      className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
-                    />
-                    <img 
-                      src="/mastercard.svg" 
-                      alt="Mastercard" 
-                      className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
-                    />
-                    <img 
-                      src="/express.svg" 
-                      alt="American Express" 
-                      className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
-                    />
+                    {/* Show all cards OR only detected card (hide if error exists) */}
+                    {!cardNumberError && (
+                      <>
+                        <img 
+                          src="/visa.svg" 
+                          alt="Visa" 
+                          className={`card-brand-icon ${cardBrand === 'visa' ? 'active slide-right' : ''} ${cardBrand && cardBrand !== 'visa' ? 'fade-out' : ''}`} 
+                        />
+                        <img 
+                          src="/mastercard.svg" 
+                          alt="Mastercard" 
+                          className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active slide-right' : ''} ${cardBrand && cardBrand !== 'mastercard' ? 'fade-out' : ''}`} 
+                        />
+                        <img 
+                          src="/express.svg" 
+                          alt="American Express" 
+                          className={`card-brand-icon ${cardBrand === 'amex' ? 'active slide-right' : ''} ${cardBrand && cardBrand !== 'amex' ? 'fade-out' : ''}`} 
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

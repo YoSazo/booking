@@ -2574,13 +2574,30 @@ padding: 6px 16px;
 .card-brand-icon {
   height: 30px;
   width: auto;
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
+  opacity: 0.3;
+  transition: all 0.3s ease;
+  position: absolute;
+  right: 0;
 }
 
+/* All 3 cards stacked when no brand detected */
+.card-brand-icon:nth-child(1) { right: 0; }
+.card-brand-icon:nth-child(2) { right: 36px; }
+.card-brand-icon:nth-child(3) { right: 72px; }
+
+/* When brand is detected and active, slide to absolute right */
 .card-brand-icon.active {
   opacity: 1;
-  transform: scale(1.05);
+  transform: scale(1.1);
+  right: 0 !important; /* Slide to absolute right */
+  z-index: 2;
+}
+
+/* Fade out non-matching cards */
+.card-brand-icon.fade-out {
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
 }
 
 
