@@ -3169,10 +3169,35 @@ padding: 6px 16px;
 }
 
 /* Payment Options Container - COMPACT VERSION */
+
+/* Payment Options Wrapper - Container box like "Your Stay" */
+.payment-options-wrapper {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
 .payment-options-container {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+/* Clickable payment option (replaces label) */
+.payment-option-clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.payment-option-clickable:hover {
+    transform: translateY(-2px);
+}
+
+.payment-option-clickable.selected .payment-option {
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+    transform: scale(1.02);
 }
 
 @media (min-width: 769px) {
