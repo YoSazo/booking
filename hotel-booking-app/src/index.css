@@ -3200,6 +3200,20 @@ padding: 6px 16px;
     transform: scale(1.02);
 }
 
+/* Pay Later - Green gradient when selected */
+.payment-option-clickable.selected .payment-option.primary {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    border-color: #10b981;
+    border-width: 3px;
+}
+
+/* Trial - Blue gradient when selected */
+.payment-option-clickable.selected .payment-option.secondary {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #3b82f6;
+    border-width: 3px;
+}
+
 @media (min-width: 769px) {
     .payment-options-container {
         flex-direction: row;

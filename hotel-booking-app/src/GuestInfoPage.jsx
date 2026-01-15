@@ -1449,7 +1449,13 @@ const handlePayLaterBooking = async (e) => {
                                 boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
                             }}>
                                 <div className="option-header">
-                                    <span className="option-title" style={{ color: '#0c5460' }}>⏱️ Pay Later</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <polyline points="12 6 12 12 16 14"/>
+                                        </svg>
+                                        <span className="option-title" style={{ color: '#0c5460' }}>Pay Later</span>
+                                    </div>
                                     <span className="option-badge" style={{ 
                                         backgroundColor: '#10b981',
                                         color: 'white'
@@ -1477,7 +1483,12 @@ const handlePayLaterBooking = async (e) => {
                             >
                                 <div className="payment-option secondary">
                                 <div className="option-header">
-                                    <span className="option-title">🔍 Try 1 Night First</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                        </svg>
+                                        <span className="option-title">Try 1 Night First</span>
+                                    </div>
                                 </div>
                                 <div className="option-price trial">
                                     Only $69
@@ -1499,7 +1510,12 @@ const handlePayLaterBooking = async (e) => {
                             >
                                 <div className="payment-option secondary">
                                 <div className="option-header">
-                                    <span className="option-title">Complete Your Booking</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                        </svg>
+                                        <span className="option-title">Complete Your Booking</span>
+                                    </div>
                                 </div>
                                 <div className="option-price">
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
@@ -1540,7 +1556,13 @@ const handlePayLaterBooking = async (e) => {
                                 boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
                             }}>
                                 <div className="option-header">
-                                    <span className="option-title" style={{ color: '#0c5460' }}>💳 Pay Later</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <polyline points="12 6 12 12 16 14"/>
+                                        </svg>
+                                        <span className="option-title" style={{ color: '#0c5460' }}>Pay Later</span>
+                                    </div>
                                     <span className="option-badge" style={{ 
                                         backgroundColor: '#10b981',
                                         color: 'white'
@@ -1568,7 +1590,12 @@ const handlePayLaterBooking = async (e) => {
                             >
                                 <div className="payment-option secondary">
                                 <div className="option-header">
-                                    <span className="option-title">Complete Your Booking</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                        </svg>
+                                        <span className="option-title">Complete Your Booking</span>
+                                    </div>
                                 </div>
                                 <div className="option-price">
                                     Pay ${(bookingDetails.total / 2).toFixed(2)} Today
