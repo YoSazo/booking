@@ -1405,7 +1405,6 @@ const handlePayLaterBooking = async (e) => {
             
             <div className="guest-info-container" style={{ paddingBottom: '120px' }}>
                 <div className="guest-info-header">
-                    <button onClick={handleBackStep} className="back-button">{getBackButtonText()}</button>
                     <h1>Guest Information</h1>
                 </div>
 
@@ -1446,6 +1445,11 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </div>
                         <div className="payment-options-wrapper">
+                            {/* Back Button - Green Pill */}
+                            <button onClick={handleBackStep} className="back-button-pill">
+                                {getBackButtonText()}
+                            </button>
+                            
                             <div className="payment-options-container">
                             {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
                             <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
@@ -1574,6 +1578,11 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                         </div>
                         <div className="payment-options-wrapper">
+                            {/* Back Button - Green Pill */}
+                            <button onClick={handleBackStep} className="back-button-pill">
+                                {getBackButtonText()}
+                            </button>
+                            
                             <div className="payment-options-container">
                             {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
                             <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
