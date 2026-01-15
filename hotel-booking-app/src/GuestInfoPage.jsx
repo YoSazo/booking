@@ -1484,14 +1484,14 @@ const handlePayLaterBooking = async (e) => {
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
                     <>
                         {/* Premium Header */}
-                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '-12px' }}>
                             <div style={{
                                 display: 'inline-block',
                                 background: 'white',
                                 borderRadius: '12px',
                                 padding: '16px 24px',
                                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                                marginBottom: '24px'
+                                marginBottom: '-4px'
                             }}>
                                 <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
                                     Your Stay
@@ -1789,14 +1789,14 @@ const handlePayLaterBooking = async (e) => {
                 {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
                     <>
                         {/* Premium Header */}
-                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '-12px' }}>
                             <div style={{
                                 display: 'inline-block',
                                 background: 'white',
                                 borderRadius: '12px',
                                 padding: '16px 24px',
                                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                                marginBottom: '24px'
+                                marginBottom: '-4px'
                             }}>
                                 <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
                                     Your Stay
