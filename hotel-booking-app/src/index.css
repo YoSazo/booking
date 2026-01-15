@@ -2572,7 +2572,7 @@ padding: 6px 16px;
 }
 
 .card-brand-icon {
-  height: 30px;
+  height: 24px; /* Smaller height */
   width: auto;
   opacity: 0.8;
   transition: opacity 0.2s ease;
