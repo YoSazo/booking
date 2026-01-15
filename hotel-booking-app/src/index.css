@@ -4532,7 +4532,7 @@ padding: 6px 16px;
     .premium-plan-icon-box {
         width: 34px !important;
         height: 34px !important;
-        margin-bottom: 8px !important;
+        margin-bottom: 6px !important;
     }
     
     .premium-plan-title {
@@ -4549,7 +4549,7 @@ padding: 6px 16px;
     
     .premium-plan-subtitle {
         font-size: 11px !important;
-        margin: 0 0 10px 0 !important;
+        margin: 0 0 8px 0 !important;
     }
     
     .premium-plan-check-item {
@@ -4586,28 +4586,41 @@ padding: 6px 16px;
     .premium-plan-card > div:nth-of-type(2) {
         width: 34px !important;
         height: 34px !important;
-        margin-bottom: 8px !important;
+        margin-bottom: 6px !important;
     }
     
-    /* Title (h3) */
+    /* Title (h3) - More space now */
     .premium-plan-card h3 {
         font-size: 16px !important;
+        margin-top: 0 !important;
+        padding-right: 80px !important; /* Space for price on right */
     }
     
-    /* Price div */
+    /* Price div - Move to right with vertical layout */
     .premium-plan-card > div:nth-of-type(3) {
         font-size: 24px !important;
+        position: absolute !important;
+        top: 12px !important;
+        right: 12px !important;
+        margin: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-end !important;
+        line-height: 1 !important;
     }
     
-    /* Price span */
+    /* Price span - Display below price */
     .premium-plan-card > div:nth-of-type(3) > span {
-        font-size: 12px !important;
+        font-size: 10px !important;
+        margin-left: 0 !important;
+        margin-top: 4px !important;
+        display: block !important;
     }
     
     /* Subtitle paragraph */
     .premium-plan-card > p {
         font-size: 11px !important;
-        margin: 0 0 10px 0 !important;
+        margin: 0 0 8px 0 !important;
     }
     
     /* Checklist items container */
