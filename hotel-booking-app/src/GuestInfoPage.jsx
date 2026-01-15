@@ -1399,9 +1399,9 @@ const handlePayLaterBooking = async (e) => {
         <>
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
             
-            <div style={{ position: 'sticky', top: '0', zIndex: 1001, paddingTop: '16px', paddingBottom: '8px' }}>
+            <div style={{ position: 'sticky', top: '0', zIndex: 1001, paddingTop: '12px', paddingBottom: '4px', marginBottom: '12px' }}>
                 {/* Back Button - Green Pill */}
-                <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '12px' }}>
+                <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '8px' }}>
                     {getBackButtonText()}
                 </button>
                 
@@ -1410,11 +1410,7 @@ const handlePayLaterBooking = async (e) => {
                 </div>
             </div>
             
-            <div className="guest-info-container" style={{ paddingBottom: '120px' }}>
-                <div className="guest-info-header">
-                    <h1>Guest Information</h1>
-                </div>
-
+            <div className="guest-info-container" style={{ paddingBottom: '120px', paddingTop: '8px' }}>
                 <div className="checkout-progress-bar">
                     <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Review Cart</span>
