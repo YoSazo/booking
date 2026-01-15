@@ -2007,37 +2007,21 @@ const handlePayLaterBooking = async (e) => {
                     }}
                   />
                   <div className="card-brands">
-                    {/* Show error icon when there's an error */}
-                    {cardNumberError && (
-                      <div className="card-error-icon">
-                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="8" x2="12" y2="12"/>
-                          <line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                      </div>
-                    )}
-                    
-                    {/* Show all cards when empty OR only detected card when typing */}
-                    {!cardNumberError && (
-                      <>
-                        <img 
-                          src="/visa.svg" 
-                          alt="Visa" 
-                          className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''} ${cardBrand && cardBrand !== 'visa' ? 'fade-out' : ''}`} 
-                        />
-                        <img 
-                          src="/mastercard.svg" 
-                          alt="Mastercard" 
-                          className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''} ${cardBrand && cardBrand !== 'mastercard' ? 'fade-out' : ''}`} 
-                        />
-                        <img 
-                          src="/express.svg" 
-                          alt="American Express" 
-                          className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''} ${cardBrand && cardBrand !== 'amex' ? 'fade-out' : ''}`} 
-                        />
-                      </>
-                    )}
+                    <img 
+                      src="/visa.svg" 
+                      alt="Visa" 
+                      className={`card-brand-icon ${cardBrand === 'visa' ? 'active' : ''}`} 
+                    />
+                    <img 
+                      src="/mastercard.svg" 
+                      alt="Mastercard" 
+                      className={`card-brand-icon ${cardBrand === 'mastercard' ? 'active' : ''}`} 
+                    />
+                    <img 
+                      src="/express.svg" 
+                      alt="American Express" 
+                      className={`card-brand-icon ${cardBrand === 'amex' ? 'active' : ''}`} 
+                    />
                   </div>
                 </div>
               </div>
