@@ -1681,7 +1681,7 @@ body {
   top: 32px;
   left: 0;
   right: 0;
-  margin: 0 auto 20px auto; /* Add 20px bottom margin for space */
+  margin: 0 auto -8px auto; /* Add 20px bottom margin for space */
   max-width: 90%;
   width: fit-content;
   z-index: 1000;
