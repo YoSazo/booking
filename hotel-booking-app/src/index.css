@@ -2531,7 +2531,7 @@ padding: 6px 16px;
 /* This targets the input wrapper Stripe creates */
 .card-field-container .__PrivateStripeElement {
   padding: 0;
-  margin-right: 80px; /* Make space for card brand icons */
+  margin-right: 110px; /* More space for card brand icons (3 cards + gaps) */
 }
 
 .card-fields-row {
@@ -2586,7 +2586,7 @@ padding: 6px 16px;
 
 .card-field-container .__PrivateStripeElement {
   padding: 0;
-  margin-right: 80px; /* Make space for card brand icons */
+  margin-right: 110px; /* More space for card brand icons (3 cards + gaps) */
 }
 
 /* For expiry and CVC fields, no extra margin needed */
