@@ -1428,13 +1428,22 @@ const handlePayLaterBooking = async (e) => {
                 {/* Plan selection for 7+ nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
                     <>
-                        <div className="booking-summary-banner">
-                            <div className="summary-label">Your Stay</div>
-                            <div className="summary-dates">
-                                {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {/* Clean Simple Header - No Container */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '600' }}>
+                                    {bookingDetails.nights} nights
+                                </span>
                             </div>
-                            <div className="summary-nights">{bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}</div>
-                            <div className="payment-plan-prompt">Choose Your Payment Plan</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Payment</span>
+                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>
+                                    ${bookingDetails.total.toFixed(2)}
+                                </span>
+                            </div>
                         </div>
                         <div className="payment-options-wrapper">
                             <div className="payment-options-container">
@@ -1478,7 +1487,7 @@ const handlePayLaterBooking = async (e) => {
 
                             {/* Trial Option - NOW SECOND */}
                             <div 
-                                className={`payment-option-clickable ${selectedPlan === 'trial' ? 'selected' : ''}`}
+                                className={`payment-option-clickable trial ${selectedPlan === 'trial' ? 'selected' : ''}`}
                                 onClick={() => setSelectedPlan('trial')}
                             >
                                 <div className="payment-option secondary">
@@ -1505,7 +1514,7 @@ const handlePayLaterBooking = async (e) => {
 
                             {/* Full Booking Option - NOW THIRD */}
                             <div 
-                                className={`payment-option-clickable ${selectedPlan === 'full' ? 'selected' : ''}`}
+                                className={`payment-option-clickable complete ${selectedPlan === 'full' ? 'selected' : ''}`}
                                 onClick={() => setSelectedPlan('full')}
                             >
                                 <div className="payment-option secondary">
@@ -1535,13 +1544,22 @@ const handlePayLaterBooking = async (e) => {
                 {/* Plan selection for <7 nights */}
                 {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
                     <>
-                        <div className="booking-summary-banner">
-                            <div className="summary-label">Your Stay</div>
-                            <div className="summary-dates">
-                                {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {/* Clean Simple Header - No Container */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '600' }}>
+                                    {bookingDetails.nights} nights
+                                </span>
                             </div>
-                            <div className="summary-nights">{bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}</div>
-                            <div className="payment-plan-prompt">Choose Your Payment Plan</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Payment</span>
+                                <span style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>
+                                    ${bookingDetails.total.toFixed(2)}
+                                </span>
+                            </div>
                         </div>
                         <div className="payment-options-wrapper">
                             <div className="payment-options-container">
@@ -1585,7 +1603,7 @@ const handlePayLaterBooking = async (e) => {
 
                             {/* Standard Booking Option - SECONDARY */}
                             <div 
-                                className={`payment-option-clickable ${selectedPlan === 'full' ? 'selected' : ''}`}
+                                className={`payment-option-clickable complete ${selectedPlan === 'full' ? 'selected' : ''}`}
                                 onClick={() => setSelectedPlan('full')}
                             >
                                 <div className="payment-option secondary">

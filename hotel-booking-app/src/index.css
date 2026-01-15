@@ -3207,10 +3207,17 @@ padding: 6px 16px;
     border-width: 3px;
 }
 
-/* Trial - Blue gradient when selected */
-.payment-option-clickable.selected .payment-option.secondary {
+/* Trial (Try 1 Night) - Blue gradient when selected */
+.payment-option-clickable.trial.selected .payment-option.secondary {
     background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
     border-color: #3b82f6;
+    border-width: 3px;
+}
+
+/* Complete Booking - Purple gradient when selected */
+.payment-option-clickable.complete.selected .payment-option.secondary {
+    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+    border-color: #8b5cf6;
     border-width: 3px;
 }
 
