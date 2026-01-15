@@ -1678,9 +1678,10 @@ body {
   color: #111827;
   padding: 12px 20px;
   position: sticky;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 16px;
+  left: 0;
+  right: 0;
+  margin: 0 auto 20px auto; /* Add 20px bottom margin for space */
   max-width: 90%;
   width: fit-content;
   z-index: 1000;
@@ -1695,7 +1696,7 @@ body {
 
 .static-banner:hover {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  transform: translateX(-50%) translateY(-2px);
+  transform: translateY(-2px);
 }
 
 .static-banner strong {
