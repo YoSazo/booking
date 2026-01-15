@@ -1399,8 +1399,15 @@ const handlePayLaterBooking = async (e) => {
         <>
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
             
-            <div className="static-banner">
-                ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
+            <div style={{ position: 'sticky', top: '0', zIndex: 1001, paddingTop: '16px', paddingBottom: '8px' }}>
+                {/* Back Button - Green Pill */}
+                <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '12px' }}>
+                    {getBackButtonText()}
+                </button>
+                
+                <div className="static-banner">
+                    ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!
+                </div>
             </div>
             
             <div className="guest-info-container" style={{ paddingBottom: '120px' }}>
