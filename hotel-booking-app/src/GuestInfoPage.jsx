@@ -1578,14 +1578,6 @@ const handlePayLaterBooking = async (e) => {
                                         <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
                                         <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
                                     </div>
-                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>$1 card verification (released immediately)</span>
-                                    </div>
-                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Cancel free up to 7 days before</span>
-                                    </div>
                                 </div>
                                 {selectedPlan === 'payLater' && (
                                     <div className="premium-plan-selected" style={{
@@ -1657,14 +1649,23 @@ const handlePayLaterBooking = async (e) => {
                                     $69
                                     <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
                                 </div>
-                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 12px 0' }}>
                                     See it before committing
                                 </p>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Book just the first night</span>
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                    border: '2px solid #3b82f6',
+                                    borderRadius: '8px',
+                                    padding: '8px 12px',
+                                    marginBottom: '12px',
+                                    textAlign: 'center'
+                                }}>
+                                    <div style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600', marginBottom: '2px' }}>Trial Night</div>
+                                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>
+                                        {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {new Date(new Date(bookingDetails.checkin).getTime() + 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                     </div>
+                                </div>
+                                <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
                                         <CheckCircle size={18} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
                                         <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% credit toward longer stay</span>
@@ -1763,10 +1764,6 @@ const handlePayLaterBooking = async (e) => {
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
                                         <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
                                         <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% refund if room not as promised</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Best for advance planning</span>
                                     </div>
                                 </div>
                                 {selectedPlan === 'full' && (
@@ -1889,14 +1886,6 @@ const handlePayLaterBooking = async (e) => {
                                         <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
                                         <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>$1 card verification (released immediately)</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Cancel free up to 7 days before</span>
-                                    </div>
                                 </div>
                                 {selectedPlan === 'payLater' && (
                                     <div style={{
@@ -1983,10 +1972,6 @@ const handlePayLaterBooking = async (e) => {
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
                                         <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
                                         <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% refund if room not as promised</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Best for advance planning</span>
                                     </div>
                                 </div>
                                 {selectedPlan === 'full' && (
