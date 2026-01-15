@@ -89,6 +89,46 @@ const zipFieldRef = useRef(null);
 // For <7 nights: payLater, full options (same as 7+ but without trial)
 const [selectedPlan, setSelectedPlan] = useState('payLater');
 
+// Mobile detection for responsive plan cards
+const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+useEffect(() => {
+    const handleResize = () => {
+        setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+}, []);
+
+// Helper function to get mobile-optimized styles (70% smaller vertically)
+const getMobileStyles = () => {
+    if (!isMobile) return {};
+    return {
+        cardPadding: '12px', // reduced from 24px
+        iconSize: 17, // reduced from 28
+        iconBox: '34px', // reduced from 56px
+        iconMarginBottom: '8px', // reduced from 16px
+        titleFontSize: '16px', // reduced from 22px
+        priceFontSize: '24px', // reduced from 36px
+        priceSpanFontSize: '12px', // reduced from 16px
+        subtitleFontSize: '11px', // reduced from 14px
+        subtitleMargin: '0 0 10px 0', // reduced from 0 0 20px 0
+        checkIconSize: 14, // reduced from 18
+        checkTextFontSize: '11px', // reduced from 14px
+        checkMargin: '6px', // reduced from 12px
+        badgePadding: '4px 12px', // reduced from 6px 16px
+        badgeFontSize: '10px', // reduced from 12px
+        badgeTop: '-8px', // reduced from -12px
+        selectedPadding: '8px', // reduced from 12px
+        selectedFontSize: '11px', // reduced from 14px
+        selectedMarginTop: '10px', // reduced from 16px
+        borderWidth: '2px', // reduced from 3px
+        borderRadius: '12px' // reduced from 16px
+    };
+};
+
+const mobileStyles = getMobileStyles();
+
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
@@ -1474,6 +1514,7 @@ const handlePayLaterBooking = async (e) => {
                         }}>
                             {/* Pay Later Plan */}
                             <div
+                                className="premium-plan-card"
                                 onClick={() => setSelectedPlan('payLater')}
                                 style={{
                                     background: selectedPlan === 'payLater' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : 'white',
@@ -1489,7 +1530,7 @@ const handlePayLaterBooking = async (e) => {
                                     flexDirection: 'column'
                                 }}
                             >
-                                <div style={{
+                                <div className="premium-plan-badge" style={{
                                     position: 'absolute',
                                     top: '-12px',
                                     left: '50%',
@@ -1505,7 +1546,7 @@ const handlePayLaterBooking = async (e) => {
                                 }}>
                                     ⭐ Most Popular
                                 </div>
-                                <div style={{
+                                <div className="premium-plan-icon-box" style={{
                                     width: '56px',
                                     height: '56px',
                                     background: selectedPlan === 'payLater' ? 'white' : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
@@ -1516,38 +1557,38 @@ const handlePayLaterBooking = async (e) => {
                                     marginBottom: '16px',
                                     marginTop: '8px'
                                 }}>
-                                    <Clock size={28} color="#10b981" strokeWidth={2.5} />
+                                    <Clock size={isMobile ? 17 : 28} color="#10b981" strokeWidth={2.5} />
                                 </div>
-                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
+                                <h3 className="premium-plan-title" style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
                                     Pay Later
                                 </h3>
-                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#10b981', margin: '8px 0', lineHeight: '1' }}>
+                                <div className="premium-plan-price" style={{ fontSize: '36px', fontWeight: '800', color: '#10b981', margin: '8px 0', lineHeight: '1' }}>
                                     $0
-                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
+                                    <span className="premium-plan-price-span" style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
                                 </div>
-                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
+                                <p className="premium-plan-subtitle" style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
                                     Pay when you arrive
                                 </p>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Zero payment today</span>
+                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Zero payment today</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
+                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>$1 card verification (released immediately)</span>
+                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>$1 card verification (released immediately)</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Cancel free up to 7 days before</span>
+                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Cancel free up to 7 days before</span>
                                     </div>
                                 </div>
                                 {selectedPlan === 'payLater' && (
-                                    <div style={{
+                                    <div className="premium-plan-selected" style={{
                                         marginTop: '16px',
                                         padding: '12px',
                                         background: 'white',
@@ -1564,6 +1605,7 @@ const handlePayLaterBooking = async (e) => {
 
                             {/* Try 1 Night Plan */}
                             <div
+                                className="premium-plan-card"
                                 onClick={() => setSelectedPlan('trial')}
                                 style={{
                                     background: selectedPlan === 'trial' ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : 'white',
@@ -1654,6 +1696,7 @@ const handlePayLaterBooking = async (e) => {
 
                             {/* Complete Booking Plan */}
                             <div
+                                className="premium-plan-card"
                                 onClick={() => setSelectedPlan('full')}
                                 style={{
                                     background: selectedPlan === 'full' ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'white',
@@ -1742,62 +1785,6 @@ const handlePayLaterBooking = async (e) => {
                                 )}
                             </div>
                         </div>
-
-                        {/* Trust Signals */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '16px',
-                            marginBottom: '32px'
-                        }}>
-                            <div style={{
-                                background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '12px',
-                                padding: '16px',
-                                textAlign: 'center'
-                            }}>
-                                <Shield size={24} color="#10b981" style={{ margin: '0 auto 8px' }} />
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
-                                    100% Secure
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                    256-bit encryption
-                                </div>
-                            </div>
-                            
-                            <div style={{
-                                background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '12px',
-                                padding: '16px',
-                                textAlign: 'center'
-                            }}>
-                                <AlertCircle size={24} color="#3b82f6" style={{ margin: '0 auto 8px' }} />
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
-                                    Free Cancellation
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                    Up to 7 days before
-                                </div>
-                            </div>
-                            
-                            <div style={{
-                                background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '12px',
-                                padding: '16px',
-                                textAlign: 'center'
-                            }}>
-                                <CheckCircle size={24} color="#8b5cf6" style={{ margin: '0 auto 8px' }} />
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
-                                    Money-Back Guarantee
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                    100% refund if not as promised
-                                </div>
-                            </div>
-                        </div>
                     </>
                 )}
 
@@ -1838,6 +1825,7 @@ const handlePayLaterBooking = async (e) => {
                         }}>
                             {/* Pay Later Plan */}
                             <div
+                                className="premium-plan-card"
                                 onClick={() => setSelectedPlan('payLater')}
                                 style={{
                                     background: selectedPlan === 'payLater' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : 'white',
@@ -1928,6 +1916,7 @@ const handlePayLaterBooking = async (e) => {
 
                             {/* Complete Booking Plan */}
                             <div
+                                className="premium-plan-card"
                                 onClick={() => setSelectedPlan('full')}
                                 style={{
                                     background: selectedPlan === 'full' ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'white',
@@ -2014,62 +2003,6 @@ const handlePayLaterBooking = async (e) => {
                                         ✓ Selected
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Trust Signals */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '16px',
-                            marginBottom: '32px'
-                        }}>
-                            <div style={{
-                                background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '12px',
-                                padding: '16px',
-                                textAlign: 'center'
-                            }}>
-                                <Shield size={24} color="#10b981" style={{ margin: '0 auto 8px' }} />
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
-                                    100% Secure
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                    256-bit encryption
-                                </div>
-                            </div>
-                            
-                            <div style={{
-                                background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '12px',
-                                padding: '16px',
-                                textAlign: 'center'
-                            }}>
-                                <AlertCircle size={24} color="#3b82f6" style={{ margin: '0 auto 8px' }} />
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
-                                    Free Cancellation
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                    Up to 7 days before
-                                </div>
-                            </div>
-                            
-                            <div style={{
-                                background: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '12px',
-                                padding: '16px',
-                                textAlign: 'center'
-                            }}>
-                                <CheckCircle size={24} color="#8b5cf6" style={{ margin: '0 auto 8px' }} />
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
-                                    Money-Back Guarantee
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                    100% refund if not as promised
-                                </div>
                             </div>
                         </div>
                     </>

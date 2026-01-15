@@ -4514,3 +4514,116 @@ padding: 6px 16px;
     padding: 40px 20px;
   }
 }
+
+/* Premium Plan Cards - Mobile Responsive (70% smaller vertically) */
+@media (max-width: 768px) {
+    .premium-plan-card {
+        padding: 12px !important;
+        border-width: 2px !important;
+        border-radius: 12px !important;
+    }
+    
+    .premium-plan-badge {
+        top: -8px !important;
+        padding: 4px 12px !important;
+        font-size: 10px !important;
+    }
+    
+    .premium-plan-icon-box {
+        width: 34px !important;
+        height: 34px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .premium-plan-title {
+        font-size: 16px !important;
+    }
+    
+    .premium-plan-price {
+        font-size: 24px !important;
+    }
+    
+    .premium-plan-price-span {
+        font-size: 12px !important;
+    }
+    
+    .premium-plan-subtitle {
+        font-size: 11px !important;
+        margin: 0 0 10px 0 !important;
+    }
+    
+    .premium-plan-check-item {
+        margin-bottom: 6px !important;
+    }
+    
+    .premium-plan-check-text {
+        font-size: 11px !important;
+    }
+    
+    .premium-plan-selected {
+        margin-top: 10px !important;
+        padding: 8px !important;
+        font-size: 11px !important;
+    }
+}
+
+/* Override: Apply mobile styles to all premium plan card children */
+@media (max-width: 768px) {
+    .premium-plan-card {
+        padding: 12px !important;
+        border-width: 2px !important;
+        border-radius: 12px !important;
+    }
+    
+    /* Badge positioning */
+    .premium-plan-card > div:first-of-type {
+        top: -8px !important;
+        padding: 4px 12px !important;
+        font-size: 10px !important;
+    }
+    
+    /* Icon box - second div */
+    .premium-plan-card > div:nth-of-type(2) {
+        width: 34px !important;
+        height: 34px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* Title (h3) */
+    .premium-plan-card h3 {
+        font-size: 16px !important;
+    }
+    
+    /* Price div */
+    .premium-plan-card > div:nth-of-type(3) {
+        font-size: 24px !important;
+    }
+    
+    /* Price span */
+    .premium-plan-card > div:nth-of-type(3) > span {
+        font-size: 12px !important;
+    }
+    
+    /* Subtitle paragraph */
+    .premium-plan-card > p {
+        font-size: 11px !important;
+        margin: 0 0 10px 0 !important;
+    }
+    
+    /* Checklist items container */
+    .premium-plan-card > div:last-of-type > div {
+        margin-bottom: 6px !important;
+    }
+    
+    /* Checklist text */
+    .premium-plan-card > div:last-of-type > div > span {
+        font-size: 11px !important;
+    }
+    
+    /* Selected indicator */
+    .premium-plan-card > div:nth-last-of-type(1) {
+        margin-top: 10px !important;
+        padding: 8px !important;
+        font-size: 11px !important;
+    }
+}
