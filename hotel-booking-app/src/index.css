@@ -3185,41 +3185,7 @@ padding: 6px 16px;
     gap: 12px;
 }
 
-/* Clickable payment option (replaces label) */
-.payment-option-clickable {
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.payment-option-clickable:hover {
-    transform: translateY(-2px);
-}
-
-.payment-option-clickable.selected .payment-option {
-    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
-    transform: scale(1.02);
-}
-
-/* Pay Later - Green gradient when selected */
-.payment-option-clickable.payLater.selected .payment-option.primary {
-    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-    border-color: #10b981;
-    border-width: 3px;
-}
-
-/* Trial (Try 1 Night) - Blue gradient when selected */
-.payment-option-clickable.trial.selected .payment-option.secondary {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-    border-color: #3b82f6;
-    border-width: 3px;
-}
-
-/* Complete Booking - Purple gradient when selected */
-.payment-option-clickable.complete.selected .payment-option.secondary {
-    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
-    border-color: #8b5cf6;
-    border-width: 3px;
-}
+/* No gradient animations - clean radio button selection */
 
 @media (min-width: 769px) {
     .payment-options-container {

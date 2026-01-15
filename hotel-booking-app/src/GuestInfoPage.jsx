@@ -1448,10 +1448,14 @@ const handlePayLaterBooking = async (e) => {
                         <div className="payment-options-wrapper">
                             <div className="payment-options-container">
                             {/* PAY LATER - NOW THE STAR OF THE SHOW! */}
-                            <div 
-                                className={`payment-option-clickable payLater ${selectedPlan === 'payLater' ? 'selected' : ''}`}
-                                onClick={() => setSelectedPlan('payLater')}
-                            >
+                            <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
+                                <input 
+                                    type="radio" 
+                                    name="plan" 
+                                    value="payLater" 
+                                    checked={selectedPlan === 'payLater'}
+                                    onChange={() => setSelectedPlan('payLater')}
+                                />
                                 <div className="payment-option primary" style={{ 
                                 background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
                                 border: '2px solid #10b981',
@@ -1483,14 +1487,18 @@ const handlePayLaterBooking = async (e) => {
                                     <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
                                 </div>
                             </div>
-                            </div>
+                        </label>
 
-                            {/* Trial Option - NOW SECOND */}
-                            <div 
-                                className={`payment-option-clickable trial ${selectedPlan === 'trial' ? 'selected' : ''}`}
-                                onClick={() => setSelectedPlan('trial')}
-                            >
-                                <div className="payment-option secondary">
+                        {/* Trial Option - NOW SECOND */}
+                        <label className={`payment-option-radio ${selectedPlan === 'trial' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="trial" 
+                                checked={selectedPlan === 'trial'}
+                                onChange={() => setSelectedPlan('trial')}
+                            />
+                            <div className="payment-option secondary">
                                 <div className="option-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1510,14 +1518,18 @@ const handlePayLaterBooking = async (e) => {
                                     <strong style={{ color: '#28a745' }}>Your $69 is 100% credited toward any longer stay</strong>
                                 </div>
                             </div>
-                            </div>
+                        </label>
 
-                            {/* Full Booking Option - NOW THIRD */}
-                            <div 
-                                className={`payment-option-clickable complete ${selectedPlan === 'full' ? 'selected' : ''}`}
-                                onClick={() => setSelectedPlan('full')}
-                            >
-                                <div className="payment-option secondary">
+                        {/* Full Booking Option - NOW THIRD */}
+                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="full" 
+                                checked={selectedPlan === 'full'}
+                                onChange={() => setSelectedPlan('full')}
+                            />
+                            <div className="payment-option secondary">
                                 <div className="option-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1535,9 +1547,9 @@ const handlePayLaterBooking = async (e) => {
                                     <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
                                 </div>
                             </div>
-                            </div>
-                        </div>
-                        </div>
+                        </label>
+                    </div>
+                    </div>
                     </>
                 )}
 
@@ -1564,10 +1576,14 @@ const handlePayLaterBooking = async (e) => {
                         <div className="payment-options-wrapper">
                             <div className="payment-options-container">
                             {/* Pay Later Option - DEFAULT (same as 7+ nights) */}
-                            <div 
-                                className={`payment-option-clickable payLater ${selectedPlan === 'payLater' ? 'selected' : ''}`}
-                                onClick={() => setSelectedPlan('payLater')}
-                            >
+                            <label className={`payment-option-radio ${selectedPlan === 'payLater' ? 'selected' : ''}`}>
+                                <input 
+                                    type="radio" 
+                                    name="plan" 
+                                    value="payLater" 
+                                    checked={selectedPlan === 'payLater'}
+                                    onChange={() => setSelectedPlan('payLater')}
+                                />
                                 <div className="payment-option primary" style={{ 
                                 background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
                                 border: '2px solid #10b981',
@@ -1599,14 +1615,18 @@ const handlePayLaterBooking = async (e) => {
                                     <strong style={{ color: '#10b981' }}>🔒 We don't charge you anything today</strong>
                                 </div>
                             </div>
-                            </div>
+                        </label>
 
-                            {/* Standard Booking Option - SECONDARY */}
-                            <div 
-                                className={`payment-option-clickable complete ${selectedPlan === 'full' ? 'selected' : ''}`}
-                                onClick={() => setSelectedPlan('full')}
-                            >
-                                <div className="payment-option secondary">
+                        {/* Standard Booking Option - SECONDARY */}
+                        <label className={`payment-option-radio ${selectedPlan === 'full' ? 'selected' : ''}`}>
+                            <input 
+                                type="radio" 
+                                name="plan" 
+                                value="full" 
+                                checked={selectedPlan === 'full'}
+                                onChange={() => setSelectedPlan('full')}
+                            />
+                            <div className="payment-option secondary">
                                 <div className="option-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1624,9 +1644,9 @@ const handlePayLaterBooking = async (e) => {
                                     <strong style={{ color: '#28a745' }}>✅ If room isn't as promised, 100% refund on the spot</strong>
                                 </div>
                             </div>
-                            </div>
-                        </div>
-                        </div>
+                        </label>
+                    </div>
+                    </div>
                     </>
                 )}
 
