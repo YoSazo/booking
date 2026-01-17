@@ -2122,20 +2122,6 @@ const handlePayLaterBooking = async (e) => {
                                 </div>
                             </div>
                             
-                            {/* Testimonial below the form */}
-                            <TestimonialTrigger 
-                                onClick={() => setIsTestimonialOpen(true)}
-                                thumbnailUrl={testimonials[0].thumbnailUrl}
-                            />
-                            {isTestimonialOpen && (
-                                <TestimonialPlayer
-                                    testimonials={testimonials}
-                                    startIndex={0}
-                                    onClose={() => {
-                                        setIsTestimonialOpen(false);
-                                    }}
-                                />
-                            )}
                         </>
                     )}
 
