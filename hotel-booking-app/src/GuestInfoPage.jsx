@@ -1985,6 +1985,85 @@ const handlePayLaterBooking = async (e) => {
                                     <span className="date-value">{new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 </div>
                             </div>
+                            
+                            {/* Smart Booking Badge - Show savings for longer stays */}
+                            {(() => {
+                                const standardRate = 69; // $69 per night
+                                const standardTotal = standardRate * bookingDetails.nights;
+                                const actualTotal = bookingDetails.subtotal;
+                                const savings = standardTotal - actualTotal;
+                                const savingsPercent = ((savings / standardTotal) * 100).toFixed(0);
+                                
+                                // Show badge for 7+ nights (weekly) or 28+ nights (monthly)
+                                if (bookingDetails.nights >= 28 && savings > 0) {
+                                    return (
+                                        <div style={{
+                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            borderRadius: '12px',
+                                            padding: '12px 16px',
+                                            marginTop: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px'
+                                        }}>
+                                            <div style={{
+                                                background: 'rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '50%',
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '18px'
+                                            }}>
+                                                💰
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
+                                                    Smart Choice! Monthly Rate Applied
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                                                    You're saving ${savings.toFixed(2)} ({savingsPercent}%) vs nightly rate
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                } else if (bookingDetails.nights >= 7 && savings > 0) {
+                                    return (
+                                        <div style={{
+                                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                            borderRadius: '12px',
+                                            padding: '12px 16px',
+                                            marginTop: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px'
+                                        }}>
+                                            <div style={{
+                                                background: 'rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '50%',
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '18px'
+                                            }}>
+                                                ✨
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
+                                                    Great Value! Weekly Discount Applied
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                                                    You're saving ${savings.toFixed(2)} ({savingsPercent}%) vs nightly rate
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
                         
                         {/* Price Breakdown Card */}
