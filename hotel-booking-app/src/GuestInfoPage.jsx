@@ -1985,85 +1985,6 @@ const handlePayLaterBooking = async (e) => {
                                     <span className="date-value">{new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 </div>
                             </div>
-                            
-                            {/* Smart Booking Badge - Show savings for longer stays */}
-                            {(() => {
-                                const standardRate = 69; // $69 per night
-                                const standardTotal = standardRate * bookingDetails.nights;
-                                const actualTotal = bookingDetails.subtotal;
-                                const savings = standardTotal - actualTotal;
-                                const savingsPercent = ((savings / standardTotal) * 100).toFixed(0);
-                                
-                                // Show badge for 7+ nights (weekly) or 28+ nights (monthly)
-                                if (bookingDetails.nights >= 28 && savings > 0) {
-                                    return (
-                                        <div style={{
-                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                            borderRadius: '12px',
-                                            padding: '12px 16px',
-                                            marginTop: '16px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px'
-                                        }}>
-                                            <div style={{
-                                                background: 'rgba(255, 255, 255, 0.2)',
-                                                borderRadius: '50%',
-                                                width: '32px',
-                                                height: '32px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '18px'
-                                            }}>
-                                                💰
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
-                                                    Smart Choice! Monthly Rate Applied
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.9)' }}>
-                                                    You're saving ${savings.toFixed(2)} ({savingsPercent}%) vs nightly rate
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                } else if (bookingDetails.nights >= 7 && savings > 0) {
-                                    return (
-                                        <div style={{
-                                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                                            borderRadius: '12px',
-                                            padding: '12px 16px',
-                                            marginTop: '16px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px'
-                                        }}>
-                                            <div style={{
-                                                background: 'rgba(255, 255, 255, 0.2)',
-                                                borderRadius: '50%',
-                                                width: '32px',
-                                                height: '32px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '18px'
-                                            }}>
-                                                ✨
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '13px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
-                                                    Great Value! Weekly Discount Applied
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.9)' }}>
-                                                    You're saving ${savings.toFixed(2)} ({savingsPercent}%) vs nightly rate
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })()}
                         </div>
                         
                         {/* Price Breakdown Card */}
@@ -2073,10 +1994,59 @@ const handlePayLaterBooking = async (e) => {
                             </div>
                             
                             <div className="price-items">
-                                <div className="price-row">
-                                    <span>Room ({bookingDetails.nights} nights)</span>
-                                    <span className="price-value">${bookingDetails.subtotal.toFixed(2)}</span>
-                                </div>
+                                {(() => {
+                                    const standardRate = 69; // $69 per night
+                                    const standardTotal = standardRate * bookingDetails.nights;
+                                    const actualTotal = bookingDetails.subtotal;
+                                    const savings = standardTotal - actualTotal;
+                                    
+                                    // Show crossed-out price for 7+ nights with savings
+                                    if (bookingDetails.nights >= 7 && savings > 0) {
+                                        return (
+                                            <>
+                                                <div className="price-row" style={{ 
+                                                    paddingBottom: '8px',
+                                                    borderBottom: '1px solid #f3f4f6'
+                                                }}>
+                                                    <span style={{ color: '#9ca3af', fontSize: '14px' }}>
+                                                        Nightly Rate ({bookingDetails.nights} nights × $69)
+                                                    </span>
+                                                    <span style={{ 
+                                                        color: '#9ca3af',
+                                                        fontSize: '14px',
+                                                        textDecoration: 'line-through'
+                                                    }}>
+                                                        ${standardTotal.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                                <div className="price-row" style={{ paddingTop: '8px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <span>Room ({bookingDetails.nights} nights)</span>
+                                                        <span style={{ 
+                                                            fontSize: '12px', 
+                                                            color: '#10b981',
+                                                            fontWeight: '600'
+                                                        }}>
+                                                            {bookingDetails.nights >= 28 ? '🎉 Monthly Rate - ' : '✨ Weekly Rate - '}
+                                                            Save ${savings.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <span className="price-value" style={{ color: '#10b981', fontWeight: '700' }}>
+                                                        ${actualTotal.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        );
+                                    } else {
+                                        return (
+                                            <div className="price-row">
+                                                <span>Room ({bookingDetails.nights} nights)</span>
+                                                <span className="price-value">${bookingDetails.subtotal.toFixed(2)}</span>
+                                            </div>
+                                        );
+                                    }
+                                })()}
+                            </div>
                                 
                                 <div className="price-row">
                                     <div className="price-label-with-info">
