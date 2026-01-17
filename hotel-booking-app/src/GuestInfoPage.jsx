@@ -230,9 +230,9 @@ useEffect(() => {
       }
     }
     
-    // Smooth scroll to top when plan page loads, after DOM renders
+    // Smooth scroll to just below progress bar when plan page loads
     setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 120, behavior: 'smooth' });
     }, 100);
   }
   
@@ -243,7 +243,12 @@ useEffect(() => {
     }, 100);
   }
   
-  // Removed scroll on payment page - banner visible at billing address explains $1 verification
+  // Smooth scroll to just below progress bar on Step 4 (Payment page)
+  if (currentStep === 4) {
+    setTimeout(() => {
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    }, 100);
+  }
   
 }, [currentStep, bookingDetails]);
 
