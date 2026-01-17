@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb } from 'lucide-react';
+import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint } from 'lucide-react';
 import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -626,10 +626,14 @@ useEffect(() => {
     
     setIsAddressSelected(true);
     
-    // Clear the flag after a delay
+    // Scroll to bottom to show the CTA button after address fields populate
     setTimeout(() => {
+        window.scrollTo({ 
+            top: document.documentElement.scrollHeight, 
+            behavior: 'smooth' 
+        });
         isInteractingWithAutocomplete.current = false;
-    }, 1000);
+    }, 500);
 };
     // Main submit handler for FULL PAYMENT (handles both card and wallet)
     const handleCardSubmit = async (e) => {
@@ -1950,13 +1954,7 @@ const handlePayLaterBooking = async (e) => {
                                 
                                 <div className="detail-item">
                                     <div className="detail-icon pets-icon">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="11" cy="4" r="2"/>
-                                            <circle cx="18" cy="8" r="2"/>
-                                            <circle cx="20" cy="16" r="2"/>
-                                            <circle cx="9" cy="10" r="2"/>
-                                            <path d="M8.5 13.5c0 0-1.5 2-1.5 4.5s1.5 2.5 2.5 2.5 2.5 0 2.5-2.5-1.5-4.5-1.5-4.5"/>
-                                        </svg>
+                                        <PawPrint size={20} />
                                     </div>
                                     <div>
                                         <div className="detail-label">Pets</div>
