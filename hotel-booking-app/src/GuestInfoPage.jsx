@@ -2046,7 +2046,6 @@ const handlePayLaterBooking = async (e) => {
                                         );
                                     }
                                 })()}
-                            </div>
                                 
                                 <div className="price-row">
                                     <div className="price-label-with-info">
