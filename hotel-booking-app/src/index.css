@@ -141,18 +141,13 @@ body {
   .room-image-container {
     width: 45%;
     min-width: 400px;
-    height: 100%;
+    height: 100%; /* Fill full card height */
     min-height: 450px;
-    display: flex; /* ADD THIS */
-    flex-direction: column; /* ADD THIS */
   }
-
   
   .room-gallery-image {
-    height: 100%;
-    width: 100%; /* ADD THIS */
-    object-fit: cover;
-    flex: 1; /* ADD THIS - makes image fill available space */
+    height: 100%; /* Image fills container */
+    object-fit: cover; /* Crop to fill without distortion */
   }
   
   .room-content {
@@ -1679,29 +1674,25 @@ body {
 
 /* --- NEW Styles for Static Banner on Guest Info Page --- */
 .static-banner {
-    margin-bottom: 20px; /* ADD THIS - creates space below banner */
-    /* Keep existing styles */
-    background: white;
-    color: #111827;
-    padding: 12px 20px;
-    position: sticky;
-    top: 32px;
-    left: 0;
-    right: 0;
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 0;
-    max-width: 90%;
-    width: fit-content;
-    z-index: 1000;
-    text-align: center;
-    font-size: 0.9em;
-    box-sizing: border-box;
-    border-radius: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    border: 1px solid #e5e7eb;
-    transition: all 0.3s ease;
-  }
+  background: white;
+  color: #111827;
+  padding: 12px 20px;
+  position: sticky;
+  top: 32px;
+  left: 0;
+  right: 0;
+  margin: 0 auto -8px auto; /* Add 20px bottom margin for space */
+  max-width: 90%;
+  width: fit-content;
+  z-index: 1000;
+  text-align: center;
+  font-size: 0.9em;
+  box-sizing: border-box;
+  border-radius: 24px; /* Pill shape */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
 
 .static-banner:hover {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
@@ -4418,12 +4409,7 @@ padding: 6px 16px;
   
   .calendar-modal-body {
     padding-bottom: 20px;
-    max-height: none;
-    padding-bottom: 0; /* CHANGE from 20px to 0 */
-  }
-
-  .calendar-apply-btn {
-    margin-bottom: 0; /* CHANGE from 24px (or whatever it was) to 0 */
+    max-height: none; /* Allow body to expand fully on desktop */
   }
 }
 
