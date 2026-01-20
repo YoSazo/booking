@@ -53,6 +53,9 @@ body {
     text-align: center;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .header h1 {
@@ -60,6 +63,21 @@ body {
     color: var(--primary-color);
     font-size: 2.5em; /* Adjusted from default */
     line-height: 1.2;
+    width: 100%;
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+/* Mobile header adjustments */
+@media (max-width: 768px) {
+  .header {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  
+  .header h1 {
+    font-size: 1.8em;
+  }
 }
 
 /* --- Booking Form --- */
@@ -105,13 +123,49 @@ body {
 
 /* Mobile - Add bottom padding so last room card button isn't smooshed */
 @media (max-width: 768px) {
+  /* Fix container width on mobile */
+  .container {
+    padding-left: 10px;
+    padding-right: 10px;
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
   .rooms-list {
     padding-bottom: 30px; /* Normal browsers: moderate padding */
+    padding-left: 0;
+    padding-right: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   
   /* Facebook/Instagram browsers ONLY: More padding */
   .fb-browser .rooms-list {
     padding-bottom: 50px;
+  }
+  
+  /* Ensure room cards don't overflow */
+  .room-card {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  /* Ensure images don't overflow */
+  .room-image-container {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .room-gallery-image {
+    width: 100%;
+    max-width: 100%;
+    object-fit: cover;
   }
 }
 
