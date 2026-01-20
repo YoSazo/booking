@@ -106,12 +106,12 @@ body {
 /* Mobile - Add bottom padding so last room card button isn't smooshed */
 @media (max-width: 768px) {
   .rooms-list {
-    padding-bottom: 80px; /* Normal browsers: moderate padding */
+    padding-bottom: 30px; /* Normal browsers: moderate padding */
   }
   
   /* Facebook/Instagram browsers ONLY: More padding */
   .fb-browser .rooms-list {
-    padding-bottom: 120px;
+    padding-bottom: 50px;
   }
 }
 
