@@ -2217,6 +2217,8 @@ padding: 6px 16px;
   .checkout-progress-bar {
     max-width: 100%;
     padding: 0 5px;
+    margin-left: auto;
+    margin-right: auto;
   }
   
   .step-circle {
@@ -2230,6 +2232,24 @@ padding: 6px 16px;
   
   .progress-step {
     gap: 4px;
+  }
+}
+
+/* Extra small screens (iPhone 5/SE) - Center progress bar */
+@media (max-width: 360px) {
+  .checkout-progress-bar {
+    padding: 0 10px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .step-circle {
+    width: 50px;
+    height: 24px;
+  }
+  
+  .step-name {
+    font-size: 0.85em;
   }
 }
 
