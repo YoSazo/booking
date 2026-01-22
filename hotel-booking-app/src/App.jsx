@@ -10,9 +10,10 @@ import { hotelData } from './hotelData.js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { calculateTieredPrice } from './priceCalculator.js';
+import getHotelId from './utils/getHotelId';
 
 
-const hotelId = import.meta.env.VITE_HOTEL_ID || 'guest-lodge-minot';
+const hotelId = getHotelId();
 const currentHotel = hotelData[hotelId];
 const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';

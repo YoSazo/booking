@@ -10,9 +10,18 @@ const app = express();
 const prisma = new PrismaClient();
 
 const allowedOrigins = [
-    'https://suitestay.clickinns.com',      // Alloow the non-wwww version
-    'https://www.suitestay.clickinns.com', // Allow the www version
-    'http://localhost:3000'       ,     // Allow local development
+    'https://suitestay.clickinns.com',
+    'https://www.suitestay.clickinns.com',
+    'https://homeplacesuites.clickinns.com',
+    'https://www.homeplacesuites.clickinns.com',
+    'https://myhomeplacesuites.com',
+    'https://www.myhomeplacesuites.com',
+    'https://guestlodgeminot.clickinns.com',
+    'https://stcroix.clickinns.com',
+    'https://clickinns.com',
+    'https://www.clickinns.com',
+    'http://localhost:3000',
+    'http://localhost:5173',
 ];
 
 const corsOptions = {
@@ -54,26 +63,89 @@ app.set('trust proxy', true);
 
 const PORT = 3001;
 const CLOUDBEDS_API_KEY = process.env.CLOUDBEDS_API_KEY;
-const PROPERTY_ID = '100080519237760';
+const BOOKINGCENTER_SITE_ID = process.env.BOOKINGCENTER_SITE_ID;
+const BOOKINGCENTER_PASSWORD = process.env.BOOKINGCENTER_PASSWORD;
 
-const roomIDMapping = {
-    'King Room': {
-        roomTypeID: '104645995540719',
-        rates: {
-            nightly: '104645995540724',
-            weekly: '163454677930189',
-            monthly: '163455843680424'
+// Multi-hotel configuration
+const hotelConfig = {
+    'suite-stay': {
+        pms: 'cloudbeds',
+        propertyId: '100080519237760',
+        roomIDMapping: {
+            'King Room': {
+                roomTypeID: '104645995540719',
+                rates: {
+                    nightly: '104645995540724',
+                    weekly: '163454677930189',
+                    monthly: '163455843680424'
+                }
+            },
+            'Double Full Bed': {
+                roomTypeID: '104644269441156',
+                rates: {
+                    nightly: '104644269441201',
+                    weekly: '163455410200730',
+                    monthly: '163456335478922'
+                }
+            }
         }
     },
-    'Double Full Bed': {
-        roomTypeID: '104644269441156',
-        rates: {
-            nightly: '104644269441201',
-            weekly: '163455410200730',
-            monthly: '163456335478922'
+    'home-place-suites': {
+        pms: 'cloudbeds',
+        propertyId: '113548817731712',
+        roomIDMapping: {
+            'Single King Room': {
+                roomTypeID: '117057244229790',
+                rates: {
+                    nightly: '117057244229790', // Update with actual rate IDs
+                    weekly: '117057244229790',
+                    monthly: '117057244229790'
+                }
+            },
+            'Double Queen Room': {
+                roomTypeID: '116355544711397',
+                rates: {
+                    nightly: '116355544711397',
+                    weekly: '116355544711397',
+                    monthly: '116355544711397'
+                }
+            },
+            'Double Queen Suite With Kitchenette': {
+                roomTypeID: '117068633694351',
+                rates: {
+                    nightly: '117068633694351',
+                    weekly: '117068633694351',
+                    monthly: '117068633694351'
+                }
+            }
         }
+    },
+    'guest-lodge-minot': {
+        pms: 'bookingcenter',
+        siteId: process.env.BOOKINGCENTER_MINOT_SITE_ID,
+        // Room mappings will be added once BookingCenter API is set up
+        roomIDMapping: {}
+    },
+    'st-croix-wisconsin': {
+        pms: 'bookingcenter',
+        siteId: process.env.BOOKINGCENTER_STCROIX_SITE_ID,
+        // Room mappings will be added once BookingCenter API is set up
+        roomIDMapping: {}
     }
 };
+
+// Helper to get hotel config
+const getHotelConfig = (hotelId) => {
+    const config = hotelConfig[hotelId];
+    if (!config) {
+        throw new Error(`Hotel configuration not found for: ${hotelId}`);
+    }
+    return config;
+};
+
+// Legacy mapping for backwards compatibility (will be removed)
+const roomIDMapping = hotelConfig['suite-stay'].roomIDMapping;
+const PROPERTY_ID = hotelConfig['suite-stay'].propertyId;
 
 const getBestRatePlan = (nights) => {
     if (nights >= 28) {
@@ -201,9 +273,19 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
             });
         }
 
-        // Create booking in Cloudbeds with "Pay at Hotel" status
+        // Create booking in PMS with "Pay at Hotel" status
+        const config = getHotelConfig(hotelId);
+        
+        // For now, only Cloudbeds supports pay-later flow
+        if (config.pms !== 'cloudbeds') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Pay later booking not yet supported for this hotel.' 
+            });
+        }
+
         const reservationData = {
-            propertyID: PROPERTY_ID,
+            propertyID: config.propertyId,
             startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
             endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
             guestFirstName: guestInfo.firstName,
@@ -486,9 +568,18 @@ app.post('/api/stripe-webhook', async (req, res) => {
             // The webhook must now create the booking as a backup.
             console.log('⚠️ Frontend booking record not found. Creating backup booking...');
 
+            // Get hotel config for this booking
+            const config = getHotelConfig(hotelId);
+            
+            // Only process Cloudbeds hotels in webhook backup (BookingCenter will be added later)
+            if (config.pms !== 'cloudbeds') {
+                console.log(`⚠️ Webhook backup not yet implemented for ${config.pms}`);
+                return res.json({ received: true });
+            }
+
             // 1. Create the booking in Cloudbeds
             const reservationData = {
-                propertyID: PROPERTY_ID,
+                propertyID: config.propertyId,
                 startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
                 endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
                 guestFirstName: guestInfo.firstName,
@@ -554,72 +645,90 @@ app.post('/api/stripe-webhook', async (req, res) => {
 
 
 // --- API ENDPOINTS ---
-app.post('/api/availability', async (req, res) => {
-    const { hotelId, checkin, checkout } = req.body;
-    if (hotelId !== 'suite-stay') {
-        return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
-    }
+
+// Cloudbeds availability handler
+async function getCloudbedsAvailability(hotelId, checkin, checkout) {
+    const config = getHotelConfig(hotelId);
     const nights = Math.round((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24));
     const ratePlanType = getBestRatePlan(nights);
 
-    try {
-        const availabilityPromises = Object.entries(roomIDMapping).map(async ([roomName, ids]) => {
-            const currentRateID = ids.rates[ratePlanType];
-            const url = `https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${PROPERTY_ID}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${ids.roomTypeID}`;
-            
-            const response = await axios.get(url, {
-                headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
-            });
-            
-            const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
-
-            return {
-                roomName: roomName,
-                available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
-                roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
-                rateID: currentRateID,
-                roomTypeID: ids.roomTypeID
-            };
+    const availabilityPromises = Object.entries(config.roomIDMapping).map(async ([roomName, ids]) => {
+        const currentRateID = ids.rates[ratePlanType];
+        const url = `https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${config.propertyId}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${ids.roomTypeID}`;
+        
+        const response = await axios.get(url, {
+            headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
         });
+        
+        const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
 
-        const availableRooms = await Promise.all(availabilityPromises);
-        res.json({ success: true, data: availableRooms.filter(room => room.available) });
+        return {
+            roomName: roomName,
+            available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
+            roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
+            rateID: currentRateID,
+            roomTypeID: ids.roomTypeID
+        };
+    });
+
+    const availableRooms = await Promise.all(availabilityPromises);
+    return availableRooms.filter(room => room.available);
+}
+
+// BookingCenter availability handler (SOAP/XML)
+async function getBookingCenterAvailability(hotelId, checkin, checkout) {
+    const config = getHotelConfig(hotelId);
+    
+    // TODO: Implement BookingCenter SOAP API
+    // This will use OTA_HotelAvailRQ message
+    // For now, return empty until API credentials are set up
+    console.log(`BookingCenter availability check for ${hotelId} - awaiting API implementation`);
+    
+    return [];
+}
+
+app.post('/api/availability', async (req, res) => {
+    const { hotelId, checkin, checkout } = req.body;
+    
+    try {
+        const config = getHotelConfig(hotelId);
+        let availableRooms;
+
+        if (config.pms === 'cloudbeds') {
+            availableRooms = await getCloudbedsAvailability(hotelId, checkin, checkout);
+        } else if (config.pms === 'bookingcenter') {
+            availableRooms = await getBookingCenterAvailability(hotelId, checkin, checkout);
+        } else {
+            return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
+        }
+
+        res.json({ success: true, data: availableRooms });
 
     } catch (error) {
-        console.error("Error fetching availability from Cloudbeds:", error.response?.data || error.message);
+        console.error("Error fetching availability:", error.response?.data || error.message);
         res.status(500).json({ success: false, message: 'Failed to fetch availability.' });
     }
 });
 
-app.post('/api/book', async (req, res) => {
-    const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
-    
-    if (hotelId !== 'suite-stay') {
-         return res.status(400).json({ success: false, message: 'This endpoint is only for Home Place Suites.' });
-    }
-
+// Cloudbeds booking handler
+async function createCloudbedsBooking(hotelId, bookingDetails, guestInfo) {
+    const config = getHotelConfig(hotelId);
     const isTrial = bookingDetails.bookingType === 'trial';
-
     let rateIDToUse = bookingDetails.rateID;
 
     if (isTrial && bookingDetails.useNightlyRate) {
-        // Find the room's nightly rate ID
-        const roomMapping = Object.entries(roomIDMapping).find(
+        const roomMapping = Object.entries(config.roomIDMapping).find(
             ([name, ids]) => ids.roomTypeID === bookingDetails.roomTypeID
         );
         
         if (roomMapping) {
-            rateIDToUse = roomMapping[1].rates.nightly; // Use nightly rate
+            rateIDToUse = roomMapping[1].rates.nightly;
             console.log(`✅ Trial booking - switching to nightly rate: ${rateIDToUse}`);
         }
     }
-    
-    if (!bookingDetails.rateID) {
-        return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
-    }
-    
+
     const reservationData = {
-        propertyID: PROPERTY_ID,
+        propertyID: config.propertyId,
         startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
         guestFirstName: guestInfo.firstName,
@@ -645,26 +754,58 @@ app.post('/api/book', async (req, res) => {
         }]),
     };
 
-    try {
-        const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
-            headers: {
-                'accept': 'application/json',
-                'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
-                'content-type': 'application/x-www-form-urlencoded',
-            }
-        });
+    const pmsResponse = await axios.post('https://api.cloudbeds.com/api/v1.3/postReservation', new URLSearchParams(reservationData), {
+        headers: {
+            'accept': 'application/json',
+            'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
+            'content-type': 'application/x-www-form-urlencoded',
+        }
+    });
 
-        if (pmsResponse.data.success) {
+    return pmsResponse.data;
+}
+
+// BookingCenter booking handler (SOAP/XML)
+async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
+    const config = getHotelConfig(hotelId);
+    
+    // TODO: Implement BookingCenter SOAP API
+    // This will use OTA_HotelRes (SaveBooking) message
+    console.log(`BookingCenter booking for ${hotelId} - awaiting API implementation`);
+    
+    return { success: false, message: 'BookingCenter integration pending' };
+}
+
+app.post('/api/book', async (req, res) => {
+    const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
+    
+    if (!bookingDetails.rateID) {
+        return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
+    }
+
+    try {
+        const config = getHotelConfig(hotelId);
+        let pmsResponse;
+
+        if (config.pms === 'cloudbeds') {
+            pmsResponse = await createCloudbedsBooking(hotelId, bookingDetails, guestInfo);
+        } else if (config.pms === 'bookingcenter') {
+            pmsResponse = await createBookingCenterBooking(hotelId, bookingDetails, guestInfo);
+        } else {
+            return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
+        }
+
+        if (pmsResponse.success) {
             // Save to database
             try {
                 await prisma.booking.create({
                     data: {
                         stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode,
-                        pmsConfirmationCode: pmsResponse.data.reservationID,
+                        pmsConfirmationCode: pmsResponse.reservationID,
                         hotelId: hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
-                        bookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
+                        bookingType: bookingDetails.bookingType || 'standard',
                         checkinDate: new Date(bookingDetails.checkin),
                         checkoutDate: new Date(bookingDetails.checkout),
                         nights: bookingDetails.nights,
@@ -683,10 +824,10 @@ app.post('/api/book', async (req, res) => {
         }
         
         res.json({
-            success: pmsResponse.data.success,
-            message: pmsResponse.data.success ? 'Reservation created successfully.' : pmsResponse.data.message,
-            reservationCode: pmsResponse.data.reservationID,
-            pmsResponse: pmsResponse.data
+            success: pmsResponse.success,
+            message: pmsResponse.success ? 'Reservation created successfully.' : pmsResponse.message,
+            reservationCode: pmsResponse.reservationID,
+            pmsResponse: pmsResponse
         });
 
     } catch (error) {

@@ -10,8 +10,10 @@ import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PaymentInfoModal from './PaymentInfoModal.jsx';
+import getHotelId from './utils/getHotelId';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const hotelId = getHotelId();
 
 
 
@@ -849,7 +851,7 @@ useEffect(() => {
                 amount: 20,
                 bookingDetails: reserveBooking,
                 guestInfo: formData,
-                hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                hotelId: hotelId
             }),
         });
 
@@ -1032,7 +1034,7 @@ const handleTrialNightBooking = async (e) => {
                 amount: trialTotal,
                 bookingDetails: trialBooking,
                 guestInfo: formData,
-                hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                hotelId: hotelId
             }),
         });
 
@@ -1219,7 +1221,7 @@ const handlePayLaterBooking = async (e) => {
             body: JSON.stringify({ 
                 bookingDetails: payLaterBooking,
                 guestInfo: formData,
-                hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                hotelId: hotelId
             }),
         });
 
@@ -1268,7 +1270,7 @@ const handlePayLaterBooking = async (e) => {
                         paymentIntentId: paymentIntent.id,
                         bookingDetails: payLaterBooking,
                         guestInfo: formData,
-                        hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                        hotelId: hotelId
                     }),
                 });
 
@@ -1322,7 +1324,7 @@ const handlePayLaterBooking = async (e) => {
                             paymentIntentId: paymentIntent.id,
                             bookingDetails: payLaterBooking,
                             guestInfo: formData,
-                            hotelId: import.meta.env.VITE_HOTEL_ID || 'suite-stay'
+                            hotelId: hotelId
                         }),
                     });
 
