@@ -76,6 +76,11 @@ const BOOKINGCENTER_ENDPOINTS = {
     booking: 'https://ws-server-test.bookingcenter.com/new_booking.php',
 };
 
+// BookingCenter receipt type codes (site_receipt_types.phtml)
+// Jeff: use an overlap like WOFF in both BCDEMO and STCROIX for initial integration.
+const BOOKINGCENTER_TEST_RECEIPT_TYPE = process.env.BOOKINGCENTER_TEST_RECEIPT_TYPE || 'WOFF';
+
+
 // Multi-hotel configuration
 const hotelConfig = {
     'suite-stay': {
@@ -810,6 +815,10 @@ function buildBcHotelResRQ({
     ratePlanCode,
     guestInfo,
     guests = 1,
+    // Deposit/guarantee metadata
+    depositAmount = 0,
+    paymentTransactionTypeCode = 'capture',
+    receiptType = BOOKINGCENTER_TEST_RECEIPT_TYPE,
 }) {
     const echoToken = Date.now().toString();
     const safeGuests = Math.max(1, Number(guests) || 1);
@@ -843,13 +852,17 @@ function buildBcHotelResRQ({
               <GuestCount Count="${safeGuests}" AgeQualifyingCode="10"/>
             </GuestCounts>
             <TimeSpan Start="${checkin}" End="${checkout}"/>
+            <Guarantee PaymentTransactionTypeCode="${paymentTransactionTypeCode}">
+              <GuaranteesAccepted>
+                <GuaranteeAccepted>
+                  <PaymentCard CardCode="${receiptType}"/>
+                </GuaranteeAccepted>
+              </GuaranteesAccepted>
+            </Guarantee>
             <PaymentPolicies>
-              <PaymentPolicy>
-                <GuaranteePayment GuaranteeType="GuaranteeRequired" PaymentCode="31" NoCardHolderInfoReqInd="true"/>
-                <GuaranteeDescription Name="Deposit Policy">
-                  <Text>Your credit card will be used to guarantee your reservation.</Text>
-                </GuaranteeDescription>
-              </PaymentPolicy>
+              <GuaranteePayment>
+                <AmountPercent Amount="${depositAmount}" TaxInclusive="false" BasisType="Fixed"/>
+              </GuaranteePayment>
             </PaymentPolicies>
             <BasicPropertyInfo HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" AgentCode="WEB"/>
           </RoomStay>
@@ -1051,6 +1064,8 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         return { success: false, message: 'Missing BookingCenter roomTypeCode or ratePlanCode.' };
     }
 
+    // BookingCenter expects a Guarantee + receipt type and a deposit amount in PaymentPolicies.
+    // For now we set depositAmount=0 because Stripe handles actual payment/holds externally.
     const xml = buildBcHotelResRQ({
         checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         checkout: new Date(bookingDetails.checkout).toISOString().split('T')[0],
@@ -1058,6 +1073,9 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         ratePlanCode,
         guestInfo,
         guests: bookingDetails.guests,
+        depositAmount: 0,
+        paymentTransactionTypeCode: 'capture',
+        receiptType: BOOKINGCENTER_TEST_RECEIPT_TYPE,
     });
 
     const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
