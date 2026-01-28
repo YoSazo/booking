@@ -845,7 +845,7 @@ function buildBcHotelResRQ({
             <TimeSpan Start="${checkin}" End="${checkout}"/>
             <PaymentPolicies>
               <PaymentPolicy>
-                <GuaranteePayment GuaranteeType="GuaranteeRequired" PaymentCode="31" NoCardHolderInfoReqInd="false"/>
+                <GuaranteePayment GuaranteeType="GuaranteeRequired" PaymentCode="31" NoCardHolderInfoReqInd="true"/>
                 <GuaranteeDescription Name="Deposit Policy">
                   <Text>Your credit card will be used to guarantee your reservation.</Text>
                 </GuaranteeDescription>
