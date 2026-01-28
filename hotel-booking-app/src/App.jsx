@@ -102,7 +102,14 @@ function App() {
   }, [finalBooking, guestInfo, reservationCode, clientSecret]);
 
   const checkAvailability = async (start, end) => {
-    if (!start || !end || currentHotel.pms.toLowerCase() !== 'cloudbeds') {
+    if (!start || !end) {
+      setAvailableRooms(currentHotel.rooms);
+      return;
+    }
+
+    // Only Cloudbeds and BookingCenter support live availability
+    const pms = (currentHotel.pms || '').toLowerCase();
+    if (pms !== 'cloudbeds' && pms !== 'bookingcenter') {
       setAvailableRooms(currentHotel.rooms);
       return;
     }
@@ -121,11 +128,35 @@ function App() {
       const result = await response.json();
       console.log('🔍 API Response:', result);  // ← ADD THIS
       if (result.success) {
-        const mergedRooms = result.data.map(apiRoom => {
-          const staticRoomData = currentHotel.rooms.find(r => r.name === apiRoom.roomName);
-          console.log(`Room: ${apiRoom.roomName}, totalRate: ${apiRoom.totalRate}`);  // ← ADD THIS
-          return { ...staticRoomData, ...apiRoom };
-        });
+        // Merge PMS availability into your marketing room cards.
+        // Cloudbeds: apiRoom.roomName matches currentHotel.rooms[].name
+        // BookingCenter: apiRoom.roomName is "Single/Double/..." so we use an explicit mapping.
+        const mergedRooms = currentHotel.rooms
+          .map((staticRoom) => {
+            let apiRoom;
+
+            if (pms === 'cloudbeds') {
+              apiRoom = result.data.find(r => r.roomName === staticRoom.name);
+            } else if (pms === 'bookingcenter') {
+              // hotelData.js should define bookingCenterRoomTypeCode / bookingCenterRatePlanCode per room
+              apiRoom = result.data.find(r => r.roomTypeID === staticRoom.bookingCenterRoomTypeCode);
+
+              // If we found it, override identifiers to ensure booking uses the correct codes
+              if (apiRoom) {
+                apiRoom = {
+                  ...apiRoom,
+                  roomTypeID: staticRoom.bookingCenterRoomTypeCode,
+                  rateID: staticRoom.bookingCenterRatePlanCode || apiRoom.rateID,
+                };
+              }
+            }
+
+            if (!apiRoom) return null;
+
+            return { ...staticRoom, ...apiRoom };
+          })
+          .filter(Boolean);
+
         setAvailableRooms(mergedRooms);
       } else {
         alert('Error checking availability: ' + result.message);
