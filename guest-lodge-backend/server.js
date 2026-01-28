@@ -285,8 +285,57 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
 
         // Create booking in PMS with "Pay at Hotel" status
         const config = getHotelConfig(hotelId);
-        
-        // For now, only Cloudbeds supports pay-later flow
+
+        // BookingCenter pay-later: we still save a booking (guarantee/verification handled by $1 hold on Stripe)
+        if (config.pms === 'bookingcenter') {
+            const pmsResponse = await createBookingCenterBooking(hotelId, bookingDetails, guestInfo);
+
+            if (!pmsResponse.success) {
+                // If booking fails, cancel the hold
+                await stripe.paymentIntents.cancel(paymentIntentId);
+                return res.status(400).json({
+                    success: false,
+                    message: pmsResponse.message || 'Failed to create reservation.'
+                });
+            }
+
+            // Save to DB if possible (but don't fail booking if DB is down)
+            try {
+                await prisma.booking.create({
+                    data: {
+                        stripePaymentIntentId: paymentIntentId,
+                        ourReservationCode: bookingDetails.reservationCode,
+                        pmsConfirmationCode: pmsResponse.reservationID,
+                        hotelId: hotelId,
+                        roomName: bookingDetails.name || bookingDetails.roomName,
+                        bookingType: 'payLater',
+                        checkinDate: new Date(bookingDetails.checkin),
+                        checkoutDate: new Date(bookingDetails.checkout),
+                        nights: bookingDetails.nights,
+                        guestFirstName: guestInfo.firstName,
+                        guestLastName: guestInfo.lastName,
+                        guestEmail: guestInfo.email,
+                        guestPhone: guestInfo.phone,
+                        subtotal: bookingDetails.subtotal,
+                        taxesAndFees: bookingDetails.taxes,
+                        grandTotal: bookingDetails.total,
+                        amountPaidNow: 0,
+                        preAuthHoldAmount: 1.00,
+                        holdStatus: 'active'
+                    }
+                });
+            } catch (dbError) {
+                console.error("Failed to save pay-later booking to database:", dbError);
+            }
+
+            return res.json({
+                success: true,
+                message: 'Reservation created successfully. $1.00 hold placed on card.',
+                reservationCode: pmsResponse.reservationID
+            });
+        }
+
+        // Cloudbeds pay-later flow
         if (config.pms !== 'cloudbeds') {
             return res.status(400).json({ 
                 success: false, 
