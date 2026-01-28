@@ -138,8 +138,11 @@ export const hotelData = {
     pms: 'bookingcenter',
     propertyCode: 'TBD',
     rates: {
-      NIGHTLY: 69,
-      WEEKLY: 299,
+      // $72/night for stays under 7 nights
+      NIGHTLY: 72,
+      // $43/night for stays 7+ nights => 7 * 43 = $301
+      WEEKLY: 301,
+      // $999 for 28+ nights
       MONTHLY: 999,
     },
     // Reviews currently not displayed in UI, keeping empty for now
