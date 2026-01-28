@@ -128,7 +128,66 @@ export const hotelData = {
   },
 
 
-  // --- Second Hotel (Example with different data) ---
+  // --- St. Croix, WI ---
+  'st-croix-wisconsin': {
+    name: 'St Croix Falls',
+    url: 'https://stcroix.clickinns.com',
+    subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
+    phone: '715-204-9757',
+    address: '726 S Vincent St, St Croix Falls, WI 54024',
+    pms: 'bookingcenter',
+    propertyCode: 'TBD',
+    rates: {
+      NIGHTLY: 69,
+      WEEKLY: 299,
+      MONTHLY: 999,
+    },
+    // Reviews currently not displayed in UI, keeping empty for now
+    reviews: [],
+    // Temporary images copied from Suite Stay – replace later
+    rooms: [
+      {
+        id: 1,
+        name: 'King Room',
+        amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping',
+        description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.',
+        maxOccupancy: 3,
+        imageUrl: 'kingbedsuitestay.JPG',
+        imageUrls: [
+          'kingbedsuitestay.JPG',
+          'doublesuitestay2.JPG',
+          'doublesuitestay3.JPG',
+          'suitestaybathroom.jpg',
+          'sinksuitestay.JPG',
+          'tvsuitestay.JPG',
+          'workspacesuitestay.JPG',
+          'suitestayoutside.jpeg',
+          'suitestayreception.jpeg',
+        ],
+      },
+      {
+        id: 2,
+        name: 'Double Full Bed',
+        amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping',
+        description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.',
+        maxOccupancy: 4,
+        imageUrl: 'doublesuitestay.JPG',
+        imageUrls: [
+          'doublesuitestay.JPG',
+          'doublesuitestay2.JPG',
+          'doublesuitestay3.JPG',
+          'suitestaybathroom.jpg',
+          'sinksuitestay.JPG',
+          'tvsuitestay.JPG',
+          'workspacesuitestay.JPG',
+          'suitestayoutside.jpeg',
+          'suitestayreception.jpeg',
+        ],
+      },
+    ],
+  },
+
+  // --- Suite Stay (Talladega, AL) ---
   'suite-stay': {
     name: 'Suite Stay',
     url: 'clickinns.com',
