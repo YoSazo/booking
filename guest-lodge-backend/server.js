@@ -78,7 +78,9 @@ const BOOKINGCENTER_ENDPOINTS = {
 
 // BookingCenter receipt type codes (site_receipt_types.phtml)
 // Jeff: use an overlap like WOFF in both BCDEMO and STCROIX for initial integration.
-const BOOKINGCENTER_TEST_RECEIPT_TYPE = process.env.BOOKINGCENTER_TEST_RECEIPT_TYPE || 'WOFF';
+// Default to PF (Phone or Fax) in BCDEMO since it doesn't require real card details.
+// You can override via env per site once STCROIX is enabled.
+const BOOKINGCENTER_TEST_RECEIPT_TYPE = process.env.BOOKINGCENTER_TEST_RECEIPT_TYPE || 'PF';
 
 
 // Multi-hotel configuration
@@ -1074,7 +1076,7 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         guestInfo,
         guests: bookingDetails.guests,
         depositAmount: 0,
-        paymentTransactionTypeCode: 'capture',
+        paymentTransactionTypeCode: 'auth',
         receiptType: BOOKINGCENTER_TEST_RECEIPT_TYPE,
     });
 
