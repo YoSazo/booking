@@ -327,7 +327,11 @@ const handleConfirmBooking = async (bookingDetails) => {
       return;
     }
     
-    if (currentHotel.pms.toLowerCase() !== 'cloudbeds') {
+    const pms = (currentHotel.pms || '').toLowerCase();
+
+    // For PMS types we don't support yet, fall back to local confirmation.
+    // Cloudbeds and BookingCenter both support /api/book.
+    if (pms !== 'cloudbeds' && pms !== 'bookingcenter') {
       const newReservationCode = generateReservationCode();
       setGuestInfo(formData);
       setReservationCode(newReservationCode);
