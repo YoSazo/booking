@@ -5,6 +5,7 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const xml2js = require('xml2js');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -63,8 +64,17 @@ app.set('trust proxy', true);
 
 const PORT = 3001;
 const CLOUDBEDS_API_KEY = process.env.CLOUDBEDS_API_KEY;
-const BOOKINGCENTER_SITE_ID = process.env.BOOKINGCENTER_SITE_ID;
-const BOOKINGCENTER_PASSWORD = process.env.BOOKINGCENTER_PASSWORD;
+
+// BookingCenter (SOAP/XML) - use BCDEMO creds for test environment
+// Jeff: "You can only use BCDEMO in the TEST system"
+const BOOKINGCENTER_TEST_SITE_ID = process.env.BOOKINGCENTER_TEST_SITE_ID || 'BCDEMO';
+const BOOKINGCENTER_TEST_PASSWORD = process.env.BOOKINGCENTER_TEST_PASSWORD || 'expdistrobook21';
+const BOOKINGCENTER_TEST_CHAIN_CODE = process.env.BOOKINGCENTER_TEST_CHAIN_CODE || 'BC';
+
+const BOOKINGCENTER_ENDPOINTS = {
+    availability: 'https://ws-server-test.bookingcenter.com/hotel_availability.php',
+    booking: 'https://ws-server-test.bookingcenter.com/new_booking.php',
+};
 
 // Multi-hotel configuration
 const hotelConfig = {
@@ -675,16 +685,238 @@ async function getCloudbedsAvailability(hotelId, checkin, checkout) {
     return availableRooms.filter(room => room.available);
 }
 
+// -------------------------
+// BookingCenter SOAP helpers
+// -------------------------
+const bcXmlParser = new xml2js.Parser({
+    explicitArray: false,
+    ignoreAttrs: false,
+    attrkey: '$',
+    charkey: '_',
+    tagNameProcessors: [xml2js.processors.stripPrefix],
+});
+
+async function parseBcXml(xml) {
+    return bcXmlParser.parseStringPromise(xml);
+}
+
+function bcSoapEnvelope(innerXml) {
+    return `<?xml version="1.0" encoding="ISO-8859-1"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" 
+                   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                   xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/">
+  <SOAP-ENV:Body>
+    ${innerXml}
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`;
+}
+
+function bcTimestamp() {
+    // BookingCenter examples use offsets like 2026-01-28T13:34:03-0800
+    // Using ISO is usually accepted by SOAP servers; if not, we can format later.
+    return new Date().toISOString();
+}
+
+function buildBcAvailRQ({ checkin, checkout, adults = 1, rooms = 1 }) {
+    const echoToken = Date.now().toString();
+
+    // NOTE: In your captured example, Count="0" caused "Invalid Number of Guests".
+    const safeAdults = Math.max(1, Number(adults) || 1);
+    const safeRooms = Math.max(1, Number(rooms) || 1);
+
+    return bcSoapEnvelope(
+        `<OTA_HotelAvailRQ xmlns="http://www.opentravel.org/OTA/2003/05">
+  <parameters EchoToken="${echoToken}" TimeStamp="${bcTimestamp()}" Target="Production" Version="1.001">
+    <POS>
+      <Source ISOCurrency="USD"/>
+      <RequestorID OTA_CodeType="10" ID="${BOOKINGCENTER_TEST_SITE_ID}" MessagePassword="${BOOKINGCENTER_TEST_PASSWORD}"/>
+    </POS>
+    <AvailRequestSegments>
+      <AvailRequestSegment>
+        <StayDateRange Start="${checkin}" End="${checkout}"/>
+        <RoomStayCandidates>
+          <RoomStayCandidate RoomTypeCode="" Quantity="${safeRooms}">
+            <GuestCounts IsPerRoom="false">
+              <GuestCount AgeQualifyingCode="10" Count="${safeAdults}"/>
+            </GuestCounts>
+          </RoomStayCandidate>
+        </RoomStayCandidates>
+        <HotelSearchCriteria>
+          <Criterion>
+            <HotelRef ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" AgentCode=""/>
+          </Criterion>
+        </HotelSearchCriteria>
+      </AvailRequestSegment>
+    </AvailRequestSegments>
+  </parameters>
+</OTA_HotelAvailRQ>`
+    );
+}
+
+function buildBcHotelResRQ({
+    checkin,
+    checkout,
+    roomTypeCode,
+    ratePlanCode,
+    guestInfo,
+    guests = 1,
+}) {
+    const echoToken = Date.now().toString();
+    const safeGuests = Math.max(1, Number(guests) || 1);
+
+    // BookingCenter availability response includes PaymentPolicy/GuaranteePayment with a PaymentCode.
+    // In your successful AvailRS sample, PaymentCode="31". Using it helps avoid "Invalid Payment Type".
+    const paymentCode = '31';
+
+    const firstName = guestInfo.firstName || 'Guest';
+    const lastName = guestInfo.lastName || 'Guest';
+
+    return bcSoapEnvelope(
+        `<OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05/hotelres">
+  <parameters TimeStamp="${bcTimestamp()}" Version="1.001" EchoToken="${echoToken}" Target="Production">
+    <POS>
+      <Source ISOCurrency="USD"/>
+      <RequestorID OTA_CodeType="10" ID="${BOOKINGCENTER_TEST_SITE_ID}" MessagePassword="${BOOKINGCENTER_TEST_PASSWORD}"/>
+    </POS>
+    <HotelReservations>
+      <HotelReservation>
+        <RoomStays>
+          <RoomStay>
+            <RoomTypes>
+              <RoomType RoomTypeCode="${roomTypeCode}" NumberOfUnits="1"/>
+            </RoomTypes>
+            <RatePlans>
+              <RatePlan RatePlanCode="${ratePlanCode}"/>
+            </RatePlans>
+            <GuestCounts>
+              <GuestCount Count="${safeGuests}" AgeQualifyingCode="10"/>
+            </GuestCounts>
+            <TimeSpan Start="${checkin}" End="${checkout}"/>
+            <PaymentPolicies>
+              <GuaranteePayment>
+                <AmountPercent Amount="0" TaxInclusive="false" BasisType="1"/>
+                <PaymentDescription>
+                  <Text>Reserve for $0 (verification only)</Text>
+                </PaymentDescription>
+              </GuaranteePayment>
+            </PaymentPolicies>
+            <Guarantee>
+              <GuaranteesAccepted>
+                <GuaranteeAccepted>
+                  <PaymentTransactionTypeCode>31</PaymentTransactionTypeCode>
+                </GuaranteeAccepted>
+              </GuaranteesAccepted>
+            </Guarantee>
+            <BasicPropertyInfo HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" AgentCode="WEB"/>
+          </RoomStay>
+        </RoomStays>
+        <ResGuests>
+          <ResGuest>
+            <Profiles>
+              <ProfileInfo>
+                <Profile ProfileType="1">
+                  <Customer>
+                    <PersonName>
+                      <GivenName>${firstName}</GivenName>
+                      <Surname>${lastName}</Surname>
+                    </PersonName>
+                    ${guestInfo.phone ? `<Telephone PhoneTechType="1" PhoneNumber="${guestInfo.phone}"/>` : ''}
+                    ${guestInfo.email ? `<Email>${guestInfo.email}</Email>` : ''}
+                    <Address>
+                      ${guestInfo.address ? `<AddressLine>${guestInfo.address}</AddressLine>` : ''}
+                      ${guestInfo.city ? `<CityName>${guestInfo.city}</CityName>` : ''}
+                      ${guestInfo.state ? `<StateProv>${guestInfo.state}</StateProv>` : ''}
+                      ${guestInfo.zip ? `<PostalCode>${guestInfo.zip}</PostalCode>` : ''}
+                      <CountryName>US</CountryName>
+                    </Address>
+                  </Customer>
+                </Profile>
+              </ProfileInfo>
+            </Profiles>
+          </ResGuest>
+        </ResGuests>
+      </HotelReservation>
+    </HotelReservations>
+  </parameters>
+</OTA_HotelResRQ>`
+    );
+}
+
+function extractBcErrors(otaResponse) {
+    const errors = otaResponse?.parameters?.Errors?.Error;
+    if (!errors) return null;
+    const list = Array.isArray(errors) ? errors : [errors];
+    return list.map(e => ({
+        type: e?.$?.Type,
+        code: e?.$?.Code,
+        shortText: e?.$?.ShortText,
+    }));
+}
+
 // BookingCenter availability handler (SOAP/XML)
 async function getBookingCenterAvailability(hotelId, checkin, checkout) {
-    const config = getHotelConfig(hotelId);
-    
-    // TODO: Implement BookingCenter SOAP API
-    // This will use OTA_HotelAvailRQ message
-    // For now, return empty until API credentials are set up
-    console.log(`BookingCenter availability check for ${hotelId} - awaiting API implementation`);
-    
-    return [];
+    // For now, BookingCenter test environment only supports BCDEMO (per Jeff)
+    // We'll switch to production creds/siteId once they enable STCROIX.
+    const xml = buildBcAvailRQ({ checkin, checkout, adults: 1, rooms: 1 });
+
+    const response = await axios.post(BOOKINGCENTER_ENDPOINTS.availability, xml, {
+        headers: {
+            'Content-Type': 'text/xml; charset=ISO-8859-1',
+            'SOAPAction': '"www.bookingcenter.com/xml:HotelAvailIn"',
+            'User-Agent': 'Node.js BookingCenter Client',
+        },
+    });
+
+    const parsed = await parseBcXml(response.data);
+    const body = parsed?.Envelope?.Body;
+    const ota = body?.OTA_HotelAvailRS;
+
+    const errors = extractBcErrors(ota);
+    if (errors) {
+        console.error('BookingCenter availability errors:', errors);
+        return [];
+    }
+
+    const roomStays = ota?.parameters?.RoomStays?.RoomStay || ota?.RoomStays?.RoomStay;
+    if (!roomStays) return [];
+
+    const stays = Array.isArray(roomStays) ? roomStays : [roomStays];
+
+    return stays.map((stay) => {
+        const ratePlan = stay?.RatePlans?.RatePlan;
+        const roomType = stay?.RoomTypes?.RoomType;
+        const roomRate = stay?.RoomRates?.RoomRate;
+        const rate = roomRate?.Rates?.Rate;
+        const base = rate?.Base?.$;
+
+        const roomTypeCode = roomType?.$?.RoomTypeCode;
+        const availableQty = Number(roomType?.$?.NumberOfUnits ?? 0) || 0;
+        const ratePlanCode = ratePlan?.$?.RatePlanCode;
+
+        // Room name comes from RoomTypeName/Text
+        const roomName = roomType?.RoomTypeName?.Text?._ || roomType?.RoomTypeName?.Text || roomTypeCode || 'Room';
+
+        // Optional pricing if you ever want it
+        const amountBeforeTax = base?.AmountBeforeTax ? Number(base.AmountBeforeTax) : null;
+        const amountAfterTax = base?.AmountAfterTax ? Number(base.AmountAfterTax) : null;
+
+        return {
+            roomName,
+            available: availableQty > 0,
+            roomsAvailable: availableQty,
+            // For BookingCenter, treat rateID as RatePlanCode and roomTypeID as RoomTypeCode
+            rateID: ratePlanCode,
+            roomTypeID: roomTypeCode,
+            // helpful extra fields (non-breaking)
+            _bc: {
+                currency: base?.CurrencyCode,
+                amountBeforeTax,
+                amountAfterTax,
+                paymentCode: rate?.PaymentPolicy?.GuaranteePayment?.$?.PaymentCode,
+            }
+        };
+    }).filter(r => r.available && r.rateID && r.roomTypeID);
 }
 
 app.post('/api/availability', async (req, res) => {
@@ -767,13 +999,60 @@ async function createCloudbedsBooking(hotelId, bookingDetails, guestInfo) {
 
 // BookingCenter booking handler (SOAP/XML)
 async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
-    const config = getHotelConfig(hotelId);
-    
-    // TODO: Implement BookingCenter SOAP API
-    // This will use OTA_HotelRes (SaveBooking) message
-    console.log(`BookingCenter booking for ${hotelId} - awaiting API implementation`);
-    
-    return { success: false, message: 'BookingCenter integration pending' };
+    // bookingDetails.roomTypeID and bookingDetails.rateID come from frontend selection
+    // For BookingCenter these should be RoomTypeCode and RatePlanCode respectively.
+    const roomTypeCode = bookingDetails.roomTypeID;
+    const ratePlanCode = bookingDetails.rateID;
+
+    if (!roomTypeCode || !ratePlanCode) {
+        return { success: false, message: 'Missing BookingCenter roomTypeCode or ratePlanCode.' };
+    }
+
+    const xml = buildBcHotelResRQ({
+        checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
+        checkout: new Date(bookingDetails.checkout).toISOString().split('T')[0],
+        roomTypeCode,
+        ratePlanCode,
+        guestInfo,
+        guests: bookingDetails.guests,
+    });
+
+    const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
+        headers: {
+            'Content-Type': 'text/xml; charset=ISO-8859-1',
+            'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
+            'User-Agent': 'Node.js BookingCenter Client',
+        },
+    });
+
+    const parsed = await parseBcXml(response.data);
+    const body = parsed?.Envelope?.Body;
+    const ota = body?.OTA_HotelResRS;
+
+    const errors = extractBcErrors(ota);
+    if (errors) {
+        console.error('BookingCenter booking errors:', errors);
+        return {
+            success: false,
+            message: errors.map(e => e.shortText).filter(Boolean).join(' | ') || 'BookingCenter booking failed',
+            errors,
+        };
+    }
+
+    // Try to extract reservation / confirmation number
+    const reservationId =
+        ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID ||
+        ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID_Context ||
+        ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
+        ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
+        null;
+
+    return {
+        success: true,
+        reservationID: reservationId || `BC_${Date.now()}`,
+        message: 'Reservation created successfully.',
+        raw: ota,
+    };
 }
 
 app.post('/api/book', async (req, res) => {
