@@ -768,6 +768,7 @@ function buildBcHotelResRQ({
     // BookingCenter availability response includes PaymentPolicy/GuaranteePayment with a PaymentCode.
     // In your successful AvailRS sample, PaymentCode="31". Using it helps avoid "Invalid Payment Type".
     const paymentCode = '31';
+    // TODO: if different properties return different payment codes, store it per-room from availability and pass through.
 
     const firstName = guestInfo.firstName || 'Guest';
     const lastName = guestInfo.lastName || 'Guest';
@@ -794,20 +795,13 @@ function buildBcHotelResRQ({
             </GuestCounts>
             <TimeSpan Start="${checkin}" End="${checkout}"/>
             <PaymentPolicies>
-              <GuaranteePayment>
-                <AmountPercent Amount="0" TaxInclusive="false" BasisType="1"/>
-                <PaymentDescription>
-                  <Text>Reserve for $0 (verification only)</Text>
-                </PaymentDescription>
-              </GuaranteePayment>
+              <PaymentPolicy>
+                <GuaranteePayment GuaranteeType="GuaranteeRequired" PaymentCode="31" NoCardHolderInfoReqInd="false"/>
+                <GuaranteeDescription Name="Deposit Policy">
+                  <Text>Your credit card will be used to guarantee your reservation.</Text>
+                </GuaranteeDescription>
+              </PaymentPolicy>
             </PaymentPolicies>
-            <Guarantee>
-              <GuaranteesAccepted>
-                <GuaranteeAccepted>
-                  <PaymentTransactionTypeCode>31</PaymentTransactionTypeCode>
-                </GuaranteeAccepted>
-              </GuaranteesAccepted>
-            </Guarantee>
             <BasicPropertyInfo HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" AgentCode="WEB"/>
           </RoomStay>
         </RoomStays>
