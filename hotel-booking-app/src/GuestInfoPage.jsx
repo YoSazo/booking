@@ -639,6 +639,12 @@ useEffect(() => {
 };
     // Main submit handler for FULL PAYMENT (handles both card and wallet)
     const handleCardSubmit = async (e) => {
+        // Prevent accidental double-submits (double-click, Enter key, rerenders)
+        if (isProcessing || isProcessingTrial) {
+            console.log('Payment already processing, ignoring duplicate submit');
+            e?.preventDefault();
+            return;
+        }
         e.preventDefault();
         
         // If trial plan selected, use trial handler instead
@@ -732,6 +738,13 @@ useEffect(() => {
             });
 
             if (error) {
+                // If the PaymentIntent already succeeded, treat as success (prevents Stripe double-confirm error)
+                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
+                    console.log('Payment already succeeded, proceeding to booking...');
+                    onComplete(formData, error.payment_intent.id);
+                    return;
+                }
+
                 setErrorMessage(error.message || "An unexpected error occurred.");
                 setIsProcessing(false);
                 setShowLoadingScreen(false);
@@ -759,6 +772,13 @@ useEffect(() => {
                 );
                 
                 if (confirmError) {
+                    if (confirmError.code === 'payment_intent_unexpected_state' && confirmError.payment_intent?.status === 'succeeded') {
+                        console.log('Wallet payment already succeeded, proceeding to booking...');
+                        ev.complete('success');
+                        onComplete(formData, confirmError.payment_intent.id);
+                        return;
+                    }
+
                     ev.complete('fail');
                     setErrorMessage(confirmError.message);
                     setIsProcessing(false);
@@ -892,6 +912,14 @@ useEffect(() => {
             });
 
             if (error) {
+                // If the PaymentIntent already succeeded, treat as success (prevents Stripe double-confirm error)
+                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
+                    console.log('Payment already succeeded, proceeding to booking...');
+                    sessionStorage.setItem('finalBooking', JSON.stringify(reserveBooking));
+                    onComplete(formData, error.payment_intent.id);
+                    return;
+                }
+
                 setErrorMessage(error.message || "Payment failed");
                 setIsProcessing(false);
             } else if (paymentIntent && paymentIntent.status === 'succeeded') {
@@ -962,6 +990,13 @@ useEffect(() => {
 };
 
 const handleTrialNightBooking = async (e) => {
+    // Prevent accidental double-submits
+    if (isProcessing || isProcessingTrial) {
+        console.log('Payment already processing, ignoring duplicate submit');
+        e?.preventDefault();
+        return;
+    }
+
     e?.preventDefault();      // Prevent default form behavior
     e?.stopPropagation();     // Stop event from bubbling up
     
@@ -1075,6 +1110,24 @@ const handleTrialNightBooking = async (e) => {
             });
 
             if (error) {
+                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
+                    console.log('Payment already succeeded, proceeding to booking...');
+                    sessionStorage.setItem('finalBooking', JSON.stringify({
+                        ...originalBooking,
+                        checkin: checkinDate.toISOString(),
+                        checkout: checkoutDate.toISOString(),
+                        nights: 1,
+                        total: trialTotal,
+                        subtotal: nightlyRate,
+                        taxes: nightlyTaxes,
+                        bookingType: 'trial',
+                        intendedNights: originalBooking.nights,
+                        originalTotal: originalBooking.total
+                    }));
+                    onComplete(formData, error.payment_intent.id);
+                    return;
+                }
+
                 setErrorMessage(error.message || "Payment failed");
                 setIsProcessingTrial(false);
             } else if (paymentIntent && paymentIntent.status === 'succeeded') {
@@ -1116,6 +1169,25 @@ const handleTrialNightBooking = async (e) => {
                 );
                 
                 if (confirmError) {
+                    if (confirmError.code === 'payment_intent_unexpected_state' && confirmError.payment_intent?.status === 'succeeded') {
+                        console.log('Wallet payment already succeeded, proceeding to booking...');
+                        ev.complete('success');
+                        sessionStorage.setItem('finalBooking', JSON.stringify({
+                            ...originalBooking,
+                            checkin: checkinDate.toISOString(),
+                            checkout: checkoutDate.toISOString(),
+                            nights: 1,
+                            total: trialTotal,
+                            subtotal: nightlyRate,
+                            taxes: nightlyTaxes,
+                            bookingType: 'trial',
+                            intendedNights: originalBooking.nights,
+                            originalTotal: originalBooking.total
+                        }));
+                        onComplete(formData, confirmError.payment_intent.id);
+                        return;
+                    }
+
                     ev.complete('fail');
                     setErrorMessage(confirmError.message);
                     setIsProcessingTrial(false);
@@ -1168,6 +1240,13 @@ const handleTrialNightBooking = async (e) => {
 
 // NEW: Handle "Pay Later" booking with pre-authorization hold
 const handlePayLaterBooking = async (e) => {
+    // Prevent accidental double-submits
+    if (isProcessing || isProcessingTrial) {
+        console.log('Payment already processing, ignoring duplicate submit');
+        e?.preventDefault();
+        return;
+    }
+
     e?.preventDefault();
     e?.stopPropagation();
     
@@ -1258,6 +1337,29 @@ const handlePayLaterBooking = async (e) => {
             });
 
             if (error) {
+                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
+                    console.log('Authorization already succeeded, proceeding...');
+                    // Treat as if the hold succeeded; continue to attempt booking creation
+                    const bookingResponse = await fetch(`${apiBaseUrl}/api/complete-pay-later-booking`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            paymentIntentId: error.payment_intent.id,
+                            bookingDetails: payLaterBooking,
+                            guestInfo: formData,
+                            hotelId: hotelId
+                        }),
+                    });
+
+                    const bookingResult = await bookingResponse.json();
+
+                    if (bookingResult.success) {
+                        sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
+                        onComplete(formData, error.payment_intent.id);
+                        return;
+                    }
+                }
+
                 setErrorMessage(error.message || "Card authorization failed");
                 setIsProcessing(false);
                 setShowLoadingScreen(false);
@@ -1309,6 +1411,29 @@ const handlePayLaterBooking = async (e) => {
                 );
                 
                 if (confirmError) {
+                    if (confirmError.code === 'payment_intent_unexpected_state' && confirmError.payment_intent?.status === 'succeeded') {
+                        console.log('Wallet authorization already succeeded, proceeding...');
+                        const bookingResponse = await fetch(`${apiBaseUrl}/api/complete-pay-later-booking`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                paymentIntentId: confirmError.payment_intent.id,
+                                bookingDetails: payLaterBooking,
+                                guestInfo: formData,
+                                hotelId: hotelId
+                            }),
+                        });
+
+                        const bookingResult = await bookingResponse.json();
+
+                        if (bookingResult.success) {
+                            ev.complete('success');
+                            sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
+                            onComplete(formData, confirmError.payment_intent.id);
+                            return;
+                        }
+                    }
+
                     ev.complete('fail');
                     setErrorMessage(confirmError.message);
                     setIsProcessing(false);
