@@ -146,7 +146,9 @@ const hotelConfig = {
     },
     'st-croix-wisconsin': {
         pms: 'bookingcenter',
-        siteId: process.env.BOOKINGCENTER_STCROIX_SITE_ID,
+        siteId: process.env.BOOKINGCENTER_STCROIX_SITE_ID || 'STCROIX',
+        sitePassword: process.env.BOOKINGCENTER_STCROIX_SITE_PASSWORD,
+        chainCode: process.env.BOOKINGCENTER_STCROIX_CHAIN_CODE || process.env.BOOKINGCENTER_CHAIN_CODE || 'BC',
         // Room mappings will be added once BookingCenter API is set up
         roomIDMapping: {}
     }
@@ -775,7 +777,7 @@ function bcTimestamp() {
     return new Date().toISOString();
 }
 
-function buildBcAvailRQ({ checkin, checkout, adults = 1, rooms = 1 }) {
+function buildBcAvailRQ({ checkin, checkout, adults = 1, rooms = 1, siteId = BOOKINGCENTER_TEST_SITE_ID, sitePassword = BOOKINGCENTER_TEST_PASSWORD, chainCode = BOOKINGCENTER_TEST_CHAIN_CODE }) {
     const echoToken = Date.now().toString();
 
     // NOTE: In your captured example, Count="0" caused "Invalid Number of Guests".
@@ -787,7 +789,7 @@ function buildBcAvailRQ({ checkin, checkout, adults = 1, rooms = 1 }) {
   <parameters EchoToken="${echoToken}" TimeStamp="${bcTimestamp()}" Target="Production" Version="1.001">
     <POS>
       <Source ISOCurrency="USD"/>
-      <RequestorID OTA_CodeType="10" ID="${BOOKINGCENTER_TEST_SITE_ID}" MessagePassword="${BOOKINGCENTER_TEST_PASSWORD}"/>
+      <RequestorID OTA_CodeType="10" ID="${siteId}" MessagePassword="${sitePassword}"/>
     </POS>
     <AvailRequestSegments>
       <AvailRequestSegment>
@@ -801,7 +803,7 @@ function buildBcAvailRQ({ checkin, checkout, adults = 1, rooms = 1 }) {
         </RoomStayCandidates>
         <HotelSearchCriteria>
           <Criterion>
-            <HotelRef ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" AgentCode=""/>
+            <HotelRef ChainCode="${chainCode}" HotelCode="${siteId}" AgentCode=""/>
           </Criterion>
         </HotelSearchCriteria>
       </AvailRequestSegment>
@@ -818,6 +820,10 @@ function buildBcHotelResRQ({
     ratePlanCode,
     guestInfo,
     guests = 1,
+    // BookingCenter auth
+    siteId = BOOKINGCENTER_TEST_SITE_ID,
+    sitePassword = BOOKINGCENTER_TEST_PASSWORD,
+    chainCode = BOOKINGCENTER_TEST_CHAIN_CODE,
     // Deposit/guarantee metadata
     depositAmount = 0,
     paymentTransactionTypeCode = 'Capture',
@@ -839,7 +845,7 @@ function buildBcHotelResRQ({
   <parameters TimeStamp="${bcTimestamp()}" Version="1.001" EchoToken="${echoToken}" Target="Production">
     <POS>
       <Source ISOCurrency="USD"/>
-      <RequestorID OTA_CodeType="10" ID="${BOOKINGCENTER_TEST_SITE_ID}" MessagePassword="${BOOKINGCENTER_TEST_PASSWORD}"/>
+      <RequestorID OTA_CodeType="10" ID="${siteId}" MessagePassword="${sitePassword}"/>
     </POS>
     <HotelReservations>
       <HotelReservation>
@@ -873,7 +879,7 @@ function buildBcHotelResRQ({
                 <AmountPercent Amount="0" TaxInclusive="N" BasisType="No Deposit" />
               </GuaranteePayment>
             </PaymentPolicies>
-            <BasicPropertyInfo HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" AgentCode="WEB"/>
+            <BasicPropertyInfo HotelCode="${siteId}" ChainCode="${chainCode}" AgentCode="WEB"/>
           </RoomStay>
         </RoomStays>
         <ResGuests>
@@ -921,9 +927,20 @@ function extractBcErrors(otaResponse) {
 
 // BookingCenter availability handler (SOAP/XML)
 async function getBookingCenterAvailability(hotelId, checkin, checkout) {
-    // For now, BookingCenter test environment only supports BCDEMO (per Jeff)
-    // We'll switch to production creds/siteId once they enable STCROIX.
-    const xml = buildBcAvailRQ({ checkin, checkout, adults: 1, rooms: 1 });
+    const config = getHotelConfig(hotelId);
+    if (!config.siteId || !config.sitePassword) {
+        throw new Error(`Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}`);
+    }
+
+    const xml = buildBcAvailRQ({
+        checkin,
+        checkout,
+        adults: 1,
+        rooms: 1,
+        siteId: config.siteId,
+        sitePassword: config.sitePassword,
+        chainCode: config.chainCode,
+    });
 
     const response = await axios.post(BOOKINGCENTER_ENDPOINTS.availability, xml, {
         headers: {
@@ -1081,6 +1098,11 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     // Pay-now/deposit = paid externally → PP (Paid On Previous System)
     const receiptType = isReserve ? 'TERM' : 'PP';
 
+    const config = getHotelConfig(hotelId);
+    if (!config.siteId || !config.sitePassword) {
+        return { success: false, message: `Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}` };
+    }
+
     const xml = buildBcHotelResRQ({
         checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         checkout: new Date(bookingDetails.checkout).toISOString().split('T')[0],
@@ -1088,6 +1110,9 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         ratePlanCode,
         guestInfo,
         guests: bookingDetails.guests,
+        siteId: config.siteId,
+        sitePassword: config.sitePassword,
+        chainCode: config.chainCode,
         depositAmount: 0,
         paymentTransactionTypeCode: 'Capture',
         receiptType: receiptType,
