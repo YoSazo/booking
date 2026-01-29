@@ -16,14 +16,7 @@ import getHotelId from './utils/getHotelId';
 const hotelId = getHotelId();
 const currentHotel = hotelData[hotelId];
 
-// Set page title per hotel (single deployment serving multiple properties)
-React.useEffect(() => {
-  if (currentHotel?.name) {
-    document.title = `${currentHotel.name} | Click Inns`;
-  } else {
-    document.title = 'Click Inns';
-  }
-}, [currentHotel?.name]);
+// (document title is set inside App() via a useEffect hook)
 const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
@@ -58,6 +51,15 @@ function ScrollToTop() {
 
 function App() {
   const navigate = useNavigate();
+
+  // Set page title per hotel (single deployment serving multiple properties)
+  useEffect(() => {
+    if (currentHotel?.name) {
+      document.title = `${currentHotel.name} | Click Inns`;
+    } else {
+      document.title = 'Click Inns';
+    }
+  }, [currentHotel?.name]);
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
   const location = useLocation(); 
