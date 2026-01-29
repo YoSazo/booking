@@ -229,11 +229,12 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  display: block; /* remove baseline whitespace gap on desktop */
+  transition: none; /* prevent zoom feel on hover/tap */
 }
 
 .room-card:hover .room-gallery-image {
-  transform: scale(1.05);
+  transform: none;
 }
 
 /* Navigation Arrows */
@@ -2178,7 +2179,7 @@ padding: 6px 16px;
   align-items: center;
   width: 100%;
   max-width: 550px;
-  margin: 0 auto 40px auto;
+  margin: 14px auto 40px auto; /* add top space so it doesn't touch banner */
   position: relative;
   padding: 0 10px;
 }
@@ -3934,8 +3935,20 @@ padding: 6px 16px;
 
 .info-form-fields {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+/* Desktop: slightly wider gutters and better alignment */
+@media (min-width: 768px) {
+  .guest-info-container {
+    max-width: 980px;
+  }
+
+  .info-form-fields {
+    gap: 20px 24px;
+    align-items: start;
+  }
 }
 
 .info-form-fields .form-field {
@@ -4174,11 +4187,11 @@ padding: 6px 16px;
   animation: slideUp 0.3s ease;
 }
 
-/* Desktop: Limit height to 95vh so it doesn't touch top/bottom */
+/* Desktop: make it true full-screen (no gap showing underlying page) */
 @media (min-width: 768px) {
   .calendar-modal-content {
-    height: 95vh;
-    max-height: 95vh;
+    height: 100vh;
+    max-height: 100vh;
   }
 }
 
