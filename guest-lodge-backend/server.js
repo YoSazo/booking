@@ -1145,9 +1145,40 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
                 'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
                 'User-Agent': 'Node.js BookingCenter Client',
             },
+            // allow us to inspect raw payload issues
+            validateStatus: () => true,
         });
 
+        if (BOOKINGCENTER_DEBUG_SOAP) {
+            const ct = response.headers?.['content-type'];
+            const cl = response.headers?.['content-length'];
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes HTTP status=${response.status} content-type=${ct} content-length=${cl}`);
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes typeof(data)=${typeof response.data} length=${(response.data && response.data.length) || 0}`);
+        }
+
         bcDebugLog('HotelResRS (response)', response.data);
+
+        // If response is empty, retry as arraybuffer to see what we're actually receiving
+        if (BOOKINGCENTER_DEBUG_SOAP && (!response.data || response.data.length === 0)) {
+            const raw = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
+                headers: {
+                    'Content-Type': 'text/xml; charset=ISO-8859-1',
+                    'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
+                    'User-Agent': 'Node.js BookingCenter Client',
+                },
+                responseType: 'arraybuffer',
+                validateStatus: () => true,
+            });
+
+            const buf = Buffer.from(raw.data || []);
+            const preview = buf.slice(0, 400).toString('utf8');
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes RAW status=${raw.status} bytes=${buf.length}`);
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes RAW preview:\n${preview}`);
+        }
+
+        if (response.status >= 400) {
+            return { success: false, errors: [{ shortText: `HTTP ${response.status} from BookingCenter booking endpoint` }], raw: response.data };
+        }
 
         const parsed = await parseBcXml(response.data);
         const body = parsed?.Envelope?.Body;
