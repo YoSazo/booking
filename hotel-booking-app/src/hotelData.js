@@ -156,7 +156,8 @@ export const hotelData = {
         bookingCenterRoomTypeCode: '1KNS',
         bookingCenterRatePlanCodes: {
           nightly: '1KNS-1KNS',
-          weekly: '1KNS-WK1K',
+          // Not always returned by STCROIX availability; allow fallback selection.
+          weekly: null,
           monthly: null,
         },
         amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping',
