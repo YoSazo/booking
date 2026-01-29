@@ -819,7 +819,7 @@ function buildBcHotelResRQ({
     guests = 1,
     // Deposit/guarantee metadata
     depositAmount = 0,
-    paymentTransactionTypeCode = 'capture',
+    paymentTransactionTypeCode = 'Account',
     receiptType = BOOKINGCENTER_TEST_RECEIPT_TYPE,
 }) {
     const echoToken = Date.now().toString();
@@ -854,16 +854,16 @@ function buildBcHotelResRQ({
               <GuestCount Count="${safeGuests}" AgeQualifyingCode="10"/>
             </GuestCounts>
             <TimeSpan Start="${checkin}" End="${checkout}"/>
-            <Guarantee PaymentTransactionTypeCode="${paymentTransactionTypeCode}">
+            <Guarantee>
               <GuaranteesAccepted>
                 <GuaranteeAccepted>
-                  <PaymentCard CardCode="${receiptType}"/>
+                  <PaymentTransactionTypeCode>Account</PaymentTransactionTypeCode>
                 </GuaranteeAccepted>
               </GuaranteesAccepted>
             </Guarantee>
             <PaymentPolicies>
               <GuaranteePayment>
-                <AmountPercent Amount="${depositAmount}" TaxInclusive="false" BasisType="Fixed"/>
+                <AmountPercent Amount="0" TaxInclusive="N" BasisType="No Deposit" />
               </GuaranteePayment>
             </PaymentPolicies>
             <BasicPropertyInfo HotelCode="${BOOKINGCENTER_TEST_SITE_ID}" ChainCode="${BOOKINGCENTER_TEST_CHAIN_CODE}" AgentCode="WEB"/>
@@ -1066,8 +1066,8 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         return { success: false, message: 'Missing BookingCenter roomTypeCode or ratePlanCode.' };
     }
 
-    // BookingCenter expects a Guarantee + receipt type and a deposit amount in PaymentPolicies.
-    // For now we set depositAmount=0 because Stripe handles actual payment/holds externally.
+    // BookingCenter (per Jason) supports external payments without card data by using:
+    // <PaymentTransactionTypeCode>Account</PaymentTransactionTypeCode> and a No-Deposit AmountPercent.
     const xml = buildBcHotelResRQ({
         checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         checkout: new Date(bookingDetails.checkout).toISOString().split('T')[0],
@@ -1076,7 +1076,7 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         guestInfo,
         guests: bookingDetails.guests,
         depositAmount: 0,
-        paymentTransactionTypeCode: 'auth',
+        paymentTransactionTypeCode: 'Account',
         receiptType: BOOKINGCENTER_TEST_RECEIPT_TYPE,
     });
 
