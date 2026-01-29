@@ -819,7 +819,7 @@ function buildBcHotelResRQ({
     guests = 1,
     // Deposit/guarantee metadata
     depositAmount = 0,
-    paymentTransactionTypeCode = 'Account',
+    paymentTransactionTypeCode = 'Capture',
     receiptType = BOOKINGCENTER_TEST_RECEIPT_TYPE,
 }) {
     const echoToken = Date.now().toString();
@@ -857,7 +857,13 @@ function buildBcHotelResRQ({
             <Guarantee>
               <GuaranteesAccepted>
                 <GuaranteeAccepted>
-                  <PaymentTransactionTypeCode>Account</PaymentTransactionTypeCode>
+                  <PaymentTransactionTypeCode>Capture</PaymentTransactionTypeCode>
+                  <PaymentCard>
+                    <CardCode>${receiptType}</CardCode>
+                    <CardNumber></CardNumber>
+                    <CardHolderName></CardHolderName>
+                    <ExpireDate></ExpireDate>
+                  </PaymentCard>
                 </GuaranteeAccepted>
               </GuaranteesAccepted>
             </Guarantee>
@@ -1066,8 +1072,11 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         return { success: false, message: 'Missing BookingCenter roomTypeCode or ratePlanCode.' };
     }
 
-    // BookingCenter (per Jason) supports external payments without card data by using:
-    // <PaymentTransactionTypeCode>Account</PaymentTransactionTypeCode> and a No-Deposit AmountPercent.
+    // BookingCenter (per Jason): include PaymentCard with a receipt type code (e.g. CASH/PP/TRANS)
+    // and leave card fields blank for externally handled payments.
+    const isReserve = (bookingDetails.bookingType === 'payLater' || bookingDetails.bookingType === 'reserve' || bookingDetails.planType === 'reserve');
+    const receiptType = isReserve ? 'CASH' : 'PP';
+
     const xml = buildBcHotelResRQ({
         checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
         checkout: new Date(bookingDetails.checkout).toISOString().split('T')[0],
@@ -1076,8 +1085,8 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         guestInfo,
         guests: bookingDetails.guests,
         depositAmount: 0,
-        paymentTransactionTypeCode: 'Account',
-        receiptType: BOOKINGCENTER_TEST_RECEIPT_TYPE,
+        paymentTransactionTypeCode: 'Capture',
+        receiptType: receiptType,
     });
 
     const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
