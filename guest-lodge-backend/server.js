@@ -1144,15 +1144,22 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
                 'Content-Type': 'text/xml; charset=ISO-8859-1',
                 'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
                 'User-Agent': 'Node.js BookingCenter Client',
+                'Accept': 'text/xml, application/xml, text/plain, */*',
             },
             // allow us to inspect raw payload issues
             validateStatus: () => true,
+            // IMPORTANT: surface redirects instead of silently following them
+            maxRedirects: 0,
         });
 
         if (BOOKINGCENTER_DEBUG_SOAP) {
             const ct = response.headers?.['content-type'];
             const cl = response.headers?.['content-length'];
+            const loc = response.headers?.['location'];
+            const finalUrl = response.request?.res?.responseUrl;
             console.log(`[BOOKINGCENTER_DEBUG] HotelRes HTTP status=${response.status} content-type=${ct} content-length=${cl}`);
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes location=${loc || ''} finalUrl=${finalUrl || ''}`);
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes headers=${JSON.stringify(response.headers || {})}`);
             console.log(`[BOOKINGCENTER_DEBUG] HotelRes typeof(data)=${typeof response.data} length=${(response.data && response.data.length) || 0}`);
         }
 
