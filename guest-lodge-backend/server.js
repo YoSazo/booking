@@ -6,6 +6,8 @@ const { PrismaClient } = require('@prisma/client');
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const xml2js = require('xml2js');
+const http = require('http');
+const https = require('https');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -772,6 +774,42 @@ function bcDebugLog(label, payload) {
     console.log(`\n[BOOKINGCENTER_DEBUG] ${label}\n${maskBookingCenterSecrets(payload)}\n`);
 }
 
+async function postSoap(url, soapAction, xmlBody) {
+    const isHttps = url.startsWith('https://');
+    const lib = isHttps ? https : http;
+
+    return new Promise((resolve, reject) => {
+        const req = lib.request(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/xml; charset=ISO-8859-1',
+                'SOAPAction': `"${soapAction}"`,
+                'Accept': 'text/xml, application/xml, text/plain, */*',
+                // Avoid compressed/chunked transfer issues behind Cloudflare
+                'Accept-Encoding': 'identity',
+                'Content-Length': Buffer.byteLength(xmlBody, 'latin1'),
+                'User-Agent': 'Node.js BookingCenter Client',
+                'Connection': 'close',
+            },
+        }, (res) => {
+            let data = '';
+            res.setEncoding('latin1');
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                resolve({
+                    status: res.statusCode,
+                    headers: res.headers,
+                    data,
+                });
+            });
+        });
+
+        req.on('error', reject);
+        req.write(xmlBody, 'latin1');
+        req.end();
+    });
+}
+
 function bcSoapEnvelope(innerXml) {
     return `<?xml version="1.0" encoding="ISO-8859-1"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -957,13 +995,16 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
 
     bcDebugLog('HotelAvailRQ (request)', xml);
 
-    const response = await axios.post(BOOKINGCENTER_ENDPOINTS.availability, xml, {
-        headers: {
-            'Content-Type': 'text/xml; charset=ISO-8859-1',
-            'SOAPAction': '"www.bookingcenter.com/xml:HotelAvailIn"',
-            'User-Agent': 'Node.js BookingCenter Client',
-        },
-    });
+    const response = await postSoap(
+        BOOKINGCENTER_ENDPOINTS.availability,
+        'www.bookingcenter.com/xml:HotelAvailIn',
+        xml
+    );
+
+    if (BOOKINGCENTER_DEBUG_SOAP) {
+        console.log(`[BOOKINGCENTER_DEBUG] HotelAvail HTTP status=${response.status} content-type=${response.headers?.['content-type']} content-length=${response.headers?.['content-length']}`);
+        console.log(`[BOOKINGCENTER_DEBUG] HotelAvail response length=${(response.data && response.data.length) || 0}`);
+    }
 
     bcDebugLog('HotelAvailRS (response)', response.data);
 
@@ -1139,49 +1180,19 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
 
         bcDebugLog('HotelResRQ (request)', xml);
 
-        const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
-            headers: {
-                'Content-Type': 'text/xml; charset=ISO-8859-1',
-                'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
-                'User-Agent': 'Node.js BookingCenter Client',
-                'Accept': 'text/xml, application/xml, text/plain, */*',
-            },
-            // allow us to inspect raw payload issues
-            validateStatus: () => true,
-            // IMPORTANT: surface redirects instead of silently following them
-            maxRedirects: 0,
-        });
+        const response = await postSoap(
+            BOOKINGCENTER_ENDPOINTS.booking,
+            'www.bookingcenter.com/xml:HotelResIn',
+            xml
+        );
 
         if (BOOKINGCENTER_DEBUG_SOAP) {
-            const ct = response.headers?.['content-type'];
-            const cl = response.headers?.['content-length'];
-            const loc = response.headers?.['location'];
-            const finalUrl = response.request?.res?.responseUrl;
-            console.log(`[BOOKINGCENTER_DEBUG] HotelRes HTTP status=${response.status} content-type=${ct} content-length=${cl}`);
-            console.log(`[BOOKINGCENTER_DEBUG] HotelRes location=${loc || ''} finalUrl=${finalUrl || ''}`);
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes HTTP status=${response.status} content-type=${response.headers?.['content-type']} content-length=${response.headers?.['content-length']}`);
             console.log(`[BOOKINGCENTER_DEBUG] HotelRes headers=${JSON.stringify(response.headers || {})}`);
-            console.log(`[BOOKINGCENTER_DEBUG] HotelRes typeof(data)=${typeof response.data} length=${(response.data && response.data.length) || 0}`);
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes response length=${(response.data && response.data.length) || 0}`);
         }
 
         bcDebugLog('HotelResRS (response)', response.data);
-
-        // If response is empty, retry as arraybuffer to see what we're actually receiving
-        if (BOOKINGCENTER_DEBUG_SOAP && (!response.data || response.data.length === 0)) {
-            const raw = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
-                headers: {
-                    'Content-Type': 'text/xml; charset=ISO-8859-1',
-                    'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
-                    'User-Agent': 'Node.js BookingCenter Client',
-                },
-                responseType: 'arraybuffer',
-                validateStatus: () => true,
-            });
-
-            const buf = Buffer.from(raw.data || []);
-            const preview = buf.slice(0, 400).toString('utf8');
-            console.log(`[BOOKINGCENTER_DEBUG] HotelRes RAW status=${raw.status} bytes=${buf.length}`);
-            console.log(`[BOOKINGCENTER_DEBUG] HotelRes RAW preview:\n${preview}`);
-        }
 
         if (response.status >= 400) {
             return { success: false, errors: [{ shortText: `HTTP ${response.status} from BookingCenter booking endpoint` }], raw: response.data };
