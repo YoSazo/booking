@@ -151,8 +151,13 @@ function App() {
             const exact = options.find(o => o.rateID === preferredCodes[tier]);
             if (exact) return exact;
           }
-          // No heuristic fallback here: some properties expose weekly rate plans that are not bookable via API.
+          // Some properties expose weekly ('WK') rate plans that are not bookable via API.
           // If a weekly plan is required, specify it explicitly via bookingCenterRatePlanCodes.weekly in hotelData.js.
+          // Otherwise, prefer a non-WK plan even for 7+ nights.
+          if (tier === 'weekly') {
+            const nonWk = options.find(o => !(o.rateID || '').includes('WK'));
+            if (nonWk) return nonWk;
+          }
           return options[0];
         };
 

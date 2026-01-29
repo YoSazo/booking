@@ -892,7 +892,7 @@ function buildBcHotelResRQ({
                 <AmountPercent Amount="0" TaxInclusive="N" BasisType="No Deposit" />
               </GuaranteePayment>
             </PaymentPolicies>
-            <BasicPropertyInfo HotelCode="${siteId}" ChainCode="${chainCode}" AgentCode="WEB"/>
+            <BasicPropertyInfo HotelCode="${siteId}"/>
           </RoomStay>
         </RoomStays>
         <ResGuests>
