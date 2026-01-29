@@ -1084,18 +1084,16 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     // bookingDetails.roomTypeID and bookingDetails.rateID come from frontend selection
     // For BookingCenter these should be RoomTypeCode and RatePlanCode respectively.
     const roomTypeCode = bookingDetails.roomTypeID;
-    const ratePlanCode = bookingDetails.rateID;
+    const initialRatePlanCode = bookingDetails.rateID;
 
-    if (!roomTypeCode || !ratePlanCode) {
+    if (!roomTypeCode || !initialRatePlanCode) {
         return { success: false, message: 'Missing BookingCenter roomTypeCode or ratePlanCode.' };
     }
 
-    // BookingCenter (per Jason): include PaymentCard with a receipt type code (e.g. CASH/PP/TRANS)
+    // BookingCenter (per Jason): include PaymentCard with a receipt type code (e.g. TERM/PP/TRANS)
     // and leave card fields blank for externally handled payments.
     const isReserve = (bookingDetails.bookingType === 'payLater' || bookingDetails.bookingType === 'reserve' || bookingDetails.planType === 'reserve');
-    // Jason: don't use CASH. Use one of the site receipt types like TERM/PP/TRANS.
-    // Reserve-for-$0 = paid at property → TERM (Paid on Terminal)
-    // Pay-now/deposit = paid externally → PP (Paid On Previous System)
+    // Jason: don't use CASH.
     const receiptType = isReserve ? 'TERM' : 'PP';
 
     const config = getHotelConfig(hotelId);
@@ -1103,56 +1101,96 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         return { success: false, message: `Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}` };
     }
 
-    const xml = buildBcHotelResRQ({
-        checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
-        checkout: new Date(bookingDetails.checkout).toISOString().split('T')[0],
-        roomTypeCode,
-        ratePlanCode,
-        guestInfo,
-        guests: bookingDetails.guests,
-        siteId: config.siteId,
-        sitePassword: config.sitePassword,
-        chainCode: config.chainCode,
-        depositAmount: 0,
-        paymentTransactionTypeCode: 'Capture',
-        receiptType: receiptType,
-    });
+    const checkin = new Date(bookingDetails.checkin).toISOString().split('T')[0];
+    const checkout = new Date(bookingDetails.checkout).toISOString().split('T')[0];
 
-    const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
-        headers: {
-            'Content-Type': 'text/xml; charset=ISO-8859-1',
-            'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
-            'User-Agent': 'Node.js BookingCenter Client',
-        },
-    });
+    const attempt = async (ratePlanCode) => {
+        const xml = buildBcHotelResRQ({
+            checkin,
+            checkout,
+            roomTypeCode,
+            ratePlanCode,
+            guestInfo,
+            guests: bookingDetails.guests,
+            siteId: config.siteId,
+            sitePassword: config.sitePassword,
+            chainCode: config.chainCode,
+            depositAmount: 0,
+            paymentTransactionTypeCode: 'Capture',
+            receiptType,
+        });
 
-    const parsed = await parseBcXml(response.data);
-    const body = parsed?.Envelope?.Body;
-    const ota = body?.OTA_HotelResRS;
+        const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
+            headers: {
+                'Content-Type': 'text/xml; charset=ISO-8859-1',
+                'SOAPAction': '"www.bookingcenter.com/xml:HotelResIn"',
+                'User-Agent': 'Node.js BookingCenter Client',
+            },
+        });
 
-    const errors = extractBcErrors(ota);
-    if (errors) {
-        console.error('BookingCenter booking errors:', errors);
+        const parsed = await parseBcXml(response.data);
+        const body = parsed?.Envelope?.Body;
+        const ota = body?.OTA_HotelResRS;
+
+        const errors = extractBcErrors(ota);
+        if (errors) {
+            return { success: false, errors, raw: ota };
+        }
+
+        const reservationId =
+            ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID ||
+            ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID_Context ||
+            ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
+            ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
+            null;
+
         return {
-            success: false,
-            message: errors.map(e => e.shortText).filter(Boolean).join(' | ') || 'BookingCenter booking failed',
-            errors,
+            success: true,
+            reservationID: reservationId || `BC_${Date.now()}`,
+            message: 'Reservation created successfully.',
+            raw: ota,
         };
+    };
+
+    // Attempt with the requested rate plan first
+    let result = await attempt(initialRatePlanCode);
+    if (result.success) return result;
+
+    const errorText = (result.errors || []).map(e => e.shortText).join(' | ');
+    const isAvailabilityError = /Not enough Availability/i.test(errorText);
+
+    // If rate plan is rejected due to availability, retry with an alternate rate plan for the same room type.
+    if (isAvailabilityError) {
+        try {
+            const available = await getBookingCenterAvailability(hotelId, checkin, checkout);
+            const alternatives = available.filter(r => r.roomTypeID === roomTypeCode && r.rateID && r.rateID !== initialRatePlanCode);
+
+            // Prefer a non-weekly rate plan if the weekly one is failing
+            const preferred = alternatives.find(r => !(r.rateID || '').includes('WK')) || alternatives[0];
+
+            if (preferred?.rateID) {
+                console.log(`BookingCenter retry: ${initialRatePlanCode} failed, retrying with ${preferred.rateID} for RoomType ${roomTypeCode}`);
+                const retryResult = await attempt(preferred.rateID);
+                if (retryResult.success) return retryResult;
+
+                const retryErrText = (retryResult.errors || []).map(e => e.shortText).join(' | ');
+                console.error('BookingCenter booking retry errors:', retryErrText);
+                return {
+                    success: false,
+                    message: retryErrText || errorText || 'BookingCenter booking failed',
+                    errors: retryResult.errors || result.errors,
+                };
+            }
+        } catch (e) {
+            console.error('BookingCenter retry availability lookup failed:', e.message);
+        }
     }
 
-    // Try to extract reservation / confirmation number
-    const reservationId =
-        ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID ||
-        ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID_Context ||
-        ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
-        ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
-        null;
-
+    console.error('BookingCenter booking errors:', result.errors);
     return {
-        success: true,
-        reservationID: reservationId || `BC_${Date.now()}`,
-        message: 'Reservation created successfully.',
-        raw: ota,
+        success: false,
+        message: errorText || 'BookingCenter booking failed',
+        errors: result.errors,
     };
 }
 
