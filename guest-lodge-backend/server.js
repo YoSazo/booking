@@ -72,8 +72,9 @@ const BOOKINGCENTER_TEST_PASSWORD = process.env.BOOKINGCENTER_TEST_PASSWORD || '
 const BOOKINGCENTER_TEST_CHAIN_CODE = process.env.BOOKINGCENTER_TEST_CHAIN_CODE || 'BC';
 
 const BOOKINGCENTER_ENDPOINTS = {
-    availability: 'https://ws-server-test.bookingcenter.com/hotel_availability.php',
-    booking: 'https://ws-server-test.bookingcenter.com/new_booking.php',
+    // Defaults to test endpoints; override in Render env for production.
+    availability: process.env.BOOKINGCENTER_AVAILABILITY_ENDPOINT || 'https://ws-server-test.bookingcenter.com/hotel_availability.php',
+    booking: process.env.BOOKINGCENTER_BOOKING_ENDPOINT || 'https://ws-server-test.bookingcenter.com/new_booking.php',
 };
 
 // BookingCenter receipt type codes (site_receipt_types.phtml)
@@ -1075,7 +1076,10 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     // BookingCenter (per Jason): include PaymentCard with a receipt type code (e.g. CASH/PP/TRANS)
     // and leave card fields blank for externally handled payments.
     const isReserve = (bookingDetails.bookingType === 'payLater' || bookingDetails.bookingType === 'reserve' || bookingDetails.planType === 'reserve');
-    const receiptType = isReserve ? 'CASH' : 'PP';
+    // Jason: don't use CASH. Use one of the site receipt types like TERM/PP/TRANS.
+    // Reserve-for-$0 = paid at property → TERM (Paid on Terminal)
+    // Pay-now/deposit = paid externally → PP (Paid On Previous System)
+    const receiptType = isReserve ? 'TERM' : 'PP';
 
     const xml = buildBcHotelResRQ({
         checkin: new Date(bookingDetails.checkin).toISOString().split('T')[0],
