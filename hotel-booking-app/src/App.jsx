@@ -141,30 +141,49 @@ function App() {
       if (result.success) {
         // Merge PMS availability into your marketing room cards.
         // Cloudbeds: apiRoom.roomName matches currentHotel.rooms[].name
-        // BookingCenter: apiRoom.roomName is "Single/Double/..." so we use an explicit mapping.
+        // BookingCenter: multiple RatePlanCodes can exist per RoomTypeCode, so we select one based on stay length.
+
+        const nights = Math.round((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
+
+        const pickBookingCenterRate = (options, tier, preferredCodes) => {
+          if (!options?.length) return null;
+          if (preferredCodes?.[tier]) {
+            const exact = options.find(o => o.rateID === preferredCodes[tier]);
+            if (exact) return exact;
+          }
+          // Fallback heuristic: weekly plans often contain 'WK'
+          if (tier === 'weekly') {
+            const wk = options.find(o => (o.rateID || '').includes('WK'));
+            if (wk) return wk;
+          }
+          return options[0];
+        };
+
         const mergedRooms = currentHotel.rooms
           .map((staticRoom) => {
-            let apiRoom;
-
             if (pms === 'cloudbeds') {
-              apiRoom = result.data.find(r => r.roomName === staticRoom.name);
-            } else if (pms === 'bookingcenter') {
-              // hotelData.js should define bookingCenterRoomTypeCode / bookingCenterRatePlanCode per room
-              apiRoom = result.data.find(r => r.roomTypeID === staticRoom.bookingCenterRoomTypeCode);
-
-              // If we found it, override identifiers to ensure booking uses the correct codes
-              if (apiRoom) {
-                apiRoom = {
-                  ...apiRoom,
-                  roomTypeID: staticRoom.bookingCenterRoomTypeCode,
-                  rateID: staticRoom.bookingCenterRatePlanCode || apiRoom.rateID,
-                };
-              }
+              const apiRoom = result.data.find(r => r.roomName === staticRoom.name);
+              return apiRoom ? { ...staticRoom, ...apiRoom } : null;
             }
 
-            if (!apiRoom) return null;
+            if (pms === 'bookingcenter') {
+              const options = result.data.filter(r => r.roomTypeID === staticRoom.bookingCenterRoomTypeCode);
+              if (!options.length) return null;
 
-            return { ...staticRoom, ...apiRoom };
+              const tier = nights >= 28 ? 'monthly' : nights >= 7 ? 'weekly' : 'nightly';
+              const preferredCodes = staticRoom.bookingCenterRatePlanCodes;
+              const picked = pickBookingCenterRate(options, tier, preferredCodes);
+              if (!picked) return null;
+
+              return {
+                ...staticRoom,
+                ...picked,
+                roomTypeID: staticRoom.bookingCenterRoomTypeCode,
+                rateID: (preferredCodes?.[tier]) || picked.rateID,
+              };
+            }
+
+            return null;
           })
           .filter(Boolean);
 

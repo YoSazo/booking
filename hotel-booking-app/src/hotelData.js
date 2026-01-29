@@ -152,9 +152,13 @@ export const hotelData = {
       {
         id: 1,
         name: 'King Room',
-        // BookingCenter sandbox mapping (BCDEMO). Update to real STCROIX codes once enabled.
-        bookingCenterRoomTypeCode: 'S',
-        bookingCenterRatePlanCode: 'S-STD',
+        // BookingCenter (STCROIX) mapping
+        bookingCenterRoomTypeCode: '1KNS',
+        bookingCenterRatePlanCodes: {
+          nightly: '1KNS-1KNS',
+          weekly: '1KNS-WK1K',
+          monthly: null,
+        },
         amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.',
         maxOccupancy: 3,
@@ -174,9 +178,13 @@ export const hotelData = {
       {
         id: 2,
         name: 'Double Full Bed',
-        // BookingCenter sandbox mapping (BCDEMO). Update to real STCROIX codes once enabled.
-        bookingCenterRoomTypeCode: 'D',
-        bookingCenterRatePlanCode: 'D-DOU',
+        // BookingCenter (STCROIX) mapping
+        bookingCenterRoomTypeCode: '2QNS',
+        bookingCenterRatePlanCodes: {
+          nightly: '2QNS-2QNS',
+          weekly: '2QNS-WK2Q',
+          monthly: null,
+        },
         amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.',
         maxOccupancy: 4,
