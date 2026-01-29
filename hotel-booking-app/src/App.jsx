@@ -151,11 +151,8 @@ function App() {
             const exact = options.find(o => o.rateID === preferredCodes[tier]);
             if (exact) return exact;
           }
-          // Fallback heuristic: weekly plans often contain 'WK'
-          if (tier === 'weekly') {
-            const wk = options.find(o => (o.rateID || '').includes('WK'));
-            if (wk) return wk;
-          }
+          // No heuristic fallback here: some properties expose weekly rate plans that are not bookable via API.
+          // If a weekly plan is required, specify it explicitly via bookingCenterRatePlanCodes.weekly in hotelData.js.
           return options[0];
         };
 

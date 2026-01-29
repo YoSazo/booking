@@ -759,6 +759,19 @@ async function parseBcXml(xml) {
     return bcXmlParser.parseStringPromise(xml);
 }
 
+const BOOKINGCENTER_DEBUG_SOAP = (process.env.BOOKINGCENTER_DEBUG_SOAP || '').toLowerCase() === 'true';
+
+function maskBookingCenterSecrets(xml) {
+    if (!xml || typeof xml !== 'string') return xml;
+    // Mask MessagePassword="..." in RequestorID blocks
+    return xml.replace(/MessagePassword=\"[^\"]*\"/g, 'MessagePassword="***"');
+}
+
+function bcDebugLog(label, payload) {
+    if (!BOOKINGCENTER_DEBUG_SOAP) return;
+    console.log(`\n[BOOKINGCENTER_DEBUG] ${label}\n${maskBookingCenterSecrets(payload)}\n`);
+}
+
 function bcSoapEnvelope(innerXml) {
     return `<?xml version="1.0" encoding="ISO-8859-1"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -942,6 +955,8 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
         chainCode: config.chainCode,
     });
 
+    bcDebugLog('HotelAvailRQ (request)', xml);
+
     const response = await axios.post(BOOKINGCENTER_ENDPOINTS.availability, xml, {
         headers: {
             'Content-Type': 'text/xml; charset=ISO-8859-1',
@@ -949,6 +964,8 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
             'User-Agent': 'Node.js BookingCenter Client',
         },
     });
+
+    bcDebugLog('HotelAvailRS (response)', response.data);
 
     const parsed = await parseBcXml(response.data);
     const body = parsed?.Envelope?.Body;
@@ -1120,6 +1137,8 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
             receiptType,
         });
 
+        bcDebugLog('HotelResRQ (request)', xml);
+
         const response = await axios.post(BOOKINGCENTER_ENDPOINTS.booking, xml, {
             headers: {
                 'Content-Type': 'text/xml; charset=ISO-8859-1',
@@ -1127,6 +1146,8 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
                 'User-Agent': 'Node.js BookingCenter Client',
             },
         });
+
+        bcDebugLog('HotelResRS (response)', response.data);
 
         const parsed = await parseBcXml(response.data);
         const body = parsed?.Envelope?.Body;
