@@ -1165,9 +1165,19 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
             ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
             null;
 
+        // IMPORTANT: Don't treat the booking as successful unless BookingCenter returns a real confirmation ID.
+        // Otherwise the frontend can show a success page even though nothing was created in the PMS.
+        if (!reservationId) {
+            return {
+                success: false,
+                message: 'BookingCenter did not return a reservation ID (confirmation).',
+                raw: ota,
+            };
+        }
+
         return {
             success: true,
-            reservationID: reservationId || `BC_${Date.now()}`,
+            reservationID: reservationId,
             message: 'Reservation created successfully.',
             raw: ota,
         };
