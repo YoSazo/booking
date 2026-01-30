@@ -3105,6 +3105,8 @@ padding: 6px 16px;
   margin-top: 20px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.18);
+  animation: slideInFromTop 0.45s ease-out;
 }
 
 /* Subtle shine effect (reuse the same shine animation) */
@@ -3117,11 +3119,11 @@ padding: 6px 16px;
   height: 200%;
   background: linear-gradient(
     45deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.12) 50%,
-    transparent 70%
+    transparent 25%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 75%
   );
-  animation: shine 3s infinite;
+  animation: shine 2.2s infinite;
 }
 
 .why-card-banner > * {
