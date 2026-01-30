@@ -3136,16 +3136,31 @@ padding: 6px 16px;
 /* Ensure text inside stays readable on dark green background */
 .why-card-banner h1,
 .why-card-banner h2,
-.why-card-banner h3,
+.why-card-banner h3 {
+  color: #fff !important;
+}
+
 .why-card-banner p,
 .why-card-banner span,
 .why-card-banner strong {
-  color: #fff;
+  color: rgba(255, 255, 255, 0.95) !important;
 }
 
 .why-card-banner a {
-  color: #fff;
+  color: #fff !important;
   text-decoration: underline;
+}
+
+/* Make the shield/icon visible even if inline styles set a dark color */
+.why-card-banner svg {
+  color: #fff !important;
+  fill: #fff !important;
+}
+
+/* Slight text shadow improves readability on gradient */
+.why-card-banner h3,
+.why-card-banner p {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
 }
 
 
