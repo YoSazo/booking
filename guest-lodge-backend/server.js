@@ -774,23 +774,32 @@ function bcDebugLog(label, payload) {
     console.log(`\n[BOOKINGCENTER_DEBUG] ${label}\n${maskBookingCenterSecrets(payload)}\n`);
 }
 
-async function postSoap(url, soapAction, xmlBody) {
+async function postSoap(url, soapAction, xmlBody, { soap12 = false } = {}) {
     const isHttps = url.startsWith('https://');
     const lib = isHttps ? https : http;
 
     return new Promise((resolve, reject) => {
+        const headers = {
+            'Accept': 'text/xml, application/xml, text/plain, */*',
+            // Avoid compressed/chunked transfer issues behind Cloudflare
+            'Accept-Encoding': 'identity',
+            'Content-Length': Buffer.byteLength(xmlBody, 'latin1'),
+            'User-Agent': 'Node.js BookingCenter Client',
+            'Connection': 'close',
+        };
+
+        if (soap12) {
+            // SOAP 1.2: action is a parameter on Content-Type and SOAPAction is typically omitted
+            headers['Content-Type'] = `application/soap+xml; charset=ISO-8859-1; action="${soapAction}"`;
+        } else {
+            // SOAP 1.1
+            headers['Content-Type'] = 'text/xml; charset=ISO-8859-1';
+            headers['SOAPAction'] = `"${soapAction}"`;
+        }
+
         const req = lib.request(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/xml; charset=ISO-8859-1',
-                'SOAPAction': `"${soapAction}"`,
-                'Accept': 'text/xml, application/xml, text/plain, */*',
-                // Avoid compressed/chunked transfer issues behind Cloudflare
-                'Accept-Encoding': 'identity',
-                'Content-Length': Buffer.byteLength(xmlBody, 'latin1'),
-                'User-Agent': 'Node.js BookingCenter Client',
-                'Connection': 'close',
-            },
+            headers,
         }, (res) => {
             let data = '';
             res.setEncoding('latin1');
@@ -1183,7 +1192,8 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         const response = await postSoap(
             BOOKINGCENTER_ENDPOINTS.booking,
             'www.bookingcenter.com/xml:HotelResIn',
-            xml
+            xml,
+            { soap12: true }
         );
 
         if (BOOKINGCENTER_DEBUG_SOAP) {
