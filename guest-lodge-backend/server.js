@@ -832,9 +832,9 @@ function bcSoapEnvelope(innerXml) {
 }
 
 function bcWrapMessagePart(methodName, tns, otaPayloadXml) {
-    // NuSOAP WSDL describes input message name + a single part called "messagePart".
-    // We wrap the OTA payload inside <messagePart> so the server can dispatch the correct operation.
-    return `<${methodName} xmlns="${tns}"><messagePart>${otaPayloadXml}</messagePart></${methodName}>`;
+    // NuSOAP often expects the typed payload element directly under the operation element.
+    // Using a generic <messagePart> wrapper can cause the server to ignore the nested OTA payload.
+    return `<${methodName} xmlns="${tns}">${otaPayloadXml}</${methodName}>`;
 }
 
 function bcTimestamp() {
