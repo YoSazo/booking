@@ -784,7 +784,7 @@ async function postSoap(url, soapAction, xmlBody, { soap12 = false } = {}) {
             // Avoid compressed/chunked transfer issues behind Cloudflare
             'Accept-Encoding': 'identity',
             'Content-Length': Buffer.byteLength(xmlBody, 'latin1'),
-            'User-Agent': 'Node.js BookingCenter Client',
+            'User-Agent': 'NuSOAP/0.9.17 (1.123)',
             'Connection': 'close',
         };
 
@@ -829,6 +829,12 @@ function bcSoapEnvelope(innerXml) {
     ${innerXml}
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>`;
+}
+
+function bcWrapMessagePart(methodName, tns, otaPayloadXml) {
+    // NuSOAP WSDL describes input message name + a single part called "messagePart".
+    // We wrap the OTA payload inside <messagePart> so the server can dispatch the correct operation.
+    return `<${methodName} xmlns="${tns}"><messagePart>${otaPayloadXml}</messagePart></${methodName}>`;
 }
 
 function bcTimestamp() {
@@ -900,8 +906,7 @@ function buildBcHotelResRQ({
     const firstName = guestInfo.firstName || 'Guest';
     const lastName = guestInfo.lastName || 'Guest';
 
-    return bcSoapEnvelope(
-        `<OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05/hotelres">
+    const otaPayload = `<OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05/hotelres">
   <parameters TimeStamp="${bcTimestamp()}" Version="1.001" EchoToken="${echoToken}" Target="Production">
     <POS>
       <Source ISOCurrency="USD"/>
@@ -970,8 +975,11 @@ function buildBcHotelResRQ({
       </HotelReservation>
     </HotelReservations>
   </parameters>
-</OTA_HotelResRQ>`
-    );
+</OTA_HotelResRQ>`;
+
+    // Wrap per WSDL message name/part: HotelResIn/messagePart
+    const wrapped = bcWrapMessagePart('HotelResIn', 'www.bookingcenter.com/hotelres', otaPayload);
+    return bcSoapEnvelope(wrapped);
 }
 
 function extractBcErrors(otaResponse) {
@@ -1193,7 +1201,7 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
             BOOKINGCENTER_ENDPOINTS.booking,
             'www.bookingcenter.com/xml:HotelResIn',
             xml,
-            { soap12: true }
+            { soap12: false }
         );
 
         if (BOOKINGCENTER_DEBUG_SOAP) {
