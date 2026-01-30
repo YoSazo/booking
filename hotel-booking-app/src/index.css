@@ -3096,6 +3096,40 @@ padding: 6px 16px;
   opacity: 1;
 }
 
+/* --- Why we need your card (Reserve for $0) --- */
+.why-card-banner {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-top: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle shine effect (reuse the same shine animation) */
+.why-card-banner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 70%
+  );
+  animation: shine 3s infinite;
+}
+
+.why-card-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+
 /* --- Money-Back Guarantee Badge Styles --- */
 .money-back-guarantee {
   background: linear-gradient(135deg, #28a745 0%, #20c997 100%);

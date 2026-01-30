@@ -2612,13 +2612,7 @@ const handlePayLaterBooking = async (e) => {
             
             {/* WHY WE NEED YOUR CARD - Critical explanation banner */}
             {selectedPlan === 'payLater' && (
-              <div style={{
-                backgroundColor: '#f0fdf4',
-                border: '2px solid #10b981',
-                borderRadius: '12px',
-                padding: '16px 18px',
-                marginTop: '20px'
-              }}>
+              <div className="why-card-banner">
                 <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
                   <ShieldCheck size={24} color="#10b981" strokeWidth={2.5} style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div>
