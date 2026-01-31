@@ -906,7 +906,10 @@ function buildBcHotelResRQ({
     const firstName = guestInfo.firstName || 'Guest';
     const lastName = guestInfo.lastName || 'Guest';
 
-    const otaPayload = `<OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05/hotelres">
+    // Jason/BookingCenter examples use the base OTA namespace (no "/hotelres" suffix).
+    // Using the wrong namespace (or an extra wrapper element) can cause the server to ignore POS/RequestorID,
+    // leading to an empty RequestorID in the response and "Invalid Credentials".
+    const otaPayload = `<OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05">
   <parameters TimeStamp="${bcTimestamp()}" Version="1.001" EchoToken="${echoToken}" Target="Production">
     <POS>
       <Source ISOCurrency="USD"/>
@@ -923,13 +926,13 @@ function buildBcHotelResRQ({
               <RatePlan RatePlanCode="${ratePlanCode}"/>
             </RatePlans>
             <GuestCounts>
-              <GuestCount Count="${safeGuests}" AgeQualifyingCode="10"/>
+              <GuestCount AgeQualifyingCode="10" Count="${safeGuests}"/>
             </GuestCounts>
             <TimeSpan Start="${checkin}" End="${checkout}"/>
             <Guarantee>
               <GuaranteesAccepted>
                 <GuaranteeAccepted>
-                  <PaymentTransactionTypeCode>Capture</PaymentTransactionTypeCode>
+                  <PaymentTransactionTypeCode>${paymentTransactionTypeCode}</PaymentTransactionTypeCode>
                   <PaymentCard>
                     <CardCode>${receiptType}</CardCode>
                     <CardNumber></CardNumber>
@@ -941,10 +944,10 @@ function buildBcHotelResRQ({
             </Guarantee>
             <PaymentPolicies>
               <GuaranteePayment>
-                <AmountPercent Amount="0" TaxInclusive="N" BasisType="No Deposit" />
+                <AmountPercent Amount="${depositAmount}" TaxInclusive="N" BasisType="No Deposit" />
               </GuaranteePayment>
             </PaymentPolicies>
-            <BasicPropertyInfo HotelCode="${siteId}"/>
+            <BasicPropertyInfo ChainCode="${chainCode}" HotelCode="${siteId}" />
           </RoomStay>
         </RoomStays>
         <ResGuests>
@@ -977,9 +980,8 @@ function buildBcHotelResRQ({
   </parameters>
 </OTA_HotelResRQ>`;
 
-    // Wrap per WSDL message name/part: HotelResIn/messagePart
-    const wrapped = bcWrapMessagePart('HotelResIn', 'www.bookingcenter.com/hotelres', otaPayload);
-    return bcSoapEnvelope(wrapped);
+    // IMPORTANT: Match AvailRQ pattern: OTA payload directly under SOAP Body (no additional HotelResIn wrapper).
+    return bcSoapEnvelope(otaPayload);
 }
 
 function extractBcErrors(otaResponse) {
@@ -1199,7 +1201,7 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
 
         const response = await postSoap(
             BOOKINGCENTER_ENDPOINTS.booking,
-            'www.bookingcenter.com/xml:HotelResIn',
+            'www.bookingcenter.com/xml:OTA_HotelResRQ',
             xml,
             { soap12: false }
         );
