@@ -980,8 +980,10 @@ function buildBcHotelResRQ({
   </parameters>
 </OTA_HotelResRQ>`;
 
-    // IMPORTANT: Match AvailRQ pattern: OTA payload directly under SOAP Body (no additional HotelResIn wrapper).
-    return bcSoapEnvelope(otaPayload);
+    // IMPORTANT: BookingCenter new_booking.php expects the WSDL operation wrapper (HotelResIn).
+    // If we send OTA_HotelResRQ as the operation, NuSOAP returns: "Operation 'OTA_HotelResRQ' is not defined in the WSDL".
+    const wrapped = bcWrapMessagePart('HotelResIn', 'www.bookingcenter.com/hotelres', otaPayload);
+    return bcSoapEnvelope(wrapped);
 }
 
 function extractBcErrors(otaResponse) {
@@ -1201,7 +1203,7 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
 
         const response = await postSoap(
             BOOKINGCENTER_ENDPOINTS.booking,
-            'www.bookingcenter.com/xml:OTA_HotelResRQ',
+            'www.bookingcenter.com/xml:HotelResIn',
             xml,
             { soap12: false }
         );
