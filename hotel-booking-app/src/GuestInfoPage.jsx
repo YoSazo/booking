@@ -2620,7 +2620,9 @@ const handlePayLaterBooking = async (e) => {
                       Why we need your card
                     </div>
                     <div className="why-card-banner__body">
-                      <strong>Please fill out your payment details above.</strong> We place a $1 hold to confirm you're a real person with a valid card - this secures your room and prevents fake bookings.
+                      <strong>$1 temporary hold (released immediately).</strong>
+                      <br />
+                      We require a valid card to prevent fake bookings and secure your room.
                       <br /><br />
                       ✅ <strong>$1 hold released immediately</strong><br />
                       ✅ <strong>You won't be charged today</strong><br />
