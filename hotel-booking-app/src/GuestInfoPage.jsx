@@ -2613,13 +2613,13 @@ const handlePayLaterBooking = async (e) => {
             {/* WHY WE NEED YOUR CARD - Critical explanation banner */}
             {selectedPlan === 'payLater' && (
               <div className="why-card-banner">
-                <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
-                  <ShieldCheck size={24} color="#10b981" strokeWidth={2.5} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div className="why-card-banner__row">
+                  <ShieldCheck size={24} strokeWidth={2.5} className="why-card-banner__icon" />
                   <div>
-                    <div style={{ fontWeight: '700', fontSize: '16px', color: '#065f46', marginBottom: '8px' }}>
+                    <div className="why-card-banner__title">
                       Why we need your card
                     </div>
-                    <div style={{ fontSize: '14px', color: '#047857', lineHeight: '1.6' }}>
+                    <div className="why-card-banner__body">
                       <strong>Please fill out your payment details above.</strong> We place a $1 hold to confirm you're a real person with a valid card - this secures your room and prevents fake bookings.
                       <br /><br />
                       ✅ <strong>$1 hold released immediately</strong><br />
