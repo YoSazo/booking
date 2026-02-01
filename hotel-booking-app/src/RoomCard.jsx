@@ -4,6 +4,7 @@ import { Wifi, Tv, Refrigerator, Briefcase, Bath, Car, Sparkles, Users, PawPrint
 function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   console.log('isProcessing in RoomCard:', isProcessing);
 
   const displayPayToday = payToday || 0;
@@ -66,7 +67,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
   return (
   <div className="room-card">
     {/* Image Gallery */}
-    <div className="room-image-container">
+    <div className="room-image-container room-image-container--fade">
       <img 
         src={room.imageUrls[currentImageIndex]} 
         alt={`${room.name} preview`} 
@@ -120,7 +121,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
 
 
-      <div className="room-details">
+      <div className="room-details room-details--overlap">
         {/* Header */}
         <div className="room-header">
           <div>
@@ -142,7 +143,14 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
         </div>
 
         {/* Description */}
-        <p className="room-description">{room.description}</p>
+        <p className={`room-description ${isDescriptionExpanded ? 'expanded' : ''}`}>{room.description}</p>
+        <button
+          type="button"
+          className="room-description-toggle"
+          onClick={(e) => { e.stopPropagation(); setIsDescriptionExpanded((v) => !v); }}
+        >
+          {isDescriptionExpanded ? 'Show less' : 'Read more'}
+        </button>
 
         {/* Selected Dates Display */}
         {nights > 0 && checkinDate && checkoutDate && (
