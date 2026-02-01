@@ -241,27 +241,29 @@ export const trackInitiateCheckout = (bookingDetails) => {
     });
 };
 
-export const trackAddPaymentInfo = (bookingDetails, guestInfo, selectedPlan = null) => {
+export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
     if (!shouldFireEvent('AddPaymentInfo')) return;
     const eventID = `addpaymentinfo.${Date.now()}`;
     const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
-    
-    // Get plan from sessionStorage if not passed
-    const plan = selectedPlan || sessionStorage.getItem('selectedPlan') || 'complete';
-    
+
+    // Reserve-for-$0 funnel: treat AddPaymentInfo as "reached payment step" / "ready to reserve".
+    // Avoid relying on sessionStorage plan state (trial/reserve/full) since the primary offer is payLater.
+    const plan = 'payLater';
+
     const pixelPayload = {
         value: bookingDetails.subtotal,
         currency: 'USD',
         content_name: bookingDetails.name,
         num_items: bookingDetails.guests,
-        content_type: plan, // trial, reserve, or complete
+        content_type: plan,
     };
+
     const serverPayload = {
         ...pixelPayload,
         event_id: eventID,
         event_time: eventTime,
         nights: bookingDetails.nights,
-        plan_selected: plan, // Track which plan they chose
+        plan_selected: plan,
         checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
         checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null,
         user_data: {
@@ -271,6 +273,7 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo, selectedPlan = nu
             ln: guestInfo.lastName,
         }
     };
+
     sendEventToPixel('AddPaymentInfo', pixelPayload, eventID);
     sendEventToServer('AddPaymentInfo', serverPayload);
 
