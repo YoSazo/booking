@@ -68,10 +68,10 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     
     // Auto-hide loading screen when processing finishes
     useEffect(() => {
-        if (!isProcessing && !isProcessingTrial) {
+        if (!isProcessing) {
             setShowLoadingScreen(false);
         }
-    }, [isProcessing, isProcessingTrial]);
+    }, [isProcessing]);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
@@ -221,7 +221,7 @@ useEffect(() => {
 
 // Auto-select default plans when reaching plan selection step
 useEffect(() => {
-  if (currentStep === 3 && bookingDetails) {
+  if (false && currentStep === 3 && bookingDetails) {
     const savedPlan = sessionStorage.getItem('selectedPlan');
     // Only auto-select if no plan was previously selected
     if (!savedPlan) {
@@ -405,7 +405,7 @@ useEffect(() => {
 
     // Create and check for a Payment Request (Apple Pay / Google Pay)
     // NOTE: This is ONLY used to detect if wallet is available and which type
-    // Each payment plan (payLater, trial, reserve, full) creates its OWN payment request with correct amount
+    // Each payment plan (payLater, reserve, full) creates its OWN payment request with correct amount
     useEffect(() => {
         if (stripe && clientSecret && bookingDetails) {
             // Use a minimal amount just to check wallet availability - this won't be used for actual payment
@@ -496,13 +496,15 @@ useEffect(() => {
   } else if (currentStep === 2) {
     if (validateInfoStep()) {
       setFormErrors({});
-      
-      // Always go to plan step (step 3) for both <7 and 7+ nights
-      setCurrentStep(3);
+
+      // Optimization: skip the Plan step entirely and go straight to payment.
+      // (Reserve for $0 is the default and the primary funnel.)
+      trackAddPaymentInfo(bookingDetails, formData);
+      setCurrentStep(4);
     }
   } else if (currentStep === 3) {
-    // User is on plan selection, proceed to payment (step 4)
-    // Save the selected plan to sessionStorage
+    // Plan selection step is no longer part of the primary funnel.
+    // Keep this as a safety fallback in case something navigates here.
     sessionStorage.setItem('selectedPlan', selectedPlan);
     trackAddPaymentInfo(bookingDetails, formData);
     setCurrentStep(4);
@@ -515,11 +517,11 @@ useEffect(() => {
   } else if (currentStep === 2) {
     setCurrentStep(1); // Goes back to Review Cart
   } else if (currentStep === 3) {
-    // Plan step - go back to info for both <7 and 7+ nights
-    setCurrentStep(2); // Go back to Info step from Plan
+    // Plan step (legacy) - go back to info
+    setCurrentStep(2);
   } else if (currentStep === 4) {
-    // Payment step - go back to plan step
-    setCurrentStep(3); // Go back to plan step
+    // Payment step - go back to Info (Plan step removed)
+    setCurrentStep(2);
   }
   setHasAttemptedSubmit(false);
   setErrorMessage('');
@@ -528,8 +530,8 @@ useEffect(() => {
     const getBackButtonText = () => {
         if (currentStep === 1) return '< Back to Booking';
         if (currentStep === 2) return '< Back to Cart';
-        if (currentStep === 3) return '< Back to Info'; // Plan step for both <7 and 7+ nights
-        if (currentStep === 4) return '< Back to Plan'; // Payment step
+        if (currentStep === 3) return '< Back to Info'; // Plan step
+        if (currentStep === 4) return '< Back to Info'; // Payment step
     };
 
     const handleChange = (e) => {
@@ -640,18 +642,12 @@ useEffect(() => {
     // Main submit handler for FULL PAYMENT (handles both card and wallet)
     const handleCardSubmit = async (e) => {
         // Prevent accidental double-submits (double-click, Enter key, rerenders)
-        if (isProcessing || isProcessingTrial) {
+        if (isProcessing) {
             console.log('Payment already processing, ignoring duplicate submit');
             e?.preventDefault();
             return;
         }
         e.preventDefault();
-        
-        // If trial plan selected, use trial handler instead
-        if (selectedPlan === 'trial') {
-            handleTrialNightBooking(e);
-            return;
-        }
         
         // If reserve plan selected, use reserve handler instead
         if (selectedPlan === 'reserve') {
@@ -989,14 +985,9 @@ useEffect(() => {
     }
 };
 
-const handleTrialNightBooking = async (e) => {
-    // Prevent accidental double-submits
-    if (isProcessing || isProcessingTrial) {
-        console.log('Payment already processing, ignoring duplicate submit');
-        e?.preventDefault();
-        return;
-    }
+// Trial plan removed
 
+const handleTrialNightBooking = async (e) => {
     e?.preventDefault();      // Prevent default form behavior
     e?.stopPropagation();     // Stop event from bubbling up
     
@@ -1568,9 +1559,7 @@ const handlePayLaterBooking = async (e) => {
     }
 
     const getPaymentButtonText = () => {
-    if (selectedPlan === 'trial') {
-        return 'Book Trial Night - Pay $69 Now';
-    } else if (selectedPlan === 'reserve') {
+    if (selectedPlan === 'reserve') {
         return 'Reserve Room - Pay $20 Now';
     } else if (selectedPlan === 'payLater') {
         return 'Confirm Reservation - $0 Today';
@@ -1606,9 +1595,6 @@ const handlePayLaterBooking = async (e) => {
                     </div>
                     <div className={`progress-step ${currentStep >= 2 ? 'completed' : ''} ${currentStep === 2 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Info</span>
-                    </div>
-                    <div className={`progress-step ${currentStep >= 3 ? 'completed' : ''} ${currentStep === 3 ? 'active' : ''}`}>
-                        <div className="step-circle"></div><span className="step-name">Plan</span>
                     </div>
                     <div className={`progress-step ${currentStep === 4 ? 'completed active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Payment</span>
@@ -2698,7 +2684,7 @@ const handlePayLaterBooking = async (e) => {
   {currentStep !== 4 ? (
     <button type="button" className="btn btn-confirm btn-wider" onClick={handleNextStep}>
       {currentStep === 1 && "Continue to Info"}
-      {currentStep === 2 && "Continue to Plan"}
+      {currentStep === 2 && "Continue to Payment"}
       {currentStep === 3 && "Continue to Payment"}
     </button>
   ) : (
@@ -2710,23 +2696,21 @@ const handlePayLaterBooking = async (e) => {
       gap: '4px'
     }}>
       <button
-        type={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
-        form={(selectedPlan === 'trial' || selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
+        type={(selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
+        form={(selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
         className="btn btn-confirm btn-wider"
         onClick={
-          selectedPlan === 'trial' 
-            ? (e) => handleTrialNightBooking(e)
-            : selectedPlan === 'reserve'
-              ? (e) => handleReserveBooking(e)
-              : selectedPlan === 'payLater'
-                ? (e) => handlePayLaterBooking(e)
-                : selectedPlan === 'full'
-                  ? (e) => handleCardSubmit(e)
-                  : () => { window.userInitiatedSubmit = true; }
+          selectedPlan === 'reserve'
+            ? (e) => handleReserveBooking(e)
+            : selectedPlan === 'payLater'
+              ? (e) => handlePayLaterBooking(e)
+              : selectedPlan === 'full'
+                ? (e) => handleCardSubmit(e)
+                : () => { window.userInitiatedSubmit = true; }
         }
-        disabled={isProcessing || isProcessingTrial || !clientSecret || !stripe || !elements}
+        disabled={isProcessing || !clientSecret || !stripe || !elements}
       >
-        {(isProcessing || isProcessingTrial) ? "Processing..." : getPaymentButtonText()}
+        {isProcessing ? "Processing..." : getPaymentButtonText()}
       </button>
       
       {/* Pay Later reassurance text - below button */}
