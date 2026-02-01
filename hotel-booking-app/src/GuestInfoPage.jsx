@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+
 import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint } from 'lucide-react';
 import { Autocomplete } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -13,6 +14,7 @@ import PaymentInfoModal from './PaymentInfoModal.jsx';
 import getHotelId from './utils/getHotelId';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Strategy 3: preload Stripe JS early (on checkout entry) but avoid mounting heavy payment UI until Step 4.
 const hotelId = getHotelId();
 
 
@@ -66,6 +68,12 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [isProcessingTrial, setIsProcessingTrial] = useState(false);
     const [showLoadingScreen, setShowLoadingScreen] = useState(false);
     
+    // Preload Stripe.js as early as possible so Step 4 feels instant.
+    useEffect(() => {
+        // Trigger the underlying Stripe.js script download ASAP.
+        stripePromise?.catch(() => {});
+    }, []);
+
     // Auto-hide loading screen when processing finishes
     useEffect(() => {
         if (!isProcessing) {
@@ -2238,7 +2246,8 @@ const handlePayLaterBooking = async (e) => {
                         </>
                     )}
 
-                    <div className="payment-wrapper" style={{ display: currentStep === 4 ? 'block' : 'none' }}>
+                    {currentStep === 4 && (
+                    <div className="payment-wrapper">
   {/* Stripe Badge & Security - Combined Header */}
   <div style={{
     background: 'linear-gradient(to right, rgb(248, 250, 252), white)',
@@ -2676,6 +2685,7 @@ const handlePayLaterBooking = async (e) => {
   </div>
 )}
 </div>
+                   )}
                 </form>
                 
                 
