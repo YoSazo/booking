@@ -64,15 +64,9 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
   const amenityList = getAmenityList();
 
   return (
-  <div className="room-card">
-    {/* Image Gallery */}
-    <div className="room-image-container">
-      <img 
-        src={room.imageUrls[currentImageIndex]} 
-        alt={`${room.name} preview`} 
-        className="room-gallery-image"
-      />
-      
+  <div className="room-card room-card--bg" style={{ backgroundImage: `url(${room.imageUrls[currentImageIndex]})` }}>
+    {/* Background image overlay controls */}
+    <div className="room-card__media-controls">
       {/* Navigation Arrows - Only show if multiple images */}
       {room.imageUrls.length > 1 && (
         <>
@@ -118,9 +112,8 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
       </button>
     </div>
 
-
-
-      <div className="room-details">
+    {/* Details overlay */}
+    <div className="room-details room-details--overlay">
         {/* Header */}
         <div className="room-header">
           <div>

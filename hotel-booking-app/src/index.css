@@ -184,30 +184,11 @@ body {
   width: 100%;
 }
 
-/* Desktop: Horizontal layout for room cards */
+/* Desktop: Room cards now use full-bleed background image */
 @media (min-width: 768px) {
   .room-card {
-    flex-direction: row;
     max-width: 1000px;
-    min-height: 450px; /* Ensure card has good height */
-  }
-  
-  .room-image-container {
-    width: 45%;
-    min-width: 400px;
-    height: 100%; /* Fill full card height */
-    min-height: 450px;
-  }
-  
-  .room-gallery-image {
-    height: 100%; /* Image fills container */
-    object-fit: cover; /* Crop to fill without distortion */
-  }
-  
-  .room-content {
-    width: 55%;
-    display: flex;
-    flex-direction: column;
+    min-height: 360px; /* more compact */
   }
 }
 
@@ -217,12 +198,92 @@ body {
 }
 
 /* Image Gallery Container */
+/* Legacy image container (no longer used for full-card bg layout) */
 .room-image-container {
   position: relative;
   height: 280px;
   background: #f3f4f6;
   overflow: hidden;
   cursor: pointer;
+}
+
+/* --- Room card: background image layout --- */
+.room-card--bg {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+/* dark gradient so details remain readable */
+.room-card--bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.12) 0%,
+    rgba(0,0,0,0.18) 45%,
+    rgba(0,0,0,0.78) 100%
+  );
+  z-index: 0;
+}
+
+.room-card__media-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none; /* allow clicks through except buttons */
+}
+
+.room-card__media-controls button {
+  pointer-events: all;
+}
+
+.room-details--overlay {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255,255,255,0.92);
+  padding: 18px;
+}
+
+.room-details--overlay h3,
+.room-details--overlay .room-subtitle {
+  color: rgba(255,255,255,0.98);
+}
+
+.room-details--overlay .room-description {
+  color: rgba(255,255,255,0.88);
+}
+
+.room-details--overlay .amenity-label {
+  color: rgba(255,255,255,0.9);
+}
+
+.room-details--overlay .amenity-icon-box {
+  background: rgba(255,255,255,0.12);
+}
+
+.room-details--overlay .premium-pricing-card {
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.18);
+}
+
+.room-details--overlay .change-dates-button,
+.room-details--overlay .premium-select-button,
+.room-details--overlay .premium-book-button {
+  background: rgba(255,255,255,0.92);
+  color: #111827;
+}
+
+.room-details--overlay .change-dates-button:hover,
+.room-details--overlay .premium-select-button:hover,
+.room-details--overlay .premium-book-button:hover {
+  background: #ffffff;
 }
 
 .room-gallery-image {
