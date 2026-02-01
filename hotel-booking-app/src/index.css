@@ -203,7 +203,8 @@ body {
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 -10px 24px rgba(0,0,0,0.08);
+    /* Remove upward glow/shadow at the seam */
+    box-shadow: none;
   }
 
   .room-description {
