@@ -243,7 +243,7 @@ body {
 /* ========== PREMIUM ROOM CARD STYLES ========== */
 
 .room-card {
-  background-color: #fff;
+  background-color: transparent;
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
@@ -284,7 +284,7 @@ body {
 
 .room-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15); /* Just a subtle dark shadow */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 /* Image Gallery Container */
@@ -414,6 +414,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background-color: #fff; /* Add explicit white background here instead */
+  border-radius: 0 0 16px 16px; /* Rounded bottom corners only */
 }
 
 /* Room Header */
