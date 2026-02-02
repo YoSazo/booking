@@ -3890,7 +3890,8 @@ padding: 6px 16px;
 
 /* Route transition: subtle fade + slide (keeps momentum, feels premium) */
 .route-transition {
-  animation: routeFadeInOnly 180ms ease-out;
+  /* Opacity-only to avoid breaking fixed-position modals */
+  animation: routeFadeInOnly 260ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity;
 }
 
