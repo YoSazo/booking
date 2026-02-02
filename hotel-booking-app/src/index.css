@@ -3890,19 +3890,13 @@ padding: 6px 16px;
 
 /* Route transition: subtle fade + slide (keeps momentum, feels premium) */
 .route-transition {
-  animation: routeFadeSlideIn 220ms ease-out;
-  will-change: opacity, filter;
+  animation: routeFadeInOnly 180ms ease-out;
+  will-change: opacity;
 }
 
-@keyframes routeFadeSlideIn {
-  from {
-    opacity: 0;
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
+@keyframes routeFadeInOnly {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .loading-screen-content {
