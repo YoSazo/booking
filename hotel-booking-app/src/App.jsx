@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPageWrapper from './GuestInfoPage.jsx';
@@ -68,6 +68,15 @@ function App() {
   const [checkoutDate, setCheckoutDate] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isRouteTransitionActive, setIsRouteTransitionActive] = useState(false);
+
+  // Full-screen overlay transition (grand feel) without transforms/filters.
+  // useLayoutEffect ensures the overlay appears before paint on route changes.
+  useLayoutEffect(() => {
+    setIsRouteTransitionActive(true);
+    const t = setTimeout(() => setIsRouteTransitionActive(false), 420);
+    return () => clearTimeout(t);
+  }, [location.pathname]);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
@@ -432,7 +441,8 @@ const handleConfirmBooking = async (bookingDetails) => {
   return (
     <>
     <ScrollToTop />
-      <div key={location.pathname} className="route-transition">
+
+    <div className={`route-transition-overlay ${isRouteTransitionActive ? 'active' : ''}`} aria-hidden="true" />
       <Routes>
         <Route path="/" element={
           <BookingPage
@@ -495,7 +505,6 @@ const handleConfirmBooking = async (bookingDetails) => {
           />
         } />
       </Routes>
-      </div>
       
       {lightboxData && (
         <ImageLightbox

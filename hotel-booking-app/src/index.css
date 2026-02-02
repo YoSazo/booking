@@ -3888,16 +3888,20 @@ padding: 6px 16px;
   to { opacity: 1; }
 }
 
-/* Route transition: subtle fade + slide (keeps momentum, feels premium) */
-.route-transition {
-  /* Opacity-only to avoid breaking fixed-position modals */
-  animation: routeFadeInOnly 260ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity;
+/* Route transition overlay (grand feel, modal-safe)
+   No transform/filter on page container so fixed-position modals remain correct. */
+.route-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.55);
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes routeFadeInOnly {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.route-transition-overlay.active {
+  opacity: 1;
 }
 
 .loading-screen-content {
