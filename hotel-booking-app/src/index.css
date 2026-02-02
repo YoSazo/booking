@@ -3891,17 +3891,17 @@ padding: 6px 16px;
 /* Route transition: subtle fade + slide (keeps momentum, feels premium) */
 .route-transition {
   animation: routeFadeSlideIn 220ms ease-out;
-  will-change: opacity, transform;
+  will-change: opacity, filter;
 }
 
 @keyframes routeFadeSlideIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    filter: blur(0);
   }
 }
 
