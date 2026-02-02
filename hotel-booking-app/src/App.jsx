@@ -432,6 +432,7 @@ const handleConfirmBooking = async (bookingDetails) => {
   return (
     <>
     <ScrollToTop />
+      <div key={location.pathname} className="route-transition">
       <Routes>
         <Route path="/" element={
           <BookingPage
@@ -494,6 +495,7 @@ const handleConfirmBooking = async (bookingDetails) => {
           />
         } />
       </Routes>
+      </div>
       
       {lightboxData && (
         <ImageLightbox

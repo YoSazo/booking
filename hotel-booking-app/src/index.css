@@ -3888,6 +3888,23 @@ padding: 6px 16px;
   to { opacity: 1; }
 }
 
+/* Route transition: subtle fade + slide (keeps momentum, feels premium) */
+.route-transition {
+  animation: routeFadeSlideIn 220ms ease-out;
+  will-change: opacity, transform;
+}
+
+@keyframes routeFadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .loading-screen-content {
   max-width: 500px;
   width: 90%;
