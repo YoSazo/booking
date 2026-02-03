@@ -1004,6 +1004,12 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
         throw new Error(`Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}`);
     }
 
+    if (BOOKINGCENTER_DEBUG_SOAP) {
+        const siteIdStr = String(config.siteId ?? '');
+        const pwStr = String(config.sitePassword ?? '');
+        console.log(`[BOOKINGCENTER_DEBUG] HotelAvail creds siteId='[${siteIdStr}]' len=${siteIdStr.length} passwordLen=${pwStr.length} hasIdWhitespace=${/\s/.test(siteIdStr)} hasPwWhitespace=${/\s/.test(pwStr)}`);
+    }
+
     const xml = buildBcAvailRQ({
         checkin,
         checkout,
@@ -1184,6 +1190,12 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     const checkout = new Date(bookingDetails.checkout).toISOString().split('T')[0];
 
     const attempt = async (ratePlanCode) => {
+        if (BOOKINGCENTER_DEBUG_SOAP) {
+            const siteIdStr = String(config.siteId ?? '');
+            const pwStr = String(config.sitePassword ?? '');
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes creds siteId='[${siteIdStr}]' len=${siteIdStr.length} passwordLen=${pwStr.length} hasIdWhitespace=${/\s/.test(siteIdStr)} hasPwWhitespace=${/\s/.test(pwStr)}`);
+        }
+
         const xml = buildBcHotelResRQ({
             checkin,
             checkout,
