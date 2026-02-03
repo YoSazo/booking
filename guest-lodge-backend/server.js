@@ -1022,6 +1022,10 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
 
     bcDebugLog('HotelAvailRQ (request)', xml);
 
+    if (BOOKINGCENTER_DEBUG_SOAP) {
+        console.log(`[BOOKINGCENTER_DEBUG] HotelAvail endpoint=${BOOKINGCENTER_ENDPOINTS.availability} SOAPAction=www.bookingcenter.com/xml:HotelAvailIn`);
+    }
+
     const response = await postSoap(
         BOOKINGCENTER_ENDPOINTS.availability,
         'www.bookingcenter.com/xml:HotelAvailIn',
