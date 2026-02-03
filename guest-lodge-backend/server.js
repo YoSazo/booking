@@ -1217,6 +1217,10 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
 
         bcDebugLog('HotelResRQ (request)', xml);
 
+        if (BOOKINGCENTER_DEBUG_SOAP) {
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes endpoint=${BOOKINGCENTER_ENDPOINTS.booking} SOAPAction=www.bookingcenter.com/xml:HotelResIn`);
+        }
+
         const response = await postSoap(
             BOOKINGCENTER_ENDPOINTS.booking,
             'www.bookingcenter.com/xml:HotelResIn',
