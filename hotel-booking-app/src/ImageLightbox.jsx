@@ -5,22 +5,11 @@ function ImageLightbox({ images, startIndex, onClose }) {
   const [allLoaded, setAllLoaded] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
 
-  // Preload all images before showing lightbox
+  // Do not preload the entire gallery up-front.
+  // Preloading 8–12 large images can add 10–20MB and delay initial page interactivity.
+  // Instead, show immediately and rely on browser caching + natural loading as users navigate.
   useEffect(() => {
-    let loaded = 0;
-    const total = images.length;
-
-    images.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        loaded++;
-        setLoadedCount(loaded);
-        if (loaded === total) {
-          setAllLoaded(true);
-        }
-      };
-    });
+    setAllLoaded(true);
   }, [images]);
 
   const goToPrevious = () => {

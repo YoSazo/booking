@@ -71,6 +71,8 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
         src={room.imageUrls[currentImageIndex]} 
         alt={`${room.name} preview`} 
         className="room-gallery-image"
+        loading="lazy"
+        decoding="async"
       />
       
       {/* Navigation Arrows - Only show if multiple images */}

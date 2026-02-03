@@ -85,16 +85,17 @@ function App() {
     setAvailableRooms(currentHotel.rooms);
   }, [hotelId]);
 
+  // IMPORTANT: Avoid preloading entire room galleries on initial load.
+  // Preloading every image can easily add 10–20MB to first load and destroy mobile performance.
+  // If you want a small perceived-speed boost, you can preload ONLY the first visible hero image.
   useEffect(() => {
-  availableRooms.forEach(room => {
-    if (room.imageUrls) {
-      room.imageUrls.forEach(url => {
-        const img = new Image();
-        img.src = url;
-      });
-    }
-  });
-}, [availableRooms]);
+    const firstRoom = availableRooms?.[0];
+    const hero = firstRoom?.imageUrls?.[0] || firstRoom?.imageUrl;
+    if (!hero) return;
+
+    const img = new Image();
+    img.src = hero;
+  }, [availableRooms]);
 
 
   useEffect(() => {
