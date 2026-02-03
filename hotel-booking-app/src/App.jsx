@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPageWrapper from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
-import CheckoutReturnPage from './CheckoutReturnPage.jsx';
 import ImageLightbox from './ImageLightbox.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 import { calculateTieredPrice } from './priceCalculator.js';
 import getHotelId from './utils/getHotelId';
+
+// Lazy-load Stripe return page so Stripe does not load on the landing page.
+const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper.jsx'));
 
 
 const hotelId = getHotelId();
@@ -19,8 +19,6 @@ const currentHotel = hotelData[hotelId];
 // (document title is set inside App() via a useEffect hook)
 const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -481,9 +479,9 @@ const handleConfirmBooking = async (bookingDetails) => {
           />
         } />
         <Route path="/confirmation" element={
-          <Elements stripe={stripePromise}>
-            <CheckoutReturnPage onComplete={handleCompleteBooking} />
-          </Elements>
+          <Suspense fallback={null}>
+            <CheckoutReturnPageWrapper onComplete={handleCompleteBooking} />
+          </Suspense>
         } />
 
         {/* This is the final, styled page the user will see */}

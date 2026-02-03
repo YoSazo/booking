@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint } from 'lucide-react';
-import { Autocomplete } from '@react-google-maps/api';
+import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
@@ -2465,6 +2465,7 @@ const handlePayLaterBooking = async (e) => {
         <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
             <div className="card-field-wrapper">
               <label>Billing Address</label>
+              <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} libraries={['places']}>
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                 <input 
                   type="text" 
@@ -2500,6 +2501,7 @@ const handlePayLaterBooking = async (e) => {
                   }}
                 />
               </Autocomplete>
+              </LoadScript>
             </div>
             
             {/* Address fields with slide-down animation - Now stacked vertically */}
