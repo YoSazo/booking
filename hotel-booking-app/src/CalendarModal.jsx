@@ -164,7 +164,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       const day = new Date(year, month, i);
       let className = "calendar-day";
       if (day < minBookingDate) className += " disabled";
-      if (day.getTime() === today.getTime()) className += " today";
+      if (day.getTime() === today.getTime() && day >= minBookingDate) className += " today";
       if (startDate) {
         const startTime = new Date(startDate).setHours(0,0,0,0);
         if (day.getTime() === startTime) className += " selected-start";
