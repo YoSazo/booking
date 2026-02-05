@@ -3,6 +3,10 @@ html, body, #root {
   /* This prevents the "rubber band" scrolling bounce effect on mobile,
      especially on iOS, and stops the grey background from appearing. */
   overscroll-behavior-y: contain;
+  /* Prevent horizontal scrolling and overflow */
+  overflow-x: hidden;
+  max-width: 100vw;
+  position: relative;
 }
 
 /* --- Basic Styles & Fonts --- */
