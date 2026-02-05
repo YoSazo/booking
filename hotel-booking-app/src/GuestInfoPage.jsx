@@ -10,7 +10,6 @@ import TestimonialPlayer from './TestimonialPlayer.jsx';
 import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
-import PaymentInfoModal from './PaymentInfoModal.jsx';
 import getHotelId from './utils/getHotelId';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -86,7 +85,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // In GuestInfoPage.jsx, with your other state and refs
 const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
-const [isPaymentInfoModalOpen, setIsPaymentInfoModalOpen] = useState(false);
 const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
@@ -1844,16 +1842,6 @@ const handlePayLaterBooking = async (e) => {
 </div>
             </div>
 
-            {/* Payment Info Modal */}
-            {isPaymentInfoModalOpen && (
-                <PaymentInfoModal
-                    onClose={() => setIsPaymentInfoModalOpen(false)}
-                    hotel={hotel}
-                    selectedPlan={selectedPlan}
-                    priceToday={priceToday}
-                    balanceDue={balanceDue}
-                />
-            )}
         </>
     );
 }
