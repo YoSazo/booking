@@ -1,12 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-html, body, #root {
-  /* This prevents the "rubber band" scrolling bounce effect on mobile,
-     especially on iOS, and stops the grey background from appearing. */
+
+/* 1. LOCK the outer shell (html/body) to the screen size */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100vh; /* Force height to be exactly the window height */
+  width: 100vw;  /* Force width to be exactly the window width */
+  overflow: hidden; /* DISABLE the scrollbar on the browser window itself */
+}
+
+/* 2. ENABLE scrolling on your App's container instead */
+#root {
+  height: 100%;       /* Fill the locked body */
+  width: 100%;
+  overflow-y: auto;   /* Create the vertical scrollbar HERE */
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  
+  /* Restore smooth scrolling for mobile/touch */
+  -webkit-overflow-scrolling: touch; 
   overscroll-behavior-y: contain;
-  /* Prevent horizontal scrolling and overflow */
-  overflow-x: hidden;
-  max-width: 100vw;
-  position: relative;
 }
 
 /* --- Basic Styles & Fonts --- */
@@ -21,13 +33,9 @@ html, body, #root {
 
 body {
     font-family: 'Inter', sans-serif;
-    margin: 0;
     background-color: #f4f7f9;
     color: var(--text-color);
     line-height: 1.6;
-    /* Prevent viewport shifting on input focus */
-    width: 100%;
-    overflow-x: hidden;
 }
 
 /* --- Main Container --- */
