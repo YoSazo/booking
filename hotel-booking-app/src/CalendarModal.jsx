@@ -6,11 +6,41 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
 
+  // Helper to get minimum booking date (for St. Croix 4 PM cutoff)
+  const getMinBookingDate = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const isStCroix = window.location.hostname.includes('stcroix.clickinns.com');
+    if (isStCroix) {
+      const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+      const centralHour = new Date(centralTime).getHours();
+      if (centralHour >= 16) { // 4 PM or later
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow;
+      }
+    }
+    return today;
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setStartDate(initialCheckin);
+      const minDate = getMinBookingDate();
+      
+      // If initialCheckin is before minDate, adjust it
+      let adjustedCheckin = initialCheckin;
+      if (initialCheckin) {
+        const checkinNormalized = new Date(initialCheckin);
+        checkinNormalized.setHours(0, 0, 0, 0);
+        if (checkinNormalized < minDate) {
+          adjustedCheckin = minDate;
+        }
+      }
+      
+      setStartDate(adjustedCheckin);
       setEndDate(initialCheckout);
-      setCurrentDate(initialCheckin || new Date());
+      setCurrentDate(adjustedCheckin || minDate);
       
       // Prevent body scroll when modal is open - iOS Safari fix
       const scrollY = window.scrollY;
