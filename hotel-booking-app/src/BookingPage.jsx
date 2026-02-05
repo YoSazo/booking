@@ -55,6 +55,27 @@ function BookingPage({
 
         {/* Calendar widget removed - redundant, calendar opens when user clicks "Book Now" on room */}
 
+        {/* Location banner - St. Croix only */}
+        {hotel.id === 'st-croix-wisconsin' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            backgroundColor: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#166534'
+          }}>
+            <span>📍</span>
+            <span>50 min away from Minneapolis</span>
+          </div>
+        )}
+
         <main className="rooms-list">
           
           {/* Conditional rendering based on loading and availability */}
