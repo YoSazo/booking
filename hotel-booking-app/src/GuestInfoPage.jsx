@@ -11,7 +11,6 @@ import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PaymentInfoModal from './PaymentInfoModal.jsx';
-import PaymentStep from './PaymentStep.jsx';
 import getHotelId from './utils/getHotelId';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
