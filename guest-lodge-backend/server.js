@@ -1239,11 +1239,16 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
             return { success: false, errors, raw: ota };
         }
 
+        // Response may have HotelReservations directly under ota OR under ota.parameters
+        const hotelReservation = 
+            ota?.parameters?.HotelReservations?.HotelReservation ||
+            ota?.HotelReservations?.HotelReservation;
+        
         const reservationId =
-            ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID ||
-            ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID_Context ||
-            ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
-            ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
+            hotelReservation?.UniqueID?.$?.ID ||
+            hotelReservation?.UniqueID?.$?.ID_Context ||
+            hotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
+            hotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
             null;
 
         // IMPORTANT: Don't treat the booking as successful unless BookingCenter returns a real confirmation ID.
