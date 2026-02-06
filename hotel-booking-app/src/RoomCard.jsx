@@ -236,7 +236,16 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
                 📅 Change Dates
               </button>
             )}
-            <button className="premium-select-button" onClick={() => onSelect(room)}>
+            <button className="premium-select-button" onClick={() => {
+              if (nights > 0) {
+                // Merge: Select room AND go straight to booking
+                onSelect(room);
+                // Small delay to ensure state is set before navigating
+                setTimeout(() => onBookNow(), 50);
+              } else {
+                onSelect(room);
+              }
+            }}>
               {nights > 0 ? 'Continue Booking' : 'Select Room'}
             </button>
           </div>
