@@ -211,7 +211,7 @@ function App() {
     checkAvailability(dates.start, dates.end);
   };
 
-  const handleRoomSelect = (room, autoProceed = false) => {
+  const handleRoomSelect = (room) => {
   if (!checkinDate || !checkoutDate) {
     setIsCalendarOpen(true);
     return;
@@ -233,14 +233,6 @@ function App() {
   const nights = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
   const subtotal = room.subtotal || calculateTieredPrice(nights, RATES);
   trackAddToCart({ ...bookingState, subtotal });
-  
-  // If autoProceed, go straight to booking after setting state
-  if (autoProceed) {
-    // Use setTimeout to ensure state is set before proceeding
-    setTimeout(() => {
-      handleConfirmBooking(null, bookingState);
-    }, 0);
-  }
 };
 
 
@@ -255,10 +247,8 @@ function App() {
 
   // In App.jsx, update handleConfirmBooking function:
 // In App.jsx, update handleConfirmBooking to go to guest-info first:
-const handleConfirmBooking = async (bookingDetails, roomOverride = null) => {
-  const roomToBook = roomOverride || selectedRoom;
-  
-  if (!roomToBook) {
+const handleConfirmBooking = async (bookingDetails) => {
+  if (!selectedRoom) {
     alert("Please select a room first.");
     return;
   }
@@ -278,7 +268,7 @@ const handleConfirmBooking = async (bookingDetails, roomOverride = null) => {
   const ourReservationCode = generateReservationCode();
 
   const newBooking = {
-    ...roomToBook,
+    ...selectedRoom,
     checkin: checkinDate,
     checkout: checkoutDate,
     nights,

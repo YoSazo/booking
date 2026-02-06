@@ -236,15 +236,8 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
                 📅 Change Dates
               </button>
             )}
-            <button className="premium-select-button" onClick={() => {
-              if (nights > 0) {
-                // Select room AND go straight to booking in one click
-                onSelect(room, true); // Pass flag to auto-proceed to booking
-              } else {
-                onSelect(room);
-              }
-            }}>
-              {nights > 0 ? 'Book Now' : 'Select Room'}
+            <button className="premium-select-button" onClick={() => onSelect(room)}>
+              {nights > 0 ? 'Continue Booking' : 'Select Room'}
             </button>
           </div>
         )}
