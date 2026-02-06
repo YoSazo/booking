@@ -56,7 +56,7 @@ function BookingPage({
         {/* Calendar widget removed - redundant, calendar opens when user clicks "Book Now" on room */}
 
         {/* Location banner - St. Croix only */}
-        {hotel.id === 'st-croix-wisconsin' && (
+        {window.location.hostname.includes('stcroix') && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
