@@ -4,6 +4,7 @@ function ImageLightbox({ images, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [allLoaded, setAllLoaded] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
+  const [loadedImages, setLoadedImages] = useState({}); // Track which images have loaded
 
   // Do not preload the entire gallery up-front.
   // Preloading 8–12 large images can add 10–20MB and delay initial page interactivity.
@@ -11,6 +12,11 @@ function ImageLightbox({ images, startIndex, onClose }) {
   useEffect(() => {
     setAllLoaded(true);
   }, [images]);
+
+  // Handle individual image load
+  const handleImageLoad = (index) => {
+    setLoadedImages(prev => ({ ...prev, [index]: true }));
+  };
 
   const goToPrevious = () => {
     const isFirstImage = currentIndex === 0;
@@ -55,14 +61,22 @@ function ImageLightbox({ images, startIndex, onClose }) {
             </button>
             
             <div className="lightbox-image-container">
+              {/* Shimmer placeholder - shows when current image hasn't loaded */}
+              {!loadedImages[currentIndex] && (
+                <div className="lightbox-shimmer">
+                  <div className="shimmer-animation"></div>
+                </div>
+              )}
               {images.map((src, index) => (
                 <img
                   key={index}
                   src={src}
                   alt={`Room image ${index + 1}`}
                   className="lightbox-image"
+                  onLoad={() => handleImageLoad(index)}
                   style={{
-                    display: index === currentIndex ? 'block' : 'none'
+                    display: index === currentIndex ? 'block' : 'none',
+                    opacity: loadedImages[index] ? 1 : 0
                   }}
                 />
               ))}
