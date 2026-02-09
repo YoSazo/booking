@@ -45,6 +45,35 @@ function ScrollToTop() {
   return null;
 }
 
+// Page transition wrapper - slides pages left/right on navigation
+function PageTransition({ children }) {
+  const location = useLocation();
+  const [displayLocation, setDisplayLocation] = useState(location);
+  const [transitionStage, setTransitionStage] = useState('enter');
+
+  useEffect(() => {
+    if (location.pathname !== displayLocation.pathname) {
+      setTransitionStage('exit');
+    }
+  }, [location, displayLocation]);
+
+  const handleAnimationEnd = () => {
+    if (transitionStage === 'exit') {
+      setDisplayLocation(location);
+      setTransitionStage('enter');
+    }
+  };
+
+  return (
+    <div
+      className={`page-transition page-transition-${transitionStage}`}
+      onAnimationEnd={handleAnimationEnd}
+    >
+      {children}
+    </div>
+  );
+}
+
 
 
 function App() {
@@ -431,68 +460,69 @@ const handleConfirmBooking = async (bookingDetails) => {
   return (
     <>
     <ScrollToTop />
-      <Routes>
-        <Route path="/" element={
-          <BookingPage
-            hotel={currentHotel}
-            roomData={availableRooms}
-            rates={RATES}
-            selectedRoom={selectedRoom}
-            checkinDate={checkinDate}
-            checkoutDate={checkoutDate}
-            isCalendarOpen={isCalendarOpen}
-            onRoomSelect={handleRoomSelect}
-            onGuestsChange={handleGuestCountChange}
-            onPetsChange={handlePetCountChange}
-            onConfirmBooking={handleConfirmBooking}
-            onCalendarOpen={() => setIsCalendarOpen(true)}
-            onCalendarClose={() => setIsCalendarOpen(false)}
-            onDatesChange={handleDatesUpdate}
-            isLoading={isLoading}
-            onOpenLightbox={handleOpenLightbox}
-            isProcessingBooking={isProcessingBooking}
-            setIsProcessingBooking={setIsProcessingBooking}
-          />
-        } />
+      <PageTransition>
+        <Routes>
+          <Route path="/" element={
+              <BookingPage
+                hotel={currentHotel}
+                roomData={availableRooms}
+                rates={RATES}
+                selectedRoom={selectedRoom}
+                checkinDate={checkinDate}
+                checkoutDate={checkoutDate}
+                isCalendarOpen={isCalendarOpen}
+                onRoomSelect={handleRoomSelect}
+                onGuestsChange={handleGuestCountChange}
+                onPetsChange={handlePetCountChange}
+                onConfirmBooking={handleConfirmBooking}
+                onCalendarOpen={() => setIsCalendarOpen(true)}
+                onCalendarClose={() => setIsCalendarOpen(false)}
+                onDatesChange={handleDatesUpdate}
+                isLoading={isLoading}
+                onOpenLightbox={handleOpenLightbox}
+                isProcessingBooking={isProcessingBooking}
+                setIsProcessingBooking={setIsProcessingBooking}
+              />
+          } />
 
+          <Route path="/guest-info" element={
+            <GuestInfoPageWrapper
+              hotel={currentHotel}
+              bookingDetails={finalBooking}
+              onBack={() => {
+                // Reset booking state when going back to booking page
+                setSelectedRoom(null);
+                setFinalBooking(null);
+                setClientSecret('');
+                setCheckinDate(null);
+                setCheckoutDate(null);
+                setAvailableRooms(currentHotel.rooms);
+                sessionStorage.removeItem('finalBooking');
+                sessionStorage.removeItem('clientSecret');
+                sessionStorage.removeItem('selectedPlan');
+                navigate('/');
+              }}
+              onComplete={handleCompleteBooking}
+              apiBaseUrl={API_BASE_URL}
+              clientSecret={clientSecret}
+            />
+          } />
+          <Route path="/confirmation" element={
+            <Suspense fallback={null}>
+              <CheckoutReturnPageWrapper onComplete={handleCompleteBooking} />
+            </Suspense>
+          } />
 
-        <Route path="/guest-info" element={
-          <GuestInfoPageWrapper
-            hotel={currentHotel}
-            bookingDetails={finalBooking}
-            onBack={() => {
-              // Reset booking state when going back to booking page
-              setSelectedRoom(null);
-              setFinalBooking(null);
-              setClientSecret('');
-              setCheckinDate(null);
-              setCheckoutDate(null);
-              setAvailableRooms(currentHotel.rooms);
-              sessionStorage.removeItem('finalBooking');
-              sessionStorage.removeItem('clientSecret');
-              sessionStorage.removeItem('selectedPlan');
-              navigate('/');
-            }}
-            onComplete={handleCompleteBooking}
-            apiBaseUrl={API_BASE_URL}
-            clientSecret={clientSecret}
-          />
-        } />
-        <Route path="/confirmation" element={
-          <Suspense fallback={null}>
-            <CheckoutReturnPageWrapper onComplete={handleCompleteBooking} />
-          </Suspense>
-        } />
-
-        {/* This is the final, styled page the user will see */}
-        <Route path="/final-confirmation" element={
-          <ConfirmationPage 
-            bookingDetails={finalBooking}
-            guestInfo={guestInfo}
-            reservationCode={reservationCode}
-          />
-        } />
-      </Routes>
+          {/* This is the final, styled page the user will see */}
+          <Route path="/final-confirmation" element={
+            <ConfirmationPage 
+              bookingDetails={finalBooking}
+              guestInfo={guestInfo}
+              reservationCode={reservationCode}
+            />
+          } />
+        </Routes>
+      </PageTransition>
       
       {lightboxData && (
         <ImageLightbox
