@@ -151,7 +151,7 @@ export const hotelData = {
     rooms: [
       {
         id: 1,
-        name: 'King Room',
+        name: 'Queen Suite',
         // BookingCenter (STCROIX) mapping
         bookingCenterRoomTypeCode: '1KNS',
         bookingCenterRatePlanCodes: {
@@ -173,7 +173,7 @@ export const hotelData = {
       },
       {
         id: 2,
-        name: 'Double Full Bed',
+        name: '2 Queen Suite',
         // BookingCenter (STCROIX) mapping
         bookingCenterRoomTypeCode: '2QNS',
         bookingCenterRatePlanCodes: {
@@ -184,13 +184,12 @@ export const hotelData = {
         amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.',
         maxOccupancy: 4,
-        imageUrl: 'stcroixdoublebed.webp',
+        imageUrl: '2queenfront.webp',
         imageUrls: [
-          'stcroixdoublebed.webp',
-          'stcroixdoublebedangle.webp',
-          'stcroixdoublebedangle2.webp',
-          'stcroixdoublebedkitchen.webp',
-          'stcroixsinglebedbathroom.webp',
+          '2queenfront.webp',
+          '2queenkitchen.webp',
+          '2queenbathroom.webp',
+          '2queensink.webp',
         ],
       },
     ],
