@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
-import CalendarModal from './CalendarModal.jsx';
 // import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
@@ -137,15 +136,6 @@ function BookingPage({
           )}
         </main>
       </div>
-      
-      <CalendarModal 
-        isOpen={isCalendarOpen}
-        onClose={onCalendarClose}
-        onDatesChange={onDatesChange}
-        initialCheckin={checkinDate}
-        checkoutDate={checkoutDate}
-        rates={rates}
-      />
     </>
   );
 }

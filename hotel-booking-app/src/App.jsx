@@ -4,6 +4,7 @@ import BookingPage from './BookingPage.jsx';
 import GuestInfoPageWrapper from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
 import ImageLightbox from './ImageLightbox.jsx';
+import CalendarModal from './CalendarModal.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
 import { calculateTieredPrice } from './priceCalculator.js';
@@ -531,6 +532,16 @@ const handleConfirmBooking = async (bookingDetails) => {
           onClose={handleCloseLightbox}
         />
       )}
+
+      {/* Calendar Modal - outside PageTransition to avoid fixed positioning issues */}
+      <CalendarModal 
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        onDatesChange={handleDatesUpdate}
+        initialCheckin={checkinDate}
+        checkoutDate={checkoutDate}
+        rates={RATES}
+      />
       
       {/* {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />} */}
     </>
