@@ -190,7 +190,7 @@ export const hotelData = {
           '2queenkitchen.webp',
           '2queenbathroom.webp',
           '2queensink.webp',
-        ],
+        ], 
       },
     ],
   },
