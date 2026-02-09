@@ -3897,19 +3897,19 @@ padding: 6px 16px;
    LOADING SCREEN STYLES
 ======================================== */
 
+/* === Minimal Loading Screen === */
 .loading-screen-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  animation: fadeIn 0.3s ease;
+  animation: fadeIn 0.4s ease;
 }
 
 @keyframes fadeIn {
@@ -3917,123 +3917,68 @@ padding: 6px 16px;
   to { opacity: 1; }
 }
 
-
-.loading-screen-content {
-  max-width: 500px;
-  width: 90%;
+.loading-screen-minimal {
   text-align: center;
   padding: 40px;
-  background: white;
-  border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
-.loading-spinner {
+.loading-icon-wrapper {
+  position: relative;
   width: 80px;
   height: 80px;
-  margin: 0 auto 30px;
-}
-
-.spinner-svg {
-  animation: rotate 2s linear infinite;
-  width: 100%;
-  height: 100%;
-}
-
-@keyframes rotate {
-  100% { transform: rotate(360deg); }
-}
-
-.spinner-circle {
-  stroke: #3b82f6;
-  stroke-linecap: round;
-  animation: dash 1.5s ease-in-out infinite;
-}
-
-@keyframes dash {
-  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
-  50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
-  100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
-}
-
-.loading-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 30px;
-  text-align: left;
-}
-
-.loading-step {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.loading-step.completed { background: #d1fae5; }
-.loading-step.completed .step-icon { background: #10b981; color: white; }
-.loading-step.active { background: #dbeafe; }
-
-.step-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  color: #6b7280;
+  margin: 0 auto 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.875rem;
-  flex-shrink: 0;
 }
 
-.step-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #3b82f6;
-  border-top-color: transparent;
+.loading-key-icon {
+  width: 40px;
+  height: 40px;
+  color: #f8fafc;
+  animation: keyFloat 2s ease-in-out infinite;
+}
+
+@keyframes keyFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(5deg); }
+}
+
+.loading-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgba(59, 130, 246, 0.5);
   border-radius: 50%;
-  animation: spin-loader 0.8s linear infinite;
+  animation: pulseRing 2s ease-out infinite;
 }
 
-@keyframes spin-loader {
-  to { transform: rotate(360deg); }
+@keyframes pulseRing {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
 }
 
-.step-text { font-size: 0.95rem; color: #4b5563; font-weight: 500; }
-.loading-step.active .step-text { color: #1e40af; font-weight: 600; }
-
-.loading-message { font-size: 1.5rem; font-weight: 700; color: #111827; margin: 20px 0 10px; }
-.loading-submessage { font-size: 0.95rem; color: #6b7280; margin-bottom: 24px; }
-
-.loading-progress-bar {
-  width: 100%;
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 20px;
+.loading-text {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.01em;
 }
 
-.loading-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.loading-reassurance { font-size: 0.875rem; color: #10b981; font-weight: 600; margin: 0; }
-
-@media (max-width: 768px) {
-  /* Keep 2-column grid on mobile for compact layout */
-  .loading-screen-content { padding: 30px 20px; }
-  .loading-spinner { width: 60px; height: 60px; }
-  .loading-message { font-size: 1.25rem; }
+.loading-hint {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
 }
 
 /* Info Form Card Styles */
