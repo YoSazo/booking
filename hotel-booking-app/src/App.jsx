@@ -50,27 +50,41 @@ function ScrollToTop() {
 function PageTransition({ children }) {
   const location = useLocation();
   const [displayLocation, setDisplayLocation] = useState(location);
-  const [transitionStage, setTransitionStage] = useState('enter');
+  const [transitionStage, setTransitionStage] = useState('idle');
 
   useEffect(() => {
     if (location.pathname !== displayLocation.pathname) {
+      // Start exit animation
       setTransitionStage('exit');
+      
+      // After exit animation, swap content and enter
+      const timer = setTimeout(() => {
+        setDisplayLocation(location);
+        setTransitionStage('enter');
+      }, 250); // Match the exit animation duration
+      
+      return () => clearTimeout(timer);
     }
   }, [location, displayLocation]);
 
   const handleAnimationEnd = () => {
-    if (transitionStage === 'exit') {
-      setDisplayLocation(location);
-      setTransitionStage('enter');
+    if (transitionStage === 'enter') {
+      setTransitionStage('idle');
     }
   };
 
+  // Clone children with the displayLocation so Routes renders the old page during exit
+  const childrenWithLocation = React.cloneElement(children, {
+    location: displayLocation,
+    key: displayLocation.pathname
+  });
+
   return (
     <div
-      className={`page-transition page-transition-${transitionStage}`}
+      className={`page-transition ${transitionStage !== 'idle' ? `page-transition-${transitionStage}` : ''}`}
       onAnimationEnd={handleAnimationEnd}
     >
-      {children}
+      {childrenWithLocation}
     </div>
   );
 }
