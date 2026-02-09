@@ -1851,7 +1851,7 @@ function GuestInfoPageWrapper(props) {
     const [elementsOptions] = useState({
         fonts: [
             {
-                cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap',
+                cssSrc: '/fonts/inter.css',
             },
         ],
         appearance: {
