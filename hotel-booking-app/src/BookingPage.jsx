@@ -56,7 +56,7 @@ function BookingPage({
 
         {/* Location banner - St. Croix only */}
         {window.location.hostname.includes('stcroix') && (
-          <div style={{
+          <div className="location-banner" style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -68,9 +68,7 @@ function BookingPage({
             marginBottom: '16px',
             fontSize: '14px',
             fontWeight: '500',
-            color: '#166534',
-            width: '100%',
-            boxSizing: 'border-box'
+            color: '#166534'
           }}>
             <span>📍</span>
             <span>50 min away from Minneapolis</span>

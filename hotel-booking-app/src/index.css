@@ -4844,23 +4844,18 @@ padding: 6px 16px;
    - Room cards compact spacing (no white space below images)
    ============================================= */
 
+/* Location banner - span full grid width */
+.location-banner {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* Only apply to desktop (>769px) */
 @media (min-width: 769px) {
 
   /* =========================================
-     FIX 1: Location Banner Full Width
-     ========================================= */
-  .location-banner-stcroix,
-  .container > div[style*="backgroundColor: '#f0fdf4'"] {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-
-  /* =========================================
-     FIX 2: Room Card - Image fills card height
+     FIX: Room Card - Image fills card height
      ========================================= */
   
   /* Room details compact padding & gaps */
