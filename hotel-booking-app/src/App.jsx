@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
 import GuestInfoPageWrapper from './GuestInfoPage.jsx';
 import ConfirmationPage from './ConfirmationPage.jsx';
-import CheckoutReturnPage from './CheckoutReturnPage.jsx';
 import ImageLightbox from './ImageLightbox.jsx';
+import CalendarModal from './CalendarModal.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 import { calculateTieredPrice } from './priceCalculator.js';
 import getHotelId from './utils/getHotelId';
+
+// Lazy-load Stripe return page so Stripe does not load on the landing page.
+const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper.jsx'));
 
 
 const hotelId = getHotelId();
@@ -19,8 +20,6 @@ const currentHotel = hotelData[hotelId];
 // (document title is set inside App() via a useEffect hook)
 const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -45,6 +44,49 @@ function ScrollToTop() {
   }, [pathname]);
 
   return null;
+}
+
+// Page transition wrapper - slides pages left/right on navigation
+function PageTransition({ children }) {
+  const location = useLocation();
+  const [displayLocation, setDisplayLocation] = useState(location);
+  const [transitionStage, setTransitionStage] = useState('idle');
+
+  useEffect(() => {
+    if (location.pathname !== displayLocation.pathname) {
+      // Start exit animation
+      setTransitionStage('exit');
+      
+      // After exit animation, swap content and enter
+      const timer = setTimeout(() => {
+        setDisplayLocation(location);
+        setTransitionStage('enter');
+      }, 250); // Match the exit animation duration
+      
+      return () => clearTimeout(timer);
+    }
+  }, [location, displayLocation]);
+
+  const handleAnimationEnd = () => {
+    if (transitionStage === 'enter') {
+      setTransitionStage('idle');
+    }
+  };
+
+  // Clone children with the displayLocation so Routes renders the old page during exit
+  const childrenWithLocation = React.cloneElement(children, {
+    location: displayLocation,
+    key: displayLocation.pathname
+  });
+
+  return (
+    <div
+      className={`page-transition ${transitionStage !== 'idle' ? `page-transition-${transitionStage}` : ''}`}
+      onAnimationEnd={handleAnimationEnd}
+    >
+      {childrenWithLocation}
+    </div>
+  );
 }
 
 
@@ -85,16 +127,17 @@ function App() {
     setAvailableRooms(currentHotel.rooms);
   }, [hotelId]);
 
+  // IMPORTANT: Avoid preloading entire room galleries on initial load.
+  // Preloading every image can easily add 10–20MB to first load and destroy mobile performance.
+  // If you want a small perceived-speed boost, you can preload ONLY the first visible hero image.
   useEffect(() => {
-  availableRooms.forEach(room => {
-    if (room.imageUrls) {
-      room.imageUrls.forEach(url => {
-        const img = new Image();
-        img.src = url;
-      });
-    }
-  });
-}, [availableRooms]);
+    const firstRoom = availableRooms?.[0];
+    const hero = firstRoom?.imageUrls?.[0] || firstRoom?.imageUrl;
+    if (!hero) return;
+
+    const img = new Image();
+    img.src = hero;
+  }, [availableRooms]);
 
 
   useEffect(() => {
@@ -432,68 +475,69 @@ const handleConfirmBooking = async (bookingDetails) => {
   return (
     <>
     <ScrollToTop />
-      <Routes>
-        <Route path="/" element={
-          <BookingPage
-            hotel={currentHotel}
-            roomData={availableRooms}
-            rates={RATES}
-            selectedRoom={selectedRoom}
-            checkinDate={checkinDate}
-            checkoutDate={checkoutDate}
-            isCalendarOpen={isCalendarOpen}
-            onRoomSelect={handleRoomSelect}
-            onGuestsChange={handleGuestCountChange}
-            onPetsChange={handlePetCountChange}
-            onConfirmBooking={handleConfirmBooking}
-            onCalendarOpen={() => setIsCalendarOpen(true)}
-            onCalendarClose={() => setIsCalendarOpen(false)}
-            onDatesChange={handleDatesUpdate}
-            isLoading={isLoading}
-            onOpenLightbox={handleOpenLightbox}
-            isProcessingBooking={isProcessingBooking}
-            setIsProcessingBooking={setIsProcessingBooking}
-          />
-        } />
+      <PageTransition>
+        <Routes>
+          <Route path="/" element={
+              <BookingPage
+                hotel={currentHotel}
+                roomData={availableRooms}
+                rates={RATES}
+                selectedRoom={selectedRoom}
+                checkinDate={checkinDate}
+                checkoutDate={checkoutDate}
+                isCalendarOpen={isCalendarOpen}
+                onRoomSelect={handleRoomSelect}
+                onGuestsChange={handleGuestCountChange}
+                onPetsChange={handlePetCountChange}
+                onConfirmBooking={handleConfirmBooking}
+                onCalendarOpen={() => setIsCalendarOpen(true)}
+                onCalendarClose={() => setIsCalendarOpen(false)}
+                onDatesChange={handleDatesUpdate}
+                isLoading={isLoading}
+                onOpenLightbox={handleOpenLightbox}
+                isProcessingBooking={isProcessingBooking}
+                setIsProcessingBooking={setIsProcessingBooking}
+              />
+          } />
 
+          <Route path="/guest-info" element={
+            <GuestInfoPageWrapper
+              hotel={currentHotel}
+              bookingDetails={finalBooking}
+              onBack={() => {
+                // Reset booking state when going back to booking page
+                setSelectedRoom(null);
+                setFinalBooking(null);
+                setClientSecret('');
+                setCheckinDate(null);
+                setCheckoutDate(null);
+                setAvailableRooms(currentHotel.rooms);
+                sessionStorage.removeItem('finalBooking');
+                sessionStorage.removeItem('clientSecret');
+                sessionStorage.removeItem('selectedPlan');
+                navigate('/');
+              }}
+              onComplete={handleCompleteBooking}
+              apiBaseUrl={API_BASE_URL}
+              clientSecret={clientSecret}
+            />
+          } />
+          <Route path="/confirmation" element={
+            <Suspense fallback={null}>
+              <CheckoutReturnPageWrapper onComplete={handleCompleteBooking} />
+            </Suspense>
+          } />
 
-        <Route path="/guest-info" element={
-          <GuestInfoPageWrapper
-            hotel={currentHotel}
-            bookingDetails={finalBooking}
-            onBack={() => {
-              // Reset booking state when going back to booking page
-              setSelectedRoom(null);
-              setFinalBooking(null);
-              setClientSecret('');
-              setCheckinDate(null);
-              setCheckoutDate(null);
-              setAvailableRooms(currentHotel.rooms);
-              sessionStorage.removeItem('finalBooking');
-              sessionStorage.removeItem('clientSecret');
-              sessionStorage.removeItem('selectedPlan');
-              navigate('/');
-            }}
-            onComplete={handleCompleteBooking}
-            apiBaseUrl={API_BASE_URL}
-            clientSecret={clientSecret}
-          />
-        } />
-        <Route path="/confirmation" element={
-          <Elements stripe={stripePromise}>
-            <CheckoutReturnPage onComplete={handleCompleteBooking} />
-          </Elements>
-        } />
-
-        {/* This is the final, styled page the user will see */}
-        <Route path="/final-confirmation" element={
-          <ConfirmationPage 
-            bookingDetails={finalBooking}
-            guestInfo={guestInfo}
-            reservationCode={reservationCode}
-          />
-        } />
-      </Routes>
+          {/* This is the final, styled page the user will see */}
+          <Route path="/final-confirmation" element={
+            <ConfirmationPage 
+              bookingDetails={finalBooking}
+              guestInfo={guestInfo}
+              reservationCode={reservationCode}
+            />
+          } />
+        </Routes>
+      </PageTransition>
       
       {lightboxData && (
         <ImageLightbox
@@ -502,6 +546,16 @@ const handleConfirmBooking = async (bookingDetails) => {
           onClose={handleCloseLightbox}
         />
       )}
+
+      {/* Calendar Modal - outside PageTransition to avoid fixed positioning issues */}
+      <CalendarModal 
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        onDatesChange={handleDatesUpdate}
+        initialCheckin={checkinDate}
+        checkoutDate={checkoutDate}
+        rates={RATES}
+      />
       
       {/* {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />} */}
     </>

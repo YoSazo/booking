@@ -890,100 +890,90 @@ function buildBcHotelResRQ({
     siteId = BOOKINGCENTER_TEST_SITE_ID,
     sitePassword = BOOKINGCENTER_TEST_PASSWORD,
     chainCode = BOOKINGCENTER_TEST_CHAIN_CODE,
-    // Deposit/guarantee metadata
+    // Deposit/guarantee metadata (kept for backwards compat but not used in Jason's structure)
     depositAmount = 0,
-    paymentTransactionTypeCode = 'Capture',
-    receiptType = BOOKINGCENTER_TEST_RECEIPT_TYPE,
 }) {
-    const echoToken = Date.now().toString();
+    // MATCHING JASON'S SUCCESSFUL PRODUCTION XML
+    // No <HotelResIn> wrapper. Direct OTA_HotelResRQ.
+    // Key differences from old code:
+    // 1. NO wrapper element - OTA_HotelResRQ goes directly in SOAP Body
+    // 2. Uses <PaymentTransactionTypeCode>Account</PaymentTransactionTypeCode> (not Capture)
+    // 3. No PaymentCard block
+    // 4. Added AgentCode="BC" to BasicPropertyInfo
+    
     const safeGuests = Math.max(1, Number(guests) || 1);
-
-    // BookingCenter availability response includes PaymentPolicy/GuaranteePayment with a PaymentCode.
-    // In your successful AvailRS sample, PaymentCode="31". Using it helps avoid "Invalid Payment Type".
-    const paymentCode = '31';
-    // TODO: if different properties return different payment codes, store it per-room from availability and pass through.
-
     const firstName = guestInfo.firstName || 'Guest';
     const lastName = guestInfo.lastName || 'Guest';
 
-    // Jason/BookingCenter examples use the base OTA namespace (no "/hotelres" suffix).
-    // Using the wrong namespace (or an extra wrapper element) can cause the server to ignore POS/RequestorID,
-    // leading to an empty RequestorID in the response and "Invalid Credentials".
-    const otaPayload = `<OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05">
-  <parameters TimeStamp="${bcTimestamp()}" Version="1.001" EchoToken="${echoToken}" Target="Production">
-    <POS>
-      <Source ISOCurrency="USD"/>
-      <RequestorID OTA_CodeType="10" ID="${siteId}" MessagePassword="${sitePassword}"/>
-    </POS>
-    <HotelReservations>
-      <HotelReservation>
-        <RoomStays>
-          <RoomStay>
-            <RoomTypes>
-              <RoomType RoomTypeCode="${roomTypeCode}" NumberOfUnits="1"/>
-            </RoomTypes>
-            <RatePlans>
-              <RatePlan RatePlanCode="${ratePlanCode}"/>
-            </RatePlans>
-            <GuestCounts>
-              <GuestCount AgeQualifyingCode="10" Count="${safeGuests}"/>
-            </GuestCounts>
-            <TimeSpan Start="${checkin}" End="${checkout}"/>
-            <Guarantee>
-              <GuaranteesAccepted>
-                <GuaranteeAccepted>
-                  <PaymentTransactionTypeCode>${paymentTransactionTypeCode}</PaymentTransactionTypeCode>
-                  <PaymentCard>
-                    <CardCode>${receiptType}</CardCode>
-                    <CardNumber></CardNumber>
-                    <CardHolderName></CardHolderName>
-                    <ExpireDate></ExpireDate>
-                  </PaymentCard>
-                </GuaranteeAccepted>
-              </GuaranteesAccepted>
-            </Guarantee>
-            <PaymentPolicies>
-              <GuaranteePayment>
-                <AmountPercent Amount="${depositAmount}" TaxInclusive="N" BasisType="No Deposit" />
-              </GuaranteePayment>
-            </PaymentPolicies>
-            <BasicPropertyInfo ChainCode="${chainCode}" HotelCode="${siteId}" />
-          </RoomStay>
-        </RoomStays>
-        <ResGuests>
-          <ResGuest>
-            <Profiles>
-              <ProfileInfo>
-                <Profile ProfileType="1">
-                  <Customer>
-                    <PersonName>
-                      <GivenName>${firstName}</GivenName>
-                      <Surname>${lastName}</Surname>
-                    </PersonName>
-                    ${guestInfo.phone ? `<Telephone PhoneTechType="1" PhoneNumber="${guestInfo.phone}"/>` : ''}
-                    ${guestInfo.email ? `<Email>${guestInfo.email}</Email>` : ''}
-                    <Address>
-                      ${guestInfo.address ? `<AddressLine>${guestInfo.address}</AddressLine>` : ''}
-                      ${guestInfo.city ? `<CityName>${guestInfo.city}</CityName>` : ''}
-                      ${guestInfo.state ? `<StateProv>${guestInfo.state}</StateProv>` : ''}
-                      ${guestInfo.zip ? `<PostalCode>${guestInfo.zip}</PostalCode>` : ''}
-                      <CountryName>US</CountryName>
-                    </Address>
-                  </Customer>
-                </Profile>
-              </ProfileInfo>
-            </Profiles>
-          </ResGuest>
-        </ResGuests>
-      </HotelReservation>
-    </HotelReservations>
-  </parameters>
-</OTA_HotelResRQ>`;
-
-    // IMPORTANT: BookingCenter new_booking.php expects the WSDL operation wrapper (HotelResIn).
-    // If we send OTA_HotelResRQ as the operation, NuSOAP returns: "Operation 'OTA_HotelResRQ' is not defined in the WSDL".
-    const wrapped = bcWrapMessagePart('HotelResIn', 'www.bookingcenter.com/hotelres', otaPayload);
-    return bcSoapEnvelope(wrapped);
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" 
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <soap:Body>
+        <OTA_HotelResRQ xmlns="http://www.opentravel.org/OTA/2003/05" Version="1.001">
+            <parameters Target="Production">
+                <POS>
+                    <Source ISOCurrency="USD" />
+                    <RequestorID OTA_CodeType="10" ID="${siteId}" MessagePassword="${sitePassword}" />
+                </POS>
+                <HotelReservations>
+                    <HotelReservation>
+                        <RoomStays>
+                            <RoomStay>
+                                <RoomTypes>
+                                    <RoomType RoomTypeCode="${roomTypeCode}" NumberOfUnits="1" />
+                                </RoomTypes>
+                                <RatePlans>
+                                    <RatePlan RatePlanCode="${ratePlanCode}" />
+                                </RatePlans>
+                                <GuestCounts>
+                                    <GuestCount AgeQualifyingCode="10" Count="${safeGuests}" />
+                                </GuestCounts>
+                                <TimeSpan Start="${checkin}" End="${checkout}" />
+                                <Guarantee>
+                                    <GuaranteesAccepted>
+                                        <GuaranteeAccepted>
+                                            <PaymentTransactionTypeCode>Account</PaymentTransactionTypeCode>
+                                        </GuaranteeAccepted>
+                                    </GuaranteesAccepted>
+                                </Guarantee>
+                                <PaymentPolicies>
+                                    <GuaranteePayment>
+                                        <AmountPercent Amount="${depositAmount}" TaxInclusive="N" BasisType="No Deposit" />
+                                    </GuaranteePayment>
+                                </PaymentPolicies>
+                                <BasicPropertyInfo ChainCode="${chainCode}" HotelCode="${siteId}" AgentCode="BC" />
+                                <Comments>
+                                    <Comment>
+                                        <Text>Booking via Click Inns</Text>
+                                    </Comment>
+                                </Comments>
+                            </RoomStay>
+                        </RoomStays>
+                        <ResGuests>
+                            <ResGuest>
+                                <Profiles>
+                                    <ProfileInfo>
+                                        <Profile ProfileType="1">
+                                            <Customer>
+                                                <PersonName>
+                                                    <GivenName>${firstName}</GivenName>
+                                                    <Surname>${lastName}</Surname>
+                                                </PersonName>
+                                                ${guestInfo.phone ? `<Telephone PhoneNumber="${guestInfo.phone}" PhoneTechType="1" />` : ''}
+                                                ${guestInfo.email ? `<Email>${guestInfo.email}</Email>` : ''}
+                                            </Customer>
+                                        </Profile>
+                                    </ProfileInfo>
+                                </Profiles>
+                            </ResGuest>
+                        </ResGuests>
+                    </HotelReservation>
+                </HotelReservations>
+            </parameters>
+        </OTA_HotelResRQ>
+    </soap:Body>
+</soap:Envelope>`;
 }
 
 function extractBcErrors(otaResponse) {
@@ -1004,6 +994,12 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
         throw new Error(`Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}`);
     }
 
+    if (BOOKINGCENTER_DEBUG_SOAP) {
+        const siteIdStr = String(config.siteId ?? '');
+        const pwStr = String(config.sitePassword ?? '');
+        console.log(`[BOOKINGCENTER_DEBUG] HotelAvail creds siteId='[${siteIdStr}]' len=${siteIdStr.length} passwordLen=${pwStr.length} hasIdWhitespace=${/\s/.test(siteIdStr)} hasPwWhitespace=${/\s/.test(pwStr)}`);
+    }
+
     const xml = buildBcAvailRQ({
         checkin,
         checkout,
@@ -1015,6 +1011,10 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
     });
 
     bcDebugLog('HotelAvailRQ (request)', xml);
+
+    if (BOOKINGCENTER_DEBUG_SOAP) {
+        console.log(`[BOOKINGCENTER_DEBUG] HotelAvail endpoint=${BOOKINGCENTER_ENDPOINTS.availability} SOAPAction=www.bookingcenter.com/xml:HotelAvailIn`);
+    }
 
     const response = await postSoap(
         BOOKINGCENTER_ENDPOINTS.availability,
@@ -1184,6 +1184,12 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     const checkout = new Date(bookingDetails.checkout).toISOString().split('T')[0];
 
     const attempt = async (ratePlanCode) => {
+        if (BOOKINGCENTER_DEBUG_SOAP) {
+            const siteIdStr = String(config.siteId ?? '');
+            const pwStr = String(config.sitePassword ?? '');
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes creds siteId='[${siteIdStr}]' len=${siteIdStr.length} passwordLen=${pwStr.length} hasIdWhitespace=${/\s/.test(siteIdStr)} hasPwWhitespace=${/\s/.test(pwStr)}`);
+        }
+
         const xml = buildBcHotelResRQ({
             checkin,
             checkout,
@@ -1200,6 +1206,10 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
         });
 
         bcDebugLog('HotelResRQ (request)', xml);
+
+        if (BOOKINGCENTER_DEBUG_SOAP) {
+            console.log(`[BOOKINGCENTER_DEBUG] HotelRes endpoint=${BOOKINGCENTER_ENDPOINTS.booking} SOAPAction=www.bookingcenter.com/xml:HotelResIn`);
+        }
 
         const response = await postSoap(
             BOOKINGCENTER_ENDPOINTS.booking,
@@ -1229,11 +1239,16 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
             return { success: false, errors, raw: ota };
         }
 
+        // Response may have HotelReservations directly under ota OR under ota.parameters
+        const hotelReservation = 
+            ota?.parameters?.HotelReservations?.HotelReservation ||
+            ota?.HotelReservations?.HotelReservation;
+        
         const reservationId =
-            ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID ||
-            ota?.HotelReservations?.HotelReservation?.UniqueID?.$?.ID_Context ||
-            ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
-            ota?.HotelReservations?.HotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
+            hotelReservation?.UniqueID?.$?.ID ||
+            hotelReservation?.UniqueID?.$?.ID_Context ||
+            hotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Value ||
+            hotelReservation?.ResGlobalInfo?.HotelReservationIDs?.HotelReservationID?.$?.ResID_Source ||
             null;
 
         // IMPORTANT: Don't treat the booking as successful unless BookingCenter returns a real confirmation ID.

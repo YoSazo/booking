@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
-import CalendarModal from './CalendarModal.jsx';
 // import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
@@ -55,6 +54,27 @@ function BookingPage({
             Trust is already established through ad creative and Kenneth video */}
 
         {/* Calendar widget removed - redundant, calendar opens when user clicks "Book Now" on room */}
+
+        {/* Location banner - St. Croix only */}
+        {window.location.hostname.includes('stcroix') && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            backgroundColor: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#166534'
+          }}>
+            <span>📍</span>
+            <span>50 min away from Minneapolis</span>
+          </div>
+        )}
 
         <main className="rooms-list">
           
@@ -117,15 +137,6 @@ function BookingPage({
           )}
         </main>
       </div>
-      
-      <CalendarModal 
-        isOpen={isCalendarOpen}
-        onClose={onCalendarClose}
-        onDatesChange={onDatesChange}
-        initialCheckin={checkinDate}
-        checkoutDate={checkoutDate}
-        rates={rates}
-      />
     </>
   );
 }

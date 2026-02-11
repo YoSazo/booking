@@ -6,11 +6,41 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
 
+  // Helper to get minimum booking date (for St. Croix 4 PM cutoff)
+  const getMinBookingDate = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const isStCroix = window.location.hostname.includes('stcroix.clickinns.com');
+    if (isStCroix) {
+      const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+      const centralHour = new Date(centralTime).getHours();
+      if (centralHour >= 16) { // 4 PM or later
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow;
+      }
+    }
+    return today;
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setStartDate(initialCheckin);
+      const minDate = getMinBookingDate();
+      
+      // If initialCheckin is before minDate, adjust it
+      let adjustedCheckin = initialCheckin;
+      if (initialCheckin) {
+        const checkinNormalized = new Date(initialCheckin);
+        checkinNormalized.setHours(0, 0, 0, 0);
+        if (checkinNormalized < minDate) {
+          adjustedCheckin = minDate;
+        }
+      }
+      
+      setStartDate(adjustedCheckin);
       setEndDate(initialCheckout);
-      setCurrentDate(initialCheckin || new Date());
+      setCurrentDate(adjustedCheckin || minDate);
       
       // Prevent body scroll when modal is open - iOS Safari fix
       const scrollY = window.scrollY;
@@ -114,13 +144,27 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    
+    // For St. Croix: after 4 PM Central, treat today as unavailable (BookingCenter API cutoff)
+    let minBookingDate = today;
+    const isStCroix = window.location.hostname.includes('stcroix.clickinns.com');
+    if (isStCroix) {
+      // Get current time in Central timezone (America/Chicago)
+      const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+      const centralHour = new Date(centralTime).getHours();
+      if (centralHour >= 16) { // 4 PM or later
+        minBookingDate = new Date(today);
+        minBookingDate.setDate(minBookingDate.getDate() + 1); // Tomorrow is the earliest
+      }
+    }
+    
     let days = [];
     for (let i = 0; i < firstDayOfMonth; i++) { days.push(<div key={`blank-${i}`} className="calendar-day other-month"></div>); }
     for (let i = 1; i <= daysInMonth; i++) {
       const day = new Date(year, month, i);
       let className = "calendar-day";
-      if (day < today) className += " disabled";
-      if (day.getTime() === today.getTime()) className += " today";
+      if (day < minBookingDate) className += " disabled";
+      if (day.getTime() === today.getTime() && day >= minBookingDate) className += " today";
       if (startDate) {
         const startTime = new Date(startDate).setHours(0,0,0,0);
         if (day.getTime() === startTime) className += " selected-start";

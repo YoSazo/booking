@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint } from 'lucide-react';
-import { Autocomplete } from '@react-google-maps/api';
+import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
@@ -10,7 +10,6 @@ import TestimonialPlayer from './TestimonialPlayer.jsx';
 import LoadingScreen from './LoadingScreen.jsx';
 import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
-import PaymentInfoModal from './PaymentInfoModal.jsx';
 import getHotelId from './utils/getHotelId';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -86,7 +85,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // In GuestInfoPage.jsx, with your other state and refs
 const isInteractingWithAutocomplete = useRef(false);
 const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
-const [isPaymentInfoModalOpen, setIsPaymentInfoModalOpen] = useState(false);
 const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
@@ -94,10 +92,8 @@ const errorMessageRef = useRef(null);
 const addressFieldsRef = useRef(null);
 const zipFieldRef = useRef(null);
 
-// Plan selection state - Default to 'payLater' for all stays
-// For 7+ nights: payLater, trial, full options
-// For <7 nights: payLater, full options (same as 7+ but without trial)
-const [selectedPlan, setSelectedPlan] = useState('payLater');
+// Plan selection removed - always use payLater (Reserve for $0)
+const selectedPlan = 'payLater';
 
 // Mobile detection for responsive plan cards
 const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -212,40 +208,10 @@ const handleAddressPaste = (e) => {
  // The empty array ensures this complex setup runs only once.
 
 
-useEffect(() => {
-  // Load selected plan from sessionStorage for both 7+ and <7 night bookings
-  if (bookingDetails) {
-    const savedPlan = sessionStorage.getItem('selectedPlan');
-    if (savedPlan) {
-      setSelectedPlan(savedPlan);
-    } else {
-      // Default to 'payLater' for <7 nights (same as 7+ nights)
-      if (bookingDetails.nights < 7) {
-        setSelectedPlan('payLater');
-      }
-    }
-  }
-}, [bookingDetails]);
+// selectedPlan sessionStorage loading removed - always payLater
 
-// Auto-select default plans when reaching plan selection step
+// Smooth scroll handling for step changes (plan step removed)
 useEffect(() => {
-  if (false && currentStep === 3 && bookingDetails) {
-    const savedPlan = sessionStorage.getItem('selectedPlan');
-    // Only auto-select if no plan was previously selected
-    if (!savedPlan) {
-      if (bookingDetails.nights >= 7) {
-        setSelectedPlan('payLater'); // Default to pay later for 7+ nights
-      } else {
-        setSelectedPlan('payLater'); // Default to pay later for <7 nights (same as 7+)
-      }
-    }
-    
-    // Smooth scroll to just below progress bar when plan page loads
-    setTimeout(() => {
-      window.scrollTo({ top: 120, behavior: 'smooth' });
-    }, 100);
-  }
-  
   // Smooth scroll to top on Step 2 (Info page) so form is visible
   if (currentStep === 2) {
     setTimeout(() => {
@@ -260,7 +226,7 @@ useEffect(() => {
     }, 100);
   }
   
-}, [currentStep, bookingDetails]);
+}, [currentStep]);
 
 // Auto-scroll to error message when it appears
 useEffect(() => {
@@ -510,12 +476,6 @@ useEffect(() => {
       trackAddPaymentInfo(bookingDetails, formData);
       setCurrentStep(4);
     }
-  } else if (currentStep === 3) {
-    // Plan selection step is no longer part of the primary funnel.
-    // Keep this as a safety fallback in case something navigates here.
-    sessionStorage.setItem('selectedPlan', selectedPlan);
-    trackAddPaymentInfo(bookingDetails, formData);
-    setCurrentStep(4);
   }
 };
     
@@ -524,11 +484,8 @@ useEffect(() => {
     onBack(); // Goes back to booking page
   } else if (currentStep === 2) {
     setCurrentStep(1); // Goes back to Review Cart
-  } else if (currentStep === 3) {
-    // Plan step (legacy) - go back to info
-    setCurrentStep(2);
   } else if (currentStep === 4) {
-    // Payment step - go back to Info (Plan step removed)
+    // Payment step - go back to Info
     setCurrentStep(2);
   }
   setHasAttemptedSubmit(false);
@@ -538,7 +495,6 @@ useEffect(() => {
     const getBackButtonText = () => {
         if (currentStep === 1) return '< Back to Booking';
         if (currentStep === 2) return '< Back to Cart';
-        if (currentStep === 3) return '< Back to Info'; // Plan step
         if (currentStep === 4) return '< Back to Info'; // Payment step
     };
 
@@ -657,17 +613,9 @@ useEffect(() => {
         }
         e.preventDefault();
         
-        // If reserve plan selected, use reserve handler instead
-        if (selectedPlan === 'reserve') {
-            handleReserveBooking(e);
-            return;
-        }
-        
-        // If pay later plan selected, use pay later handler instead
-        if (selectedPlan === 'payLater') {
-            handlePayLaterBooking(e);
-            return;
-        }
+        // Always use pay later handler (Reserve for $0)
+        handlePayLaterBooking(e);
+        return;
         
         setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
 
@@ -815,427 +763,6 @@ useEffect(() => {
         }
     };
 
-    const handleReserveBooking = async (e) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    
-    setHasAttemptedSubmit(true);
-
-    // Process payment based on method
-    if (paymentMethod === 'card') {
-        // ✅ Validate card is filled out FIRST
-        const cardNumberElement = elements.getElement(CardNumberElement);
-        if (!cardNumberElement || !cardNumberElement._complete) {
-            setErrorMessage("Please fill out your card information before proceeding.");
-            return;
-        }
-    }
-
-    // ✅ Validate billing address for BOTH card and wallet (checked AFTER card info)
-    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        return;
-    }
-
-    setIsProcessing(true);
-    // Only show loading screen for card payments, not wallet
-    if (paymentMethod === 'card') {
-        setShowLoadingScreen(true);
-    }
-    setErrorMessage('');
-
-    // Get original booking from sessionStorage
-    const originalBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
-    
-    // Create reserve booking (full stay dates, but only $20 payment now)
-    const reserveBooking = {
-        roomTypeID: originalBooking.roomTypeID,
-        rateID: originalBooking.rateID,
-        roomName: originalBooking.name,
-        checkin: originalBooking.checkin,
-        checkout: originalBooking.checkout,
-        nights: originalBooking.nights,
-        guests: originalBooking.guests,
-        subtotal: originalBooking.subtotal,
-        taxes: originalBooking.taxes,
-        total: originalBooking.total,
-        reservationCode: originalBooking.reservationCode,
-        bookingType: 'reserve',
-        amountPaidNow: 20,
-        amountDueAtArrival: originalBooking.total - 20,
-        isNonRefundable: true,
-    };
-
-    try {
-        // Create new payment intent for $20 reserve amount
-        const response = await fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                amount: 20,
-                bookingDetails: reserveBooking,
-                guestInfo: formData,
-                hotelId: hotelId
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!data.clientSecret) {
-            throw new Error("Failed to create reserve payment");
-        }
-
-        // Update payment intent with guest info
-        await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                clientSecret: data.clientSecret, 
-                guestInfo: formData 
-            }),
-        });
-
-        // Process payment based on method
-        if (paymentMethod === 'card') {
-            const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
-                payment_method: {
-                    card: elements.getElement(CardNumberElement),
-                    billing_details: {
-                        name: `${formData.firstName} ${formData.lastName}`,
-                        email: formData.email,
-                        phone: formData.phone,
-                        address: {
-                            line1: formData.address,
-                            city: formData.city,
-                            state: formData.state,
-                            postal_code: formData.zip,
-                            country: 'US',
-                        },
-                    },
-                },
-            });
-
-            if (error) {
-                // If the PaymentIntent already succeeded, treat as success (prevents Stripe double-confirm error)
-                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
-                    console.log('Payment already succeeded, proceeding to booking...');
-                    sessionStorage.setItem('finalBooking', JSON.stringify(reserveBooking));
-                    onComplete(formData, error.payment_intent.id);
-                    return;
-                }
-
-                setErrorMessage(error.message || "Payment failed");
-                setIsProcessing(false);
-            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                // Save reserve booking data for confirmation page
-                sessionStorage.setItem('finalBooking', JSON.stringify(reserveBooking));
-                
-                // Complete the booking
-                onComplete(formData, paymentIntent.id);
-            }
-        } else if (paymentMethod === 'wallet') {
-            // Create payment request for $20
-            const reserveAmountInCents = 2000; // $20
-            
-            const reservePaymentRequest = stripe.paymentRequest({
-                country: 'US',
-                currency: 'usd',
-                total: { label: 'Room Reservation', amount: reserveAmountInCents },
-                requestPayerName: true,
-                requestPayerEmail: true,
-            });
-
-            // Set up payment method handler
-            reservePaymentRequest.on('paymentmethod', async (ev) => {
-                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-                    data.clientSecret, 
-                    { payment_method: ev.paymentMethod.id }, 
-                    { handleActions: false }
-                );
-                
-                if (confirmError) {
-                    ev.complete('fail');
-                    setErrorMessage(confirmError.message);
-                    setIsProcessing(false);
-                    return;
-                }
-                
-                ev.complete('success');
-                
-                // Save reserve booking for confirmation page
-                sessionStorage.setItem('finalBooking', JSON.stringify(reserveBooking));
-                
-                onComplete(formData, paymentIntent.id);
-            });
-
-            // Show payment request
-            const canMakePayment = await reservePaymentRequest.canMakePayment();
-            
-            if (!canMakePayment) {
-                setErrorMessage("Digital wallet is not available. Please use card payment.");
-                setIsProcessing(false);
-                return;
-            }
-
-            try {
-                await reservePaymentRequest.show();
-            } catch (error) {
-                console.log('Payment cancelled:', error);
-                setErrorMessage("Payment cancelled");
-                setIsProcessing(false);
-            }
-        }
-
-    } catch (error) {
-        console.error("Reserve booking failed:", error);
-        setErrorMessage("Failed to process reservation. Please try again.");
-        setIsProcessing(false);
-    }
-};
-
-// Trial plan removed
-
-const handleTrialNightBooking = async (e) => {
-    e?.preventDefault();      // Prevent default form behavior
-    e?.stopPropagation();     // Stop event from bubbling up
-    
-    setHasAttemptedSubmit(true);
-
-    // Process payment based on method
-    if (paymentMethod === 'card') {
-        // ✅ Validate card is filled out FIRST
-        const cardNumberElement = elements.getElement(CardNumberElement);
-        if (!cardNumberElement || !cardNumberElement._complete) {
-            setErrorMessage("Please fill out your card information before proceeding.");
-            return;
-        }
-    }
-
-    // ✅ Validate billing address for BOTH card and wallet (checked AFTER card info)
-    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        return;
-    }
-
-    setIsProcessingTrial(true);
-    // Only show loading screen for card payments, not wallet
-    if (paymentMethod === 'card') {
-        setShowLoadingScreen(true);
-    }
-    setErrorMessage('');
-
-    // ✅ CRITICAL FIX: Get ORIGINAL booking from sessionStorage to preserve full stay data
-    const originalBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
-    
-    // ✅ FIX: Ensure checkin is a Date object
-    const checkinDate = originalBooking.checkin instanceof Date 
-        ? originalBooking.checkin 
-        : new Date(originalBooking.checkin);
-    
-    // Create checkout date (1 day after checkin)
-    const checkoutDate = new Date(checkinDate);
-    checkoutDate.setDate(checkoutDate.getDate() + 1);
-
-    // Calculate nightly rate with taxes (10% tax rate)
-    const nightlyRate = originalBooking.subtotal / originalBooking.nights; // Get per-night subtotal
-    const nightlyTaxes = nightlyRate * 0.10; // 10% tax
-    const trialTotal = nightlyRate + nightlyTaxes;
-
-    const trialBooking = {
-        roomTypeID: originalBooking.roomTypeID,
-        rateID: originalBooking.rateID,
-        roomName: originalBooking.name,
-        checkin: checkinDate.toISOString(),  // ✅ Now safe
-        checkout: checkoutDate.toISOString(), // ✅ Now safe
-        nights: 1,
-        guests: originalBooking.guests,
-        subtotal: nightlyRate,
-        taxes: nightlyTaxes,
-        total: trialTotal,
-        reservationCode: originalBooking.reservationCode,
-        bookingType: 'trial',
-        intendedNights: originalBooking.nights,  // ✅ Preserve original nights
-        originalTotal: originalBooking.total,     // ✅ NEW: Preserve original total
-        useNightlyRate: true,
-    };
-
-    try {
-        // Create new payment intent for trial amount (1 night with taxes)
-        const response = await fetch(`${apiBaseUrl}/api/create-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                amount: trialTotal,
-                bookingDetails: trialBooking,
-                guestInfo: formData,
-                hotelId: hotelId
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!data.clientSecret) {
-            throw new Error("Failed to create trial payment");
-        }
-
-        // Update payment intent with guest info
-        await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                clientSecret: data.clientSecret, 
-                guestInfo: formData 
-            }),
-        });
-
-        // Process payment based on method
-        if (paymentMethod === 'card') {
-            const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
-                payment_method: {
-                    card: elements.getElement(CardNumberElement),
-                    billing_details: {
-                        name: `${formData.firstName} ${formData.lastName}`,
-                        email: formData.email,
-                        phone: formData.phone,
-                        address: {
-                            line1: formData.address,
-                            city: formData.city,
-                            state: formData.state,
-                            postal_code: formData.zip,
-                            country: 'US',
-                        },
-                    },
-                },
-            });
-
-            if (error) {
-                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
-                    console.log('Payment already succeeded, proceeding to booking...');
-                    sessionStorage.setItem('finalBooking', JSON.stringify({
-                        ...originalBooking,
-                        checkin: checkinDate.toISOString(),
-                        checkout: checkoutDate.toISOString(),
-                        nights: 1,
-                        total: trialTotal,
-                        subtotal: nightlyRate,
-                        taxes: nightlyTaxes,
-                        bookingType: 'trial',
-                        intendedNights: originalBooking.nights,
-                        originalTotal: originalBooking.total
-                    }));
-                    onComplete(formData, error.payment_intent.id);
-                    return;
-                }
-
-                setErrorMessage(error.message || "Payment failed");
-                setIsProcessingTrial(false);
-            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                // ✅ Save trial booking data for confirmation page ONLY
-                sessionStorage.setItem('finalBooking', JSON.stringify({
-                    ...originalBooking,
-                    checkin: checkinDate.toISOString(),
-                    checkout: checkoutDate.toISOString(),
-                    nights: 1,
-                    total: trialTotal,
-                    subtotal: nightlyRate,
-                    taxes: nightlyTaxes,
-                    bookingType: 'trial',
-                    intendedNights: originalBooking.nights,
-                    originalTotal: originalBooking.total
-                }));
-                
-                // Complete the booking
-                onComplete(formData, paymentIntent.id);
-            }
-        } else if (paymentMethod === 'wallet') {
-            // Create a NEW payment request for the trial amount
-            const trialAmountInCents = Math.round(trialTotal * 100);
-            
-            const trialPaymentRequest = stripe.paymentRequest({
-                country: 'US',
-                currency: 'usd',
-                total: { label: 'Trial Night Booking', amount: trialAmountInCents },
-                requestPayerName: true,
-                requestPayerEmail: true,
-            });
-
-            // Set up the payment method handler
-            trialPaymentRequest.on('paymentmethod', async (ev) => {
-                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-                    data.clientSecret, 
-                    { payment_method: ev.paymentMethod.id }, 
-                    { handleActions: false }
-                );
-                
-                if (confirmError) {
-                    if (confirmError.code === 'payment_intent_unexpected_state' && confirmError.payment_intent?.status === 'succeeded') {
-                        console.log('Wallet payment already succeeded, proceeding to booking...');
-                        ev.complete('success');
-                        sessionStorage.setItem('finalBooking', JSON.stringify({
-                            ...originalBooking,
-                            checkin: checkinDate.toISOString(),
-                            checkout: checkoutDate.toISOString(),
-                            nights: 1,
-                            total: trialTotal,
-                            subtotal: nightlyRate,
-                            taxes: nightlyTaxes,
-                            bookingType: 'trial',
-                            intendedNights: originalBooking.nights,
-                            originalTotal: originalBooking.total
-                        }));
-                        onComplete(formData, confirmError.payment_intent.id);
-                        return;
-                    }
-
-                    ev.complete('fail');
-                    setErrorMessage(confirmError.message);
-                    setIsProcessingTrial(false);
-                    return;
-                }
-                
-                ev.complete('success');
-                
-                // ✅ Save trial booking for confirmation page ONLY
-                sessionStorage.setItem('finalBooking', JSON.stringify({
-                    ...originalBooking,
-                    checkin: checkinDate.toISOString(),
-                    checkout: checkoutDate.toISOString(),
-                    nights: 1,
-                    total: trialTotal,
-                    subtotal: nightlyRate,
-                    taxes: nightlyTaxes,
-                    bookingType: 'trial',
-                    intendedNights: originalBooking.nights,
-                    originalTotal: originalBooking.total
-                }));
-                
-                onComplete(formData, paymentIntent.id);
-            });
-
-            // Show the payment request
-            const canMakePayment = await trialPaymentRequest.canMakePayment();
-            
-            if (!canMakePayment) {
-                setErrorMessage("Digital wallet is not available. Please use card payment.");
-                setIsProcessingTrial(false);
-                return;
-            }
-
-            try {
-                await trialPaymentRequest.show();
-            } catch (error) {
-                console.log('Payment cancelled:', error);
-                setErrorMessage("Payment cancelled");
-                setIsProcessingTrial(false);
-            }
-        }
-
-    } catch (error) {
-        console.error("Trial night booking failed:", error);
-        setErrorMessage("Failed to process trial booking. Please try again.");
-        setIsProcessing(false);
-    }
-};
 
 // NEW: Handle "Pay Later" booking with pre-authorization hold
 const handlePayLaterBooking = async (e) => {
@@ -1567,14 +1094,7 @@ const handlePayLaterBooking = async (e) => {
     }
 
     const getPaymentButtonText = () => {
-    if (selectedPlan === 'reserve') {
-        return 'Reserve Room - Pay $20 Now';
-    } else if (selectedPlan === 'payLater') {
         return 'Confirm Reservation - $0 Today';
-    } else {
-        const priceToday = bookingDetails.total / 2;
-        return `Pay $${priceToday.toFixed(2)} and Complete Booking`;
-    }
     };
     
     const priceToday = bookingDetails.total / 2;
@@ -1585,7 +1105,7 @@ const handlePayLaterBooking = async (e) => {
         <>
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
             
-            <div style={{ position: 'sticky', top: '0', zIndex: 1001, paddingTop: '8px', paddingBottom: '2px', marginBottom: '8px' }}>
+            <div style={{ position: 'relative', paddingTop: '8px', paddingBottom: '2px', marginBottom: '8px' }}>
                 {/* Back Button - Green Pill */}
                 <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '12px' }}>
                     {getBackButtonText()}
@@ -1611,417 +1131,8 @@ const handlePayLaterBooking = async (e) => {
 
 
                 {/* Plan selection for 7+ nights - DESKTOP PREMIUM DESIGN */}
-                {currentStep === 3 && bookingDetails && bookingDetails.nights >= 7 && (
-                    <>
-                        {/* Premium Header */}
-                        <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '-12px' }}>
-                            <div style={{
-                                display: 'inline-block',
-                                background: 'white',
-                                borderRadius: '12px',
-                                padding: '16px 24px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                                marginBottom: '-4px'
-                            }}>
-                                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
-                                    Your Stay
-                                </div>
-                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </div>
-                                <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-                                    {bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Premium Plan Cards Grid */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                            gap: '20px',
-                            marginBottom: '32px'
-                        }}>
-                            {/* Pay Later Plan */}
-                            <div
-                                className="premium-plan-card"
-                                onClick={() => setSelectedPlan('payLater')}
-                                style={{
-                                    background: selectedPlan === 'payLater' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : 'white',
-                                    border: `3px solid ${selectedPlan === 'payLater' ? '#10b981' : '#e5e7eb'}`,
-                                    borderRadius: '16px',
-                                    padding: '24px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s ease',
-                                    transform: selectedPlan === 'payLater' ? 'scale(1.02)' : 'scale(1)',
-                                    boxShadow: selectedPlan === 'payLater' ? '0 12px 24px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
-                                    position: 'relative',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}
-                            >
-                                <div className="premium-plan-badge" style={{
-                                    position: 'absolute',
-                                    top: '-12px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    background: '#10b981',
-                                    color: 'white',
-                                    padding: '6px 16px',
-                                    borderRadius: '20px',
-                                    fontSize: '12px',
-                                    fontWeight: '700',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                                }}>
-                                    ⭐ Most Popular
-                                </div>
-                                <div className="premium-plan-icon-box" style={{
-                                    width: '56px',
-                                    height: '56px',
-                                    background: selectedPlan === 'payLater' ? 'white' : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                                    borderRadius: '12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginBottom: '16px',
-                                    marginTop: '8px'
-                                }}>
-                                    <Clock size={isMobile ? 17 : 28} color="#10b981" strokeWidth={2.5} />
-                                </div>
-                                <h3 className="premium-plan-title" style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
-                                    Pay Later
-                                </h3>
-                                <div className="premium-plan-price" style={{ fontSize: '36px', fontWeight: '800', color: '#10b981', margin: '8px 0', lineHeight: '1' }}>
-                                    $0
-                                    <span className="premium-plan-price-span" style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
-                                </div>
-                                <p className="premium-plan-subtitle" style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
-                                    Pay when you arrive
-                                </p>
-                                <div style={{ flex: 1 }}>
-                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Zero payment today</span>
-                                    </div>
-                                    <div className="premium-plan-check-item" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={isMobile ? 14 : 18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span className="premium-plan-check-text" style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
-                                    </div>
-                                </div>
-                                {selectedPlan === 'payLater' && (
-                                    <div className="premium-plan-selected" style={{
-                                        marginTop: '16px',
-                                        padding: '12px',
-                                        background: 'white',
-                                        borderRadius: '8px',
-                                        textAlign: 'center',
-                                        fontWeight: '700',
-                                        color: '#10b981',
-                                        fontSize: '14px'
-                                    }}>
-                                        ✓ Selected
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Complete Booking Plan */}
-                            <div
-                                className="premium-plan-card"
-                                onClick={() => setSelectedPlan('full')}
-                                style={{
-                                    background: selectedPlan === 'full' ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'white',
-                                    border: `3px solid ${selectedPlan === 'full' ? '#8b5cf6' : '#e5e7eb'}`,
-                                    borderRadius: '16px',
-                                    padding: '24px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s ease',
-                                    transform: selectedPlan === 'full' ? 'scale(1.02)' : 'scale(1)',
-                                    boxShadow: selectedPlan === 'full' ? '0 12px 24px rgba(139, 92, 246, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
-                                    position: 'relative',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}
-                            >
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '-12px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    background: '#8b5cf6',
-                                    color: 'white',
-                                    padding: '6px 16px',
-                                    borderRadius: '20px',
-                                    fontSize: '12px',
-                                    fontWeight: '700',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                                }}>
-                                    ⭐ Secure & Save
-                                </div>
-                                <div style={{
-                                    width: '56px',
-                                    height: '56px',
-                                    background: selectedPlan === 'full' ? 'white' : 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
-                                    borderRadius: '12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginBottom: '16px',
-                                    marginTop: '8px'
-                                }}>
-                                    <Shield size={28} color="#8b5cf6" strokeWidth={2.5} />
-                                </div>
-                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
-                                    Complete Booking
-                                </h3>
-                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#8b5cf6', margin: '8px 0', lineHeight: '1' }}>
-                                    ${(bookingDetails.total / 2).toFixed(2)}
-                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
-                                </div>
-                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
-                                    Pay half now, half later
-                                </p>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Lock in your rate today</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Balance due at check-in</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% refund if room not as promised</span>
-                                    </div>
-                                </div>
-                                {selectedPlan === 'full' && (
-                                    <div style={{
-                                        marginTop: '16px',
-                                        padding: '12px',
-                                        background: 'white',
-                                        borderRadius: '8px',
-                                        textAlign: 'center',
-                                        fontWeight: '700',
-                                        color: '#8b5cf6',
-                                        fontSize: '14px'
-                                    }}>
-                                        ✓ Selected
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </>
-                )}
 
                 {/* Plan selection for <7 nights - DESKTOP PREMIUM DESIGN */}
-                {currentStep === 3 && bookingDetails && bookingDetails.nights < 7 && (
-                    <>
-                        {/* Premium Header */}
-                        <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: '-12px' }}>
-                            <div style={{
-                                display: 'inline-block',
-                                background: 'white',
-                                borderRadius: '12px',
-                                padding: '16px 24px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                                marginBottom: '-4px'
-                            }}>
-                                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
-                                    Your Stay
-                                </div>
-                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>
-                                    {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(bookingDetails.checkout).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </div>
-                                <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-                                    {bookingDetails.nights} nights • Total: ${bookingDetails.total.toFixed(2)}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Premium Plan Cards Grid - Only 2 Plans */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                            gap: '20px',
-                            marginBottom: '32px',
-                            maxWidth: '700px',
-                            marginLeft: 'auto',
-                            marginRight: 'auto'
-                        }}>
-                            {/* Pay Later Plan */}
-                            <div
-                                className="premium-plan-card"
-                                onClick={() => setSelectedPlan('payLater')}
-                                style={{
-                                    background: selectedPlan === 'payLater' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' : 'white',
-                                    border: `3px solid ${selectedPlan === 'payLater' ? '#10b981' : '#e5e7eb'}`,
-                                    borderRadius: '16px',
-                                    padding: '24px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s ease',
-                                    transform: selectedPlan === 'payLater' ? 'scale(1.02)' : 'scale(1)',
-                                    boxShadow: selectedPlan === 'payLater' ? '0 12px 24px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
-                                    position: 'relative',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}
-                            >
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '-12px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    background: '#10b981',
-                                    color: 'white',
-                                    padding: '6px 16px',
-                                    borderRadius: '20px',
-                                    fontSize: '12px',
-                                    fontWeight: '700',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                                }}>
-                                    ⭐ Most Popular
-                                </div>
-                                <div style={{
-                                    width: '56px',
-                                    height: '56px',
-                                    background: selectedPlan === 'payLater' ? 'white' : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                                    borderRadius: '12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginBottom: '16px',
-                                    marginTop: '8px'
-                                }}>
-                                    <Clock size={28} color="#10b981" strokeWidth={2.5} />
-                                </div>
-                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
-                                    Pay Later
-                                </h3>
-                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#10b981', margin: '8px 0', lineHeight: '1' }}>
-                                    $0
-                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
-                                </div>
-                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
-                                    Pay when you arrive
-                                </p>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Zero payment today</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Full amount at check-in</span>
-                                    </div>
-                                </div>
-                                {selectedPlan === 'payLater' && (
-                                    <div style={{
-                                        marginTop: '16px',
-                                        padding: '12px',
-                                        background: 'white',
-                                        borderRadius: '8px',
-                                        textAlign: 'center',
-                                        fontWeight: '700',
-                                        color: '#10b981',
-                                        fontSize: '14px'
-                                    }}>
-                                        ✓ Selected
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Complete Booking Plan */}
-                            <div
-                                className="premium-plan-card"
-                                onClick={() => setSelectedPlan('full')}
-                                style={{
-                                    background: selectedPlan === 'full' ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'white',
-                                    border: `3px solid ${selectedPlan === 'full' ? '#8b5cf6' : '#e5e7eb'}`,
-                                    borderRadius: '16px',
-                                    padding: '24px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s ease',
-                                    transform: selectedPlan === 'full' ? 'scale(1.02)' : 'scale(1)',
-                                    boxShadow: selectedPlan === 'full' ? '0 12px 24px rgba(139, 92, 246, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
-                                    position: 'relative',
-                                    display: 'flex',
-                                    flexDirection: 'column'
-                                }}
-                            >
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '-12px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    background: '#8b5cf6',
-                                    color: 'white',
-                                    padding: '6px 16px',
-                                    borderRadius: '20px',
-                                    fontSize: '12px',
-                                    fontWeight: '700',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                                }}>
-                                    ⭐ Secure & Save
-                                </div>
-                                <div style={{
-                                    width: '56px',
-                                    height: '56px',
-                                    background: selectedPlan === 'full' ? 'white' : 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
-                                    borderRadius: '12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginBottom: '16px',
-                                    marginTop: '8px'
-                                }}>
-                                    <Shield size={28} color="#8b5cf6" strokeWidth={2.5} />
-                                </div>
-                                <h3 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px 0' }}>
-                                    Complete Booking
-                                </h3>
-                                <div style={{ fontSize: '36px', fontWeight: '800', color: '#8b5cf6', margin: '8px 0', lineHeight: '1' }}>
-                                    ${(bookingDetails.total / 2).toFixed(2)}
-                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginLeft: '8px' }}>today</span>
-                                </div>
-                                <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' }}>
-                                    Pay half now, half later
-                                </p>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Lock in your rate today</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>Balance due at check-in</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                        <CheckCircle size={18} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <span style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>100% refund if room not as promised</span>
-                                    </div>
-                                </div>
-                                {selectedPlan === 'full' && (
-                                    <div style={{
-                                        marginTop: '16px',
-                                        padding: '12px',
-                                        background: 'white',
-                                        borderRadius: '8px',
-                                        textAlign: 'center',
-                                        fontWeight: '700',
-                                        color: '#8b5cf6',
-                                        fontSize: '14px'
-                                    }}>
-                                        ✓ Selected
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </>
-                )}
 
                 {currentStep === 1 && (
                     <div className="modern-review-cart-wrapper">
@@ -2465,6 +1576,7 @@ const handlePayLaterBooking = async (e) => {
         <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
             <div className="card-field-wrapper">
               <label>Billing Address</label>
+              <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} libraries={['places']}>
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                 <input 
                   type="text" 
@@ -2500,6 +1612,7 @@ const handlePayLaterBooking = async (e) => {
                   }}
                 />
               </Autocomplete>
+              </LoadScript>
             </div>
             
             {/* Address fields with slide-down animation - Now stacked vertically */}
@@ -2695,7 +1808,6 @@ const handlePayLaterBooking = async (e) => {
     <button type="button" className="btn btn-confirm btn-wider" onClick={handleNextStep}>
       {currentStep === 1 && "Continue to Info"}
       {currentStep === 2 && "Continue to Payment"}
-      {currentStep === 3 && "Continue to Payment"}
     </button>
   ) : (
     <div style={{ 
@@ -2706,50 +1818,30 @@ const handlePayLaterBooking = async (e) => {
       gap: '4px'
     }}>
       <button
-        type={(selectedPlan === 'reserve') ? "button" : (paymentMethod === 'card' ? "submit" : "button")}
-        form={(selectedPlan === 'reserve') ? undefined : (paymentMethod === 'card' ? "main-checkout-form" : undefined)}
+        type={paymentMethod === 'card' ? "submit" : "button"}
+        form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
         className="btn btn-confirm btn-wider"
-        onClick={
-          selectedPlan === 'reserve'
-            ? (e) => handleReserveBooking(e)
-            : selectedPlan === 'payLater'
-              ? (e) => handlePayLaterBooking(e)
-              : selectedPlan === 'full'
-                ? (e) => handleCardSubmit(e)
-                : () => { window.userInitiatedSubmit = true; }
-        }
+        onClick={(e) => handlePayLaterBooking(e)}
         disabled={isProcessing || !clientSecret || !stripe || !elements}
       >
         {isProcessing ? "Processing..." : getPaymentButtonText()}
       </button>
       
       {/* Pay Later reassurance text - below button */}
-      {selectedPlan === 'payLater' && (
-        <div style={{
-          textAlign: 'center',
-          marginTop: '4px',
-          color: '#047857',
-          fontSize: '13px',
-          fontWeight: '600'
-        }}>
-          $0 charged today • $1.00 verification only
-        </div>
-      )}
+      <div style={{
+        textAlign: 'center',
+        marginTop: '4px',
+        color: '#047857',
+        fontSize: '13px',
+        fontWeight: '600'
+      }}>
+        $0 charged today • $1.00 verification only
+      </div>
     </div>
   )}
 </div>
             </div>
 
-            {/* Payment Info Modal */}
-            {isPaymentInfoModalOpen && (
-                <PaymentInfoModal
-                    onClose={() => setIsPaymentInfoModalOpen(false)}
-                    hotel={hotel}
-                    selectedPlan={selectedPlan}
-                    priceToday={priceToday}
-                    balanceDue={balanceDue}
-                />
-            )}
         </>
     );
 }
@@ -2759,7 +1851,7 @@ function GuestInfoPageWrapper(props) {
     const [elementsOptions] = useState({
         fonts: [
             {
-                cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap',
+                cssSrc: '/fonts/inter.css',
             },
         ],
         appearance: {
