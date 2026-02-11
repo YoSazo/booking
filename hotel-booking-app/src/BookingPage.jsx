@@ -4,6 +4,7 @@ import CalendarModal from './CalendarModal.jsx';
 // import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
+import './desktop-layout-fixes.css';
 
 
 function BookingPage({ 
