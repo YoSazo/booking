@@ -28,7 +28,6 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     'wifi': { icon: Wifi, label: 'Free WiFi' },
     'tv': { icon: Tv, label: 'Smart TV' },
     'kitchen': { icon: Refrigerator, label: 'Kitchen' },
-    'fridge': { icon: Refrigerator, label: 'Fridge' },
     'workspace': { icon: Briefcase, label: 'Workspace' },
     'workstation': { icon: Briefcase, label: 'Workstation' },
     'bath': { icon: Bath, label: 'Private Bath' },
