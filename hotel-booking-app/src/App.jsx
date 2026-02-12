@@ -215,7 +215,7 @@ function App() {
               const options = result.data.filter(r => r.roomTypeID === staticRoom.bookingCenterRoomTypeCode);
               if (!options.length) return null;
 
-              const tier = nights >= 30 ? 'monthly' : nights >= 7 ? 'weekly' : 'nightly';
+              const tier = nights >= 28 ? 'monthly' : nights >= 7 ? 'weekly' : 'nightly';
               const preferredCodes = staticRoom.bookingCenterRatePlanCodes;
               const picked = pickBookingCenterRate(options, tier, preferredCodes);
               if (!picked) return null;

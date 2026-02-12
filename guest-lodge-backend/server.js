@@ -1091,15 +1091,6 @@ app.post('/api/availability', async (req, res) => {
             availableRooms = await getCloudbedsAvailability(hotelId, checkin, checkout);
         } else if (config.pms === 'bookingcenter') {
             availableRooms = await getBookingCenterAvailability(hotelId, checkin, checkout);
-            
-            // Log only St. Croix Queen Suite and 2 Queen Suite rate plan codes
-            if (hotelId === 'st-croix-wisconsin') {
-                const stCroixRateCodes = ['1QNS-1QNS', '1QNS-WK1Q', '1QNS-MOQNS', '2QNS-2QNS', '2QNS-WK2Q', '2QNS-MO2QNS'];
-                const filteredRooms = availableRooms.filter(room => stCroixRateCodes.includes(room.rateID));
-                console.log(`[ST-CROIX AVAILABILITY] Found ${filteredRooms.length} matching rate plans:`, 
-                    filteredRooms.map(room => ({ roomType: room.roomTypeID, ratePlan: room.rateID, available: room.roomsAvailable }))
-                );
-            }
         } else {
             return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
         }

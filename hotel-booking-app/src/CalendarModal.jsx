@@ -110,11 +110,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     const start = startDate || new Date();
     start.setHours(0,0,0,0);
     const newEndDate = new Date(start);
-    
-    // For St. Croix, 1 month = 30 days; for others, 28 days
-    const isStCroix = window.location.hostname.includes('stcroix.clickinns.com');
-    const monthDays = isStCroix ? 30 : 28;
-    newEndDate.setDate(newEndDate.getDate() + monthDays);
+    newEndDate.setDate(newEndDate.getDate() + 28);
     
     // Immediately apply and search
     trackSearch(start, newEndDate);

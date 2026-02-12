@@ -156,9 +156,8 @@ export const hotelData = {
         bookingCenterRoomTypeCode: '1QNS',
         bookingCenterRatePlanCodes: {
           nightly: '1QNS-1QNS',
-          // Not always returned by STCROIX availability; allow fallback selection.
           weekly: '1QNS-WK1Q',
-          monthly: '1QNS-MOQNS',
+          monthly: '1QNS-WK1Q', // Using weekly rate for monthly bookings (pay at check-in)
         },
         amenities: 'Free WiFi • 60" TV • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.',
@@ -179,7 +178,7 @@ export const hotelData = {
         bookingCenterRatePlanCodes: {
           nightly: '2QNS-2QNS',
           weekly: '2QNS-WK2Q',
-          monthly: '2QNS-MO2QNS',
+          monthly: '2QNS-WK2Q', // Using weekly rate for monthly bookings (pay at check-in)
         },
         amenities: 'Free WiFi • 60" TV • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.',
