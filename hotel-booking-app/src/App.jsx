@@ -553,7 +553,7 @@ const handleConfirmBooking = async (bookingDetails) => {
         onClose={() => setIsCalendarOpen(false)}
         onDatesChange={handleDatesUpdate}
         initialCheckin={checkinDate}
-        checkoutDate={checkoutDate}
+        initialCheckout={checkoutDate}
         rates={RATES}
       />
       
