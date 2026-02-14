@@ -165,7 +165,6 @@ export const hotelData = {
         imageUrl: '/stcroix/IMG_5452.webp',
         imageUrls: [
           '/stcroix/IMG_5452.webp',
-          '/stcroix/IMG_5453.webp'
         ],
       },
       {
