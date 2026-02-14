@@ -180,9 +180,9 @@ export const hotelData = {
         amenities: 'Free WiFi • 60" TV • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.',
         maxOccupancy: 4,
-        imageUrl: '/stcroix/IMG_5983.webp',
+        imageUrl: '/stcroix/IMG_5449.webp',
         imageUrls: [
-          '/stcroix/IMG_5983.webp',
+          '/stcroix/IMG_5449.webp',
         ], 
       },
     ],
