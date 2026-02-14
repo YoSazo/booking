@@ -109,14 +109,6 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           {roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!
         </div>
       )}
-
-      {/* View Photos Button */}
-      <button 
-        onClick={(e) => { e.stopPropagation(); onOpenLightbox(room.imageUrls, 0); }} 
-        className="view-photos-button"
-      >
-        View All Photos
-      </button>
     </div>
 
 
