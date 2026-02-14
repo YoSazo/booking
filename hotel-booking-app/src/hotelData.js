@@ -162,9 +162,9 @@ export const hotelData = {
         amenities: 'Free WiFi • 60" TV • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.',
         maxOccupancy: 3,
-        imageUrl: "C:/Users/samat/BOOKING/hotel-booking-app/public/stcroix/IMG_5452.webp",
+        imageUrl: '/stcroix/singgle.webp',
         imageUrls: [
-          "C:/Users/samat/BOOKING/hotel-booking-app/public/stcroix/IMG_5452.webp",
+          '/stcroix/singgle.webp',
         ],
       },
       {
