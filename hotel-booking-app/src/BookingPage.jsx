@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
-// import ReviewCard from './ReviewCard.jsx'; // Removed - blocking calendar visibility
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 

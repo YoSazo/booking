@@ -557,7 +557,6 @@ const handleConfirmBooking = async (bookingDetails) => {
         rates={RATES}
       />
       
-      {/* {(currentPage === 'booking' || currentPage === 'guest-info') && !isCalendarOpen && <HelpWidget phone={currentHotel.phone} />} */}
     </>
   );
 }

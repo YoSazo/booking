@@ -5,10 +5,7 @@ import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
-import TestimonialTrigger from './TestimonialTrigger.jsx';
-import TestimonialPlayer from './TestimonialPlayer.jsx';
 import LoadingScreen from './LoadingScreen.jsx';
-import { testimonials } from './TestimonialData.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
 
@@ -84,7 +81,6 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const latestFormData = useRef(formData);
     // In GuestInfoPage.jsx, with your other state and refs
 const isInteractingWithAutocomplete = useRef(false);
-const [isTestimonialOpen, setIsTestimonialOpen] = useState(false);
 const paymentFormRef = useRef(null);
 const paymentOptionsRef = useRef(null);
 const hasScrolledToPayment = useRef(false);
