@@ -214,7 +214,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             </div>
 
             <button className="premium-book-button" onClick={onBookNow} disabled={isProcessing}>
-              {isProcessing ? 'Processing...' : 'Book Now'}
+              {isProcessing ? 'Processing...' : 'Reserve for $0'}
             </button>
           </div>
         ) : (
