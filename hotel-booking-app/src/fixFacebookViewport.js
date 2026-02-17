@@ -16,6 +16,13 @@ function fixFacebookViewport() {
   // Add class to body for FB/IG browsers
   document.documentElement.classList.add('fb-browser');
   
+  // Detect Business Suite specifically — it has hidden bottom chrome
+  const isBusinessSuite = (ua.indexOf("BusinessSuite") > -1) || (ua.indexOf("FBForBusinessActivity") > -1) || (ua.indexOf("FBBS") > -1);
+  if (isBusinessSuite) {
+    document.documentElement.classList.add('fb-business-suite');
+    console.log('Business Suite browser detected - applying extra bottom padding');
+  }
+  
   // Force correct viewport height
   const setHeight = () => {
     // Use screen.height instead of window.innerHeight (which is wrong in FB browser)

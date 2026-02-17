@@ -3230,8 +3230,7 @@ padding: 6px 16px;
   align-items: flex-end;
   justify-content: center;
   animation: whyCardOverlayIn 0.3s ease-out;
-  /* Lift sheet above hidden bottom chrome (Business Suite in-app browser) */
-  padding-bottom: env(safe-area-inset-bottom, 50px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @keyframes whyCardOverlayIn {
@@ -3428,6 +3427,19 @@ padding: 6px 16px;
       opacity: 1;
     }
   }
+}
+
+/* Business Suite in-app browser — hidden bottom chrome steals space */
+.fb-business-suite .why-card-modal-overlay {
+  padding-bottom: 50px;
+}
+
+.fb-business-suite .guest-info-container {
+  padding-bottom: 170px !important;
+}
+
+.fb-business-suite .checkout-cta-container {
+  bottom: 50px;
 }
 
 /* --- Money-Back Guarantee Badge Styles --- */
