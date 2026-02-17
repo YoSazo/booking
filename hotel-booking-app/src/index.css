@@ -3231,7 +3231,7 @@ padding: 6px 16px;
   justify-content: center;
   animation: whyCardOverlayIn 0.3s ease-out;
   /* Lift sheet above hidden bottom chrome (Business Suite in-app browser) */
-  padding-bottom: env(safe-area-inset-bottom, 24px);
+  padding-bottom: env(safe-area-inset-bottom, 40px);
 }
 
 @keyframes whyCardOverlayIn {
@@ -3248,7 +3248,7 @@ padding: 6px 16px;
   padding: 0;
   box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.15);
   animation: whyCardSheetSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: min(60vh, 450px);
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3271,7 +3271,7 @@ padding: 6px 16px;
   height: 4px;
   background: #d1d5db;
   border-radius: 999px;
-  margin: 8px auto 0;
+  margin: 12px auto 0;
   flex-shrink: 0;
 }
 
@@ -3279,12 +3279,12 @@ padding: 6px 16px;
 .why-card-modal-sheet__icon-row {
   display: flex;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .why-card-modal-sheet__shield {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
@@ -3297,20 +3297,20 @@ padding: 6px 16px;
 /* Title */
 .why-card-modal-sheet__title {
   text-align: center;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   color: #111827;
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   letter-spacing: -0.3px;
 }
 
 /* Subtitle — ties back to ad promise */
 .why-card-modal-sheet__subtitle {
   text-align: center;
-  font-size: 14px;
+  font-size: 15px;
   color: #6b7280;
-  margin: 0 0 14px;
-  line-height: 1.4;
+  margin: 0 0 20px;
+  line-height: 1.5;
 }
 
 .why-card-modal-sheet__subtitle strong {
@@ -3319,7 +3319,7 @@ padding: 6px 16px;
 
 /* Body text */
 .why-card-modal-sheet__body {
-  font-size: 14px;
+  font-size: 15px;
   color: #374151;
 }
 
@@ -3327,15 +3327,15 @@ padding: 6px 16px;
 .why-card-modal-sheet__checks {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .why-card-modal-sheet__check-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: #059669;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .why-card-modal-sheet__check-item span {
@@ -3349,25 +3349,24 @@ padding: 6px 16px;
 /* Scrollable content area */
 .why-card-modal-sheet__scrollable {
   flex: 1;
-  min-height: 0; /* crucial for flex child overflow */
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 24px 8px;
+  padding: 16px 24px 0;
 }
 
 /* Pinned bottom section — always visible */
 .why-card-modal-sheet__pinned {
   flex-shrink: 0;
-  padding: 12px 24px calc(20px + env(safe-area-inset-bottom, 0px));
+  padding: 20px 24px 24px;
   background: #fff;
-  border-top: 1px solid #f3f4f6;
 }
 
 /* CTA button */
 .why-card-modal-sheet__cta {
   display: block;
   width: 100%;
-  padding: 14px 24px;
+  padding: 16px 24px;
   border: none;
   border-radius: 14px;
   background: linear-gradient(135deg, #10b981, #059669);

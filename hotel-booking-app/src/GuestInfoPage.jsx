@@ -1131,7 +1131,7 @@ const handlePayLaterBooking = async (e) => {
                   <div className="why-card-modal-sheet__scrollable">
                     <div className="why-card-modal-sheet__icon-row">
                       <div className="why-card-modal-sheet__shield">
-                        <ShieldCheck size={24} strokeWidth={2.2} />
+                        <ShieldCheck size={32} strokeWidth={2.2} />
                       </div>
                     </div>
 
@@ -1144,26 +1144,26 @@ const handlePayLaterBooking = async (e) => {
                     </p>
 
                     <div className="why-card-modal-sheet__body">
-                      <p style={{ margin: '0 0 10px 0', lineHeight: '1.5' }}>
+                      <p style={{ margin: '0 0 16px 0', lineHeight: '1.6' }}>
                         We place a <strong>$1 temporary hold</strong> to verify your card and prevent fake bookings.
                         It's released immediately — you're never charged.
                       </p>
                       
                       <div className="why-card-modal-sheet__checks">
                         <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={18} strokeWidth={2.5} />
+                          <CheckCircle2 size={20} strokeWidth={2.5} />
                           <span><strong>$1 hold released immediately</strong></span>
                         </div>
                         <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={18} strokeWidth={2.5} />
+                          <CheckCircle2 size={20} strokeWidth={2.5} />
                           <span><strong>You won't be charged today</strong></span>
                         </div>
                         <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={18} strokeWidth={2.5} />
+                          <CheckCircle2 size={20} strokeWidth={2.5} />
                           <span><strong>Pay ${bookingDetails.total.toFixed(2)} when you arrive</strong></span>
                         </div>
                         <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={18} strokeWidth={2.5} />
+                          <CheckCircle2 size={20} strokeWidth={2.5} />
                           <span><strong>Free cancellation up to 7 days before</strong></span>
                         </div>
                       </div>
