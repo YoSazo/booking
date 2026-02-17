@@ -20,7 +20,7 @@ function fixFacebookViewport() {
   // Business Suite uses FBAV version pattern like 547.x.x.x.x
   const fbavMatch = ua.match(/FBAV\/(\d+)\./);
   const fbavMajor = fbavMatch ? parseInt(fbavMatch[1]) : 0;
-  const isBusinessSuite = (ua.indexOf("BusinessSuite") > -1) || (ua.indexOf("FBForBusinessActivity") > -1) || (ua.indexOf("FBBS") > -1) || (fbavMajor >= 500);
+  const isBusinessSuite = (ua.indexOf("BusinessSuite") > -1) || (ua.indexOf("FBForBusinessActivity") > -1) || (ua.indexOf("FBBS") > -1) || (fbavMajor >= 433);
   if (isBusinessSuite) {
     document.documentElement.classList.add('fb-business-suite');
     console.log('Business Suite browser detected (FBAV/' + fbavMajor + ') - applying extra bottom padding');
