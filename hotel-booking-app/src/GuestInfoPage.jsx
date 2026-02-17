@@ -1796,8 +1796,28 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
             
-            {/* Slim banner removed — modal handles objection, sticky CTA bar 
-                already shows "$0 charged today • $1.00 verification only" persistently */}
+            {/* Subtle reassurance after modal dismissed */}
+            {selectedPlan === 'payLater' && whyCardModalDismissed && paymentMethod === 'card' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '16px',
+                padding: '10px 14px',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '10px',
+                fontSize: '13px',
+                color: '#15803d',
+                fontWeight: '500',
+                lineHeight: '1.4'
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>$1 verification only — released immediately. You pay ${bookingDetails.total.toFixed(2)} at check-in.</span>
+              </div>
+            )}
 
             {/* Wallet selected indicator - inside card section */}
             {paymentMethod === 'wallet' && walletType && (

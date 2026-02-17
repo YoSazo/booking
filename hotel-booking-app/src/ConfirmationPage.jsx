@@ -15,7 +15,7 @@ const formatDateWithSuffix = (date) => {
 function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
   return (
     <>
-      <div className="static-banner">
+      <div className="static-banner" style={{ marginTop: '16px' }}>
         ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call (701) 289-5992 — we're happy to help!
       </div>
 
