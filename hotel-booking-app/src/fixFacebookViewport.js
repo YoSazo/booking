@@ -2,7 +2,7 @@
 function fixFacebookViewport() {
   // Only run in Facebook/Instagram in-app browsers
   const ua = navigator.userAgent || navigator.vendor || window.opera;
-  const isFBBrowser = (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1);
+  const isFBBrowser = (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1) || (ua.indexOf("BusinessSuite") > -1) || (ua.indexOf("FBForBusinessActivity") > -1);
   
   if (!isFBBrowser) {
     console.log('Not Facebook browser, skipping viewport fix');

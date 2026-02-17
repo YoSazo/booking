@@ -3246,7 +3246,9 @@ padding: 6px 16px;
   padding: 0;
   box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.15);
   animation: whyCardSheetSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: calc(var(--real-vh, 1vh) * 85);
+  /* Triple fallback: dvh (modern, chrome-aware) → --real-vh (FB fix) → vh (last resort) */
+  max-height: calc(var(--real-vh, 1vh) * 75);
+  max-height: 75dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3269,7 +3271,7 @@ padding: 6px 16px;
   height: 4px;
   background: #d1d5db;
   border-radius: 999px;
-  margin: 12px auto 0;
+  margin: 8px auto 0;
   flex-shrink: 0;
 }
 
@@ -3277,12 +3279,12 @@ padding: 6px 16px;
 .why-card-modal-sheet__icon-row {
   display: flex;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .why-card-modal-sheet__shield {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
@@ -3295,20 +3297,20 @@ padding: 6px 16px;
 /* Title */
 .why-card-modal-sheet__title {
   text-align: center;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: #111827;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   letter-spacing: -0.3px;
 }
 
 /* Subtitle — ties back to ad promise */
 .why-card-modal-sheet__subtitle {
   text-align: center;
-  font-size: 15px;
+  font-size: 14px;
   color: #6b7280;
-  margin: 0 0 20px;
-  line-height: 1.5;
+  margin: 0 0 14px;
+  line-height: 1.4;
 }
 
 .why-card-modal-sheet__subtitle strong {
@@ -3317,7 +3319,7 @@ padding: 6px 16px;
 
 /* Body text */
 .why-card-modal-sheet__body {
-  font-size: 15px;
+  font-size: 14px;
   color: #374151;
 }
 
@@ -3325,15 +3327,15 @@ padding: 6px 16px;
 .why-card-modal-sheet__checks {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .why-card-modal-sheet__check-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: #059669;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .why-card-modal-sheet__check-item span {
@@ -3347,15 +3349,16 @@ padding: 6px 16px;
 /* Scrollable content area */
 .why-card-modal-sheet__scrollable {
   flex: 1;
+  min-height: 0; /* crucial for flex child overflow */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 24px 0;
+  padding: 12px 24px 8px;
 }
 
 /* Pinned bottom section — always visible */
 .why-card-modal-sheet__pinned {
   flex-shrink: 0;
-  padding: 16px 24px 24px;
+  padding: 12px 24px 20px;
   background: #fff;
   border-top: 1px solid #f3f4f6;
 }
@@ -3364,7 +3367,7 @@ padding: 6px 16px;
 .why-card-modal-sheet__cta {
   display: block;
   width: 100%;
-  padding: 16px 24px;
+  padding: 14px 24px;
   border: none;
   border-radius: 14px;
   background: linear-gradient(135deg, #10b981, #059669);
@@ -3403,16 +3406,17 @@ padding: 6px 16px;
   
   .why-card-modal-sheet {
     border-radius: 24px;
-    max-height: 85vh;
+    max-height: 80vh;
+    max-height: 80dvh;
     animation-name: whyCardSheetScaleIn;
   }
   
   .why-card-modal-sheet__pinned {
-    padding: 16px 32px 28px;
+    padding: 16px 32px 24px;
   }
   
   .why-card-modal-sheet__scrollable {
-    padding: 20px 32px 0;
+    padding: 16px 32px 8px;
   }
   
   @keyframes whyCardSheetScaleIn {
