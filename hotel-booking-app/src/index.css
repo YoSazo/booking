@@ -3434,6 +3434,11 @@ padding: 6px 16px;
   padding-bottom: 50px;
 }
 
+/* Facebook Pages Manager has even more hidden chrome */
+.fb-page-admin .why-card-modal-overlay {
+  padding-bottom: 75px;
+}
+
 /* --- Money-Back Guarantee Badge Styles --- */
 .money-back-guarantee {
   background: linear-gradient(135deg, #28a745 0%, #20c997 100%);

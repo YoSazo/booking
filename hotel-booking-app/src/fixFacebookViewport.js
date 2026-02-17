@@ -16,14 +16,11 @@ function fixFacebookViewport() {
   // Add class to body for FB/IG browsers
   document.documentElement.classList.add('fb-browser');
   
-  // Detect Business Suite specifically — it has hidden bottom chrome
-  // Business Suite uses FBAV version pattern like 547.x.x.x.x
-  const fbavMatch = ua.match(/FBAV\/(\d+)\./);
-  const fbavMajor = fbavMatch ? parseInt(fbavMatch[1]) : 0;
-  const isBusinessSuite = (ua.indexOf("BusinessSuite") > -1) || (ua.indexOf("FBForBusinessActivity") > -1) || (ua.indexOf("FBBS") > -1) || (fbavMajor >= 433);
-  if (isBusinessSuite) {
-    document.documentElement.classList.add('fb-business-suite');
-    console.log('Business Suite browser detected (FBAV/' + fbavMajor + ') - applying extra bottom padding');
+  // Detect Facebook Pages Manager — it has extra hidden bottom chrome
+  const isPageAdmin = (ua.indexOf("FBAN/FBPageAdmin") > -1);
+  if (isPageAdmin) {
+    document.documentElement.classList.add('fb-page-admin');
+    console.log('Facebook Pages Manager browser detected - applying extra bottom padding');
   }
   
   // Force correct viewport height
