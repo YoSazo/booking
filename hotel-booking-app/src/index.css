@@ -3429,12 +3429,7 @@ padding: 6px 16px;
   }
 }
 
-/* Facebook in-app browsers — hidden bottom chrome steals space */
-.fb-browser .why-card-modal-overlay {
-  padding-bottom: 50px;
-}
-
-/* Facebook Pages Manager has even more hidden chrome */
+/* Facebook Pages Manager — lies about viewport height, hidden bottom chrome */
 .fb-page-admin .why-card-modal-overlay {
   padding-bottom: 75px;
 }
