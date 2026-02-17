@@ -1372,6 +1372,42 @@ app.post('/api/book', async (req, res) => {
 });
 
 
+// Browser diagnostics endpoint — logs in-app browser details
+app.post('/api/browser-diagnostics', (req, res) => {
+    const d = req.body;
+    console.log('\n========== BROWSER DIAGNOSTICS ==========');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('--- User Agent ---');
+    console.log(d.userAgent);
+    console.log('--- Viewport ---');
+    console.log(`window.innerWidth: ${d.innerWidth}`);
+    console.log(`window.innerHeight: ${d.innerHeight}`);
+    console.log(`document.documentElement.clientWidth: ${d.clientWidth}`);
+    console.log(`document.documentElement.clientHeight: ${d.clientHeight}`);
+    console.log(`screen.width: ${d.screenWidth}`);
+    console.log(`screen.height: ${d.screenHeight}`);
+    console.log(`screen.availWidth: ${d.screenAvailWidth}`);
+    console.log(`screen.availHeight: ${d.screenAvailHeight}`);
+    console.log(`devicePixelRatio: ${d.devicePixelRatio}`);
+    console.log(`visualViewport.width: ${d.visualViewportWidth}`);
+    console.log(`visualViewport.height: ${d.visualViewportHeight}`);
+    console.log(`visualViewport.offsetTop: ${d.visualViewportOffsetTop}`);
+    console.log('--- Computed Values ---');
+    console.log(`--real-vh: ${d.realVh}`);
+    console.log(`1vh in px: ${d.oneVhPx}`);
+    console.log(`Height diff (screen - innerHeight): ${d.heightDiff}px`);
+    console.log('--- Detection ---');
+    console.log(`Classes on <html>: ${d.htmlClasses}`);
+    console.log(`FBAV version: ${d.fbavVersion}`);
+    console.log(`Is FB browser: ${d.isFbBrowser}`);
+    console.log(`Is Business Suite: ${d.isBusinessSuite}`);
+    console.log('--- Safe Areas ---');
+    console.log(`safe-area-inset-top: ${d.safeAreaTop}`);
+    console.log(`safe-area-inset-bottom: ${d.safeAreaBottom}`);
+    console.log('==========================================\n');
+    res.json({ success: true });
+});
+
 app.post('/api/track', async (req, res) => {
     let body;
     try {

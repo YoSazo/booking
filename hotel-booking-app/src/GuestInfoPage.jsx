@@ -208,6 +208,47 @@ const handleAddressPaste = (e) => {
 
 // selectedPlan sessionStorage loading removed - always payLater
 
+// Send browser diagnostics to backend on mount (for debugging in-app browsers)
+useEffect(() => {
+  const ua = navigator.userAgent || '';
+  const fbavMatch = ua.match(/FBAV\/(\d+[\d.]*)/);
+  const vv = window.visualViewport;
+  
+  // Read computed safe area insets
+  const computedStyle = getComputedStyle(document.documentElement);
+  
+  const diagnostics = {
+    userAgent: ua,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    clientWidth: document.documentElement.clientWidth,
+    clientHeight: document.documentElement.clientHeight,
+    screenWidth: screen.width,
+    screenHeight: screen.height,
+    screenAvailWidth: screen.availWidth,
+    screenAvailHeight: screen.availHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    visualViewportWidth: vv?.width ?? 'N/A',
+    visualViewportHeight: vv?.height ?? 'N/A',
+    visualViewportOffsetTop: vv?.offsetTop ?? 'N/A',
+    realVh: computedStyle.getPropertyValue('--real-vh') || 'not set',
+    oneVhPx: (window.innerHeight * 0.01).toFixed(2) + 'px',
+    heightDiff: screen.height - window.innerHeight,
+    htmlClasses: document.documentElement.className,
+    fbavVersion: fbavMatch ? fbavMatch[1] : 'N/A',
+    isFbBrowser: document.documentElement.classList.contains('fb-browser'),
+    isBusinessSuite: document.documentElement.classList.contains('fb-business-suite'),
+    safeAreaTop: computedStyle.getPropertyValue('env(safe-area-inset-top)') || 'N/A',
+    safeAreaBottom: computedStyle.getPropertyValue('env(safe-area-inset-bottom)') || 'N/A',
+  };
+
+  fetch(`${apiBaseUrl}/api/browser-diagnostics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(diagnostics),
+  }).catch(() => {});
+}, []);
+
 // Smooth scroll handling for step changes (plan step removed)
 useEffect(() => {
   // Smooth scroll to top on Step 2 (Info page) so form is visible
