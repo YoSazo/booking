@@ -3214,20 +3214,6 @@ padding: 6px 16px;
   text-underline-offset: 2px;
 }
 
-/* Slimmed-down inline banner (shown after modal dismissed) */
-.why-card-banner--slim {
-  padding: 14px 18px;
-  margin-top: 16px;
-  border-width: 2px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
-}
-
-.why-card-banner--slim .why-card-banner__body {
-  font-size: 13px;
-  line-height: 1.8;
-}
-
 /* ======================================================
    WHY-CARD PROACTIVE BOTTOM-SHEET MODAL
    ====================================================== */

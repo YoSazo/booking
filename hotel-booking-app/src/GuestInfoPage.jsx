@@ -1171,7 +1171,7 @@ const handlePayLaterBooking = async (e) => {
                     className="why-card-modal-sheet__cta"
                     onClick={handleDismissWhyCardModal}
                   >
-                    Got It — Reserve My Room
+                    Got It — I'm In
                   </button>
                   
                   <p className="why-card-modal-sheet__footer">
@@ -1794,19 +1794,8 @@ const handlePayLaterBooking = async (e) => {
               </div>
             </div>
             
-            {/* WHY WE NEED YOUR CARD - Slim inline reminder (shown after modal dismissed) */}
-            {selectedPlan === 'payLater' && whyCardModalDismissed && (
-              <div className="why-card-banner why-card-banner--slim">
-                <div className="why-card-banner__row">
-                  <ShieldCheck size={20} strokeWidth={2.5} className="why-card-banner__icon" />
-                  <div className="why-card-banner__body" style={{ margin: 0 }}>
-                    ✅ <strong>$1 hold released immediately</strong>&nbsp;&nbsp;
-                    ✅ <strong>$0 charged today</strong>&nbsp;&nbsp;
-                    ✅ <strong>Pay ${bookingDetails.total.toFixed(2)} at arrival</strong>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Slim banner removed — modal handles objection, sticky CTA bar 
+                already shows "$0 charged today • $1.00 verification only" persistently */}
 
             {/* Wallet selected indicator - inside card section */}
             {paymentMethod === 'wallet' && walletType && (
