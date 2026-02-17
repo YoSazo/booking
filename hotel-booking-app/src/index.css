@@ -3230,6 +3230,8 @@ padding: 6px 16px;
   align-items: flex-end;
   justify-content: center;
   animation: whyCardOverlayIn 0.3s ease-out;
+  /* Lift sheet above hidden bottom chrome (Business Suite in-app browser) */
+  padding-bottom: env(safe-area-inset-bottom, 24px);
 }
 
 @keyframes whyCardOverlayIn {
@@ -3246,7 +3248,7 @@ padding: 6px 16px;
   padding: 0;
   box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.15);
   animation: whyCardSheetSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: min(55vh, 420px);
+  max-height: min(60vh, 450px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
