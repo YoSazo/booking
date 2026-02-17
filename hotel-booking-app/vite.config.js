@@ -2,13 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  build: {
+    target: 'es2020',
+  },
+  esbuild: {
+    // Strip all console.* and debugger statements in production builds
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
   server: {
-    host: true, // Keep this - it's good practice for network access
-    
-    // --- ADD THIS ---
-    // This explicitly tells Vite to trust requests from any ngrok free domain
+    host: true,
     allowedHosts: ['.ngrok-free.app']
   }
-})
+}))

@@ -1,17 +1,18 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
-import GuestInfoPageWrapper from './GuestInfoPage.jsx';
-import ConfirmationPage from './ConfirmationPage.jsx';
-import ImageLightbox from './ImageLightbox.jsx';
 import CalendarModal from './CalendarModal.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
 import { hotelData } from './hotelData.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 import getHotelId from './utils/getHotelId';
 
-// Lazy-load Stripe return page so Stripe does not load on the landing page.
+// Lazy-load heavy pages so they don't bloat the initial landing page bundle.
+// GuestInfoPage pulls in Stripe + Google Maps — biggest win.
+const GuestInfoPageWrapper = lazy(() => import('./GuestInfoPage.jsx'));
+const ConfirmationPage = lazy(() => import('./ConfirmationPage.jsx'));
 const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper.jsx'));
+const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 
 
 const hotelId = getHotelId();
@@ -501,26 +502,28 @@ const handleConfirmBooking = async (bookingDetails) => {
           } />
 
           <Route path="/guest-info" element={
-            <GuestInfoPageWrapper
-              hotel={currentHotel}
-              bookingDetails={finalBooking}
-              onBack={() => {
-                // Reset booking state when going back to booking page
-                setSelectedRoom(null);
-                setFinalBooking(null);
-                setClientSecret('');
-                setCheckinDate(null);
-                setCheckoutDate(null);
-                setAvailableRooms(currentHotel.rooms);
-                sessionStorage.removeItem('finalBooking');
-                sessionStorage.removeItem('clientSecret');
-                sessionStorage.removeItem('selectedPlan');
-                navigate('/');
-              }}
-              onComplete={handleCompleteBooking}
-              apiBaseUrl={API_BASE_URL}
-              clientSecret={clientSecret}
-            />
+            <Suspense fallback={null}>
+              <GuestInfoPageWrapper
+                hotel={currentHotel}
+                bookingDetails={finalBooking}
+                onBack={() => {
+                  // Reset booking state when going back to booking page
+                  setSelectedRoom(null);
+                  setFinalBooking(null);
+                  setClientSecret('');
+                  setCheckinDate(null);
+                  setCheckoutDate(null);
+                  setAvailableRooms(currentHotel.rooms);
+                  sessionStorage.removeItem('finalBooking');
+                  sessionStorage.removeItem('clientSecret');
+                  sessionStorage.removeItem('selectedPlan');
+                  navigate('/');
+                }}
+                onComplete={handleCompleteBooking}
+                apiBaseUrl={API_BASE_URL}
+                clientSecret={clientSecret}
+              />
+            </Suspense>
           } />
           <Route path="/confirmation" element={
             <Suspense fallback={null}>
@@ -530,21 +533,25 @@ const handleConfirmBooking = async (bookingDetails) => {
 
           {/* This is the final, styled page the user will see */}
           <Route path="/final-confirmation" element={
-            <ConfirmationPage 
-              bookingDetails={finalBooking}
-              guestInfo={guestInfo}
-              reservationCode={reservationCode}
-            />
+            <Suspense fallback={null}>
+              <ConfirmationPage 
+                bookingDetails={finalBooking}
+                guestInfo={guestInfo}
+                reservationCode={reservationCode}
+              />
+            </Suspense>
           } />
         </Routes>
       </PageTransition>
       
       {lightboxData && (
-        <ImageLightbox
-          images={lightboxData.images}
-          startIndex={lightboxData.startIndex}
-          onClose={handleCloseLightbox}
-        />
+        <Suspense fallback={null}>
+          <ImageLightbox
+            images={lightboxData.images}
+            startIndex={lightboxData.startIndex}
+            onClose={handleCloseLightbox}
+          />
+        </Suspense>
       )}
 
       {/* Calendar Modal - outside PageTransition to avoid fixed positioning issues */}
