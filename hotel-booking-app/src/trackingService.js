@@ -7,6 +7,8 @@ const getSessionEvents = () => {
     AddToCart: false,
     InitiateCheckout: false,
     AddPaymentInfo: false,
+    CardModalAcknowledged: false,
+    FirstCardFieldFocus: false,
     Purchase: false
   };
 };
@@ -289,6 +291,44 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
     });
 };
 
+
+// --- DIAGNOSTIC CUSTOM EVENTS (browser pixel only, no server/Zapier) ---
+
+export const trackCardModalAcknowledged = (bookingDetails) => {
+    if (!shouldFireEvent('CardModalAcknowledged')) return;
+    const eventID = `cardmodalack.${Date.now()}`;
+    if (typeof fbq === 'function') {
+        fbq('trackCustom', 'CardModalAcknowledged', {
+            value: bookingDetails.total,
+            currency: 'USD',
+            content_name: bookingDetails.name,
+        }, { eventID });
+        console.log(`✅ CardModalAcknowledged pixel event fired (Event ID: ${eventID})`);
+    }
+    sendEventToGA4('card_modal_acknowledged', {
+        value: bookingDetails.total,
+        currency: 'USD',
+        content_name: bookingDetails.name,
+    });
+};
+
+export const trackFirstCardFieldFocus = (bookingDetails) => {
+    if (!shouldFireEvent('FirstCardFieldFocus')) return;
+    const eventID = `cardfocus.${Date.now()}`;
+    if (typeof fbq === 'function') {
+        fbq('trackCustom', 'FirstCardFieldFocus', {
+            value: bookingDetails.total,
+            currency: 'USD',
+            content_name: bookingDetails.name,
+        }, { eventID });
+        console.log(`✅ FirstCardFieldFocus pixel event fired (Event ID: ${eventID})`);
+    }
+    sendEventToGA4('first_card_field_focus', {
+        value: bookingDetails.total,
+        currency: 'USD',
+        content_name: bookingDetails.name,
+    });
+};
 
 export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     if (!shouldFireEvent('Purchase')) return;

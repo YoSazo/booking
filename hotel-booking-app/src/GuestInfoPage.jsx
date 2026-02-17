@@ -4,7 +4,7 @@ import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2
 import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { trackInitiateCheckout, trackAddPaymentInfo } from './trackingService.js';
+import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus } from './trackingService.js';
 import LoadingScreen from './LoadingScreen.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
@@ -1114,6 +1114,7 @@ const handlePayLaterBooking = async (e) => {
         setShowWhyCardModal(false);
         setWhyCardModalDismissed(true);
         document.body.style.overflow = '';
+        trackCardModalAcknowledged(bookingDetails);
     };
 
     return (
@@ -1567,6 +1568,7 @@ const handlePayLaterBooking = async (e) => {
                 <div className="card-field-container">
                   <CardNumberElement 
                     options={ELEMENT_OPTIONS}
+                    onFocus={() => trackFirstCardFieldFocus(bookingDetails)}
                     onChange={(e) => {
                       setCardBrand(e.brand);
                       setCardComplete(prev => ({ ...prev, cardNumber: e.complete }));
