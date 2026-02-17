@@ -3429,17 +3429,9 @@ padding: 6px 16px;
   }
 }
 
-/* Business Suite in-app browser — hidden bottom chrome steals space */
-.fb-business-suite .why-card-modal-overlay {
+/* Facebook in-app browsers — hidden bottom chrome steals space */
+.fb-browser .why-card-modal-overlay {
   padding-bottom: 50px;
-}
-
-.fb-business-suite .guest-info-container {
-  padding-bottom: 170px !important;
-}
-
-.fb-business-suite .checkout-cta-container {
-  bottom: 50px;
 }
 
 /* --- Money-Back Guarantee Badge Styles --- */
