@@ -3231,7 +3231,7 @@ padding: 6px 16px;
   justify-content: center;
   animation: whyCardOverlayIn 0.3s ease-out;
   /* Lift sheet above hidden bottom chrome (Business Suite in-app browser) */
-  padding-bottom: env(safe-area-inset-bottom, 40px);
+  padding-bottom: env(safe-area-inset-bottom, 50px);
 }
 
 @keyframes whyCardOverlayIn {
