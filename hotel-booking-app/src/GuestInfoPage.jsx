@@ -1162,69 +1162,54 @@ const handlePayLaterBooking = async (e) => {
         <>
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
 
-            {/* Why We Need Your Card - Proactive Bottom-Sheet Modal */}
+            {/* Why We Need Your Card - Centered Floating Modal */}
             {showWhyCardModal && (
               <div className="why-card-modal-overlay" onClick={(e) => e.stopPropagation()}>
                 <div className="why-card-modal-sheet">
-                  <div className="why-card-modal-sheet__handle" />
+                  <div className="why-card-modal-sheet__icon-row">
+                    <div className="why-card-modal-sheet__shield">
+                      <ShieldCheck size={26} strokeWidth={2.2} />
+                    </div>
+                  </div>
+
+                  <h2 className="why-card-modal-sheet__title">
+                    Why we need your card
+                  </h2>
                   
-                  {/* Scrollable content */}
-                  <div className="why-card-modal-sheet__scrollable">
-                    <div className="why-card-modal-sheet__icon-row">
-                      <div className="why-card-modal-sheet__shield">
-                        <ShieldCheck size={32} strokeWidth={2.2} />
-                      </div>
+                  <p className="why-card-modal-sheet__subtitle">
+                    A <strong>$1 temporary hold</strong> verifies your card. Released immediately — <strong>you're never charged.</strong>
+                  </p>
+
+                  <div className="why-card-modal-sheet__checks">
+                    <div className="why-card-modal-sheet__check-item">
+                      <CheckCircle2 size={18} strokeWidth={2.5} />
+                      <span><strong>$0 charged today</strong></span>
                     </div>
-
-                    <h2 className="why-card-modal-sheet__title">
-                      Why we need your card
-                    </h2>
-                    
-                    <p className="why-card-modal-sheet__subtitle">
-                      This is how we keep the <strong>no deposit, no lease</strong> promise.
-                    </p>
-
-                    <div className="why-card-modal-sheet__body">
-                      <p style={{ margin: '0 0 16px 0', lineHeight: '1.6' }}>
-                        We place a <strong>$1 temporary hold</strong> to verify your card and prevent fake bookings.
-                        It's released immediately — you're never charged.
-                      </p>
-                      
-                      <div className="why-card-modal-sheet__checks">
-                        <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={20} strokeWidth={2.5} />
-                          <span><strong>$1 hold released immediately</strong></span>
-                        </div>
-                        <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={20} strokeWidth={2.5} />
-                          <span><strong>You won't be charged today</strong></span>
-                        </div>
-                        <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={20} strokeWidth={2.5} />
-                          <span><strong>Pay ${bookingDetails.total.toFixed(2)} when you arrive</strong></span>
-                        </div>
-                        <div className="why-card-modal-sheet__check-item">
-                          <CheckCircle2 size={20} strokeWidth={2.5} />
-                          <span><strong>Free cancellation up to 7 days before</strong></span>
-                        </div>
-                      </div>
+                    <div className="why-card-modal-sheet__check-item">
+                      <CheckCircle2 size={18} strokeWidth={2.5} />
+                      <span><strong>$1 hold released immediately</strong></span>
+                    </div>
+                    <div className="why-card-modal-sheet__check-item">
+                      <CheckCircle2 size={18} strokeWidth={2.5} />
+                      <span><strong>Pay ${bookingDetails.total.toFixed(2)} at check-in</strong></span>
+                    </div>
+                    <div className="why-card-modal-sheet__check-item">
+                      <CheckCircle2 size={18} strokeWidth={2.5} />
+                      <span><strong>Free cancellation — 7 days before</strong></span>
                     </div>
                   </div>
 
-                  {/* Pinned bottom — always visible regardless of viewport */}
-                  <div className="why-card-modal-sheet__pinned">
-                    <button
-                      type="button"
-                      className="why-card-modal-sheet__cta"
-                      onClick={handleDismissWhyCardModal}
-                    >
-                      I Understand — Continue
-                    </button>
-                    
-                    <p className="why-card-modal-sheet__footer">
-                      🔒 Secured by Stripe &bull; 256-bit encryption
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    className="why-card-modal-sheet__cta"
+                    onClick={handleDismissWhyCardModal}
+                  >
+                    Got It — I'm In
+                  </button>
+                  
+                  <p className="why-card-modal-sheet__footer">
+                    🔒 Secured by Stripe &bull; 256-bit encryption
+                  </p>
                 </div>
               </div>
             )}
