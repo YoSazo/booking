@@ -173,7 +173,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
               <span className="price-today-label">today</span>
             </div>
             <p className="pricing-subtitle">
-              Select dates to see pricing
+            Tap Select Room to see pricing
             </p>
           </div>
         )}
