@@ -1187,15 +1187,7 @@ const handlePayLaterBooking = async (e) => {
                     </div>
                     <div className="why-card-modal-sheet__check-item">
                       <CheckCircle2 size={18} strokeWidth={2.5} />
-                      <span><strong>$1 hold released immediately</strong></span>
-                    </div>
-                    <div className="why-card-modal-sheet__check-item">
-                      <CheckCircle2 size={18} strokeWidth={2.5} />
                       <span><strong>Pay ${bookingDetails.total.toFixed(2)} at check-in</strong></span>
-                    </div>
-                    <div className="why-card-modal-sheet__check-item">
-                      <CheckCircle2 size={18} strokeWidth={2.5} />
-                      <span><strong>Free cancellation — 7 days before</strong></span>
                     </div>
                   </div>
 
