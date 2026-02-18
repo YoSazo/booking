@@ -1177,7 +1177,7 @@ const handlePayLaterBooking = async (e) => {
                   </h2>
                   
                   <p className="why-card-modal-sheet__subtitle">
-                    Enter your card details below to hold your room. We place a <strong>$1 verification hold</strong> — released immediately — to prevent fake bookings and secure your reservation.
+                    Enter your card details below to hold your room. We place a <strong>$1 verification hold — released immediately</strong> — to prevent fake bookings and secure your reservation.
                   </p>
 
                   <div className="why-card-modal-sheet__checks">
