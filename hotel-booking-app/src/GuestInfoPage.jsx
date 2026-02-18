@@ -1177,7 +1177,7 @@ const handlePayLaterBooking = async (e) => {
                   </h2>
                   
                   <p className="why-card-modal-sheet__subtitle">
-                    A <strong>$1 temporary hold</strong> verifies your card. Released immediately — <strong>you're never charged.</strong>
+                    Please enter your card details above. A <strong>$1 temporary hold</strong> confirms a valid card to prevent fake bookings and secure your room — released immediately. <strong>You're never charged today.</strong>
                   </p>
 
                   <div className="why-card-modal-sheet__checks">
