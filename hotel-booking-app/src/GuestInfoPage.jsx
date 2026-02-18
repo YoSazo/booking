@@ -1218,7 +1218,7 @@ const handlePayLaterBooking = async (e) => {
                       className="why-card-modal-sheet__cta"
                       onClick={handleDismissWhyCardModal}
                     >
-                      Got It — I'm In
+                      I Understand — Continue
                     </button>
                     
                     <p className="why-card-modal-sheet__footer">
