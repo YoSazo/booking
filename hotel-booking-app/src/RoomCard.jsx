@@ -192,14 +192,19 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
                   <Users size={18} />
                   <span>Guests</span>
                 </div>
-                <select
-                  id={`guests-${room.id}`}
-                  value={bookingDetails.guests}
-                  onChange={(e) => onGuestsChange(parseInt(e.target.value))}
-                  className="premium-select"
-                >
-                  {guestOptions.map(number => <option key={number} value={number}>{number}</option>)}
-                </select>
+                <div className="custom-stepper">
+                  <button
+                    className="stepper-btn"
+                    onClick={() => onGuestsChange(Math.max(1, bookingDetails.guests - 1))}
+                    disabled={bookingDetails.guests <= 1}
+                  >−</button>
+                  <span className="stepper-value">{bookingDetails.guests}</span>
+                  <button
+                    className="stepper-btn"
+                    onClick={() => onGuestsChange(Math.min(room.maxOccupancy, bookingDetails.guests + 1))}
+                    disabled={bookingDetails.guests >= room.maxOccupancy}
+                  >+</button>
+                </div>
               </div>
 
               <div className="inline-selector-item">
@@ -207,14 +212,19 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
                   <PawPrint size={18} />
                   <span>Pets</span>
                 </div>
-                <select
-                  id={`pets-${room.id}`}
-                  value={bookingDetails.pets}
-                  onChange={(e) => onPetsChange(parseInt(e.target.value))}
-                  className="premium-select"
-                >
-                  {petOptions.map(number => <option key={number} value={number}>{number}</option>)}
-                </select>
+                <div className="custom-stepper">
+                  <button
+                    className="stepper-btn"
+                    onClick={() => onPetsChange(Math.max(0, bookingDetails.pets - 1))}
+                    disabled={bookingDetails.pets <= 0}
+                  >−</button>
+                  <span className="stepper-value">{bookingDetails.pets}</span>
+                  <button
+                    className="stepper-btn"
+                    onClick={() => onPetsChange(Math.min(2, bookingDetails.pets + 1))}
+                    disabled={bookingDetails.pets >= 2}
+                  >+</button>
+                </div>
               </div>
             </div>
 
