@@ -151,7 +151,12 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
                 <span className="date-value">{new Date(checkoutDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </div>
             </div>
-            <div className="nights-display">{nights} night{nights !== 1 ? 's' : ''}</div>
+            <div className="dates-footer">
+              <div className="nights-display">{nights} night{nights !== 1 ? 's' : ''}</div>
+              <button className="change-dates-inline-button" onClick={onChangeDates}>
+                📅 Change Dates
+              </button>
+            </div>
           </div>
         )}
 

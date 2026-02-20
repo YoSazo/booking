@@ -462,13 +462,35 @@ body {
   padding: 0 4px;
 }
 
+.dates-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid #bfdbfe;
+}
+
 .nights-display {
-  text-align: center;
   font-size: 0.85rem;
   font-weight: 600;
   color: #3b82f6;
-  padding-top: 8px;
-  border-top: 1px solid #bfdbfe;
+}
+
+.change-dates-inline-button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.change-dates-inline-button:hover {
+  color: #1d4ed8;
 }
 
 /* Premium Pricing Card */
