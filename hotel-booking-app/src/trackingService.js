@@ -352,6 +352,11 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         currency: 'USD',
         event_id: eventID,
         event_time: eventTime,
+        room_name: bookingDetails.name,
+        checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
+        checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null,
+        nights: bookingDetails.nights,
+        our_reservation_code: reservationCode,
         user_data: {
             em: guestInfo.email,
             ph: guestInfo.phone.replace(/\D/g, ''),
