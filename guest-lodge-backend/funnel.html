@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketel Funnel</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
+    --green-mint: #C8EDD9; --bg: #EEF2EF; --white: #FFFFFF;
+    --text: #1A2B22; --text-muted: #6B7D72; --border: #D8E4DC;
+    --red: #E05252; --amber: #F59E0B; --blue: #3B82F6;
+    --shadow: 0 2px 12px rgba(46,125,91,0.10);
+    --shadow-lg: 0 8px 32px rgba(46,125,91,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* LOGIN */
+  .login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
+  }
+  .login-card {
+    background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+  }
+  .login-logo {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+  .login-logo-icon { height: 48px; width: auto; }
+  .login-logo-text { height: 28px; width: auto; }
+  .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .login-input {
+    width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
+    border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
+    letter-spacing: 4px; outline: none; margin-bottom: 12px; color: var(--text);
+    transition: border-color 0.2s;
+  }
+  .login-input:focus { border-color: var(--green); }
+  .login-btn {
+    width: 100%; padding: 13px; background: var(--green); color: white;
+    border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
+    font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .login-btn:hover { background: #245f46; }
+  .login-error { color: var(--red); font-size: 13px; margin-top: 8px; }
+
+  /* HEADER */
+  .header {
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 24px; height: 58px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 1px 8px rgba(46,125,91,0.07);
+  }
+  .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: var(--text); }
+  .header-logo-icon { height: 32px; width: auto; }
+  .header-logo-text { height: 20px; width: auto; }
+  .header-logo-suffix { margin-left: 2px; color: var(--text-muted); font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .header-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .refresh-btn {
+    background: var(--green-pale); border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 5px 12px; font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--green); cursor: pointer; transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: var(--green); color: white; }
+  .live-dot { width: 8px; height: 8px; background: var(--green-light); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
+
+  /* LAYOUT */
+  .layout { display: flex; height: calc(100vh - 58px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 240px; background: var(--white); border-right: 1.5px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  .sidebar-section { padding: 16px 14px 8px; }
+  .sidebar-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 6px; padding: 0 4px;
+  }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+    border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; transition: all 0.15s; margin-bottom: 2px; text-decoration: none;
+  }
+  .sidebar-link:hover { background: var(--green-pale); color: var(--green); }
+  .sidebar-link.active { background: var(--green); color: white; font-weight: 600; }
+  .divider { height: 1px; background: var(--border); margin: 6px 14px; }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+  .main-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .main-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+
+  /* FUNNEL */
+  .funnel-section {
+    background: var(--white); border-radius: 16px; border: 1.5px solid var(--border);
+    padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow);
+  }
+  .funnel-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 16px; }
+  .funnel-steps {
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .funnel-step {
+    display: flex; align-items: center; gap: 16px; padding: 14px 16px;
+    border-radius: 12px; margin-bottom: 6px; transition: background 0.15s;
+    border-left: 4px solid transparent;
+  }
+  .funnel-step:hover { background: var(--green-pale); }
+  .funnel-step:nth-child(1) { border-left-color: #3B82F6; }
+  .funnel-step:nth-child(2) { border-left-color: #8B5CF6; }
+  .funnel-step:nth-child(3) { border-left-color: #EC4899; }
+  .funnel-step:nth-child(4) { border-left-color: #F59E0B; }
+  .funnel-step:nth-child(5) { border-left-color: #10B981; }
+  .funnel-step:nth-child(6) { border-left-color: var(--green); }
+  .funnel-step-emoji { font-size: 20px; width: 32px; text-align: center; }
+  .funnel-step-label { flex: 1; font-weight: 600; font-size: 14px; }
+  .funnel-step-count {
+    background: var(--green-pale); color: var(--green); border-radius: 20px;
+    padding: 4px 12px; font-size: 13px; font-weight: 700; font-family: 'DM Mono', monospace;
+  }
+  .funnel-step-pct { font-size: 11px; color: var(--text-muted); font-weight: 500; min-width: 48px; text-align: right; }
+
+  /* RECENT */
+  .recent-section { background: var(--white); border-radius: 16px; border: 1.5px solid var(--border); padding: 24px; box-shadow: var(--shadow); }
+  .recent-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 16px; }
+  .recent-list { max-height: 320px; overflow-y: auto; }
+  .recent-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: 10px; margin-bottom: 4px; font-size: 12px; transition: background 0.15s;
+  }
+  .recent-item:hover { background: var(--bg); }
+  .recent-item-emoji { font-size: 14px; width: 24px; text-align: center; }
+  .recent-item-event { font-weight: 600; color: var(--text); }
+  .recent-item-meta { color: var(--text-muted); font-size: 11px; }
+  .recent-item-time { color: var(--text-muted); font-size: 10px; font-family: 'DM Mono', monospace; margin-left: auto; }
+  .recent-empty { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 400px; gap: 24px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } .sidebar { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    </div>
+    <p>Enter your PIN to continue</p>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+<header class="header">
+  <div class="header-logo">
+    <img src="/marketellogo.svg" alt="" class="header-logo-icon">
+    <img src="/marketel.svg" alt="Marketel" class="header-logo-text">
+    <span class="header-logo-suffix">Funnel</span>
+  </div>
+  <div class="header-right">
+    <span class="live-dot"></span>
+    <span style="font-size:12px;color:var(--text-muted);">Live</span>
+    <button class="refresh-btn" onclick="load()">↻ Refresh</button>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Tools</div>
+      <a href="/crm" class="sidebar-link">📋 Bookings CRM</a>
+      <a href="/funnel" class="sidebar-link active">📊 Funnel</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <h1 class="main-title">Conversion Funnel</h1>
+    <p class="main-subtitle">Real-time events from your booking engine. Data refreshes every 3 seconds.</p>
+
+    <div class="grid-2">
+      <div class="funnel-section">
+        <h2>Funnel Steps</h2>
+        <div class="funnel-steps" id="funnelSteps">
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">🔍</span>
+            <span class="funnel-step-label">Search</span>
+            <span class="funnel-step-count" id="count-Search">0</span>
+            <span class="funnel-step-pct" id="pct-Search"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">🛒</span>
+            <span class="funnel-step-label">Add to Cart</span>
+            <span class="funnel-step-count" id="count-AddToCart">0</span>
+            <span class="funnel-step-pct" id="pct-AddToCart"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">📋</span>
+            <span class="funnel-step-label">Initiate Checkout</span>
+            <span class="funnel-step-count" id="count-InitiateCheckout">0</span>
+            <span class="funnel-step-pct" id="pct-InitiateCheckout"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">💳</span>
+            <span class="funnel-step-label">Add Payment Info</span>
+            <span class="funnel-step-count" id="count-AddPaymentInfo">0</span>
+            <span class="funnel-step-pct" id="pct-AddPaymentInfo"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">✅</span>
+            <span class="funnel-step-label">Purchase</span>
+            <span class="funnel-step-count" id="count-Purchase">0</span>
+            <span class="funnel-step-pct" id="pct-Purchase"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>Recent Activity</h2>
+        <div class="recent-list" id="recentList">
+          <div class="recent-empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<script>
+  const EMOJI_MAP = { Search: '🔍', AddToCart: '🛒', InitiateCheckout: '📋', AddPaymentInfo: '💳', Purchase: '✅', PageView: '👁' };
+  let token = '';
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    const now = Date.now();
+    const diff = Math.floor((now - ts) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function render(data) {
+    const { counts, recent } = data || { counts: {}, recent: [] };
+    const steps = ['Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
+    const top = counts.Search || 1;
+
+    steps.forEach(name => {
+      const n = counts[name] || 0;
+      const el = document.getElementById('count-' + name);
+      const pctEl = document.getElementById('pct-' + name);
+      if (el) el.textContent = n;
+      if (pctEl) pctEl.textContent = top ? Math.round((n / top) * 100) + '%' : '';
+    });
+
+    const list = document.getElementById('recentList');
+    if (recent.length === 0) {
+      list.innerHTML = '<div class="recent-empty">No events yet. Events appear when users interact with your booking site.</div>';
+    } else {
+      list.innerHTML = recent.map(e => `
+        <div class="recent-item">
+          <span class="recent-item-emoji">${EMOJI_MAP[e.event_name] || '•'}</span>
+          <div>
+            <span class="recent-item-event">${e.event_name}</span>
+            ${e.content_name ? `<div class="recent-item-meta">${e.content_name}${e.value ? ' · $' + e.value.toFixed(0) : ''}</div>` : ''}
+          </div>
+          <span class="recent-item-time">${formatTime(e.timestamp)}</span>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('headerDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  async function doLogin() {
+    const pin = document.getElementById('pinInput').value.trim();
+    document.getElementById('loginError').textContent = '';
+    if (!pin) { document.getElementById('loginError').textContent = 'Enter PIN.'; return; }
+    try {
+      const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        token = pin;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        load();
+      } else {
+        document.getElementById('loginError').textContent = 'Wrong PIN.';
+      }
+    } catch (e) {
+      document.getElementById('loginError').textContent = 'Connection failed.';
+    }
+  }
+
+  async function load() {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/funnel', { headers: { 'x-crm-token': token } });
+      if (res.status === 401) {
+        token = '';
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+        return;
+      }
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      document.getElementById('recentList').innerHTML = '<div class="recent-empty">Failed to load.</div>';
+    }
+  }
+
+  if (document.getElementById('pinInput')) document.getElementById('pinInput').focus();
+  setInterval(load, 3000);
+</script>
+</body>
+</html>

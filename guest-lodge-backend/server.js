@@ -184,6 +184,23 @@ const ZAPIER_URLS = {
     Purchase: process.env.ZAPIER_PURCHASE_URL,
 };
 
+// In-memory funnel event store (last 500 events, for dashboard)
+const FUNNEL_EVENTS = ['PageView', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
+const funnelStore = [];
+const FUNNEL_MAX = 500;
+
+function pushFunnelEvent(event_name, eventData) {
+    if (!FUNNEL_EVENTS.includes(event_name)) return;
+    funnelStore.unshift({
+        event_name,
+        timestamp: Date.now(),
+        event_id: eventData?.event_id,
+        value: eventData?.value,
+        content_name: eventData?.content_name,
+    });
+    if (funnelStore.length > FUNNEL_MAX) funnelStore.pop();
+}
+
 
 // In your server.jss
 
@@ -1438,6 +1455,9 @@ app.post('/api/track', async (req, res) => {
         client_ip_address: req.ip, 
         user_agent: req.headers['user-agent'] 
     };
+
+    // Store in funnel dashboard (in-memory)
+    pushFunnelEvent(event_name, enrichedPayload);
     
     try {
         await axios.post(webhookUrl, enrichedPayload);
@@ -1521,6 +1541,19 @@ const crmAuth = (req, res, next) => {
 // Serve CRM HTML
 app.get('/crm', (req, res) => {
     res.sendFile(path.join(__dirname, 'crm.html'));
+});
+
+// Funnel dashboard API (same auth as CRM)
+app.get('/api/funnel', crmAuth, (req, res) => {
+    const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
+    funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
+    const recent = funnelStore.slice(0, 50);
+    res.json({ counts, recent });
+});
+
+// Serve funnel dashboard HTML (login handled client-side, API requires crmAuth)
+app.get('/funnel', (req, res) => {
+    res.sendFile(path.join(__dirname, 'funnel.html'));
 });
 
 // Verify PIN only (no DB) - helps debug auth vs DB issues
