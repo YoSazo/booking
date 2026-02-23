@@ -46,6 +46,7 @@ const corsOptions = {
 // Webhook needs raw body
 app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api/stripe-webhook')) {
