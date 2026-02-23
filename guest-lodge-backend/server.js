@@ -27,24 +27,17 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:3001',
-];
+].concat((process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean));
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // --- This console log will help us debug on Render ---
-        console.log("--- CORS CHECK ---");
-        console.log("Request Origin:", origin);
-        console.log("Allowed Origins:", allowedOrigins);
-        // ---------------------------------------------
-
-        // Allow requests with no origin (like mobile apps or curl requests) or from our allowed list
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            console.log("CORS Check Passed.");
-            callback(null, true);
-        } else {
-            console.error("CORS Check FAILED.");
-            callback(new Error('Not allowed by CORS'));
-        }
+        // Allow requests with no origin (e.g. mobile apps, curl, same-origin)
+        if (!origin) return callback(null, true);
+        // Explicit allow list
+        if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+        // Allow any Render deployment (*.onrender.com)
+        if (origin.endsWith('.onrender.com')) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
     }
 };
 
