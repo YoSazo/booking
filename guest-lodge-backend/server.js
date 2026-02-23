@@ -1508,7 +1508,7 @@ app.post('/api/webhooks/zapier-booking', async (req, res) => {
 });
 
 // --- Front Desk CRM ---
-const CRM_PASSWORD = process.env.CRM_PASSWORD || 'frontdesk2024';
+const CRM_PASSWORD = process.env.CRM_PASSWORD || '2026';
 
 const crmAuth = (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
