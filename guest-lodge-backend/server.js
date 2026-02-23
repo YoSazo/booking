@@ -1500,8 +1500,6 @@ app.post('/api/webhooks/zapier-booking', async (req, res) => {
             amountPaidNow: 0,
             preAuthHoldAmount: 1,
             holdStatus: 'active',
-            crmStage: 'new',
-            callStatus: 'not-called',
         };
 
         await prisma.booking.upsert({
