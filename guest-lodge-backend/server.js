@@ -201,6 +201,56 @@ function pushFunnelEvent(event_name, eventData) {
     if (funnelStore.length > FUNNEL_MAX) funnelStore.pop();
 }
 
+// ─── META CAPI ────────────────────────────────────────────
+const crypto = require('crypto');
+
+function sha256(value) {
+    if (!value) return undefined;
+    return crypto.createHash('sha256').update(String(value).trim().toLowerCase()).digest('hex');
+}
+
+async function sendToMetaCAPI(event_name, eventData) {
+    const pixelId = process.env.META_PIXEL_ID;
+    const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
+    if (!pixelId || !accessToken) return;
+
+    const payload = {
+        data: [{
+            event_name,
+            event_time: eventData.event_time || Math.floor(Date.now() / 1000),
+            event_id: eventData.event_id,
+            action_source: 'website',
+            event_source_url: eventData.event_source_url,
+            user_data: {
+                client_ip_address: eventData.client_ip_address,
+                client_user_agent: eventData.user_agent,
+                fbc: eventData.fbc,
+                fbp: eventData.fbp,
+                em: sha256(eventData.user_data?.em),
+                ph: sha256(eventData.user_data?.ph),
+                fn: sha256(eventData.user_data?.fn),
+                ln: sha256(eventData.user_data?.ln),
+            },
+            custom_data: {
+                value: eventData.value,
+                currency: eventData.currency || 'USD',
+                content_name: eventData.content_name,
+                content_ids: eventData.content_ids,
+                checkin_date: eventData.checkin_date,
+                checkout_date: eventData.checkout_date,
+                num_nights: eventData.nights,
+                order_id: eventData.order_id,
+            },
+        }],
+    };
+
+    // Uncomment to test in Events Manager test tab:
+    // payload.test_event_code = 'TEST23190';
+
+    const url = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
+    const response = await axios.post(url, payload);
+    console.log(`✅ Meta CAPI: ${event_name} | events_received: ${response.data?.events_received}`);
+}
 
 // In your server.jss
 
@@ -1461,12 +1511,19 @@ app.post('/api/track', async (req, res) => {
     
     try {
         await axios.post(webhookUrl, enrichedPayload);
-        console.log(`Successfully forwarded '${event_name}' event to Zapier with IP: ${req.ip} and event_time: ${enrichedPayload.event_time}`);
-        res.status(200).json({ success: true, message: 'Event tracked.' });
+        console.log(`Successfully forwarded '${event_name}' event to Zapier with IP: ${req.ip}`);
     } catch (error) {
         console.error(`Failed to forward event to Zapier for '${event_name}'. Status: ${error.response?.status}. Message: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Event tracking failed on the server.' });
     }
+
+    // Direct Meta CAPI (runs in parallel, silent fail — Zapier already ran)
+    try {
+        await sendToMetaCAPI(event_name, enrichedPayload);
+    } catch (error) {
+        console.error(`❌ Meta CAPI failed for '${event_name}': ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
+    }
+
+    res.status(200).json({ success: true, message: 'Event tracked.' });
 });
 
 // --- Zapier → CRM webhook (backup when Supabase fails) ---
@@ -1554,22 +1611,30 @@ app.get('/api/funnel', crmAuth, async (req, res) => {
     const metaToken = process.env.META_ADS_ACCESS_TOKEN;
     if (adAccountId && metaToken) {
         try {
-            const base = `https://graph.facebook.com/v21.0/act_${String(adAccountId).replace(/^act_/, '')}/insights`;
-            const params = (preset) => `fields=impressions,clicks,spend,actions,action_values&date_preset=${preset}&access_token=${encodeURIComponent(metaToken)}`;
+            const accountId = String(adAccountId).replace(/^act_/, '');
+            const base = `https://graph.facebook.com/v21.0/act_${accountId}/insights`;
+            const fields = 'impressions,clicks,spend';
+            const params = (preset) => `fields=${fields}&date_preset=${preset}&access_token=${encodeURIComponent(metaToken)}`;
             const [todayRes, weekRes] = await Promise.all([
                 axios.get(`${base}?${params('today')}`),
                 axios.get(`${base}?${params('last_7d')}`)
             ]);
             const parse = (r) => {
-                const d = r.data?.data?.[0] || {};
-                const actions = (d.actions || []).reduce((acc, a) => { acc[a.action_type] = parseInt(a.value, 10) || 0; return acc; }, {});
-                const actionValues = (d.action_values || []).reduce((acc, a) => { acc[a.action_type] = parseFloat(a.value) || 0; return acc; }, {});
-                return { spend: parseFloat(d.spend) || 0, impressions: parseInt(d.impressions, 10) || 0, clicks: parseInt(d.clicks, 10) || 0, actions, actionValues };
+                const d = r.data?.data?.[0] || r.data?.data || {};
+                const row = Array.isArray(d) ? d[0] : d;
+                return {
+                    spend: parseFloat(row?.spend) || 0,
+                    impressions: parseInt(row?.impressions, 10) || 0,
+                    clicks: parseInt(row?.clicks, 10) || 0,
+                    actions: {},
+                    actionValues: {}
+                };
             };
             meta = { today: parse(todayRes), last7d: parse(weekRes) };
         } catch (e) {
-            console.error('Meta Insights fetch failed:', e.message);
-            meta = { error: e.message };
+            const errMsg = e.response?.data?.error?.message || e.message;
+            console.error('Meta Insights fetch failed:', errMsg);
+            meta = { error: errMsg };
         }
     }
 
