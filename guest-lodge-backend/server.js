@@ -244,8 +244,8 @@ async function sendToMetaCAPI(event_name, eventData) {
         }],
     };
 
-    // Uncomment to test in Events Manager test tab:
-    // payload.test_event_code = 'TEST23190';
+    // Test mode: events show in Events Manager → Test Events
+    payload.test_event_code = 'TEST23190';
 
     const url = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
     const response = await axios.post(url, payload);
