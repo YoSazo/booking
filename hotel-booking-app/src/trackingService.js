@@ -353,6 +353,7 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         event_id: eventID,
         event_time: eventTime,
         room_name: bookingDetails.name,
+        content_name: bookingDetails.name,
         checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
         checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null,
         nights: bookingDetails.nights,

@@ -1455,6 +1455,67 @@ app.post('/api/track', async (req, res) => {
     }
 });
 
+// --- Zapier → CRM webhook (backup when Supabase fails) ---
+const ZAPIER_WEBHOOK_SECRET = process.env.ZAPIER_WEBHOOK_SECRET || '';
+app.post('/api/webhooks/zapier-booking', async (req, res) => {
+    try {
+        if (ZAPIER_WEBHOOK_SECRET && req.headers['x-zapier-secret'] !== ZAPIER_WEBHOOK_SECRET) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const body = req.body;
+        const ourReservationCode = body.ourReservationCode || body.our_reservation_code || body.event_id;
+        if (!ourReservationCode) {
+            return res.status(400).json({ success: false, message: 'ourReservationCode required' });
+        }
+        const fn = body.guestFirstName || body.user_data?.fn || '';
+        const ln = body.guestLastName || body.user_data?.ln || '';
+        const email = body.guestEmail || body.user_data?.em || '';
+        let phone = body.guestPhone || body.user_data?.ph || '';
+        if (phone && !phone.startsWith('+')) phone = '+1 ' + phone.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2-$3');
+        const roomName = body.roomName || body.room_name || 'Room';
+        const checkinDate = body.checkinDate || body.checkin_date;
+        const checkoutDate = body.checkoutDate || body.checkout_date;
+        const nights = parseInt(body.nights, 10) || 0;
+        const grandTotal = parseFloat(body.grandTotal || body.value || 0) || 0;
+        const subtotal = parseFloat(body.subtotal) || Math.round(grandTotal / 1.1 * 100) / 100;
+        const taxesAndFees = parseFloat(body.taxesAndFees) || Math.round((grandTotal - subtotal) * 100) / 100;
+        const hotelId = body.hotelId || 'suite-stay';
+
+        const data = {
+            ourReservationCode,
+            pmsConfirmationCode: body.pmsConfirmationCode || ourReservationCode,
+            hotelId,
+            roomName,
+            checkinDate: new Date(checkinDate),
+            checkoutDate: new Date(checkoutDate),
+            nights,
+            guestFirstName: fn,
+            guestLastName: ln,
+            guestEmail: email,
+            guestPhone: phone,
+            subtotal,
+            taxesAndFees,
+            grandTotal,
+            bookingType: 'payLater',
+            amountPaidNow: 0,
+            preAuthHoldAmount: 1,
+            holdStatus: 'active',
+            crmStage: 'new',
+            callStatus: 'not-called',
+        };
+
+        await prisma.booking.upsert({
+            where: { ourReservationCode },
+            create: data,
+            update: {},
+        });
+        res.json({ success: true, message: 'Booking upserted' });
+    } catch (e) {
+        console.error('Zapier webhook error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // --- Front Desk CRM ---
 const CRM_PASSWORD = process.env.CRM_PASSWORD || 'frontdesk2024';
 
