@@ -336,11 +336,12 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
     const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
     const totalAmount = (bookingDetails.subtotal || 0) + (bookingDetails.taxes || 0);
     
+    const roomName = bookingDetails.name || bookingDetails.roomName || '';
     // Pixel payload (browser-side) - doesn't include PII
     const pixelPayload = {
         value: totalAmount,
         currency: 'USD',
-        content_name: bookingDetails.name,
+        content_name: roomName,
         content_ids: [bookingDetails.id],
         content_type: 'product',
         num_items: bookingDetails.guests,
@@ -352,8 +353,8 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         currency: 'USD',
         event_id: eventID,
         event_time: eventTime,
-        room_name: bookingDetails.name,
-        content_name: bookingDetails.name,
+        room_name: roomName,
+        content_name: roomName,
         checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
         checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null,
         nights: bookingDetails.nights,
@@ -383,7 +384,7 @@ export const trackPurchase = (bookingDetails, guestInfo, reservationCode) => {
         currency: 'USD',
         items: [{
             item_id: bookingDetails.id,
-            item_name: bookingDetails.name,
+            item_name: roomName,
             quantity: bookingDetails.guests,
             price: bookingDetails.subtotal
         }]
