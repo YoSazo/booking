@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Front Desk CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
+    --green-mint: #C8EDD9; --bg: #EEF2EF; --white: #FFFFFF;
+    --text: #1A2B22; --text-muted: #6B7D72; --border: #D8E4DC;
+    --red: #E05252; --amber: #F59E0B; --blue: #3B82F6;
+    --shadow: 0 2px 12px rgba(46,125,91,0.10);
+    --shadow-lg: 0 8px 32px rgba(46,125,91,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* LOGIN */
+  .login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
+  }
+  .login-card {
+    background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+  }
+  .login-logo { font-size: 32px; margin-bottom: 8px; }
+  .login-card h1 { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .login-input {
+    width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
+    border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
+    letter-spacing: 4px; outline: none; margin-bottom: 12px; color: var(--text);
+    transition: border-color 0.2s;
+  }
+  .login-input:focus { border-color: var(--green); }
+  .login-btn {
+    width: 100%; padding: 13px; background: var(--green); color: white;
+    border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
+    font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .login-btn:hover { background: #245f46; }
+  .login-error { color: var(--red); font-size: 13px; margin-top: 8px; }
+
+  /* HEADER */
+  .header {
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 24px; height: 58px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 1px 8px rgba(46,125,91,0.07);
+  }
+  .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: var(--green); }
+  .header-logo .dot { width: 9px; height: 9px; background: var(--green-light); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .stat-pill {
+    background: var(--green-pale); border-radius: 20px; padding: 4px 12px;
+    font-size: 12px; font-weight: 600; color: var(--green); display: flex; align-items: center; gap: 4px;
+  }
+  .header-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .refresh-btn {
+    background: var(--green-pale); border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 5px 12px; font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--green); cursor: pointer; transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: var(--green); color: white; }
+
+  /* LAYOUT */
+  .layout { display: flex; height: calc(100vh - 58px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 240px; background: var(--white); border-right: 1.5px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  .sidebar-section { padding: 16px 14px 8px; }
+  .sidebar-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 6px; padding: 0 4px;
+  }
+  .sidebar-nav-item {
+    display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+    border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; transition: all 0.15s; margin-bottom: 2px;
+  }
+  .sidebar-nav-item:hover { background: var(--green-pale); color: var(--green); }
+  .sidebar-nav-item.active { background: var(--green); color: white; font-weight: 600; }
+  .sidebar-nav-item .badge {
+    margin-left: auto; background: var(--green-light); color: white;
+    border-radius: 20px; padding: 1px 7px; font-size: 11px; font-weight: 700;
+  }
+  .sidebar-nav-item.active .badge { background: rgba(255,255,255,0.25); }
+  .divider { height: 1px; background: var(--border); margin: 6px 14px; }
+  .search-wrap { padding: 10px 14px; position: relative; }
+  .search-icon { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none; }
+  .search-input {
+    width: 100%; padding: 7px 10px 7px 30px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-family: inherit; font-size: 12px; background: var(--bg);
+    color: var(--text); outline: none; transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--green); }
+  .btn-add {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--green); color: white; border: none; border-radius: 10px;
+    padding: 9px 14px; font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; width: calc(100% - 28px); margin: 0 14px 14px;
+    transition: background 0.15s;
+  }
+  .btn-add:hover { background: #245f46; }
+
+  /* BOARD */
+  .board { flex: 1; overflow-x: auto; padding: 20px 16px; display: flex; gap: 14px; align-items: flex-start; }
+  .column { min-width: 268px; max-width: 268px; display: flex; flex-direction: column; }
+  .column-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; padding: 0 2px; }
+  .column-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .column-title { font-weight: 700; font-size: 13px; flex: 1; }
+  .column-count {
+    background: var(--white); border: 1.5px solid var(--border); border-radius: 20px;
+    padding: 1px 9px; font-size: 11px; font-weight: 600; color: var(--text-muted);
+  }
+  .column-body {
+    display: flex; flex-direction: column; gap: 9px; min-height: 100px;
+    padding: 3px; border-radius: 12px; transition: background 0.2s;
+  }
+  .column-body.drag-over { background: var(--green-mint); outline: 2px dashed var(--green-light); }
+  .empty-col {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 24px 14px;
+    text-align: center; color: var(--text-muted); font-size: 12px; font-weight: 500;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--white); border-radius: 13px; box-shadow: var(--shadow);
+    border: 1.5px solid var(--border); overflow: hidden; cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .card.dragging { opacity: 0.45; cursor: grabbing; }
+  .card-accent { height: 3px; }
+  .card-body { padding: 12px 14px; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+  .card-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
+  .room-badge {
+    background: var(--green-pale); color: var(--green); border-radius: 7px;
+    padding: 2px 8px; font-size: 10px; font-weight: 600; white-space: nowrap; flex-shrink: 0; margin-left: 6px;
+  }
+  .card-dates { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; }
+  .card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .meta-chip {
+    display: flex; align-items: center; gap: 3px; background: var(--bg);
+    border-radius: 7px; padding: 2px 7px; font-size: 10px; color: var(--text-muted); font-weight: 500;
+  }
+  .call-badge { border-radius: 6px; padding: 2px 7px; font-size: 10px; font-weight: 600; }
+  .call-badge.not-called { background: #FEF3C7; color: #92400E; }
+  .call-badge.called    { background: #D1FAE5; color: #065F46; }
+  .call-badge.no-answer { background: #FEE2E2; color: #991B1B; }
+  .card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 9px; border-top: 1px solid var(--border); }
+  .card-total { font-weight: 700; font-size: 15px; color: var(--green); font-family: 'DM Mono', monospace; }
+  .card-actions { display: flex; gap: 5px; }
+  .btn-icon {
+    width: 28px; height: 28px; border-radius: 7px; border: 1.5px solid var(--border);
+    background: var(--white); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 13px; transition: all 0.15s; color: var(--text-muted);
+  }
+  .btn-icon:hover { border-color: var(--green); color: var(--green); background: var(--green-pale); }
+  .btn-icon.call:hover { border-color: var(--green); color: white; background: var(--green); }
+  .arrival-badge { display: inline-flex; align-items: center; gap: 3px; border-radius: 5px; padding: 2px 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+  .arrival-badge.today { background: #D1FAE5; color: #065F46; }
+  .arrival-badge.tomorrow { background: #DBEAFE; color: #1E40AF; }
+  .arrival-badge.soon { background: #FEF3C7; color: #92400E; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(26,43,34,0.5); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.15s ease;
+  }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  .modal {
+    background: var(--white); border-radius: 18px; box-shadow: var(--shadow-lg);
+    width: 460px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .modal-header {
+    padding: 20px 22px 16px; border-bottom: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: white; z-index: 1;
+  }
+  .modal-title { font-size: 17px; font-weight: 700; }
+  .modal-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .modal-close {
+    width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: none; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .modal-close:hover { background: #fee2e2; border-color: var(--red); color: var(--red); }
+  .modal-body { padding: 20px 22px; }
+  .modal-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 10px; }
+  .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { color: var(--text-muted); font-weight: 500; }
+  .detail-value { font-weight: 600; }
+  .stage-btns { display: flex; flex-wrap: wrap; gap: 7px; }
+  .stage-btn {
+    padding: 6px 12px; border-radius: 9px; border: 1.5px solid var(--border);
+    background: var(--white); color: var(--text-muted); font-family: inherit;
+    font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .stage-btn.active { color: white; border-color: transparent; }
+  .stage-btn:hover { border-color: var(--green); color: var(--green); }
+  .notes-area {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 9px;
+    padding: 9px 11px; font-family: inherit; font-size: 12px; resize: vertical;
+    min-height: 70px; outline: none; color: var(--text); transition: border-color 0.2s; margin-top: 6px;
+  }
+  .notes-area:focus { border-color: var(--green); }
+  .call-log-item { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .call-log-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .call-log-time { color: var(--text-muted); font-size: 10px; font-family: 'DM Mono', monospace; }
+  .modal-footer { padding: 14px 22px 20px; display: flex; gap: 9px; }
+  .btn { flex: 1; padding: 10px 14px; border-radius: 11px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid transparent; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .btn-primary { background: var(--green); color: white; }
+  .btn-primary:hover { background: #245f46; }
+  .btn-secondary { background: var(--white); color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover { border-color: var(--green); color: var(--green); background: var(--green-pale); }
+  .btn-danger { background: #FEE2E2; color: var(--red); border-color: #FECACA; flex: none; }
+  .btn-danger:hover { background: var(--red); color: white; border-color: var(--red); }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 7px; }
+  .toast {
+    background: var(--text); color: white; border-radius: 11px; padding: 11px 16px;
+    font-size: 12px; font-weight: 600; box-shadow: var(--shadow-lg);
+    display: flex; align-items: center; gap: 7px;
+    animation: slideInR 0.2s ease, fadeOut 0.3s ease 2.7s forwards;
+  }
+  @keyframes slideInR { from{transform:translateX(40px);opacity:0} to{transform:translateX(0);opacity:1} }
+  @keyframes fadeOut { to{opacity:0;transform:translateX(20px)} }
+  .toast.success { background: var(--green); }
+  .toast.call { background: #1D4ED8; }
+  .toast.error { background: var(--red); }
+
+  /* LOADING */
+  .loading { display: flex; align-items: center; justify-content: center; height: 200px; font-size: 14px; color: var(--text-muted); gap: 10px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  @media (max-width: 768px) { .sidebar { display: none; } .header-right .stat-pill { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🏨</div>
+    <h1>Front Desk CRM</h1>
+    <p>Enter your PIN to continue</p>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <header class="header">
+    <div class="header-logo"><div class="dot"></div>Front Desk CRM</div>
+    <div class="header-right">
+      <div id="statNew" class="stat-pill">📥 <strong>0</strong> New</div>
+      <div id="statConfirmed" class="stat-pill">✅ <strong>0</strong> Confirmed</div>
+      <div id="statInHouse" class="stat-pill">🏨 <strong>0</strong> In-House</div>
+      <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="searchInput" placeholder="Search guests..." oninput="render()">
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Views</div>
+        <div class="sidebar-nav-item active" onclick="setView('all',this)">📋 All Bookings <span class="badge" id="badgeAll">0</span></div>
+        <div class="sidebar-nav-item" onclick="setView('today',this)">📅 Arriving Today <span class="badge" id="badgeToday">0</span></div>
+        <div class="sidebar-nav-item" onclick="setView('uncalled',this)">📞 Needs Call <span class="badge" id="badgeUncalled">0</span></div>
+      </div>
+      <div class="divider"></div>
+      <button class="btn-add" onclick="openAddModal()">＋ Manual Booking</button>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Legend</div>
+        <div style="font-size:11px;color:var(--text-muted);line-height:2.2;padding:0 4px">
+          🟡 Needs Call &nbsp; 🟢 Called<br>
+          🔴 No Answer<br>
+          Drag cards to move stages
+        </div>
+      </div>
+    </aside>
+
+    <main class="board" id="board">
+      <div class="loading"><div class="spinner"></div> Loading bookings...</div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+<div id="modalContainer"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────
+const COLUMNS = [
+  { id:'new',        label:'New Bookings',  color:'#F59E0B', emoji:'🆕' },
+  { id:'called',     label:'Called',        color:'#3B82F6', emoji:'📞' },
+  { id:'confirmed',  label:'Confirmed',     color:'#10B981', emoji:'✅' },
+  { id:'checked_in', label:'Checked In',    color:'#8B5CF6', emoji:'🏨' },
+  { id:'no_show',    label:'No Show',       color:'#EF4444', emoji:'❌' },
+];
+
+// ─── STATE ────────────────────────────────────────────────
+let token = '';
+let bookings = [];
+let currentView = 'all';
+let draggedId = null;
+let openModalBookingId = null;
+
+// ─── AUTH ─────────────────────────────────────────────────
+function doLogin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  if (!pin) return;
+  token = pin;
+  document.getElementById('loginError').textContent = '';
+  loadBookings(true);
+}
+
+// ─── API ──────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'x-crm-token': token }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (res.status === 401) {
+    showLogin();
+    throw new Error('Unauthorized');
+  }
+  return res.json();
+}
+
+async function loadBookings(firstLoad = false) {
+  try {
+    // Verify PIN first (no DB)
+    const verify = await api('GET', '/api/crm/verify');
+    if (!verify.success) throw new Error('Invalid PIN');
+    // Then load bookings
+    const data = await api('GET', '/api/crm/bookings');
+    if (!data.success) throw new Error(data.message);
+    // Normalize DB rows to local shape
+    bookings = data.data.map(b => ({
+      id:         b.id,
+      name:       `${b.guestFirstName} ${b.guestLastName}`,
+      phone:      b.guestPhone || '',
+      email:      b.guestEmail || '',
+      roomType:   b.roomName || 'Room',
+      guests:     1,
+      nights:     b.nights || 0,
+      checkIn:    b.checkinDate  ? b.checkinDate.split('T')[0]  : '',
+      checkOut:   b.checkoutDate ? b.checkoutDate.split('T')[0] : '',
+      total:      b.grandTotal || 0,
+      column:     b.crmStage || 'new',
+      callStatus: b.callStatus || 'not-called',
+      notes:      b.notes || '',
+      callLog:    b.callLog ? JSON.parse(b.callLog) : [],
+      bookedAt:   b.createdAt ? new Date(b.createdAt).toLocaleString() : '',
+      bookingType: b.bookingType || 'standard',
+      pmsCode:    b.pmsConfirmationCode || b.ourReservationCode || '',
+    }));
+    if (firstLoad) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    }
+    render();
+    toast('Bookings loaded', 'success');
+  } catch(e) {
+    if (firstLoad) {
+      const msg = e.message || String(e);
+      if (msg === 'Unauthorized' || msg.includes('401')) {
+        document.getElementById('loginError').textContent = 'Wrong PIN.';
+      } else if (msg.includes('fetch') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        document.getElementById('loginError').textContent = 'Connection failed. Is the server running on port 3001?';
+      } else {
+        document.getElementById('loginError').textContent = 'Server: ' + msg;
+      }
+      token = '';
+    } else {
+      toast('Failed to load: ' + (e.message || e), 'error');
+    }
+  }
+}
+
+function showLogin() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  token = '';
+}
+
+async function saveBooking(id, changes) {
+  const b = bookings.find(x => x.id === id);
+  if (!b) return;
+  Object.assign(b, changes);
+  try {
+    await api('POST', '/api/crm/update', { id, ...changes });
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteBooking(id) {
+  const b = bookings.find(x => String(x.id) === String(id));
+  if (!b) return;
+  if (!confirm(`Delete booking for ${b.name}? This removes it from the database permanently.`)) return;
+  if (String(id).startsWith('manual_')) {
+    bookings = bookings.filter(x => String(x.id) !== String(id));
+    toast('Removed from list', 'success');
+    closeModal();
+    render();
+    return;
+  }
+  try {
+    const res = await fetch('/api/crm/bookings/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { 'x-crm-token': token }
+    });
+    const result = await res.json().catch(() => ({}));
+    if (res.status === 401) { showLogin(); throw new Error('Unauthorized'); }
+    if (!res.ok || !result.success) throw new Error(result.message || 'Delete failed (check server logs)');
+    bookings = bookings.filter(x => String(x.id) !== String(id));
+    toast('Booking deleted', 'success');
+    closeModal();
+    render();
+  } catch(e) {
+    toast('Delete failed: ' + (e.message || e), 'error');
+  }
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function getFiltered() {
+  let list = [...bookings];
+  const today = new Date().toISOString().split('T')[0];
+  if (currentView === 'today')   list = list.filter(b => b.checkIn === today);
+  if (currentView === 'uncalled') list = list.filter(b => b.callStatus === 'not-called');
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  if (q) list = list.filter(b => b.name.toLowerCase().includes(q) || b.phone.includes(q) || b.roomType.toLowerCase().includes(q));
+  return list;
+}
+
+function render() {
+  updateBadges();
+  const filtered = getFiltered();
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  COLUMNS.forEach(col => {
+    const cards = filtered.filter(b => b.column === col.id);
+    const colEl = document.createElement('div');
+    colEl.className = 'column';
+    colEl.innerHTML = `
+      <div class="column-header">
+        <div class="column-dot" style="background:${col.color}"></div>
+        <div class="column-title">${col.emoji} ${col.label}</div>
+        <div class="column-count">${cards.length}</div>
+      </div>
+      <div class="column-body" data-col="${col.id}"
+        ondragover="event.preventDefault()"
+        ondrop="onDrop(event,'${col.id}')"
+        ondragenter="event.currentTarget.classList.add('drag-over')"
+        ondragleave="if(!event.currentTarget.contains(event.relatedTarget))event.currentTarget.classList.remove('drag-over')">
+        ${cards.length === 0
+          ? '<div class="empty-col">📭 Drop bookings here</div>'
+          : cards.map(renderCard).join('')}
+      </div>`;
+    board.appendChild(colEl);
+  });
+
+  board.querySelectorAll('.card').forEach(el => {
+    el.addEventListener('dragstart', e => { draggedId = el.dataset.id; setTimeout(()=>el.classList.add('dragging'),0); });
+    el.addEventListener('dragend', () => { document.querySelectorAll('.card').forEach(c=>c.classList.remove('dragging')); document.querySelectorAll('.column-body').forEach(c=>c.classList.remove('drag-over')); draggedId=null; });
+  });
+}
+
+function arrivalBadge(checkIn) {
+  const today = new Date().toISOString().split('T')[0];
+  const tom   = new Date(Date.now()+86400000).toISOString().split('T')[0];
+  const soon  = new Date(Date.now()+3*86400000).toISOString().split('T')[0];
+  if (checkIn === today) return '<span class="arrival-badge today">Today</span>';
+  if (checkIn === tom)   return '<span class="arrival-badge tomorrow">Tomorrow</span>';
+  if (checkIn <= soon)   return '<span class="arrival-badge soon">Soon</span>';
+  return '';
+}
+
+function renderCard(b) {
+  const ci = b.checkIn  ? new Date(b.checkIn +'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+  const co = b.checkOut ? new Date(b.checkOut+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+  const colColor = COLUMNS.find(c=>c.id===b.column)?.color || '#ccc';
+  const callLabel = { 'not-called':'🟡 Call needed', 'called':'🟢 Called', 'no-answer':'🔴 No answer' };
+  return `
+    <div class="card" draggable="true" data-id="${b.id}" onclick="openDetail('${b.id}')">
+      <div class="card-accent" style="background:${colColor}"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-name">${esc(b.name)}</div>
+          <div class="room-badge">${esc(b.roomType)}</div>
+        </div>
+        <div class="card-dates">📅 ${ci} → ${co} <span style="color:var(--text-muted)">(${b.nights}n)</span> ${arrivalBadge(b.checkIn)}</div>
+        <div class="card-meta">
+          <div class="meta-chip">👤 ${b.guests} guest${b.guests>1?'s':''}</div>
+          ${b.bookingType==='payLater'?'<div class="meta-chip">💳 Pay at hotel</div>':''}
+          <span class="call-badge ${b.callStatus||'not-called'}">${callLabel[b.callStatus]||'🟡 Call needed'}</span>
+        </div>
+        <div class="card-footer">
+          <div class="card-total">$${Number(b.total).toFixed(2)}</div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <div class="btn-icon call" title="Log call" onclick="logCall('${b.id}',event)">📞</div>
+            <div class="btn-icon" title="View" onclick="openDetail('${b.id}',event)">👁</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── DRAG & DROP ──────────────────────────────────────────
+function onDrop(e, colId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!draggedId) return;
+  const b = bookings.find(x => String(x.id) === String(draggedId));
+  if (b && b.column !== colId) {
+    saveBooking(b.id, { crmStage: colId, column: colId });
+    toast(`Moved to ${COLUMNS.find(c=>c.id===colId)?.label}`, 'success');
+    render();
+  }
+}
+
+// ─── CALL LOGGING ─────────────────────────────────────────
+function logCall(id, e) {
+  if (e) e.stopPropagation();
+  const b = bookings.find(x => String(x.id) === String(id));
+  if (!b) return;
+  const opts = ['✅ Spoke with guest — confirmed','📵 No answer — left voicemail','🔄 Called back — will confirm later','❌ Wrong number / disconnected'];
+  const statusMap = ['called','no-answer','called','not-called'];
+  const newColMap  = ['called','new','called','new'];
+  const choice = prompt(`Log call for ${b.name}:\n\n${opts.map((o,i)=>`${i+1}. ${o}`).join('\n')}\n\nEnter 1-4:`);
+  if (!choice) return;
+  const idx = parseInt(choice)-1;
+  if (idx < 0 || idx > 3) return;
+  const now = new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  const newLog = [{ time: now, note: opts[idx].replace(/^.{2}/,'').trim(), status: statusMap[idx] }, ...b.callLog];
+  const newCol = statusMap[idx]==='called' ? 'called' : b.column;
+  saveBooking(b.id, { callStatus: statusMap[idx], crmStage: newCol, column: newCol, callLog: newLog });
+  toast(`Call logged for ${b.name}`, 'call');
+  render();
+  if (openModalBookingId === String(id)) openDetail(id);
+}
+
+// ─── MODALS ───────────────────────────────────────────────
+function openDetail(id, e) {
+  if (e) e.stopPropagation();
+  openModalBookingId = String(id);
+  const b = bookings.find(x => String(x.id) === String(id));
+  if (!b) return;
+  const ci = b.checkIn  ? new Date(b.checkIn +'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'}) : '—';
+  const co = b.checkOut ? new Date(b.checkOut+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'}) : '—';
+  const callLabel = { 'not-called':'🟡 Not called yet','called':'🟢 Called','no-answer':'🔴 No answer' };
+
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" id="modalOverlay" onclick="handleOverlay(event)">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">${esc(b.name)}</div>
+            <div class="modal-subtitle">Booked ${b.bookedAt} · ${b.pmsCode ? 'PMS: '+b.pmsCode : 'No PMS code'}</div>
+          </div>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-section">Reservation</div>
+          <div class="detail-row"><span class="detail-label">Room</span><span class="detail-value">${esc(b.roomType)}</span></div>
+          <div class="detail-row"><span class="detail-label">Check-In</span><span class="detail-value">${ci}</span></div>
+          <div class="detail-row"><span class="detail-label">Check-Out</span><span class="detail-value">${co}</span></div>
+          <div class="detail-row"><span class="detail-label">Duration</span><span class="detail-value">${b.nights} nights</span></div>
+          <div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value">${b.bookingType==='payLater'?'Pay at hotel':'Paid online'}</span></div>
+          <div class="detail-row"><span class="detail-label">Total</span><span class="detail-value" style="color:var(--green);font-family:'DM Mono',monospace;font-size:16px">$${Number(b.total).toFixed(2)}</span></div>
+
+          <div class="modal-section" style="margin-top:16px">Contact</div>
+          <div class="detail-row"><span class="detail-label">📞 Phone</span><span class="detail-value"><a href="tel:${esc(b.phone)}" style="color:var(--green);text-decoration:none;font-weight:700">${esc(b.phone)}</a></span></div>
+          <div class="detail-row"><span class="detail-label">✉️ Email</span><span class="detail-value" style="font-size:12px">${esc(b.email)}</span></div>
+          <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${callLabel[b.callStatus]||'🟡 Not called yet'}</span></div>
+
+          <div class="modal-section" style="margin-top:16px">Move Stage</div>
+          <div class="stage-btns">
+            ${COLUMNS.map(c=>`<button class="stage-btn ${c.id===b.column?'active':''}" style="${c.id===b.column?`background:${c.color}`:'color:var(--text-muted)'}" onclick="moveTo('${id}','${c.id}')">${c.emoji} ${c.label}</button>`).join('')}
+          </div>
+
+          <div class="modal-section" style="margin-top:16px">Notes</div>
+          <textarea class="notes-area" id="notesInput" placeholder="Special requests, notes...">${esc(b.notes)}</textarea>
+          <button class="btn btn-secondary" style="margin-top:8px;flex:none;padding:7px 14px;font-size:12px" onclick="saveNotes('${id}')">💾 Save Notes</button>
+
+          ${b.callLog.length > 0 ? `
+            <div class="modal-section" style="margin-top:16px">Call Log</div>
+            ${b.callLog.map(entry=>`
+              <div class="call-log-item">
+                <div class="call-log-dot" style="background:${entry.status==='called'?'var(--green)':'var(--red)'}"></div>
+                <div><div style="font-weight:600">${esc(entry.note)}</div><div class="call-log-time">${esc(entry.time)}</div></div>
+              </div>`).join('')}
+          ` : ''}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick="logCall('${id}')">📞 Log Call</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+          <button class="btn btn-danger" onclick="deleteBooking('${id}')" title="Permanently remove from database">🗑 Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openAddModal() {
+  openModalBookingId = null;
+  const f = (label, id, type, placeholder, span=1) =>
+    `<div style="grid-column:span ${span}">
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);display:block;margin-bottom:4px">${label}</label>
+      <input id="${id}" type="${type}" placeholder="${placeholder}" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;outline:none;color:var(--text)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border)'">
+    </div>`;
+
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" id="modalOverlay" onclick="handleOverlay(event)">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">➕ Manual Booking</div>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
+            ${f('Guest Name','aName','text','Jane Smith',2)}
+            ${f('Phone','aPhone','tel','(715) 555-0000',2)}
+            ${f('Email','aEmail','email','guest@email.com',2)}
+            ${f('Room Type','aRoom','text','King Room',1)}
+            ${f('Guests','aGuests','number','1',1)}
+            ${f('Check-In','aCI','date','',1)}
+            ${f('Check-Out','aCO','date','',1)}
+            ${f('Total ($)','aTotal','number','0.00',2)}
+          </div>
+          <div style="margin-top:12px">
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);display:block;margin-bottom:4px">Notes</label>
+            <textarea class="notes-area" id="aNotes" placeholder="Special requests..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick="addManualBooking()">Add Booking</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeModal() {
+  document.getElementById('modalContainer').innerHTML = '';
+  openModalBookingId = null;
+}
+function handleOverlay(e) { if (e.target.id==='modalOverlay') closeModal(); }
+
+function moveTo(id, colId) {
+  saveBooking(id, { crmStage: colId, column: colId });
+  toast(`Moved to ${COLUMNS.find(c=>c.id===colId)?.label}`, 'success');
+  render();
+  openDetail(id);
+}
+
+function saveNotes(id) {
+  const notes = document.getElementById('notesInput').value;
+  saveBooking(id, { notes });
+  toast('Notes saved', 'success');
+}
+
+function addManualBooking() {
+  const name  = document.getElementById('aName').value.trim();
+  const phone = document.getElementById('aPhone').value.trim();
+  const email = document.getElementById('aEmail').value.trim();
+  const room  = document.getElementById('aRoom').value.trim() || 'King Room';
+  const guests= parseInt(document.getElementById('aGuests').value) || 1;
+  const ci    = document.getElementById('aCI').value;
+  const co    = document.getElementById('aCO').value;
+  const total = parseFloat(document.getElementById('aTotal').value) || 0;
+  const notes = document.getElementById('aNotes').value;
+  if (!name || !phone || !ci || !co) { alert('Name, phone, and dates are required.'); return; }
+  const nights = Math.max(1, Math.round((new Date(co)-new Date(ci))/86400000));
+  // Add locally only (no DB endpoint for manual adds in this version — extend if needed)
+  bookings.unshift({
+    id: 'manual_'+Date.now(), name, phone, email, roomType: room, guests,
+    nights, checkIn: ci, checkOut: co, total, column:'new',
+    callStatus:'not-called', notes, callLog:[], bookedAt: new Date().toLocaleString(),
+    bookingType:'manual', pmsCode:'',
+  });
+  toast(`Added ${name}`, 'success');
+  closeModal();
+  render();
+}
+
+// ─── BADGES & UTILS ───────────────────────────────────────
+function updateBadges() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('badgeAll').textContent     = bookings.length;
+  document.getElementById('badgeToday').textContent   = bookings.filter(b=>b.checkIn===today).length;
+  document.getElementById('badgeUncalled').textContent= bookings.filter(b=>b.callStatus==='not-called').length;
+  document.getElementById('statNew').innerHTML        = `📥 <strong>${bookings.filter(b=>b.column==='new').length}</strong> New`;
+  document.getElementById('statConfirmed').innerHTML  = `✅ <strong>${bookings.filter(b=>b.column==='confirmed').length}</strong> Confirmed`;
+  document.getElementById('statInHouse').innerHTML    = `🏨 <strong>${bookings.filter(b=>b.column==='checked_in').length}</strong> In-House`;
+}
+
+function setView(v, el) {
+  currentView = v;
+  document.querySelectorAll('.sidebar-nav-item').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function toast(msg, type='') {
+  const c = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = `${type==='success'?'✓':type==='call'?'📞':type==='error'?'✕':'ℹ'} ${msg}`;
+  c.appendChild(el);
+  setTimeout(()=>el.remove(), 3100);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+document.getElementById('headerDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+document.getElementById('pinInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>

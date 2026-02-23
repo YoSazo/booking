@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -25,6 +26,7 @@ const allowedOrigins = [
     'https://www.clickinns.com',
     'http://localhost:3000',
     'http://localhost:5173',
+    'http://localhost:3001',
 ];
 
 const corsOptions = {
@@ -1453,6 +1455,72 @@ app.post('/api/track', async (req, res) => {
     }
 });
 
+// --- Front Desk CRM ---
+const CRM_PASSWORD = process.env.CRM_PASSWORD || 'frontdesk2024';
+
+const crmAuth = (req, res, next) => {
+    const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
+    const expected = (CRM_PASSWORD || '').toString().trim();
+    if (!token || token !== expected) return res.status(401).json({ error: 'Unauthorized' });
+    next();
+};
+
+// Serve CRM HTML
+app.get('/crm', (req, res) => {
+    res.sendFile(path.join(__dirname, 'crm.html'));
+});
+
+// Verify PIN only (no DB) - helps debug auth vs DB issues
+app.get('/api/crm/verify', crmAuth, (req, res) => {
+    res.json({ success: true });
+});
+
+// Get bookings for CRM - last 7 days + all future
+app.get('/api/crm/bookings', crmAuth, async (req, res) => {
+    try {
+        const bookings = await prisma.booking.findMany({
+            orderBy: { checkinDate: 'asc' },
+            where: {
+                checkinDate: {
+                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                }
+            }
+        });
+        res.json({ success: true, data: bookings });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Update a booking's CRM stage, call status, notes, call log
+app.post('/api/crm/update', crmAuth, async (req, res) => {
+    try {
+        const { id, crmStage, callStatus, notes, callLog } = req.body;
+        const data = {};
+        if (crmStage !== undefined) data.crmStage = crmStage;
+        if (callStatus !== undefined) data.callStatus = callStatus;
+        if (notes !== undefined) data.notes = notes;
+        if (callLog !== undefined) data.callLog = JSON.stringify(callLog);
+
+        const booking = await prisma.booking.update({ where: { id }, data });
+        res.json({ success: true, booking });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Delete a booking
+app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.booking.delete({ where: { id } });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CRM delete error:', e.message);
+        const msg = e.code === 'P2025' ? 'Booking not found or already deleted.' : (e.message || 'Delete failed');
+        res.status(e.code === 'P2025' ? 404 : 500).json({ success: false, message: msg });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);

@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Booking {
@@ -36,4 +37,10 @@ model Booking {
   holdReleasedAt        DateTime?
   holdCapturedAt        DateTime?
   noShowFeePaid         Boolean  @default(false)
+
+  // Front desk CRM
+  crmStage    String?  @default("new")
+  callStatus  String?  @default("not-called")
+  notes       String?
+  callLog     String?  // stored as JSON string
 }
