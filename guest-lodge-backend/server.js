@@ -1544,11 +1544,36 @@ app.get('/crm', (req, res) => {
 });
 
 // Funnel dashboard API (same auth as CRM)
-app.get('/api/funnel', crmAuth, (req, res) => {
+app.get('/api/funnel', crmAuth, async (req, res) => {
     const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
     funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
     const recent = funnelStore.slice(0, 50);
-    res.json({ counts, recent });
+
+    let meta = null;
+    const adAccountId = process.env.META_ADS_ACCOUNT_ID;
+    const metaToken = process.env.META_ADS_ACCESS_TOKEN;
+    if (adAccountId && metaToken) {
+        try {
+            const base = `https://graph.facebook.com/v21.0/act_${String(adAccountId).replace(/^act_/, '')}/insights`;
+            const params = (preset) => `fields=impressions,clicks,spend,actions,action_values&date_preset=${preset}&access_token=${encodeURIComponent(metaToken)}`;
+            const [todayRes, weekRes] = await Promise.all([
+                axios.get(`${base}?${params('today')}`),
+                axios.get(`${base}?${params('last_7d')}`)
+            ]);
+            const parse = (r) => {
+                const d = r.data?.data?.[0] || {};
+                const actions = (d.actions || []).reduce((acc, a) => { acc[a.action_type] = parseInt(a.value, 10) || 0; return acc; }, {});
+                const actionValues = (d.action_values || []).reduce((acc, a) => { acc[a.action_type] = parseFloat(a.value) || 0; return acc; }, {});
+                return { spend: parseFloat(d.spend) || 0, impressions: parseInt(d.impressions, 10) || 0, clicks: parseInt(d.clicks, 10) || 0, actions, actionValues };
+            };
+            meta = { today: parse(todayRes), last7d: parse(weekRes) };
+        } catch (e) {
+            console.error('Meta Insights fetch failed:', e.message);
+            meta = { error: e.message };
+        }
+    }
+
+    res.json({ counts, recent, meta });
 });
 
 // Serve funnel dashboard HTML (login handled client-side, API requires crmAuth)
