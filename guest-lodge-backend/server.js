@@ -48,7 +48,7 @@ setInterval(async () => {
     } catch (e) {
         // silent - just keeping connection warm
     }
-}, 4 * 60 * 1000); // ping every 4 minutes
+}, 2 * 60 * 1000); // ping every 2 minutes (well under Supabase's ~5 min timeout)
 
 const allowedOrigins = [
     'https://suitestay.clickinns.com',
@@ -1598,6 +1598,16 @@ app.post('/api/webhooks/zapier-booking', async (req, res) => {
     } catch (e) {
         console.error('Zapier webhook error:', e.message);
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// --- Health check (for uptime monitors; keeps Render awake + warms DB) ---
+app.get('/health', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.status(200).json({ ok: true, db: 'connected' });
+    } catch (e) {
+        res.status(503).json({ ok: false, db: 'error', message: e.message });
     }
 });
 
