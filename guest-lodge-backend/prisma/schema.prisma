@@ -44,3 +44,24 @@ model Booking {
   notes       String?
   callLog     String?  // stored as JSON string
 }
+
+model PaymentDeclinedLead {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  hotelId          String
+  guestFirstName   String
+  guestLastName    String
+  guestEmail       String
+  guestPhone       String
+  roomName         String
+  checkinDate      String
+  checkoutDate     String
+  nights           Int
+  grandTotal       Float
+  errorCode        String?
+  errorDeclineCode String?
+  errorMessage     String?
+  paymentMethod    String?  // 'card' | 'wallet'
+  called           Boolean  @default(false)
+  notes            String?
+}

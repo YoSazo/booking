@@ -1468,6 +1468,43 @@ app.post('/api/track', async (req, res) => {
     }
 });
 
+// --- Payment declined leads (for front desk to call) ---
+app.post('/api/payment-declined', async (req, res) => {
+    try {
+        const { guestInfo, bookingDetails, errorCode, errorDeclineCode, errorMessage, hotelId, paymentMethod } = req.body;
+        if (!guestInfo?.firstName || !guestInfo?.lastName || !guestInfo?.email || !guestInfo?.phone) {
+            return res.status(400).json({ success: false, message: 'Missing guest info' });
+        }
+        if (!bookingDetails?.roomName || !bookingDetails?.checkin || !bookingDetails?.checkout || !bookingDetails?.total) {
+            return res.status(400).json({ success: false, message: 'Missing booking details' });
+        }
+        const checkinStr = typeof bookingDetails.checkin === 'string' ? bookingDetails.checkin.split('T')[0] : '';
+        const checkoutStr = typeof bookingDetails.checkout === 'string' ? bookingDetails.checkout.split('T')[0] : '';
+        await prisma.paymentDeclinedLead.create({
+            data: {
+                hotelId: hotelId || 'suite-stay',
+                guestFirstName: guestInfo.firstName,
+                guestLastName: guestInfo.lastName,
+                guestEmail: guestInfo.email,
+                guestPhone: guestInfo.phone,
+                roomName: bookingDetails.roomName || 'Room',
+                checkinDate: checkinStr,
+                checkoutDate: checkoutStr,
+                nights: parseInt(bookingDetails.nights, 10) || 0,
+                grandTotal: parseFloat(bookingDetails.total) || 0,
+                errorCode: errorCode || null,
+                errorDeclineCode: errorDeclineCode || null,
+                errorMessage: errorMessage || null,
+                paymentMethod: paymentMethod || 'card',
+            },
+        });
+        res.status(200).json({ success: true });
+    } catch (e) {
+        console.error('Payment declined lead save error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // --- Zapier → CRM webhook (backup when Supabase fails) ---
 const ZAPIER_WEBHOOK_SECRET = process.env.ZAPIER_WEBHOOK_SECRET || '';
 app.post('/api/webhooks/zapier-booking', async (req, res) => {
@@ -1622,6 +1659,34 @@ app.post('/api/crm/update', crmAuth, async (req, res) => {
 
         const booking = await prisma.booking.update({ where: { id }, data });
         res.json({ success: true, booking });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Get payment declined leads
+app.get('/api/crm/payment-declined', crmAuth, async (req, res) => {
+    try {
+        const leads = await prisma.paymentDeclinedLead.findMany({
+            orderBy: { createdAt: 'desc' },
+            where: { called: false }
+        });
+        res.json({ success: true, data: leads });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Mark payment declined lead as called (or add notes)
+app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { called, notes } = req.body;
+        const data = {};
+        if (called !== undefined) data.called = !!called;
+        if (notes !== undefined) data.notes = notes;
+        await prisma.paymentDeclinedLead.update({ where: { id }, data });
+        res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

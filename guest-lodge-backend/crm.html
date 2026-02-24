@@ -299,9 +299,10 @@
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">Views</div>
-        <div class="sidebar-nav-item active" onclick="setView('all',this)">📋 All Bookings <span class="badge" id="badgeAll">0</span></div>
-        <div class="sidebar-nav-item" onclick="setView('today',this)">📅 Arriving Today <span class="badge" id="badgeToday">0</span></div>
-        <div class="sidebar-nav-item" onclick="setView('uncalled',this)">📞 Needs Call <span class="badge" id="badgeUncalled">0</span></div>
+        <div class="sidebar-nav-item active" onclick="setView('all',this)" id="navAll">📋 All Bookings <span class="badge" id="badgeAll">0</span></div>
+        <div class="sidebar-nav-item" onclick="setView('today',this)" id="navToday">📅 Arriving Today <span class="badge" id="badgeToday">0</span></div>
+        <div class="sidebar-nav-item" onclick="setView('uncalled',this)" id="navUncalled">📞 Needs Call <span class="badge" id="badgeUncalled">0</span></div>
+        <div class="sidebar-nav-item" onclick="setView('declined',this)" id="navDeclined">💳 Payment Declined <span class="badge" id="badgeDeclined">0</span></div>
       </div>
       <div class="divider"></div>
       <button class="btn-add" onclick="openAddModal()">＋ Manual Booking</button>
@@ -337,6 +338,7 @@ const COLUMNS = [
 // ─── STATE ────────────────────────────────────────────────
 let token = '';
 let bookings = [];
+let paymentDeclinedLeads = [];
 let currentView = 'all';
 let draggedId = null;
 let openModalBookingId = null;
@@ -347,7 +349,7 @@ function doLogin() {
   if (!pin) return;
   token = pin;
   document.getElementById('loginError').textContent = '';
-  loadBookings(true);
+    loadBookings(true);
 }
 
 // ─── API ──────────────────────────────────────────────────
@@ -370,9 +372,14 @@ async function loadBookings(firstLoad = false) {
     // Verify PIN first (no DB)
     const verify = await api('GET', '/api/crm/verify');
     if (!verify.success) throw new Error('Invalid PIN');
-    // Then load bookings
-    const data = await api('GET', '/api/crm/bookings');
+    // Load bookings and payment declined leads
+    const [bookingsRes, declinedRes] = await Promise.all([
+      api('GET', '/api/crm/bookings'),
+      api('GET', '/api/crm/payment-declined').catch(() => ({ success: false, data: [] }))
+    ]);
+    const data = bookingsRes;
     if (!data.success) throw new Error(data.message);
+    if (declinedRes.success) paymentDeclinedLeads = declinedRes.data || [];
     // Normalize DB rows to local shape
     bookings = data.data.map(b => ({
       id:         b.id,
@@ -474,8 +481,39 @@ function getFiltered() {
 
 function render() {
   updateBadges();
-  const filtered = getFiltered();
   const board = document.getElementById('board');
+
+  if (currentView === 'declined') {
+    board.innerHTML = `
+      <div class="declined-panel" style="padding:20px;max-width:800px;">
+        <h2 style="font-size:16px;margin-bottom:16px;color:var(--text-muted);">💳 Payment Declined — Call to complete booking</h2>
+        ${paymentDeclinedLeads.length === 0
+          ? '<div class="empty-col" style="margin-top:0;">No payment declined leads. These appear when a guest tries to pay but their card is declined.</div>'
+          : paymentDeclinedLeads.map(l => `
+            <div class="card" style="margin-bottom:12px;">
+              <div class="card-accent" style="background:#EF4444"></div>
+              <div class="card-body">
+                <div class="card-top">
+                  <div class="card-name">${esc(l.guestFirstName + ' ' + l.guestLastName)}</div>
+                  <div class="room-badge">${esc(l.roomName)}</div>
+                </div>
+                <div class="card-dates">📅 ${l.checkinDate} → ${l.checkoutDate} (${l.nights}n) &nbsp; 💰 $${Number(l.grandTotal).toFixed(2)}</div>
+                <div style="font-size:12px;color:var(--text-muted);margin:8px 0;">
+                  📞 <a href="tel:${esc(l.guestPhone)}" style="color:var(--green);font-weight:600;">${esc(l.guestPhone)}</a> &nbsp;
+                  ✉ ${esc(l.guestEmail)}
+                </div>
+                ${l.errorMessage ? `<div style="font-size:11px;color:var(--red);background:#FEE2E2;padding:6px 10px;border-radius:8px;margin-bottom:8px;">⚠ ${esc(l.errorMessage)}</div>` : ''}
+                <div class="card-footer">
+                  <button class="btn btn-primary" onclick="markDeclinedCalled('${l.id}')">✓ Mark as Called</button>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+      </div>`;
+    return;
+  }
+
+  const filtered = getFiltered();
   board.innerHTML = '';
 
   COLUMNS.forEach(col => {
@@ -729,16 +767,39 @@ function updateBadges() {
   document.getElementById('badgeAll').textContent     = bookings.length;
   document.getElementById('badgeToday').textContent   = bookings.filter(b=>b.checkIn===today).length;
   document.getElementById('badgeUncalled').textContent= bookings.filter(b=>b.callStatus==='not-called').length;
+  const badgeDeclinedEl = document.getElementById('badgeDeclined');
+  if (badgeDeclinedEl) badgeDeclinedEl.textContent = paymentDeclinedLeads.length;
   document.getElementById('statNew').innerHTML        = `📥 <strong>${bookings.filter(b=>b.column==='new').length}</strong> New`;
   document.getElementById('statConfirmed').innerHTML  = `✅ <strong>${bookings.filter(b=>b.column==='confirmed').length}</strong> Confirmed`;
   document.getElementById('statInHouse').innerHTML    = `🏨 <strong>${bookings.filter(b=>b.column==='checked_in').length}</strong> In-House`;
+}
+
+async function loadPaymentDeclinedLeads() {
+  try {
+    const data = await api('GET', '/api/crm/payment-declined');
+    paymentDeclinedLeads = data.success ? data.data : [];
+  } catch(e) {
+    paymentDeclinedLeads = [];
+  }
+}
+
+async function markDeclinedCalled(id) {
+  try {
+    await api('PATCH', '/api/crm/payment-declined/' + encodeURIComponent(id), { called: true });
+    paymentDeclinedLeads = paymentDeclinedLeads.filter(l => l.id !== id);
+    toast('Marked as called', 'success');
+    render();
+  } catch(e) {
+    toast('Failed: ' + (e.message || e), 'error');
+  }
 }
 
 function setView(v, el) {
   currentView = v;
   document.querySelectorAll('.sidebar-nav-item').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
-  render();
+  if (v === 'declined') loadPaymentDeclinedLeads().then(render);
+  else render();
 }
 
 function toast(msg, type='') {
