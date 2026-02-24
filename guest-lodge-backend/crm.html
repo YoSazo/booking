@@ -334,6 +334,7 @@ const COLUMNS = [
   { id:'checked_in', label:'Checked In',    color:'#8B5CF6', emoji:'🏨' },
   { id:'no_show',    label:'No Show',       color:'#EF4444', emoji:'❌' },
 ];
+const DECLINED_COLUMN = { id:'declined', label:'Payment Declined', color:'#EF4444', emoji:'💳' };
 
 // ─── STATE ────────────────────────────────────────────────
 let token = '';
@@ -543,6 +544,24 @@ function render() {
     board.appendChild(colEl);
   });
 
+  // Payment Declined column in All Bookings
+  if (currentView === 'all') {
+    const declCol = document.createElement('div');
+    declCol.className = 'column';
+    declCol.innerHTML = `
+      <div class="column-header">
+        <div class="column-dot" style="background:${DECLINED_COLUMN.color}"></div>
+        <div class="column-title">${DECLINED_COLUMN.emoji} ${DECLINED_COLUMN.label}</div>
+        <div class="column-count">${paymentDeclinedLeads.length}</div>
+      </div>
+      <div class="column-body" data-col="declined">
+        ${paymentDeclinedLeads.length === 0
+          ? '<div class="empty-col">No declined payments</div>'
+          : paymentDeclinedLeads.map(renderDeclinedCard).join('')}
+      </div>`;
+    board.appendChild(declCol);
+  }
+
   board.querySelectorAll('.card').forEach(el => {
     el.addEventListener('dragstart', e => { draggedId = el.dataset.id; setTimeout(()=>el.classList.add('dragging'),0); });
     el.addEventListener('dragend', () => { document.querySelectorAll('.card').forEach(c=>c.classList.remove('dragging')); document.querySelectorAll('.column-body').forEach(c=>c.classList.remove('drag-over')); draggedId=null; });
@@ -557,6 +576,29 @@ function arrivalBadge(checkIn) {
   if (checkIn === tom)   return '<span class="arrival-badge tomorrow">Tomorrow</span>';
   if (checkIn <= soon)   return '<span class="arrival-badge soon">Soon</span>';
   return '';
+}
+
+function renderDeclinedCard(l) {
+  const ci = l.checkinDate ? new Date(l.checkinDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+  const co = l.checkoutDate ? new Date(l.checkoutDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+  const name = (l.guestFirstName + ' ' + l.guestLastName).trim();
+  return `
+    <div class="card" style="cursor:pointer" data-id="declined_${l.id}" onclick="openDeclinedDetail('${l.id}')">
+      <div class="card-accent" style="background:${DECLINED_COLUMN.color}"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-name">${esc(name)}</div>
+          <div class="room-badge">${esc(l.roomName)}</div>
+        </div>
+        <div class="card-dates">📅 ${ci} → ${co} <span style="color:var(--text-muted)">(${l.nights}n)</span></div>
+        <div class="card-meta">
+          <span class="call-badge not-called">💳 Card declined</span>
+        </div>
+        <div class="card-footer">
+          <div class="card-total">$${Number(l.grandTotal).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderCard(b) {
