@@ -814,6 +814,17 @@ useEffect(() => {
     };
 
 
+// Detect Stripe card/decline errors (for payment-declined leads)
+// Includes "live mode + test card" (e.g. 4242... with live keys) so you can test the CRM view
+const isCardDeclineError = (err) => {
+  if (!err) return false;
+  const msg = (err?.message || '').toLowerCase();
+  if (msg.includes('live mode') && msg.includes('test card') && msg.includes('declined')) return true;
+  if (!err?.code) return false;
+  const declineCodes = ['card_declined', 'insufficient_funds', 'expired_card', 'incorrect_cvc', 'incorrect_number', 'invalid_expiry_month', 'invalid_expiry_year', 'processing_error'];
+  return declineCodes.includes(err.code) || !!err.decline_code;
+};
+
 // NEW: Handle "Pay Later" booking with pre-authorization hold
 const handlePayLaterBooking = async (e) => {
     // Prevent accidental double-submits
@@ -939,6 +950,21 @@ const handlePayLaterBooking = async (e) => {
                 setErrorMessage(error.message || "Card authorization failed");
                 setIsProcessing(false);
                 setShowLoadingScreen(false);
+                if (isCardDeclineError(error)) {
+                  fetch(`${apiBaseUrl}/api/payment-declined`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      guestInfo: formData,
+                      bookingDetails: payLaterBooking,
+                      errorCode: error.code,
+                      errorDeclineCode: error.decline_code,
+                      errorMessage: error.message,
+                      hotelId: hotelId,
+                      paymentMethod: 'card'
+                    })
+                  }).catch(() => {});
+                }
             } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
                 // Hold successfully placed - now create the booking
                 const bookingResponse = await fetch(`${apiBaseUrl}/api/complete-pay-later-booking`, {
@@ -1013,6 +1039,21 @@ const handlePayLaterBooking = async (e) => {
                     ev.complete('fail');
                     setErrorMessage(confirmError.message);
                     setIsProcessing(false);
+                    if (isCardDeclineError(confirmError)) {
+                      fetch(`${apiBaseUrl}/api/payment-declined`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          guestInfo: formData,
+                          bookingDetails: payLaterBooking,
+                          errorCode: confirmError.code,
+                          errorDeclineCode: confirmError.decline_code,
+                          errorMessage: confirmError.message,
+                          hotelId: hotelId,
+                          paymentMethod: 'wallet'
+                        })
+                      }).catch(() => {});
+                    }
                     return;
                 }
                 
