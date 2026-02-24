@@ -342,6 +342,7 @@ let paymentDeclinedLeads = [];
 let currentView = 'all';
 let draggedId = null;
 let openModalBookingId = null;
+let openDeclinedLeadId = null;
 let refreshInterval = null;
 
 // ─── AUTH ─────────────────────────────────────────────────
@@ -494,7 +495,7 @@ function render() {
         ${paymentDeclinedLeads.length === 0
           ? '<div class="empty-col" style="margin-top:0;">No payment declined leads. These appear when a guest tries to pay but their card is declined.</div>'
           : paymentDeclinedLeads.map(l => `
-            <div class="card" style="margin-bottom:12px;">
+            <div class="card" style="margin-bottom:12px;cursor:pointer" onclick="openDeclinedDetail('${l.id}')">
               <div class="card-accent" style="background:#EF4444"></div>
               <div class="card-body">
                 <div class="card-top">
@@ -503,11 +504,11 @@ function render() {
                 </div>
                 <div class="card-dates">📅 ${l.checkinDate} → ${l.checkoutDate} (${l.nights}n) &nbsp; 💰 $${Number(l.grandTotal).toFixed(2)}</div>
                 <div style="font-size:12px;color:var(--text-muted);margin:8px 0;">
-                  📞 <a href="tel:${esc(l.guestPhone)}" style="color:var(--green);font-weight:600;">${esc(l.guestPhone)}</a> &nbsp;
+                  📞 <a href="tel:${esc(l.guestPhone)}" onclick="event.stopPropagation()" style="color:var(--green);font-weight:600;">${esc(l.guestPhone)}</a> &nbsp;
                   ✉ ${esc(l.guestEmail)}
                 </div>
                 ${l.errorMessage ? `<div style="font-size:11px;color:var(--red);background:#FEE2E2;padding:6px 10px;border-radius:8px;margin-bottom:8px;">⚠ ${esc(l.errorMessage)}</div>` : ''}
-                <div class="card-footer">
+                <div class="card-footer" onclick="event.stopPropagation()">
                   <button class="btn btn-primary" onclick="markDeclinedCalled('${l.id}')">✓ Mark as Called</button>
                 </div>
               </div>
@@ -683,6 +684,64 @@ function openDetail(id, e) {
     </div>`;
 }
 
+function openDeclinedDetail(id) {
+  openDeclinedLeadId = String(id);
+  const l = paymentDeclinedLeads.find(x => String(x.id) === String(id));
+  if (!l) return;
+  const ci = l.checkinDate ? new Date(l.checkinDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }) : '—';
+  const co = l.checkoutDate ? new Date(l.checkoutDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }) : '—';
+
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" id="modalOverlay" onclick="handleOverlay(event)">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">💳 ${esc(l.guestFirstName + ' ' + l.guestLastName)} — Payment Declined</div>
+            <div class="modal-subtitle">Call to complete booking manually</div>
+          </div>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-section">Reservation</div>
+          <div class="detail-row"><span class="detail-label">Room</span><span class="detail-value">${esc(l.roomName)}</span></div>
+          <div class="detail-row"><span class="detail-label">Check-In</span><span class="detail-value">${ci}</span></div>
+          <div class="detail-row"><span class="detail-label">Check-Out</span><span class="detail-value">${co}</span></div>
+          <div class="detail-row"><span class="detail-label">Duration</span><span class="detail-value">${l.nights} nights</span></div>
+          <div class="detail-row"><span class="detail-label">Total</span><span class="detail-value" style="color:var(--green);font-family:'DM Mono',monospace;font-size:16px">$${Number(l.grandTotal).toFixed(2)}</span></div>
+
+          <div class="modal-section" style="margin-top:16px">Contact</div>
+          <div class="detail-row"><span class="detail-label">📞 Phone</span><span class="detail-value"><a href="tel:${esc(l.guestPhone)}" style="color:var(--green);text-decoration:none;font-weight:700">${esc(l.guestPhone)}</a></span></div>
+          <div class="detail-row"><span class="detail-label">✉️ Email</span><span class="detail-value" style="font-size:12px">${esc(l.guestEmail)}</span></div>
+
+          ${l.errorMessage ? `
+          <div class="modal-section" style="margin-top:16px">Decline Reason</div>
+          <div style="font-size:12px;color:var(--red);background:#FEE2E2;padding:10px 12px;border-radius:8px;margin-bottom:8px;">⚠ ${esc(l.errorMessage)}</div>
+          ` : ''}
+
+          <div class="modal-section" style="margin-top:16px">Notes</div>
+          <textarea class="notes-area" id="declinedNotesInput" placeholder="Call notes, payment details...">${esc(l.notes || '')}</textarea>
+          <button class="btn btn-secondary" style="margin-top:8px;flex:none;padding:7px 14px;font-size:12px" onclick="saveDeclinedNotes('${l.id}')">💾 Save Notes</button>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick="markDeclinedCalled('${l.id}')">✓ Mark as Called</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function saveDeclinedNotes(id) {
+  const notes = document.getElementById('declinedNotesInput')?.value ?? '';
+  try {
+    await api('PATCH', '/api/crm/payment-declined/' + encodeURIComponent(id), { notes });
+    const l = paymentDeclinedLeads.find(x => String(x.id) === String(id));
+    if (l) l.notes = notes;
+    toast('Notes saved', 'success');
+  } catch (e) {
+    toast('Failed to save notes', 'error');
+  }
+}
+
 function openAddModal() {
   openModalBookingId = null;
   const f = (label, id, type, placeholder, span=1) =>
@@ -725,6 +784,7 @@ function openAddModal() {
 function closeModal() {
   document.getElementById('modalContainer').innerHTML = '';
   openModalBookingId = null;
+  openDeclinedLeadId = null;
 }
 function handleOverlay(e) { if (e.target.id==='modalOverlay') closeModal(); }
 
@@ -741,7 +801,7 @@ function saveNotes(id) {
   toast('Notes saved', 'success');
 }
 
-function addManualBooking() {
+async function addManualBooking() {
   const name  = document.getElementById('aName').value.trim();
   const phone = document.getElementById('aPhone').value.trim();
   const email = document.getElementById('aEmail').value.trim();
@@ -752,17 +812,16 @@ function addManualBooking() {
   const total = parseFloat(document.getElementById('aTotal').value) || 0;
   const notes = document.getElementById('aNotes').value;
   if (!name || !phone || !ci || !co) { alert('Name, phone, and dates are required.'); return; }
-  const nights = Math.max(1, Math.round((new Date(co)-new Date(ci))/86400000));
-  // Add locally only (no DB endpoint for manual adds in this version — extend if needed)
-  bookings.unshift({
-    id: 'manual_'+Date.now(), name, phone, email, roomType: room, guests,
-    nights, checkIn: ci, checkOut: co, total, column:'new',
-    callStatus:'not-called', notes, callLog:[], bookedAt: new Date().toLocaleString(),
-    bookingType:'manual', pmsCode:'',
-  });
-  toast(`Added ${name}`, 'success');
-  closeModal();
-  render();
+  try {
+    const res = await api('POST', '/api/crm/bookings', { name, phone, email, room, guests, checkIn: ci, checkOut: co, total, notes });
+    if (!res.success) throw new Error(res.message);
+    closeModal();
+    await loadBookings(false, true);
+    toast(`Added ${name}`, 'success');
+    render();
+  } catch (e) {
+    toast('Failed to add booking: ' + (e.message || e), 'error');
+  }
 }
 
 // ─── BADGES & UTILS ───────────────────────────────────────
@@ -791,6 +850,7 @@ async function markDeclinedCalled(id) {
   try {
     await api('PATCH', '/api/crm/payment-declined/' + encodeURIComponent(id), { called: true });
     paymentDeclinedLeads = paymentDeclinedLeads.filter(l => l.id !== id);
+    if (openDeclinedLeadId === String(id)) closeModal();
     toast('Marked as called', 'success');
     render();
   } catch(e) {

@@ -1614,6 +1614,67 @@ app.get('/api/crm/bookings', crmAuth, async (req, res) => {
     }
 });
 
+// Create a manual booking (from CRM "Add Booking")
+app.post('/api/crm/bookings', crmAuth, async (req, res) => {
+    try {
+        const body = req.body;
+        const name = (body.name || '').trim();
+        const [guestFirstName = '', guestLastName = ''] = name ? name.split(/\s+/, 2) : ['', ''];
+        const guestPhone = (body.phone || '').trim();
+        const guestEmail = (body.email || '').trim();
+        const roomName = (body.room || 'King Room').trim();
+        const guests = parseInt(body.guests, 10) || 1;
+        const checkIn = body.checkIn || body.checkin;
+        const checkOut = body.checkOut || body.checkout;
+        const total = parseFloat(body.total) || 0;
+        const notes = (body.notes || '').trim();
+
+        if (!name || !guestPhone || !checkIn || !checkOut) {
+            return res.status(400).json({ success: false, message: 'Name, phone, and dates are required.' });
+        }
+
+        const checkinDate = new Date(checkIn);
+        const checkoutDate = new Date(checkOut);
+        const nights = Math.max(1, Math.round((checkoutDate - checkinDate) / 86400000));
+        const grandTotal = total;
+        const subtotal = Math.round((grandTotal / 1.1) * 100) / 100;
+        const taxesAndFees = Math.round((grandTotal - subtotal) * 100) / 100;
+
+        const crypto = require('crypto');
+        const ourReservationCode = `MANUAL-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+        const hotelId = body.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot';
+
+        const booking = await prisma.booking.create({
+            data: {
+                ourReservationCode,
+                pmsConfirmationCode: ourReservationCode,
+                hotelId,
+                roomName,
+                checkinDate,
+                checkoutDate,
+                nights,
+                guestFirstName: guestFirstName || '-',
+                guestLastName: guestLastName || '-',
+                guestEmail: guestEmail || '-',
+                guestPhone,
+                subtotal,
+                taxesAndFees,
+                grandTotal,
+                bookingType: 'manual',
+                status: 'confirmed',
+                crmStage: 'new',
+                callStatus: 'not-called',
+                notes: notes || null,
+            },
+        });
+
+        res.json({ success: true, data: booking });
+    } catch (e) {
+        console.error('CRM manual booking create error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // Update a booking's CRM stage, call status, notes, call log
 app.post('/api/crm/update', crmAuth, async (req, res) => {
     try {
