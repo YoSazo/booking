@@ -342,6 +342,7 @@ let paymentDeclinedLeads = [];
 let currentView = 'all';
 let draggedId = null;
 let openModalBookingId = null;
+let refreshInterval = null;
 
 // ─── AUTH ─────────────────────────────────────────────────
 function doLogin() {
@@ -367,7 +368,7 @@ async function api(method, path, body) {
   return res.json();
 }
 
-async function loadBookings(firstLoad = false) {
+async function loadBookings(firstLoad = false, silent = false) {
   try {
     // Verify PIN first (no DB)
     const verify = await api('GET', '/api/crm/verify');
@@ -403,9 +404,11 @@ async function loadBookings(firstLoad = false) {
     if (firstLoad) {
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('app').style.display = 'block';
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => loadBookings(false, true), 60000);
     }
     render();
-    toast('Bookings loaded', 'success');
+    if (!silent) toast('Bookings loaded', 'success');
   } catch(e) {
     if (firstLoad) {
       const msg = e.message || String(e);
@@ -427,6 +430,7 @@ function showLogin() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   token = '';
+  if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
 }
 
 async function saveBooking(id, changes) {
