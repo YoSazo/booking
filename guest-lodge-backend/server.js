@@ -11,7 +11,44 @@ const http = require('http');
 const https = require('https');
 
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+    datasources: {
+        db: {
+            url: process.env.DATABASE_URL + (process.env.DATABASE_URL?.includes('?') ? '&' : '?') + 'pgbouncer=true&connection_limit=1&pool_timeout=20'
+        }
+    },
+    log: ['error'],
+});
+
+// Reconnect helper for connection pool drops (e.g. Supabase idle timeout)
+async function withRetry(fn, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        } catch (e) {
+            const isConnErr = e.message?.includes("Can't reach database") ||
+                e.message?.includes('P1001') ||
+                e.message?.includes('P1017');
+            if (isConnErr && i < retries - 1) {
+                console.log(`DB connection failed, retrying in ${delay}ms... (${i + 1}/${retries})`);
+                await prisma.$disconnect();
+                await new Promise(r => setTimeout(r, delay));
+                await prisma.$connect();
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
+// Keepalive ping so connection never goes idle (Supabase drops ~5 min)
+setInterval(async () => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+    } catch (e) {
+        // silent - just keeping connection warm
+    }
+}, 4 * 60 * 1000); // ping every 4 minutes
 
 const allowedOrigins = [
     'https://suitestay.clickinns.com',
@@ -1480,7 +1517,7 @@ app.post('/api/payment-declined', async (req, res) => {
         }
         const checkinStr = typeof bookingDetails.checkin === 'string' ? bookingDetails.checkin.split('T')[0] : '';
         const checkoutStr = typeof bookingDetails.checkout === 'string' ? bookingDetails.checkout.split('T')[0] : '';
-        await prisma.paymentDeclinedLead.create({
+        await withRetry(() => prisma.paymentDeclinedLead.create({
             data: {
                 hotelId: hotelId || 'suite-stay',
                 guestFirstName: guestInfo.firstName,
@@ -1497,7 +1534,7 @@ app.post('/api/payment-declined', async (req, res) => {
                 errorMessage: errorMessage || null,
                 paymentMethod: paymentMethod || 'card',
             },
-        });
+        }));
         res.status(200).json({ success: true });
     } catch (e) {
         console.error('Payment declined lead save error:', e.message);
@@ -1600,14 +1637,14 @@ app.get('/api/crm/verify', crmAuth, (req, res) => {
 // Get bookings for CRM - last 7 days + all future
 app.get('/api/crm/bookings', crmAuth, async (req, res) => {
     try {
-        const bookings = await prisma.booking.findMany({
+        const bookings = await withRetry(() => prisma.booking.findMany({
             orderBy: { checkinDate: 'asc' },
             where: {
                 checkinDate: {
                     gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
                 }
             }
-        });
+        }));
         res.json({ success: true, data: bookings });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -1644,7 +1681,7 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
         const ourReservationCode = `MANUAL-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         const hotelId = body.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot';
 
-        const booking = await prisma.booking.create({
+        const booking = await withRetry(() => prisma.booking.create({
             data: {
                 ourReservationCode,
                 pmsConfirmationCode: ourReservationCode,
@@ -1666,7 +1703,7 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
                 callStatus: 'not-called',
                 notes: notes || null,
             },
-        });
+        }));
 
         res.json({ success: true, data: booking });
     } catch (e) {
@@ -1685,7 +1722,7 @@ app.post('/api/crm/update', crmAuth, async (req, res) => {
         if (notes !== undefined) data.notes = notes;
         if (callLog !== undefined) data.callLog = JSON.stringify(callLog);
 
-        const booking = await prisma.booking.update({ where: { id }, data });
+        const booking = await withRetry(() => prisma.booking.update({ where: { id }, data }));
         res.json({ success: true, booking });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -1695,10 +1732,10 @@ app.post('/api/crm/update', crmAuth, async (req, res) => {
 // Get payment declined leads
 app.get('/api/crm/payment-declined', crmAuth, async (req, res) => {
     try {
-        const leads = await prisma.paymentDeclinedLead.findMany({
+        const leads = await withRetry(() => prisma.paymentDeclinedLead.findMany({
             orderBy: { createdAt: 'desc' },
             where: { called: false }
-        });
+        }));
         res.json({ success: true, data: leads });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -1713,7 +1750,7 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
         const data = {};
         if (called !== undefined) data.called = !!called;
         if (notes !== undefined) data.notes = notes;
-        await prisma.paymentDeclinedLead.update({ where: { id }, data });
+        await withRetry(() => prisma.paymentDeclinedLead.update({ where: { id }, data }));
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -1724,7 +1761,7 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
 app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        await prisma.booking.delete({ where: { id } });
+        await withRetry(() => prisma.booking.delete({ where: { id } }));
         res.json({ success: true });
     } catch (e) {
         console.error('CRM delete error:', e.message);
