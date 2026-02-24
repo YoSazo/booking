@@ -505,7 +505,7 @@ function render() {
                 </div>
                 <div class="card-dates">📅 ${l.checkinDate} → ${l.checkoutDate} (${l.nights}n) &nbsp; 💰 $${Number(l.grandTotal).toFixed(2)}</div>
                 <div style="font-size:12px;color:var(--text-muted);margin:8px 0;">
-                  📞 <a href="tel:${esc(l.guestPhone)}" onclick="event.stopPropagation()" style="color:var(--green);font-weight:600;">${esc(l.guestPhone)}</a> &nbsp;
+                  📞 <span style="color:var(--green);font-weight:600;">${esc(l.guestPhone)}</span> &nbsp;
                   ✉ ${esc(l.guestEmail)}
                 </div>
                 ${l.errorMessage ? `<div style="font-size:11px;color:var(--red);background:#FEE2E2;padding:6px 10px;border-radius:8px;margin-bottom:8px;">⚠ ${esc(l.errorMessage)}</div>` : ''}
@@ -695,7 +695,7 @@ function openDetail(id, e) {
           <div class="detail-row"><span class="detail-label">Total</span><span class="detail-value" style="color:var(--green);font-family:'DM Mono',monospace;font-size:16px">$${Number(b.total).toFixed(2)}</span></div>
 
           <div class="modal-section" style="margin-top:16px">Contact</div>
-          <div class="detail-row"><span class="detail-label">📞 Phone</span><span class="detail-value"><a href="tel:${esc(b.phone)}" style="color:var(--green);text-decoration:none;font-weight:700">${esc(b.phone)}</a></span></div>
+          <div class="detail-row"><span class="detail-label">📞 Phone</span><span class="detail-value" style="color:var(--green);font-weight:700">${esc(b.phone)}</span></div>
           <div class="detail-row"><span class="detail-label">✉️ Email</span><span class="detail-value" style="font-size:12px">${esc(b.email)}</span></div>
           <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${callLabel[b.callStatus]||'🟡 Not called yet'}</span></div>
 
@@ -752,7 +752,7 @@ function openDeclinedDetail(id) {
           <div class="detail-row"><span class="detail-label">Total</span><span class="detail-value" style="color:var(--green);font-family:'DM Mono',monospace;font-size:16px">$${Number(l.grandTotal).toFixed(2)}</span></div>
 
           <div class="modal-section" style="margin-top:16px">Contact</div>
-          <div class="detail-row"><span class="detail-label">📞 Phone</span><span class="detail-value"><a href="tel:${esc(l.guestPhone)}" style="color:var(--green);text-decoration:none;font-weight:700">${esc(l.guestPhone)}</a></span></div>
+          <div class="detail-row"><span class="detail-label">📞 Phone</span><span class="detail-value" style="color:var(--green);font-weight:700">${esc(l.guestPhone)}</span></div>
           <div class="detail-row"><span class="detail-label">✉️ Email</span><span class="detail-value" style="font-size:12px">${esc(l.guestEmail)}</span></div>
 
           ${l.errorMessage ? `
