@@ -523,7 +523,6 @@ useEffect(() => {
 
       // Optimization: skip the Plan step entirely and go straight to payment.
       // (Reserve for $0 is the default and the primary funnel.)
-      trackAddPaymentInfo(bookingDetails, formData);
       setCurrentStep(4);
     }
   }
@@ -1197,6 +1196,7 @@ const handlePayLaterBooking = async (e) => {
         setWhyCardModalDismissed(true);
         document.body.style.overflow = '';
         trackCardModalAcknowledged(bookingDetails);
+        trackAddPaymentInfo(bookingDetails, formData);
     };
 
     return (
