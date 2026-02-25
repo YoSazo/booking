@@ -644,20 +644,19 @@
     metaRangeEndIndex = null;
     updateMetaModalSelection();
     const btn = document.getElementById('metaSelectBtn');
-    if (btn) btn.textContent = metaSelectRange ? 'Range mode' : 'Select';
+    if (btn) btn.textContent = metaSelectRange ? 'Single mode' : 'Range mode';
   }
 
   function applyMetaRange() {
-    if (
-      !metaSelectRange ||
-      metaRangeStartIndex == null ||
-      metaRangeEndIndex == null
-    ) {
+    if (metaRangeStartIndex == null || metaRangeEndIndex == null) {
       closeMetaModal();
       return;
     }
-    const start = metaModalDates[metaRangeStartIndex];
-    const end = metaModalDates[metaRangeEndIndex];
+    // Indices are newest-first (0 = today), so higher index = earlier date
+    const earlierIndex = Math.max(metaRangeStartIndex, metaRangeEndIndex);
+    const laterIndex   = Math.min(metaRangeStartIndex, metaRangeEndIndex);
+    const start = metaModalDates[earlierIndex];
+    const end   = metaModalDates[laterIndex];
     if (!start || !end) {
       closeMetaModal();
       return;
