@@ -10,6 +10,11 @@ const xml2js = require('xml2js');
 const http = require('http');
 const https = require('https');
 
+// Meta Ads / Facebook Marketing API config
+const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
+
 const app = express();
 const prisma = new PrismaClient({
     datasources: {
@@ -1635,6 +1640,139 @@ app.get('/api/funnel', crmAuth, (req, res) => {
     funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
     const recent = funnelStore.slice(0, 50);
     res.json({ counts, recent });
+});
+
+// Meta Ads insights for funnel dashboard (7-day window)
+app.get('/api/meta-insights', crmAuth, async (req, res) => {
+    try {
+        if (!META_AD_ACCOUNT_ID || !META_ACCESS_TOKEN) {
+            return res.json({
+                success: false,
+                enabled: false,
+                message: 'Meta Ads env vars not configured',
+            });
+        }
+
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0];
+        const until = new Date().toISOString().split('T')[0];
+
+        const url = `https://graph.facebook.com/${META_API_VERSION}/act_${META_AD_ACCOUNT_ID}/insights`;
+
+        const params = {
+            access_token: META_ACCESS_TOKEN,
+            level: 'account',
+            time_range: JSON.stringify({ since, until }),
+            time_increment: 'all_days',
+            fields: [
+                'spend',
+                'impressions',
+                'clicks',
+                'cpm',
+                'ctr',
+                'actions',
+                'action_values',
+                'cost_per_action_type',
+                'purchase_roas',
+            ].join(','),
+        };
+
+        const resp = await axios.get(url, { params });
+        const rows = resp.data?.data || [];
+        if (!rows.length) {
+            return res.json({ success: true, enabled: true, data: null });
+        }
+
+        const row = rows[0] || {};
+
+        const spend = parseFloat(row.spend || 0) || 0;
+        const impressions = parseInt(row.impressions || 0, 10) || 0;
+        const clicks = parseInt(row.clicks || 0, 10) || 0;
+        const ctr = parseFloat(row.ctr || 0) || 0;
+        const cpm = parseFloat(row.cpm || 0) || 0;
+
+        // Event counts from Meta (actions)
+        const metaEvents = {
+            landing_page_view: 0,
+            search: 0,
+            add_to_cart: 0,
+            initiate_checkout: 0,
+            add_payment_info: 0,
+            purchase: 0,
+        };
+
+        if (Array.isArray(row.actions)) {
+            row.actions.forEach(a => {
+                const type = a.action_type;
+                const v = Number(a.value || 0);
+                if (!v) return;
+                if (type === 'landing_page_view') metaEvents.landing_page_view += v;
+                if (type === 'search') metaEvents.search += v;
+                if (type === 'add_to_cart') metaEvents.add_to_cart += v;
+                if (type === 'initiate_checkout') metaEvents.initiate_checkout += v;
+                if (type === 'add_payment_info') metaEvents.add_payment_info += v;
+                if (type === 'purchase') metaEvents.purchase += v;
+            });
+        }
+
+        // Landing page views and cost per LP view
+        const landingPageViews = metaEvents.landing_page_view;
+
+        let costPerLPV = 0;
+        if (Array.isArray(row.cost_per_action_type)) {
+            const cplpv = row.cost_per_action_type.find(
+                a => a.action_type === 'landing_page_view'
+            );
+            if (cplpv && cplpv.value != null) {
+                costPerLPV = Number(cplpv.value);
+            }
+        }
+        if (!costPerLPV && landingPageViews > 0 && spend > 0) {
+            costPerLPV = spend / landingPageViews;
+        }
+
+        // Purchase value and ROAS
+        let purchaseValue = 0;
+        if (Array.isArray(row.action_values)) {
+            const pv = row.action_values.find(a => a.action_type === 'purchase');
+            purchaseValue = pv ? Number(pv.value || 0) : 0;
+        }
+
+        let roas = 0;
+        if (spend > 0 && purchaseValue > 0) {
+            roas = purchaseValue / spend;
+        }
+        if (Array.isArray(row.purchase_roas) && row.purchase_roas[0]?.value != null) {
+            roas = Number(row.purchase_roas[0].value);
+        }
+
+        res.json({
+            success: true,
+            enabled: true,
+            data: {
+                spend,
+                impressions,
+                clicks,
+                ctr,
+                cpm,
+                landing_page_views: landingPageViews,
+                cost_per_landing_page_view: costPerLPV || 0,
+                purchase_value: purchaseValue,
+                roas: roas || 0,
+                events: metaEvents,
+                since,
+                until,
+            },
+        });
+    } catch (e) {
+        console.error('Meta insights error:', e.response?.data || e.message);
+        res.status(500).json({
+            success: false,
+            enabled: true,
+            message: e.message || 'Meta insights error',
+        });
+    }
 });
 
 // Serve funnel dashboard HTML (login handled client-side, API requires crmAuth)
