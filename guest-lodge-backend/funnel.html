@@ -131,6 +131,39 @@
     font-weight: 700;
   }
 
+  .meta-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.25);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+  .meta-modal {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-lg);
+    max-width: 420px;
+    width: 100%;
+  }
+  .meta-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .meta-modal-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .meta-modal-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   /* FUNNEL */
   .funnel-section {
     background: var(--white); border-radius: 16px; border: 1.5px solid var(--border);
@@ -233,11 +266,7 @@
       <button class="refresh-btn" onclick="setMetaRange('today')">Today</button>
       <button class="refresh-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
       <button class="refresh-btn" onclick="setMetaRange('last7')">Last 7 days</button>
-      <span style="font-size:12px;color:var(--text-muted);margin-left:8px;">Custom:</span>
-      <input type="date" id="meta-from">
-      <span style="font-size:12px;">→</span>
-      <input type="date" id="meta-to">
-      <button class="refresh-btn" onclick="setMetaCustomRange()">Apply</button>
+      <button class="refresh-btn" onclick="openMetaModal()">Choose dates</button>
       <button class="refresh-btn" onclick="copyMetaSummary()">Copy summary</button>
     </div>
 
@@ -334,6 +363,16 @@
     </div>
   </main>
 </div>
+</div>
+
+<div id="metaModal" class="meta-modal-overlay" onclick="handleMetaModalOverlay(event)">
+  <div class="meta-modal">
+    <div class="meta-modal-header">
+      <span class="meta-modal-title">Choose date (last 14 days)</span>
+      <button class="refresh-btn" onclick="closeMetaModal()">×</button>
+    </div>
+    <div class="meta-modal-body" id="metaModalBody"></div>
+  </div>
 </div>
 
 <script>
@@ -497,15 +536,40 @@
     loadMeta();
   }
 
-  function setMetaCustomRange() {
-    const fromEl = document.getElementById('meta-from');
-    const toEl = document.getElementById('meta-to');
-    if (!fromEl || !toEl) return;
-    const from = fromEl.value;
-    const to = toEl.value;
-    if (!from || !to) return;
-    metaRange = { type: 'custom', from, to };
-    loadMeta();
+  function openMetaModal() {
+    const modal = document.getElementById('metaModal');
+    const body = document.getElementById('metaModalBody');
+    if (!modal || !body) return;
+    body.innerHTML = '';
+
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const iso = d.toISOString().split('T')[0];
+      const btn = document.createElement('button');
+      btn.className = 'refresh-btn';
+      btn.textContent = label;
+      btn.onclick = () => {
+        metaRange = { type: 'custom', from: iso, to: iso };
+        closeMetaModal();
+        loadMeta();
+      };
+      body.appendChild(btn);
+    }
+
+    modal.style.display = 'flex';
+  }
+
+  function closeMetaModal() {
+    const modal = document.getElementById('metaModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function handleMetaModalOverlay(e) {
+    if (e.target && e.target.id === 'metaModal') {
+      closeMetaModal();
+    }
   }
 
   async function copyMetaSummary() {
