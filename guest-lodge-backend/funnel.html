@@ -164,6 +164,12 @@
     gap: 8px;
   }
 
+  .meta-date-btn.selected {
+    background: var(--green);
+    color: #fff;
+    border-color: var(--green);
+  }
+
   /* FUNNEL */
   .funnel-section {
     background: var(--white); border-radius: 16px; border: 1.5px solid var(--border);
@@ -369,7 +375,11 @@
   <div class="meta-modal">
     <div class="meta-modal-header">
       <span class="meta-modal-title">Choose date (last 14 days)</span>
-      <button class="refresh-btn" onclick="closeMetaModal()">×</button>
+      <div>
+        <button class="refresh-btn" id="metaSelectBtn" onclick="toggleMetaRangeMode()">Select</button>
+        <button class="refresh-btn" onclick="applyMetaRange()">Done</button>
+        <button class="refresh-btn" onclick="closeMetaModal()">×</button>
+      </div>
     </div>
     <div class="meta-modal-body" id="metaModalBody"></div>
   </div>
@@ -380,6 +390,10 @@
   let token = '';
   let metaRange = { type: 'last7' };
   let lastMeta = null;
+  let metaModalDates = [];
+  let metaSelectRange = false;
+  let metaRangeStartIndex = null;
+  let metaRangeEndIndex = null;
 
   function formatTime(ts) {
     const d = new Date(ts);
@@ -542,19 +556,24 @@
     if (!modal || !body) return;
     body.innerHTML = '';
 
+    metaModalDates = [];
+    metaSelectRange = false;
+    metaRangeStartIndex = null;
+    metaRangeEndIndex = null;
+    const selectBtn = document.getElementById('metaSelectBtn');
+    if (selectBtn) selectBtn.textContent = 'Select';
+
     const today = new Date();
     for (let i = 0; i < 14; i++) {
       const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
       const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       const iso = d.toISOString().split('T')[0];
+      metaModalDates.push({ iso });
       const btn = document.createElement('button');
-      btn.className = 'refresh-btn';
+      btn.className = 'refresh-btn meta-date-btn';
       btn.textContent = label;
-      btn.onclick = () => {
-        metaRange = { type: 'custom', from: iso, to: iso };
-        closeMetaModal();
-        loadMeta();
-      };
+      btn.dataset.index = String(i);
+      btn.onclick = () => onMetaDateClick(i);
       body.appendChild(btn);
     }
 
@@ -570,6 +589,82 @@
     if (e.target && e.target.id === 'metaModal') {
       closeMetaModal();
     }
+  }
+
+  function onMetaDateClick(index) {
+    const entry = metaModalDates[index];
+    if (!entry) return;
+
+    if (!metaSelectRange) {
+      // Single-day selection
+      metaRange = { type: 'custom', from: entry.iso, to: entry.iso };
+      closeMetaModal();
+      loadMeta();
+      return;
+    }
+
+    // Range selection mode
+    if (metaRangeStartIndex === null) {
+      metaRangeStartIndex = index;
+      metaRangeEndIndex = index;
+    } else {
+      metaRangeEndIndex = index;
+    }
+
+    if (metaRangeEndIndex < metaRangeStartIndex) {
+      const tmp = metaRangeStartIndex;
+      metaRangeStartIndex = metaRangeEndIndex;
+      metaRangeEndIndex = tmp;
+    }
+    updateMetaModalSelection();
+  }
+
+  function updateMetaModalSelection() {
+    const body = document.getElementById('metaModalBody');
+    if (!body) return;
+    const buttons = body.querySelectorAll('.meta-date-btn');
+    buttons.forEach(btn => {
+      const idx = parseInt(btn.dataset.index || '-1', 10);
+      if (
+        metaRangeStartIndex != null &&
+        metaRangeEndIndex != null &&
+        idx >= metaRangeStartIndex &&
+        idx <= metaRangeEndIndex
+      ) {
+        btn.classList.add('selected');
+      } else {
+        btn.classList.remove('selected');
+      }
+    });
+  }
+
+  function toggleMetaRangeMode() {
+    metaSelectRange = !metaSelectRange;
+    metaRangeStartIndex = null;
+    metaRangeEndIndex = null;
+    updateMetaModalSelection();
+    const btn = document.getElementById('metaSelectBtn');
+    if (btn) btn.textContent = metaSelectRange ? 'Range mode' : 'Select';
+  }
+
+  function applyMetaRange() {
+    if (
+      !metaSelectRange ||
+      metaRangeStartIndex == null ||
+      metaRangeEndIndex == null
+    ) {
+      closeMetaModal();
+      return;
+    }
+    const start = metaModalDates[metaRangeStartIndex];
+    const end = metaModalDates[metaRangeEndIndex];
+    if (!start || !end) {
+      closeMetaModal();
+      return;
+    }
+    metaRange = { type: 'custom', from: start.iso, to: end.iso };
+    closeMetaModal();
+    loadMeta();
   }
 
   async function copyMetaSummary() {
