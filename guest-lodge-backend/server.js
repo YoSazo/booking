@@ -1642,7 +1642,7 @@ app.get('/api/funnel', crmAuth, (req, res) => {
     res.json({ counts, recent });
 });
 
-// Meta Ads insights for funnel dashboard (7-day window)
+// Meta Ads insights for funnel dashboard
 app.get('/api/meta-insights', crmAuth, async (req, res) => {
     try {
         if (!META_AD_ACCOUNT_ID || !META_ACCESS_TOKEN) {
@@ -1653,16 +1653,44 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
             });
         }
 
-        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0];
-        const until = new Date().toISOString().split('T')[0];
+        const { range, from, to } = req.query;
+        const today = new Date();
+        const fmtDate = d => d.toISOString().split('T')[0];
+
+        let since;
+        let until;
+
+        if (range === 'today') {
+            since = fmtDate(today);
+            until = fmtDate(today);
+        } else if (range === 'yesterday') {
+            const y = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+            since = fmtDate(y);
+            until = fmtDate(y);
+        } else if (from && to) {
+            const fromDate = new Date(from);
+            const toDate = new Date(to);
+            if (isNaN(fromDate) || isNaN(toDate) || fromDate > toDate) {
+                return res.status(400).json({ success: false, message: 'Invalid date range' });
+            }
+            const diffDays = (toDate - fromDate) / (24 * 60 * 60 * 1000);
+            if (diffDays > 14) {
+                return res.status(400).json({ success: false, message: 'Max 14-day range is 14 days' });
+            }
+            since = fmtDate(fromDate);
+            until = fmtDate(toDate);
+        } else {
+            // default last 7 days
+            const sevenAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            since = fmtDate(sevenAgo);
+            until = fmtDate(today);
+        }
 
         const url = `https://graph.facebook.com/${META_API_VERSION}/act_${META_AD_ACCOUNT_ID}/insights`;
 
         const params = {
             access_token: META_ACCESS_TOKEN,
-            level: 'account',
+            level: 'campaign',
             time_range: JSON.stringify({ since, until }),
             time_increment: 'all_days',
             fields: [
@@ -1676,6 +1704,13 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
                 'cost_per_action_type',
                 'purchase_roas',
             ].join(','),
+            filtering: JSON.stringify([
+                {
+                    field: 'campaign.id',
+                    operator: 'IN',
+                    value: ['6964479702393'],
+                },
+            ]),
         };
 
         const resp = await axios.get(url, { params });

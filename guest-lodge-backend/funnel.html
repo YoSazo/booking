@@ -97,6 +97,14 @@
   .main-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
   .main-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
 
+  .meta-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
   /* META METRICS */
   .metrics-grid {
     display: grid;
@@ -221,6 +229,18 @@
     <h1 class="main-title">Conversion Funnel</h1>
     <p class="main-subtitle">Real-time events from your booking engine. Funnel data refreshes every 3 seconds.</p>
 
+    <div class="meta-toolbar">
+      <button class="refresh-btn" onclick="setMetaRange('today')">Today</button>
+      <button class="refresh-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
+      <button class="refresh-btn" onclick="setMetaRange('last7')">Last 7 days</button>
+      <span style="font-size:12px;color:var(--text-muted);margin-left:8px;">Custom:</span>
+      <input type="date" id="meta-from">
+      <span style="font-size:12px;">→</span>
+      <input type="date" id="meta-to">
+      <button class="refresh-btn" onclick="setMetaCustomRange()">Apply</button>
+      <button class="refresh-btn" onclick="copyMetaSummary()">Copy summary</button>
+    </div>
+
     <div class="metrics-grid" id="metaMetrics" style="display:none">
       <div class="metric-card">
         <div class="metric-label">Ad Spend (7d)</div>
@@ -319,6 +339,8 @@
 <script>
   const EMOJI_MAP = { Search: '🔍', AddToCart: '🛒', InitiateCheckout: '📋', AddPaymentInfo: '💳', Purchase: '✅', PageView: '👁' };
   let token = '';
+  let metaRange = { type: 'last7' };
+  let lastMeta = null;
 
   function formatTime(ts) {
     const d = new Date(ts);
@@ -340,6 +362,7 @@
     }
 
     const d = payload.data;
+    lastMeta = d;
     container.style.display = 'grid';
 
     const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
@@ -441,7 +464,18 @@
   async function loadMeta() {
     if (!token) return;
     try {
-      const res = await fetch('/api/meta-insights', { headers: { 'x-crm-token': token } });
+      let qs = '';
+      if (metaRange.type === 'today' || metaRange.type === 'yesterday') {
+        qs = '?range=' + encodeURIComponent(metaRange.type);
+      } else if (metaRange.type === 'custom') {
+        qs =
+          '?from=' +
+          encodeURIComponent(metaRange.from) +
+          '&to=' +
+          encodeURIComponent(metaRange.to);
+      } // last7 -> default on backend
+
+      const res = await fetch('/api/meta-insights' + qs, { headers: { 'x-crm-token': token } });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         renderMeta(null);
@@ -456,6 +490,61 @@
   function handleRefresh() {
     load();
     loadMeta();
+  }
+
+  function setMetaRange(type) {
+    metaRange = { type };
+    loadMeta();
+  }
+
+  function setMetaCustomRange() {
+    const fromEl = document.getElementById('meta-from');
+    const toEl = document.getElementById('meta-to');
+    if (!fromEl || !toEl) return;
+    const from = fromEl.value;
+    const to = toEl.value;
+    if (!from || !to) return;
+    metaRange = { type: 'custom', from, to };
+    loadMeta();
+  }
+
+  async function copyMetaSummary() {
+    if (!lastMeta) return;
+    const d = lastMeta;
+    const ev = d.events || {};
+
+    const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
+    const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
+
+    const lines = [
+      `Date range: ${d.since || ''} → ${d.until || ''}`,
+      '',
+      `Spend: ${fmtMoney(d.spend)}`,
+      `CPM: ${fmtMoney(d.cpm)}`,
+      `CTR: ${fmtPct(d.ctr)}`,
+      `ROAS: ${d.roas != null ? d.roas.toFixed(2) + 'x' : '–'}`,
+      `Cost per LP view: ${fmtMoney(d.cost_per_landing_page_view)}`,
+      '',
+      `LP views (Meta): ${ev.landing_page_view ?? '–'}`,
+      `Searches (Meta): ${ev.search ?? '–'}`,
+      `Add to Cart (Meta): ${ev.add_to_cart ?? '–'}`,
+      `Initiate Checkout (Meta): ${ev.initiate_checkout ?? '–'}`,
+      `Add Payment Info (Meta): ${ev.add_payment_info ?? '–'}`,
+      `Purchases (Meta): ${ev.purchase ?? '–'}`,
+    ];
+
+    const text = lines.join('\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
   }
 
   if (document.getElementById('pinInput')) document.getElementById('pinInput').focus();
