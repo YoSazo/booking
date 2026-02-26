@@ -237,6 +237,7 @@
     </div>
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
+      <button class="refresh-btn" onclick="addDummyBookings()">➕ Test Bookings</button>
       <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notifications</button>
       <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
     </div>
@@ -407,6 +408,22 @@ async function addNote(id) {
     await api('POST', `/api/crm/bookings/${id}/note`, { note });
     toast('Note saved', 'success');
   } catch(e) { toast('Failed to save note', 'error'); }
+}
+
+// ── ADD DUMMY BOOKINGS ─────────────────────────────────
+async function addDummyBookings() {
+  if (!confirm('Add 4 test bookings (1 with payment declined)?')) return;
+  try {
+    const data = await api('POST', '/api/crm/add-dummy-bookings');
+    if (data.success) {
+      toast(`Added ${data.count} test bookings`, 'success');
+      loadBookings();
+    } else {
+      toast('Failed to add test bookings', 'error');
+    }
+  } catch(e) {
+    toast('Error adding test bookings', 'error');
+  }
 }
 
 // ── NOTIFICATIONS ──────────────────────────────────────
