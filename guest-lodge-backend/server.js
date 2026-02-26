@@ -1850,6 +1850,26 @@ app.get('/crm', (req, res) => {
     res.sendFile(path.join(__dirname, 'crm.html'));
 });
 
+// Serve Simple CRM HTML (for front desk)
+app.get('/simple-crm', (req, res) => {
+    res.sendFile(path.join(__dirname, 'simple-crm.html'));
+});
+
+// Simple CRM API: Mark booking as confirmed
+app.post('/api/crm/bookings/:id/confirm', crmAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const booking = await prisma.booking.update({
+            where: { id },
+            data: { confirmed: true }
+        });
+        res.json({ success: true, booking });
+    } catch (error) {
+        console.error('Confirm booking error:', error);
+        res.status(500).json({ error: 'Failed to confirm booking' });
+    }
+});
+
 // Funnel dashboard API (same auth as CRM)
 app.get('/api/funnel', crmAuth, (req, res) => {
     const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };

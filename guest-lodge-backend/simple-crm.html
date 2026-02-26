@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookings - Front Desk</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#EEF2EF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <style>
+    :root {
+      --bg: #EEF2EF;
+      --white: #FFFFFF;
+      --border: #D8E1DD;
+      --text: #1a1a1a;
+      --text-muted: #6B7280;
+      --green: #2E7D5B;
+      --green-light: #5BA886;
+      --green-pale: #E8F5EE;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* LOGIN */
+    .login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-light) 100%);
+    }
+
+    .login-card {
+      background: var(--white);
+      padding: 40px 32px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .login-logo-icon { height: 36px; }
+    .login-logo-text { height: 24px; }
+
+    .login-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .login-input {
+      width: 100%;
+      padding: 16px 14px;
+      font-size: 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: inherit;
+      margin-bottom: 16px;
+      transition: all 0.15s;
+    }
+
+    .login-input:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--green-pale);
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .login-btn:hover {
+      background: #245f46;
+      transform: translateY(-1px);
+    }
+
+    .login-error {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #DC2626;
+      min-height: 18px;
+    }
+
+    /* HEADER */
+    .header {
+      background: var(--white);
+      border-bottom: 1.5px solid var(--border);
+      padding: 0 20px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .header-logo-icon { height: 28px; }
+    .header-logo-text { height: 20px; }
+
+    .header-logo-suffix {
+      font-weight: 700;
+      color: var(--green);
+      margin-left: 4px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .stat-pill strong {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .refresh-btn {
+      padding: 8px 14px;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .refresh-btn:hover {
+      background: var(--green-pale);
+      border-color: var(--green-light);
+      color: var(--green);
+    }
+
+    /* MAIN LAYOUT */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .count-badge {
+      background: var(--green);
+      color: white;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* BOOKING CARD */
+    .booking-card {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      transition: all 0.15s;
+    }
+
+    .booking-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .booking-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .booking-guest {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .booking-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .booking-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+      padding: 14px;
+      background: var(--bg);
+      border-radius: 8px;
+    }
+
+    .booking-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .booking-detail-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .booking-detail-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .phone-link {
+      color: var(--green);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .phone-link:hover {
+      text-decoration: underline;
+    }
+
+    .booking-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 14px 18px;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .action-btn.primary {
+      background: var(--green);
+      color: white;
+    }
+
+    .action-btn.primary:hover {
+      background: #245f46;
+    }
+
+    .action-btn.success {
+      background: #10B981;
+      color: white;
+    }
+
+    .action-btn.success:hover {
+      background: #059669;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state-text {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    </div>
+    <p>Front Desk - Enter PIN</p>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <header class="header">
+    <div class="header-logo">
+      <img src="/marketellogo.svg" alt="" class="header-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="header-logo-text">
+      <span class="header-logo-suffix">Front Desk</span>
+    </div>
+    <div class="header-right">
+      <div id="statNew" class="stat-pill">📥 <strong>0</strong> New</div>
+      <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notifications</button>
+      <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <h1 class="section-title">
+      📞 Bookings to Confirm
+      <span class="count-badge" id="bookingCount">0</span>
+    </h1>
+    <div id="bookingsList">
+      <div class="loading">
+        <div class="spinner"></div>
+        Loading bookings...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem('crmToken') || '';
+let bookings = [];
+
+// LOGIN
+function doLogin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  const err = document.getElementById('loginError');
+  
+  if (!pin) {
+    err.textContent = 'Please enter PIN';
+    return;
+  }
+
+  // Simple auth - just store token
+  token = pin;
+  localStorage.setItem('crmToken', token);
+  
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  
+  loadBookings();
+}
+
+// LOAD BOOKINGS
+async function loadBookings() {
+  try {
+    const res = await fetch('/api/crm/bookings', {
+      headers: { 'x-crm-token': token }
+    });
+    
+    if (!res.ok) {
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+      throw new Error('Failed to load bookings');
+    }
+    
+    bookings = await res.json();
+    
+    // Filter: only unconfirmed bookings
+    const unconfirmed = bookings.filter(b => !b.confirmed);
+    
+    renderBookings(unconfirmed);
+  } catch (error) {
+    console.error('Load bookings error:', error);
+    document.getElementById('bookingsList').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-text">Failed to load bookings</div>
+      </div>
+    `;
+  }
+}
+
+// RENDER BOOKINGS
+function renderBookings(list) {
+  const container = document.getElementById('bookingsList');
+  const countBadge = document.getElementById('bookingCount');
+  const statNew = document.getElementById('statNew');
+  
+  countBadge.textContent = list.length;
+  statNew.innerHTML = `📥 <strong>${list.length}</strong> New`;
+  
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">✅</div>
+        <div class="empty-state-text">All bookings confirmed!</div>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = list.map(booking => `
+    <div class="booking-card">
+      <div class="booking-header">
+        <div class="booking-guest">${booking.guestFirstName} ${booking.guestLastName}</div>
+        <div class="booking-time">${timeAgo(booking.createdAt)}</div>
+      </div>
+      
+      <div class="booking-details">
+        <div class="booking-detail">
+          <div class="booking-detail-label">Room</div>
+          <div class="booking-detail-value">${booking.roomName || 'N/A'}</div>
+        </div>
+        <div class="booking-detail">
+          <div class="booking-detail-label">Total</div>
+          <div class="booking-detail-value">$${booking.grandTotal.toFixed(2)}</div>
+        </div>
+        <div class="booking-detail">
+          <div class="booking-detail-label">Check-in</div>
+          <div class="booking-detail-value">${formatDate(booking.checkinDate)}</div>
+        </div>
+        <div class="booking-detail">
+          <div class="booking-detail-label">Nights</div>
+          <div class="booking-detail-value">${booking.nights}</div>
+        </div>
+        <div class="booking-detail">
+          <div class="booking-detail-label">Phone</div>
+          <div class="booking-detail-value">
+            <a href="tel:${booking.guestPhone}" class="phone-link">${booking.guestPhone}</a>
+          </div>
+        </div>
+        <div class="booking-detail">
+          <div class="booking-detail-label">Email</div>
+          <div class="booking-detail-value" style="font-size:12px">${booking.guestEmail}</div>
+        </div>
+      </div>
+      
+      <div class="booking-actions">
+        <button class="action-btn primary" onclick="window.location.href='tel:${booking.guestPhone}'">
+          📞 Call Guest
+        </button>
+        <button class="action-btn success" onclick="markConfirmed('${booking.id}')">
+          ✓ Mark Confirmed
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// MARK CONFIRMED
+async function markConfirmed(bookingId) {
+  try {
+    const res = await fetch(`/api/crm/bookings/${bookingId}/confirm`, {
+      method: 'POST',
+      headers: { 'x-crm-token': token }
+    });
+    
+    if (!res.ok) throw new Error('Failed to confirm');
+    
+    // Remove from list
+    bookings = bookings.map(b => b.id === bookingId ? { ...b, confirmed: true } : b);
+    const unconfirmed = bookings.filter(b => !b.confirmed);
+    renderBookings(unconfirmed);
+  } catch (error) {
+    console.error('Confirm error:', error);
+    alert('Failed to mark as confirmed');
+  }
+}
+
+// HELPERS
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function timeAgo(dateStr) {
+  const now = new Date();
+  const past = new Date(dateStr);
+  const diffMs = now - past;
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+function logout() {
+  localStorage.removeItem('crmToken');
+  token = '';
+  location.reload();
+}
+
+// NOTIFICATIONS (placeholder - same as funnel.html)
+async function enableNotifications() {
+  alert('Notifications will be enabled here - copy logic from funnel.html');
+}
+
+// AUTO-LOAD
+if (token) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadBookings();
+}
+
+// AUTO-REFRESH every 30 seconds
+setInterval(loadBookings, 30000);
+</script>
+</body>
+</html>
