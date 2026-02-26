@@ -1889,7 +1889,9 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 grandTotal: 450.00,
                 stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_1',
                 ourReservationCode: 'BOOK-' + Date.now() + '-1',
-                confirmed: false,
+                status: 'confirmed',
+                crmStage: 'new',
+                callStatus: 'not-called',
             },
             {
                 hotelId: 'suite-stay',
@@ -1906,7 +1908,9 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 grandTotal: 380.00,
                 stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_2',
                 ourReservationCode: 'BOOK-' + Date.now() + '-2',
-                confirmed: false,
+                status: 'confirmed',
+                crmStage: 'new',
+                callStatus: 'not-called',
             },
             {
                 hotelId: 'suite-stay',
@@ -1923,7 +1927,9 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 grandTotal: 850.00,
                 stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_3',
                 ourReservationCode: 'BOOK-' + Date.now() + '-3',
-                confirmed: false,
+                status: 'confirmed',
+                crmStage: 'new',
+                callStatus: 'not-called',
             },
             {
                 hotelId: 'suite-stay',
@@ -1940,7 +1946,9 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 grandTotal: 320.00,
                 stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_4',
                 ourReservationCode: 'BOOK-' + Date.now() + '-4',
-                confirmed: false,
+                status: 'confirmed',
+                crmStage: 'new',
+                callStatus: 'not-called',
             },
         ];
 
