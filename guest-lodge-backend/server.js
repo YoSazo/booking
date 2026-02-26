@@ -1861,7 +1861,10 @@ app.post('/api/crm/bookings/:id/confirm', crmAuth, async (req, res) => {
         const { id } = req.params;
         const booking = await prisma.booking.update({
             where: { id },
-            data: { confirmed: true }
+            data: { 
+                callStatus: 'called',
+                crmStage: 'confirmed'
+            }
         });
         res.json({ success: true, booking });
     } catch (error) {

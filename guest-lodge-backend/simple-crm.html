@@ -455,8 +455,8 @@ async function loadBookings() {
     const json = await res.json();
     bookings = json.data || json; // Handle both { data: [] } and direct array
     
-    // Filter: only unconfirmed bookings
-    const unconfirmed = bookings.filter(b => !b.confirmed);
+    // Filter: only bookings that need calls (not yet called)
+    const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
     
     renderBookings(unconfirmed);
   } catch (error) {
@@ -548,9 +548,9 @@ async function markConfirmed(bookingId) {
     if (!res.ok) throw new Error('Failed to confirm');
     
     // Remove from list
-    bookings = bookings.map(b => b.id === bookingId ? { ...b, confirmed: true } : b);
-    const unconfirmed = bookings.filter(b => !b.confirmed);
-    renderBookings(unconfirmed);
+    bookings = bookings.map(b => b.id === bookingId ? { ...b, callStatus: 'called' } : b);
+    const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
+    renderBookings(needsCalls);
   } catch (error) {
     console.error('Confirm error:', error);
     alert('Failed to mark as confirmed');
