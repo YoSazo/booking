@@ -451,7 +451,8 @@ async function loadBookings() {
       throw new Error('Failed to load bookings');
     }
     
-    bookings = await res.json();
+    const json = await res.json();
+    bookings = json.data || json; // Handle both { data: [] } and direct array
     
     // Filter: only unconfirmed bookings
     const unconfirmed = bookings.filter(b => !b.confirmed);
