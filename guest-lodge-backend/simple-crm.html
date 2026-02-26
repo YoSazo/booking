@@ -360,8 +360,7 @@ function renderBookings(list) {
         <div class="card-meta">
           <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
           <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
-          ${b.bookingType === 'payLater' ? '<div class="meta-chip">💳 Pay at hotel</div>' : ''}
-          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : ''}
+          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : '<div class="pay-chip">💳 Pay at check-in</div>'}
         </div>
 
         <div class="card-dates">
