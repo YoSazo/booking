@@ -1673,10 +1673,6 @@ const crmAuth = (req, res, next) => {
     next();
 };
 
-<<<<<<< HEAD
-// Setup push notification routes
-setupPushRoutes(app, prisma, crmAuth);
-=======
 // PWA push: public VAPID key for subscription
 app.get('/api/push/vapid-public', (req, res) => {
     if (!VAPID_PUBLIC) return res.status(503).json({ error: 'Push not configured' });
@@ -1750,7 +1746,6 @@ async function notifyPurchase() {
         console.error('notifyPurchase:', e.message);
     }
 }
->>>>>>> c4526c9e603cbc5668943dba17729e0e73641695
 
 // Serve CRM HTML
 app.get('/crm', (req, res) => {

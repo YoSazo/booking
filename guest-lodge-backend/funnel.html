@@ -361,11 +361,7 @@
   <div class="header-right">
     <span class="live-dot"></span>
     <span style="font-size:12px;color:var(--text-muted);">Live</span>
-<<<<<<< HEAD
-    <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notify</button>
-=======
     <button class="refresh-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings and purchases">🔔 Notifications</button>
->>>>>>> c4526c9e603cbc5668943dba17729e0e73641695
     <button class="refresh-btn" onclick="handleRefresh()">↻ Refresh</button>
     <div class="header-date" id="headerDate"></div>
   </div>
@@ -627,34 +623,6 @@
     return outputArray;
   }
 
-  async function enableFunnelNotifications() {
-    if (!token) { document.getElementById('loginError').textContent = 'Sign in first.'; return; }
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') { alert('Notifications blocked'); return; }
-      const keyRes = await fetch('/api/push/vapid-public');
-      const keyData = await keyRes.json().catch(() => ({}));
-      if (!keyData.publicKey) { alert('Push not configured'); return; }
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
-      });
-      const bufToB64 = (buf) => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
-      const p256dh = sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '';
-      const auth = sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : '';
-      const res = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
-        body: JSON.stringify({ endpoint: sub.endpoint, p256dh, auth, source: 'funnel' }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Subscribe failed');
-      const btn = document.getElementById('btnNotify');
-      if (btn) btn.textContent = '🔔 On';
-    } catch (e) {
-      alert('Notifications: ' + (e.message || e));
-    }
-  }
 
   async function load() {
     if (!token) return;
@@ -894,7 +862,7 @@
     return outputArray;
   }
 
-  async function enableNotifications() {
+  async function enableFunnelNotifications() {
     if (!token) {
       alert('Please sign in first.');
       return;
