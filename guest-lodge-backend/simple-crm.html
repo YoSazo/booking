@@ -3,413 +3,210 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bookings - Front Desk</title>
+  <title>Marketel · Front Desk</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#EEF2EF">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="/icon-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #EEF2EF;
-      --white: #FFFFFF;
-      --border: #D8E1DD;
-      --text: #1a1a1a;
-      --text-muted: #6B7280;
-      --green: #2E7D5B;
-      --green-light: #5BA886;
-      --green-pale: #E8F5EE;
-      --shadow: 0 1px 3px rgba(0,0,0,0.08);
-      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+      --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
+      --green-mint: #C8EDD9; --bg: #EEF2EF; --white: #FFFFFF;
+      --text: #1A2B22; --text-muted: #6B7D72; --border: #D8E4DC;
+      --red: #E05252; --amber: #F59E0B;
+      --shadow: 0 2px 12px rgba(46,125,91,0.10);
+      --shadow-lg: 0 8px 32px rgba(46,125,91,0.14);
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-    }
-
-    /* LOGIN */
+    /* ── LOGIN ── */
     .login-screen {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      background: linear-gradient(135deg, var(--green) 0%, var(--green-light) 100%);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
     }
-
     .login-card {
-      background: var(--white);
-      padding: 40px 32px;
-      border-radius: 16px;
-      box-shadow: var(--shadow-lg);
-      width: 90%;
-      max-width: 400px;
-      text-align: center;
+      background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
     }
-
-    .login-logo {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-
-    .login-logo-icon { height: 36px; }
-    .login-logo-text { height: 24px; }
-
-    .login-card p {
-      font-size: 14px;
-      color: var(--text-muted);
-      margin-bottom: 24px;
-    }
-
+    .login-logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
+    .login-logo-icon { height: 48px; width: auto; }
+    .login-logo-text { height: 28px; width: auto; }
+    .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
     .login-input {
-      width: 100%;
-      padding: 16px 14px;
-      font-size: 16px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      font-family: inherit;
-      margin-bottom: 16px;
-      transition: all 0.15s;
+      width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
+      border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
+      letter-spacing: 4px; outline: none; margin-bottom: 12px; color: var(--text);
+      transition: border-color 0.2s;
     }
-
-    .login-input:focus {
-      outline: none;
-      border-color: var(--green);
-      box-shadow: 0 0 0 3px var(--green-pale);
-    }
-
+    .login-input:focus { border-color: var(--green); }
     .login-btn {
-      width: 100%;
-      padding: 14px;
-      background: var(--green);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.15s;
+      width: 100%; padding: 13px; background: var(--green); color: white;
+      border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
+      font-weight: 600; cursor: pointer; transition: background 0.15s;
     }
+    .login-btn:hover { background: #245f46; }
+    .login-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
 
-    .login-btn:hover {
-      background: #245f46;
-      transform: translateY(-1px);
-    }
-
-    .login-error {
-      margin-top: 12px;
-      font-size: 13px;
-      color: #DC2626;
-      min-height: 18px;
-    }
-
-    /* HEADER */
+    /* ── HEADER ── */
     .header {
-      background: var(--white);
-      border-bottom: 1.5px solid var(--border);
-      padding: 0 20px;
-      height: 58px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      background: var(--white); border-bottom: 1.5px solid var(--border);
+      padding: 0 24px; height: 58px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 8px rgba(46,125,91,0.07);
     }
-
-    .header-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text);
-    }
-
-    .header-logo-icon { height: 28px; }
-    .header-logo-text { height: 20px; }
-
-    .header-logo-suffix {
-      font-weight: 700;
-      color: var(--green);
-      margin-left: 4px;
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
+    .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: var(--text); }
+    .header-logo-icon { height: 32px; width: auto; }
+    .header-logo-text { height: 20px; width: auto; }
+    .header-logo-suffix { margin-left: 2px; color: var(--text-muted); font-weight: 600; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
     .stat-pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      background: var(--bg);
-      border-radius: 20px;
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 600;
+      background: var(--green-pale); border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; font-weight: 600; color: var(--green); display: flex; align-items: center; gap: 4px;
     }
-
-    .stat-pill strong {
-      color: var(--green);
-      font-weight: 700;
-    }
-
     .refresh-btn {
-      padding: 8px 14px;
-      background: var(--bg);
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text);
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.15s;
+      background: var(--green-pale); border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 5px 12px; font-family: inherit; font-size: 12px; font-weight: 600;
+      color: var(--green); cursor: pointer; transition: all 0.15s;
     }
+    .refresh-btn:hover { background: var(--green); color: white; border-color: var(--green); }
 
-    .refresh-btn:hover {
-      background: var(--green-pale);
-      border-color: var(--green-light);
-      color: var(--green);
-    }
+    /* ── LAYOUT ── */
+    .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
 
-    /* MAIN LAYOUT */
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px 20px;
-    }
-
-    .section-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .count-badge {
-      background: var(--green);
-      color: white;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    /* BOOKING CARD */
-    .booking-card {
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
-      transition: all 0.15s;
-    }
-
-    .booking-card:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .booking-split {
-      display: flex;
-      gap: 24px;
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 20px;
-      align-items: center;
+    }
+    .page-title {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .count-badge {
+      background: var(--green); color: white;
+      padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
     }
 
-    .booking-left {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    /* ── BOOKING CARD ── */
+    .booking-card {
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: 14px; overflow: hidden;
+      box-shadow: var(--shadow); margin-bottom: 10px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .booking-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+    .card-accent { height: 3px; background: var(--green); }
+    .card-accent.declined { background: var(--amber); }
+
+    .card-inner { padding: 14px 16px; }
+
+    /* TOP ROW */
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+    .guest-info { display: flex; flex-direction: column; gap: 3px; }
+    .guest-name { font-size: 17px; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .guest-time { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+    .card-amount { 
+      font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 700;
+      color: var(--green); text-align: right; flex-shrink: 0; margin-left: 12px;
     }
 
-    .booking-guest-name {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text);
+    /* META ROW */
+    .card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+    .meta-chip {
+      display: flex; align-items: center; gap: 3px; background: var(--bg);
+      border-radius: 7px; padding: 3px 8px; font-size: 11px; color: var(--text-muted); font-weight: 500;
+    }
+    .declined-chip {
+      background: #FEF3C7; color: #92400E; border-radius: 7px;
+      padding: 3px 8px; font-size: 11px; font-weight: 600;
+      display: flex; align-items: center; gap: 3px;
     }
 
-    .booking-time-ago {
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 600;
-      margin-bottom: 6px;
+    /* DATES */
+    .card-dates {
+      display: flex; gap: 0; margin-bottom: 12px;
+      background: var(--bg); border-radius: 10px; overflow: hidden;
+      border: 1.5px solid var(--border);
     }
-
-    .booking-room {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--green);
+    .date-block {
+      flex: 1; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px;
     }
+    .date-block + .date-block { border-left: 1.5px solid var(--border); }
+    .date-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .date-value { font-size: 13px; font-weight: 600; color: var(--text); }
 
-    .booking-card.payment-declined {
-      border-color: #F59E0B;
-      background: #FEF3C7;
+    /* CONTACT ROW */
+    .card-contact { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; }
+    .contact-details { display: flex; flex-direction: column; gap: 2px; }
+    .contact-phone { font-size: 18px; font-weight: 700; color: var(--green); font-family: 'DM Mono', monospace; }
+    .contact-email { font-size: 11px; color: var(--text-muted); }
+
+    .phone-call-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--green); color: white;
+      border: none; border-radius: 10px; padding: 9px 16px;
+      font-family: inherit; font-size: 13px; font-weight: 700;
+      cursor: pointer; text-decoration: none; transition: all 0.15s;
+      flex-shrink: 0;
     }
+    .phone-call-btn:hover { background: #245f46; transform: scale(1.03); }
 
-    .declined-banner {
-      background: #F59E0B;
-      color: white;
-      padding: 10px 16px;
-      margin: -20px -20px 16px -20px;
-      border-radius: 12px 12px 0 0;
-      font-size: 14px;
-      font-weight: 700;
-      text-align: center;
+    /* FOOTER */
+    .card-footer { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .btn {
+      flex: 1; padding: 9px 12px; border-radius: 10px; font-family: inherit;
+      font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid transparent;
+      transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px;
     }
+    .btn-confirm { background: var(--green); color: white; }
+    .btn-confirm:hover { background: #245f46; }
+    .btn-note { background: var(--white); color: var(--text); border-color: var(--border); }
+    .btn-note:hover { border-color: var(--green); color: var(--green); background: var(--green-pale); }
 
-    .booking-email {
-      font-size: 13px;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .booking-dates {
-      display: flex;
-      gap: 20px;
-      margin-top: 8px;
-    }
-
-    .date-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .date-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-    }
-
-    .date-value {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .booking-right {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .phone-number {
-      font-size: 32px;
-      font-weight: 700;
-      color: var(--green);
-      text-decoration: none;
-      transition: all 0.15s;
-      padding: 12px 20px;
-      border: 2px solid var(--green-light);
-      border-radius: 12px;
-      background: var(--green-pale);
-    }
-
-    .phone-number:hover {
-      background: var(--green);
-      color: white;
-      transform: scale(1.05);
-    }
-
-    .booking-actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .action-btn {
-      flex: 1;
-      padding: 14px 18px;
-      border: none;
-      border-radius: 10px;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .action-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-    .action-btn.primary {
-      background: var(--green);
-      color: white;
-    }
-
-    .action-btn.primary:hover {
-      background: #245f46;
-    }
-
-    .action-btn.success {
-      background: #10B981;
-      color: white;
-    }
-
-    .action-btn.success:hover {
-      background: #059669;
-    }
-
+    /* ── STATES ── */
     .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-muted);
+      text-align: center; padding: 64px 20px;
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow);
     }
-
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-
-    .empty-state-text {
-      font-size: 16px;
-      font-weight: 600;
-    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-text { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .empty-sub { font-size: 13px; color: var(--text-muted); }
 
     .loading {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center;
+      height: 200px; font-size: 14px; color: var(--text-muted); gap: 10px;
     }
-
     .spinner {
-      width: 24px;
-      height: 24px;
-      border: 3px solid var(--border);
-      border-top-color: var(--green);
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      margin: 0 auto 12px;
+      width: 18px; height: 18px; border: 2px solid var(--border);
+      border-top-color: var(--green); border-radius: 50%;
+      animation: spin 0.7s linear infinite;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    /* ── TOAST ── */
+    .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 7px; }
+    .toast {
+      background: var(--text); color: white; border-radius: 11px; padding: 11px 16px;
+      font-size: 12px; font-weight: 600; box-shadow: var(--shadow-lg);
+      display: flex; align-items: center; gap: 7px;
+      animation: slideInR 0.2s ease, fadeOut 0.3s ease 2.7s forwards;
+    }
+    @keyframes slideInR { from{transform:translateX(40px);opacity:0} to{transform:translateX(0);opacity:1} }
+    @keyframes fadeOut { to{opacity:0;transform:translateX(20px)} }
+    .toast.success { background: var(--green); }
+    .toast.error { background: var(--red); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .header { padding: 0 14px; }
+      .header-right .stat-pill { display: none; }
+      .container { padding: 16px 12px; }
+      .card-inner { padding: 12px 14px; }
+      .contact-phone { font-size: 15px; }
     }
   </style>
 </head>
@@ -422,7 +219,7 @@
       <img src="/marketellogo.svg" alt="" class="login-logo-icon">
       <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
     </div>
-    <p>Front Desk - Enter PIN</p>
+    <p>Front Desk — Enter your PIN to continue</p>
     <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
       onkeydown="if(event.key==='Enter') doLogin()">
     <button class="login-btn" onclick="doLogin()">Sign In</button>
@@ -439,252 +236,244 @@
       <span class="header-logo-suffix">Front Desk</span>
     </div>
     <div class="header-right">
-      <div id="statNew" class="stat-pill">📥 <strong>0</strong> New</div>
-      <button class="refresh-btn" onclick="addDummyBookings()">➕ Test Bookings</button>
+      <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notifications</button>
       <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
     </div>
   </header>
 
   <div class="container">
-    <h1 class="section-title">
-      📞 Bookings to Confirm
-      <span class="count-badge" id="bookingCount">0</span>
-    </h1>
-    <div id="bookingsList">
-      <div class="loading">
-        <div class="spinner"></div>
-        Loading bookings...
+    <div class="page-header">
+      <div class="page-title">
+        📞 Needs a Call
+        <span class="count-badge" id="bookingCount">0</span>
       </div>
+    </div>
+    <div id="bookingsList">
+      <div class="loading"><div class="spinner"></div> Loading bookings…</div>
     </div>
   </div>
 </div>
 
+<div class="toast-container" id="toasts"></div>
+
 <script>
-let token = localStorage.getItem('crmToken') || '';
+let token = '';
 let bookings = [];
 
-// LOGIN
+try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── LOGIN ──────────────────────────────────────────────
 function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   const err = document.getElementById('loginError');
-  
-  if (!pin) {
-    err.textContent = 'Please enter PIN';
-    return;
-  }
-
-  // Simple auth - just store token
+  if (!pin) { err.textContent = 'Please enter PIN'; return; }
   token = pin;
-  localStorage.setItem('crmToken', token);
-  
+  try { localStorage.setItem('crmToken', token); } catch(e) {}
+  err.textContent = '';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  
   loadBookings();
 }
 
-// LOAD BOOKINGS
+// ── API ────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'x-crm-token': token } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (res.status === 401) { showLogin(); throw new Error('Unauthorized'); }
+  return res.json();
+}
+
+function showLogin() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  token = '';
+  try { localStorage.removeItem('crmToken'); } catch(e) {}
+}
+
+// ── LOAD ───────────────────────────────────────────────
 async function loadBookings() {
   try {
-    const res = await fetch('/api/crm/bookings', {
-      headers: { 'x-crm-token': token }
-    });
-    
-    if (!res.ok) {
-      if (res.status === 401) {
-        logout();
-        return;
-      }
-      throw new Error('Failed to load bookings');
-    }
-    
-    const json = await res.json();
-    bookings = json.data || json; // Handle both { data: [] } and direct array
-    
-    // Filter: only bookings that need calls (not yet called)
+    const data = await api('GET', '/api/crm/bookings');
+    if (!data.success) throw new Error(data.message);
+    bookings = data.data || [];
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    
     renderBookings(needsCalls);
-  } catch (error) {
-    console.error('Load bookings error:', error);
+  } catch(e) {
+    if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">⚠️</div>
-        <div class="empty-state-text">Failed to load bookings</div>
-      </div>
-    `;
+        <div class="empty-icon">⚠️</div>
+        <div class="empty-text">Could not load bookings</div>
+        <div class="empty-sub">${esc(e.message)}</div>
+      </div>`;
   }
 }
 
-// RENDER BOOKINGS
+// ── RENDER ─────────────────────────────────────────────
 function renderBookings(list) {
-  const container = document.getElementById('bookingsList');
-  const countBadge = document.getElementById('bookingCount');
-  const statNew = document.getElementById('statNew');
-  
-  countBadge.textContent = list.length;
-  statNew.innerHTML = `📥 <strong>${list.length}</strong> New`;
-  
+  document.getElementById('bookingCount').textContent = list.length;
+  document.getElementById('statCount').textContent = list.length;
+
+  const el = document.getElementById('bookingsList');
+
   if (list.length === 0) {
-    container.innerHTML = `
+    el.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">✅</div>
-        <div class="empty-state-text">All bookings confirmed!</div>
-      </div>
-    `;
+        <div class="empty-icon">✅</div>
+        <div class="empty-text">All caught up!</div>
+        <div class="empty-sub">No bookings need a call right now.</div>
+      </div>`;
     return;
   }
-  
-  container.innerHTML = list.map(booking => `
-    <div class="booking-card ${booking.paymentDeclined ? 'payment-declined' : ''}">
-      ${booking.paymentDeclined ? '<div class="declined-banner">⚠️ Payment Declined - Card issue, call to confirm</div>' : ''}
-      
-      <div class="booking-split">
-        <div class="booking-left">
-          <div class="booking-guest-name">${booking.guestFirstName} ${booking.guestLastName}</div>
-          <div class="booking-time-ago">${timeAgo(booking.createdAt)}</div>
-          <div class="booking-room">${booking.roomName || 'N/A'} • $${booking.grandTotal.toFixed(2)}</div>
-          <div class="booking-email">${booking.guestEmail}</div>
-          <div class="booking-dates">
-            <div class="date-item">
-              <span class="date-label">Check-in:</span>
-              <span class="date-value">${formatDate(booking.checkinDate)}</span>
-            </div>
-            <div class="date-item">
-              <span class="date-label">Check-out:</span>
-              <span class="date-value">${formatDate(booking.checkoutDate)}</span>
-            </div>
-            <div class="date-item">
-              <span class="date-label">Nights:</span>
-              <span class="date-value">${booking.nights}</span>
-            </div>
+
+  el.innerHTML = list.map(b => {
+    const isDeclined = b.paymentDeclined;
+    const ci = b.checkinDate ? new Date(b.checkinDate + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const co = b.checkoutDate ? new Date(b.checkoutDate + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const ago = timeAgo(b.createdAt);
+
+    return `
+    <div class="booking-card">
+      <div class="card-accent ${isDeclined ? 'declined' : ''}"></div>
+      <div class="card-inner">
+
+        <div class="card-top">
+          <div class="guest-info">
+            <div class="guest-name">${esc(b.guestFirstName)} ${esc(b.guestLastName)}</div>
+            <div class="guest-time">${ago}</div>
+          </div>
+          <div class="card-amount">$${Number(b.grandTotal).toFixed(2)}</div>
+        </div>
+
+        <div class="card-meta">
+          <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
+          <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
+          ${b.bookingType === 'payLater' ? '<div class="meta-chip">💳 Pay at hotel</div>' : ''}
+          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : ''}
+        </div>
+
+        <div class="card-dates">
+          <div class="date-block">
+            <div class="date-label">Check-in</div>
+            <div class="date-value">${ci}</div>
+          </div>
+          <div class="date-block">
+            <div class="date-label">Check-out</div>
+            <div class="date-value">${co}</div>
+          </div>
+          <div class="date-block">
+            <div class="date-label">Guests</div>
+            <div class="date-value">${b.guests || 1} guest${(b.guests || 1) !== 1 ? 's' : ''}</div>
           </div>
         </div>
-        
-        <div class="booking-right">
-          <a href="tel:${booking.guestPhone}" class="phone-number">${booking.guestPhone}</a>
+
+        <div class="card-contact">
+          <div class="contact-details">
+            <div class="contact-phone">${esc(b.guestPhone)}</div>
+            <div class="contact-email">${esc(b.guestEmail)}</div>
+          </div>
+          <a href="tel:${esc(b.guestPhone)}" class="phone-call-btn">📞 Call</a>
+        </div>
+
+        <div class="card-footer">
+          <button class="btn btn-confirm" onclick="markConfirmed('${b.id}')">✓ Mark Called</button>
+          <button class="btn btn-note" onclick="addNote('${b.id}')">📝 Add Note</button>
         </div>
       </div>
-      
-      <div class="booking-actions">
-        <button class="action-btn success" onclick="markConfirmed('${booking.id}')">
-          ✓ Mark Confirmed
-        </button>
-        <button class="action-btn" onclick="addNote('${booking.id}')">
-          📝 Add Note
-        </button>
-      </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-// MARK CONFIRMED
-async function markConfirmed(bookingId) {
+// ── ACTIONS ────────────────────────────────────────────
+async function markConfirmed(id) {
   try {
-    const res = await fetch(`/api/crm/bookings/${bookingId}/confirm`, {
-      method: 'POST',
-      headers: { 'x-crm-token': token }
-    });
-    
-    if (!res.ok) throw new Error('Failed to confirm');
-    
-    // Remove from list
-    bookings = bookings.map(b => b.id === bookingId ? { ...b, callStatus: 'called' } : b);
-    const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    renderBookings(needsCalls);
-  } catch (error) {
-    console.error('Confirm error:', error);
-    alert('Failed to mark as confirmed');
-  }
+    await api('POST', `/api/crm/bookings/${id}/confirm`);
+    bookings = bookings.map(b => b.id === id ? { ...b, callStatus: 'called' } : b);
+    renderBookings(bookings.filter(b => b.callStatus === 'not-called'));
+    toast('Marked as called', 'success');
+  } catch(e) { toast('Failed to update', 'error'); }
 }
 
-// ADD NOTE
-async function addNote(bookingId) {
+async function addNote(id) {
   const note = prompt('Add a note for this booking:');
   if (!note) return;
-  
   try {
-    const res = await fetch(`/api/crm/bookings/${bookingId}/note`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-crm-token': token 
-      },
-      body: JSON.stringify({ note })
-    });
-    
-    if (!res.ok) throw new Error('Failed to add note');
-    
-    alert('✅ Note added!');
-  } catch (error) {
-    console.error('Add note error:', error);
-    alert('Failed to add note');
-  }
+    await api('POST', `/api/crm/bookings/${id}/note`, { note });
+    toast('Note saved', 'success');
+  } catch(e) { toast('Failed to save note', 'error'); }
 }
 
-// HELPERS
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+// ── NOTIFICATIONS ──────────────────────────────────────
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
+  return output;
 }
 
-function timeAgo(dateStr) {
-  const now = new Date();
-  const past = new Date(dateStr);
-  const diffMs = now - past;
-  const diffMins = Math.floor(diffMs / 60000);
-  
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
-function logout() {
-  localStorage.removeItem('crmToken');
-  token = '';
-  location.reload();
-}
-
-// ADD DUMMY BOOKINGS
-async function addDummyBookings() {
-  if (!confirm('Add 4 test bookings?')) return;
-  
-  try {
-    const res = await fetch('/api/crm/add-dummy-bookings', {
-      method: 'POST',
-      headers: { 'x-crm-token': token }
-    });
-    
-    const data = await res.json();
-    if (data.success) {
-      alert(`✅ Added ${data.count} test bookings!`);
-      loadBookings();
-    } else {
-      alert('Failed to add test bookings');
-    }
-  } catch (error) {
-    console.error('Add dummy bookings error:', error);
-    alert('Error adding test bookings');
-  }
-}
-
-// NOTIFICATIONS (placeholder - same as funnel.html)
 async function enableNotifications() {
-  alert('Notifications will be enabled here - copy logic from funnel.html');
+  if (!token) { toast('Sign in first', 'error'); return; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Notifications blocked', 'error'); return; }
+    const keyRes = await fetch('/api/push/vapid-public');
+    const keyData = await keyRes.json().catch(() => ({}));
+    if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+    });
+    const bufToB64 = buf => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+    await api('POST', '/api/push/subscribe', {
+      endpoint: sub.endpoint,
+      p256dh: sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '',
+      auth: sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : ''
+    });
+    toast('Notifications enabled', 'success');
+    document.getElementById('btnNotify').textContent = '🔔 On';
+  } catch(e) { toast('Failed: ' + (e.message || e), 'error'); }
 }
 
-// AUTO-LOAD
+// ── HELPERS ────────────────────────────────────────────
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function toast(msg, type = '') {
+  const c = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'} ${msg}`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 3100);
+}
+
+// ── INIT ───────────────────────────────────────────────
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
 if (token) {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   loadBookings();
 }
 
-// AUTO-REFRESH every 30 seconds
 setInterval(loadBookings, 30000);
 </script>
 </body>
