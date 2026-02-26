@@ -393,6 +393,7 @@
     </div>
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong>0</strong> New</div>
+      <button class="refresh-btn" onclick="addDummyBookings()">➕ Test Bookings</button>
       <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notifications</button>
       <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
     </div>
@@ -580,6 +581,29 @@ function logout() {
   localStorage.removeItem('crmToken');
   token = '';
   location.reload();
+}
+
+// ADD DUMMY BOOKINGS
+async function addDummyBookings() {
+  if (!confirm('Add 4 test bookings?')) return;
+  
+  try {
+    const res = await fetch('/api/crm/add-dummy-bookings', {
+      method: 'POST',
+      headers: { 'x-crm-token': token }
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Added ${data.count} test bookings!`);
+      loadBookings();
+    } else {
+      alert('Failed to add test bookings');
+    }
+  } catch (error) {
+    console.error('Add dummy bookings error:', error);
+    alert('Error adding test bookings');
+  }
 }
 
 // NOTIFICATIONS (placeholder - same as funnel.html)
