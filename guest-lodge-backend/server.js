@@ -1716,7 +1716,31 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
         const resp = await axios.get(url, { params });
         const rows = resp.data?.data || [];
         if (!rows.length) {
-            return res.json({ success: true, enabled: true, data: null });
+            return res.json({
+                success: true,
+                enabled: true,
+                data: {
+                    spend: 0,
+                    impressions: 0,
+                    clicks: 0,
+                    ctr: 0,
+                    cpm: 0,
+                    landing_page_views: 0,
+                    cost_per_landing_page_view: 0,
+                    purchase_value: 0,
+                    roas: 0,
+                    events: {
+                        landing_page_view: 0,
+                        search: 0,
+                        add_to_cart: 0,
+                        initiate_checkout: 0,
+                        add_payment_info: 0,
+                        purchase: 0,
+                    },
+                    since,
+                    until,
+                },
+            });
         }
 
         const row = rows[0] || {};

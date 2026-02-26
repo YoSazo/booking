@@ -409,14 +409,16 @@
     const container = document.getElementById('metaMetrics');
     if (!container) return;
 
-    if (!payload || payload.enabled === false || !payload.data) {
+    if (!payload || payload.enabled === false) {
       container.style.display = 'none';
       return;
     }
 
-    const d = payload.data;
-    lastMeta = d;
+    // Show the grid even if data is null (no activity yet for that period)
     container.style.display = 'grid';
+
+    const d = payload.data || {};
+    if (payload.data) lastMeta = d;
 
     const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
     const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
