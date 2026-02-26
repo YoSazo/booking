@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "Suite Stay - Founder Dashboard",
   "short_name": "Suite Stay",
   "description": "Real-time booking funnel analytics and notifications",
@@ -7,12 +8,24 @@
   "background_color": "#EEF2EF",
   "theme_color": "#2E7D5B",
   "orientation": "portrait",
+=======
+  "name": "Marketel Bookings",
+  "short_name": "Marketel",
+  "start_url": "/crm",
+  "display": "standalone",
+  "background_color": "#EEF2EF",
+  "theme_color": "#2E7D5B",
+>>>>>>> c4526c9e603cbc5668943dba17729e0e73641695
   "icons": [
     {
       "src": "/marketellogo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+<<<<<<< HEAD
       "purpose": "any maskable"
+=======
+      "purpose": "any"
+>>>>>>> c4526c9e603cbc5668943dba17729e0e73641695
     }
   ]
 }

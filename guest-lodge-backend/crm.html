@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marketel</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/marketellogo.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -254,7 +258,63 @@
   .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to{transform:rotate(360deg)} }
 
-  @media (max-width: 768px) { .sidebar { display: none; } .header-right .stat-pill { display: none; } }
+  /* Mobile: menu toggle (shown only on small screens) */
+  .menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 149;
+  }
+  @media (max-width: 900px) {
+    .header { padding: 0 12px; height: auto; min-height: 52px; flex-wrap: wrap; gap: 8px; }
+    .header-right { flex-wrap: wrap; gap: 8px; }
+    .header-right .stat-pill { display: none; }
+    .header-date { font-size: 11px; width: 100%; order: 3; }
+    .layout { height: calc(100vh - 52px); min-height: 0; }
+    .board { padding: 10px 8px; gap: 8px; }
+    .column { min-width: 220px; max-width: 280px; }
+    .card-body { padding: 10px 11px; }
+    .btn-icon { min-width: 36px; min-height: 36px; }
+    .modal { width: 100%; max-width: 100%; max-height: 100vh; border-radius: 0; }
+    .modal-header, .modal-body, .modal-footer { padding-left: 16px; padding-right: 16px; }
+    .login-card { width: 92%; max-width: 340px; padding: 32px 24px; }
+  }
+  @media (max-width: 768px) {
+    .menu-toggle { display: flex; }
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 52px;
+      bottom: 0;
+      width: 260px;
+      max-width: 85vw;
+      z-index: 150;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+      box-shadow: none;
+    }
+    body.sidebar-open .sidebar { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.15); }
+    body.sidebar-open .sidebar-overlay { display: block; }
+    .refresh-btn, #btnNotify { padding: 8px 12px; min-height: 40px; font-size: 13px; }
+  }
+  @media (max-width: 480px) {
+    .header-logo-suffix { font-size: 13px; }
+    .column { min-width: 200px; }
+  }
 </style>
 </head>
 <body>
@@ -276,7 +336,9 @@
 
 <!-- APP -->
 <div id="app" style="display:none">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="document.body.classList.remove('sidebar-open')" aria-hidden="true"></div>
   <header class="header">
+    <button type="button" class="menu-toggle" id="menuToggle" onclick="document.body.classList.toggle('sidebar-open')" title="Menu">☰</button>
     <div class="header-logo">
       <img src="/marketellogo.svg" alt="" class="header-logo-icon">
       <img src="/marketel.svg" alt="Marketel" class="header-logo-text">
@@ -286,6 +348,7 @@
       <div id="statNew" class="stat-pill">📥 <strong>0</strong> New</div>
       <div id="statConfirmed" class="stat-pill">✅ <strong>0</strong> Confirmed</div>
       <div id="statInHouse" class="stat-pill">🏨 <strong>0</strong> In-House</div>
+      <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()" title="Get notified when a new booking comes in">🔔 Notifications</button>
       <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
       <div class="header-date" id="headerDate"></div>
     </div>
@@ -351,8 +414,9 @@ function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   if (!pin) return;
   token = pin;
+  try { localStorage.setItem('crm_token', pin); } catch (e) {}
   document.getElementById('loginError').textContent = '';
-    loadBookings(true);
+  loadBookings(true);
 }
 
 // ─── API ──────────────────────────────────────────────────
@@ -432,6 +496,7 @@ function showLogin() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   token = '';
+  try { localStorage.removeItem('crm_token'); } catch (e) {}
   if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
 }
 
@@ -785,6 +850,7 @@ async function saveDeclinedNotes(id) {
 }
 
 function openAddModal() {
+  document.body.classList.remove('sidebar-open');
   openModalBookingId = null;
   const f = (label, id, type, placeholder, span=1) =>
     `<div style="grid-column:span ${span}">
@@ -901,6 +967,7 @@ async function markDeclinedCalled(id) {
 }
 
 function setView(v, el) {
+  document.body.classList.remove('sidebar-open');
   currentView = v;
   document.querySelectorAll('.sidebar-nav-item').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
@@ -921,9 +988,63 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ─── PWA & PUSH ───────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function enableNotifications() {
+  if (!token) { toast('Sign in first', 'error'); return; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Notifications blocked', 'error'); return; }
+    const keyRes = await fetch('/api/push/vapid-public');
+    const keyData = await keyRes.json().catch(() => ({}));
+    if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+    });
+    const bufToB64 = (buf) => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+    const p256dh = sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '';
+    const auth = sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : '';
+    await api('POST', '/api/push/subscribe', { endpoint: sub.endpoint, p256dh: p256dh, auth: auth });
+    toast('Notifications enabled', 'success');
+    const btn = document.getElementById('btnNotify');
+    if (btn) btn.textContent = '🔔 On';
+  } catch (e) {
+    toast('Failed: ' + (e.message || e), 'error');
+  }
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
 // ─── INIT ─────────────────────────────────────────────────
 document.getElementById('headerDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 document.getElementById('pinInput').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+(function init() {
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (saved) {
+    token = saved;
+    loadBookings(true);
+    if (isStandalone() && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      setTimeout(function () { enableNotifications(); }, 800);
+    }
+  }
+})();
 </script>
 </body>
 </html>

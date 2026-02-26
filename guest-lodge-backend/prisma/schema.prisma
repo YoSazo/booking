@@ -69,8 +69,15 @@ model PaymentDeclinedLead {
 model PushSubscription {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+<<<<<<< HEAD
   endpoint  String   @unique
   p256dh    String
   auth      String
   source    String?  // 'funnel' | 'crm'
+=======
+  endpoint  String
+  p256dh    String
+  auth      String
+  source    String   @default("crm")   // 'crm' | 'funnel' – who gets which notifications
+>>>>>>> c4526c9e603cbc5668943dba17729e0e73641695
 }
