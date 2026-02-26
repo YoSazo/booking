@@ -458,7 +458,7 @@ async function loadBookings() {
     // Filter: only bookings that need calls (not yet called)
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
     
-    renderBookings(unconfirmed);
+    renderBookings(needsCalls);
   } catch (error) {
     console.error('Load bookings error:', error);
     document.getElementById('bookingsList').innerHTML = `
