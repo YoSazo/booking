@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marketel Funnel</title>
+<link rel="manifest" href="/manifest-funnel.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/marketellogo.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -354,6 +358,7 @@
   <div class="header-right">
     <span class="live-dot"></span>
     <span style="font-size:12px;color:var(--text-muted);">Live</span>
+    <button class="refresh-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings and purchases">🔔 Notifications</button>
     <button class="refresh-btn" onclick="handleRefresh()">↻ Refresh</button>
     <div class="header-date" id="headerDate"></div>
   </div>
@@ -490,6 +495,8 @@
 </div>
 
 <script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
+
   const EMOJI_MAP = { Search: '🔍', AddToCart: '🛒', InitiateCheckout: '📋', AddPaymentInfo: '💳', Purchase: '✅', PageView: '👁' };
   let token = '';
   let metaRange = { type: 'last7' };
@@ -591,6 +598,7 @@
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success) {
         token = pin;
+        try { localStorage.setItem('crm_token', pin); } catch (e) {}
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         load();
@@ -603,12 +611,51 @@
     }
   }
 
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  async function enableFunnelNotifications() {
+    if (!token) { document.getElementById('loginError').textContent = 'Sign in first.'; return; }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { alert('Notifications blocked'); return; }
+      const keyRes = await fetch('/api/push/vapid-public');
+      const keyData = await keyRes.json().catch(() => ({}));
+      if (!keyData.publicKey) { alert('Push not configured'); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+      });
+      const bufToB64 = (buf) => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+      const p256dh = sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '';
+      const auth = sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : '';
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+        body: JSON.stringify({ endpoint: sub.endpoint, p256dh, auth, source: 'funnel' }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Subscribe failed');
+      const btn = document.getElementById('btnNotify');
+      if (btn) btn.textContent = '🔔 On';
+    } catch (e) {
+      alert('Notifications: ' + (e.message || e));
+    }
+  }
+
   async function load() {
     if (!token) return;
     try {
       const res = await fetch('/api/funnel', { headers: { 'x-crm-token': token } });
       if (res.status === 401) {
         token = '';
+        try { localStorage.removeItem('crm_token'); } catch (e) {}
         document.getElementById('loginScreen').style.display = 'flex';
         document.getElementById('app').style.display = 'none';
         return;
@@ -814,7 +861,18 @@
     }
   }
 
-  if (document.getElementById('pinInput')) document.getElementById('pinInput').focus();
+  (function init() {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (saved) {
+      token = saved;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      load();
+      loadMeta();
+    } else if (document.getElementById('pinInput')) {
+      document.getElementById('pinInput').focus();
+    }
+  })();
   setInterval(load, 3000);
 </script>
 </body>

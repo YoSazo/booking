@@ -1513,7 +1513,8 @@ app.post('/api/track', async (req, res) => {
 
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
-    
+    if (event_name === 'Purchase') notifyPurchase().catch(() => {});
+
     try {
         await axios.post(webhookUrl, enrichedPayload);
         console.log(`Successfully forwarded '${event_name}' event to Zapier with IP: ${req.ip} and event_time: ${enrichedPayload.event_time}`);
@@ -1646,23 +1647,30 @@ app.get('/api/push/vapid-public', (req, res) => {
     res.json({ publicKey: VAPID_PUBLIC });
 });
 
-// PWA push: save subscription (CRM auth required)
+// PWA push: save subscription (CRM auth required). Optional body.source: 'crm' | 'funnel'
 app.post('/api/push/subscribe', crmAuth, async (req, res) => {
     try {
-        const { endpoint, p256dh, auth } = req.body || {};
+        const { endpoint, p256dh, auth, source } = req.body || {};
         if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: 'endpoint, p256dh, auth required' });
-        await prisma.pushSubscription.upsert({
-            where: { endpoint },
-            create: { endpoint, p256dh, auth },
-            update: { p256dh, auth },
-        });
+        const subSource = (source === 'funnel') ? 'funnel' : 'crm';
+        const existing = await prisma.pushSubscription.findFirst({ where: { endpoint } });
+        if (existing) {
+            await prisma.pushSubscription.update({
+                where: { id: existing.id },
+                data: { p256dh, auth, source: subSource },
+            });
+        } else {
+            await prisma.pushSubscription.create({
+                data: { endpoint, p256dh, auth, source: subSource },
+            });
+        }
         res.json({ ok: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
-// Notify all subscribed clients of a new booking (fire-and-forget)
+// Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
 async function notifyNewBooking(guestName, roomName) {
     if (!VAPID_PRIVATE) return;
     try {
@@ -1670,6 +1678,7 @@ async function notifyNewBooking(guestName, roomName) {
         const payload = JSON.stringify({
             title: 'New booking',
             body: guestName ? `${guestName}${roomName ? ` – ${roomName}` : ''}` : 'A new booking just came in.',
+            url: '/crm',
         });
         await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
@@ -1680,6 +1689,29 @@ async function notifyNewBooking(guestName, roomName) {
         ));
     } catch (e) {
         console.error('notifyNewBooking:', e.message);
+    }
+}
+
+// Notify Funnel subscribers only when a purchase event is recorded (fire-and-forget)
+async function notifyPurchase() {
+    if (!VAPID_PRIVATE) return;
+    try {
+        const subs = await prisma.pushSubscription.findMany({ where: { source: 'funnel' } });
+        if (subs.length === 0) return;
+        const payload = JSON.stringify({
+            title: 'Purchase',
+            body: 'A purchase just came in.',
+            url: '/funnel',
+        });
+        await Promise.allSettled(subs.map((s) =>
+            webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload,
+                { TTL: 60 }
+            )
+        ));
+    } catch (e) {
+        console.error('notifyPurchase:', e.message);
     }
 }
 

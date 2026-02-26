@@ -72,4 +72,5 @@ model PushSubscription {
   endpoint  String
   p256dh    String
   auth      String
+  source    String   @default("crm")   // 'crm' | 'funnel' – who gets which notifications
 }
