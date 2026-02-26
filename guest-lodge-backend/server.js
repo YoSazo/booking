@@ -1672,22 +1672,35 @@ app.get('/api/push/vapid-public', (req, res) => {
 // PWA push: save subscription (CRM auth required). Optional body.source: 'crm' | 'funnel'
 app.post('/api/push/subscribe', crmAuth, async (req, res) => {
     try {
+        console.log('Push subscribe called, body:', JSON.stringify(req.body));
         const { endpoint, p256dh, auth, source } = req.body || {};
+        console.log('endpoint:', endpoint ? 'present' : 'missing');
+        console.log('p256dh:', p256dh ? 'present' : 'missing');
+        console.log('auth:', auth ? 'present' : 'missing');
+        
         if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: 'endpoint, p256dh, auth required' });
+        
         const subSource = (source === 'funnel') ? 'funnel' : 'crm';
+        console.log('Checking for existing subscription...');
         const existing = await prisma.pushSubscription.findFirst({ where: { endpoint } });
+        console.log('existing:', existing ? 'found' : 'not found');
+        
         if (existing) {
+            console.log('Updating existing subscription...');
             await prisma.pushSubscription.update({
                 where: { id: existing.id },
                 data: { p256dh, auth, source: subSource },
             });
         } else {
+            console.log('Creating new subscription...');
             await prisma.pushSubscription.create({
                 data: { endpoint, p256dh, auth, source: subSource },
             });
         }
+        console.log('Subscription saved successfully');
         res.json({ ok: true });
     } catch (e) {
+        console.error('Push subscribe error FULL:', e);
         res.status(500).json({ error: e.message });
     }
 });

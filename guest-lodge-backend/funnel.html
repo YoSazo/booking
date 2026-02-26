@@ -950,7 +950,7 @@
       }
     } catch (error) {
       console.error('Notification error:', error);
-      alert('Error enabling notifications: ' + error.message);
+      alert('Error enabling notifications: ' + error.message + ' | ' + JSON.stringify(error));
     }
   }
 
