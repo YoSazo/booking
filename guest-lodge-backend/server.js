@@ -25,7 +25,8 @@ const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
-    webpush.setVapidDetails('mailto:marketel@localhost', VAPID_PUBLIC, VAPID_PRIVATE);
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+    console.log('✅ Web push configured with subject:', VAPID_SUBJECT);
 }
 
 const app = express();
