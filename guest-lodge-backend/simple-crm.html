@@ -334,7 +334,7 @@ function renderBookings(list) {
   }
 
   el.innerHTML = list.map(b => {
-    const isDeclined = b.paymentDeclined;
+    const isDeclined = b.notes && b.notes.includes('PAYMENT DECLINED');
     const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
     const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
     const ago = timeAgo(b.createdAt);

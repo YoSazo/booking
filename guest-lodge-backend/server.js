@@ -1975,7 +1975,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 status: 'confirmed',
                 crmStage: 'new',
                 callStatus: 'not-called',
-                paymentDeclined: true, // This one had payment issues!
+                notes: 'PAYMENT DECLINED - Card issue, verify payment method when calling',
             },
         ];
 
