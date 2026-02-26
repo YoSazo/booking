@@ -15,6 +15,14 @@ const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
 
+// Web Push (PWA notifications for new bookings)
+const webpush = require('web-push');
+const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+    webpush.setVapidDetails('mailto:marketel@localhost', VAPID_PUBLIC, VAPID_PRIVATE);
+}
+
 const app = express();
 const prisma = new PrismaClient({
     datasources: {
@@ -393,6 +401,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         holdStatus: 'active'
                     }
                 });
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -482,6 +491,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         }
                     });
                     dbSaveSuccess = true;
+                    notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -1410,6 +1420,7 @@ app.post('/api/book', async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
             }
@@ -1628,6 +1639,49 @@ const crmAuth = (req, res, next) => {
     if (!token || token !== expected) return res.status(401).json({ error: 'Unauthorized' });
     next();
 };
+
+// PWA push: public VAPID key for subscription
+app.get('/api/push/vapid-public', (req, res) => {
+    if (!VAPID_PUBLIC) return res.status(503).json({ error: 'Push not configured' });
+    res.json({ publicKey: VAPID_PUBLIC });
+});
+
+// PWA push: save subscription (CRM auth required)
+app.post('/api/push/subscribe', crmAuth, async (req, res) => {
+    try {
+        const { endpoint, p256dh, auth } = req.body || {};
+        if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: 'endpoint, p256dh, auth required' });
+        await prisma.pushSubscription.upsert({
+            where: { endpoint },
+            create: { endpoint, p256dh, auth },
+            update: { p256dh, auth },
+        });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Notify all subscribed clients of a new booking (fire-and-forget)
+async function notifyNewBooking(guestName, roomName) {
+    if (!VAPID_PRIVATE) return;
+    try {
+        const subs = await prisma.pushSubscription.findMany();
+        const payload = JSON.stringify({
+            title: 'New booking',
+            body: guestName ? `${guestName}${roomName ? ` – ${roomName}` : ''}` : 'A new booking just came in.',
+        });
+        await Promise.allSettled(subs.map((s) =>
+            webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload,
+                { TTL: 60 }
+            )
+        ));
+    } catch (e) {
+        console.error('notifyNewBooking:', e.message);
+    }
+}
 
 // Serve CRM HTML
 app.get('/crm', (req, res) => {
@@ -1915,6 +1969,7 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
             },
         }));
 
+        notifyNewBooking([guestFirstName, guestLastName].filter(Boolean).join(' ') || null, roomName).catch(() => {});
         res.json({ success: true, data: booking });
     } catch (e) {
         console.error('CRM manual booking create error:', e.message);

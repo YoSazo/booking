@@ -1,0 +1,16 @@
+{
+  "name": "Marketel Bookings",
+  "short_name": "Marketel",
+  "start_url": "/crm",
+  "display": "standalone",
+  "background_color": "#EEF2EF",
+  "theme_color": "#2E7D5B",
+  "icons": [
+    {
+      "src": "/marketellogo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -65,3 +65,11 @@ model PaymentDeclinedLead {
   called           Boolean  @default(false)
   notes            String?
 }
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  endpoint  String
+  p256dh    String
+  auth      String
+}
