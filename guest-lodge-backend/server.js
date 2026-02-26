@@ -1571,6 +1571,12 @@ app.post('/api/payment-declined', async (req, res) => {
                 paymentMethod: paymentMethod || 'card',
             },
         }));
+        
+        // Send urgent push notification for payment decline
+        notifyPaymentDeclined(guestInfo, bookingDetails, errorMessage).catch((err) => {
+            console.error('Failed to send payment declined notification:', err.message);
+        });
+        
         res.status(200).json({ success: true });
     } catch (e) {
         console.error('Payment declined lead save error:', e.message);
@@ -1728,6 +1734,60 @@ async function notifyPurchase() {
         ));
     } catch (e) {
         console.error('notifyPurchase:', e.message);
+    }
+}
+
+// Notify about payment declined leads (URGENT - call within 60 seconds!)
+async function notifyPaymentDeclined(guestInfo, bookingDetails, errorMessage) {
+    if (!VAPID_PRIVATE) return;
+    try {
+        const subs = await prisma.pushSubscription.findMany();
+        if (subs.length === 0) return;
+
+        const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || 'Guest';
+        const roomName = bookingDetails.roomName || 'Room';
+        const total = bookingDetails.total ? `$${bookingDetails.total}` : '';
+        const phone = guestInfo.phone || '';
+        
+        // Determine decline reason for better context
+        let declineReason = 'Payment declined';
+        if (errorMessage) {
+            if (errorMessage.includes('insufficient')) declineReason = 'Insufficient funds';
+            else if (errorMessage.includes('expired')) declineReason = 'Expired card';
+            else if (errorMessage.includes('declined')) declineReason = 'Card declined';
+        }
+
+        const payload = JSON.stringify({
+            title: '🔴 URGENT: Payment Declined',
+            body: `${guestName} • ${phone}\n${roomName} • ${total}\n${declineReason} - CALL NOW!`,
+            icon: '/marketellogo.svg',
+            badge: '/marketellogo.svg',
+            tag: 'payment-declined',
+            requireInteraction: true, // Keeps notification visible until dismissed
+            vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern
+            data: {
+                url: '/crm',
+                type: 'payment_declined',
+                urgent: true,
+                guestName: guestName,
+                guestPhone: phone,
+                roomName: roomName,
+                total: total,
+                errorMessage: errorMessage
+            }
+        });
+
+        await Promise.allSettled(subs.map((s) =>
+            webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload,
+                { TTL: 300, urgency: 'high' } // 5 min TTL, high urgency
+            )
+        ));
+        
+        console.log(`🔴 Urgent payment declined notification sent for ${guestName}`);
+    } catch (e) {
+        console.error('notifyPaymentDeclined:', e.message);
     }
 }
 
