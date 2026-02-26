@@ -236,18 +236,21 @@
     .login-btn { padding: 12px; font-size: 14px; }
 
     .header {
-      padding: 0 12px;
-      height: 52px;
+      padding: 8px 12px;
+      height: auto;
+      min-height: 52px;
       flex-wrap: wrap;
+      gap: 6px;
     }
-    .header-logo { font-size: 13px; gap: 6px; }
+    .header-logo { font-size: 13px; gap: 6px; flex: 1 0 100%; }
     .header-logo-icon { height: 26px; }
     .header-logo-text { height: 18px; }
-    .header-right { gap: 10px; }
-    .header-date { font-size: 11px; display: none; }
-    .refresh-btn { padding: 8px 10px; font-size: 11px; }
+    .header-right { gap: 8px; flex-wrap: wrap; width: 100%; justify-content: flex-start; }
+    .header-date { display: none; }
+    .refresh-btn { padding: 7px 10px; font-size: 11px; }
+    .live-dot { width: 6px; height: 6px; }
 
-    .layout { height: calc(100vh - 52px); }
+    .layout { height: auto; min-height: calc(100vh - 68px); }
 
     .main {
       padding: 16px 12px;
@@ -354,6 +357,7 @@
   <div class="header-right">
     <span class="live-dot"></span>
     <span style="font-size:12px;color:var(--text-muted);">Live</span>
+    <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notify</button>
     <button class="refresh-btn" onclick="handleRefresh()">↻ Refresh</button>
     <div class="header-date" id="headerDate"></div>
   </div>
@@ -816,6 +820,135 @@
 
   if (document.getElementById('pinInput')) document.getElementById('pinInput').focus();
   setInterval(load, 3000);
+
+  // Push Notification Functions
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  async function enableNotifications() {
+    if (!token) {
+      alert('Please sign in first.');
+      return;
+    }
+
+    try {
+      // Check for browser support
+      if (!('Notification' in window)) {
+        alert('This browser does not support notifications.');
+        return;
+      }
+
+      if (!('serviceWorker' in navigator)) {
+        alert('This browser does not support service workers.');
+        return;
+      }
+
+      if (!('PushManager' in window)) {
+        alert('Push notifications are not supported on this device. Try Chrome on Android or desktop.');
+        return;
+      }
+
+      // Request permission
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('Notification permission denied. Enable in browser settings.');
+        return;
+      }
+
+      // Register service worker
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      console.log('Service Worker registered');
+
+      // Get VAPID public key
+      const keyRes = await fetch('/api/push/vapid-public');
+      const keyData = await keyRes.json();
+      if (!keyData.publicKey) {
+        alert('Push notifications not configured on server.');
+        return;
+      }
+
+      // Check if push manager is available
+      if (!registration.pushManager) {
+        alert('Push notifications not available in this browser.');
+        return;
+      }
+
+      // Subscribe to push
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+      });
+
+      // Convert keys to base64
+      const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh'))));
+      const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))));
+
+      // Save subscription to server
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-crm-token': token
+        },
+        body: JSON.stringify({
+          endpoint: subscription.endpoint,
+          p256dh: p256dh,
+          auth: auth,
+          source: 'funnel'
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        const btn = document.getElementById('btnNotify');
+        if (btn) {
+          btn.textContent = '🔔 On';
+          btn.style.background = 'var(--green)';
+          btn.style.color = 'white';
+        }
+        alert('✅ Notifications enabled! You\'ll receive alerts when bookings come in.');
+      } else {
+        alert('Failed to enable notifications: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Notification error:', error);
+      alert('Error enabling notifications: ' + error.message);
+    }
+  }
+
+  // Check if already subscribed on load
+  async function checkNotificationStatus() {
+    if (!token || !('serviceWorker' in navigator)) return;
+    
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration && registration.pushManager) {
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          const btn = document.getElementById('btnNotify');
+          if (btn) {
+            btn.textContent = '🔔 On';
+            btn.style.background = 'var(--green)';
+            btn.style.color = 'white';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking notification status:', error);
+    }
+  }
+
+  // Check status after login
+  setTimeout(checkNotificationStatus, 1000);
 </script>
 </body>
 </html>

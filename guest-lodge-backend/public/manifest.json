@@ -1,0 +1,18 @@
+{
+  "name": "Suite Stay - Founder Dashboard",
+  "short_name": "Suite Stay",
+  "description": "Real-time booking funnel analytics and notifications",
+  "start_url": "/funnel",
+  "display": "standalone",
+  "background_color": "#EEF2EF",
+  "theme_color": "#2E7D5B",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/marketellogo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
