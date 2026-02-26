@@ -1530,6 +1530,13 @@ app.post('/api/track', async (req, res) => {
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
     if (event_name === 'Purchase') notifyPurchase().catch(() => {});
+    
+    // Send notification for Search events (for testing notifications)
+    if (event_name === 'Search') {
+        const checkin = eventData.content_name?.split(' - ')[0] || 'Unknown dates';
+        const checkout = eventData.content_name?.split(' - ')[1] || '';
+        notifySearch(checkin, checkout).catch(() => {});
+    }
 
     try {
         await axios.post(webhookUrl, enrichedPayload);
@@ -1747,6 +1754,39 @@ async function notifyPurchase() {
         ));
     } catch (e) {
         console.error('notifyPurchase:', e.message);
+    }
+}
+
+// Notify when someone searches (for testing push notifications)
+async function notifySearch(checkin, checkout) {
+    if (!VAPID_PRIVATE) return;
+    try {
+        console.log('🔍 notifySearch called for', checkin, checkout);
+        const subs = await prisma.pushSubscription.findMany({ where: { source: 'funnel' } });
+        console.log('📊 Found', subs.length, 'subscriptions');
+        if (subs.length === 0) return;
+        
+        const payload = JSON.stringify({
+            title: '🔍 New Search!',
+            body: `Someone searched for dates: ${checkin}${checkout ? ' - ' + checkout : ''}`,
+            icon: '/marketellogo.svg',
+            badge: '/marketellogo.svg',
+            data: {
+                url: '/funnel'
+            }
+        });
+        
+        const results = await Promise.allSettled(subs.map((s) =>
+            webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload
+            )
+        ));
+        
+        console.log('📬 Push results:', JSON.stringify(results, null, 2));
+        console.log('✅ Search notification sent to', subs.length, 'subscribers');
+    } catch (e) {
+        console.error('❌ notifySearch error:', e.message);
     }
 }
 
