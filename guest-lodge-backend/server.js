@@ -10,14 +10,11 @@ const xml2js = require('xml2js');
 const http = require('http');
 const https = require('https');
 const webpush = require('web-push');
-const { initializePush, sendPushNotification, setupPushRoutes } = require('./push-notifications');
 
 // Web Push configuration
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:notifications@clickinns.com';
-
-initializePush(VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT);
 
 // Meta Ads / Facebook Marketing API config
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
@@ -709,16 +706,9 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 console.log('✅ Frontend call was successful. Webhook signing off. No duplicates created.');
                 
                 // Send push notification for new booking
-                await sendPushNotification(
-                    prisma,
-                    '🎉 New Booking!',
-                    `${guestInfo.firstName} ${guestInfo.lastName} - ${bookingDetails.roomName || bookingDetails.name} - $${bookingDetails.total}`,
-                    {
-                        bookingId: existingBooking.id,
-                        reservationCode: existingBooking.ourReservationCode,
-                        hotelId: hotelId
-                    }
-                );
+                const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
+                const roomName = bookingDetails.roomName || bookingDetails.name;
+                notifyNewBooking(guestName, roomName).catch(() => {});
                 
                 return res.json({ received: true });
             }
@@ -787,15 +777,9 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 console.log('✅ Backup booking record saved to DB by webhook.');
 
                 // 3. Send push notification
-                await sendPushNotification(
-                    prisma,
-                    '🎉 New Booking!',
-                    `${guestInfo.firstName} ${guestInfo.lastName} - ${bookingDetails.roomName || bookingDetails.name} - $${bookingDetails.total}`,
-                    {
-                        reservationCode: pmsResponse.data.reservationID,
-                        hotelId: hotelId
-                    }
-                );
+                const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
+                const roomName = bookingDetails.roomName || bookingDetails.name;
+                notifyNewBooking(guestName, roomName).catch(() => {});
 
                 // 4. Fire the purchase event since the webhook did the work.
                 if (process.env.ZAPIER_PURCHASE_URL) {
