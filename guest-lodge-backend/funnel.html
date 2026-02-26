@@ -674,7 +674,10 @@
     const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
     const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
 
+    const localTime = new Date().toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
     const lines = [
+      `Copied at: ${localTime} (local time)`,
+      '',
       `Date range: ${d.since || ''} → ${d.until || ''}`,
       '',
       `Spend: ${fmtMoney(d.spend)}`,
