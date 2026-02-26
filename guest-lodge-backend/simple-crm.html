@@ -334,8 +334,8 @@ function renderBookings(list) {
 
   el.innerHTML = list.map(b => {
     const isDeclined = b.paymentDeclined;
-    const ci = b.checkinDate ? new Date(b.checkinDate + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-    const co = b.checkoutDate ? new Date(b.checkoutDate + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
     const ago = timeAgo(b.createdAt);
 
     return `
