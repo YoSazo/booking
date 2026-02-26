@@ -1873,6 +1873,29 @@ app.post('/api/crm/bookings/:id/confirm', crmAuth, async (req, res) => {
     }
 });
 
+// Simple CRM API: Add note to booking
+app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { note } = req.body;
+        
+        if (!note) {
+            return res.status(400).json({ error: 'Note is required' });
+        }
+        
+        const booking = await prisma.booking.update({
+            where: { id },
+            data: { 
+                crmNotes: note // Append note (you might want to append to existing notes)
+            }
+        });
+        res.json({ success: true, booking });
+    } catch (error) {
+        console.error('Add note error:', error);
+        res.status(500).json({ error: 'Failed to add note' });
+    }
+});
+
 // Add dummy bookings (for testing)
 app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     try {
@@ -1952,6 +1975,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 status: 'confirmed',
                 crmStage: 'new',
                 callStatus: 'not-called',
+                paymentDeclined: true, // This one had payment issues!
             },
         ];
 

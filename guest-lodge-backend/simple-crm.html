@@ -244,13 +244,35 @@
       font-size: 22px;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 4px;
+    }
+
+    .booking-time-ago {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 6px;
     }
 
     .booking-room {
       font-size: 16px;
       font-weight: 600;
       color: var(--green);
+    }
+
+    .booking-card.payment-declined {
+      border-color: #F59E0B;
+      background: #FEF3C7;
+    }
+
+    .declined-banner {
+      background: #F59E0B;
+      color: white;
+      padding: 10px 16px;
+      margin: -20px -20px 16px -20px;
+      border-radius: 12px 12px 0 0;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
     }
 
     .booking-email {
@@ -515,11 +537,14 @@ function renderBookings(list) {
   }
   
   container.innerHTML = list.map(booking => `
-    <div class="booking-card">
+    <div class="booking-card ${booking.paymentDeclined ? 'payment-declined' : ''}">
+      ${booking.paymentDeclined ? '<div class="declined-banner">⚠️ Payment Declined - Card issue, call to confirm</div>' : ''}
+      
       <div class="booking-split">
         <div class="booking-left">
           <div class="booking-guest-name">${booking.guestFirstName} ${booking.guestLastName}</div>
-          <div class="booking-room">${booking.roomName || 'N/A'}</div>
+          <div class="booking-time-ago">${timeAgo(booking.createdAt)}</div>
+          <div class="booking-room">${booking.roomName || 'N/A'} • $${booking.grandTotal.toFixed(2)}</div>
           <div class="booking-email">${booking.guestEmail}</div>
           <div class="booking-dates">
             <div class="date-item">
@@ -543,11 +568,11 @@ function renderBookings(list) {
       </div>
       
       <div class="booking-actions">
-        <button class="action-btn primary" onclick="window.location.href='tel:${booking.guestPhone}'">
-          📞 Call Guest
-        </button>
         <button class="action-btn success" onclick="markConfirmed('${booking.id}')">
           ✓ Mark Confirmed
+        </button>
+        <button class="action-btn" onclick="addNote('${booking.id}')">
+          📝 Add Note
         </button>
       </div>
     </div>
@@ -571,6 +596,30 @@ async function markConfirmed(bookingId) {
   } catch (error) {
     console.error('Confirm error:', error);
     alert('Failed to mark as confirmed');
+  }
+}
+
+// ADD NOTE
+async function addNote(bookingId) {
+  const note = prompt('Add a note for this booking:');
+  if (!note) return;
+  
+  try {
+    const res = await fetch(`/api/crm/bookings/${bookingId}/note`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-crm-token': token 
+      },
+      body: JSON.stringify({ note })
+    });
+    
+    if (!res.ok) throw new Error('Failed to add note');
+    
+    alert('✅ Note added!');
+  } catch (error) {
+    console.error('Add note error:', error);
+    alert('Failed to add note');
   }
 }
 
