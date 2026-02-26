@@ -215,10 +215,114 @@
   .recent-empty { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
 
   .grid-2 { display: grid; grid-template-columns: 1fr 400px; gap: 24px; }
+
+  /* Tablet / small desktop */
   @media (max-width: 900px) {
     .grid-2 { grid-template-columns: 1fr; }
     .sidebar { display: none; }
     .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .login-card {
+      width: calc(100% - 32px);
+      max-width: 340px;
+      padding: 28px 20px;
+      margin: 0 16px;
+    }
+    .login-card p { font-size: 12px; margin-bottom: 20px; }
+    .login-input { padding: 14px 12px; font-size: 16px; }
+    .login-btn { padding: 12px; font-size: 14px; }
+
+    .header {
+      padding: 0 12px;
+      height: 52px;
+      flex-wrap: wrap;
+    }
+    .header-logo { font-size: 13px; gap: 6px; }
+    .header-logo-icon { height: 26px; }
+    .header-logo-text { height: 18px; }
+    .header-right { gap: 10px; }
+    .header-date { font-size: 11px; display: none; }
+    .refresh-btn { padding: 8px 10px; font-size: 11px; }
+
+    .layout { height: calc(100vh - 52px); }
+
+    .main {
+      padding: 16px 12px;
+      padding-bottom: 24px;
+    }
+    .main-title { font-size: 18px; margin-bottom: 6px; }
+    .main-subtitle { font-size: 12px; margin-bottom: 12px; line-height: 1.4; }
+
+    .meta-toolbar {
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .meta-toolbar .refresh-btn {
+      padding: 10px 12px;
+      font-size: 12px;
+      min-height: 44px;
+    }
+
+    .metrics-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .metric-card {
+      padding: 12px 14px;
+      min-height: auto;
+    }
+    .metric-label { font-size: 10px; }
+    .metric-value { font-size: 15px; }
+
+    .funnel-section {
+      padding: 16px 14px;
+      margin-bottom: 16px;
+    }
+    .funnel-section h2 { font-size: 12px; margin-bottom: 12px; }
+    .funnel-step {
+      padding: 12px 14px;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .funnel-step-emoji { font-size: 18px; width: 28px; }
+    .funnel-step-label { font-size: 13px; }
+    .funnel-step-count { font-size: 12px; padding: 3px 10px; }
+    .funnel-step-pct { font-size: 10px; min-width: 40px; }
+
+    .recent-section { padding: 16px 14px; }
+    .recent-section h2 { font-size: 12px; margin-bottom: 12px; }
+    .recent-list { max-height: 280px; }
+    .recent-item {
+      padding: 10px 10px;
+      font-size: 11px;
+      gap: 10px;
+    }
+    .recent-item-emoji { font-size: 12px; width: 20px; }
+    .recent-item-time { font-size: 9px; }
+    .recent-empty { font-size: 12px; padding: 20px; }
+
+    .grid-2 { gap: 16px; }
+
+    .meta-modal {
+      margin: 16px;
+      max-width: none;
+      padding: 14px 16px;
+    }
+    .meta-modal-header {
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .meta-modal-title { font-size: 13px; }
+    .meta-modal-body .refresh-btn {
+      padding: 10px 12px;
+      font-size: 12px;
+      min-height: 44px;
+    }
   }
 </style>
 </head>
