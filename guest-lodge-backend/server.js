@@ -1870,6 +1870,83 @@ app.post('/api/crm/bookings/:id/confirm', crmAuth, async (req, res) => {
     }
 });
 
+// Add dummy bookings (for testing)
+app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
+    try {
+        const dummyBookings = [
+            {
+                hotelId: 'suite-stay',
+                guestFirstName: 'John',
+                guestLastName: 'Smith',
+                guestEmail: 'john.smith@example.com',
+                guestPhone: '(555) 123-4567',
+                roomName: 'King Room',
+                checkinDate: '2026-03-15',
+                checkoutDate: '2026-03-18',
+                nights: 3,
+                grandTotal: 450.00,
+                stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_1',
+                ourReservationCode: 'BOOK-' + Date.now() + '-1',
+                confirmed: false,
+            },
+            {
+                hotelId: 'suite-stay',
+                guestFirstName: 'Sarah',
+                guestLastName: 'Johnson',
+                guestEmail: 'sarah.j@example.com',
+                guestPhone: '(555) 234-5678',
+                roomName: 'Double Queen',
+                checkinDate: '2026-03-16',
+                checkoutDate: '2026-03-19',
+                nights: 3,
+                grandTotal: 380.00,
+                stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_2',
+                ourReservationCode: 'BOOK-' + Date.now() + '-2',
+                confirmed: false,
+            },
+            {
+                hotelId: 'suite-stay',
+                guestFirstName: 'Michael',
+                guestLastName: 'Chen',
+                guestEmail: 'mchen@example.com',
+                guestPhone: '(555) 345-6789',
+                roomName: 'Suite Premium',
+                checkinDate: '2026-03-20',
+                checkoutDate: '2026-03-25',
+                nights: 5,
+                grandTotal: 850.00,
+                stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_3',
+                ourReservationCode: 'BOOK-' + Date.now() + '-3',
+                confirmed: false,
+            },
+            {
+                hotelId: 'suite-stay',
+                guestFirstName: 'Emily',
+                guestLastName: 'Rodriguez',
+                guestEmail: 'emily.r@example.com',
+                guestPhone: '(555) 456-7890',
+                roomName: 'Standard Double',
+                checkinDate: '2026-03-17',
+                checkoutDate: '2026-03-20',
+                nights: 3,
+                grandTotal: 320.00,
+                stripePaymentIntentId: 'pi_dummy_' + Date.now() + '_4',
+                ourReservationCode: 'BOOK-' + Date.now() + '-4',
+                confirmed: false,
+            },
+        ];
+
+        const created = await Promise.all(
+            dummyBookings.map(booking => prisma.booking.create({ data: booking }))
+        );
+
+        res.json({ success: true, count: created.length, bookings: created });
+    } catch (error) {
+        console.error('Add dummy bookings error:', error);
+        res.status(500).json({ error: 'Failed to add dummy bookings' });
+    }
+});
+
 // Funnel dashboard API (same auth as CRM)
 app.get('/api/funnel', crmAuth, (req, res) => {
     const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
