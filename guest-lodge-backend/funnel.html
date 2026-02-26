@@ -937,7 +937,7 @@
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data.ok || data.success) {
         const btn = document.getElementById('btnNotify');
         if (btn) {
           btn.textContent = '🔔 On';
