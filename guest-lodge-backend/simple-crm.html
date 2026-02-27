@@ -386,9 +386,6 @@ async function loadBookings() {
 
 // ── RENDER ─────────────────────────────────────────────
 function renderBookings(list) {
-  document.getElementById('bookingCount').textContent = list.length;
-  document.getElementById('statCount').textContent = list.length;
-
   const el = document.getElementById('bookingsList');
 
   if (list.length === 0) {
