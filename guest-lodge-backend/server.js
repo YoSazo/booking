@@ -2013,7 +2013,7 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
         const booking = await prisma.booking.update({
             where: { id },
             data: { 
-                crmNotes: note // Append note (you might want to append to existing notes)
+                notes: note // Append note (you might want to append to existing notes)
             }
         });
         res.json({ success: true, booking });

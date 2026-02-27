@@ -285,6 +285,167 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── TOAST ── */
+    /* Notes Section */
+    .card-notes {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    .notes-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .notes-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .notes-count {
+      font-size: 11px;
+      background: #e5e7eb;
+      color: #6b7280;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .notes-content {
+      font-size: 13px;
+      color: #374151;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .notes-empty {
+      font-size: 12px;
+      color: #9ca3af;
+      font-style: italic;
+    }
+
+    /* Notes Modal */
+    .notes-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .notes-modal {
+      background: white;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: modalSlideUp 0.2s ease-out;
+    }
+    @keyframes modalSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .notes-modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .notes-modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .notes-modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: none;
+      background: #f3f4f6;
+      color: #6b7280;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .notes-modal-close:hover {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    .notes-modal-body {
+      padding: 24px;
+    }
+    .notes-input-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+    .notes-input {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      color: #111827;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .notes-input:focus {
+      border-color: #2E7D5B;
+    }
+    .notes-modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+    .notes-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      font-family: inherit;
+    }
+    .notes-btn-cancel {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+    .notes-btn-cancel:hover {
+      background: #e5e7eb;
+    }
+    .notes-btn-save {
+      background: #2E7D5B;
+      color: white;
+    }
+    .notes-btn-save:hover {
+      background: #245f46;
+    }
+
     .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 7px; }
     .toast {
       background: var(--text); color: white; border-radius: 11px; padding: 11px 16px;
@@ -357,6 +518,24 @@
 </div>
 
 <div class="toast-container" id="toasts"></div>
+
+<!-- NOTES MODAL -->
+<div class="notes-modal-overlay" id="notesModal" onclick="closeNotesModal(event)">
+  <div class="notes-modal" onclick="event.stopPropagation()">
+    <div class="notes-modal-header">
+      <div class="notes-modal-title">Add Note</div>
+      <button class="notes-modal-close" onclick="closeNotesModal()">×</button>
+    </div>
+    <div class="notes-modal-body">
+      <label class="notes-input-label">Note</label>
+      <textarea class="notes-input" id="noteInput" placeholder="Add details about the booking, guest requests, or call notes..."></textarea>
+    </div>
+    <div class="notes-modal-footer">
+      <button class="notes-btn notes-btn-cancel" onclick="closeNotesModal()">Cancel</button>
+      <button class="notes-btn notes-btn-save" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+</div>
 
 <script>
 let token = '';
@@ -498,9 +677,18 @@ function renderBookings(list) {
           </div>
         </div>
 
+        ${b.notes ? `
+        <div class="card-notes">
+          <div class="notes-header">
+            <div class="notes-title">Notes</div>
+          </div>
+          <div class="notes-content">${esc(b.notes)}</div>
+        </div>
+        ` : ''}
+
         <div class="card-footer">
           <button class="btn btn-confirm" onclick="markConfirmed('${b.id}')">✓ Mark Called</button>
-          <button class="btn btn-note" onclick="addNote('${b.id}')">📝 Add Note</button>
+          <button class="btn btn-note" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
         </div>
       </div>
     </div>`;
@@ -554,14 +742,52 @@ async function markConfirmed(id) {
   } catch(e) { toast('Failed to update', 'error'); }
 }
 
-async function addNote(id) {
-  const note = prompt('Add a note for this booking:');
-  if (!note) return;
-  try {
-    await api('POST', `/api/crm/bookings/${id}/note`, { note });
-    toast('Note saved', 'success');
-  } catch(e) { toast('Failed to save note', 'error'); }
+// ── NOTES MODAL ────────────────────────────────────────
+let currentNoteBookingId = null;
+
+function addNote(id, existingNote = '') {
+  currentNoteBookingId = id;
+  const modal = document.getElementById('notesModal');
+  const input = document.getElementById('noteInput');
+  input.value = existingNote;
+  modal.style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
 }
+
+function closeNotesModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById('notesModal');
+  modal.style.display = 'none';
+  currentNoteBookingId = null;
+  document.getElementById('noteInput').value = '';
+}
+
+async function saveNote() {
+  const note = document.getElementById('noteInput').value.trim();
+  if (!note) {
+    toast('Please enter a note', 'error');
+    return;
+  }
+  
+  try {
+    await api('POST', `/api/crm/bookings/${currentNoteBookingId}/note`, { note });
+    toast('Note saved', 'success');
+    closeNotesModal();
+    loadBookings();
+  } catch(e) {
+    toast('Failed to save note', 'error');
+  }
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('notesModal');
+    if (modal.style.display === 'flex') {
+      closeNotesModal();
+    }
+  }
+});
 
 // ── ADD DUMMY BOOKINGS ─────────────────────────────────
 async function addDummyBookings() {
