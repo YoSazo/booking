@@ -75,6 +75,55 @@
     /* ── LAYOUT ── */
     .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
 
+    /* TABS */
+    .tabs-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0;
+    }
+
+    .tab {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 12px 20px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: -2px;
+    }
+
+    .tab:hover {
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .tab.active {
+      color: var(--green);
+      border-bottom-color: var(--green);
+    }
+
+    .tab-badge {
+      background: var(--bg);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tab.active .tab-badge {
+      background: var(--green);
+      color: white;
+    }
+
     .page-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 20px;
@@ -249,11 +298,16 @@
   </header>
 
   <div class="container">
-    <div class="page-header">
-      <div class="page-title">
-        📞 Needs a Call
-        <span class="count-badge" id="bookingCount">0</span>
-      </div>
+    <div class="tabs-container">
+      <button class="tab active" onclick="setFilter('needs-call', this)">
+        📞 Needs Call <span class="tab-badge" id="countNeedsCalled">0</span>
+      </button>
+      <button class="tab" onclick="setFilter('called', this)">
+        ✅ Called <span class="tab-badge" id="countCalled">0</span>
+      </button>
+      <button class="tab" onclick="setFilter('all', this)">
+        📋 All <span class="tab-badge" id="countAll">0</span>
+      </button>
     </div>
     <div id="bookingsList">
       <div class="loading"><div class="spinner"></div> Loading bookings…</div>
