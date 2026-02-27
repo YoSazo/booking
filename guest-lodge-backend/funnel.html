@@ -139,8 +139,18 @@
 
   @media (min-width: 768px) {
     .container {
-      max-width: 480px;
-      padding: 32px 24px 80px;
+      max-width: 1200px;
+      padding: 40px 32px 40px;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+  }
+
+  @media (min-width: 1400px) {
+    .container {
+      max-width: 1400px;
     }
   }
 
@@ -150,6 +160,12 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 12px;
+  }
+  
+  @media (min-width: 768px) {
+    .header {
+      display: none;
+    }
   }
   .header-brand {
     font-family: 'Instrument Serif', serif;
@@ -547,6 +563,20 @@
     gap: 10px;
     margin-bottom: 16px;
   }
+  
+  @media (min-width: 768px) {
+    .metrics-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+  }
+  
+  @media (min-width: 1200px) {
+    .metrics-grid {
+      grid-template-columns: repeat(5, 1fr);
+    }
+  }
   .metric-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -745,6 +775,88 @@
     line-height: 1.6;
   }
 
+  /* ── DESKTOP SIDEBAR ── */
+  .desktop-sidebar {
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .desktop-sidebar {
+      display: block;
+      position: sticky;
+      top: 40px;
+    }
+    
+    .sidebar-logo {
+      font-family: 'Instrument Serif', serif;
+      font-size: 24px;
+      color: var(--ink);
+      margin-bottom: 32px;
+      letter-spacing: -0.3px;
+    }
+    
+    .sidebar-logo em {
+      color: var(--green);
+      font-style: italic;
+    }
+    
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .sidebar-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: var(--r-sm);
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+    }
+    
+    .sidebar-nav-item:hover {
+      background: var(--bg);
+      color: var(--ink);
+    }
+    
+    .sidebar-nav-item.active {
+      background: var(--green);
+      color: white;
+    }
+    
+    .sidebar-nav-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    
+    .sidebar-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+  }
+
+  .main-content {
+    min-width: 0;
+  }
+
+  @media (min-width: 768px) {
+    .greeting {
+      margin-bottom: 16px;
+    }
+  }
+
   /* Responsive adjustments */
   @media (max-width: 640px) {
     .hero-amount { font-size: 42px; }
@@ -878,24 +990,59 @@
 <!-- APP -->
 <div id="app" style="display:none">
 <div class="container">
-  <!-- HEADER -->
-  <div class="header anim a1">
-    <div class="header-brand">Marketel <em>Funnel</em></div>
-    <div class="header-right">
-      <button class="icon-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings">
-        <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
+  <!-- DESKTOP SIDEBAR -->
+  <aside class="desktop-sidebar">
+    <div class="sidebar-logo">Marketel <em>Funnel</em></div>
+    
+    <nav class="sidebar-nav">
+      <button type="button" class="sidebar-nav-item active" data-view="funnel" onclick="switchView('funnel')">
+        <i data-lucide="bar-chart-3" class="sidebar-nav-icon"></i>
+        <span>Funnel</span>
       </button>
-      <button class="icon-btn" onclick="handleRefresh()" title="Refresh data">
-        <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
+      <button type="button" class="sidebar-nav-item" data-view="analytics" onclick="switchView('analytics')">
+        <i data-lucide="trending-up" class="sidebar-nav-icon"></i>
+        <span>Analytics</span>
       </button>
-    </div>
-  </div>
+      <a href="/crm" class="sidebar-nav-item">
+        <i data-lucide="users" class="sidebar-nav-icon"></i>
+        <span>Bookings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-divider"></div>
+    
+    <nav class="sidebar-nav">
+      <button class="sidebar-nav-item" id="btnNotifyDesktop" onclick="enableFunnelNotifications()" title="Get notified for new bookings">
+        <i data-lucide="bell" class="sidebar-nav-icon"></i>
+        <span>Notifications</span>
+      </button>
+      <button class="sidebar-nav-item" onclick="handleRefresh()" title="Refresh data">
+        <i data-lucide="refresh-cw" class="sidebar-nav-icon"></i>
+        <span>Refresh</span>
+      </button>
+    </nav>
+  </aside>
 
-  <!-- GREETING -->
-  <div class="greeting anim a2">
-    <div class="greeting-sub" id="headerDate"></div>
-    <div class="greeting-title" id="pageTitle">Conversion<br>Analytics</div>
-  </div>
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <!-- HEADER (Mobile only) -->
+    <div class="header anim a1">
+      <div class="header-brand">Marketel <em>Funnel</em></div>
+      <div class="header-right">
+        <button class="icon-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings">
+          <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
+        </button>
+        <button class="icon-btn" onclick="handleRefresh()" title="Refresh data">
+          <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- GREETING -->
+    <div class="greeting anim a2">
+      <div class="greeting-sub" id="headerDate"></div>
+      <div class="greeting-title" id="pageTitle">Conversion<br>Analytics</div>
+    </div>
 
   <!-- FUNNEL VIEW -->
   <div id="funnelView" class="view-container">
@@ -1062,6 +1209,9 @@
     </div>
   </div>
   <!-- END ANALYTICS VIEW -->
+
+  </div>
+  <!-- END MAIN CONTENT -->
 
 </div>
 </div>
@@ -1595,9 +1745,9 @@
       const data = await res.json();
       if (data.ok || data.success) {
         const btn = document.getElementById('btnNotify');
-        if (btn) {
-          btn.classList.add('active');
-        }
+        const btnDesktop = document.getElementById('btnNotifyDesktop');
+        if (btn) btn.classList.add('active');
+        if (btnDesktop) btnDesktop.classList.add('active');
         alert('✅ Notifications enabled! You\'ll receive alerts when bookings come in.');
       } else {
         alert('Failed to enable notifications: ' + (data.error || 'Unknown error'));
@@ -1618,9 +1768,9 @@
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
           const btn = document.getElementById('btnNotify');
-          if (btn) {
-            btn.classList.add('active');
-          }
+          const btnDesktop = document.getElementById('btnNotifyDesktop');
+          if (btn) btn.classList.add('active');
+          if (btnDesktop) btnDesktop.classList.add('active');
         }
       }
     } catch (error) {
@@ -1654,6 +1804,15 @@
     }
     
     currentView = viewName;
+    
+    // Update desktop sidebar active states
+    document.querySelectorAll('.sidebar-nav-item').forEach(item => {
+      if (item.getAttribute('data-view') === viewName) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
   }
 
   // ── NAVBAR DRAG ANIMATION (Yuto Style) ──
