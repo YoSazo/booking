@@ -317,6 +317,7 @@
 <script>
 let token = '';
 let bookings = [];
+let currentFilter = 'needs-call';
 
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
