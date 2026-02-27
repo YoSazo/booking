@@ -2203,6 +2203,7 @@ app.get('/api/crm/verify', crmAuth, (req, res) => {
 // Get bookings for CRM - last 7 days + all future
 app.get('/api/crm/bookings', crmAuth, async (req, res) => {
     try {
+        // Get regular bookings
         const bookings = await withRetry(() => prisma.booking.findMany({
             orderBy: { checkinDate: 'asc' },
             where: {
@@ -2211,7 +2212,41 @@ app.get('/api/crm/bookings', crmAuth, async (req, res) => {
                 }
             }
         }));
-        res.json({ success: true, data: bookings });
+        
+        // Get payment declined leads and transform them to look like bookings
+        const declinedLeads = await withRetry(() => prisma.paymentDeclinedLead.findMany({
+            orderBy: { createdAt: 'desc' },
+            where: {
+                called: false // Only show uncalled declined leads
+            }
+        }));
+        
+        // Transform declined leads to match booking structure
+        const transformedDeclined = declinedLeads.map(lead => ({
+            id: lead.id,
+            createdAt: lead.createdAt,
+            hotelId: lead.hotelId,
+            guestFirstName: lead.guestFirstName,
+            guestLastName: lead.guestLastName,
+            guestEmail: lead.guestEmail,
+            guestPhone: lead.guestPhone,
+            roomName: lead.roomName,
+            checkinDate: new Date(lead.checkinDate),
+            checkoutDate: new Date(lead.checkoutDate),
+            nights: lead.nights,
+            grandTotal: lead.grandTotal,
+            subtotal: lead.grandTotal * 0.85, // Approximate
+            taxesAndFees: lead.grandTotal * 0.15,
+            callStatus: 'not-called',
+            crmStage: 'new',
+            notes: `PAYMENT DECLINED - ${lead.errorMessage || 'Card issue, verify payment method when calling'}`,
+            paymentDeclined: true // Flag for UI
+        }));
+        
+        // Merge both lists
+        const allBookings = [...bookings, ...transformedDeclined];
+        
+        res.json({ success: true, data: allBookings });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
