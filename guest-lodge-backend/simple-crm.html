@@ -305,9 +305,6 @@
       <button class="tab" onclick="setFilter('called', this)">
         ✅ Called <span class="tab-badge" id="countCalled">0</span>
       </button>
-      <button class="tab" onclick="setFilter('all', this)">
-        📋 All <span class="tab-badge" id="countAll">0</span>
-      </button>
     </div>
     <div id="bookingsList">
       <div class="loading"><div class="spinner"></div> Loading bookings…</div>
@@ -368,7 +365,6 @@ async function loadBookings() {
     const called = bookings.filter(b => b.callStatus === 'called');
     document.getElementById('countNeedsCalled').textContent = needsCalls.length;
     document.getElementById('countCalled').textContent = called.length;
-    document.getElementById('countAll').textContent = bookings.length;
     document.getElementById('statCount').textContent = needsCalls.length;
     
     // Render based on current filter
@@ -463,14 +459,9 @@ function setFilter(filter, btn) {
 }
 
 function applyFilter() {
-  let filtered = [];
-  if (currentFilter === 'needs-call') {
-    filtered = bookings.filter(b => b.callStatus === 'not-called');
-  } else if (currentFilter === 'called') {
-    filtered = bookings.filter(b => b.callStatus === 'called');
-  } else {
-    filtered = bookings;
-  }
+  const filtered = currentFilter === 'needs-call' 
+    ? bookings.filter(b => b.callStatus === 'not-called')
+    : bookings.filter(b => b.callStatus === 'called');
   renderBookings(filtered);
 }
 
