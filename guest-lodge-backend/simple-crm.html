@@ -370,16 +370,28 @@ function esc(s) {
 }
 
 // ── LOGIN ──────────────────────────────────────────────
-function doLogin() {
+async function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   const err = document.getElementById('loginError');
-  if (!pin) { err.textContent = 'Please enter PIN'; return; }
-  token = pin;
-  try { localStorage.setItem('crmToken', token); } catch(e) {}
   err.textContent = '';
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  loadBookings();
+  if (!pin) { err.textContent = 'Please enter PIN'; return; }
+  
+  // Verify PIN with server first
+  try {
+    const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.success) {
+      token = pin;
+      try { localStorage.setItem('crmToken', token); } catch(e) {}
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      loadBookings();
+    } else {
+      err.textContent = 'Wrong PIN';
+    }
+  } catch (e) {
+    err.textContent = 'Connection failed';
+  }
 }
 
 // ── API ────────────────────────────────────────────────

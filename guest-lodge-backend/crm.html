@@ -410,13 +410,26 @@ let openDeclinedLeadId = null;
 let refreshInterval = null;
 
 // ─── AUTH ─────────────────────────────────────────────────
-function doLogin() {
+async function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
-  if (!pin) return;
-  token = pin;
-  try { localStorage.setItem('crm_token', pin); } catch (e) {}
-  document.getElementById('loginError').textContent = '';
-  loadBookings(true);
+  const err = document.getElementById('loginError');
+  err.textContent = '';
+  if (!pin) { err.textContent = 'Please enter PIN'; return; }
+  
+  // Verify PIN with server first
+  try {
+    const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.success) {
+      token = pin;
+      try { localStorage.setItem('crm_token', pin); } catch (e) {}
+      loadBookings(true);
+    } else {
+      err.textContent = 'Wrong PIN';
+    }
+  } catch (e) {
+    err.textContent = 'Connection failed';
+  }
 }
 
 // ─── API ──────────────────────────────────────────────────
