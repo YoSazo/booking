@@ -2,334 +2,715 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Marketel Funnel</title>
 <link rel="manifest" href="/manifest-funnel.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="/marketellogo.svg">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
-    --green-mint: #C8EDD9; --bg: #EEF2EF; --white: #FFFFFF;
-    --text: #1A2B22; --text-muted: #6B7D72; --border: #D8E4DC;
-    --red: #E05252; --amber: #F59E0B; --blue: #3B82F6;
-    --shadow: 0 2px 12px rgba(46,125,91,0.10);
-    --shadow-lg: 0 8px 32px rgba(46,125,91,0.14);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* LOGIN */
+  :root {
+    --white: #ffffff;
+    --bg: #f5f4f1;
+    --bg2: #eeecea;
+    --card: #ffffff;
+    --border: #e8e5e0;
+    --border2: #d8d4ce;
+    --ink: #1a1714;
+    --ink2: #3d3a36;
+    --muted: #8a8580;
+    --muted2: #b0aca6;
+    --green: #1a9e5c;
+    --green-lt: #e8f7ef;
+    --green-mid: #d0f0e0;
+    --green-bright: #22c76e;
+    --amber: #d97706;
+    --amber-lt: #fef3c7;
+    --red: #dc2626;
+    --red-lt: #fee2e2;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --pink: #ec4899;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+    --r: 18px;
+    --r-sm: 12px;
+    --r-xs: 8px;
+  }
+
+  body {
+    font-family: 'Geist', sans-serif;
+    background: #dbd8d3;
+    min-height: 100vh;
+    color: var(--ink);
+  }
+
+  /* ── LOGIN SCREEN ── */
   .login-screen {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--ink) 0%, var(--green) 100%);
   }
   .login-card {
-    background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+    background: white;
+    border-radius: 24px;
+    padding: 48px 40px;
+    width: 380px;
+    max-width: calc(100% - 32px);
+    box-shadow: var(--shadow-lg);
+    text-align: center;
   }
   .login-logo {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
   }
-  .login-logo-icon { height: 48px; width: auto; }
-  .login-logo-text { height: 28px; width: auto; }
-  .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .login-logo-icon { height: 56px; width: auto; }
+  .login-logo-text { height: 32px; width: auto; }
+  .login-card p {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
   .login-input {
-    width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
-    border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
-    letter-spacing: 4px; outline: none; margin-bottom: 12px; color: var(--text);
-    transition: border-color 0.2s;
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid var(--border);
+    border-radius: var(--r-sm);
+    font-family: inherit;
+    font-size: 18px;
+    text-align: center;
+    letter-spacing: 4px;
+    outline: none;
+    margin-bottom: 16px;
+    color: var(--ink);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: var(--bg);
   }
-  .login-input:focus { border-color: var(--green); }
+  .login-input:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px var(--green-lt);
+  }
   .login-btn {
-    width: 100%; padding: 13px; background: var(--green); color: white;
-    border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
-    font-weight: 600; cursor: pointer; transition: background 0.15s;
+    width: 100%;
+    padding: 14px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: var(--r-sm);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
   }
-  .login-btn:hover { background: #245f46; }
-  .login-error { color: var(--red); font-size: 13px; margin-top: 8px; }
+  .login-btn:hover {
+    background: #16844d;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+  .login-btn:active {
+    transform: translateY(0);
+  }
+  .login-error {
+    color: var(--red);
+    font-size: 13px;
+    margin-top: 12px;
+  }
 
-  /* HEADER */
+  /* ── MAIN CONTAINER ── */
+  .container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 24px 16px 80px;
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      max-width: 480px;
+      padding: 32px 24px 80px;
+    }
+  }
+
+  /* ── HEADER ── */
   .header {
-    background: var(--white); border-bottom: 1.5px solid var(--border);
-    padding: 0 24px; height: 58px; display: flex; align-items: center;
-    justify-content: space-between; position: sticky; top: 0; z-index: 100;
-    box-shadow: 0 1px 8px rgba(46,125,91,0.07);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
   }
-  .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: var(--text); }
-  .header-logo-icon { height: 32px; width: auto; }
-  .header-logo-text { height: 20px; width: auto; }
-  .header-logo-suffix { margin-left: 2px; color: var(--text-muted); font-weight: 600; }
-  .header-right { display: flex; align-items: center; gap: 16px; }
-  .header-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-  .refresh-btn {
-    background: var(--green-pale); border: 1.5px solid var(--border); border-radius: 8px;
-    padding: 5px 12px; font-family: inherit; font-size: 12px; font-weight: 600;
-    color: var(--green); cursor: pointer; transition: all 0.15s;
+  .header-brand {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px;
+    color: var(--ink);
+    letter-spacing: -0.3px;
   }
-  .refresh-btn:hover { background: var(--green); color: white; }
-  .live-dot { width: 8px; height: 8px; background: var(--green-light); border-radius: 50%; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
+  .header-brand em {
+    color: var(--green);
+    font-style: italic;
+  }
+  .header-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .icon-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+  .icon-btn.active {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+  }
 
-  /* LAYOUT */
-  .layout { display: flex; height: calc(100vh - 58px); }
-
-  /* SIDEBAR */
-  .sidebar {
-    width: 240px; background: var(--white); border-right: 1.5px solid var(--border);
-    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  /* ── GREETING ── */
+  .greeting {
+    margin-bottom: 8px;
   }
-  .sidebar-section { padding: 16px 14px 8px; }
-  .sidebar-label {
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 6px; padding: 0 4px;
+  .greeting-sub {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-bottom: 4px;
   }
-  .sidebar-link {
-    display: flex; align-items: center; gap: 9px; padding: 8px 10px;
-    border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--text-muted);
-    cursor: pointer; transition: all 0.15s; margin-bottom: 2px; text-decoration: none;
+  .greeting-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 32px;
+    color: var(--ink);
+    line-height: 1.1;
+    letter-spacing: -0.5px;
   }
-  .sidebar-link:hover { background: var(--green-pale); color: var(--green); }
-  .sidebar-link.active { background: var(--green); color: white; font-weight: 600; }
-  .divider { height: 1px; background: var(--border); margin: 6px 14px; }
 
-  /* MAIN */
-  .main { flex: 1; overflow-y: auto; padding: 24px; }
-  .main-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
-  .main-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+  /* ── LIVE TAG ── */
+  .live-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--green-lt);
+    border: 1px solid var(--green-mid);
+    border-radius: 20px;
+    padding: 6px 14px 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--green);
+    margin: 12px 0 16px;
+  }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-bright);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 199, 110, 0.4); }
+    50% { box-shadow: 0 0 0 5px rgba(34, 199, 110, 0); }
+  }
 
+  /* ── HERO CARD ── */
+  .hero-card {
+    background: var(--ink);
+    border-radius: var(--r);
+    padding: 24px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-lg);
+  }
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 90% -20%, rgba(34, 199, 110, 0.3) 0%, transparent 55%),
+      radial-gradient(ellipse at -10% 110%, rgba(34, 199, 110, 0.12) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .hero-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .hero-amount {
+    font-family: 'Instrument Serif', serif;
+    font-size: 52px;
+    letter-spacing: -2px;
+    line-height: 1;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .hero-amount-sm {
+    font-size: 28px;
+    color: rgba(255, 255, 255, 0.65);
+  }
+  .hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    position: relative;
+  }
+  .hero-badge {
+    background: rgba(34, 199, 110, 0.2);
+    color: #5de89a;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+  .hero-badge.red {
+    background: rgba(220, 38, 38, 0.2);
+    color: #fca5a5;
+  }
+  .hero-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 18px 0;
+    position: relative;
+  }
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    position: relative;
+  }
+  .hstat {
+    padding: 0 12px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: center;
+  }
+  .hstat:first-child {
+    padding-left: 0;
+    text-align: left;
+  }
+  .hstat:last-child {
+    border-right: none;
+    text-align: right;
+  }
+  .hstat-val {
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .hstat-val.green {
+    color: #5de89a;
+  }
+  .hstat-val.amber {
+    color: #fbbf24;
+  }
+  .hstat-lbl {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  /* ── SECTION HEADER ── */
+  .sec-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 24px 0 12px;
+  }
+  .sec-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+  }
+  .sec-action {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--green);
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .sec-action:hover {
+    opacity: 0.7;
+  }
+
+  /* ── META TOOLBAR ── */
   .meta-toolbar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: 6px;
+    margin-bottom: 12px;
   }
-
-  /* META METRICS */
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
+  .meta-btn {
+    padding: 7px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
   }
-  .metric-card {
-    background: var(--white);
-    border-radius: 12px;
-    border: 1.5px solid var(--border);
-    padding: 10px 12px;
+  .meta-btn:hover {
+    transform: translateY(-1px);
     box-shadow: var(--shadow);
   }
-  .metric-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-  .metric-value {
-    font-size: 16px;
-    font-weight: 700;
+  .meta-btn:active {
+    transform: translateY(0);
   }
 
+  /* ── CARD ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+  }
+
+  /* ── FUNNEL STEPS ── */
+  .funnel-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .funnel-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border-radius: var(--r-sm);
+    border-left: 4px solid;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .funnel-step:hover {
+    background: var(--bg2);
+    transform: translateX(4px);
+  }
+  .funnel-step:nth-child(1) { border-left-color: var(--blue); }
+  .funnel-step:nth-child(2) { border-left-color: var(--purple); }
+  .funnel-step:nth-child(3) { border-left-color: var(--pink); }
+  .funnel-step:nth-child(4) { border-left-color: var(--amber); }
+  .funnel-step:nth-child(5) { border-left-color: var(--green); }
+  
+  .funnel-step-emoji {
+    font-size: 22px;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .funnel-step-label {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .funnel-step-count {
+    background: var(--white);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 5px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Geist', monospace;
+    box-shadow: var(--shadow-sm);
+  }
+  .funnel-step-pct {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    min-width: 48px;
+    text-align: right;
+  }
+
+  /* ── CHART CARD ── */
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+  }
+  .chart-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .chart-kpi {
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px;
+    letter-spacing: -1px;
+    color: var(--ink);
+  }
+  .chart-kpi-lbl {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .chart-kpi-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--green);
+    background: var(--green-lt);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-top: 6px;
+  }
+  .chart-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg2);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .ctab {
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+  .ctab.on {
+    background: var(--white);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── META METRICS GRID ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .metric-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .metric-value {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.5px;
+  }
+
+  /* ── RECENT ACTIVITY ── */
+  .recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .recent-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+  .recent-item:hover {
+    transform: translateX(4px);
+  }
+  .recent-stripe {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--green-bright);
+    border-radius: 0 2px 2px 0;
+  }
+  .recent-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .recent-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .recent-event {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .recent-meta {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .recent-time {
+    font-size: 10px;
+    color: var(--muted2);
+    font-weight: 500;
+    font-family: 'Geist', monospace;
+    flex-shrink: 0;
+  }
+  .recent-empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 32px;
+    text-align: center;
+  }
+
+  /* ── META MODAL ── */
   .meta-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.25);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 999;
+    padding: 16px;
   }
   .meta-modal {
     background: var(--white);
-    border-radius: 16px;
-    padding: 16px 18px;
+    border-radius: var(--r);
+    padding: 20px;
     box-shadow: var(--shadow-lg);
     max-width: 420px;
     width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
   }
   .meta-modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
   }
   .meta-modal-title {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
   }
   .meta-modal-body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
-
+  .meta-date-btn {
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .meta-date-btn:hover {
+    background: var(--bg2);
+  }
   .meta-date-btn.selected {
     background: var(--green);
     color: #fff;
     border-color: var(--green);
   }
 
-  /* FUNNEL */
-  .funnel-section {
-    background: var(--white); border-radius: 16px; border: 1.5px solid var(--border);
-    padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow);
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  .funnel-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 16px; }
-  .funnel-steps {
-    display: flex; flex-direction: column; gap: 0;
+  .anim {
+    animation: fadeUp 0.5s ease both;
   }
-  .funnel-step {
-    display: flex; align-items: center; gap: 16px; padding: 14px 16px;
-    border-radius: 12px; margin-bottom: 6px; transition: background 0.15s;
-    border-left: 4px solid transparent;
-  }
-  .funnel-step:hover { background: var(--green-pale); }
-  .funnel-step:nth-child(1) { border-left-color: #3B82F6; }
-  .funnel-step:nth-child(2) { border-left-color: #8B5CF6; }
-  .funnel-step:nth-child(3) { border-left-color: #EC4899; }
-  .funnel-step:nth-child(4) { border-left-color: #F59E0B; }
-  .funnel-step:nth-child(5) { border-left-color: #10B981; }
-  .funnel-step:nth-child(6) { border-left-color: var(--green); }
-  .funnel-step-emoji { font-size: 20px; width: 32px; text-align: center; }
-  .funnel-step-label { flex: 1; font-weight: 600; font-size: 14px; }
-  .funnel-step-count {
-    background: var(--green-pale); color: var(--green); border-radius: 20px;
-    padding: 4px 12px; font-size: 13px; font-weight: 700; font-family: 'DM Mono', monospace;
-  }
-  .funnel-step-pct { font-size: 11px; color: var(--text-muted); font-weight: 500; min-width: 48px; text-align: right; }
-
-  /* RECENT */
-  .recent-section { background: var(--white); border-radius: 16px; border: 1.5px solid var(--border); padding: 24px; box-shadow: var(--shadow); }
-  .recent-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 16px; }
-  .recent-list { max-height: 320px; overflow-y: auto; }
-  .recent-item {
-    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
-    border-radius: 10px; margin-bottom: 4px; font-size: 12px; transition: background 0.15s;
-  }
-  .recent-item:hover { background: var(--bg); }
-  .recent-item-emoji { font-size: 14px; width: 24px; text-align: center; }
-  .recent-item-event { font-weight: 600; color: var(--text); }
-  .recent-item-meta { color: var(--text-muted); font-size: 11px; }
-  .recent-item-time { color: var(--text-muted); font-size: 10px; font-family: 'DM Mono', monospace; margin-left: auto; }
-  .recent-empty { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
-
-  .grid-2 { display: grid; grid-template-columns: 1fr 400px; gap: 24px; }
-
-  /* Tablet / small desktop */
-  @media (max-width: 900px) {
-    .grid-2 { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
-    .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-
-  /* Mobile */
-  @media (max-width: 600px) {
-    .login-card {
-      width: calc(100% - 32px);
-      max-width: 340px;
-      padding: 28px 20px;
-      margin: 0 16px;
-    }
-    .login-card p { font-size: 12px; margin-bottom: 20px; }
-    .login-input { padding: 14px 12px; font-size: 16px; }
-    .login-btn { padding: 12px; font-size: 14px; }
-
-    .header {
-      padding: 8px 12px;
-      height: auto;
-      min-height: 52px;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .header-logo { font-size: 13px; gap: 6px; flex: 1 0 100%; }
-    .header-logo-icon { height: 26px; }
-    .header-logo-text { height: 18px; }
-    .header-right { gap: 8px; flex-wrap: wrap; width: 100%; justify-content: flex-start; }
-    .header-date { display: none; }
-    .refresh-btn { padding: 7px 10px; font-size: 11px; }
-    .live-dot { width: 6px; height: 6px; }
-
-    .layout { height: auto; min-height: calc(100vh - 68px); }
-
-    .main {
-      padding: 16px 12px;
-      padding-bottom: 24px;
-    }
-    .main-title { font-size: 18px; margin-bottom: 6px; }
-    .main-subtitle { font-size: 12px; margin-bottom: 12px; line-height: 1.4; }
-
-    .meta-toolbar {
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-    .meta-toolbar .refresh-btn {
-      padding: 10px 12px;
-      font-size: 12px;
-      min-height: 44px;
-    }
-
-    .metrics-grid {
-      grid-template-columns: 1fr;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .metric-card {
-      padding: 12px 14px;
-      min-height: auto;
-    }
-    .metric-label { font-size: 10px; }
-    .metric-value { font-size: 15px; }
-
-    .funnel-section {
-      padding: 16px 14px;
-      margin-bottom: 16px;
-    }
-    .funnel-section h2 { font-size: 12px; margin-bottom: 12px; }
-    .funnel-step {
-      padding: 12px 14px;
-      gap: 12px;
-      margin-bottom: 4px;
-    }
-    .funnel-step-emoji { font-size: 18px; width: 28px; }
-    .funnel-step-label { font-size: 13px; }
-    .funnel-step-count { font-size: 12px; padding: 3px 10px; }
-    .funnel-step-pct { font-size: 10px; min-width: 40px; }
-
-    .recent-section { padding: 16px 14px; }
-    .recent-section h2 { font-size: 12px; margin-bottom: 12px; }
-    .recent-list { max-height: 280px; }
-    .recent-item {
-      padding: 10px 10px;
-      font-size: 11px;
-      gap: 10px;
-    }
-    .recent-item-emoji { font-size: 12px; width: 20px; }
-    .recent-item-time { font-size: 9px; }
-    .recent-empty { font-size: 12px; padding: 20px; }
-
-    .grid-2 { gap: 16px; }
-
-    .meta-modal {
-      margin: 16px;
-      max-width: none;
-      padding: 14px 16px;
-    }
-    .meta-modal-header {
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .meta-modal-title { font-size: 13px; }
-    .meta-modal-body .refresh-btn {
-      padding: 10px 12px;
-      font-size: 12px;
-      min-height: 44px;
-    }
+  .a1 { animation-delay: 0.05s; }
+  .a2 { animation-delay: 0.12s; }
+  .a3 { animation-delay: 0.20s; }
+  .a4 { animation-delay: 0.28s; }
+  .a5 { animation-delay: 0.36s; }
+  .a6 { animation-delay: 0.44s; }
+  .a7 { animation-delay: 0.52s; }
+  
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .hero-amount { font-size: 42px; }
+    .hero-stats { grid-template-columns: 1fr; gap: 12px; }
+    .hstat { border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 0; text-align: left !important; }
+    .hstat:last-child { border-bottom: none; }
   }
 </style>
 </head>
@@ -352,145 +733,168 @@
 
 <!-- APP -->
 <div id="app" style="display:none">
-<header class="header">
-  <div class="header-logo">
-    <img src="/marketellogo.svg" alt="" class="header-logo-icon">
-    <img src="/marketel.svg" alt="Marketel" class="header-logo-text">
-    <span class="header-logo-suffix">Funnel</span>
+<div class="container">
+  <!-- HEADER -->
+  <div class="header anim a1">
+    <div class="header-brand">Marketel <em>Funnel</em></div>
+    <div class="header-right">
+      <button class="icon-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings">🔔</button>
+      <button class="icon-btn" onclick="handleRefresh()" title="Refresh data">↻</button>
+    </div>
   </div>
-  <div class="header-right">
-    <span class="live-dot"></span>
-    <span style="font-size:12px;color:var(--text-muted);">Live</span>
-    <button class="refresh-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings and purchases">🔔 Notifications</button>
-    <button class="refresh-btn" onclick="handleRefresh()">↻ Refresh</button>
-    <div class="header-date" id="headerDate"></div>
+
+  <!-- GREETING -->
+  <div class="greeting anim a2">
+    <div class="greeting-sub" id="headerDate"></div>
+    <div class="greeting-title">Conversion<br>Analytics</div>
   </div>
-</header>
 
-<div class="layout">
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">Tools</div>
-      <a href="/crm" class="sidebar-link">📋 Bookings CRM</a>
-      <a href="/funnel" class="sidebar-link active">📊 Funnel</a>
+  <!-- LIVE TAG -->
+  <div class="live-tag anim a2">
+    <div class="live-dot"></div>
+    <span id="liveStatus">Live tracking · Updates every 3s</span>
+  </div>
+
+  <!-- HERO CARD: Conversion Rate -->
+  <div class="hero-card anim a3">
+    <div class="hero-label">Overall Conversion Rate</div>
+    <div class="hero-amount"><span class="hero-amount-sm" id="heroConversionRate">0%</span></div>
+    <div class="hero-meta">
+      <span class="hero-badge" id="heroConversionBadge">—</span>
+      <span id="heroConversionMeta">Search to Purchase</span>
     </div>
-  </aside>
-
-  <main class="main">
-    <h1 class="main-title">Conversion Funnel</h1>
-    <p class="main-subtitle">Real-time events from your booking engine. Funnel data refreshes every 3 seconds.</p>
-
-    <div class="meta-toolbar">
-      <button class="refresh-btn" onclick="setMetaRange('today')">Today</button>
-      <button class="refresh-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
-      <button class="refresh-btn" onclick="setMetaRange('last7')">Last 7 days</button>
-      <button class="refresh-btn" onclick="openMetaModal()">Choose dates</button>
-      <button class="refresh-btn" onclick="copyMetaSummary()">Copy summary</button>
-    </div>
-
-    <div class="metrics-grid" id="metaMetrics" style="display:none">
-      <div class="metric-card">
-        <div class="metric-label">Ad Spend (7d)</div>
-        <div class="metric-value" id="meta-spend">–</div>
+    <div class="hero-divider"></div>
+    <div class="hero-stats">
+      <div class="hstat">
+        <div class="hstat-val green" id="heroSearches">0</div>
+        <div class="hstat-lbl">Searches</div>
       </div>
-      <div class="metric-card">
-        <div class="metric-label">CPM</div>
-        <div class="metric-value" id="meta-cpm">–</div>
+      <div class="hstat">
+        <div class="hstat-val" id="heroCarts">0</div>
+        <div class="hstat-lbl">Add to Cart</div>
       </div>
-      <div class="metric-card">
-        <div class="metric-label">CTR</div>
-        <div class="metric-value" id="meta-ctr">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Cost / LP View</div>
-        <div class="metric-value" id="meta-cplpv">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">ROAS</div>
-        <div class="metric-value" id="meta-roas">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">LP Views (Meta)</div>
-        <div class="metric-value" id="meta-lpv">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Searches (Meta)</div>
-        <div class="metric-value" id="meta-search">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Add to Cart (Meta)</div>
-        <div class="metric-value" id="meta-atc">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Initiate Checkout (Meta)</div>
-        <div class="metric-value" id="meta-ic">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Add Payment Info (Meta)</div>
-        <div class="metric-value" id="meta-api">–</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Purchases (Meta)</div>
-        <div class="metric-value" id="meta-purchase">–</div>
+      <div class="hstat">
+        <div class="hstat-val amber" id="heroPurchases">0</div>
+        <div class="hstat-lbl">Purchases</div>
       </div>
     </div>
+  </div>
 
-    <div class="grid-2">
-      <div class="funnel-section">
-        <h2>Funnel Steps</h2>
-        <div class="funnel-steps" id="funnelSteps">
-          <div class="funnel-step">
-            <span class="funnel-step-emoji">🔍</span>
-            <span class="funnel-step-label">Search</span>
-            <span class="funnel-step-count" id="count-Search">0</span>
-            <span class="funnel-step-pct" id="pct-Search"></span>
-          </div>
-          <div class="funnel-step">
-            <span class="funnel-step-emoji">🛒</span>
-            <span class="funnel-step-label">Add to Cart</span>
-            <span class="funnel-step-count" id="count-AddToCart">0</span>
-            <span class="funnel-step-pct" id="pct-AddToCart"></span>
-          </div>
-          <div class="funnel-step">
-            <span class="funnel-step-emoji">📋</span>
-            <span class="funnel-step-label">Initiate Checkout</span>
-            <span class="funnel-step-count" id="count-InitiateCheckout">0</span>
-            <span class="funnel-step-pct" id="pct-InitiateCheckout"></span>
-          </div>
-          <div class="funnel-step">
-            <span class="funnel-step-emoji">💳</span>
-            <span class="funnel-step-label">Add Payment Info</span>
-            <span class="funnel-step-count" id="count-AddPaymentInfo">0</span>
-            <span class="funnel-step-pct" id="pct-AddPaymentInfo"></span>
-          </div>
-          <div class="funnel-step">
-            <span class="funnel-step-emoji">✅</span>
-            <span class="funnel-step-label">Purchase</span>
-            <span class="funnel-step-count" id="count-Purchase">0</span>
-            <span class="funnel-step-pct" id="pct-Purchase"></span>
-          </div>
-        </div>
+  <!-- META ADS SECTION -->
+  <div class="sec-header anim a4">
+    <span class="sec-title">Meta Ads Performance</span>
+  </div>
+
+  <div class="meta-toolbar anim a4">
+    <button class="meta-btn" onclick="setMetaRange('today')">Today</button>
+    <button class="meta-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
+    <button class="meta-btn" onclick="setMetaRange('last7')">Last 7 days</button>
+    <button class="meta-btn" onclick="openMetaModal()">Choose dates</button>
+    <button class="meta-btn" onclick="copyMetaSummary()">📋 Copy</button>
+  </div>
+
+    <div class="metric-card">
+      <div class="metric-label">Ad Spend</div>
+      <div class="metric-value" id="meta-spend">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">CPM</div>
+      <div class="metric-value" id="meta-cpm">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">CTR</div>
+      <div class="metric-value" id="meta-ctr">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">ROAS</div>
+      <div class="metric-value" id="meta-roas">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">LP Views</div>
+      <div class="metric-value" id="meta-lpv">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Searches</div>
+      <div class="metric-value" id="meta-search">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Add to Cart</div>
+      <div class="metric-value" id="meta-atc">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Checkouts</div>
+      <div class="metric-value" id="meta-ic">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Payment Info</div>
+      <div class="metric-value" id="meta-api">–</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Purchases</div>
+      <div class="metric-value" id="meta-purchase">–</div>
+    </div>
+  </div>
+
+  <!-- FUNNEL STEPS -->
+  <div class="sec-header anim a5">
+    <span class="sec-title">Funnel Steps</span>
+  </div>
+
+  <div class="card anim a5">
+    <div class="funnel-steps" id="funnelSteps">
+      <div class="funnel-step">
+        <span class="funnel-step-emoji">🔍</span>
+        <span class="funnel-step-label">Search</span>
+        <span class="funnel-step-count" id="count-Search">0</span>
+        <span class="funnel-step-pct" id="pct-Search"></span>
       </div>
-
-      <div class="recent-section">
-        <h2>Recent Activity</h2>
-        <div class="recent-list" id="recentList">
-          <div class="recent-empty">Loading...</div>
-        </div>
+      <div class="funnel-step">
+        <span class="funnel-step-emoji">🛒</span>
+        <span class="funnel-step-label">Add to Cart</span>
+        <span class="funnel-step-count" id="count-AddToCart">0</span>
+        <span class="funnel-step-pct" id="pct-AddToCart"></span>
+      </div>
+      <div class="funnel-step">
+        <span class="funnel-step-emoji">📋</span>
+        <span class="funnel-step-label">Initiate Checkout</span>
+        <span class="funnel-step-count" id="count-InitiateCheckout">0</span>
+        <span class="funnel-step-pct" id="pct-InitiateCheckout"></span>
+      </div>
+      <div class="funnel-step">
+        <span class="funnel-step-emoji">💳</span>
+        <span class="funnel-step-label">Add Payment Info</span>
+        <span class="funnel-step-count" id="count-AddPaymentInfo">0</span>
+        <span class="funnel-step-pct" id="pct-AddPaymentInfo"></span>
+      </div>
+      <div class="funnel-step">
+        <span class="funnel-step-emoji">✅</span>
+        <span class="funnel-step-label">Purchase</span>
+        <span class="funnel-step-count" id="count-Purchase">0</span>
+        <span class="funnel-step-pct" id="pct-Purchase"></span>
       </div>
     </div>
-  </main>
+  </div>
+
+  <!-- RECENT ACTIVITY -->
+  <div class="sec-header anim a6">
+    <span class="sec-title">Recent Activity</span>
+  </div>
+
+  <div class="recent-list anim a6" id="recentList">
+    <div class="recent-empty">Loading...</div>
+  </div>
+
 </div>
 </div>
 
 <div id="metaModal" class="meta-modal-overlay" onclick="handleMetaModalOverlay(event)">
-  <div class="meta-modal">
+  <div class="meta-modal" onclick="event.stopPropagation()">
     <div class="meta-modal-header">
-      <span class="meta-modal-title">Choose date (last 14 days)</span>
-      <div>
-        <button class="refresh-btn" id="metaSelectBtn" onclick="toggleMetaRangeMode()">Select</button>
-        <button class="refresh-btn" onclick="applyMetaRange()">Done</button>
-        <button class="refresh-btn" onclick="closeMetaModal()">×</button>
+      <span class="meta-modal-title">Choose date range</span>
+      <div style="display: flex; gap: 6px;">
+        <button class="meta-btn" id="metaSelectBtn" onclick="toggleMetaRangeMode()">Range</button>
+        <button class="meta-btn" onclick="applyMetaRange()">Done</button>
+        <button class="meta-btn" onclick="closeMetaModal()">×</button>
       </div>
     </div>
     <div class="meta-modal-body" id="metaModalBody"></div>
@@ -545,10 +949,6 @@
     set('meta-spend', d.spend != null ? fmtMoney(d.spend) : '–');
     set('meta-cpm', d.cpm != null ? fmtMoney(d.cpm) : '–');
     set('meta-ctr', d.ctr != null ? fmtPct(d.ctr) : '–');
-    set(
-      'meta-cplpv',
-      d.cost_per_landing_page_view != null ? fmtMoney(d.cost_per_landing_page_view) : '–'
-    );
     set('meta-roas', d.roas != null ? d.roas.toFixed(2) + 'x' : '–');
 
     const ev = d.events || {};
@@ -565,6 +965,41 @@
     const steps = ['Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
     const top = counts.Search || 1;
 
+    // Update hero card with conversion metrics
+    const searches = counts.Search || 0;
+    const carts = counts.AddToCart || 0;
+    const purchases = counts.Purchase || 0;
+    const conversionRate = searches > 0 ? ((purchases / searches) * 100) : 0;
+    
+    const heroConvEl = document.getElementById('heroConversionRate');
+    const heroBadgeEl = document.getElementById('heroConversionBadge');
+    const heroSearchesEl = document.getElementById('heroSearches');
+    const heroCartsEl = document.getElementById('heroCarts');
+    const heroPurchasesEl = document.getElementById('heroPurchases');
+    
+    if (heroConvEl) heroConvEl.textContent = conversionRate.toFixed(1) + '%';
+    if (heroSearchesEl) heroSearchesEl.textContent = searches;
+    if (heroCartsEl) heroCartsEl.textContent = carts;
+    if (heroPurchasesEl) heroPurchasesEl.textContent = purchases;
+    
+    // Update badge based on conversion rate
+    if (heroBadgeEl) {
+      if (conversionRate >= 5) {
+        heroBadgeEl.textContent = '↑ Strong';
+        heroBadgeEl.className = 'hero-badge';
+      } else if (conversionRate >= 2) {
+        heroBadgeEl.textContent = '→ Normal';
+        heroBadgeEl.className = 'hero-badge';
+      } else if (conversionRate > 0) {
+        heroBadgeEl.textContent = '↓ Low';
+        heroBadgeEl.className = 'hero-badge red';
+      } else {
+        heroBadgeEl.textContent = '—';
+        heroBadgeEl.className = 'hero-badge';
+      }
+    }
+
+    // Update funnel steps
     steps.forEach(name => {
       const n = counts[name] || 0;
       const el = document.getElementById('count-' + name);
@@ -573,23 +1008,26 @@
       if (pctEl) pctEl.textContent = top ? Math.round((n / top) * 100) + '%' : '';
     });
 
+    // Update recent activity with new card design
     const list = document.getElementById('recentList');
     if (recent.length === 0) {
       list.innerHTML = '<div class="recent-empty">No events yet. Events appear when users interact with your booking site.</div>';
     } else {
       list.innerHTML = recent.map(e => `
         <div class="recent-item">
-          <span class="recent-item-emoji">${EMOJI_MAP[e.event_name] || '•'}</span>
-          <div>
-            <span class="recent-item-event">${e.event_name}</span>
-            ${e.content_name ? `<div class="recent-item-meta">${e.content_name}${e.value ? ' · $' + e.value.toFixed(0) : ''}</div>` : ''}
+          <div class="recent-stripe"></div>
+          <div class="recent-icon">${EMOJI_MAP[e.event_name] || '•'}</div>
+          <div class="recent-info">
+            <div class="recent-event">${e.event_name}</div>
+            ${e.content_name ? `<div class="recent-meta">${e.content_name}${e.value ? ' · $' + e.value.toFixed(0) : ''}</div>` : ''}
           </div>
-          <span class="recent-item-time">${formatTime(e.timestamp)}</span>
+          <div class="recent-time">${formatTime(e.timestamp)}</div>
         </div>
       `).join('');
     }
 
-    document.getElementById('headerDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    // Update header date
+    document.getElementById('headerDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
   async function doLogin() {
@@ -689,7 +1127,7 @@
     metaRangeStartIndex = null;
     metaRangeEndIndex = null;
     const selectBtn = document.getElementById('metaSelectBtn');
-    if (selectBtn) selectBtn.textContent = 'Select';
+    if (selectBtn) selectBtn.textContent = 'Range';
 
     const today = new Date();
     for (let i = 0; i < 14; i++) {
@@ -698,7 +1136,7 @@
       const iso = d.toISOString().split('T')[0];
       metaModalDates.push({ iso });
       const btn = document.createElement('button');
-      btn.className = 'refresh-btn meta-date-btn';
+      btn.className = 'meta-date-btn';
       btn.textContent = label;
       btn.dataset.index = String(i);
       btn.onclick = () => onMetaDateClick(i);
@@ -772,7 +1210,7 @@
     metaRangeEndIndex = null;
     updateMetaModalSelection();
     const btn = document.getElementById('metaSelectBtn');
-    if (btn) btn.textContent = metaSelectRange ? 'Single mode' : 'Range mode';
+    if (btn) btn.textContent = metaSelectRange ? 'Single' : 'Range';
   }
 
   function applyMetaRange() {
@@ -940,9 +1378,7 @@
       if (data.ok || data.success) {
         const btn = document.getElementById('btnNotify');
         if (btn) {
-          btn.textContent = '🔔 On';
-          btn.style.background = 'var(--green)';
-          btn.style.color = 'white';
+          btn.classList.add('active');
         }
         alert('✅ Notifications enabled! You\'ll receive alerts when bookings come in.');
       } else {
@@ -965,9 +1401,7 @@
         if (subscription) {
           const btn = document.getElementById('btnNotify');
           if (btn) {
-            btn.textContent = '🔔 On';
-            btn.style.background = 'var(--green)';
-            btn.style.color = 'white';
+            btn.classList.add('active');
           }
         }
       }

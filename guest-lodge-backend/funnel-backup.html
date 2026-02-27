@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketel Funnel</title>
+<link rel="manifest" href="/manifest-funnel.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/marketellogo.svg">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
+    --green-mint: #C8EDD9; --bg: #EEF2EF; --white: #FFFFFF;
+    --text: #1A2B22; --text-muted: #6B7D72; --border: #D8E4DC;
+    --red: #E05252; --amber: #F59E0B; --blue: #3B82F6;
+    --shadow: 0 2px 12px rgba(46,125,91,0.10);
+    --shadow-lg: 0 8px 32px rgba(46,125,91,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* LOGIN */
+  .login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
+  }
+  .login-card {
+    background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+  }
+  .login-logo {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+  .login-logo-icon { height: 48px; width: auto; }
+  .login-logo-text { height: 28px; width: auto; }
+  .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .login-input {
+    width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
+    border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
+    letter-spacing: 4px; outline: none; margin-bottom: 12px; color: var(--text);
+    transition: border-color 0.2s;
+  }
+  .login-input:focus { border-color: var(--green); }
+  .login-btn {
+    width: 100%; padding: 13px; background: var(--green); color: white;
+    border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
+    font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .login-btn:hover { background: #245f46; }
+  .login-error { color: var(--red); font-size: 13px; margin-top: 8px; }
+
+  /* HEADER */
+  .header {
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 24px; height: 58px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 1px 8px rgba(46,125,91,0.07);
+  }
+  .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: var(--text); }
+  .header-logo-icon { height: 32px; width: auto; }
+  .header-logo-text { height: 20px; width: auto; }
+  .header-logo-suffix { margin-left: 2px; color: var(--text-muted); font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .header-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .refresh-btn {
+    background: var(--green-pale); border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 5px 12px; font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--green); cursor: pointer; transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: var(--green); color: white; }
+  .live-dot { width: 8px; height: 8px; background: var(--green-light); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.3)} }
+
+  /* LAYOUT */
+  .layout { display: flex; height: calc(100vh - 58px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 240px; background: var(--white); border-right: 1.5px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  }
+  .sidebar-section { padding: 16px 14px 8px; }
+  .sidebar-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 6px; padding: 0 4px;
+  }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+    border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; transition: all 0.15s; margin-bottom: 2px; text-decoration: none;
+  }
+  .sidebar-link:hover { background: var(--green-pale); color: var(--green); }
+  .sidebar-link.active { background: var(--green); color: white; font-weight: 600; }
+  .divider { height: 1px; background: var(--border); margin: 6px 14px; }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+  .main-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .main-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+
+  .meta-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  /* META METRICS */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .metric-card {
+    background: var(--white);
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    padding: 10px 12px;
+    box-shadow: var(--shadow);
+  }
+  .metric-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .meta-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.25);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+  .meta-modal {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow-lg);
+    max-width: 420px;
+    width: 100%;
+  }
+  .meta-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .meta-modal-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .meta-modal-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .meta-date-btn.selected {
+    background: var(--green);
+    color: #fff;
+    border-color: var(--green);
+  }
+
+  /* FUNNEL */
+  .funnel-section {
+    background: var(--white); border-radius: 16px; border: 1.5px solid var(--border);
+    padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow);
+  }
+  .funnel-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 16px; }
+  .funnel-steps {
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .funnel-step {
+    display: flex; align-items: center; gap: 16px; padding: 14px 16px;
+    border-radius: 12px; margin-bottom: 6px; transition: background 0.15s;
+    border-left: 4px solid transparent;
+  }
+  .funnel-step:hover { background: var(--green-pale); }
+  .funnel-step:nth-child(1) { border-left-color: #3B82F6; }
+  .funnel-step:nth-child(2) { border-left-color: #8B5CF6; }
+  .funnel-step:nth-child(3) { border-left-color: #EC4899; }
+  .funnel-step:nth-child(4) { border-left-color: #F59E0B; }
+  .funnel-step:nth-child(5) { border-left-color: #10B981; }
+  .funnel-step:nth-child(6) { border-left-color: var(--green); }
+  .funnel-step-emoji { font-size: 20px; width: 32px; text-align: center; }
+  .funnel-step-label { flex: 1; font-weight: 600; font-size: 14px; }
+  .funnel-step-count {
+    background: var(--green-pale); color: var(--green); border-radius: 20px;
+    padding: 4px 12px; font-size: 13px; font-weight: 700; font-family: 'DM Mono', monospace;
+  }
+  .funnel-step-pct { font-size: 11px; color: var(--text-muted); font-weight: 500; min-width: 48px; text-align: right; }
+
+  /* RECENT */
+  .recent-section { background: var(--white); border-radius: 16px; border: 1.5px solid var(--border); padding: 24px; box-shadow: var(--shadow); }
+  .recent-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 16px; }
+  .recent-list { max-height: 320px; overflow-y: auto; }
+  .recent-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: 10px; margin-bottom: 4px; font-size: 12px; transition: background 0.15s;
+  }
+  .recent-item:hover { background: var(--bg); }
+  .recent-item-emoji { font-size: 14px; width: 24px; text-align: center; }
+  .recent-item-event { font-weight: 600; color: var(--text); }
+  .recent-item-meta { color: var(--text-muted); font-size: 11px; }
+  .recent-item-time { color: var(--text-muted); font-size: 10px; font-family: 'DM Mono', monospace; margin-left: auto; }
+  .recent-empty { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 400px; gap: 24px; }
+
+  /* Tablet / small desktop */
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .login-card {
+      width: calc(100% - 32px);
+      max-width: 340px;
+      padding: 28px 20px;
+      margin: 0 16px;
+    }
+    .login-card p { font-size: 12px; margin-bottom: 20px; }
+    .login-input { padding: 14px 12px; font-size: 16px; }
+    .login-btn { padding: 12px; font-size: 14px; }
+
+    .header {
+      padding: 8px 12px;
+      height: auto;
+      min-height: 52px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .header-logo { font-size: 13px; gap: 6px; flex: 1 0 100%; }
+    .header-logo-icon { height: 26px; }
+    .header-logo-text { height: 18px; }
+    .header-right { gap: 8px; flex-wrap: wrap; width: 100%; justify-content: flex-start; }
+    .header-date { display: none; }
+    .refresh-btn { padding: 7px 10px; font-size: 11px; }
+    .live-dot { width: 6px; height: 6px; }
+
+    .layout { height: auto; min-height: calc(100vh - 68px); }
+
+    .main {
+      padding: 16px 12px;
+      padding-bottom: 24px;
+    }
+    .main-title { font-size: 18px; margin-bottom: 6px; }
+    .main-subtitle { font-size: 12px; margin-bottom: 12px; line-height: 1.4; }
+
+    .meta-toolbar {
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .meta-toolbar .refresh-btn {
+      padding: 10px 12px;
+      font-size: 12px;
+      min-height: 44px;
+    }
+
+    .metrics-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .metric-card {
+      padding: 12px 14px;
+      min-height: auto;
+    }
+    .metric-label { font-size: 10px; }
+    .metric-value { font-size: 15px; }
+
+    .funnel-section {
+      padding: 16px 14px;
+      margin-bottom: 16px;
+    }
+    .funnel-section h2 { font-size: 12px; margin-bottom: 12px; }
+    .funnel-step {
+      padding: 12px 14px;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .funnel-step-emoji { font-size: 18px; width: 28px; }
+    .funnel-step-label { font-size: 13px; }
+    .funnel-step-count { font-size: 12px; padding: 3px 10px; }
+    .funnel-step-pct { font-size: 10px; min-width: 40px; }
+
+    .recent-section { padding: 16px 14px; }
+    .recent-section h2 { font-size: 12px; margin-bottom: 12px; }
+    .recent-list { max-height: 280px; }
+    .recent-item {
+      padding: 10px 10px;
+      font-size: 11px;
+      gap: 10px;
+    }
+    .recent-item-emoji { font-size: 12px; width: 20px; }
+    .recent-item-time { font-size: 9px; }
+    .recent-empty { font-size: 12px; padding: 20px; }
+
+    .grid-2 { gap: 16px; }
+
+    .meta-modal {
+      margin: 16px;
+      max-width: none;
+      padding: 14px 16px;
+    }
+    .meta-modal-header {
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .meta-modal-title { font-size: 13px; }
+    .meta-modal-body .refresh-btn {
+      padding: 10px 12px;
+      font-size: 12px;
+      min-height: 44px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    </div>
+    <p>Enter your PIN to continue</p>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+<header class="header">
+  <div class="header-logo">
+    <img src="/marketellogo.svg" alt="" class="header-logo-icon">
+    <img src="/marketel.svg" alt="Marketel" class="header-logo-text">
+    <span class="header-logo-suffix">Funnel</span>
+  </div>
+  <div class="header-right">
+    <span class="live-dot"></span>
+    <span style="font-size:12px;color:var(--text-muted);">Live</span>
+    <button class="refresh-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings and purchases">🔔 Notifications</button>
+    <button class="refresh-btn" onclick="handleRefresh()">↻ Refresh</button>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Tools</div>
+      <a href="/crm" class="sidebar-link">📋 Bookings CRM</a>
+      <a href="/funnel" class="sidebar-link active">📊 Funnel</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <h1 class="main-title">Conversion Funnel</h1>
+    <p class="main-subtitle">Real-time events from your booking engine. Funnel data refreshes every 3 seconds.</p>
+
+    <div class="meta-toolbar">
+      <button class="refresh-btn" onclick="setMetaRange('today')">Today</button>
+      <button class="refresh-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
+      <button class="refresh-btn" onclick="setMetaRange('last7')">Last 7 days</button>
+      <button class="refresh-btn" onclick="openMetaModal()">Choose dates</button>
+      <button class="refresh-btn" onclick="copyMetaSummary()">Copy summary</button>
+    </div>
+
+    <div class="metrics-grid" id="metaMetrics" style="display:none">
+      <div class="metric-card">
+        <div class="metric-label">Ad Spend (7d)</div>
+        <div class="metric-value" id="meta-spend">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">CPM</div>
+        <div class="metric-value" id="meta-cpm">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">CTR</div>
+        <div class="metric-value" id="meta-ctr">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Cost / LP View</div>
+        <div class="metric-value" id="meta-cplpv">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">ROAS</div>
+        <div class="metric-value" id="meta-roas">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">LP Views (Meta)</div>
+        <div class="metric-value" id="meta-lpv">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Searches (Meta)</div>
+        <div class="metric-value" id="meta-search">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Add to Cart (Meta)</div>
+        <div class="metric-value" id="meta-atc">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Initiate Checkout (Meta)</div>
+        <div class="metric-value" id="meta-ic">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Add Payment Info (Meta)</div>
+        <div class="metric-value" id="meta-api">–</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Purchases (Meta)</div>
+        <div class="metric-value" id="meta-purchase">–</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="funnel-section">
+        <h2>Funnel Steps</h2>
+        <div class="funnel-steps" id="funnelSteps">
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">🔍</span>
+            <span class="funnel-step-label">Search</span>
+            <span class="funnel-step-count" id="count-Search">0</span>
+            <span class="funnel-step-pct" id="pct-Search"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">🛒</span>
+            <span class="funnel-step-label">Add to Cart</span>
+            <span class="funnel-step-count" id="count-AddToCart">0</span>
+            <span class="funnel-step-pct" id="pct-AddToCart"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">📋</span>
+            <span class="funnel-step-label">Initiate Checkout</span>
+            <span class="funnel-step-count" id="count-InitiateCheckout">0</span>
+            <span class="funnel-step-pct" id="pct-InitiateCheckout"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">💳</span>
+            <span class="funnel-step-label">Add Payment Info</span>
+            <span class="funnel-step-count" id="count-AddPaymentInfo">0</span>
+            <span class="funnel-step-pct" id="pct-AddPaymentInfo"></span>
+          </div>
+          <div class="funnel-step">
+            <span class="funnel-step-emoji">✅</span>
+            <span class="funnel-step-label">Purchase</span>
+            <span class="funnel-step-count" id="count-Purchase">0</span>
+            <span class="funnel-step-pct" id="pct-Purchase"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h2>Recent Activity</h2>
+        <div class="recent-list" id="recentList">
+          <div class="recent-empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<div id="metaModal" class="meta-modal-overlay" onclick="handleMetaModalOverlay(event)">
+  <div class="meta-modal">
+    <div class="meta-modal-header">
+      <span class="meta-modal-title">Choose date (last 14 days)</span>
+      <div>
+        <button class="refresh-btn" id="metaSelectBtn" onclick="toggleMetaRangeMode()">Select</button>
+        <button class="refresh-btn" onclick="applyMetaRange()">Done</button>
+        <button class="refresh-btn" onclick="closeMetaModal()">×</button>
+      </div>
+    </div>
+    <div class="meta-modal-body" id="metaModalBody"></div>
+  </div>
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
+
+  const EMOJI_MAP = { Search: '🔍', AddToCart: '🛒', InitiateCheckout: '📋', AddPaymentInfo: '💳', Purchase: '✅', PageView: '👁' };
+  let token = '';
+  let metaRange = { type: 'last7' };
+  let lastMeta = null;
+  let metaModalDates = [];
+  let metaSelectRange = false;
+  let metaRangeStartIndex = null;
+  let metaRangeEndIndex = null;
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    const now = Date.now();
+    const diff = Math.floor((now - ts) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderMeta(payload) {
+    const container = document.getElementById('metaMetrics');
+    if (!container) return;
+
+    if (!payload || payload.enabled === false) {
+      container.style.display = 'none';
+      return;
+    }
+
+    // Show the grid even if data is null (no activity yet for that period)
+    container.style.display = 'grid';
+
+    const d = payload.data || {};
+    if (payload.data) lastMeta = d;
+
+    const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
+    const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
+
+    const set = (id, text) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+
+    set('meta-spend', d.spend != null ? fmtMoney(d.spend) : '–');
+    set('meta-cpm', d.cpm != null ? fmtMoney(d.cpm) : '–');
+    set('meta-ctr', d.ctr != null ? fmtPct(d.ctr) : '–');
+    set(
+      'meta-cplpv',
+      d.cost_per_landing_page_view != null ? fmtMoney(d.cost_per_landing_page_view) : '–'
+    );
+    set('meta-roas', d.roas != null ? d.roas.toFixed(2) + 'x' : '–');
+
+    const ev = d.events || {};
+    set('meta-lpv', ev.landing_page_view != null ? ev.landing_page_view : '–');
+    set('meta-search', ev.search != null ? ev.search : '–');
+    set('meta-atc', ev.add_to_cart != null ? ev.add_to_cart : '–');
+    set('meta-ic', ev.initiate_checkout != null ? ev.initiate_checkout : '–');
+    set('meta-api', ev.add_payment_info != null ? ev.add_payment_info : '–');
+    set('meta-purchase', ev.purchase != null ? ev.purchase : '–');
+  }
+
+  function render(data) {
+    const { counts, recent } = data || { counts: {}, recent: [] };
+    const steps = ['Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
+    const top = counts.Search || 1;
+
+    steps.forEach(name => {
+      const n = counts[name] || 0;
+      const el = document.getElementById('count-' + name);
+      const pctEl = document.getElementById('pct-' + name);
+      if (el) el.textContent = n;
+      if (pctEl) pctEl.textContent = top ? Math.round((n / top) * 100) + '%' : '';
+    });
+
+    const list = document.getElementById('recentList');
+    if (recent.length === 0) {
+      list.innerHTML = '<div class="recent-empty">No events yet. Events appear when users interact with your booking site.</div>';
+    } else {
+      list.innerHTML = recent.map(e => `
+        <div class="recent-item">
+          <span class="recent-item-emoji">${EMOJI_MAP[e.event_name] || '•'}</span>
+          <div>
+            <span class="recent-item-event">${e.event_name}</span>
+            ${e.content_name ? `<div class="recent-item-meta">${e.content_name}${e.value ? ' · $' + e.value.toFixed(0) : ''}</div>` : ''}
+          </div>
+          <span class="recent-item-time">${formatTime(e.timestamp)}</span>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('headerDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  async function doLogin() {
+    const pin = document.getElementById('pinInput').value.trim();
+    document.getElementById('loginError').textContent = '';
+    if (!pin) { document.getElementById('loginError').textContent = 'Enter PIN.'; return; }
+    try {
+      const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        token = pin;
+        try { localStorage.setItem('crm_token', pin); } catch (e) {}
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        load();
+        loadMeta();
+      } else {
+        document.getElementById('loginError').textContent = 'Wrong PIN.';
+      }
+    } catch (e) {
+      document.getElementById('loginError').textContent = 'Connection failed.';
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+
+  async function load() {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/funnel', { headers: { 'x-crm-token': token } });
+      if (res.status === 401) {
+        token = '';
+        try { localStorage.removeItem('crm_token'); } catch (e) {}
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+        return;
+      }
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      document.getElementById('recentList').innerHTML = '<div class="recent-empty">Failed to load.</div>';
+    }
+  }
+
+  async function loadMeta() {
+    if (!token) return;
+    try {
+      let qs = '';
+      if (metaRange.type === 'today' || metaRange.type === 'yesterday') {
+        qs = '?range=' + encodeURIComponent(metaRange.type);
+      } else if (metaRange.type === 'custom') {
+        qs =
+          '?from=' +
+          encodeURIComponent(metaRange.from) +
+          '&to=' +
+          encodeURIComponent(metaRange.to);
+      } // last7 -> default on backend
+
+      const res = await fetch('/api/meta-insights' + qs, { headers: { 'x-crm-token': token } });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        renderMeta(null);
+        return;
+      }
+      renderMeta(json);
+    } catch (e) {
+      renderMeta(null);
+    }
+  }
+
+  function handleRefresh() {
+    load();
+    loadMeta();
+  }
+
+  function setMetaRange(type) {
+    metaRange = { type };
+    loadMeta();
+  }
+
+  function openMetaModal() {
+    const modal = document.getElementById('metaModal');
+    const body = document.getElementById('metaModalBody');
+    if (!modal || !body) return;
+    body.innerHTML = '';
+
+    metaModalDates = [];
+    metaSelectRange = false;
+    metaRangeStartIndex = null;
+    metaRangeEndIndex = null;
+    const selectBtn = document.getElementById('metaSelectBtn');
+    if (selectBtn) selectBtn.textContent = 'Select';
+
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+      const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const iso = d.toISOString().split('T')[0];
+      metaModalDates.push({ iso });
+      const btn = document.createElement('button');
+      btn.className = 'refresh-btn meta-date-btn';
+      btn.textContent = label;
+      btn.dataset.index = String(i);
+      btn.onclick = () => onMetaDateClick(i);
+      body.appendChild(btn);
+    }
+
+    modal.style.display = 'flex';
+  }
+
+  function closeMetaModal() {
+    const modal = document.getElementById('metaModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function handleMetaModalOverlay(e) {
+    if (e.target && e.target.id === 'metaModal') {
+      closeMetaModal();
+    }
+  }
+
+  function onMetaDateClick(index) {
+    const entry = metaModalDates[index];
+    if (!entry) return;
+
+    if (!metaSelectRange) {
+      // Single-day selection
+      metaRange = { type: 'custom', from: entry.iso, to: entry.iso };
+      closeMetaModal();
+      loadMeta();
+      return;
+    }
+
+    // Range selection mode
+    if (metaRangeStartIndex === null) {
+      metaRangeStartIndex = index;
+      metaRangeEndIndex = index;
+    } else {
+      metaRangeEndIndex = index;
+    }
+
+    if (metaRangeEndIndex < metaRangeStartIndex) {
+      const tmp = metaRangeStartIndex;
+      metaRangeStartIndex = metaRangeEndIndex;
+      metaRangeEndIndex = tmp;
+    }
+    updateMetaModalSelection();
+  }
+
+  function updateMetaModalSelection() {
+    const body = document.getElementById('metaModalBody');
+    if (!body) return;
+    const buttons = body.querySelectorAll('.meta-date-btn');
+    buttons.forEach(btn => {
+      const idx = parseInt(btn.dataset.index || '-1', 10);
+      if (
+        metaRangeStartIndex != null &&
+        metaRangeEndIndex != null &&
+        idx >= metaRangeStartIndex &&
+        idx <= metaRangeEndIndex
+      ) {
+        btn.classList.add('selected');
+      } else {
+        btn.classList.remove('selected');
+      }
+    });
+  }
+
+  function toggleMetaRangeMode() {
+    metaSelectRange = !metaSelectRange;
+    metaRangeStartIndex = null;
+    metaRangeEndIndex = null;
+    updateMetaModalSelection();
+    const btn = document.getElementById('metaSelectBtn');
+    if (btn) btn.textContent = metaSelectRange ? 'Single mode' : 'Range mode';
+  }
+
+  function applyMetaRange() {
+    if (metaRangeStartIndex == null || metaRangeEndIndex == null) {
+      closeMetaModal();
+      return;
+    }
+    // Indices are newest-first (0 = today), so higher index = earlier date
+    const earlierIndex = Math.max(metaRangeStartIndex, metaRangeEndIndex);
+    const laterIndex   = Math.min(metaRangeStartIndex, metaRangeEndIndex);
+    const start = metaModalDates[earlierIndex];
+    const end   = metaModalDates[laterIndex];
+    if (!start || !end) {
+      closeMetaModal();
+      return;
+    }
+    metaRange = { type: 'custom', from: start.iso, to: end.iso };
+    closeMetaModal();
+    loadMeta();
+  }
+
+  async function copyMetaSummary() {
+    if (!lastMeta) return;
+    const d = lastMeta;
+    const ev = d.events || {};
+
+    const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
+    const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
+
+    const localTime = new Date().toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    const lines = [
+      `Copied at: ${localTime} (local time)`,
+      '',
+      `Date range: ${d.since || ''} → ${d.until || ''}`,
+      '',
+      `Spend: ${fmtMoney(d.spend)}`,
+      `CPM: ${fmtMoney(d.cpm)}`,
+      `CTR: ${fmtPct(d.ctr)}`,
+      `ROAS: ${d.roas != null ? d.roas.toFixed(2) + 'x' : '–'}`,
+      `Cost per LP view: ${fmtMoney(d.cost_per_landing_page_view)}`,
+      '',
+      `LP views (Meta): ${ev.landing_page_view ?? '–'}`,
+      `Searches (Meta): ${ev.search ?? '–'}`,
+      `Add to Cart (Meta): ${ev.add_to_cart ?? '–'}`,
+      `Initiate Checkout (Meta): ${ev.initiate_checkout ?? '–'}`,
+      `Add Payment Info (Meta): ${ev.add_payment_info ?? '–'}`,
+      `Purchases (Meta): ${ev.purchase ?? '–'}`,
+    ];
+
+    const text = lines.join('\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  }
+
+  (function init() {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (saved) {
+      token = saved;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      load();
+      loadMeta();
+    } else if (document.getElementById('pinInput')) {
+      document.getElementById('pinInput').focus();
+    }
+  })();
+  setInterval(load, 3000);
+
+  // Push Notification Functions
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  async function enableFunnelNotifications() {
+    if (!token) {
+      alert('Please sign in first.');
+      return;
+    }
+
+    try {
+      // Check for browser support
+      if (!('Notification' in window)) {
+        alert('This browser does not support notifications.');
+        return;
+      }
+
+      if (!('serviceWorker' in navigator)) {
+        alert('This browser does not support service workers.');
+        return;
+      }
+
+      if (!('PushManager' in window)) {
+        alert('Push notifications are not supported on this device. Try Chrome on Android or desktop.');
+        return;
+      }
+
+      // Request permission
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('Notification permission denied. Enable in browser settings.');
+        return;
+      }
+
+      // Register service worker
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      console.log('Service Worker registered');
+
+      // Get VAPID public key
+      const keyRes = await fetch('/api/push/vapid-public');
+      const keyData = await keyRes.json();
+      if (!keyData.publicKey) {
+        alert('Push notifications not configured on server.');
+        return;
+      }
+
+      // Check if push manager is available
+      if (!registration.pushManager) {
+        alert('Push notifications not available in this browser.');
+        return;
+      }
+
+      // Subscribe to push
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+      });
+
+      // Convert keys to base64
+      const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh'))));
+      const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))));
+
+      // Save subscription to server
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-crm-token': token
+        },
+        body: JSON.stringify({
+          endpoint: subscription.endpoint,
+          p256dh: p256dh,
+          auth: auth,
+          source: 'funnel'
+        })
+      });
+
+      const data = await res.json();
+      if (data.ok || data.success) {
+        const btn = document.getElementById('btnNotify');
+        if (btn) {
+          btn.textContent = '🔔 On';
+          btn.style.background = 'var(--green)';
+          btn.style.color = 'white';
+        }
+        alert('✅ Notifications enabled! You\'ll receive alerts when bookings come in.');
+      } else {
+        alert('Failed to enable notifications: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Notification error:', error);
+      alert('Error enabling notifications: ' + error.message + ' | ' + JSON.stringify(error));
+    }
+  }
+
+  // Check if already subscribed on load
+  async function checkNotificationStatus() {
+    if (!token || !('serviceWorker' in navigator)) return;
+    
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration && registration.pushManager) {
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          const btn = document.getElementById('btnNotify');
+          if (btn) {
+            btn.textContent = '🔔 On';
+            btn.style.background = 'var(--green)';
+            btn.style.color = 'white';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking notification status:', error);
+    }
+  }
+
+  // Check status after login
+  setTimeout(checkNotificationStatus, 1000);
+</script>
+</body>
+</html>
