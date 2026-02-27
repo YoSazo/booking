@@ -4,6 +4,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
+const crypto = require('crypto');
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const xml2js = require('xml2js');
@@ -20,6 +21,11 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:notifications@clickin
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
+
+// Meta Conversions API (CAPI) config
+const META_PIXEL_ID = process.env.META_PIXEL_ID || '1199632701644095';
+const META_TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || 'TEST39655';
+const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI === 'true';
 
 // Web Push (PWA notifications for new bookings)
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
@@ -234,6 +240,117 @@ const getBestRatePlan = (nights) => {
     return 'nightly';
 };
 
+
+// ── META CONVERSIONS API (CAPI) ──────────────────────────────────────────────
+
+// Helper function to hash and normalize data for Meta CAPI
+function hashValue(value) {
+    if (!value) return null;
+    const normalized = String(value).toLowerCase().trim();
+    return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+
+// Send event to Meta Conversions API
+async function sendToMetaCAPI(eventName, eventData) {
+    if (!ENABLE_META_CAPI) {
+        console.log('Meta CAPI disabled - skipping');
+        return { success: false, reason: 'disabled' };
+    }
+
+    if (!META_ACCESS_TOKEN || !META_PIXEL_ID) {
+        console.warn('Meta CAPI: Missing credentials');
+        return { success: false, reason: 'missing_credentials' };
+    }
+
+    try {
+        const url = `https://graph.facebook.com/${META_API_VERSION}/${META_PIXEL_ID}/events`;
+        
+        // Build user_data with hashed PII
+        const userData = {};
+        
+        if (eventData.user_data) {
+            if (eventData.user_data.em) {
+                userData.em = [hashValue(eventData.user_data.em)];
+            }
+            if (eventData.user_data.ph) {
+                const phoneDigits = String(eventData.user_data.ph).replace(/\D/g, '');
+                userData.ph = [hashValue(phoneDigits)];
+            }
+            if (eventData.user_data.fn) {
+                userData.fn = [hashValue(eventData.user_data.fn)];
+            }
+            if (eventData.user_data.ln) {
+                userData.ln = [hashValue(eventData.user_data.ln)];
+            }
+            if (eventData.user_data.ad) {
+                userData.ct = eventData.user_data.ad.ct ? [hashValue(eventData.user_data.ad.ct)] : undefined;
+                userData.st = eventData.user_data.ad.st ? [hashValue(eventData.user_data.ad.st)] : undefined;
+                userData.zp = eventData.user_data.ad.zp ? [hashValue(eventData.user_data.ad.zp)] : undefined;
+                userData.country = eventData.user_data.ad.country ? [hashValue(eventData.user_data.ad.country)] : undefined;
+            }
+            if (eventData.user_data.external_id) {
+                userData.external_id = [eventData.user_data.external_id];
+            }
+        }
+        
+        // Add client info (not hashed)
+        if (eventData.client_ip_address) userData.client_ip_address = eventData.client_ip_address;
+        if (eventData.user_agent) userData.client_user_agent = eventData.user_agent;
+        if (eventData.fbc) userData.fbc = eventData.fbc;
+        if (eventData.fbp) userData.fbp = eventData.fbp;
+
+        // Build custom_data
+        const customData = {};
+        if (eventData.value) customData.value = parseFloat(eventData.value);
+        if (eventData.currency) customData.currency = eventData.currency;
+        if (eventData.content_name) customData.content_name = eventData.content_name;
+        if (eventData.content_ids) customData.content_ids = eventData.content_ids;
+        if (eventData.content_type) customData.content_type = eventData.content_type;
+        if (eventData.num_items) customData.num_items = parseInt(eventData.num_items);
+
+        // Build the event payload
+        const eventPayload = {
+            event_name: eventName,
+            event_time: eventData.event_time || Math.floor(Date.now() / 1000),
+            event_id: eventData.event_id || `${eventName.toLowerCase()}.${Date.now()}`,
+            event_source_url: eventData.event_source_url || 'https://suitestay.com',
+            action_source: 'website',
+            user_data: userData,
+            custom_data: customData
+        };
+
+        // Build final payload
+        const payload = {
+            data: [eventPayload],
+            access_token: META_ACCESS_TOKEN
+        };
+
+        // Add test event code if provided
+        if (META_TEST_EVENT_CODE) {
+            payload.test_event_code = META_TEST_EVENT_CODE;
+        }
+
+        const response = await axios.post(url, payload);
+        
+        console.log(`✅ Meta CAPI: ${eventName} sent successfully`, {
+            event_id: eventPayload.event_id,
+            test_mode: !!META_TEST_EVENT_CODE,
+            events_received: response.data?.events_received,
+            fbtrace_id: response.data?.fbtrace_id
+        });
+
+        return { success: true, data: response.data };
+    } catch (error) {
+        console.error(`❌ Meta CAPI: ${eventName} failed`, {
+            error: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
+        return { success: false, error: error.message };
+    }
+}
+
+// ── ZAPIER WEBHOOKS ──────────────────────────────────────────────────────────
 
 const ZAPIER_URLS = {
     Search: process.env.ZAPIER_SEARCH_URL,
@@ -1539,12 +1656,17 @@ app.post('/api/track', async (req, res) => {
         notifySearch(checkin, checkout).catch(() => {});
     }
 
+    // Send to Meta CAPI (async, don't wait)
+    sendToMetaCAPI(event_name, enrichedPayload).catch(err => {
+        console.error(`Meta CAPI background send failed for ${event_name}:`, err.message);
+    });
+
     try {
         await axios.post(webhookUrl, enrichedPayload);
-        console.log(`Successfully forwarded '${event_name}' event to Zapier with IP: ${req.ip} and event_time: ${enrichedPayload.event_time}`);
+        console.log(`✅ Zapier: ${event_name} sent successfully`);
         res.status(200).json({ success: true, message: 'Event tracked.' });
     } catch (error) {
-        console.error(`Failed to forward event to Zapier for '${event_name}'. Status: ${error.response?.status}. Message: ${error.message}`);
+        console.error(`❌ Zapier: ${event_name} failed. Status: ${error.response?.status}. Message: ${error.message}`);
         res.status(500).json({ success: false, message: 'Event tracking failed on the server.' });
     }
 });
