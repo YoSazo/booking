@@ -2200,6 +2200,10 @@ app.get('/funnel', (req, res) => {
     res.sendFile(path.join(__dirname, 'funnel.html'));
 });
 
+app.get('/analytics', (req, res) => {
+    res.sendFile(path.join(__dirname, 'analytics.html'));
+});
+
 // Verify PIN only (no DB) - helps debug auth vs DB issues
 app.get('/api/crm/verify', crmAuth, (req, res) => {
     res.json({ success: true });

@@ -712,6 +712,55 @@
     .hstat { border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 0; text-align: left !important; }
     .hstat:last-child { border-bottom: none; }
   }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.04);
+    z-index: 100;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 16px;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border-radius: 12px;
+    min-width: 64px;
+  }
+  .nav-item:hover {
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .nav-item.active {
+    color: var(--green);
+  }
+  .nav-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .nav-item.active .nav-icon {
+    transform: scale(1.1);
+  }
+  
+  @media (min-width: 768px) {
+    .bottom-nav {
+      display: none;
+    }
+  }
 </style>
 </head>
 <body>
@@ -793,6 +842,7 @@
     <button class="meta-btn" onclick="copyMetaSummary()">📋 Copy</button>
   </div>
 
+  <div class="metrics-grid anim a4" id="metaMetrics" style="display:none">
     <div class="metric-card">
       <div class="metric-label">Ad Spend</div>
       <div class="metric-value" id="meta-spend">–</div>
@@ -887,6 +937,26 @@
 </div>
 </div>
 
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a href="/funnel" class="nav-item active">
+    <div class="nav-icon">📊</div>
+    <span>Funnel</span>
+  </a>
+  <a href="/analytics" class="nav-item">
+    <div class="nav-icon">📈</div>
+    <span>Analytics</span>
+  </a>
+  <a href="/crm" class="nav-item">
+    <div class="nav-icon">📋</div>
+    <span>Bookings</span>
+  </a>
+  <a href="#settings" class="nav-item">
+    <div class="nav-icon">⚙️</div>
+    <span>Settings</span>
+  </a>
+</nav>
+
 <div id="metaModal" class="meta-modal-overlay" onclick="handleMetaModalOverlay(event)">
   <div class="meta-modal" onclick="event.stopPropagation()">
     <div class="meta-modal-header">
@@ -928,11 +998,13 @@
     if (!container) return;
 
     if (!payload || payload.enabled === false) {
+      console.log('Meta insights not enabled or no payload:', payload);
       container.style.display = 'none';
       return;
     }
 
     // Show the grid even if data is null (no activity yet for that period)
+    console.log('Meta insights data:', payload);
     container.style.display = 'grid';
 
     const d = payload.data || {};
