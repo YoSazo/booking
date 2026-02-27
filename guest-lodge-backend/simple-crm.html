@@ -362,8 +362,17 @@ async function loadBookings() {
     const data = await api('GET', '/api/crm/bookings');
     if (!data.success) throw new Error(data.message);
     bookings = data.data || [];
+    
+    // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    renderBookings(needsCalls);
+    const called = bookings.filter(b => b.callStatus === 'called');
+    document.getElementById('countNeedsCalled').textContent = needsCalls.length;
+    document.getElementById('countCalled').textContent = called.length;
+    document.getElementById('countAll').textContent = bookings.length;
+    document.getElementById('statCount').textContent = needsCalls.length;
+    
+    // Render based on current filter
+    applyFilter();
   } catch(e) {
     if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
@@ -448,12 +457,40 @@ function renderBookings(list) {
   }).join('');
 }
 
+// ── FILTER TABS ────────────────────────────────────────
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilter();
+}
+
+function applyFilter() {
+  let filtered = [];
+  if (currentFilter === 'needs-call') {
+    filtered = bookings.filter(b => b.callStatus === 'not-called');
+  } else if (currentFilter === 'called') {
+    filtered = bookings.filter(b => b.callStatus === 'called');
+  } else {
+    filtered = bookings;
+  }
+  renderBookings(filtered);
+}
+
 // ── ACTIONS ────────────────────────────────────────────
 async function markConfirmed(id) {
   try {
     await api('POST', `/api/crm/bookings/${id}/confirm`);
     bookings = bookings.map(b => b.id === id ? { ...b, callStatus: 'called' } : b);
-    renderBookings(bookings.filter(b => b.callStatus === 'not-called'));
+    
+    // Update counts
+    const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
+    const called = bookings.filter(b => b.callStatus === 'called');
+    document.getElementById('countNeedsCalled').textContent = needsCalls.length;
+    document.getElementById('countCalled').textContent = called.length;
+    document.getElementById('statCount').textContent = needsCalls.length;
+    
+    applyFilter();
     toast('Marked as called', 'success');
   } catch(e) { toast('Failed to update', 'error'); }
 }

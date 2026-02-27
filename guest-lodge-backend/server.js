@@ -1851,8 +1851,13 @@ app.get('/crm', (req, res) => {
 });
 
 // Serve Simple CRM HTML (for front desk)
-app.get('/simple-crm', (req, res) => {
+app.get('/frontdesk', (req, res) => {
     res.sendFile(path.join(__dirname, 'simple-crm.html'));
+});
+
+// Legacy route redirect
+app.get('/simple-crm', (req, res) => {
+    res.redirect(301, '/frontdesk');
 });
 
 // Simple CRM API: Mark booking as confirmed
