@@ -706,6 +706,24 @@
   .a6 { animation-delay: 0.44s; }
   .a7 { animation-delay: 0.52s; }
   
+  /* ── VIEW CONTAINER ── */
+  .view-container {
+    animation: fadeIn 0.3s ease;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .placeholder {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 40px 20px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
   /* Responsive adjustments */
   @media (max-width: 640px) {
     .hero-amount { font-size: 42px; }
@@ -851,17 +869,19 @@
   <!-- GREETING -->
   <div class="greeting anim a2">
     <div class="greeting-sub" id="headerDate"></div>
-    <div class="greeting-title">Conversion<br>Analytics</div>
+    <div class="greeting-title" id="pageTitle">Conversion<br>Analytics</div>
   </div>
 
-  <!-- LIVE TAG -->
-  <div class="live-tag anim a2">
-    <div class="live-dot"></div>
-    <span id="liveStatus">Live tracking · Updates every 3s</span>
-  </div>
+  <!-- FUNNEL VIEW -->
+  <div id="funnelView" class="view-container">
+    <!-- LIVE TAG -->
+    <div class="live-tag anim a2">
+      <div class="live-dot"></div>
+      <span id="liveStatus">Live tracking · Updates every 3s</span>
+    </div>
 
-  <!-- HERO CARD: Conversion Rate -->
-  <div class="hero-card anim a3">
+    <!-- HERO CARD: Conversion Rate -->
+    <div class="hero-card anim a3">
     <div class="hero-label">Overall Conversion Rate</div>
     <div class="hero-amount"><span class="hero-amount-sm" id="heroConversionRate">0%</span></div>
     <div class="hero-meta">
@@ -990,6 +1010,20 @@
     <div class="recent-empty">Loading...</div>
   </div>
 
+  </div>
+  <!-- END FUNNEL VIEW -->
+
+  <!-- ANALYTICS VIEW -->
+  <div id="analyticsView" class="view-container" style="display:none">
+    <div class="card anim a3">
+      <div class="placeholder">
+        📈 Analytics dashboard coming soon!<br><br>
+        This page will show detailed charts and insights about your booking performance.
+      </div>
+    </div>
+  </div>
+  <!-- END ANALYTICS VIEW -->
+
 </div>
 </div>
 
@@ -998,18 +1032,18 @@
   <div class="nav-glass"></div>
   <div class="nav-pill" id="navPill"></div>
   <div class="nav-items" id="navItems">
-    <a href="/funnel" class="nav-item active" data-index="0">
+    <button type="button" class="nav-item active" data-index="0" data-view="funnel">
       <div class="nav-icon-wrapper">
         <i data-lucide="bar-chart-3" class="nav-icon"></i>
       </div>
       <span class="nav-label">Funnel</span>
-    </a>
-    <a href="/analytics" class="nav-item" data-index="1">
+    </button>
+    <button type="button" class="nav-item" data-index="1" data-view="analytics">
       <div class="nav-icon-wrapper">
         <i data-lucide="trending-up" class="nav-icon"></i>
       </div>
       <span class="nav-label">Analytics</span>
-    </a>
+    </button>
   </div>
 </nav>
 
@@ -1546,6 +1580,26 @@
     lucide.createIcons();
   }
 
+  // ── VIEW SWITCHING ──
+  let currentView = 'funnel';
+  
+  function switchView(viewName) {
+    // Hide all views
+    document.getElementById('funnelView').style.display = 'none';
+    document.getElementById('analyticsView').style.display = 'none';
+    
+    // Show selected view
+    if (viewName === 'funnel') {
+      document.getElementById('funnelView').style.display = 'block';
+      document.getElementById('pageTitle').innerHTML = 'Conversion<br>Analytics';
+    } else if (viewName === 'analytics') {
+      document.getElementById('analyticsView').style.display = 'block';
+      document.getElementById('pageTitle').innerHTML = 'Analytics<br>Dashboard';
+    }
+    
+    currentView = viewName;
+  }
+
   // ── NAVBAR DRAG ANIMATION (Yuto Style) ──
   (function() {
     const navBar = document.getElementById('navBar');
@@ -1675,7 +1729,12 @@
         currentActiveIndex = clickedIndex;
         updatePillPosition(clickedIndex, false);
         updateActiveStates(clickedIndex);
-        navItems[clickedIndex].click();
+        
+        // Switch view
+        const viewName = navItems[clickedIndex].getAttribute('data-view');
+        if (viewName) {
+          switchView(viewName);
+        }
       } else {
         // Snap to nearest
         const rect = navBar.getBoundingClientRect();
@@ -1685,7 +1744,12 @@
         currentActiveIndex = snapIndex;
         updatePillPosition(snapIndex, false);
         updateActiveStates(snapIndex);
-        navItems[snapIndex].click();
+        
+        // Switch view
+        const viewName = navItems[snapIndex].getAttribute('data-view');
+        if (viewName) {
+          switchView(viewName);
+        }
       }
     });
 
@@ -1700,12 +1764,19 @@
     // Click handlers
     navItems.forEach((item, index) => {
       item.addEventListener('click', (e) => {
+        e.preventDefault();
         if (isDragging && Math.abs(e.clientX - dragStart.x) > 8) {
           return; // Let drag handler manage this
         }
         currentActiveIndex = index;
         updatePillPosition(index, false);
         updateActiveStates(index);
+        
+        // Switch view
+        const viewName = item.getAttribute('data-view');
+        if (viewName) {
+          switchView(viewName);
+        }
       });
     });
 
