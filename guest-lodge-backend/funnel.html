@@ -52,11 +52,13 @@
 
   /* ── LOGIN SCREEN ── */
   .login-screen {
-    min-height: 100vh;
+    position: fixed;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, var(--ink) 0%, var(--green) 100%);
+    z-index: 9999;
   }
   .login-card {
     background: white;
@@ -938,7 +940,10 @@
     <button class="meta-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
     <button class="meta-btn" onclick="setMetaRange('last7')">Last 7 days</button>
     <button class="meta-btn" onclick="openMetaModal()">Choose dates</button>
-    <button class="meta-btn" onclick="copyMetaSummary()">📋 Copy</button>
+    <button class="meta-btn" onclick="copyMetaSummary()">
+      <i data-lucide="clipboard" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+      Copy
+    </button>
   </div>
 
   <div class="metrics-grid anim a4" id="metaMetrics" style="display:none">
