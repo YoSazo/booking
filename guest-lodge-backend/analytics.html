@@ -142,7 +142,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: calc(100% - 32px);
-    max-width: 380px;
+    max-width: 280px;
     height: 60px;
     z-index: 100;
     touch-action: none;
@@ -169,14 +169,14 @@
     background: var(--ink);
     z-index: 20;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    left: calc(1 * 25% + 5px);
-    width: calc(25% - 10px);
+    left: calc(1 * 50% + 5px);
+    width: calc(50% - 10px);
   }
   
-  .nav-pill[data-active="0"] { left: calc(0 * 25% + 5px); }
-  .nav-pill[data-active="1"] { left: calc(1 * 25% + 5px); }
-  .nav-pill[data-active="2"] { left: calc(2 * 25% + 5px); }
-  .nav-pill[data-active="3"] { left: calc(3 * 25% + 5px); }
+  .nav-pill.dragging {
+    transition: none;
+    transform: scaleY(1.03);
+  }
   
   .nav-items {
     position: relative;
@@ -199,6 +199,10 @@
     border: none;
     text-decoration: none;
     transition: all 0.15s ease-out;
+  }
+  
+  .nav-icon-wrapper {
+    transition: transform 0.15s ease-out;
   }
   
   .nav-icon {
@@ -261,25 +265,21 @@
 </div>
 
 <!-- BOTTOM NAV (Yuto Glass Style) -->
-<nav class="bottom-nav">
+<nav class="bottom-nav" id="navBar">
   <div class="nav-glass"></div>
-  <div class="nav-pill" id="navPill" data-active="1"></div>
-  <div class="nav-items">
+  <div class="nav-pill" id="navPill"></div>
+  <div class="nav-items" id="navItems">
     <a href="/funnel" class="nav-item" data-index="0">
-      <i data-lucide="bar-chart-3" class="nav-icon"></i>
+      <div class="nav-icon-wrapper">
+        <i data-lucide="bar-chart-3" class="nav-icon"></i>
+      </div>
       <span class="nav-label">Funnel</span>
     </a>
     <a href="/analytics" class="nav-item active" data-index="1">
-      <i data-lucide="trending-up" class="nav-icon"></i>
+      <div class="nav-icon-wrapper">
+        <i data-lucide="trending-up" class="nav-icon"></i>
+      </div>
       <span class="nav-label">Analytics</span>
-    </a>
-    <a href="/crm" class="nav-item" data-index="2">
-      <i data-lucide="users" class="nav-icon"></i>
-      <span class="nav-label">Bookings</span>
-    </a>
-    <a href="#settings" class="nav-item" data-index="3">
-      <i data-lucide="settings" class="nav-icon"></i>
-      <span class="nav-label">Settings</span>
     </a>
   </div>
 </nav>
@@ -291,6 +291,173 @@
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
+
+  // ── NAVBAR DRAG ANIMATION (Yuto Style) ──
+  (function() {
+    const navBar = document.getElementById('navBar');
+    const navPill = document.getElementById('navPill');
+    const navItems = document.querySelectorAll('.nav-item');
+    const numTabs = navItems.length;
+    
+    if (!navBar || !navPill || numTabs === 0) return;
+
+    let isDragging = false;
+    let dragStart = { x: 0, pillLeft: 0 };
+    let currentActiveIndex = 1; // Analytics is active
+
+    // Find active tab
+    navItems.forEach((item, i) => {
+      if (item.classList.contains('active')) {
+        currentActiveIndex = i;
+      }
+    });
+
+    const getPillWidth = () => {
+      const rect = navBar.getBoundingClientRect();
+      return rect.width / numTabs - 10;
+    };
+
+    const getHoverIndex = (dragLeft) => {
+      const rect = navBar.getBoundingClientRect();
+      const pillW = getPillWidth();
+      const center = dragLeft + pillW / 2;
+      return Math.min(numTabs - 1, Math.max(0, Math.floor(center / (rect.width / numTabs))));
+    };
+
+    const updatePillPosition = (index, dragging = false, customLeft = null) => {
+      if (customLeft !== null) {
+        navPill.style.left = `${customLeft}px`;
+        navPill.style.width = `${getPillWidth()}px`;
+      } else {
+        navPill.style.left = `calc(${index * (100 / numTabs)}% + 5px)`;
+        navPill.style.width = `calc(${100 / numTabs}% - 10px)`;
+      }
+      
+      if (dragging) {
+        navPill.classList.add('dragging');
+      } else {
+        navPill.classList.remove('dragging');
+      }
+    };
+
+    const updateMagnification = (dragLeft) => {
+      const rect = navBar.getBoundingClientRect();
+      const pillW = getPillWidth();
+      const pillCenter = dragLeft + pillW / 2;
+
+      navItems.forEach((item, i) => {
+        const wrapper = item.querySelector('.nav-icon-wrapper');
+        if (!wrapper) return;
+
+        const tabCenter = (i * (100 / numTabs) + (50 / numTabs)) / 100 * rect.width;
+        const distance = Math.abs(pillCenter - tabCenter);
+        const maxDist = rect.width / numTabs;
+        const proximity = Math.max(0, 1 - distance / maxDist);
+        const scale = 1 + proximity * 0.35;
+        
+        wrapper.style.transform = `scale(${scale})`;
+      });
+    };
+
+    const resetMagnification = () => {
+      navItems.forEach((item) => {
+        const wrapper = item.querySelector('.nav-icon-wrapper');
+        if (wrapper) {
+          wrapper.style.transform = 'scale(1)';
+        }
+      });
+    };
+
+    const updateActiveStates = (index) => {
+      navItems.forEach((item, i) => {
+        if (i === index) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+    };
+
+    navBar.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      navBar.setPointerCapture(e.pointerId);
+
+      const rect = navBar.getBoundingClientRect();
+      const currentLeft = (currentActiveIndex / numTabs) * rect.width + 5;
+
+      dragStart = { x: e.clientX, pillLeft: currentLeft };
+      isDragging = true;
+      updatePillPosition(currentActiveIndex, true, currentLeft);
+    });
+
+    navBar.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+
+      const rect = navBar.getBoundingClientRect();
+      const pillW = getPillWidth();
+      const delta = e.clientX - dragStart.x;
+      const newLeft = dragStart.pillLeft + delta;
+      const clampedLeft = Math.max(5, Math.min(newLeft, rect.width - pillW - 5));
+
+      updatePillPosition(null, true, clampedLeft);
+      updateMagnification(clampedLeft);
+      
+      const hoverIndex = getHoverIndex(clampedLeft);
+      updateActiveStates(hoverIndex);
+    });
+
+    navBar.addEventListener('pointerup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      resetMagnification();
+
+      const moved = Math.abs(e.clientX - dragStart.x);
+      
+      if (moved < 8) {
+        // Treat as click
+        const rect = navBar.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const clickedIndex = Math.min(numTabs - 1, Math.max(0, Math.floor(x / (rect.width / numTabs))));
+        currentActiveIndex = clickedIndex;
+        updatePillPosition(clickedIndex, false);
+        updateActiveStates(clickedIndex);
+        navItems[clickedIndex].click();
+      } else {
+        // Snap to nearest
+        const rect = navBar.getBoundingClientRect();
+        const pillW = getPillWidth();
+        const currentLeft = parseFloat(navPill.style.left);
+        const snapIndex = getHoverIndex(currentLeft);
+        currentActiveIndex = snapIndex;
+        updatePillPosition(snapIndex, false);
+        updateActiveStates(snapIndex);
+        navItems[snapIndex].click();
+      }
+    });
+
+    navBar.addEventListener('pointercancel', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      resetMagnification();
+      updatePillPosition(currentActiveIndex, false);
+      updateActiveStates(currentActiveIndex);
+    });
+
+    // Click handlers
+    navItems.forEach((item, index) => {
+      item.addEventListener('click', (e) => {
+        if (isDragging && Math.abs(e.clientX - dragStart.x) > 8) {
+          return; // Let drag handler manage this
+        }
+        currentActiveIndex = index;
+        updatePillPosition(index, false);
+        updateActiveStates(index);
+      });
+    });
+
+    // Initialize position
+    updatePillPosition(currentActiveIndex, false);
+  })();
 </script>
 
 </body>
