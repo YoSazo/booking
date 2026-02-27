@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="/marketellogo.svg">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -44,7 +45,7 @@
 
   body {
     font-family: 'Geist', sans-serif;
-    background: #dbd8d3;
+    background: var(--white);
     min-height: 100vh;
     color: var(--ink);
   }
@@ -713,47 +714,98 @@
     .hstat:last-child { border-bottom: none; }
   }
 
-  /* ── BOTTOM NAV ── */
+  /* ── BOTTOM NAV (Yuto Glass Style) ── */
   .bottom-nav {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--card);
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: space-around;
-    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-    box-shadow: 0 -4px 16px rgba(0,0,0,0.04);
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 380px;
+    height: 60px;
     z-index: 100;
+    touch-action: none;
+    user-select: none;
   }
+  
+  .nav-glass {
+    position: absolute;
+    inset: 0;
+    border-radius: 30px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  }
+  
+  .nav-pill {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    border-radius: 25px;
+    background: var(--ink);
+    z-index: 20;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    left: calc(0 * 25% + 5px);
+    width: calc(25% - 10px);
+  }
+  
+  .nav-pill[data-active="0"] { left: calc(0 * 25% + 5px); }
+  .nav-pill[data-active="1"] { left: calc(1 * 25% + 5px); }
+  .nav-pill[data-active="2"] { left: calc(2 * 25% + 5px); }
+  .nav-pill[data-active="3"] { left: calc(3 * 25% + 5px); }
+  
+  .nav-items {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    z-index: 30;
+  }
+  
   .nav-item {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 6px 16px;
+    justify-content: center;
+    gap: 2px;
+    height: 100%;
+    cursor: pointer;
+    background: transparent;
+    border: none;
     text-decoration: none;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 600;
-    transition: all 0.2s;
-    border-radius: 12px;
-    min-width: 64px;
+    transition: all 0.15s ease-out;
   }
-  .nav-item:hover {
-    background: var(--bg);
-    color: var(--ink);
-  }
-  .nav-item.active {
-    color: var(--green);
-  }
+  
   .nav-icon {
-    font-size: 20px;
-    line-height: 1;
+    width: 22px;
+    height: 22px;
+    transition: all 0.2s;
   }
+  
   .nav-item.active .nav-icon {
-    transform: scale(1.1);
+    color: #fff;
+  }
+  
+  .nav-item:not(.active) .nav-icon {
+    color: #9ca3af;
+  }
+  
+  .nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    transition: color 0.2s;
+  }
+  
+  .nav-item.active .nav-label {
+    color: #fff;
+  }
+  
+  .nav-item:not(.active) .nav-label {
+    color: #9ca3af;
   }
   
   @media (min-width: 768px) {
@@ -937,24 +989,28 @@
 </div>
 </div>
 
-<!-- BOTTOM NAV -->
+<!-- BOTTOM NAV (Yuto Glass Style) -->
 <nav class="bottom-nav">
-  <a href="/funnel" class="nav-item active">
-    <div class="nav-icon">📊</div>
-    <span>Funnel</span>
-  </a>
-  <a href="/analytics" class="nav-item">
-    <div class="nav-icon">📈</div>
-    <span>Analytics</span>
-  </a>
-  <a href="/crm" class="nav-item">
-    <div class="nav-icon">📋</div>
-    <span>Bookings</span>
-  </a>
-  <a href="#settings" class="nav-item">
-    <div class="nav-icon">⚙️</div>
-    <span>Settings</span>
-  </a>
+  <div class="nav-glass"></div>
+  <div class="nav-pill" id="navPill" data-active="0"></div>
+  <div class="nav-items">
+    <a href="/funnel" class="nav-item active" data-index="0">
+      <i data-lucide="bar-chart-3" class="nav-icon"></i>
+      <span class="nav-label">Funnel</span>
+    </a>
+    <a href="/analytics" class="nav-item" data-index="1">
+      <i data-lucide="trending-up" class="nav-icon"></i>
+      <span class="nav-label">Analytics</span>
+    </a>
+    <a href="/crm" class="nav-item" data-index="2">
+      <i data-lucide="users" class="nav-icon"></i>
+      <span class="nav-label">Bookings</span>
+    </a>
+    <a href="#settings" class="nav-item" data-index="3">
+      <i data-lucide="settings" class="nav-icon"></i>
+      <span class="nav-label">Settings</span>
+    </a>
+  </div>
 </nav>
 
 <div id="metaModal" class="meta-modal-overlay" onclick="handleMetaModalOverlay(event)">
@@ -1484,6 +1540,11 @@
 
   // Check status after login
   setTimeout(checkNotificationStatus, 1000);
+
+  // Initialize Lucide icons
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 </script>
 </body>
 </html>
