@@ -1885,8 +1885,8 @@ async function notifySearch(checkin, checkout) {
     if (!VAPID_PRIVATE) return;
     try {
         console.log('🔍 notifySearch called for', checkin, checkout);
-        const subs = await prisma.pushSubscription.findMany({ where: { source: 'funnel' } });
-        console.log('📊 Found', subs.length, 'subscriptions');
+        const subs = await prisma.pushSubscription.findMany({ where: { source: 'simple-crm' } });
+        console.log('📊 Found', subs.length, 'front desk subscriptions');
         if (subs.length === 0) return;
         
         const payload = JSON.stringify({
@@ -1895,7 +1895,7 @@ async function notifySearch(checkin, checkout) {
             icon: '/marketellogo.svg',
             badge: '/marketellogo.svg',
             data: {
-                url: '/funnel'
+                url: '/simple-crm'
             }
         });
         
