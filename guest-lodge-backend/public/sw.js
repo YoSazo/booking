@@ -16,10 +16,22 @@ self.addEventListener('push', function(event) {
         body: data.body,
         icon: data.icon || '/marketellogo.svg',
         badge: data.badge || '/marketellogo.svg',
-        data: data.data || {},
-        vibrate: [200, 100, 200],
+        image: data.image || 'https://em-content.zobj.net/source/apple/391/money-bag_1f4b0.png', // Money bag emoji image
+        requireInteraction: true, // Stays until clicked! 🔥
+        renotify: true,
         tag: 'booking-notification',
-        renotify: true
+        vibrate: [200, 100, 200, 100, 200], // Stronger vibration pattern
+        actions: [
+            {
+                action: 'view',
+                title: '👀 View Booking'
+            },
+            {
+                action: 'dismiss',
+                title: '✖️ Dismiss'
+            }
+        ],
+        data: data.data || {}
     };
 
     event.waitUntil(
@@ -28,11 +40,19 @@ self.addEventListener('push', function(event) {
 });
 
 self.addEventListener('notificationclick', function(event) {
-    console.log('[Service Worker] Notification click Received.');
+    console.log('[Service Worker] Notification click Received. Action:', event.action);
     
     event.notification.close();
     
-    const urlToOpen = event.notification.data.url || '/funnel';
+    // Handle action buttons
+    if (event.action === 'dismiss') {
+        // Just close the notification, do nothing else
+        console.log('[Service Worker] Notification dismissed by user');
+        return;
+    }
+    
+    // For 'view' action or clicking the notification body
+    const urlToOpen = event.notification.data.url || '/crm';
     
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
