@@ -2,7 +2,7 @@
   "name": "Marketel Bookings",
   "short_name": "Marketel",
   "description": "Real-time booking funnel analytics and notifications",
-  "start_url": "/crm",
+  "start_url": "/simple-crm",
   "display": "standalone",
   "background_color": "#EEF2EF",
   "theme_color": "#2E7D5B",

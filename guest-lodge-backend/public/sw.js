@@ -16,7 +16,6 @@ self.addEventListener('push', function(event) {
         body: data.body,
         icon: data.icon || '/marketellogo.svg',
         badge: data.badge || '/marketellogo.svg',
-        image: data.image || 'https://em-content.zobj.net/source/apple/391/money-bag_1f4b0.png', // Money bag emoji image
         requireInteraction: true, // Stays until clicked! 🔥
         renotify: true,
         tag: 'booking-notification',
@@ -52,7 +51,7 @@ self.addEventListener('notificationclick', function(event) {
     }
     
     // For 'view' action or clicking the notification body
-    const urlToOpen = event.notification.data.url || '/crm';
+    const urlToOpen = event.notification.data.url || '/simple-crm';
     
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
