@@ -1857,17 +1857,30 @@ async function notifyNewBooking(guestName, roomName) {
     }
 }
 
-// Notify Funnel subscribers only when a purchase event is recorded (fire-and-forget)
+// Notify subscribers when a purchase event is recorded (fire-and-forget)
 async function notifyPurchase() {
     if (!VAPID_PRIVATE) return;
     try {
-        const subs = await prisma.pushSubscription.findMany({ where: { source: 'funnel' } });
-        if (subs.length === 0) return;
-        const payload = JSON.stringify({
-            title: 'Purchase',
-            body: 'A purchase just came in.',
-            url: '/funnel',
+        // Send to both funnel and front desk
+        const subs = await prisma.pushSubscription.findMany({ 
+            where: { 
+                source: { in: ['funnel', 'simple-crm'] } 
+            } 
         });
+        if (subs.length === 0) return;
+        
+        console.log(`🔔 Sending purchase notification to ${subs.length} subscriptions`);
+        
+        const payload = JSON.stringify({
+            title: '💰 New Booking!',
+            body: 'A purchase just came in.',
+            icon: '/marketellogo.svg',
+            badge: '/marketellogo.svg',
+            data: {
+                url: '/simple-crm' // Default to front desk for urgency
+            }
+        });
+        
         await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
                 { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
