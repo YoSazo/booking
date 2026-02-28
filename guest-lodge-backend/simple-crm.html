@@ -833,7 +833,7 @@ async function enableNotifications() {
       endpoint: sub.endpoint,
       p256dh: sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '',
       auth: sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : '',
-      source: 'crm'
+      source: 'simple-crm'
     });
     toast('Notifications enabled', 'success');
     document.getElementById('btnNotify').textContent = '🔔 On';
