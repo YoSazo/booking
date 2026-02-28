@@ -1810,7 +1810,9 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
         
         if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: 'endpoint, p256dh, auth required' });
         
-        const subSource = (source === 'funnel') ? 'funnel' : 'crm';
+        // Keep the source as-is (funnel, simple-crm, or crm)
+        const subSource = source || 'crm';
+        console.log('Subscription source:', subSource);
         console.log('Checking for existing subscription...');
         const existing = await prisma.pushSubscription.findFirst({ where: { endpoint } });
         console.log('existing:', existing ? 'found' : 'not found');
