@@ -1649,10 +1649,10 @@ app.post('/api/track', async (req, res) => {
     pushFunnelEvent(event_name, enrichedPayload);
     if (event_name === 'Purchase') notifyPurchase().catch(() => {});
     
-    // Send notification for Search events (for testing notifications)
+    // Send notification for Search events
     if (event_name === 'Search') {
-        const checkin = eventData.content_name?.split(' - ')[0] || 'Unknown dates';
-        const checkout = eventData.content_name?.split(' - ')[1] || '';
+        const checkin = eventData.checkin_date || 'Unknown date';
+        const checkout = eventData.checkout_date || '';
         notifySearch(checkin, checkout).catch(() => {});
     }
 
@@ -1874,12 +1874,12 @@ async function notifyPurchase() {
         console.log(`🔔 Sending purchase notification to ${subs.length} subscriptions`);
         
         const payload = JSON.stringify({
-            title: '💰 New Booking!',
+            title: 'New Booking!',
             body: 'A purchase just came in.',
             icon: '/marketellogo.svg',
             badge: '/marketellogo.svg',
             data: {
-                url: '/simple-crm' // Default to front desk for urgency
+                url: '/simple-crm'
             }
         });
         
@@ -1957,7 +1957,7 @@ async function notifyPaymentDeclined(guestInfo, bookingDetails, errorMessage) {
             requireInteraction: true, // Keeps notification visible until dismissed
             vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern
             data: {
-                url: '/crm',
+                url: '/simple-crm',
                 type: 'payment_declined',
                 urgent: true,
                 guestName: guestName,
