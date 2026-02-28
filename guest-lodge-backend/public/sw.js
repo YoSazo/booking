@@ -24,10 +24,6 @@ self.addEventListener('push', function(event) {
             {
                 action: 'view',
                 title: '👀 View Booking'
-            },
-            {
-                action: 'dismiss',
-                title: '✖️ Dismiss'
             }
         ],
         data: data.data || {}
