@@ -476,21 +476,34 @@ body {
   color: #3b82f6;
 }
 
-.change-dates-inline-button {
-  background: none;
+.change-dates-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #2E7D5B;
+  color: white;
   border: none;
-  color: #2563eb;
-  font-size: 0.82rem;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 2px 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(46, 125, 91, 0.2);
 }
 
-.change-dates-inline-button:hover {
-  color: #1d4ed8;
+.change-dates-pill:hover {
+  background: #245f46;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 125, 91, 0.3);
+}
+
+.change-dates-pill:active {
+  transform: translateY(0);
+}
+
+.change-dates-pill svg {
+  flex-shrink: 0;
 }
 
 /* Premium Pricing Card */
@@ -677,23 +690,7 @@ body {
 }
 
 /* Change Dates Button */
-.change-dates-button {
-  width: 100%;
-  padding: 12px 20px;
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.change-dates-button:hover {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-}
+/* Old change-dates-button removed - now using change-dates-pill only */
 
 .room-price {
     font-size: 1.5em;
