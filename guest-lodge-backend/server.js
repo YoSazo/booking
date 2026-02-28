@@ -1649,12 +1649,6 @@ app.post('/api/track', async (req, res) => {
     pushFunnelEvent(event_name, enrichedPayload);
     if (event_name === 'Purchase') notifyPurchase().catch(() => {});
     
-    // Send notification for Search events
-    if (event_name === 'Search') {
-        const checkin = eventData.checkin_date || 'Unknown date';
-        const checkout = eventData.checkout_date || '';
-        notifySearch(checkin, checkout).catch(() => {});
-    }
 
     // Send to Meta CAPI (async, don't wait)
     sendToMetaCAPI(event_name, enrichedPayload).catch(err => {
@@ -1895,38 +1889,6 @@ async function notifyPurchase() {
     }
 }
 
-// Notify when someone searches (for testing push notifications)
-async function notifySearch(checkin, checkout) {
-    if (!VAPID_PRIVATE) return;
-    try {
-        console.log('🔍 notifySearch called for', checkin, checkout);
-        const subs = await prisma.pushSubscription.findMany({ where: { source: 'simple-crm' } });
-        console.log('📊 Found', subs.length, 'front desk subscriptions');
-        if (subs.length === 0) return;
-        
-        const payload = JSON.stringify({
-            title: '🔍 New Search!',
-            body: `Someone searched for dates: ${checkin}${checkout ? ' - ' + checkout : ''}`,
-            icon: '/marketellogo.svg',
-            badge: '/marketellogo.svg',
-            data: {
-                url: '/simple-crm'
-            }
-        });
-        
-        const results = await Promise.allSettled(subs.map((s) =>
-            webpush.sendNotification(
-                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                payload
-            )
-        ));
-        
-        console.log('📬 Push results:', JSON.stringify(results, null, 2));
-        console.log('✅ Search notification sent to', subs.length, 'subscribers');
-    } catch (e) {
-        console.error('❌ notifySearch error:', e.message);
-    }
-}
 
 // Notify about payment declined leads (URGENT - call within 60 seconds!)
 async function notifyPaymentDeclined(guestInfo, bookingDetails, errorMessage) {
