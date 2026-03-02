@@ -24,8 +24,8 @@ const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
 
 // Meta Conversions API (CAPI) config
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '1199632701644095';
-const META_TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || 'TEST39655';
-const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI === 'true';
+const META_TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || ''; // Set in env for testing only; leave unset in production
+const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI !== 'false'; // ON by default; set ENABLE_META_CAPI=false to disable
 
 // Web Push (PWA notifications for new bookings)
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
@@ -349,16 +349,6 @@ async function sendToMetaCAPI(eventName, eventData) {
         return { success: false, error: error.message };
     }
 }
-
-// ── ZAPIER WEBHOOKS ──────────────────────────────────────────────────────────
-
-const ZAPIER_URLS = {
-    Search: process.env.ZAPIER_SEARCH_URL,
-    AddToCart: process.env.ZAPIER_ADDTOCART_URL,
-    InitiateCheckout: process.env.ZAPIER_INITIATECHECKOUT_URL,
-    AddPaymentInfo: process.env.ZAPIER_PAYMENT_INFO_URL,
-    Purchase: process.env.ZAPIER_PURCHASE_URL,
-};
 
 // In-memory funnel event store (last 500 events, for dashboard)
 const FUNNEL_EVENTS = ['PageView', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
@@ -899,11 +889,19 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 const roomName = bookingDetails.roomName || bookingDetails.name;
                 notifyNewBooking(guestName, roomName).catch(() => {});
 
-                // 4. Fire the purchase event since the webhook did the work.
-                if (process.env.ZAPIER_PURCHASE_URL) {
-                    await axios.post(process.env.ZAPIER_PURCHASE_URL, { /* ...your zapier data... */ });
-                    console.log('✅ Purchase event fired via webhook.');
-                }
+                // 4. Fire purchase event via Meta CAPI since the webhook did the work.
+                sendToMetaCAPI('Purchase', {
+                    value: bookingDetails.total,
+                    currency: 'USD',
+                    content_name: bookingDetails.roomName || bookingDetails.name,
+                    event_source_url: 'https://suitestay.clickinns.com',
+                    user_data: {
+                        em: guestInfo.email,
+                        ph: guestInfo.phone,
+                        fn: guestInfo.firstName,
+                        ln: guestInfo.lastName,
+                    },
+                }).catch(err => console.error('Meta CAPI Purchase (webhook backup) failed:', err.message));
             }
         } catch (error) {
             // This will catch any unexpected errors during the backup process.
@@ -1624,43 +1622,31 @@ app.post('/api/track', async (req, res) => {
     }
 
     const { event_name, ...eventData } = body;
-    const webhookUrl = ZAPIER_URLS[event_name];
 
-    if (!webhookUrl) {
+    if (!FUNNEL_EVENTS.includes(event_name)) {
         const errorMessage = `Received track request for unknown event: '${event_name}'`;
         console.error(errorMessage);
         return res.status(400).json({ success: false, message: errorMessage });
     }
-    if (!webhookUrl.startsWith('https://hooks.zapier.com')) {
-        const errorMessage = `The webhook URL for '${event_name}' seems to be missing or incorrect in your .env file.`;
-        console.error(errorMessage);
-        return res.status(500).json({ success: false, message: errorMessage });
-    }
 
     // Add event_time as Unix timestamp (required for accurate Meta tracking)
-    const enrichedPayload = { 
-        ...eventData, 
-        event_time: Math.floor(Date.now() / 1000), // Unix timestamp in seconds
-        client_ip_address: req.ip, 
-        user_agent: req.headers['user-agent'] 
+    const enrichedPayload = {
+        ...eventData,
+        event_time: Math.floor(Date.now() / 1000),
+        client_ip_address: req.ip,
+        user_agent: req.headers['user-agent']
     };
 
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
     if (event_name === 'Purchase') notifyPurchase().catch(() => {});
-    
 
-    // Send to Meta CAPI (async, don't wait)
+    // Send directly to Meta CAPI — no middleman needed
     sendToMetaCAPI(event_name, enrichedPayload).catch(err => {
         console.error(`Meta CAPI background send failed for ${event_name}:`, err.message);
     });
 
-    try {
-        await axios.post(webhookUrl, enrichedPayload);
-        res.status(200).json({ success: true, message: 'Event tracked.' });
-    } catch (error) {
-        res.status(200).json({ success: true, message: 'Event tracked.' });
-    }
+    res.status(200).json({ success: true, message: 'Event tracked.' });
 });
 
 // --- Payment declined leads (for front desk to call) ---
@@ -1702,65 +1688,6 @@ app.post('/api/payment-declined', async (req, res) => {
         res.status(200).json({ success: true });
     } catch (e) {
         console.error('Payment declined lead save error:', e.message);
-        res.status(500).json({ success: false, message: e.message });
-    }
-});
-
-// --- Zapier → CRM webhook (backup when Supabase fails) ---
-const ZAPIER_WEBHOOK_SECRET = process.env.ZAPIER_WEBHOOK_SECRET || '';
-app.post('/api/webhooks/zapier-booking', async (req, res) => {
-    try {
-        if (ZAPIER_WEBHOOK_SECRET && req.headers['x-zapier-secret'] !== ZAPIER_WEBHOOK_SECRET) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' });
-        }
-        const body = req.body;
-        const ourReservationCode = body.ourReservationCode || body.our_reservation_code || body.event_id;
-        if (!ourReservationCode) {
-            return res.status(400).json({ success: false, message: 'ourReservationCode required' });
-        }
-        const fn = body.guestFirstName || body.user_data?.fn || '';
-        const ln = body.guestLastName || body.user_data?.ln || '';
-        const email = body.guestEmail || body.user_data?.em || '';
-        let phone = body.guestPhone || body.user_data?.ph || '';
-        if (phone && !phone.startsWith('+')) phone = '+1 ' + phone.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2-$3');
-        const roomName = body.roomName || body.room_name || 'Room';
-        const checkinDate = body.checkinDate || body.checkin_date;
-        const checkoutDate = body.checkoutDate || body.checkout_date;
-        const nights = parseInt(body.nights, 10) || 0;
-        const grandTotal = parseFloat(body.grandTotal || body.value || 0) || 0;
-        const subtotal = parseFloat(body.subtotal) || Math.round(grandTotal / 1.1 * 100) / 100;
-        const taxesAndFees = parseFloat(body.taxesAndFees) || Math.round((grandTotal - subtotal) * 100) / 100;
-        const hotelId = body.hotelId || 'suite-stay';
-
-        const data = {
-            ourReservationCode,
-            pmsConfirmationCode: body.pmsConfirmationCode || ourReservationCode,
-            hotelId,
-            roomName,
-            checkinDate: new Date(checkinDate),
-            checkoutDate: new Date(checkoutDate),
-            nights,
-            guestFirstName: fn,
-            guestLastName: ln,
-            guestEmail: email,
-            guestPhone: phone,
-            subtotal,
-            taxesAndFees,
-            grandTotal,
-            bookingType: 'payLater',
-            amountPaidNow: 0,
-            preAuthHoldAmount: 1,
-            holdStatus: 'active',
-        };
-
-        await prisma.booking.upsert({
-            where: { ourReservationCode },
-            create: data,
-            update: {},
-        });
-        res.json({ success: true, message: 'Booking upserted' });
-    } catch (e) {
-        console.error('Zapier webhook error:', e.message);
         res.status(500).json({ success: false, message: e.message });
     }
 });

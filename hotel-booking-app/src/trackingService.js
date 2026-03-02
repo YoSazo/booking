@@ -71,14 +71,6 @@ const getExternalId = () => {
 
 const TRACKING_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/track`;
 
-const ZAPIER_WEBHOOKS = {
-    Search: 'https://hooks.zapier.com/hooks/catch/23096608/uu9wu4u/',
-    AddToCart: 'https://hooks.zapier.com/hooks/catch/23096608/uu9whix/',
-    InitiateCheckout: 'https://hooks.zapier.com/hooks/catch/23096608/umy17ci/',
-    AddPaymentInfo: 'https://hooks.zapier.com/hooks/catch/23096608/u11il0b/',
-    Purchase: 'https://hooks.zapier.com/hooks/catch/23096608/umyhejw/',
-};
-
 const sendEventToServer = (eventName, payload) => {
     // Try multiple sources for fbc
     let fbc = getCookie('_fbc') || sessionStorage.getItem('_fbc');
@@ -292,7 +284,7 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
 };
 
 
-// --- DIAGNOSTIC CUSTOM EVENTS (browser pixel only, no server/Zapier) ---
+// --- DIAGNOSTIC CUSTOM EVENTS (browser pixel only, no server-side tracking) ---
 
 export const trackCardModalAcknowledged = (bookingDetails) => {
     if (!shouldFireEvent('CardModalAcknowledged')) return;
