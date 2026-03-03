@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint } from 'lucide-react';
+import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint, PhoneCall, Smartphone, DollarSign } from 'lucide-react';
 import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick } from './trackingService.js';
+import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick, trackCardDeclineModalShown, trackTapToCallFirst } from './trackingService.js';
 import LoadingScreen from './LoadingScreen.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
@@ -65,6 +65,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [showLoadingScreen, setShowLoadingScreen] = useState(false);
     const [showWhyCardModal, setShowWhyCardModal] = useState(false);
     const [whyCardModalDismissed, setWhyCardModalDismissed] = useState(false);
+    const [showCardDeclineModal, setShowCardDeclineModal] = useState(false);
     
     // Preload Stripe.js as early as possible so Step 4 feels instant.
     useEffect(() => {
@@ -966,6 +967,13 @@ const handlePayLaterBooking = async (e) => {
                       paymentMethod: 'card'
                     })
                   }).catch(() => {});
+                  try {
+                    trackCardDeclineModalShown(bookingDetails, error.code);
+                  } catch (e) {
+                    console.warn('Failed to track CardDeclineModalShown:', e);
+                  }
+                  setShowCardDeclineModal(true);
+                  document.body.style.overflow = 'hidden';
                 }
             } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
                 // Hold successfully placed - now create the booking
@@ -1055,6 +1063,13 @@ const handlePayLaterBooking = async (e) => {
                           paymentMethod: 'wallet'
                         })
                       }).catch(() => {});
+                      try {
+                        trackCardDeclineModalShown(bookingDetails, confirmError.code);
+                      } catch (e) {
+                        console.warn('Failed to track CardDeclineModalShown (wallet):', e);
+                      }
+                      setShowCardDeclineModal(true);
+                      document.body.style.overflow = 'hidden';
                     }
                     return;
                 }
@@ -1113,6 +1128,14 @@ const handlePayLaterBooking = async (e) => {
         console.error("Pay later booking failed:", error);
         setErrorMessage("Failed to process reservation. Please try again.");
         setIsProcessing(false);
+        // For non-validation, external failures, surface recovery modal
+        try {
+            trackCardDeclineModalShown(bookingDetails);
+        } catch (e) {
+            console.warn('Failed to track CardDeclineModalShown for external error:', e);
+        }
+        setShowCardDeclineModal(true);
+        document.body.style.overflow = 'hidden';
     }
 };
 
@@ -1202,6 +1225,11 @@ const handlePayLaterBooking = async (e) => {
         trackAddPaymentInfo(bookingDetails, formData);
     };
 
+    const handleDismissCardDeclineModal = () => {
+        setShowCardDeclineModal(false);
+        document.body.style.overflow = '';
+    };
+
     return (
         <>
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
@@ -1246,6 +1274,80 @@ const handlePayLaterBooking = async (e) => {
                   <p className="why-card-modal-sheet__footer">
                     🔒 Secured by Stripe &bull; 256-bit encryption
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Card Declined / Payment Issue Recovery Modal */}
+            {showCardDeclineModal && (
+              <div className="confirmation-call-modal-overlay" onClick={(e) => e.stopPropagation()}>
+                <div className="confirmation-call-modal-sheet">
+                  <div className="confirmation-call-phone-pulse-wrapper">
+                    <div className="confirmation-call-phone-pulse">
+                      <div className="confirmation-call-phone-pulse-ring" />
+                      <div className="confirmation-call-phone-pulse-ring confirmation-call-phone-pulse-ring--delay" />
+                      <div className="confirmation-call-phone-inner">
+                        <PhoneCall size={22} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <h2 className="confirmation-call-title">Card declined? Don&apos;t worry</h2>
+                  <p className="confirmation-call-subtitle">
+                    Sometimes banks block the small <strong>$1 verification hold</strong> we use to prevent fake bookings.
+                    Your room isn&apos;t lost — our front desk can help you finish your reservation in a quick call.
+                  </p>
+
+                  <div className="confirmation-call-info-rows">
+                    <a href={`tel:${hotel.phone}`} className="confirmation-call-phone-number-row">
+                      <div className="confirmation-call-phone-number-top">
+                        <div className="confirmation-call-phone-number-icon">
+                          <PhoneCall size={18} />
+                        </div>
+                        <div className="confirmation-call-phone-number-label">We&apos;re calling from</div>
+                      </div>
+                      <div
+                        className="confirmation-call-phone-number-bottom"
+                        onClick={() => trackTapToCallFirst(bookingDetails, hotel.phone)}
+                      >
+                        <div className="confirmation-call-phone-number-digits">{hotel.phone}</div>
+                        <div className="confirmation-call-phone-number-tap">Tap to call now →</div>
+                      </div>
+                    </a>
+
+                    <div className="confirmation-call-info-row">
+                      <div className="confirmation-call-info-icon confirmation-call-info-icon--green">
+                        <CheckCircle2 size={16} />
+                      </div>
+                      <div className="confirmation-call-info-text">
+                        <strong>Your room is still held</strong> while we sort this out
+                      </div>
+                    </div>
+                    <div className="confirmation-call-info-row">
+                      <div className="confirmation-call-info-icon confirmation-call-info-icon--blue">
+                        <Smartphone size={16} />
+                      </div>
+                      <div className="confirmation-call-info-text">
+                        Expect a quick call to <strong>confirm your arrival</strong> and payment
+                      </div>
+                    </div>
+                    <div className="confirmation-call-info-row">
+                      <div className="confirmation-call-info-icon confirmation-call-info-icon--amber">
+                        <DollarSign size={16} />
+                      </div>
+                      <div className="confirmation-call-info-text">
+                        <strong>We can complete payment at check-in</strong> if needed
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="confirmation-call-cta-btn"
+                    onClick={handleDismissCardDeclineModal}
+                  >
+                    Got It — I&apos;ll Watch for the Call
+                  </button>
                 </div>
               </div>
             )}

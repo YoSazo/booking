@@ -12,7 +12,8 @@ const getSessionEvents = () => {
     ConfirmBookingClick: false,
     Purchase: false,
     CallModalDismissed: false,
-    TapToCallFirst: false
+    TapToCallFirst: false,
+    CardDeclineModalShown: false
   };
 };
 
@@ -334,6 +335,22 @@ export const trackTapToCallFirst = (bookingDetails, phone) => {
   }
   sendEventToServer('TapToCallFirst', { ...payload, event_id: eventID });
   sendEventToGA4('tap_to_call_first', payload);
+};
+
+export const trackCardDeclineModalShown = (bookingDetails, errorCode) => {
+  if (!shouldFireEvent('CardDeclineModalShown')) return;
+  const eventID = `carddeclinemodal.${Date.now()}`;
+  const payload = {
+    value: bookingDetails?.total || bookingDetails?.subtotal || 0,
+    currency: 'USD',
+    content_name: bookingDetails?.name || bookingDetails?.roomName || '',
+    error_code: errorCode || null,
+  };
+  if (typeof fbq === 'function') {
+    fbq('trackCustom', 'CardDeclineModalShown', payload, { eventID });
+  }
+  sendEventToServer('CardDeclineModalShown', { ...payload, event_id: eventID });
+  sendEventToGA4('card_decline_modal_shown', payload);
 };
 
 export const trackConfirmBookingClick = (bookingDetails, guestInfo) => {
