@@ -10,7 +10,9 @@ const getSessionEvents = () => {
     CardModalAcknowledged: false,
     FirstCardFieldFocus: false,
     ConfirmBookingClick: false,
-    Purchase: false
+    Purchase: false,
+    CallModalDismissed: false,
+    TapToCallFirst: false
   };
 };
 
@@ -301,6 +303,37 @@ export const trackCardModalAcknowledged = (bookingDetails) => {
     }
     sendEventToServer('CardModalAcknowledged', { ...payload, event_id: eventID });
     sendEventToGA4('card_modal_acknowledged', payload);
+};
+
+export const trackCallModalDismissed = (bookingDetails) => {
+  if (!shouldFireEvent('CallModalDismissed')) return;
+  const eventID = `callmodaldismissed.${Date.now()}`;
+  const payload = {
+    value: bookingDetails?.total || 0,
+    currency: 'USD',
+    content_name: bookingDetails?.name || bookingDetails?.roomName || '',
+  };
+  if (typeof fbq === 'function') {
+    fbq('trackCustom', 'CallModalDismissed', payload, { eventID });
+  }
+  sendEventToServer('CallModalDismissed', { ...payload, event_id: eventID });
+  sendEventToGA4('call_modal_dismissed', payload);
+};
+
+export const trackTapToCallFirst = (bookingDetails, phone) => {
+  if (!shouldFireEvent('TapToCallFirst')) return;
+  const eventID = `taptocallfirst.${Date.now()}`;
+  const payload = {
+    value: bookingDetails?.total || 0,
+    currency: 'USD',
+    content_name: bookingDetails?.name || bookingDetails?.roomName || '',
+    phone_number: phone,
+  };
+  if (typeof fbq === 'function') {
+    fbq('trackCustom', 'TapToCallFirst', payload, { eventID });
+  }
+  sendEventToServer('TapToCallFirst', { ...payload, event_id: eventID });
+  sendEventToGA4('tap_to_call_first', payload);
 };
 
 export const trackConfirmBookingClick = (bookingDetails, guestInfo) => {

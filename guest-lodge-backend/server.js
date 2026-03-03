@@ -351,7 +351,7 @@ async function sendToMetaCAPI(eventName, eventData) {
 }
 
 // In-memory funnel event store (last 500 events, for dashboard)
-const FUNNEL_EVENTS = ['PageView', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'CardModalAcknowledged', 'ConfirmBookingClick', 'Purchase'];
+const FUNNEL_EVENTS = ['PageView', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'CardModalAcknowledged', 'ConfirmBookingClick', 'Purchase', 'CallModalDismissed', 'TapToCallFirst'];
 const funnelStore = [];
 const FUNNEL_MAX = 500;
 

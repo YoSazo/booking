@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 
 const formatDateWithSuffix = (date) => {
   const d = new Date(date);
@@ -73,7 +74,10 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
                   <div className="confirmation-call-phone-number-icon">📞</div>
                   <div className="confirmation-call-phone-number-label">We&apos;re calling from</div>
                 </div>
-                <div className="confirmation-call-phone-number-bottom">
+                <div
+                  className="confirmation-call-phone-number-bottom"
+                  onClick={() => trackTapToCallFirst(bookingDetails, hotelPhone)}
+                >
                   <div className="confirmation-call-phone-number-digits">{hotelPhone}</div>
                   <div className="confirmation-call-phone-number-tap">Tap to call first →</div>
                 </div>
@@ -102,7 +106,10 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
             <button
               type="button"
               className="confirmation-call-cta-btn"
-              onClick={handleDismissCallModal}
+              onClick={() => {
+                trackCallModalDismissed(bookingDetails);
+                handleDismissCallModal();
+              }}
             >
               Got It — I&apos;ll Watch for the Call
             </button>
