@@ -104,10 +104,6 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
             >
               Got It — I&apos;ll Watch for the Call
             </button>
-
-            <p className="confirmation-call-footer-note">
-              Questions? Call us at {hotelPhone}
-            </p>
           </div>
         </div>
       )}
