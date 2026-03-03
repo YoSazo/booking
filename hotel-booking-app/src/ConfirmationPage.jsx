@@ -69,12 +69,14 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
             <div className="confirmation-call-info-rows">
               {/* Phone number callout */}
               <a href={`tel:${hotelPhone}`} className="confirmation-call-phone-number-row">
-                <div className="confirmation-call-phone-number-icon">📞</div>
-                <div className="confirmation-call-phone-number-text">
+                <div className="confirmation-call-phone-number-top">
+                  <div className="confirmation-call-phone-number-icon">📞</div>
                   <div className="confirmation-call-phone-number-label">We&apos;re calling from</div>
-                  <div className="confirmation-call-phone-number-digits">{hotelPhone}</div>
                 </div>
-                <div className="confirmation-call-phone-number-tap">Tap to call first →</div>
+                <div className="confirmation-call-phone-number-bottom">
+                  <div className="confirmation-call-phone-number-digits">{hotelPhone}</div>
+                  <div className="confirmation-call-phone-number-tap">Tap to call first →</div>
+                </div>
               </a>
 
               <div className="confirmation-call-info-row">

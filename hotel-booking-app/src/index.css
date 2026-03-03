@@ -3590,8 +3590,8 @@ padding: 6px 16px;
 /* Phone number callout row */
 .confirmation-call-phone-number-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   background: linear-gradient(135deg, #ecfdf5, #d1fae5);
   border: 1.5px solid #6ee7b7;
   border-radius: 10px;
@@ -3604,6 +3604,18 @@ padding: 6px 16px;
 .confirmation-call-phone-number-row:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.confirmation-call-phone-number-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirmation-call-phone-number-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .confirmation-call-phone-number-icon {
@@ -3625,14 +3637,15 @@ padding: 6px 16px;
 }
 
 .confirmation-call-phone-number-digits {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   color: #065f46;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .confirmation-call-phone-number-tap {
-  font-size: 11px;
+  font-size: 12px;
   color: #059669;
   font-weight: 600;
   white-space: nowrap;
@@ -3662,6 +3675,70 @@ padding: 6px 16px;
 .confirmation-call-cta-btn:active {
   transform: translateY(0);
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+/* On short screens, make the modal sheet scrollable so CTA is always reachable */
+@media (max-height: 700px) {
+  .confirmation-call-modal-overlay {
+    align-items: flex-start;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .confirmation-call-modal-sheet {
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* iPhone SE and similar (375x667) - tighten spacing so CTA fits without scrolling */
+@media (max-height: 700px) and (max-width: 390px) {
+  .confirmation-call-modal-sheet {
+    padding: 16px 16px 16px;
+  }
+
+  .confirmation-call-phone-pulse-wrapper {
+    margin-bottom: 8px;
+  }
+
+  .confirmation-call-phone-pulse {
+    width: 44px;
+    height: 44px;
+  }
+
+  .confirmation-call-phone-inner {
+    font-size: 18px;
+    inset: 6px;
+  }
+
+  .confirmation-call-title {
+    font-size: 17px;
+    margin-bottom: 4px;
+  }
+
+  .confirmation-call-subtitle {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  .confirmation-call-info-rows {
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .confirmation-call-info-row {
+    padding: 8px 10px;
+  }
+
+  .confirmation-call-phone-number-row {
+    padding: 8px 10px;
+  }
+
+  .confirmation-call-cta-btn {
+    padding: 13px 20px;
+    font-size: 14px;
+  }
 }
 
 /* --- Money-Back Guarantee Badge Styles --- */
