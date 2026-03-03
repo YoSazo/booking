@@ -66,6 +66,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [showWhyCardModal, setShowWhyCardModal] = useState(false);
     const [whyCardModalDismissed, setWhyCardModalDismissed] = useState(false);
     const [showCardDeclineModal, setShowCardDeclineModal] = useState(false);
+    const CARD_DECLINE_MODAL_DELAY_MS = 1200; // Let user see inline error briefly before modal
     
     // Preload Stripe.js as early as possible so Step 4 feels instant.
     useEffect(() => {
@@ -972,8 +973,10 @@ const handlePayLaterBooking = async (e) => {
                   } catch (e) {
                     console.warn('Failed to track CardDeclineModalShown:', e);
                   }
-                  setShowCardDeclineModal(true);
-                  document.body.style.overflow = 'hidden';
+                  setTimeout(() => {
+                    setShowCardDeclineModal(true);
+                    document.body.style.overflow = 'hidden';
+                  }, CARD_DECLINE_MODAL_DELAY_MS);
                 }
             } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
                 // Hold successfully placed - now create the booking
@@ -1068,8 +1071,10 @@ const handlePayLaterBooking = async (e) => {
                       } catch (e) {
                         console.warn('Failed to track CardDeclineModalShown (wallet):', e);
                       }
-                      setShowCardDeclineModal(true);
-                      document.body.style.overflow = 'hidden';
+                      setTimeout(() => {
+                        setShowCardDeclineModal(true);
+                        document.body.style.overflow = 'hidden';
+                      }, CARD_DECLINE_MODAL_DELAY_MS);
                     }
                     return;
                 }
@@ -1134,8 +1139,10 @@ const handlePayLaterBooking = async (e) => {
         } catch (e) {
             console.warn('Failed to track CardDeclineModalShown for external error:', e);
         }
-        setShowCardDeclineModal(true);
-        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+            setShowCardDeclineModal(true);
+            document.body.style.overflow = 'hidden';
+        }, CARD_DECLINE_MODAL_DELAY_MS);
     }
 };
 
