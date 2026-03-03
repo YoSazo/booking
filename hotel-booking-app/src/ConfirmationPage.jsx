@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PhoneCall, CheckCircle2, Smartphone, DollarSign } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 
 const formatDateWithSuffix = (date) => {
@@ -58,7 +59,9 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
               <div className="confirmation-call-phone-pulse">
                 <div className="confirmation-call-phone-pulse-ring" />
                 <div className="confirmation-call-phone-pulse-ring confirmation-call-phone-pulse-ring--delay" />
-                <div className="confirmation-call-phone-inner">📞</div>
+                <div className="confirmation-call-phone-inner">
+                  <PhoneCall size={22} />
+                </div>
               </div>
             </div>
 
@@ -71,7 +74,9 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
               {/* Phone number callout */}
               <a href={`tel:${hotelPhone}`} className="confirmation-call-phone-number-row">
                 <div className="confirmation-call-phone-number-top">
-                  <div className="confirmation-call-phone-number-icon">📞</div>
+                  <div className="confirmation-call-phone-number-icon">
+                    <PhoneCall size={18} />
+                  </div>
                   <div className="confirmation-call-phone-number-label">We&apos;re calling from</div>
                 </div>
                 <div
@@ -84,19 +89,25 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
               </a>
 
               <div className="confirmation-call-info-row">
-                <div className="confirmation-call-info-icon confirmation-call-info-icon--green">✅</div>
+                <div className="confirmation-call-info-icon confirmation-call-info-icon--green">
+                  <CheckCircle2 size={16} />
+                </div>
                 <div className="confirmation-call-info-text">
                   <strong>Your room is reserved</strong> — no action needed on your end
                 </div>
               </div>
               <div className="confirmation-call-info-row">
-                <div className="confirmation-call-info-icon confirmation-call-info-icon--blue">📱</div>
+                <div className="confirmation-call-info-icon confirmation-call-info-icon--blue">
+                  <Smartphone size={16} />
+                </div>
                 <div className="confirmation-call-info-text">
                   Expect a call to <strong>your phone</strong> from our front desk soon
                 </div>
               </div>
               <div className="confirmation-call-info-row">
-                <div className="confirmation-call-info-icon confirmation-call-info-icon--amber">💰</div>
+                <div className="confirmation-call-info-icon confirmation-call-info-icon--amber">
+                  <DollarSign size={16} />
+                </div>
                 <div className="confirmation-call-info-text">
                   <strong>Pay at check-in</strong> — nothing charged today
                 </div>
