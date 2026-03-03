@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const formatDateWithSuffix = (date) => {
   const d = new Date(date);
@@ -12,11 +12,108 @@ const formatDateWithSuffix = (date) => {
   return `${monthYear} ${day}${suffix}`;
 };
 
-function ConfirmationPage({ bookingDetails, guestInfo, reservationCode }) {
+function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel }) {
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [callModalDismissed, setCallModalDismissed] = useState(false);
+
+  const hotelPhone = hotel?.phone || '(701) 289-5992';
+
+  useEffect(() => {
+    if (!bookingDetails) return;
+
+    const shouldShow =
+      bookingDetails.bookingType === 'payLater' && !callModalDismissed;
+
+    if (!shouldShow) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowCallModal(true);
+      document.body.style.overflow = 'hidden';
+    }, 400);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = '';
+    };
+  }, [bookingDetails, callModalDismissed]);
+
+  const handleDismissCallModal = () => {
+    setShowCallModal(false);
+    setCallModalDismissed(true);
+    document.body.style.overflow = '';
+  };
+
   return (
     <>
+      {/* Confirmation Call Modal - Pay Later bookings */}
+      {bookingDetails?.bookingType === 'payLater' && showCallModal && (
+        <div className="confirmation-call-modal-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="confirmation-call-modal-sheet">
+            {/* Pulsing phone icon */}
+            <div className="confirmation-call-phone-pulse-wrapper">
+              <div className="confirmation-call-phone-pulse">
+                <div className="confirmation-call-phone-pulse-ring" />
+                <div className="confirmation-call-phone-pulse-ring confirmation-call-phone-pulse-ring--delay" />
+                <div className="confirmation-call-phone-inner">📞</div>
+              </div>
+            </div>
+
+            <h2 className="confirmation-call-title">We&apos;ll call to confirm</h2>
+            <p className="confirmation-call-subtitle">
+              A team member will call you <strong>within the next few minutes</strong> to confirm your arrival details and answer any questions.
+            </p>
+
+            <div className="confirmation-call-info-rows">
+              {/* Phone number callout */}
+              <a href={`tel:${hotelPhone}`} className="confirmation-call-phone-number-row">
+                <div className="confirmation-call-phone-number-icon">📞</div>
+                <div className="confirmation-call-phone-number-text">
+                  <div className="confirmation-call-phone-number-label">We&apos;re calling from</div>
+                  <div className="confirmation-call-phone-number-digits">{hotelPhone}</div>
+                </div>
+                <div className="confirmation-call-phone-number-tap">Tap to call first →</div>
+              </a>
+
+              <div className="confirmation-call-info-row">
+                <div className="confirmation-call-info-icon confirmation-call-info-icon--green">✅</div>
+                <div className="confirmation-call-info-text">
+                  <strong>Your room is reserved</strong> — no action needed on your end
+                </div>
+              </div>
+              <div className="confirmation-call-info-row">
+                <div className="confirmation-call-info-icon confirmation-call-info-icon--blue">📱</div>
+                <div className="confirmation-call-info-text">
+                  Expect a call to <strong>your phone</strong> from our front desk soon
+                </div>
+              </div>
+              <div className="confirmation-call-info-row">
+                <div className="confirmation-call-info-icon confirmation-call-info-icon--amber">💰</div>
+                <div className="confirmation-call-info-text">
+                  <strong>Pay at check-in</strong> — nothing charged today
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="confirmation-call-cta-btn"
+              onClick={handleDismissCallModal}
+            >
+              Got It — I&apos;ll Watch for the Call
+            </button>
+
+            <p className="confirmation-call-footer-note">
+              Questions? Call us at {hotelPhone}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="static-banner" style={{ marginTop: '16px' }}>
-        ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call (701) 289-5992 — we're happy to help!
+        ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotelPhone} — we're happy to help!
       </div>
 
       <div className="confirmation-container">

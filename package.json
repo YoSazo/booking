@@ -3,6 +3,8 @@
     "@react-google-maps/api": "^2.20.7",
     "@vercel/analytics": "^1.5.0",
     "react-google-autocomplete": "^2.7.5",
-    "react-router-dom": "^7.9.1"
+    "react-router-dom": "^7.9.1",
+    "prisma": "6.16.1",
+    "@prisma/client": "6.16.1"
   }
 }

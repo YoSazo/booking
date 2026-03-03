@@ -533,13 +533,14 @@ const handleConfirmBooking = async (bookingDetails) => {
 
           {/* This is the final, styled page the user will see */}
           <Route path="/final-confirmation" element={
-            <Suspense fallback={null}>
-              <ConfirmationPage 
-                bookingDetails={finalBooking}
-                guestInfo={guestInfo}
-                reservationCode={reservationCode}
-              />
-            </Suspense>
+          <Suspense fallback={null}>
+            <ConfirmationPage 
+              bookingDetails={finalBooking}
+              guestInfo={guestInfo}
+              reservationCode={reservationCode}
+              hotel={currentHotel}
+            />
+          </Suspense>
           } />
         </Routes>
       </PageTransition>
