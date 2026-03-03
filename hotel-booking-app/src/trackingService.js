@@ -9,6 +9,7 @@ const getSessionEvents = () => {
     AddPaymentInfo: false,
     CardModalAcknowledged: false,
     FirstCardFieldFocus: false,
+    ConfirmBookingClick: false,
     Purchase: false
   };
 };
@@ -289,19 +290,46 @@ export const trackAddPaymentInfo = (bookingDetails, guestInfo) => {
 export const trackCardModalAcknowledged = (bookingDetails) => {
     if (!shouldFireEvent('CardModalAcknowledged')) return;
     const eventID = `cardmodalack.${Date.now()}`;
-    if (typeof fbq === 'function') {
-        fbq('trackCustom', 'CardModalAcknowledged', {
-            value: bookingDetails.total,
-            currency: 'USD',
-            content_name: bookingDetails.name,
-        }, { eventID });
-        console.log(`✅ CardModalAcknowledged pixel event fired (Event ID: ${eventID})`);
-    }
-    sendEventToGA4('card_modal_acknowledged', {
+    const payload = {
         value: bookingDetails.total,
         currency: 'USD',
         content_name: bookingDetails.name,
-    });
+    };
+    if (typeof fbq === 'function') {
+        fbq('trackCustom', 'CardModalAcknowledged', payload, { eventID });
+        console.log(`✅ CardModalAcknowledged pixel event fired (Event ID: ${eventID})`);
+    }
+    sendEventToServer('CardModalAcknowledged', { ...payload, event_id: eventID });
+    sendEventToGA4('card_modal_acknowledged', payload);
+};
+
+export const trackConfirmBookingClick = (bookingDetails, guestInfo) => {
+    if (!shouldFireEvent('ConfirmBookingClick')) return;
+    const eventID = `confirmbooking.${Date.now()}`;
+    const pixelPayload = {
+        value: bookingDetails.total,
+        currency: 'USD',
+        content_name: bookingDetails.name,
+    };
+    const serverPayload = {
+        ...pixelPayload,
+        event_id: eventID,
+        checkin_date: bookingDetails.checkin ? new Date(bookingDetails.checkin).toISOString().split('T')[0] : null,
+        checkout_date: bookingDetails.checkout ? new Date(bookingDetails.checkout).toISOString().split('T')[0] : null,
+        nights: bookingDetails.nights,
+        user_data: {
+            em: guestInfo?.email,
+            ph: guestInfo?.phone?.replace(/\D/g, ''),
+            fn: guestInfo?.firstName,
+            ln: guestInfo?.lastName,
+        },
+    };
+    if (typeof fbq === 'function') {
+        fbq('trackCustom', 'ConfirmBookingClick', pixelPayload, { eventID });
+        console.log(`✅ ConfirmBookingClick pixel event fired (Event ID: ${eventID})`);
+    }
+    sendEventToServer('ConfirmBookingClick', serverPayload);
+    sendEventToGA4('confirm_booking_click', pixelPayload);
 };
 
 export const trackFirstCardFieldFocus = (bookingDetails) => {

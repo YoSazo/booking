@@ -4,7 +4,7 @@ import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2
 import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus } from './trackingService.js';
+import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick } from './trackingService.js';
 import LoadingScreen from './LoadingScreen.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
@@ -835,7 +835,10 @@ const handlePayLaterBooking = async (e) => {
 
     e?.preventDefault();
     e?.stopPropagation();
-    
+
+    // Fire confirm booking click event (browser + server) immediately on button press
+    trackConfirmBookingClick(bookingDetails, formData);
+
     setHasAttemptedSubmit(true);
 
     // Process payment based on method
