@@ -631,10 +631,13 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         } else {
             // If booking fails, cancel the hold
             await stripe.paymentIntents.cancel(paymentIntentId);
-            
+
+            console.error('❌ Cloudbeds reservation failed:', JSON.stringify(pmsResponse.data, null, 2));
+
             res.status(400).json({
                 success: false,
-                message: pmsResponse.data.message || 'Failed to create reservation.'
+                message: pmsResponse.data.message || 'Failed to create reservation.',
+                cloudbedsError: pmsResponse.data // expose full Cloudbeds response for debugging
             });
         }
 
