@@ -1301,8 +1301,7 @@ const handlePayLaterBooking = async (e) => {
 
                   <h2 className="confirmation-call-title">Card declined? Don&apos;t worry</h2>
                   <p className="confirmation-call-subtitle">
-                    Sometimes banks block the small <strong>$1 verification hold</strong> we use to prevent fake bookings.
-                    Your room isn&apos;t lost — our <strong>front desk will call you in the next few minutes</strong> to finish your reservation.
+                    Our front desk will call you in the next few minutes to complete your reservation. Your room is being held.
                   </p>
 
                   <div className="confirmation-call-info-rows">
