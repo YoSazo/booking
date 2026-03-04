@@ -154,19 +154,25 @@ const hotelConfig = {
         propertyId: '100080519237760',
         roomIDMapping: {
             'King Room': {
-                roomTypeID: '104645995540719',
+                roomTypeIDs: [
+                    '104645995540719',  // smoking
+                    '104645995544800'   // non-smoking
+                ],
                 rates: {
-                    nightly: '104645995540724',
-                    weekly: '163454677930189',
-                    monthly: '163455843680424'
+                    nightly: { smoking: '104645995540724', nonSmoking: '104646759809220' },
+                    weekly:  { smoking: '163454677930189', nonSmoking: '163454677930190' },
+                    monthly: { smoking: '163455843680424', nonSmoking: '163455843680425' }
                 }
             },
             'Double Full Bed': {
-                roomTypeID: '104644269441156',
+                roomTypeIDs: [
+                    '104634114855119',  // smoking
+                    '104644269441156'   // non-smoking
+                ],
                 rates: {
-                    nightly: '104644269441201',
-                    weekly: '163455410200730',
-                    monthly: '163456335478922'
+                    nightly: { smoking: '104634114855121', nonSmoking: '104644269441201' },
+                    weekly:  { smoking: '163455410200729', nonSmoking: '163455410200730' },
+                    monthly: { smoking: '163456335478921', nonSmoking: '163456335478922' }
                 }
             }
         }
@@ -926,32 +932,63 @@ async function getCloudbedsAvailability(hotelId, checkin, checkout) {
     const ratePlanType = getBestRatePlan(nights);
 
     const availabilityPromises = Object.entries(config.roomIDMapping).map(async ([roomName, ids]) => {
-        const currentRateID = ids.rates[ratePlanType];
-        const url = `https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${config.propertyId}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${ids.roomTypeID}`;
-        
-        const response = await axios.get(url, {
-            headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
-        });
-        
-        const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
+        // Support both old single roomTypeID and new roomTypeIDs array
+        const isNewFormat = !!ids.rates?.nightly?.smoking;
+
+        if (!isNewFormat) {
+            // Legacy single-rate fallback (for home-place-suites etc.)
+            const currentRateID = ids.rates[ratePlanType];
+            const url = `https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${config.propertyId}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${ids.roomTypeID}`;
+            const response = await axios.get(url, {
+                headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
+            });
+            const specificRatePlan = response.data.data.find(rate => rate.rateID === currentRateID);
+            return {
+                roomName,
+                available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
+                roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
+                rateID: currentRateID,
+                roomTypeID: ids.roomTypeID
+            };
+        }
+
+        // New format: fetch both smoking and non-smoking
+        const smokingRateID    = ids.rates[ratePlanType].smoking;
+        const nonSmokingRateID = ids.rates[ratePlanType].nonSmoking;
+        const smokingTypeID    = ids.roomTypeIDs[0];
+        const nonSmokingTypeID = ids.roomTypeIDs[1];
+
+        const [smokingResp, nonSmokingResp] = await Promise.all([
+            axios.get(`https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${config.propertyId}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${smokingTypeID}`, {
+                headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
+            }),
+            axios.get(`https://hotels.cloudbeds.com/api/v1.2/getRatePlans?property_id=${config.propertyId}&startDate=${checkin}&endDate=${checkout}&detailedRates=true&roomTypeID=${nonSmokingTypeID}`, {
+                headers: { 'Authorization': `Bearer ${CLOUDBEDS_API_KEY}` }
+            })
+        ]);
+
+        const smokingPlan    = smokingResp.data.data?.find(r => r.rateID === smokingRateID);
+        const nonSmokingPlan = nonSmokingResp.data.data?.find(r => r.rateID === nonSmokingRateID);
+
+        const smokingAvail    = smokingPlan?.roomsAvailable ?? 0;
+        const nonSmokingAvail = nonSmokingPlan?.roomsAvailable ?? 0;
+        const totalAvail      = smokingAvail + nonSmokingAvail;
+
+        // Prefer non-smoking; fall back to smoking if non-smoking is 0
+        const preferredRateID     = nonSmokingAvail > 0 ? nonSmokingRateID : smokingRateID;
+        const preferredRoomTypeID = nonSmokingAvail > 0 ? nonSmokingTypeID : smokingTypeID;
 
         return {
-            roomName: roomName,
-            available: specificRatePlan ? specificRatePlan.roomsAvailable > 0 : false,
-            roomsAvailable: specificRatePlan ? specificRatePlan.roomsAvailable : 0,
-            rateID: currentRateID,
-            roomTypeID: ids.roomTypeID
+            roomName,
+            available: totalAvail > 0,
+            roomsAvailable: totalAvail,
+            rateID: preferredRateID,
+            roomTypeID: preferredRoomTypeID
         };
     });
 
     const availableRooms = await Promise.all(availabilityPromises);
-    console.log('🟦 Cloudbeds availability response', {
-        hotelId,
-        checkin,
-        checkout,
-        ratePlanType,
-        availableRooms
-    });
+    console.log('🟦 Cloudbeds availability response', { hotelId, checkin, checkout, ratePlanType, availableRooms });
     return availableRooms.filter(room => room.available);
 }
 
