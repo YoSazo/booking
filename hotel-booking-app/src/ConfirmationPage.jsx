@@ -18,6 +18,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
   const [showCallModal, setShowCallModal] = useState(false);
   const [callModalDismissed, setCallModalDismissed] = useState(false);
 
+  const CONFIRMATION_CALL_MODAL_DELAY_MS = 1200; // Match card-decline modal delay so page is visible briefly first
   const hotelPhone = hotel?.phone || '(701) 289-5992';
 
   useEffect(() => {
@@ -34,7 +35,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
     const timer = setTimeout(() => {
       setShowCallModal(true);
       document.body.style.overflow = 'hidden';
-    }, 400);
+    }, CONFIRMATION_CALL_MODAL_DELAY_MS);
 
     return () => {
       clearTimeout(timer);
