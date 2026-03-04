@@ -66,7 +66,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [showWhyCardModal, setShowWhyCardModal] = useState(false);
     const [whyCardModalDismissed, setWhyCardModalDismissed] = useState(false);
     const [showCardDeclineModal, setShowCardDeclineModal] = useState(false);
-    const CARD_DECLINE_MODAL_DELAY_MS = 1200; // Let user see inline error briefly before modal
+    const CARD_DECLINE_MODAL_DELAY_MS = 800; // Let user see inline error briefly before modal
     
     // Preload Stripe.js as early as possible so Step 4 feels instant.
     useEffect(() => {
