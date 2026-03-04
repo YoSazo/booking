@@ -945,6 +945,13 @@ async function getCloudbedsAvailability(hotelId, checkin, checkout) {
     });
 
     const availableRooms = await Promise.all(availabilityPromises);
+    console.log('🟦 Cloudbeds availability response', {
+        hotelId,
+        checkin,
+        checkout,
+        ratePlanType,
+        availableRooms
+    });
     return availableRooms.filter(room => room.available);
 }
 
