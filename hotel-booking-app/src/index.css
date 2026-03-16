@@ -3614,8 +3614,9 @@ padding: 6px 16px;
 
 .confirmation-call-phone-number-bottom {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .confirmation-call-phone-number-icon {
@@ -3637,7 +3638,7 @@ padding: 6px 16px;
 }
 
 .confirmation-call-phone-number-digits {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 800;
   color: #065f46;
   letter-spacing: 0.5px;
@@ -3645,10 +3646,17 @@ padding: 6px 16px;
 }
 
 .confirmation-call-phone-number-tap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  margin-left: auto;
+  background: #059669;
+  color: #ecfdf5;
   font-size: 12px;
-  color: #059669;
   font-weight: 600;
   white-space: nowrap;
+  border-radius: 0 8px 8px 0;
 }
 
 .confirmation-call-cta-btn {
