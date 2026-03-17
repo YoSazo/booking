@@ -1141,11 +1141,6 @@
     <span class="sec-title">Funnel Steps</span>
   </div>
 
-  <div class="meta-toolbar anim a5" style="justify-content: space-between; gap: 10px;">
-    <div class="greeting-sub" id="funnelRangeLabel" style="margin: 0;">Date range: —</div>
-    <button class="meta-btn" onclick="openMetaModal()">Choose dates</button>
-  </div>
-
   <div class="card anim a5">
     <div class="funnel-steps" id="funnelSteps">
       <div class="funnel-step">
@@ -1274,36 +1269,6 @@
   let metaSelectRange = false;
   let metaRangeStartIndex = null;
   let metaRangeEndIndex = null;
-
-  function buildRangeQuery(r) {
-    if (!r || !r.type) return '';
-    if (r.type === 'today' || r.type === 'yesterday') {
-      return '?range=' + encodeURIComponent(r.type);
-    }
-    if (r.type === 'custom' && r.from && r.to) {
-      return (
-        '?from=' +
-        encodeURIComponent(r.from) +
-        '&to=' +
-        encodeURIComponent(r.to)
-      );
-    }
-    return ''; // last7 -> backend default
-  }
-
-  function updateFunnelRangeLabel(since, until) {
-    const el = document.getElementById('funnelRangeLabel');
-    if (!el) return;
-    if (since && until) {
-      el.textContent = `Date range: ${since} → ${until}`;
-      return;
-    }
-    // If we don't have server-provided dates yet, best-effort label from selection
-    if (metaRange?.type === 'today') el.textContent = 'Date range: Today';
-    else if (metaRange?.type === 'yesterday') el.textContent = 'Date range: Yesterday';
-    else if (metaRange?.type === 'custom') el.textContent = `Date range: ${metaRange.from || ''} → ${metaRange.to || ''}`;
-    else el.textContent = 'Date range: Last 7 days';
-  }
 
   function formatTime(ts) {
     const d = new Date(ts);
@@ -1483,8 +1448,7 @@
   async function load() {
     if (!token) return;
     try {
-      const qs = buildRangeQuery(metaRange);
-      const res = await fetch('/api/funnel' + qs, { headers: { 'x-crm-token': token } });
+      const res = await fetch('/api/funnel', { headers: { 'x-crm-token': token } });
       if (res.status === 401) {
         token = '';
         try { localStorage.removeItem('crm_token'); } catch (e) {}
@@ -1493,7 +1457,6 @@
         return;
       }
       const data = await res.json();
-      updateFunnelRangeLabel(data?.since, data?.until);
       render(data);
     } catch (e) {
       document.getElementById('recentList').innerHTML = '<div class="recent-empty">Failed to load.</div>';
@@ -1503,7 +1466,16 @@
   async function loadMeta() {
     if (!token) return;
     try {
-      const qs = buildRangeQuery(metaRange);
+      let qs = '';
+      if (metaRange.type === 'today' || metaRange.type === 'yesterday') {
+        qs = '?range=' + encodeURIComponent(metaRange.type);
+      } else if (metaRange.type === 'custom') {
+        qs =
+          '?from=' +
+          encodeURIComponent(metaRange.from) +
+          '&to=' +
+          encodeURIComponent(metaRange.to);
+      } // last7 -> default on backend
 
       const res = await fetch('/api/meta-insights' + qs, { headers: { 'x-crm-token': token } });
       const json = await res.json().catch(() => ({}));
@@ -1525,8 +1497,6 @@
   function setMetaRange(type) {
     metaRange = { type };
     loadMeta();
-    load();
-    updateFunnelRangeLabel();
   }
 
   function openMetaModal() {
@@ -1579,8 +1549,6 @@
       metaRange = { type: 'custom', from: entry.iso, to: entry.iso };
       closeMetaModal();
       loadMeta();
-      load();
-      updateFunnelRangeLabel();
       return;
     }
 
@@ -1645,8 +1613,6 @@
     metaRange = { type: 'custom', from: start.iso, to: end.iso };
     closeMetaModal();
     loadMeta();
-    load();
-    updateFunnelRangeLabel();
   }
 
   async function copyMetaSummary() {

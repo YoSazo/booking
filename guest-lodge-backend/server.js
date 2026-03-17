@@ -2068,52 +2068,10 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
 
 // Funnel dashboard API (same auth as CRM)
 app.get('/api/funnel', crmAuth, (req, res) => {
-    const { range, from, to } = req.query;
-    const today = new Date();
-    const fmtDate = d => d.toISOString().split('T')[0];
-
-    let since;
-    let until;
-
-    if (range === 'today') {
-        since = fmtDate(today);
-        until = fmtDate(today);
-    } else if (range === 'yesterday') {
-        const y = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-        since = fmtDate(y);
-        until = fmtDate(y);
-    } else if (from && to) {
-        const fromDate = new Date(from);
-        const toDate = new Date(to);
-        if (isNaN(fromDate) || isNaN(toDate) || fromDate > toDate) {
-            return res.status(400).json({ success: false, message: 'Invalid date range' });
-        }
-        const diffDays = (toDate - fromDate) / (24 * 60 * 60 * 1000);
-        if (diffDays > 14) {
-            return res.status(400).json({ success: false, message: 'Max 14-day range is 14 days' });
-        }
-        since = fmtDate(fromDate);
-        until = fmtDate(toDate);
-    } else {
-        // default last 7 days
-        const sevenAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        since = fmtDate(sevenAgo);
-        until = fmtDate(today);
-    }
-
-    const startMs = Date.parse(`${since}T00:00:00.000Z`);
-    const endMs = Date.parse(`${until}T23:59:59.999Z`);
-
-    const filtered = funnelStore.filter(e => {
-        const ts = Number(e.timestamp || 0);
-        if (!ts) return false;
-        return ts >= startMs && ts <= endMs;
-    });
-
     const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
-    filtered.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
-    const recent = filtered.slice(0, 50);
-    res.json({ success: true, since, until, counts, recent });
+    funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
+    const recent = funnelStore.slice(0, 50);
+    res.json({ counts, recent });
 });
 
 // Meta Ads insights for funnel dashboard
