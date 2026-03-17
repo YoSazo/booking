@@ -2140,7 +2140,7 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
                 {
                     field: 'campaign.id',
                     operator: 'IN',
-                    value: ['6970186008193'],
+                    value: ['6980975676193'],
                 },
             ]),
         };
