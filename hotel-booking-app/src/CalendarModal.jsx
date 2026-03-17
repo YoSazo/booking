@@ -11,7 +11,16 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const isStCroix = window.location.hostname.includes('stcroix.clickinns.com');
+    const hostname = window.location.hostname;
+    const isStCroix = hostname.includes('stcroix.clickinns.com');
+    const isSuiteStay =
+      hostname === 'suitestay.clickinns.com' ||
+      hostname === 'clickinns.com' ||
+      hostname === 'www.clickinns.com' ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1';
+
+    // St. Croix: after 4 PM Central, block same-day
     if (isStCroix) {
       const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
       const centralHour = new Date(centralTime).getHours();
@@ -21,6 +30,18 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         return tomorrow;
       }
     }
+
+    // Suite Stay: after 6 PM Central, block same-day
+    if (isSuiteStay) {
+      const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+      const centralHour = new Date(centralTime).getHours();
+      if (centralHour >= 18) { // 6 PM or later
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow;
+      }
+    }
+
     return today;
   };
 
@@ -147,12 +168,24 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     
     // For St. Croix: after 4 PM Central, treat today as unavailable (BookingCenter API cutoff)
     let minBookingDate = today;
-    const isStCroix = window.location.hostname.includes('stcroix.clickinns.com');
-    if (isStCroix) {
+    const hostname = window.location.hostname;
+    const isStCroix = hostname.includes('stcroix.clickinns.com');
+    const isSuiteStay =
+      hostname === 'suitestay.clickinns.com' ||
+      hostname === 'clickinns.com' ||
+      hostname === 'www.clickinns.com' ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1';
+
+    if (isStCroix || isSuiteStay) {
       // Get current time in Central timezone (America/Chicago)
       const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
       const centralHour = new Date(centralTime).getHours();
-      if (centralHour >= 16) { // 4 PM or later
+
+      // St. Croix: cutoff 4 PM, Suite Stay: cutoff 6 PM
+      const cutoffHour = isStCroix ? 16 : 18;
+
+      if (centralHour >= cutoffHour) {
         minBookingDate = new Date(today);
         minBookingDate.setDate(minBookingDate.getDate() + 1); // Tomorrow is the earliest
       }
