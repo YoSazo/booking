@@ -1684,6 +1684,37 @@ app.post('/api/track', async (req, res) => {
         user_agent: req.headers['user-agent']
     };
 
+    // Persist guests who reach the AddPaymentInfo step so front desk can call them
+    if (event_name === 'AddPaymentInfo') {
+        try {
+            const user = enrichedPayload.user_data || {};
+            const hotelId = process.env.HOTEL_ID || 'guest-lodge-minot';
+            const checkinDate = enrichedPayload.checkin_date || '';
+            const checkoutDate = enrichedPayload.checkout_date || '';
+            const nights = parseInt(enrichedPayload.nights, 10) || 0;
+            const total = parseFloat(enrichedPayload.value) || 0;
+
+            await withRetry(() => prisma.hitPayment.create({
+                data: {
+                    hotelId,
+                    guestFirstName: user.fn || '-',
+                    guestLastName: user.ln || '-',
+                    guestEmail: user.em || '-',
+                    guestPhone: user.ph || '',
+                    roomName: enrichedPayload.content_name || 'Room',
+                    checkinDate,
+                    checkoutDate,
+                    nights,
+                    grandTotal: total,
+                    eventName: event_name,
+                    eventId: enrichedPayload.event_id || null,
+                }
+            }));
+        } catch (e) {
+            console.error('Failed to save HitPayment lead:', e.message);
+        }
+    }
+
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
     if (event_name === 'Purchase') notifyPurchase().catch(() => {});
