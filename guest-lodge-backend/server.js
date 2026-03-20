@@ -2130,6 +2130,12 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
             const y = new Date(today.getTime() - 24 * 60 * 60 * 1000);
             since = fmtDate(y);
             until = fmtDate(y);
+        } else if (range === 'max') {
+            // "All time": use a long lookback window. Meta may clamp to its max allowed range.
+            // 10 years is a reasonable upper bound for performance + coverage.
+            const maxSince = new Date(today.getTime() - 10 * 365 * 24 * 60 * 60 * 1000);
+            since = fmtDate(maxSince);
+            until = fmtDate(today);
         } else if (from && to) {
             const fromDate = new Date(from);
             const toDate = new Date(to);

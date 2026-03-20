@@ -1086,6 +1086,7 @@
     <button class="meta-btn" onclick="setMetaRange('today')">Today</button>
     <button class="meta-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
     <button class="meta-btn" onclick="setMetaRange('last7')">Last 7 days</button>
+    <button class="meta-btn" onclick="setMetaRange('max')">All time</button>
     <button class="meta-btn" onclick="openMetaModal()">Choose dates</button>
     <button class="meta-btn" onclick="copyMetaSummary()">
       <i data-lucide="clipboard" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
@@ -1469,6 +1470,8 @@
       let qs = '';
       if (metaRange.type === 'today' || metaRange.type === 'yesterday') {
         qs = '?range=' + encodeURIComponent(metaRange.type);
+      } else if (metaRange.type === 'max') {
+        qs = '?range=' + encodeURIComponent('max');
       } else if (metaRange.type === 'custom') {
         qs =
           '?from=' +
