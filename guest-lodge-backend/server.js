@@ -2222,15 +2222,13 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
             });
         }
 
-        const row = rows[0] || {};
+        // Meta returns multiple rows (often: one per day, possibly multiple campaigns).
+        // "All time" being lower than "Today" happens when we only read `rows[0]`.
+        // Aggregate across all rows so totals match the full date range.
+        let spend = 0;
+        let impressions = 0;
+        let clicks = 0;
 
-        const spend = parseFloat(row.spend || 0) || 0;
-        const impressions = parseInt(row.impressions || 0, 10) || 0;
-        const clicks = parseInt(row.clicks || 0, 10) || 0;
-        const ctr = parseFloat(row.ctr || 0) || 0;
-        const cpm = parseFloat(row.cpm || 0) || 0;
-
-        // Event counts from Meta (actions)
         const metaEvents = {
             landing_page_view: 0,
             search: 0,
@@ -2240,50 +2238,42 @@ app.get('/api/meta-insights', crmAuth, async (req, res) => {
             purchase: 0,
         };
 
-        if (Array.isArray(row.actions)) {
-            row.actions.forEach(a => {
-                const type = a.action_type;
-                const v = Number(a.value || 0);
-                if (!v) return;
-                if (type === 'landing_page_view') metaEvents.landing_page_view += v;
-                if (type === 'search') metaEvents.search += v;
-                if (type === 'add_to_cart') metaEvents.add_to_cart += v;
-                if (type === 'initiate_checkout') metaEvents.initiate_checkout += v;
-                if (type === 'add_payment_info') metaEvents.add_payment_info += v;
-                if (type === 'purchase') metaEvents.purchase += v;
-            });
-        }
+        let purchaseValue = 0;
+
+        rows.forEach(r => {
+            spend += parseFloat(r.spend || 0) || 0;
+            impressions += parseInt(r.impressions || 0, 10) || 0;
+            clicks += parseInt(r.clicks || 0, 10) || 0;
+
+            if (Array.isArray(r.actions)) {
+                r.actions.forEach(a => {
+                    const type = a.action_type;
+                    const v = Number(a.value || 0);
+                    if (!v) return;
+                    if (type === 'landing_page_view') metaEvents.landing_page_view += v;
+                    if (type === 'search') metaEvents.search += v;
+                    if (type === 'add_to_cart') metaEvents.add_to_cart += v;
+                    if (type === 'initiate_checkout') metaEvents.initiate_checkout += v;
+                    if (type === 'add_payment_info') metaEvents.add_payment_info += v;
+                    if (type === 'purchase') metaEvents.purchase += v;
+                });
+            }
+
+            if (Array.isArray(r.action_values)) {
+                const pv = r.action_values.find(a => a.action_type === 'purchase');
+                purchaseValue += pv ? Number(pv.value || 0) : 0;
+            }
+        });
+
+        const ctr = impressions > 0 ? (clicks / impressions) : 0;
+        const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
 
         // Landing page views and cost per LP view
         const landingPageViews = metaEvents.landing_page_view;
+        const costPerLPV = landingPageViews > 0 && spend > 0 ? (spend / landingPageViews) : 0;
 
-        let costPerLPV = 0;
-        if (Array.isArray(row.cost_per_action_type)) {
-            const cplpv = row.cost_per_action_type.find(
-                a => a.action_type === 'landing_page_view'
-            );
-            if (cplpv && cplpv.value != null) {
-                costPerLPV = Number(cplpv.value);
-            }
-        }
-        if (!costPerLPV && landingPageViews > 0 && spend > 0) {
-            costPerLPV = spend / landingPageViews;
-        }
-
-        // Purchase value and ROAS
-        let purchaseValue = 0;
-        if (Array.isArray(row.action_values)) {
-            const pv = row.action_values.find(a => a.action_type === 'purchase');
-            purchaseValue = pv ? Number(pv.value || 0) : 0;
-        }
-
-        let roas = 0;
-        if (spend > 0 && purchaseValue > 0) {
-            roas = purchaseValue / spend;
-        }
-        if (Array.isArray(row.purchase_roas) && row.purchase_roas[0]?.value != null) {
-            roas = Number(row.purchase_roas[0].value);
-        }
+        // ROAS (purchase value / spend)
+        const roas = spend > 0 && purchaseValue > 0 ? (purchaseValue / spend) : 0;
 
         res.json({
             success: true,
