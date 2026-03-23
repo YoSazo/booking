@@ -134,6 +134,18 @@ function BookingPage({
             <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
           )}
         </main>
+
+        <footer className="powered-by-marketel-footer" aria-label="Powered by Marketel">
+          <div className="powered-by-marketel">
+            <span className="powered-by-marketel-label">Powered by</span>
+            <img
+              className="powered-by-marketel-logo"
+              src="/marketellogo.svg"
+              alt="Marketel logo"
+              loading="lazy"
+            />
+          </div>
+        </footer>
       </div>
     </>
   );

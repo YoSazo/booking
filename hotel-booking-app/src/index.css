@@ -2026,6 +2026,34 @@ body {
   margin: 0;
 }
 
+/* --- Powered by Marketel footer --- */
+.powered-by-marketel-footer {
+  grid-column: 1 / -1;
+  margin-top: 24px;
+  padding: 16px 0 6px;
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.powered-by-marketel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #6b7280;
+  font-size: 0.85em;
+}
+
+.powered-by-marketel-label {
+  font-weight: 500;
+}
+
+.powered-by-marketel-logo {
+  height: 28px;
+  width: auto;
+}
+
 /* --- NEW Style for Header Address --- */
 .header-address {
   font-size: 0.9em;
