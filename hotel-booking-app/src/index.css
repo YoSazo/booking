@@ -2061,8 +2061,8 @@ body {
 @media (max-width: 768px) {
   /* Mobile: reduce extra whitespace around the licensing footer */
   .powered-by-marketel-footer {
-    margin-top: 14px;
-    padding-bottom: 12px;
+    margin-top: 8px;
+    padding-bottom: 8px;
   }
 }
 
