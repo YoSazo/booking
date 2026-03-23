@@ -2058,6 +2058,14 @@ body {
   width: auto;
 }
 
+@media (max-width: 768px) {
+  /* Mobile: reduce extra whitespace around the licensing footer */
+  .powered-by-marketel-footer {
+    margin-top: 14px;
+    padding-bottom: 12px;
+  }
+}
+
 /* --- NEW Style for Header Address --- */
 .header-address {
   font-size: 0.9em;
