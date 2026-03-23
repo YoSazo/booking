@@ -2038,10 +2038,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 5px;
   flex-wrap: wrap;
   color: #6b7280;
-  font-size: 0.85em;
+  font-size: 0.75em;
 }
 
 .powered-by-marketel-text {
@@ -2049,12 +2049,12 @@ body {
 }
 
 .powered-by-marketel-wordmark {
-  height: 20px;
+  height: 10px;
   width: auto;
 }
 
 .powered-by-marketel-icon {
-  height: 26px;
+  height: 17px;
   width: auto;
 }
 
