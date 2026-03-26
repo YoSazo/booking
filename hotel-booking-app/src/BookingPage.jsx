@@ -83,54 +83,56 @@ function BookingPage({
               <span className="spinner"></span>
             </p>
           ) : roomData && roomData.length > 0 ? (
-  roomData.map(room => {
-    const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
-    const nights = checkinDate && checkoutDate 
-      ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) 
-      : 0;
+            <div className="rooms-grid">
+              {roomData.map(room => {
+                const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
+                const nights = checkinDate && checkoutDate
+                  ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
+                  : 0;
 
-    let grandTotal, payToday, balanceDue;
-    
-    if (room.totalRate !== undefined && room.totalRate !== null) {
-      // Cloudbeds API returned a rate - use it directly
-      grandTotal = room.totalRate;
-      payToday = 0; // Reserve for $0 today
-      balanceDue = grandTotal; // Full amount due at arrival
-    } else {
-      // Fallback to local calculation if API didn't return rates
-      const subtotalBeforeTax = calculateTieredPrice(nights, rates);
-      const taxAmount = 0;
-      grandTotal = subtotalBeforeTax + taxAmount;
-      payToday = 0; // Reserve for $0 today
-      balanceDue = grandTotal; // Full amount due at arrival
-    }
+                let grandTotal, payToday, balanceDue;
 
-    return (
-      <RoomCard
-        key={room.id}
-        room={room}
-        rates={rates}
-        onSelect={onRoomSelect}
-        onChangeDates={onCalendarOpen}
-        isSelected={selectedRoom?.id === room.id}
-        bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
-        onGuestsChange={onGuestsChange}
-        onPetsChange={onPetsChange}
-        onBookNow={onConfirmBooking}
-        nights={nights}
-        onOpenLightbox={onOpenLightbox}
-        subtotal={grandTotal}
-        taxes={0}
-        payToday={payToday}
-        balanceDue={balanceDue}
-        isProcessing={isProcessingBooking}
-        roomsAvailable={currentRoomData.roomsAvailable}
-        checkinDate={checkinDate}
-        checkoutDate={checkoutDate}
-      />
-    ); // <-- 5. Closed the return statement
-  }) // <-- 6. Closed the map function with a curly brace
-) : (
+                if (room.totalRate !== undefined && room.totalRate !== null) {
+                  // Cloudbeds API returned a rate - use it directly
+                  grandTotal = room.totalRate;
+                  payToday = 0; // Reserve for $0 today
+                  balanceDue = grandTotal; // Full amount due at arrival
+                } else {
+                  // Fallback to local calculation if API didn't return rates
+                  const subtotalBeforeTax = calculateTieredPrice(nights, rates);
+                  const taxAmount = 0;
+                  grandTotal = subtotalBeforeTax + taxAmount;
+                  payToday = 0; // Reserve for $0 today
+                  balanceDue = grandTotal; // Full amount due at arrival
+                }
+
+                return (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    rates={rates}
+                    onSelect={onRoomSelect}
+                    onChangeDates={onCalendarOpen}
+                    isSelected={selectedRoom?.id === room.id}
+                    bookingDetails={selectedRoom?.id === room.id ? { guests: selectedRoom.guests, pets: selectedRoom.pets } : null}
+                    onGuestsChange={onGuestsChange}
+                    onPetsChange={onPetsChange}
+                    onBookNow={onConfirmBooking}
+                    nights={nights}
+                    onOpenLightbox={onOpenLightbox}
+                    subtotal={grandTotal}
+                    taxes={0}
+                    payToday={payToday}
+                    balanceDue={balanceDue}
+                    isProcessing={isProcessingBooking}
+                    roomsAvailable={currentRoomData.roomsAvailable}
+                    checkinDate={checkinDate}
+                    checkoutDate={checkoutDate}
+                  />
+                );
+              })}
+            </div>
+          ) : (
             <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
           )}
         </main>
