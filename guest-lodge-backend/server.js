@@ -15,7 +15,7 @@ const webpush = require('web-push');
 // Web Push configuration
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:notifications@clickinns.com';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:notifications@example.com';
 
 // Meta Ads / Facebook Marketing API config
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
@@ -23,7 +23,7 @@ const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
 
 // Meta Conversions API (CAPI) config
-const META_PIXEL_ID = process.env.META_PIXEL_ID || '1199632701644095';
+const META_PIXEL_ID = process.env.META_PIXEL_ID || '';
 const META_TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || ''; // Set in env for testing only; leave unset in production
 const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI !== 'false'; // ON by default; set ENABLE_META_CAPI=false to disable
 
@@ -131,7 +131,7 @@ const CLOUDBEDS_API_KEY = process.env.CLOUDBEDS_API_KEY;
 // BookingCenter (SOAP/XML) - use BCDEMO creds for test environment
 // Jeff: "You can only use BCDEMO in the TEST system"
 const BOOKINGCENTER_TEST_SITE_ID = process.env.BOOKINGCENTER_TEST_SITE_ID || 'BCDEMO';
-const BOOKINGCENTER_TEST_PASSWORD = process.env.BOOKINGCENTER_TEST_PASSWORD || 'expdistrobook21';
+const BOOKINGCENTER_TEST_PASSWORD = process.env.BOOKINGCENTER_TEST_PASSWORD || '';
 const BOOKINGCENTER_TEST_CHAIN_CODE = process.env.BOOKINGCENTER_TEST_CHAIN_CODE || 'BC';
 
 const BOOKINGCENTER_ENDPOINTS = {
@@ -1781,7 +1781,7 @@ app.get('/health', async (req, res) => {
 });
 
 // --- Front Desk CRM ---
-const CRM_PASSWORD = process.env.CRM_PASSWORD || '2026';
+const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
 
 const crmAuth = (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();

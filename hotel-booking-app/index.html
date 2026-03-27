@@ -1,100 +1,40 @@
 <!doctype html>
 <html lang="en">
   <head>
-    
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>Suite Stay</title>
-    
+
     <!-- Webkit/Safari Safety Script -->
     <script>
-(function() {
-  // Prevent webkit-specific bugs and ensure compatibility
-  if (/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)) {
-    // Fix for Safari input autofill issues
-    document.addEventListener('DOMContentLoaded', function() {
-      const inputs = document.querySelectorAll('input');
-      inputs.forEach(function(input) {
-        // Force Safari to respect autocomplete attributes
-        input.setAttribute('autocomplete', input.getAttribute('autocomplete') || 'off');
-      });
-    });
-    
-    // Fix for Safari scroll issues with fixed elements
-    document.addEventListener('touchstart', function() {}, { passive: true });
-    
-    console.log('✅ Safari/Webkit optimizations applied');
-  }
-})();
-</script>
+      (function() {
+        // Prevent webkit-specific bugs and ensure compatibility
+        if (/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)) {
+          // Fix for Safari input autofill issues
+          document.addEventListener('DOMContentLoaded', function() {
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(function(input) {
+              // Force Safari to respect autocomplete attributes
+              input.setAttribute('autocomplete', input.getAttribute('autocomplete') || 'off');
+            });
+          });
 
-    <!-- Facebook Click ID Capture Script -->
-    <script>
-(function() {
-  // Get fbclid from URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const fbclid = urlParams.get('fbclid');
-  
-  if (fbclid) {
-    // Immediately create _fbc cookie
-    const timestamp = Date.now();
-    const fbc = 'fb.1.' + timestamp + '.' + fbclid;
-    
-    // Set cookie for 90 days
-    const expires = new Date(timestamp + 90 * 24 * 60 * 60 * 1000).toUTCString();
-    document.cookie = '_fbc=' + fbc + '; expires=' + expires + '; path=/; domain=' + location.hostname.replace(/^www\./, '.');
-    
-    // Also store in sessionStorage as backup
-    sessionStorage.setItem('fbclid', fbclid);
-    sessionStorage.setItem('_fbc', fbc);
-    
-    console.log('✅ Captured fbclid:', fbclid);
-  }
-})();
-</script>
-    <!-- Google tag (gtag.js) -->
-<!-- Google tag (gtag.js) -->
-<script async defer src="https://www.googletagmanager.com/gtag/js?id=G-HZ8QWVLRBL"></script>
-<script defer>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+          // Fix for Safari scroll issues with fixed elements
+          document.addEventListener('touchstart', function() {}, { passive: true });
 
-  gtag('config', 'G-HZ8QWVLRBL');
-</script>
-    <!-- Meta Pixel Code -->
-    <script>
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '1199632701644095');
-    fbq('track', 'PageView');
+          console.log('Safari/Webkit optimizations applied');
+        }
+      })();
     </script>
-    <!-- The <noscript> tag will be moved to the body -->
-    <!-- End Meta Pixel Code -->
 
-<script type='text/javascript'>
-  window.smartlook||(function(d) {
-    var o=smartlook=function(){ o.api.push(arguments)},h=d.getElementsByTagName('head')[0];
-    var c=d.createElement('script');o.api=new Array();c.async=true;c.type='text/javascript';
-    c.charset='utf-8';c.src='https://web-sdk.smartlook.com/recorder.js';h.appendChild(c);
-    })(document);
-    smartlook('init', '564572a62e394252e9592a22aa2c4a1d4418ac59', { region: 'eu' });
-</script>
-
+    <!-- Analytics and session-recording IDs removed from the handoff build.
+         Configure your own GA, Meta Pixel, and Smartlook settings before enabling tracking. -->
   </head>
   <body>
-    <!-- FIXED: The noscript part of the pixel is now in the body -->
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=1199632701644095&ev=PageView&noscript=1"
-    /></noscript>
-
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

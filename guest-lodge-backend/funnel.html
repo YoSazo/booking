@@ -1262,7 +1262,6 @@
     Purchase: 'check-circle', 
     PageView: 'eye' 
   };
-  const FUNNEL_PIN = '2020202020202026';
   let token = '';
   let metaRange = { type: 'last7' };
   let lastMeta = null;
@@ -1406,18 +1405,7 @@
     err.textContent = '';
     if (!pin) { err.textContent = 'Enter PIN.'; return; }
     
-    // Check funnel-specific PIN first
-    if (pin === FUNNEL_PIN) {
-      token = pin;
-      try { localStorage.setItem('crm_token', pin); } catch (e) {}
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      load();
-      loadMeta();
-      return;
-    }
-    
-    // Fall back to server verification for CRM PIN (2026)
+    // Verify against the server-managed CRM PIN only
     try {
       const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
       const json = await res.json().catch(() => ({}));

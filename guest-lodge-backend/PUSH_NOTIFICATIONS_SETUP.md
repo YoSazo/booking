@@ -20,21 +20,21 @@ Add these to your `.env` file:
 
 ```env
 # VAPID Keys for Push Notifications
-VAPID_PUBLIC_KEY=BB0ssFM_dG4wOfA8kit5FXV0I92CHe20aPWyd03isNGgaf1NO1njtnQYeA6VUb5c0vwRNfFAqbj7JXx75czUqXE
-VAPID_PRIVATE_KEY=FIOvvsY2VZLiPdKVQAWQo2MH5UKD9isTOE45sWs_8sw
-VAPID_SUBJECT=mailto:notifications@clickinns.com
+VAPID_PUBLIC_KEY=YOUR_GENERATED_VAPID_PUBLIC_KEY
+VAPID_PRIVATE_KEY=YOUR_GENERATED_VAPID_PRIVATE_KEY
+VAPID_SUBJECT=mailto:notifications@example.com
 ```
 
 ## How to Use
 
 ### 1. Deploy to Production
-Make sure to add the VAPID keys to your Render environment variables.
+Generate a fresh VAPID keypair and add it to your Render environment variables.
 
 ### 2. Open the Funnel Dashboard
 Navigate to: `https://your-domain.com/funnel`
 
 ### 3. Sign In
-Use your CRM_PASSWORD (default: 2026)
+Use your configured `CRM_PASSWORD`
 
 ### 4. Enable Notifications
 Click the **🔔 Notify** button in the header
