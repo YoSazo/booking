@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -127,6 +128,7 @@ app.set('trust proxy', true);
 
 const PORT = 3001;
 const CLOUDBEDS_API_KEY = process.env.CLOUDBEDS_API_KEY;
+const ALLOW_MANUAL_AVAILABILITY_FALLBACK = process.env.ALLOW_MANUAL_AVAILABILITY_FALLBACK === 'true';
 
 // BookingCenter (SOAP/XML) - use BCDEMO creds for test environment
 // Jeff: "You can only use BCDEMO in the TEST system"
@@ -232,6 +234,18 @@ const getHotelConfig = (hotelId) => {
     return config;
 };
 
+const resolveHotelConfig = (hotelId) => {
+    try {
+        return getHotelConfig(hotelId);
+    } catch (err) {
+        if (!ALLOW_MANUAL_AVAILABILITY_FALLBACK) throw err;
+        return {
+            pms: 'manual',
+            roomIDMapping: {},
+        };
+    }
+};
+
 // Legacy mapping for backwards compatibility (will be removed)
 const roomIDMapping = hotelConfig['suite-stay'].roomIDMapping;
 const PROPERTY_ID = hotelConfig['suite-stay'].propertyId;
@@ -245,6 +259,199 @@ const getBestRatePlan = (nights) => {
     }
     return 'nightly';
 };
+
+const MANUAL_AVAILABILITY_FILE = path.join(__dirname, 'manual-availability.json');
+
+function normalizeIsoDate(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+}
+
+function enumerateDatesInclusive(startIso, endIso, maxDays = 180) {
+    const start = normalizeIsoDate(startIso);
+    const end = normalizeIsoDate(endIso);
+    if (!start || !end) return [];
+    if (end < start) return [];
+
+    const out = [];
+    let cursor = new Date(`${start}T00:00:00.000Z`);
+    const last = new Date(`${end}T00:00:00.000Z`);
+
+    while (cursor <= last && out.length < maxDays) {
+        out.push(cursor.toISOString().slice(0, 10));
+        cursor = new Date(cursor.getTime() + 86400000);
+    }
+    return out;
+}
+
+function sanitizeManualAvailability(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const roomsSrc = Array.isArray(src.rooms) ? src.rooms : [];
+    const overridesSrc = src.overrides && typeof src.overrides === 'object' ? src.overrides : {};
+
+    const seen = new Set();
+    const rooms = [];
+    for (const item of roomsSrc) {
+        const name = String(item?.name || '').trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const totalUnits = Math.max(0, parseInt(item?.totalUnits, 10) || 0);
+        rooms.push({ name, totalUnits });
+    }
+
+    const overrides = {};
+    for (const [k, v] of Object.entries(overridesSrc)) {
+        if (!k || typeof v !== 'object' || v === null) continue;
+        const [roomNameRaw, dateRaw] = k.split('|');
+        const roomName = String(roomNameRaw || '').trim();
+        const date = normalizeIsoDate(dateRaw);
+        if (!roomName || !date) continue;
+
+        const hasAvail = v.availableUnits !== undefined && v.availableUnits !== null && v.availableUnits !== '';
+        const availableUnits = hasAvail ? Math.max(0, parseInt(v.availableUnits, 10) || 0) : null;
+        const closed = !!v.closed;
+
+        if (!closed && availableUnits === null) continue;
+        overrides[`${roomName}|${date}`] = {
+            availableUnits,
+            closed,
+            updatedAt: v.updatedAt || new Date().toISOString(),
+        };
+    }
+
+    rooms.sort((a, b) => a.name.localeCompare(b.name));
+    return { rooms, overrides };
+}
+
+function loadManualAvailability() {
+    try {
+        if (!fs.existsSync(MANUAL_AVAILABILITY_FILE)) {
+            return { rooms: [], overrides: {} };
+        }
+        const raw = fs.readFileSync(MANUAL_AVAILABILITY_FILE, 'utf8');
+        if (!raw.trim()) return { rooms: [], overrides: {} };
+        return sanitizeManualAvailability(JSON.parse(raw));
+    } catch (e) {
+        console.error('Manual availability load failed:', e.message);
+        return { rooms: [], overrides: {} };
+    }
+}
+
+function saveManualAvailability(store) {
+    const safe = sanitizeManualAvailability(store);
+    fs.writeFileSync(MANUAL_AVAILABILITY_FILE, JSON.stringify(safe, null, 2), 'utf8');
+    return safe;
+}
+
+function slugifyText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80);
+}
+
+async function getManualAvailability(checkin, checkout) {
+    const start = normalizeIsoDate(checkin);
+    const end = normalizeIsoDate(checkout);
+    if (!start || !end || end <= start) return [];
+
+    const store = loadManualAvailability();
+    const rooms = Array.isArray(store.rooms) ? store.rooms : [];
+    if (!rooms.length) return [];
+
+    const checkinDate = new Date(`${start}T00:00:00.000Z`);
+    const checkoutDate = new Date(`${end}T00:00:00.000Z`);
+    const stayDates = enumerateDatesInclusive(
+        start,
+        new Date(checkoutDate.getTime() - 86400000).toISOString().slice(0, 10),
+        180
+    );
+    if (!stayDates.length) return [];
+
+    const overlapping = await withRetry(() => prisma.booking.findMany({
+        where: {
+            checkinDate: { lt: checkoutDate },
+            checkoutDate: { gt: checkinDate },
+        },
+        select: {
+            roomName: true,
+            checkinDate: true,
+            checkoutDate: true,
+        },
+    }));
+
+    const bookedCounts = {};
+    for (const b of overlapping) {
+        const roomName = String(b.roomName || '').trim();
+        if (!roomName) continue;
+        const bStart = normalizeIsoDate(b.checkinDate);
+        const bEnd = normalizeIsoDate(b.checkoutDate);
+        if (!bStart || !bEnd || bEnd <= bStart) continue;
+        const bookedDays = enumerateDatesInclusive(
+            bStart,
+            new Date(new Date(`${bEnd}T00:00:00.000Z`).getTime() - 86400000).toISOString().slice(0, 10),
+            180
+        );
+        for (const day of bookedDays) {
+            const key = `${roomName}|${day}`;
+            bookedCounts[key] = (bookedCounts[key] || 0) + 1;
+        }
+    }
+
+    const out = [];
+    for (const room of rooms) {
+        const roomName = String(room.name || '').trim();
+        const totalUnits = Math.max(0, parseInt(room.totalUnits, 10) || 0);
+        if (!roomName || totalUnits <= 0) continue;
+
+        let minAvailable = Number.POSITIVE_INFINITY;
+        for (const day of stayDates) {
+            const key = `${roomName}|${day}`;
+            const override = store.overrides[key];
+            const booked = bookedCounts[key] || 0;
+
+            let availableForDay;
+            if (override?.closed) {
+                availableForDay = 0;
+            } else if (override && override.availableUnits !== null && override.availableUnits !== undefined && override.availableUnits !== '') {
+                availableForDay = Math.max(0, parseInt(override.availableUnits, 10) || 0);
+            } else {
+                availableForDay = Math.max(0, totalUnits - booked);
+            }
+            minAvailable = Math.min(minAvailable, availableForDay);
+        }
+
+        const availableRooms = Number.isFinite(minAvailable) ? minAvailable : 0;
+        if (availableRooms <= 0) continue;
+
+        const slug = slugifyText(roomName) || 'room';
+        out.push({
+            roomName,
+            available: true,
+            roomsAvailable: availableRooms,
+            roomTypeID: `manual-${slug}`,
+            rateID: `manual-${slug}`,
+            source: 'manual',
+        });
+    }
+
+    return out;
+}
+
+async function createManualBooking(hotelId, bookingDetails) {
+    const fallbackCode = `MANUAL-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`.toUpperCase();
+    return {
+        success: true,
+        reservationID: bookingDetails?.reservationCode || fallbackCode,
+        provider: 'manual',
+        hotelId,
+    };
+}
 
 
 // ── META CONVERSIONS API (CAPI) ──────────────────────────────────────────────
@@ -1330,13 +1537,15 @@ app.post('/api/availability', async (req, res) => {
     const { hotelId, checkin, checkout } = req.body;
     
     try {
-        const config = getHotelConfig(hotelId);
+        const config = resolveHotelConfig(hotelId);
         let availableRooms;
 
         if (config.pms === 'cloudbeds') {
             availableRooms = await getCloudbedsAvailability(hotelId, checkin, checkout);
         } else if (config.pms === 'bookingcenter') {
             availableRooms = await getBookingCenterAvailability(hotelId, checkin, checkout);
+        } else if (config.pms === 'manual') {
+            availableRooms = await getManualAvailability(checkin, checkout);
         } else {
             return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
         }
@@ -1565,13 +1774,15 @@ app.post('/api/book', async (req, res) => {
     }
 
     try {
-        const config = getHotelConfig(hotelId);
+        const config = resolveHotelConfig(hotelId);
         let pmsResponse;
 
         if (config.pms === 'cloudbeds') {
             pmsResponse = await createCloudbedsBooking(hotelId, bookingDetails, guestInfo);
         } else if (config.pms === 'bookingcenter') {
             pmsResponse = await createBookingCenterBooking(hotelId, bookingDetails, guestInfo);
+        } else if (config.pms === 'manual') {
+            pmsResponse = await createManualBooking(hotelId, bookingDetails);
         } else {
             return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
         }
@@ -2312,6 +2523,93 @@ app.get('/analytics', (req, res) => {
 // Verify PIN only (no DB) - helps debug auth vs DB issues
 app.get('/api/crm/verify', crmAuth, (req, res) => {
     res.json({ success: true });
+});
+
+app.get('/api/crm/manual-availability', crmAuth, (req, res) => {
+    try {
+        const store = loadManualAvailability();
+        res.json({ success: true, data: store });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/crm/manual-availability/rooms', crmAuth, (req, res) => {
+    try {
+        const roomName = String(req.body?.roomName || '').trim();
+        const totalUnits = Math.max(0, parseInt(req.body?.totalUnits, 10) || 0);
+
+        if (!roomName) {
+            return res.status(400).json({ success: false, message: 'roomName is required.' });
+        }
+
+        const store = loadManualAvailability();
+        const idx = store.rooms.findIndex(r => r.name.toLowerCase() === roomName.toLowerCase());
+        if (idx >= 0) {
+            store.rooms[idx] = { ...store.rooms[idx], name: roomName, totalUnits };
+        } else {
+            store.rooms.push({ name: roomName, totalUnits });
+        }
+
+        const saved = saveManualAvailability(store);
+        res.json({ success: true, data: saved });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/crm/manual-availability/range', crmAuth, (req, res) => {
+    try {
+        const roomName = String(req.body?.roomName || '').trim();
+        const startDate = normalizeIsoDate(req.body?.startDate);
+        const endDate = normalizeIsoDate(req.body?.endDate);
+        const closed = !!req.body?.closed;
+        const clear = !!req.body?.clear;
+        const hasAvail = req.body?.availableUnits !== undefined && req.body?.availableUnits !== null && req.body?.availableUnits !== '';
+        const availableUnits = hasAvail ? Math.max(0, parseInt(req.body.availableUnits, 10) || 0) : null;
+
+        if (!roomName) {
+            return res.status(400).json({ success: false, message: 'roomName is required.' });
+        }
+        if (!startDate || !endDate) {
+            return res.status(400).json({ success: false, message: 'startDate and endDate are required.' });
+        }
+
+        const dates = enumerateDatesInclusive(startDate, endDate, 180);
+        if (!dates.length) {
+            return res.status(400).json({ success: false, message: 'Invalid date range.' });
+        }
+
+        const store = loadManualAvailability();
+        const roomExists = store.rooms.some(r => r.name.toLowerCase() === roomName.toLowerCase());
+        if (!roomExists) {
+            return res.status(400).json({ success: false, message: 'Room type not found. Add room first.' });
+        }
+
+        for (const day of dates) {
+            const key = `${roomName}|${day}`;
+            if (clear) {
+                delete store.overrides[key];
+                continue;
+            }
+
+            if (!closed && !hasAvail) {
+                delete store.overrides[key];
+                continue;
+            }
+
+            store.overrides[key] = {
+                availableUnits,
+                closed,
+                updatedAt: new Date().toISOString(),
+            };
+        }
+
+        const saved = saveManualAvailability(store);
+        res.json({ success: true, data: saved, affectedDays: dates.length });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 // Get bookings for CRM - last 7 days + all future
