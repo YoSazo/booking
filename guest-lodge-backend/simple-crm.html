@@ -459,41 +459,262 @@
     .toast.success { background: var(--green); }
     .toast.error { background: var(--red); }
 
-    .availability-view { margin-top: 8px; display: flex; flex-direction: column; gap: 14px; }
-    .availability-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .availability-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
+    .rooms-shell { display: flex; flex-direction: column; gap: 12px; }
+    .room-pill-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .room-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .room-pill:hover { border-color: var(--green); color: var(--green); }
+    .room-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .room-pill-add {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1.5px dashed var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .room-pill-add:hover { border-color: var(--green); color: var(--green); }
+
     .availability-card {
-      background: var(--white); border: 2px solid var(--border); border-radius: 16px;
-      padding: 14px; box-shadow: var(--shadow);
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: var(--shadow);
     }
     .availability-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
-    .availability-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-    .availability-input, .availability-select {
-      flex: 1; min-width: 120px; border: 1.5px solid var(--border);
-      border-radius: 10px; padding: 9px 10px; font-family: inherit; color: var(--text);
-      background: var(--white);
-    }
-    .availability-btn {
-      border: 1.5px solid var(--green); background: var(--green); color: white;
-      border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
-    }
-    .availability-btn.alt { background: var(--white); color: var(--green); }
-    .availability-toggle {
-      display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted);
-      margin: 4px 0 8px;
-    }
     .availability-help { font-size: 12px; color: var(--text-muted); }
-    .availability-table-wrap { overflow-x: auto; border: 1.5px solid var(--border); border-radius: 12px; }
-    .availability-table { width: 100%; border-collapse: collapse; min-width: 720px; background: var(--white); }
-    .availability-table th, .availability-table td {
-      padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; text-align: left;
+    .availability-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 30px 10px;
+      font-size: 14px;
     }
-    .availability-table th { background: var(--bg); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
-    .availability-pill {
-      display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
-      background: var(--green-pale); color: var(--green);
+
+    .cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 8px;
     }
-    .availability-pill.low { background: #FEF3C7; color: #92400E; }
-    .availability-pill.closed { background: #FEE2E2; color: #991B1B; }
+    .cal-month-label { font-size: 15px; font-weight: 700; color: var(--text); }
+    .cal-nav { display: flex; gap: 6px; }
+    .cal-nav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      color: var(--text);
+      font-size: 15px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .cal-nav-btn:hover { border-color: var(--green); color: var(--green); }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .cal-dow {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 3px 0 7px;
+    }
+    .cal-day {
+      min-height: 54px;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      background: var(--white);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all .12s;
+      padding: 4px;
+    }
+    .cal-day:hover { border-color: var(--green); }
+    .cal-day.empty { background: transparent; border-color: transparent !important; cursor: default; }
+    .cal-day.past { opacity: .45; cursor: default; }
+    .cal-day.past:hover { border-color: transparent; }
+    .cal-day.today { border-color: var(--green) !important; }
+    .cal-day.open { background: var(--green-pale); }
+    .cal-day.partial { background: #FEF3C7; }
+    .cal-day.full { background: #FEE2E2; }
+    .cal-day.closed { background: #f2f4f3; }
+    .day-num { font-size: 13px; font-weight: 700; line-height: 1; margin-bottom: 3px; }
+    .day-avail { font-size: 11px; font-family: 'DM Mono', monospace; line-height: 1; }
+    .cal-day.open .day-avail { color: var(--green); }
+    .cal-day.partial .day-avail { color: #92400E; }
+    .cal-day.full .day-avail { color: #991B1B; }
+    .cal-day.closed .day-avail { color: var(--text-muted); }
+
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    .range-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .range-input {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-family: inherit;
+      background: var(--white);
+      color: var(--text);
+    }
+    .range-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .range-btn {
+      border: 1.5px solid var(--green);
+      background: var(--green);
+      color: white;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .range-btn.alt { background: var(--white); color: var(--green); }
+    .range-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .rooms-modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 15, 20, 0.38);
+      z-index: 240;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+    .rooms-modal-bg.open { display: flex; }
+    .rooms-modal {
+      width: min(360px, 100%);
+      background: var(--white);
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      padding: 18px;
+    }
+    .rooms-modal h3 { font-size: 15px; margin-bottom: 10px; }
+    .rooms-modal input {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: inherit;
+      margin-bottom: 8px;
+    }
+    .rooms-modal-row { display: flex; gap: 8px; }
+    .rooms-modal-btn {
+      flex: 1;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: transparent;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .rooms-modal-btn.primary {
+      border-color: var(--green);
+      background: var(--green);
+      color: white;
+    }
+
+    .day-popover {
+      display: none;
+      position: fixed;
+      z-index: 260;
+      width: 228px;
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+      padding: 14px;
+    }
+    .day-popover.open { display: block; }
+    .day-popover-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .day-stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .day-step-btn {
+      width: 32px;
+      height: 32px;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      background: var(--bg);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .day-step-count {
+      flex: 1;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .day-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .day-save-btn {
+      width: 100%;
+      border: 1.5px solid var(--green);
+      border-radius: 9px;
+      padding: 8px 9px;
+      background: var(--green);
+      color: white;
+      font-family: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
     /* ── RESPONSIVE ── */
     @media (max-width: 600px) {
@@ -585,6 +806,9 @@ let bookings = [];
 let currentFilter = 'needs-call';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
+let availabilityYear = new Date().getFullYear();
+let availabilityMonth = new Date().getMonth();
+let availabilityEditingDay = '';
 
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
@@ -617,6 +841,12 @@ function enumerateDates(startIso, endIso, maxDays = 180) {
   return out;
 }
 
+const AVAIL_DOW = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const AVAIL_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 function ensureAvailabilityUi() {
   const tabs = document.querySelector('.tabs-container');
   if (tabs && !document.getElementById('countRooms')) {
@@ -632,53 +862,124 @@ function ensureAvailabilityUi() {
   if (container && !document.getElementById('availabilityView')) {
     container.insertAdjacentHTML('beforeend', `
       <div id="availabilityView" class="availability-view" style="display:none">
-        <div class="availability-grid">
+        <div class="rooms-shell">
+          <div id="roomsPillBar" class="room-pill-bar"></div>
+
           <div class="availability-card">
-            <div class="availability-title">Room Types</div>
-            <div class="availability-row">
-              <input id="roomTypeNameInput" class="availability-input" type="text" placeholder="Room name (e.g. King Room)">
-              <input id="roomTypeUnitsInput" class="availability-input" type="number" min="0" step="1" placeholder="Total units">
+            <div id="availabilityNoRoom" class="availability-empty">
+              Add a room type to start managing manual availability.
             </div>
-            <div class="availability-row">
-              <button class="availability-btn" onclick="saveRoomType()">Save Room Type</button>
+            <div id="availabilityCalendarWrap" style="display:none">
+              <div class="cal-header">
+                <div id="availabilityMonthLabel" class="cal-month-label"></div>
+                <div class="cal-nav">
+                  <button class="cal-nav-btn" type="button" id="availabilityPrevMonthBtn">‹</button>
+                  <button class="cal-nav-btn" type="button" id="availabilityNextMonthBtn">›</button>
+                </div>
+              </div>
+              <div id="availabilityCalendarGrid" class="cal-grid"></div>
+              <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:var(--green-pale);border:1px solid var(--green)"></div>Open</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#FEF3C7;border:1px solid #F59E0B"></div>Partial</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#FEE2E2;border:1px solid #E05252"></div>Full</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f2f4f3;border:1px solid #d0d7d3"></div>Closed</div>
+              </div>
             </div>
-            <div class="availability-help">Set how many rooms exist for each room type.</div>
           </div>
+
           <div class="availability-card">
-            <div class="availability-title">Date Range Override</div>
-            <div class="availability-row">
-              <select id="availabilityRoomSelect" class="availability-select" onchange="onAvailabilityRoomChange()"></select>
+            <div class="availability-title">Quick Range Update</div>
+            <div class="availability-help" id="availabilityActiveRoomLabel">Select a room type first.</div>
+            <div class="range-grid">
+              <input id="availabilityRangeStart" class="range-input" type="date">
+              <input id="availabilityRangeEnd" class="range-input" type="date">
+              <input id="availabilityRangeUnits" class="range-input" type="number" min="0" step="1" placeholder="Available units">
             </div>
-            <div class="availability-row">
-              <input id="availabilityStartDate" class="availability-input" type="date">
-              <input id="availabilityEndDate" class="availability-input" type="date">
-            </div>
-            <div class="availability-row">
-              <input id="availabilityUnitsInput" class="availability-input" type="number" min="0" step="1" placeholder="Available units override">
-            </div>
-            <label class="availability-toggle">
-              <input id="availabilityClosedInput" type="checkbox">
-              Mark dates as closed (sold out)
+            <label class="range-toggle">
+              <input id="availabilityRangeClosed" type="checkbox">
+              Mark selected dates as closed
             </label>
-            <div class="availability-row">
-              <button class="availability-btn" onclick="applyAvailabilityRange()">Apply Range</button>
-              <button class="availability-btn alt" onclick="clearAvailabilityRange()">Clear Range</button>
+            <div class="range-row">
+              <button id="availabilityApplyRangeBtn" class="range-btn" type="button">Apply Range</button>
+              <button id="availabilityClearRangeBtn" class="range-btn alt" type="button">Clear Range</button>
             </div>
-            <div class="availability-help">Override availability for short closures, outages, or manual holds.</div>
+            <div class="availability-help">Use this for closures or quick inventory adjustments.</div>
           </div>
         </div>
-        <div class="availability-card">
-          <div class="availability-title">21-Day Front Desk Preview</div>
-          <div id="availabilityTableWrap" class="availability-table-wrap"></div>
+      </div>
+
+      <div id="roomsAddModalBg" class="rooms-modal-bg">
+        <div class="rooms-modal" onclick="event.stopPropagation()">
+          <h3>New room type</h3>
+          <input id="roomsAddNameInput" type="text" placeholder="Room name (e.g. King Room)">
+          <input id="roomsAddUnitsInput" type="number" min="0" step="1" placeholder="Total units">
+          <div class="rooms-modal-row">
+            <button id="roomsAddCancelBtn" class="rooms-modal-btn" type="button">Cancel</button>
+            <button id="roomsAddSaveBtn" class="rooms-modal-btn primary" type="button">Save</button>
+          </div>
         </div>
+      </div>
+
+      <div id="availabilityDayPopover" class="day-popover">
+        <div id="availabilityDayPopoverTitle" class="day-popover-title"></div>
+        <div class="day-stepper">
+          <button id="availabilityStepDownBtn" class="day-step-btn" type="button">-</button>
+          <div id="availabilityDayCount" class="day-step-count">0</div>
+          <button id="availabilityStepUpBtn" class="day-step-btn" type="button">+</button>
+        </div>
+        <label class="day-toggle">
+          <input id="availabilityDayClosedInput" type="checkbox">
+          Mark as closed
+        </label>
+        <button id="availabilityDaySaveBtn" class="day-save-btn" type="button">Done</button>
       </div>
     `);
   }
 
-  const startEl = document.getElementById('availabilityStartDate');
-  const endEl = document.getElementById('availabilityEndDate');
+  const startEl = document.getElementById('availabilityRangeStart');
+  const endEl = document.getElementById('availabilityRangeEnd');
   if (startEl && !startEl.value) startEl.value = addDaysIso(0);
   if (endEl && !endEl.value) endEl.value = addDaysIso(20);
+
+  bindAvailabilityUiEvents();
+}
+
+function bindAvailabilityUiEvents() {
+  const wrap = document.getElementById('availabilityView');
+  if (!wrap || wrap.dataset.bound === 'true') return;
+  wrap.dataset.bound = 'true';
+
+  const prev = document.getElementById('availabilityPrevMonthBtn');
+  const next = document.getElementById('availabilityNextMonthBtn');
+  if (prev) prev.addEventListener('click', () => changeAvailabilityMonth(-1));
+  if (next) next.addEventListener('click', () => changeAvailabilityMonth(1));
+
+  const applyBtn = document.getElementById('availabilityApplyRangeBtn');
+  const clearBtn = document.getElementById('availabilityClearRangeBtn');
+  if (applyBtn) applyBtn.addEventListener('click', applyAvailabilityRange);
+  if (clearBtn) clearBtn.addEventListener('click', clearAvailabilityRange);
+
+  const modalBg = document.getElementById('roomsAddModalBg');
+  const modalCancel = document.getElementById('roomsAddCancelBtn');
+  const modalSave = document.getElementById('roomsAddSaveBtn');
+  if (modalBg) {
+    modalBg.addEventListener('click', (e) => {
+      if (e.target === modalBg) closeRoomsAddModal();
+    });
+  }
+  if (modalCancel) modalCancel.addEventListener('click', closeRoomsAddModal);
+  if (modalSave) modalSave.addEventListener('click', saveRoomType);
+
+  const stepDown = document.getElementById('availabilityStepDownBtn');
+  const stepUp = document.getElementById('availabilityStepUpBtn');
+  const closedInput = document.getElementById('availabilityDayClosedInput');
+  const saveDayBtn = document.getElementById('availabilityDaySaveBtn');
+  if (stepDown) stepDown.addEventListener('click', () => stepAvailabilityDay(-1));
+  if (stepUp) stepUp.addEventListener('click', () => stepAvailabilityDay(1));
+  if (closedInput) closedInput.addEventListener('change', toggleAvailabilityDayClosed);
+  if (saveDayBtn) saveDayBtn.addEventListener('click', saveAvailabilityDay);
+
+  document.addEventListener('click', closeAvailabilityPopoverIfOutside);
 }
 
 // ── LOGIN ──────────────────────────────────────────────
@@ -870,6 +1171,7 @@ function applyFilter() {
 
   if (bookingsEl) bookingsEl.style.display = '';
   if (availabilityEl) availabilityEl.style.display = 'none';
+  closeAvailabilityDayPopover();
   const filtered = currentFilter === 'needs-call' 
     ? bookings.filter(b => b.callStatus === 'not-called')
     : bookings.filter(b => b.callStatus === 'called');
@@ -889,7 +1191,7 @@ async function loadManualAvailability() {
       manualSelectedRoom = manualAvailability.rooms[0].name;
     }
     refreshRoomBadge();
-    populateAvailabilityRoomSelect();
+    renderAvailabilityView();
   } catch (e) {
     toast('Could not load manual availability', 'error');
   }
@@ -904,22 +1206,55 @@ function refreshRoomBadge() {
   if (badge) badge.textContent = manualAvailability.rooms.length;
 }
 
-function populateAvailabilityRoomSelect() {
-  const select = document.getElementById('availabilityRoomSelect');
-  if (!select) return;
+function getManualRoomByName(name) {
+  return (manualAvailability.rooms || []).find(r => r.name === name) || null;
+}
+
+function setActiveManualRoom(name) {
+  const room = getManualRoomByName(name);
+  if (!room) return;
+  manualSelectedRoom = room.name;
+  renderAvailabilityView();
+}
+
+function renderRoomPills() {
+  const bar = document.getElementById('roomsPillBar');
+  if (!bar) return;
   const rooms = manualAvailability.rooms || [];
-  if (!rooms.length) {
-    select.innerHTML = '<option value="">No room types yet</option>';
-    manualSelectedRoom = '';
-    return;
-  }
 
-  if (!manualSelectedRoom || !rooms.some(r => r.name === manualSelectedRoom)) {
-    manualSelectedRoom = rooms[0].name;
-  }
+  bar.innerHTML = '';
+  rooms.forEach((room) => {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = `room-pill ${manualSelectedRoom === room.name ? 'active' : ''}`;
+    pill.textContent = `${room.name} (${Math.max(0, parseInt(room.totalUnits, 10) || 0)})`;
+    pill.addEventListener('click', () => setActiveManualRoom(room.name));
+    bar.appendChild(pill);
+  });
 
-  select.innerHTML = rooms.map(r => `<option value="${esc(r.name)}">${esc(r.name)} (${Number(r.totalUnits || 0)} total)</option>`).join('');
-  select.value = manualSelectedRoom;
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'room-pill-add';
+  addBtn.textContent = '+ Add room type';
+  addBtn.addEventListener('click', openRoomsAddModal);
+  bar.appendChild(addBtn);
+}
+
+function openRoomsAddModal() {
+  const modal = document.getElementById('roomsAddModalBg');
+  if (!modal) return;
+  modal.classList.add('open');
+  const nameInput = document.getElementById('roomsAddNameInput');
+  const unitsInput = document.getElementById('roomsAddUnitsInput');
+  if (nameInput) nameInput.value = '';
+  if (unitsInput) unitsInput.value = '';
+  if (nameInput) nameInput.focus();
+}
+
+function closeRoomsAddModal() {
+  const modal = document.getElementById('roomsAddModalBg');
+  if (!modal) return;
+  modal.classList.remove('open');
 }
 
 function bookingsByRoomDate() {
@@ -940,86 +1275,232 @@ function bookingsByRoomDate() {
   return counts;
 }
 
-function availabilityFor(room, day, bookedMap) {
+function availabilityForDay(room, dayIso, bookedMap) {
   const baseUnits = Math.max(0, Number(room.totalUnits || 0));
-  const booked = bookedMap[roomDateKey(room.name, day)] || 0;
-  const override = manualAvailability.overrides[roomDateKey(room.name, day)];
+  const booked = bookedMap[roomDateKey(room.name, dayIso)] || 0;
+  const override = manualAvailability.overrides[roomDateKey(room.name, dayIso)];
 
-  if (override?.closed) return { mode: 'closed', value: 0, booked, baseUnits };
-  if (override && override.availableUnits !== null && override.availableUnits !== undefined && override.availableUnits !== '') {
-    return { mode: 'override', value: Math.max(0, Number(override.availableUnits) || 0), booked, baseUnits };
+  if (override?.closed) {
+    return { status: 'closed', value: 0, booked, baseUnits, mode: 'closed' };
   }
-  return { mode: 'base', value: Math.max(0, baseUnits - booked), booked, baseUnits };
+
+  let value = Math.max(0, baseUnits - booked);
+  let mode = 'auto';
+  if (override && override.availableUnits !== null && override.availableUnits !== undefined && override.availableUnits !== '') {
+    value = Math.max(0, Number(override.availableUnits) || 0);
+    mode = 'override';
+  }
+
+  let status = 'open';
+  if (value <= 0) status = 'full';
+  else if (value < baseUnits) status = 'partial';
+
+  return { status, value, booked, baseUnits, mode };
 }
 
 function renderAvailabilityView() {
   ensureAvailabilityUi();
-  populateAvailabilityRoomSelect();
-  renderAvailabilityTable();
-}
+  renderRoomPills();
 
-function renderAvailabilityTable() {
-  const wrap = document.getElementById('availabilityTableWrap');
-  if (!wrap) return;
+  const rooms = manualAvailability.rooms || [];
+  if (!manualSelectedRoom && rooms.length) {
+    manualSelectedRoom = rooms[0].name;
+  }
+  if (manualSelectedRoom && !rooms.some(r => r.name === manualSelectedRoom)) {
+    manualSelectedRoom = rooms.length ? rooms[0].name : '';
+  }
+
+  const noRoom = document.getElementById('availabilityNoRoom');
+  const calWrap = document.getElementById('availabilityCalendarWrap');
+  const activeLabel = document.getElementById('availabilityActiveRoomLabel');
+
   if (!manualSelectedRoom) {
-    wrap.innerHTML = '<div class="availability-help" style="padding:12px;">Add at least one room type to start manual availability.</div>';
+    if (noRoom) noRoom.style.display = 'block';
+    if (calWrap) calWrap.style.display = 'none';
+    if (activeLabel) activeLabel.textContent = 'Select a room type first.';
+    closeAvailabilityDayPopover();
     return;
   }
 
-  const room = (manualAvailability.rooms || []).find(r => r.name === manualSelectedRoom);
-  if (!room) {
-    wrap.innerHTML = '<div class="availability-help" style="padding:12px;">Selected room type was not found.</div>';
-    return;
+  if (noRoom) noRoom.style.display = 'none';
+  if (calWrap) calWrap.style.display = 'block';
+  const room = getManualRoomByName(manualSelectedRoom);
+  if (activeLabel && room) {
+    activeLabel.textContent = `Editing: ${room.name} (${Math.max(0, Number(room.totalUnits || 0))} total units)`;
   }
 
-  const bookedMap = bookingsByRoomDate();
-  const start = addDaysIso(0);
-  const end = addDaysIso(20);
-  const days = enumerateDates(start, end);
-
-  const rows = days.map(day => {
-    const result = availabilityFor(room, day, bookedMap);
-    const d = new Date(`${day}T00:00:00.000Z`);
-    const friendly = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const badgeClass = result.mode === 'closed' ? 'availability-pill closed' : result.value <= 1 ? 'availability-pill low' : 'availability-pill';
-    const modeText = result.mode === 'closed' ? 'Closed' : result.mode === 'override' ? 'Override' : 'Auto';
-
-    return `
-      <tr>
-        <td>${esc(friendly)}</td>
-        <td>${result.baseUnits}</td>
-        <td>${result.booked}</td>
-        <td><span class="${badgeClass}">${result.value}</span></td>
-        <td>${modeText}</td>
-      </tr>
-    `;
-  }).join('');
-
-  wrap.innerHTML = `
-    <table class="availability-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Total Units</th>
-          <th>Booked</th>
-          <th>Available</th>
-          <th>Source</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
+  renderAvailabilityCalendar();
 }
 
-function onAvailabilityRoomChange() {
-  const select = document.getElementById('availabilityRoomSelect');
-  manualSelectedRoom = select ? select.value : '';
-  renderAvailabilityTable();
+function renderAvailabilityCalendar() {
+  const room = getManualRoomByName(manualSelectedRoom);
+  const grid = document.getElementById('availabilityCalendarGrid');
+  const monthLabel = document.getElementById('availabilityMonthLabel');
+  if (!room || !grid || !monthLabel) return;
+
+  monthLabel.textContent = `${AVAIL_MONTHS[availabilityMonth]} ${availabilityYear}`;
+  grid.innerHTML = '';
+  AVAIL_DOW.forEach((dow) => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = dow;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(availabilityYear, availabilityMonth, 1).getDay();
+  const daysInMonth = new Date(availabilityYear, availabilityMonth + 1, 0).getDate();
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const bookedMap = bookingsByRoomDate();
+
+  for (let i = 0; i < firstDay; i += 1) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const date = new Date(availabilityYear, availabilityMonth, d);
+    const iso = toIsoDate(date);
+    const isPast = date.getTime() < todayMidnight;
+    const isToday = date.getTime() === todayMidnight;
+
+    const result = availabilityForDay(room, iso, bookedMap);
+    const dayEl = document.createElement('div');
+    dayEl.className = `cal-day ${result.status}${isPast ? ' past' : ''}${isToday ? ' today' : ''}`;
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = String(d);
+
+    const avail = document.createElement('div');
+    avail.className = 'day-avail';
+    avail.textContent = result.status === 'closed' ? '--' : String(result.value);
+
+    dayEl.appendChild(num);
+    dayEl.appendChild(avail);
+    if (!isPast) {
+      dayEl.addEventListener('click', (event) => openAvailabilityDayPopover(event, iso));
+    }
+    grid.appendChild(dayEl);
+  }
+}
+
+function changeAvailabilityMonth(delta) {
+  availabilityMonth += delta;
+  if (availabilityMonth > 11) {
+    availabilityMonth = 0;
+    availabilityYear += 1;
+  }
+  if (availabilityMonth < 0) {
+    availabilityMonth = 11;
+    availabilityYear -= 1;
+  }
+  closeAvailabilityDayPopover();
+  renderAvailabilityCalendar();
+}
+
+function openAvailabilityDayPopover(event, dayIso) {
+  const room = getManualRoomByName(manualSelectedRoom);
+  const pop = document.getElementById('availabilityDayPopover');
+  const title = document.getElementById('availabilityDayPopoverTitle');
+  const countEl = document.getElementById('availabilityDayCount');
+  const closedInput = document.getElementById('availabilityDayClosedInput');
+  if (!room || !pop || !title || !countEl || !closedInput) return;
+
+  availabilityEditingDay = dayIso;
+  const bookedMap = bookingsByRoomDate();
+  const result = availabilityForDay(room, dayIso, bookedMap);
+  const pretty = new Date(`${dayIso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  title.textContent = pretty;
+  countEl.textContent = String(result.value);
+  closedInput.checked = result.status === 'closed';
+  toggleAvailabilityDayClosed();
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  let left = rect.left;
+  let top = rect.bottom + 8;
+  const popWidth = 228;
+  const popHeight = 176;
+  if (left + popWidth > window.innerWidth - 8) left = window.innerWidth - popWidth - 8;
+  if (top + popHeight > window.innerHeight - 8) top = rect.top - popHeight - 8;
+  if (left < 8) left = 8;
+  if (top < 8) top = 8;
+
+  pop.style.left = `${left}px`;
+  pop.style.top = `${top}px`;
+  pop.classList.add('open');
+  event.stopPropagation();
+}
+
+function closeAvailabilityDayPopover() {
+  availabilityEditingDay = '';
+  const pop = document.getElementById('availabilityDayPopover');
+  if (pop) pop.classList.remove('open');
+}
+
+function closeAvailabilityPopoverIfOutside(event) {
+  const pop = document.getElementById('availabilityDayPopover');
+  if (!pop || !pop.classList.contains('open')) return;
+  if (!pop.contains(event.target)) closeAvailabilityDayPopover();
+}
+
+function stepAvailabilityDay(delta) {
+  if (!availabilityEditingDay) return;
+  const room = getManualRoomByName(manualSelectedRoom);
+  const countEl = document.getElementById('availabilityDayCount');
+  const closedInput = document.getElementById('availabilityDayClosedInput');
+  if (!room || !countEl || !closedInput || closedInput.checked) return;
+  const cur = parseInt(countEl.textContent, 10) || 0;
+  const maxUnits = Math.max(0, parseInt(room.totalUnits, 10) || 0);
+  const next = Math.max(0, Math.min(maxUnits, cur + delta));
+  countEl.textContent = String(next);
+}
+
+function toggleAvailabilityDayClosed() {
+  const closedInput = document.getElementById('availabilityDayClosedInput');
+  const countEl = document.getElementById('availabilityDayCount');
+  const stepButtons = document.querySelectorAll('.day-step-btn');
+  if (!closedInput || !countEl) return;
+  const isClosed = !!closedInput.checked;
+  countEl.style.opacity = isClosed ? '0.35' : '1';
+  stepButtons.forEach((btn) => {
+    btn.disabled = isClosed;
+    btn.style.opacity = isClosed ? '0.35' : '1';
+  });
+}
+
+async function saveAvailabilityDay() {
+  if (!availabilityEditingDay || !manualSelectedRoom) return;
+  const closedInput = document.getElementById('availabilityDayClosedInput');
+  const countEl = document.getElementById('availabilityDayCount');
+  if (!closedInput || !countEl) return;
+
+  const payload = {
+    roomName: manualSelectedRoom,
+    startDate: availabilityEditingDay,
+    endDate: availabilityEditingDay,
+    closed: !!closedInput.checked,
+  };
+  if (!closedInput.checked) {
+    payload.availableUnits = Math.max(0, parseInt(countEl.textContent, 10) || 0);
+  }
+
+  try {
+    const data = await api('POST', '/api/crm/manual-availability/range', payload);
+    if (!data.success) throw new Error(data.message || 'Failed to save day');
+    manualAvailability = data.data || manualAvailability;
+    closeAvailabilityDayPopover();
+    renderAvailabilityCalendar();
+    toast('Day updated', 'success');
+  } catch (e) {
+    toast('Failed to update day', 'error');
+  }
 }
 
 async function saveRoomType() {
-  const nameEl = document.getElementById('roomTypeNameInput');
-  const unitsEl = document.getElementById('roomTypeUnitsInput');
+  const nameEl = document.getElementById('roomsAddNameInput');
+  const unitsEl = document.getElementById('roomsAddUnitsInput');
   if (!nameEl || !unitsEl) return;
   const roomName = nameEl.value.trim();
   const totalUnits = Math.max(0, parseInt(unitsEl.value, 10) || 0);
@@ -1033,11 +1514,9 @@ async function saveRoomType() {
     if (!data.success) throw new Error(data.message || 'Failed to save room type');
     manualAvailability = data.data || manualAvailability;
     manualSelectedRoom = roomName;
-    nameEl.value = '';
-    unitsEl.value = '';
+    closeRoomsAddModal();
     refreshRoomBadge();
-    populateAvailabilityRoomSelect();
-    renderAvailabilityTable();
+    renderAvailabilityView();
     toast('Room type saved', 'success');
   } catch (e) {
     toast('Failed to save room type', 'error');
@@ -1045,11 +1524,11 @@ async function saveRoomType() {
 }
 
 async function applyAvailabilityRange() {
-  const roomName = (document.getElementById('availabilityRoomSelect') || {}).value || '';
-  const startDate = (document.getElementById('availabilityStartDate') || {}).value || '';
-  const endDate = (document.getElementById('availabilityEndDate') || {}).value || '';
-  const unitsRaw = (document.getElementById('availabilityUnitsInput') || {}).value;
-  const closed = !!((document.getElementById('availabilityClosedInput') || {}).checked);
+  const roomName = manualSelectedRoom;
+  const startDate = (document.getElementById('availabilityRangeStart') || {}).value || '';
+  const endDate = (document.getElementById('availabilityRangeEnd') || {}).value || '';
+  const unitsRaw = (document.getElementById('availabilityRangeUnits') || {}).value;
+  const closed = !!((document.getElementById('availabilityRangeClosed') || {}).checked);
 
   if (!roomName || !startDate || !endDate) {
     toast('Room and date range are required', 'error');
@@ -1065,7 +1544,7 @@ async function applyAvailabilityRange() {
     const data = await api('POST', '/api/crm/manual-availability/range', payload);
     if (!data.success) throw new Error(data.message || 'Failed to apply override');
     manualAvailability = data.data || manualAvailability;
-    renderAvailabilityTable();
+    renderAvailabilityCalendar();
     toast(`Override applied (${data.affectedDays || 0} days)`, 'success');
   } catch (e) {
     toast('Failed to apply override', 'error');
@@ -1073,9 +1552,9 @@ async function applyAvailabilityRange() {
 }
 
 async function clearAvailabilityRange() {
-  const roomName = (document.getElementById('availabilityRoomSelect') || {}).value || '';
-  const startDate = (document.getElementById('availabilityStartDate') || {}).value || '';
-  const endDate = (document.getElementById('availabilityEndDate') || {}).value || '';
+  const roomName = manualSelectedRoom;
+  const startDate = (document.getElementById('availabilityRangeStart') || {}).value || '';
+  const endDate = (document.getElementById('availabilityRangeEnd') || {}).value || '';
   if (!roomName || !startDate || !endDate) {
     toast('Room and date range are required', 'error');
     return;
@@ -1085,7 +1564,7 @@ async function clearAvailabilityRange() {
     const data = await api('POST', '/api/crm/manual-availability/range', { roomName, startDate, endDate, clear: true });
     if (!data.success) throw new Error(data.message || 'Failed to clear override');
     manualAvailability = data.data || manualAvailability;
-    renderAvailabilityTable();
+    renderAvailabilityCalendar();
     toast(`Range cleared (${data.affectedDays || 0} days)`, 'success');
   } catch (e) {
     toast('Failed to clear range', 'error');
@@ -1147,12 +1626,22 @@ async function saveNote() {
   }
 }
 
-// Close modal on Escape key
+// Close modals/popovers on Escape, and submit room modal on Enter
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const modal = document.getElementById('notesModal');
     if (modal.style.display === 'flex') {
       closeNotesModal();
+    }
+    closeRoomsAddModal();
+    closeAvailabilityDayPopover();
+  }
+
+  if (e.key === 'Enter') {
+    const roomModal = document.getElementById('roomsAddModalBg');
+    if (roomModal && roomModal.classList.contains('open')) {
+      e.preventDefault();
+      saveRoomType();
     }
   }
 });
