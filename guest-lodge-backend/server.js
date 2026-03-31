@@ -2963,6 +2963,86 @@ app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
     }
 });
 
+app.put('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+
+        const currentRoomName = String(req.body?.currentRoomName || '').trim();
+        const newRoomName = String(req.body?.newRoomName || '').trim();
+        const totalUnits = Math.max(0, parseInt(req.body?.totalUnits, 10) || 0);
+
+        if (!currentRoomName) {
+            return res.status(400).json({ success: false, message: 'currentRoomName is required.' });
+        }
+        if (!newRoomName) {
+            return res.status(400).json({ success: false, message: 'newRoomName is required.' });
+        }
+
+        const room = await withRetry(() => prisma.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId, name: currentRoomName } },
+            select: { id: true, name: true },
+        }));
+        if (!room) {
+            return res.status(404).json({ success: false, message: 'Room type not found.' });
+        }
+
+        if (newRoomName !== currentRoomName) {
+            const conflict = await withRetry(() => prisma.manualRoom.findUnique({
+                where: { hotelId_name: { hotelId, name: newRoomName } },
+                select: { id: true },
+            }));
+            if (conflict) {
+                return res.status(409).json({ success: false, message: 'A room with this name already exists.' });
+            }
+        }
+
+        await withRetry(() => prisma.manualRoom.update({
+            where: { id: room.id },
+            data: { name: newRoomName, totalUnits },
+        }));
+
+        const rooms = await getManualRooms(hotelId);
+        const payload = formatManualAvailabilityPayload(rooms);
+        res.json({ success: true, data: payload });
+    } catch (e) {
+        console.error('manual-availability:rooms update failed:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.delete('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+
+        const roomName = String(req.body?.roomName || '').trim();
+        if (!roomName) {
+            return res.status(400).json({ success: false, message: 'roomName is required.' });
+        }
+
+        const room = await withRetry(() => prisma.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId, name: roomName } },
+            select: { id: true, name: true },
+        }));
+        if (!room) {
+            return res.status(404).json({ success: false, message: 'Room type not found.' });
+        }
+
+        await withRetry(() => prisma.$transaction([
+            prisma.manualOverride.deleteMany({ where: { roomId: room.id } }),
+            prisma.manualRoom.delete({ where: { id: room.id } }),
+        ]));
+
+        const rooms = await getManualRooms(hotelId);
+        const payload = formatManualAvailabilityPayload(rooms);
+        res.json({ success: true, data: payload });
+    } catch (e) {
+        console.error('manual-availability:rooms delete failed:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 app.post('/api/crm/manual-availability/range', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);

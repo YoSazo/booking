@@ -467,6 +467,7 @@
     .availability-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .rooms-shell { display: flex; flex-direction: column; gap: 12px; }
     .room-pill-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .room-pill-wrap { display: inline-flex; align-items: center; gap: 6px; }
     .room-pill {
       padding: 8px 14px;
       border-radius: 999px;
@@ -481,6 +482,23 @@
     }
     .room-pill:hover { border-color: var(--green); color: var(--green); }
     .room-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .room-pill-action {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+    }
+    .room-pill-action:hover { border-color: var(--green); color: var(--green); }
+    .room-pill-action.danger:hover { border-color: var(--red); color: var(--red); }
     .room-pill-add {
       padding: 8px 12px;
       border-radius: 999px;
@@ -847,6 +865,7 @@ let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
 let availabilityMonth = new Date().getMonth();
 let availabilityEditingDay = '';
+let editingRoomName = '';
 const CRM_HOTEL_BY_HOST = {
   'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
   'stcroix.clickinns.com': 'st-croix-wisconsin',
@@ -992,6 +1011,18 @@ function ensureAvailabilityUi() {
         </div>
       </div>
 
+      <div id="roomsEditModalBg" class="rooms-modal-bg">
+        <div class="rooms-modal" onclick="event.stopPropagation()">
+          <h3>Edit room type</h3>
+          <input id="roomsEditNameInput" type="text" placeholder="Room name">
+          <input id="roomsEditUnitsInput" type="number" min="0" step="1" placeholder="Total units">
+          <div class="rooms-modal-row">
+            <button id="roomsEditCancelBtn" class="rooms-modal-btn" type="button">Cancel</button>
+            <button id="roomsEditSaveBtn" class="rooms-modal-btn primary" type="button">Save changes</button>
+          </div>
+        </div>
+      </div>
+
       <div id="availabilityDayPopover" class="day-popover">
         <div id="availabilityDayPopoverTitle" class="day-popover-title"></div>
         <div class="day-stepper">
@@ -1041,6 +1072,17 @@ function bindAvailabilityUiEvents() {
   }
   if (modalCancel) modalCancel.addEventListener('click', closeRoomsAddModal);
   if (modalSave) modalSave.addEventListener('click', saveRoomType);
+
+  const editModalBg = document.getElementById('roomsEditModalBg');
+  const editModalCancel = document.getElementById('roomsEditCancelBtn');
+  const editModalSave = document.getElementById('roomsEditSaveBtn');
+  if (editModalBg) {
+    editModalBg.addEventListener('click', (e) => {
+      if (e.target === editModalBg) closeRoomsEditModal();
+    });
+  }
+  if (editModalCancel) editModalCancel.addEventListener('click', closeRoomsEditModal);
+  if (editModalSave) editModalSave.addEventListener('click', saveEditedRoomType);
 
   const stepDown = document.getElementById('availabilityStepDownBtn');
   const stepUp = document.getElementById('availabilityStepUpBtn');
@@ -1325,12 +1367,41 @@ function renderRoomPills() {
 
   bar.innerHTML = '';
   rooms.forEach((room) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'room-pill-wrap';
+
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = `room-pill ${manualSelectedRoom === room.name ? 'active' : ''}`;
     pill.textContent = `${room.name} (${Math.max(0, parseInt(room.totalUnits, 10) || 0)})`;
     pill.addEventListener('click', () => setActiveManualRoom(room.name));
-    bar.appendChild(pill);
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'room-pill-action';
+    editBtn.title = `Edit ${room.name}`;
+    editBtn.setAttribute('aria-label', `Edit ${room.name}`);
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRoomsEditModal(room.name);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'room-pill-action danger';
+    delBtn.title = `Delete ${room.name}`;
+    delBtn.setAttribute('aria-label', `Delete ${room.name}`);
+    delBtn.textContent = '🗑';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteRoomType(room.name);
+    });
+
+    wrap.appendChild(pill);
+    wrap.appendChild(editBtn);
+    wrap.appendChild(delBtn);
+    bar.appendChild(wrap);
   });
 
   const addBtn = document.createElement('button');
@@ -1356,6 +1427,28 @@ function closeRoomsAddModal() {
   const modal = document.getElementById('roomsAddModalBg');
   if (!modal) return;
   modal.classList.remove('open');
+}
+
+function openRoomsEditModal(roomName) {
+  const room = getManualRoomByName(roomName);
+  if (!room) return;
+
+  const modal = document.getElementById('roomsEditModalBg');
+  const nameInput = document.getElementById('roomsEditNameInput');
+  const unitsInput = document.getElementById('roomsEditUnitsInput');
+  if (!modal || !nameInput || !unitsInput) return;
+
+  editingRoomName = room.name;
+  nameInput.value = room.name;
+  unitsInput.value = Math.max(0, parseInt(room.totalUnits, 10) || 0);
+  modal.classList.add('open');
+  nameInput.focus();
+}
+
+function closeRoomsEditModal() {
+  const modal = document.getElementById('roomsEditModalBg');
+  if (modal) modal.classList.remove('open');
+  editingRoomName = '';
 }
 
 function bookingsByRoomDate() {
@@ -1624,6 +1717,59 @@ async function saveRoomType() {
   }
 }
 
+async function saveEditedRoomType() {
+  const nameEl = document.getElementById('roomsEditNameInput');
+  const unitsEl = document.getElementById('roomsEditUnitsInput');
+  if (!nameEl || !unitsEl || !editingRoomName) return;
+
+  const newRoomName = nameEl.value.trim();
+  const totalUnits = Math.max(0, parseInt(unitsEl.value, 10) || 0);
+  if (!newRoomName) {
+    toast('Room name is required', 'error');
+    return;
+  }
+
+  try {
+    const data = await api('PUT', '/api/crm/manual-availability/rooms', {
+      currentRoomName: editingRoomName,
+      newRoomName,
+      totalUnits,
+    });
+    if (!data.success) throw new Error(data.message || 'Failed to update room type');
+    manualAvailability = data.data || manualAvailability;
+    manualSelectedRoom = newRoomName;
+    closeRoomsEditModal();
+    refreshRoomBadge();
+    renderAvailabilityView();
+    toast('Room type updated', 'success');
+  } catch (e) {
+    toast(e.message || 'Failed to update room type', 'error');
+  }
+}
+
+async function deleteRoomType(roomName) {
+  const room = getManualRoomByName(roomName);
+  if (!room) return;
+
+  const confirmDelete = confirm(`Delete room type "${room.name}"? This will also remove its day-by-day overrides.`);
+  if (!confirmDelete) return;
+
+  try {
+    const data = await api('DELETE', '/api/crm/manual-availability/rooms', { roomName: room.name });
+    if (!data.success) throw new Error(data.message || 'Failed to delete room type');
+    manualAvailability = data.data || manualAvailability;
+    if (manualSelectedRoom === room.name) {
+      manualSelectedRoom = (manualAvailability.rooms && manualAvailability.rooms[0] && manualAvailability.rooms[0].name) || '';
+    }
+    closeAvailabilityDayPopover();
+    refreshRoomBadge();
+    renderAvailabilityView();
+    toast('Room type deleted', 'success');
+  } catch (e) {
+    toast(e.message || 'Failed to delete room type', 'error');
+  }
+}
+
 async function applyAvailabilityRange() {
   const roomName = manualSelectedRoom;
   const startDate = (document.getElementById('availabilityRangeStart') || {}).value || '';
@@ -1735,14 +1881,21 @@ document.addEventListener('keydown', (e) => {
       closeNotesModal();
     }
     closeRoomsAddModal();
+    closeRoomsEditModal();
     closeAvailabilityDayPopover();
   }
 
   if (e.key === 'Enter') {
     const roomModal = document.getElementById('roomsAddModalBg');
+    const roomEditModal = document.getElementById('roomsEditModalBg');
     if (roomModal && roomModal.classList.contains('open')) {
       e.preventDefault();
       saveRoomType();
+      return;
+    }
+    if (roomEditModal && roomEditModal.classList.contains('open')) {
+      e.preventDefault();
+      saveEditedRoomType();
     }
   }
 });
