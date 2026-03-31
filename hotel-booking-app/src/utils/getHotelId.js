@@ -20,6 +20,7 @@ const domainMap = {
   
   // Guest Lodge Minot
   'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
+  'booking-kappa-nine.vercel.app': 'guest-lodge-minot',
   
   // Local development - default to suite-stay
   'localhost': 'suite-stay',
