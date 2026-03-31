@@ -737,12 +737,21 @@
       .stat-pill { display: none !important; }
       .refresh-btn { padding: 5px 8px; font-size: 11px; }
       .container { padding: 16px 12px; }
+      .tabs-container {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 4px;
+        padding: 4px;
+        overflow: visible;
+      }
+      .tabs-slider { display: none; }
       .card-inner { padding: 12px 14px; }
       .contact-phone { font-size: 15px; }
       .guest-name { font-size: 20px; }
       .card-amount { font-size: 20px; }
       .date-value { font-size: 15px; }
-      .tab { padding: 9px 14px; font-size: 13px; }
+      .tab { padding: 8px 8px; font-size: 12px; justify-content: center; gap: 6px; min-width: 0; }
+      .tab-badge { padding: 1px 6px; font-size: 11px; }
       .availability-card { padding: 12px; }
       .cal-grid { gap: 4px; }
       .cal-day { min-height: 48px; border-radius: 9px; }

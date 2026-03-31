@@ -310,6 +310,9 @@ function formatManualAvailabilityPayload(rooms) {
 }
 
 async function getManualRooms(hotelId) {
+    if (!prisma.manualRoom || !prisma.manualOverride) {
+        throw new Error('Manual availability models are missing in Prisma client. Redeploy with prisma generate + prisma migrate deploy.');
+    }
     return withRetry(() => prisma.manualRoom.findMany({
         where: { hotelId },
         include: { overrides: true },
@@ -318,6 +321,9 @@ async function getManualRooms(hotelId) {
 }
 
 async function getManualAvailability(hotelId, checkin, checkout) {
+    if (!prisma.manualRoom || !prisma.manualOverride) {
+        throw new Error('Manual availability models are missing in Prisma client. Redeploy with prisma generate + prisma migrate deploy.');
+    }
     const start = normalizeIsoDate(checkin);
     const end = normalizeIsoDate(checkout);
     if (!start || !end || end <= start) return [];
@@ -2505,6 +2511,7 @@ app.get('/api/crm/manual-availability', crmAuth, async (req, res) => {
         const payload = formatManualAvailabilityPayload(rooms);
         res.json({ success: true, data: payload });
     } catch (e) {
+        console.error('manual-availability:get failed:', e.message);
         res.status(500).json({ success: false, message: e.message });
     }
 });
@@ -2529,6 +2536,7 @@ app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
         const payload = formatManualAvailabilityPayload(rooms);
         res.json({ success: true, data: payload });
     } catch (e) {
+        console.error('manual-availability:rooms failed:', e.message);
         res.status(500).json({ success: false, message: e.message });
     }
 });
@@ -2585,6 +2593,7 @@ app.post('/api/crm/manual-availability/range', crmAuth, async (req, res) => {
         const payload = formatManualAvailabilityPayload(rooms);
         res.json({ success: true, data: payload, affectedDays: dates.length });
     } catch (e) {
+        console.error('manual-availability:range failed:', e.message);
         res.status(500).json({ success: false, message: e.message });
     }
 });
