@@ -1,18 +1,18 @@
 ﻿export const hotelData = {
   // --- First Hotel ---
   'guest-lodge-minot': {
-    name: 'Guest Lodge Minot',
+    name: 'Suite Stay',
     url: 'booking-kappa-nine.vercel.app',
     subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
-    address: '1937 N Broadway, Minot, ND 58703',
-    phone: '(701) 289-5992',
+    address: '65600 AL-77, Talladega, AL 35160',
+    phone: '256-207-8086',
     pms: 'manual',
     propertyCode: 'Dont know yet',
     // NEW: Hotel-specific rates
     rates: {
-      NIGHTLY: 59,
-      WEEKLY: 250,
-      MONTHLY: 950,
+      NIGHTLY: 69,
+      WEEKLY: 299,
+      MONTHLY: 999,
     },
     // NEW: Hotel-specific reviews
     reviews: [
@@ -30,19 +30,31 @@
       },
     ],
     rooms: [
-      { id: 1, name: 'King room', amenities: 'Free WiFi â€¢ 30" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg', imageUrls: [
-            '/kingbedbart.jpg',
-            'https://placehold.co/400x400/667280/ffffff?text=King+Bathroom',
-            'https://placehold.co/400x400/7989a1/ffffff?text=Workstation',
+  { id: 1, name: 'King Room', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
+    'kingbedsuitestay.webp',
+    'doublesuitestay2.webp',
+    'doublesuitestay3.webp',
+    'suitestaybathroom.webp',
+    'sinksuitestay.webp',
+    'tvsuitestay.webp',
+    'workspacesuitestay.webp',
+    'suitestayoutside.webp',
+    'suitestayreception.webp',
         ] },
 
       
 
 
-      { id: 2, name: 'Queen Room', amenities: 'Free WiFi â€¢ 30" TV â€¢ Workstation â€¢ Fridge â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg', imageUrls: [
-            '/kingbedbart.jpg',
-            'https://placehold.co/400x400/667280/ffffff?text=King+Bathroom',
-            'https://placehold.co/400x400/7989a1/ffffff?text=Workstation',
+  { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
+    'doublesuitestay.webp',
+    'doublesuitestay2.webp',
+    'doublesuitestay3.webp',
+    'suitestaybathroom.webp',
+    'sinksuitestay.webp',
+    'tvsuitestay.webp',
+    'workspacesuitestay.webp',
+    'suitestayoutside.webp',
+    'suitestayreception.webp',
         ]  },
     ]
   },
