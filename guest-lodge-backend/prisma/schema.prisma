@@ -116,3 +116,44 @@ model ManualOverride {
 
   @@unique([roomId, date])
 }
+
+model HotelConfig {
+  id            String   @id
+  name          String?
+  pms           String
+  propertyId    String?
+  siteId        String?
+  sitePassword  String?
+  chainCode     String?
+  roomIDMapping Json?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  domains       HotelDomain[]
+  crmPins       CrmPin[]
+}
+
+model HotelDomain {
+  id         String      @id @default(cuid())
+  hotel      HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId    String
+  domain     String      @unique
+  isPrimary  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model CrmPin {
+  id         String      @id @default(cuid())
+  hotel      HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId    String
+  pinHash    String
+  label      String?
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([hotelId, pinHash])
+  @@index([pinHash, active])
+}

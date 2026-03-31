@@ -209,9 +209,8 @@ const hotelConfig = {
         }
     },
     'guest-lodge-minot': {
-        pms: 'bookingcenter',
-        siteId: process.env.BOOKINGCENTER_MINOT_SITE_ID,
-        // Room mappings will be added once BookingCenter API is set up
+        pms: 'manual',
+        // Manual front-desk managed availability (simple-crm.html)
         roomIDMapping: {}
     },
     'st-croix-wisconsin': {
@@ -224,26 +223,75 @@ const hotelConfig = {
     }
 };
 
-// Helper to get hotel config
-const getHotelConfig = (hotelId) => {
+const HOTEL_CONFIG_CACHE_TTL_MS = 30 * 1000;
+const hotelConfigCache = new Map();
+
+function normalizeHotelConfig(input = {}) {
+    const normalized = {
+        ...input,
+        pms: String(input.pms || '').toLowerCase(),
+    };
+    if (!normalized.roomIDMapping || typeof normalized.roomIDMapping !== 'object' || Array.isArray(normalized.roomIDMapping)) {
+        normalized.roomIDMapping = {};
+    }
+    return normalized;
+}
+
+async function getDbHotelConfig(hotelId) {
+    if (!prisma.hotelConfig) return null;
+    const key = String(hotelId || '').trim();
+    if (!key) return null;
+
+    const cached = hotelConfigCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    const row = await withRetry(() => prisma.hotelConfig.findUnique({
+        where: { id: key },
+        include: { domains: true },
+    }));
+
+    const config = row && row.active
+        ? normalizeHotelConfig({
+            id: row.id,
+            name: row.name || row.id,
+            pms: row.pms,
+            propertyId: row.propertyId || undefined,
+            siteId: row.siteId || undefined,
+            sitePassword: row.sitePassword || undefined,
+            chainCode: row.chainCode || undefined,
+            roomIDMapping: row.roomIDMapping || {},
+            domains: (row.domains || []).map(d => d.domain),
+            source: 'db',
+        })
+        : null;
+
+    hotelConfigCache.set(key, { value: config, expiresAt: Date.now() + HOTEL_CONFIG_CACHE_TTL_MS });
+    return config;
+}
+
+function getStaticHotelConfig(hotelId) {
     const config = hotelConfig[hotelId];
     if (!config) {
         throw new Error(`Hotel configuration not found for: ${hotelId}`);
     }
-    return config;
-};
+    return normalizeHotelConfig({ id: hotelId, ...config, source: 'static' });
+}
 
-const resolveHotelConfig = (hotelId) => {
+async function resolveHotelConfig(hotelId) {
+    const dbConfig = await getDbHotelConfig(hotelId);
+    if (dbConfig) return dbConfig;
     try {
-        return getHotelConfig(hotelId);
+        return getStaticHotelConfig(hotelId);
     } catch (err) {
         if (!ALLOW_MANUAL_AVAILABILITY_FALLBACK) throw err;
-        return {
+        return normalizeHotelConfig({
+            id: hotelId || 'unknown',
             pms: 'manual',
             roomIDMapping: {},
-        };
+            source: 'fallback',
+        });
     }
-};
+}
 
 // Legacy mapping for backwards compatibility (will be removed)
 const roomIDMapping = hotelConfig['suite-stay'].roomIDMapping;
@@ -662,7 +710,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         }
 
         // Create booking in PMS with "Pay at Hotel" status
-        const config = getHotelConfig(hotelId);
+        const config = await resolveHotelConfig(hotelId);
 
         // BookingCenter pay-later: we still save a booking (guarantee/verification handled by $1 hold on Stripe)
         if (config.pms === 'bookingcenter') {
@@ -1017,7 +1065,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
             console.log('⚠️ Frontend booking record not found. Creating backup booking...');
 
             // Get hotel config for this booking
-            const config = getHotelConfig(hotelId);
+            const config = await resolveHotelConfig(hotelId);
             
             // Only process Cloudbeds hotels in webhook backup (BookingCenter will be added later)
             if (config.pms !== 'cloudbeds') {
@@ -1109,7 +1157,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
 
 // Cloudbeds availability handler
 async function getCloudbedsAvailability(hotelId, checkin, checkout) {
-    const config = getHotelConfig(hotelId);
+    const config = await resolveHotelConfig(hotelId);
     const nights = Math.round((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24));
     const ratePlanType = getBestRatePlan(nights);
 
@@ -1417,7 +1465,7 @@ function extractBcErrors(otaResponse) {
 
 // BookingCenter availability handler (SOAP/XML)
 async function getBookingCenterAvailability(hotelId, checkin, checkout) {
-    const config = getHotelConfig(hotelId);
+    const config = await resolveHotelConfig(hotelId);
     if (!config.siteId || !config.sitePassword) {
         throw new Error(`Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}`);
     }
@@ -1512,7 +1560,7 @@ app.post('/api/availability', async (req, res) => {
     const { hotelId, checkin, checkout } = req.body;
     
     try {
-        const config = resolveHotelConfig(hotelId);
+        const config = await resolveHotelConfig(hotelId);
         let availableRooms;
 
         if (config.pms === 'cloudbeds') {
@@ -1535,7 +1583,7 @@ app.post('/api/availability', async (req, res) => {
 
 // Cloudbeds booking handler
 async function createCloudbedsBooking(hotelId, bookingDetails, guestInfo) {
-    const config = getHotelConfig(hotelId);
+    const config = await resolveHotelConfig(hotelId);
     const isTrial = bookingDetails.bookingType === 'trial';
     let rateIDToUse = bookingDetails.rateID;
 
@@ -1605,7 +1653,7 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     // Jason: don't use CASH.
     const receiptType = isReserve ? 'TERM' : 'PP';
 
-    const config = getHotelConfig(hotelId);
+    const config = await resolveHotelConfig(hotelId);
     if (!config.siteId || !config.sitePassword) {
         return { success: false, message: `Missing BookingCenter siteId/sitePassword for hotelId=${hotelId}` };
     }
@@ -1749,7 +1797,7 @@ app.post('/api/book', async (req, res) => {
     }
 
     try {
-        const config = resolveHotelConfig(hotelId);
+        const config = await resolveHotelConfig(hotelId);
         let pmsResponse;
 
         if (config.pms === 'cloudbeds') {
@@ -1969,16 +2017,369 @@ app.get('/health', async (req, res) => {
 // --- Front Desk CRM ---
 const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
 const CRM_PASSWORD_ALT = process.env.CRM_PASSWORD_ALT || '2026';
+const DEFAULT_CRM_HOTEL_ID = (process.env.HOTEL_ID || 'guest-lodge-minot').trim();
+const CRM_TOKEN_HOTELS_JSON = process.env.CRM_TOKEN_HOTELS || process.env.CRM_PIN_HOTEL_MAP || '';
+const ADMIN_TOKEN = (process.env.ADMIN_TOKEN || process.env.CRM_ADMIN_TOKEN || '').trim();
 
-const crmAuth = (req, res, next) => {
+function toHotelList(value) {
+    if (Array.isArray(value)) {
+        return value.map(v => String(v || '').trim()).filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return [];
+        return trimmed.split(',').map(v => v.trim()).filter(Boolean);
+    }
+    return [];
+}
+
+function buildCrmTokenHotelMap() {
+    const map = {};
+
+    if (CRM_TOKEN_HOTELS_JSON) {
+        try {
+            const parsed = JSON.parse(CRM_TOKEN_HOTELS_JSON);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                for (const [token, hotels] of Object.entries(parsed)) {
+                    const cleanToken = String(token || '').trim();
+                    if (!cleanToken) continue;
+                    const list = toHotelList(hotels);
+                    if (list.length) map[cleanToken] = list;
+                }
+            }
+        } catch (e) {
+            console.error('Invalid CRM_TOKEN_HOTELS/CRM_PIN_HOTEL_MAP JSON. Falling back to legacy PIN config.');
+        }
+    }
+
+    // Backward compatible fallback: existing PINs scoped to one default hotel.
+    if (!Object.keys(map).length) {
+        const fallbackPins = [CRM_PASSWORD, CRM_PASSWORD_ALT].map(v => String(v || '').trim()).filter(Boolean);
+        for (const pin of fallbackPins) {
+            map[pin] = [DEFAULT_CRM_HOTEL_ID];
+        }
+    }
+
+    return map;
+}
+
+const CRM_TOKEN_HOTELS_MAP = buildCrmTokenHotelMap();
+
+function hashCrmPin(pin) {
+    return crypto.createHash('sha256').update(String(pin || '').trim()).digest('hex');
+}
+
+async function getDbAllowedHotelsForToken(token) {
+    if (!token || !prisma.crmPin) return [];
+    const pinHash = hashCrmPin(token);
+    const rows = await withRetry(() => prisma.crmPin.findMany({
+        where: { pinHash, active: true, hotel: { active: true } },
+        select: { hotelId: true },
+    }));
+    return [...new Set(rows.map(r => String(r.hotelId || '').trim()).filter(Boolean))];
+}
+
+function getRequestedCrmHotelId(req) {
+    const queryHotel = String(req.query?.hotelId || '').trim();
+    const bodyHotel = String(req.body?.hotelId || '').trim();
+    return queryHotel || bodyHotel || req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
+}
+
+function resolveScopedHotelId(req, { allowFallback = true } = {}) {
+    const requested = getRequestedCrmHotelId(req);
+    const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
+    if (!allowed.length) return null;
+    if (requested && allowed.includes(requested)) return requested;
+    return allowFallback ? allowed[0] : null;
+}
+
+function requireScopedHotelId(req, res) {
+    const requested = getRequestedCrmHotelId(req);
+    const hotelId = resolveScopedHotelId(req, { allowFallback: false });
+    if (hotelId) return hotelId;
+    res.status(403).json({
+        success: false,
+        message: requested
+            ? `Unauthorized hotel context: ${requested}`
+            : 'Missing authorized hotel context.',
+    });
+    return null;
+}
+
+function getAllowedHotelFilter(req) {
+    const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
+    return { in: allowed.length ? allowed : [DEFAULT_CRM_HOTEL_ID] };
+}
+
+const crmAuth = async (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
-    const allowedPins = new Set([
-        (CRM_PASSWORD || '').toString().trim(),
-        (CRM_PASSWORD_ALT || '').toString().trim(),
-    ].filter(Boolean));
-    if (!token || !allowedPins.has(token)) return res.status(401).json({ error: 'Unauthorized' });
+    const dbAllowedHotels = await getDbAllowedHotelsForToken(token).catch(() => []);
+    const allowedHotels = dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []);
+    if (!token || !allowedHotels?.length) return res.status(401).json({ error: 'Unauthorized' });
+    req.crmToken = token;
+    req.crmAllowedHotels = allowedHotels;
+    req.crmDefaultHotelId = allowedHotels[0];
     next();
 };
+
+const adminAuth = (req, res, next) => {
+    if (!ADMIN_TOKEN) {
+        return res.status(503).json({ success: false, message: 'Admin API is disabled. Set ADMIN_TOKEN.' });
+    }
+    const token = String(req.headers['x-admin-token'] || '').trim();
+    if (!token || token !== ADMIN_TOKEN) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    next();
+};
+
+function normalizePmsType(value) {
+    const pms = String(value || '').trim().toLowerCase();
+    if (!['manual', 'cloudbeds', 'bookingcenter'].includes(pms)) {
+        throw new Error(`Invalid PMS type: ${value}`);
+    }
+    return pms;
+}
+
+function normalizeDomain(value) {
+    return String(value || '').trim().toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '');
+}
+
+function normalizeDomainList(domains = [], primaryDomain = '') {
+    const out = new Set();
+    for (const d of domains) {
+        const clean = normalizeDomain(d);
+        if (clean) out.add(clean);
+    }
+    const primary = normalizeDomain(primaryDomain);
+    if (primary) out.add(primary);
+    return { list: [...out], primary };
+}
+
+function sanitizeConfigForResponse(cfg) {
+    if (!cfg) return null;
+    return {
+        id: cfg.id,
+        name: cfg.name || cfg.id,
+        pms: cfg.pms,
+        propertyId: cfg.propertyId || null,
+        siteId: cfg.siteId || null,
+        chainCode: cfg.chainCode || null,
+        roomIDMapping: cfg.roomIDMapping || {},
+        source: cfg.source || 'unknown',
+    };
+}
+
+async function resolveHotelIdFromDomain(domain) {
+    const clean = normalizeDomain(domain);
+    if (!clean || !prisma.hotelDomain) return null;
+    const row = await withRetry(() => prisma.hotelDomain.findUnique({
+        where: { domain: clean },
+        select: { hotelId: true, hotel: { select: { active: true } } },
+    }));
+    if (!row || !row.hotel?.active) return null;
+    return row.hotelId;
+}
+
+app.get('/api/hotel-context', async (req, res) => {
+    try {
+        const explicitHotelId = String(req.query.hotelId || '').trim();
+        const requestedDomain =
+            String(req.query.domain || '').trim() ||
+            String((req.headers['x-forwarded-host'] || '').split(',')[0] || '').trim() ||
+            String(req.hostname || '').trim();
+
+        let hotelId = explicitHotelId;
+        if (!hotelId) {
+            hotelId = await resolveHotelIdFromDomain(requestedDomain);
+        }
+        if (!hotelId) hotelId = DEFAULT_CRM_HOTEL_ID;
+
+        const config = await resolveHotelConfig(hotelId);
+        const manualRooms = (config.pms === 'manual' && prisma.manualRoom)
+            ? await withRetry(() => prisma.manualRoom.findMany({
+                where: { hotelId },
+                orderBy: { name: 'asc' },
+                select: { name: true, totalUnits: true },
+            }))
+            : [];
+
+        res.json({
+            success: true,
+            data: {
+                hotelId,
+                domain: normalizeDomain(requestedDomain),
+                config: sanitizeConfigForResponse(config),
+                manualRooms,
+            },
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.get('/api/admin/hotels', adminAuth, async (req, res) => {
+    try {
+        if (!prisma.hotelConfig) {
+            return res.status(503).json({ success: false, message: 'HotelConfig model unavailable. Run Prisma migrate/generate.' });
+        }
+
+        const hotels = await withRetry(() => prisma.hotelConfig.findMany({
+            include: {
+                domains: { orderBy: { domain: 'asc' } },
+                _count: { select: { crmPins: true } },
+            },
+            orderBy: { id: 'asc' },
+        }));
+
+        res.json({
+            success: true,
+            data: hotels.map(h => ({
+                id: h.id,
+                name: h.name || h.id,
+                pms: h.pms,
+                active: h.active,
+                propertyId: h.propertyId,
+                siteId: h.siteId,
+                chainCode: h.chainCode,
+                roomIDMapping: h.roomIDMapping || {},
+                domains: (h.domains || []).map(d => d.domain),
+                primaryDomain: (h.domains || []).find(d => d.isPrimary)?.domain || null,
+                crmPinCount: h._count?.crmPins || 0,
+                updatedAt: h.updatedAt,
+            })),
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/admin/hotels', adminAuth, async (req, res) => {
+    try {
+        if (!prisma.hotelConfig) {
+            return res.status(503).json({ success: false, message: 'HotelConfig model unavailable. Run Prisma migrate/generate.' });
+        }
+
+        const hotelId = String(req.body?.hotelId || req.body?.id || '').trim();
+        if (!hotelId) return res.status(400).json({ success: false, message: 'hotelId is required.' });
+
+        const pms = normalizePmsType(req.body?.pms || 'manual');
+        const { list: domains, primary: primaryDomain } = normalizeDomainList(req.body?.domains || [], req.body?.primaryDomain || '');
+        const roomIDMapping = (req.body?.roomIDMapping && typeof req.body.roomIDMapping === 'object' && !Array.isArray(req.body.roomIDMapping))
+            ? req.body.roomIDMapping
+            : {};
+
+        const active = req.body?.active !== false;
+        const name = String(req.body?.name || hotelId).trim();
+        const propertyId = req.body?.propertyId ? String(req.body.propertyId).trim() : null;
+        const siteId = req.body?.siteId ? String(req.body.siteId).trim() : null;
+        const sitePassword = req.body?.sitePassword ? String(req.body.sitePassword) : null;
+        const chainCode = req.body?.chainCode ? String(req.body.chainCode).trim() : null;
+
+        await withRetry(() => prisma.$transaction(async (tx) => {
+            await tx.hotelConfig.upsert({
+                where: { id: hotelId },
+                update: { name, pms, active, propertyId, siteId, sitePassword, chainCode, roomIDMapping },
+                create: { id: hotelId, name, pms, active, propertyId, siteId, sitePassword, chainCode, roomIDMapping },
+            });
+
+            await tx.hotelDomain.deleteMany({ where: { hotelId } });
+            if (domains.length) {
+                await tx.hotelDomain.createMany({
+                    data: domains.map(domain => ({
+                        hotelId,
+                        domain,
+                        isPrimary: primaryDomain ? domain === primaryDomain : false,
+                    })),
+                });
+            }
+
+            const seedRooms = Array.isArray(req.body?.seedManualRooms) ? req.body.seedManualRooms : [];
+            if (pms === 'manual' && seedRooms.length && tx.manualRoom) {
+                for (const r of seedRooms) {
+                    const roomName = String(r?.name || '').trim();
+                    if (!roomName) continue;
+                    const totalUnits = Math.max(0, parseInt(r?.totalUnits, 10) || 0);
+                    await tx.manualRoom.upsert({
+                        where: { hotelId_name: { hotelId, name: roomName } },
+                        update: { totalUnits },
+                        create: { hotelId, name: roomName, totalUnits },
+                    });
+                }
+            }
+        }));
+
+        hotelConfigCache.delete(hotelId);
+        const config = await resolveHotelConfig(hotelId);
+        res.json({ success: true, data: sanitizeConfigForResponse(config), hotelId, domains });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.get('/api/admin/hotels/:hotelId/pins', adminAuth, async (req, res) => {
+    try {
+        if (!prisma.crmPin) {
+            return res.status(503).json({ success: false, message: 'CrmPin model unavailable. Run Prisma migrate/generate.' });
+        }
+        const hotelId = String(req.params.hotelId || '').trim();
+        const pins = await withRetry(() => prisma.crmPin.findMany({
+            where: { hotelId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, label: true, active: true, createdAt: true, updatedAt: true },
+        }));
+        res.json({ success: true, data: pins });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/admin/hotels/:hotelId/pins', adminAuth, async (req, res) => {
+    try {
+        if (!prisma.crmPin) {
+            return res.status(503).json({ success: false, message: 'CrmPin model unavailable. Run Prisma migrate/generate.' });
+        }
+        const hotelId = String(req.params.hotelId || '').trim();
+        const pin = String(req.body?.pin || '').trim();
+        const label = String(req.body?.label || '').trim() || null;
+        if (!hotelId || !pin) {
+            return res.status(400).json({ success: false, message: 'hotelId and pin are required.' });
+        }
+
+        const pinHash = hashCrmPin(pin);
+        await withRetry(() => prisma.crmPin.upsert({
+            where: { hotelId_pinHash: { hotelId, pinHash } },
+            update: { label, active: req.body?.active !== false },
+            create: { hotelId, pinHash, label, active: req.body?.active !== false },
+        }));
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.patch('/api/admin/hotels/:hotelId/pins/:pinId', adminAuth, async (req, res) => {
+    try {
+        if (!prisma.crmPin) {
+            return res.status(503).json({ success: false, message: 'CrmPin model unavailable. Run Prisma migrate/generate.' });
+        }
+        const hotelId = String(req.params.hotelId || '').trim();
+        const pinId = String(req.params.pinId || '').trim();
+        const data = {};
+        if (req.body?.label !== undefined) data.label = String(req.body.label || '').trim() || null;
+        if (req.body?.active !== undefined) data.active = !!req.body.active;
+        const updated = await withRetry(() => prisma.crmPin.updateMany({
+            where: { id: pinId, hotelId },
+            data,
+        }));
+        if (!updated.count) return res.status(404).json({ success: false, message: 'PIN not found' });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
 
 // PWA push: public VAPID key for subscription
 app.get('/api/push/vapid-public', (req, res) => {
@@ -2156,6 +2557,12 @@ app.get('/simple-crm', (req, res) => {
 app.post('/api/crm/bookings/:id/confirm', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
+        const bookingMatch = await withRetry(() => prisma.booking.findFirst({
+            where: { id, hotelId: getAllowedHotelFilter(req) },
+            select: { id: true },
+        }));
+        if (!bookingMatch) return res.status(404).json({ error: 'Booking not found' });
+
         const booking = await prisma.booking.update({
             where: { id },
             data: { 
@@ -2180,6 +2587,12 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
             return res.status(400).json({ error: 'Note is required' });
         }
         
+        const bookingMatch = await withRetry(() => prisma.booking.findFirst({
+            where: { id, hotelId: getAllowedHotelFilter(req) },
+            select: { id: true },
+        }));
+        if (!bookingMatch) return res.status(404).json({ error: 'Booking not found' });
+
         const booking = await prisma.booking.update({
             where: { id },
             data: { 
@@ -2196,9 +2609,10 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
 // Add dummy bookings (for testing)
 app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     try {
+        const hotelId = req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
         const dummyBookings = [
             {
-                hotelId: 'suite-stay',
+                hotelId,
                 guestFirstName: 'John',
                 guestLastName: 'Smith',
                 guestEmail: 'john.smith@example.com',
@@ -2217,7 +2631,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 callStatus: 'not-called',
             },
             {
-                hotelId: 'suite-stay',
+                hotelId,
                 guestFirstName: 'Sarah',
                 guestLastName: 'Johnson',
                 guestEmail: 'sarah.j@example.com',
@@ -2236,7 +2650,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 callStatus: 'not-called',
             },
             {
-                hotelId: 'suite-stay',
+                hotelId,
                 guestFirstName: 'Michael',
                 guestLastName: 'Chen',
                 guestEmail: 'mchen@example.com',
@@ -2255,7 +2669,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 callStatus: 'not-called',
             },
             {
-                hotelId: 'suite-stay',
+                hotelId,
                 guestFirstName: 'Emily',
                 guestLastName: 'Rodriguez',
                 guestEmail: 'emily.r@example.com',
@@ -2501,12 +2915,17 @@ app.get('/analytics', (req, res) => {
 
 // Verify PIN only (no DB) - helps debug auth vs DB issues
 app.get('/api/crm/verify', crmAuth, (req, res) => {
-    res.json({ success: true });
+    res.json({
+        success: true,
+        hotelId: req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID,
+        allowedHotels: req.crmAllowedHotels || [],
+    });
 });
 
 app.get('/api/crm/manual-availability', crmAuth, async (req, res) => {
     try {
-        const hotelId = String(req.query.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot').trim();
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const rooms = await getManualRooms(hotelId);
         const payload = formatManualAvailabilityPayload(rooms);
         res.json({ success: true, data: payload });
@@ -2518,7 +2937,8 @@ app.get('/api/crm/manual-availability', crmAuth, async (req, res) => {
 
 app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
     try {
-        const hotelId = String(req.body?.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot').trim();
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const roomName = String(req.body?.roomName || '').trim();
         const totalUnits = Math.max(0, parseInt(req.body?.totalUnits, 10) || 0);
 
@@ -2543,7 +2963,8 @@ app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
 
 app.post('/api/crm/manual-availability/range', crmAuth, async (req, res) => {
     try {
-        const hotelId = String(req.body?.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot').trim();
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const roomName = String(req.body?.roomName || '').trim();
         const startDate = normalizeIsoDate(req.body?.startDate);
         const endDate = normalizeIsoDate(req.body?.endDate);
@@ -2601,10 +3022,13 @@ app.post('/api/crm/manual-availability/range', crmAuth, async (req, res) => {
 // Get bookings for CRM - last 7 days + all future
 app.get('/api/crm/bookings', crmAuth, async (req, res) => {
     try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         // Get regular bookings
         const bookings = await withRetry(() => prisma.booking.findMany({
             orderBy: { checkinDate: 'asc' },
             where: {
+                hotelId,
                 checkinDate: {
                     gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
                 }
@@ -2615,6 +3039,7 @@ app.get('/api/crm/bookings', crmAuth, async (req, res) => {
         const declinedLeads = await withRetry(() => prisma.paymentDeclinedLead.findMany({
             orderBy: { createdAt: 'desc' },
             where: {
+                hotelId,
                 called: false // Only show uncalled declined leads
             }
         }));
@@ -2678,7 +3103,8 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
 
         const crypto = require('crypto');
         const ourReservationCode = `MANUAL-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-        const hotelId = body.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot';
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
 
         const booking = await withRetry(() => prisma.booking.create({
             data: {
@@ -2716,6 +3142,12 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
 app.post('/api/crm/update', crmAuth, async (req, res) => {
     try {
         const { id, crmStage, callStatus, notes, callLog } = req.body;
+        const bookingMatch = await withRetry(() => prisma.booking.findFirst({
+            where: { id, hotelId: getAllowedHotelFilter(req) },
+            select: { id: true },
+        }));
+        if (!bookingMatch) return res.status(404).json({ success: false, message: 'Booking not found' });
+
         const data = {};
         if (crmStage !== undefined) data.crmStage = crmStage;
         if (callStatus !== undefined) data.callStatus = callStatus;
@@ -2732,9 +3164,11 @@ app.post('/api/crm/update', crmAuth, async (req, res) => {
 // Get payment declined leads
 app.get('/api/crm/payment-declined', crmAuth, async (req, res) => {
     try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const leads = await withRetry(() => prisma.paymentDeclinedLead.findMany({
             orderBy: { createdAt: 'desc' },
-            where: { called: false }
+            where: { hotelId, called: false }
         }));
         res.json({ success: true, data: leads });
     } catch (e) {
@@ -2747,6 +3181,12 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { called, notes } = req.body;
+        const leadMatch = await withRetry(() => prisma.paymentDeclinedLead.findFirst({
+            where: { id, hotelId: getAllowedHotelFilter(req) },
+            select: { id: true },
+        }));
+        if (!leadMatch) return res.status(404).json({ success: false, message: 'Lead not found' });
+
         const data = {};
         if (called !== undefined) data.called = !!called;
         if (notes !== undefined) data.notes = notes;
@@ -2761,6 +3201,12 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
 app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
+        const bookingMatch = await withRetry(() => prisma.booking.findFirst({
+            where: { id, hotelId: getAllowedHotelFilter(req) },
+            select: { id: true },
+        }));
+        if (!bookingMatch) return res.status(404).json({ success: false, message: 'Booking not found or already deleted.' });
+
         await withRetry(() => prisma.booking.delete({ where: { id } }));
         res.json({ success: true });
     } catch (e) {
