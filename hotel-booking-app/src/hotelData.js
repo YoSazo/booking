@@ -30,7 +30,7 @@
       },
     ],
     rooms: [
-  { id: 1, name: 'King Room', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
+  { id: 1, name: 'King room', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
     'kingbedsuitestay.webp',
     'doublesuitestay2.webp',
     'doublesuitestay3.webp',
@@ -45,7 +45,7 @@
       
 
 
-  { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
+  { id: 2, name: 'Queen Room', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
     'doublesuitestay.webp',
     'doublesuitestay2.webp',
     'doublesuitestay3.webp',
