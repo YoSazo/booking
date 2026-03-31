@@ -137,23 +137,25 @@ function BookingPage({
           )}
         </main>
 
-        <footer className="powered-by-marketel-footer" aria-label="Powered by Marketel">
-          <div className="powered-by-marketel">
-            <span className="powered-by-marketel-text">Powered by</span>
-            <img
-              className="powered-by-marketel-wordmark"
-              src="/marketel.svg"
-              alt="Marketel"
-              loading="lazy"
-            />
-            <img
-              className="powered-by-marketel-icon"
-              src="/marketellogo.svg"
-              alt="Marketel logo"
-              loading="lazy"
-            />
-          </div>
-        </footer>
+        {!isLoading && (
+          <footer className="powered-by-marketel-footer" aria-label="Powered by Marketel">
+            <div className="powered-by-marketel">
+              <span className="powered-by-marketel-text">Powered by</span>
+              <img
+                className="powered-by-marketel-wordmark"
+                src="/marketel.svg"
+                alt="Marketel"
+                loading="lazy"
+              />
+              <img
+                className="powered-by-marketel-icon"
+                src="/marketellogo.svg"
+                alt="Marketel logo"
+                loading="lazy"
+              />
+            </div>
+          </footer>
+        )}
       </div>
     </>
   );
