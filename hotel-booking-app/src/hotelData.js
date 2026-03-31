@@ -6,7 +6,7 @@ export const hotelData = {
     subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
     address: '1937 N Broadway, Minot, ND 58703',
     phone: '(701) 289-5992',
-    pms: 'bookingcenter',
+    pms: 'manual',
     propertyCode: 'Dont know yet',
     // NEW: Hotel-specific rates
     rates: {
@@ -241,8 +241,4 @@ export const hotelData = {
         ] },
     ]
   },
-
-
-
 };
-

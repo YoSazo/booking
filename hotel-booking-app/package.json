@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "scaffold:hotel": "node scripts/scaffold-hotel.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^4.0.2",

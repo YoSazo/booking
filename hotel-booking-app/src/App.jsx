@@ -16,7 +16,20 @@ const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 
 
 const hotelId = getHotelId();
-const currentHotel = hotelData[hotelId];
+const currentHotel = hotelData[hotelId] || {
+  name: `Click Inns (${hotelId})`,
+  url: '',
+  subtitle: 'No deposits. No leases. No credit checks.',
+  phone: '',
+  address: '',
+  pms: 'manual',
+  rates: {
+    NIGHTLY: 69,
+    WEEKLY: 299,
+    MONTHLY: 999,
+  },
+  rooms: [],
+};
 
 // (document title is set inside App() via a useEffect hook)
 const RATES = currentHotel.rates;
@@ -147,9 +160,9 @@ function App() {
       return;
     }
 
-    // Only Cloudbeds and BookingCenter support live availability
+    // PMS types with server-backed live availability
     const pms = (currentHotel.pms || '').toLowerCase();
-    if (pms !== 'cloudbeds' && pms !== 'bookingcenter') {
+    if (pms !== 'cloudbeds' && pms !== 'bookingcenter' && pms !== 'manual') {
       setAvailableRooms(currentHotel.rooms);
       return;
     }
@@ -214,9 +227,31 @@ function App() {
               };
             }
 
+            if (pms === 'manual') {
+              const apiRoom = result.data.find(r => r.roomName === staticRoom.name);
+              return apiRoom ? { ...staticRoom, ...apiRoom } : null;
+            }
+
             return null;
           })
           .filter(Boolean);
+
+        if (pms === 'manual' && mergedRooms.length === 0 && Array.isArray(result.data) && result.data.length > 0) {
+          const genericRooms = result.data.map((apiRoom, idx) => ({
+            id: idx + 1,
+            name: apiRoom.roomName,
+            roomName: apiRoom.roomName,
+            amenities: 'Free WiFi • TV • Free Parking',
+            description: 'Comfortable room available for your selected dates.',
+            maxOccupancy: 4,
+            imageUrls: ['/logo.jpg'],
+            imageUrl: '/logo.jpg',
+            ...apiRoom,
+          }));
+          setAvailableRooms(genericRooms);
+          setIsLoading(false);
+          return;
+        }
 
         setAvailableRooms(mergedRooms);
       } else {
@@ -391,8 +426,8 @@ const handleConfirmBooking = async (bookingDetails) => {
     const pms = (currentHotel.pms || '').toLowerCase();
 
     // For PMS types we don't support yet, fall back to local confirmation.
-    // Cloudbeds and BookingCenter both support /api/book.
-    if (pms !== 'cloudbeds' && pms !== 'bookingcenter') {
+    // Cloudbeds, BookingCenter, and Manual support /api/book.
+    if (pms !== 'cloudbeds' && pms !== 'bookingcenter' && pms !== 'manual') {
       const newReservationCode = generateReservationCode();
       setGuestInfo(formData);
       setReservationCode(newReservationCode);

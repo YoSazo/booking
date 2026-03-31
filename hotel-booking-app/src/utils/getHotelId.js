@@ -37,7 +37,7 @@ const pathMap = {
 
 /**
  * Determines the hotel ID from the current URL
- * Priority: 1) URL path, 2) Domain/subdomain, 3) Env var fallback, 4) Default
+ * Priority: 1) URL query (?hotelId=), 2) URL path, 3) Domain/subdomain, 4) Env var fallback, 5) Default
  */
 export function getHotelId() {
   // Check if we're in a browser environment
@@ -47,6 +47,11 @@ export function getHotelId() {
 
   const hostname = window.location.hostname;
   const pathname = window.location.pathname;
+  const queryHotelId = new URLSearchParams(window.location.search).get('hotelId');
+
+  if (queryHotelId && queryHotelId.trim()) {
+    return queryHotelId.trim();
+  }
 
   // First, check path-based routing (e.g., /suite-stay/...)
   for (const [path, hotelId] of Object.entries(pathMap)) {
