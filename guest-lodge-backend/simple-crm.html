@@ -744,7 +744,10 @@
         padding: 4px;
         overflow: visible;
       }
-      .tabs-slider { display: none; }
+      .tabs-slider {
+        top: 4px;
+        height: calc(100% - 8px);
+      }
       .card-inner { padding: 12px 14px; }
       .contact-phone { font-size: 15px; }
       .guest-name { font-size: 20px; }
@@ -1190,9 +1193,15 @@ function setFilter(filter, btn) {
 
 function moveSlider(activeTab) {
   const slider = document.getElementById('tabsSlider');
-  if (!slider || !activeTab) return;
-  slider.style.width = activeTab.offsetWidth + 'px';
-  slider.style.transform = `translateX(${activeTab.offsetLeft - 5}px)`;
+  const tabs = activeTab ? activeTab.closest('.tabs-container') : null;
+  if (!slider || !activeTab || !tabs) return;
+
+  const tabRect = activeTab.getBoundingClientRect();
+  const tabsRect = tabs.getBoundingClientRect();
+  const left = (tabRect.left - tabsRect.left) + tabs.scrollLeft;
+
+  slider.style.width = `${Math.round(tabRect.width)}px`;
+  slider.style.transform = `translateX(${Math.round(left)}px)`;
 }
 
 // Call on load to position slider under the default active tab
@@ -1200,6 +1209,19 @@ document.addEventListener('DOMContentLoaded', () => {
   ensureAvailabilityUi();
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
+
+  const tabs = document.querySelector('.tabs-container');
+  if (tabs) {
+    tabs.addEventListener('scroll', () => {
+      const current = document.querySelector('.tab.active');
+      if (current) moveSlider(current);
+    }, { passive: true });
+  }
+
+  window.addEventListener('resize', () => {
+    const current = document.querySelector('.tab.active');
+    if (current) moveSlider(current);
+  });
 });
 
 function applyFilter() {
