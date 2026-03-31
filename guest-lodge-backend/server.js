@@ -1,6 +1,5 @@
 require('dotenv').config();
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -260,8 +259,6 @@ const getBestRatePlan = (nights) => {
     return 'nightly';
 };
 
-const MANUAL_AVAILABILITY_FILE = path.join(__dirname, 'manual-availability.json');
-
 function normalizeIsoDate(value) {
     if (!value) return null;
     const d = new Date(value);
@@ -286,67 +283,6 @@ function enumerateDatesInclusive(startIso, endIso, maxDays = 180) {
     return out;
 }
 
-function sanitizeManualAvailability(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const roomsSrc = Array.isArray(src.rooms) ? src.rooms : [];
-    const overridesSrc = src.overrides && typeof src.overrides === 'object' ? src.overrides : {};
-
-    const seen = new Set();
-    const rooms = [];
-    for (const item of roomsSrc) {
-        const name = String(item?.name || '').trim();
-        if (!name) continue;
-        const key = name.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const totalUnits = Math.max(0, parseInt(item?.totalUnits, 10) || 0);
-        rooms.push({ name, totalUnits });
-    }
-
-    const overrides = {};
-    for (const [k, v] of Object.entries(overridesSrc)) {
-        if (!k || typeof v !== 'object' || v === null) continue;
-        const [roomNameRaw, dateRaw] = k.split('|');
-        const roomName = String(roomNameRaw || '').trim();
-        const date = normalizeIsoDate(dateRaw);
-        if (!roomName || !date) continue;
-
-        const hasAvail = v.availableUnits !== undefined && v.availableUnits !== null && v.availableUnits !== '';
-        const availableUnits = hasAvail ? Math.max(0, parseInt(v.availableUnits, 10) || 0) : null;
-        const closed = !!v.closed;
-
-        if (!closed && availableUnits === null) continue;
-        overrides[`${roomName}|${date}`] = {
-            availableUnits,
-            closed,
-            updatedAt: v.updatedAt || new Date().toISOString(),
-        };
-    }
-
-    rooms.sort((a, b) => a.name.localeCompare(b.name));
-    return { rooms, overrides };
-}
-
-function loadManualAvailability() {
-    try {
-        if (!fs.existsSync(MANUAL_AVAILABILITY_FILE)) {
-            return { rooms: [], overrides: {} };
-        }
-        const raw = fs.readFileSync(MANUAL_AVAILABILITY_FILE, 'utf8');
-        if (!raw.trim()) return { rooms: [], overrides: {} };
-        return sanitizeManualAvailability(JSON.parse(raw));
-    } catch (e) {
-        console.error('Manual availability load failed:', e.message);
-        return { rooms: [], overrides: {} };
-    }
-}
-
-function saveManualAvailability(store) {
-    const safe = sanitizeManualAvailability(store);
-    fs.writeFileSync(MANUAL_AVAILABILITY_FILE, JSON.stringify(safe, null, 2), 'utf8');
-    return safe;
-}
-
 function slugifyText(value) {
     return String(value || '')
         .toLowerCase()
@@ -355,14 +291,36 @@ function slugifyText(value) {
         .slice(0, 80);
 }
 
-async function getManualAvailability(checkin, checkout) {
+function formatManualAvailabilityPayload(rooms) {
+    const overrides = {};
+    for (const room of rooms) {
+        for (const ov of room.overrides || []) {
+            overrides[`${room.name}|${ov.date}`] = {
+                availableUnits: ov.availableUnits,
+                closed: ov.closed,
+                updatedAt: ov.updatedAt,
+            };
+        }
+    }
+
+    return {
+        rooms: rooms.map(r => ({ name: r.name, totalUnits: r.totalUnits })),
+        overrides,
+    };
+}
+
+async function getManualRooms(hotelId) {
+    return withRetry(() => prisma.manualRoom.findMany({
+        where: { hotelId },
+        include: { overrides: true },
+        orderBy: { name: 'asc' },
+    }));
+}
+
+async function getManualAvailability(hotelId, checkin, checkout) {
     const start = normalizeIsoDate(checkin);
     const end = normalizeIsoDate(checkout);
     if (!start || !end || end <= start) return [];
-
-    const store = loadManualAvailability();
-    const rooms = Array.isArray(store.rooms) ? store.rooms : [];
-    if (!rooms.length) return [];
 
     const checkinDate = new Date(`${start}T00:00:00.000Z`);
     const checkoutDate = new Date(`${end}T00:00:00.000Z`);
@@ -373,8 +331,19 @@ async function getManualAvailability(checkin, checkout) {
     );
     if (!stayDates.length) return [];
 
+    const rooms = await withRetry(() => prisma.manualRoom.findMany({
+        where: { hotelId },
+        include: {
+            overrides: {
+                where: { date: { in: stayDates } },
+            },
+        },
+    }));
+    if (!rooms.length) return [];
+
     const overlapping = await withRetry(() => prisma.booking.findMany({
         where: {
+            hotelId,
             checkinDate: { lt: checkoutDate },
             checkoutDate: { gt: checkinDate },
         },
@@ -408,18 +377,18 @@ async function getManualAvailability(checkin, checkout) {
         const roomName = String(room.name || '').trim();
         const totalUnits = Math.max(0, parseInt(room.totalUnits, 10) || 0);
         if (!roomName || totalUnits <= 0) continue;
+        const overrideMap = Object.fromEntries((room.overrides || []).map(ov => [ov.date, ov]));
 
         let minAvailable = Number.POSITIVE_INFINITY;
         for (const day of stayDates) {
-            const key = `${roomName}|${day}`;
-            const override = store.overrides[key];
-            const booked = bookedCounts[key] || 0;
+            const override = overrideMap[day];
+            const booked = bookedCounts[`${roomName}|${day}`] || 0;
 
             let availableForDay;
             if (override?.closed) {
                 availableForDay = 0;
-            } else if (override && override.availableUnits !== null && override.availableUnits !== undefined && override.availableUnits !== '') {
-                availableForDay = Math.max(0, parseInt(override.availableUnits, 10) || 0);
+            } else if (override && override.availableUnits !== null) {
+                availableForDay = Math.max(0, override.availableUnits);
             } else {
                 availableForDay = Math.max(0, totalUnits - booked);
             }
@@ -1545,7 +1514,7 @@ app.post('/api/availability', async (req, res) => {
         } else if (config.pms === 'bookingcenter') {
             availableRooms = await getBookingCenterAvailability(hotelId, checkin, checkout);
         } else if (config.pms === 'manual') {
-            availableRooms = await getManualAvailability(checkin, checkout);
+            availableRooms = await getManualAvailability(hotelId, checkin, checkout);
         } else {
             return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
         }
@@ -2529,17 +2498,20 @@ app.get('/api/crm/verify', crmAuth, (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/crm/manual-availability', crmAuth, (req, res) => {
+app.get('/api/crm/manual-availability', crmAuth, async (req, res) => {
     try {
-        const store = loadManualAvailability();
-        res.json({ success: true, data: store });
+        const hotelId = String(req.query.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot').trim();
+        const rooms = await getManualRooms(hotelId);
+        const payload = formatManualAvailabilityPayload(rooms);
+        res.json({ success: true, data: payload });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
 });
 
-app.post('/api/crm/manual-availability/rooms', crmAuth, (req, res) => {
+app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
     try {
+        const hotelId = String(req.body?.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot').trim();
         const roomName = String(req.body?.roomName || '').trim();
         const totalUnits = Math.max(0, parseInt(req.body?.totalUnits, 10) || 0);
 
@@ -2547,23 +2519,23 @@ app.post('/api/crm/manual-availability/rooms', crmAuth, (req, res) => {
             return res.status(400).json({ success: false, message: 'roomName is required.' });
         }
 
-        const store = loadManualAvailability();
-        const idx = store.rooms.findIndex(r => r.name.toLowerCase() === roomName.toLowerCase());
-        if (idx >= 0) {
-            store.rooms[idx] = { ...store.rooms[idx], name: roomName, totalUnits };
-        } else {
-            store.rooms.push({ name: roomName, totalUnits });
-        }
+        await withRetry(() => prisma.manualRoom.upsert({
+            where: { hotelId_name: { hotelId, name: roomName } },
+            update: { totalUnits },
+            create: { hotelId, name: roomName, totalUnits },
+        }));
 
-        const saved = saveManualAvailability(store);
-        res.json({ success: true, data: saved });
+        const rooms = await getManualRooms(hotelId);
+        const payload = formatManualAvailabilityPayload(rooms);
+        res.json({ success: true, data: payload });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
 });
 
-app.post('/api/crm/manual-availability/range', crmAuth, (req, res) => {
+app.post('/api/crm/manual-availability/range', crmAuth, async (req, res) => {
     try {
+        const hotelId = String(req.body?.hotelId || process.env.HOTEL_ID || 'guest-lodge-minot').trim();
         const roomName = String(req.body?.roomName || '').trim();
         const startDate = normalizeIsoDate(req.body?.startDate);
         const endDate = normalizeIsoDate(req.body?.endDate);
@@ -2579,38 +2551,39 @@ app.post('/api/crm/manual-availability/range', crmAuth, (req, res) => {
             return res.status(400).json({ success: false, message: 'startDate and endDate are required.' });
         }
 
+        const room = await withRetry(() => prisma.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId, name: roomName } },
+        }));
+        if (!room) {
+            return res.status(400).json({ success: false, message: 'Room type not found. Add room first.' });
+        }
+
         const dates = enumerateDatesInclusive(startDate, endDate, 180);
         if (!dates.length) {
             return res.status(400).json({ success: false, message: 'Invalid date range.' });
         }
 
-        const store = loadManualAvailability();
-        const roomExists = store.rooms.some(r => r.name.toLowerCase() === roomName.toLowerCase());
-        if (!roomExists) {
-            return res.status(400).json({ success: false, message: 'Room type not found. Add room first.' });
+        if (clear) {
+            await withRetry(() => prisma.manualOverride.deleteMany({
+                where: { roomId: room.id, date: { in: dates } },
+            }));
+        } else if (!closed && !hasAvail) {
+            await withRetry(() => prisma.manualOverride.deleteMany({
+                where: { roomId: room.id, date: { in: dates } },
+            }));
+        } else {
+            await withRetry(() => prisma.$transaction(
+                dates.map(date => prisma.manualOverride.upsert({
+                    where: { roomId_date: { roomId: room.id, date } },
+                    update: { availableUnits, closed },
+                    create: { roomId: room.id, date, availableUnits, closed },
+                }))
+            ));
         }
 
-        for (const day of dates) {
-            const key = `${roomName}|${day}`;
-            if (clear) {
-                delete store.overrides[key];
-                continue;
-            }
-
-            if (!closed && !hasAvail) {
-                delete store.overrides[key];
-                continue;
-            }
-
-            store.overrides[key] = {
-                availableUnits,
-                closed,
-                updatedAt: new Date().toISOString(),
-            };
-        }
-
-        const saved = saveManualAvailability(store);
-        res.json({ success: true, data: saved, affectedDays: dates.length });
+        const rooms = await getManualRooms(hotelId);
+        const payload = formatManualAvailabilityPayload(rooms);
+        res.json({ success: true, data: payload, affectedDays: dates.length });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

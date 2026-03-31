@@ -91,3 +91,28 @@ model PushSubscription {
   auth      String
   source    String?  // 'funnel' | 'crm'
 }
+
+model ManualRoom {
+  id         String   @id @default(cuid())
+  hotelId    String
+  name       String
+  totalUnits Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  overrides  ManualOverride[]
+
+  @@unique([hotelId, name])
+}
+
+model ManualOverride {
+  id             String     @id @default(cuid())
+  room           ManualRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId         String
+  date           String
+  availableUnits Int?
+  closed         Boolean    @default(false)
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([roomId, date])
+}

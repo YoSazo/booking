@@ -86,8 +86,13 @@
       border-radius: 16px;
       padding: 5px;
       position: relative;
-      width: fit-content;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
     }
+    .tabs-container::-webkit-scrollbar { display: none; }
 
     .tabs-slider {
       position: absolute;
@@ -577,6 +582,14 @@
       gap: 8px;
       margin-bottom: 8px;
     }
+    .range-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .range-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
     .range-input {
       width: 100%;
       border: 1.5px solid var(--border);
@@ -607,6 +620,7 @@
       color: var(--text-muted);
       margin-top: 4px;
     }
+    .range-toggle input { margin: 0; }
 
     .rooms-modal-bg {
       display: none;
@@ -728,6 +742,18 @@
       .guest-name { font-size: 20px; }
       .card-amount { font-size: 20px; }
       .date-value { font-size: 15px; }
+      .tab { padding: 9px 14px; font-size: 13px; }
+      .availability-card { padding: 12px; }
+      .cal-grid { gap: 4px; }
+      .cal-day { min-height: 48px; border-radius: 9px; }
+      .day-num { font-size: 12px; margin-bottom: 2px; }
+      .day-avail { font-size: 10px; }
+      .range-grid { grid-template-columns: 1fr; gap: 10px; }
+      .range-label { font-size: 10px; }
+      .range-input { min-height: 44px; padding: 11px 12px; font-size: 15px; }
+      .range-toggle { font-size: 13px; margin-top: 6px; }
+      .range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .range-btn { width: 100%; min-height: 42px; font-size: 13px; }
     }
   </style>
 </head>
@@ -891,9 +917,18 @@ function ensureAvailabilityUi() {
             <div class="availability-title">Quick Range Update</div>
             <div class="availability-help" id="availabilityActiveRoomLabel">Select a room type first.</div>
             <div class="range-grid">
-              <input id="availabilityRangeStart" class="range-input" type="date">
-              <input id="availabilityRangeEnd" class="range-input" type="date">
-              <input id="availabilityRangeUnits" class="range-input" type="number" min="0" step="1" placeholder="Available units">
+              <label class="range-field">
+                <span class="range-label">Start Date</span>
+                <input id="availabilityRangeStart" class="range-input" type="date">
+              </label>
+              <label class="range-field">
+                <span class="range-label">End Date</span>
+                <input id="availabilityRangeEnd" class="range-input" type="date">
+              </label>
+              <label class="range-field">
+                <span class="range-label">Available Units (Optional)</span>
+                <input id="availabilityRangeUnits" class="range-input" type="number" min="0" step="1" placeholder="Leave blank to keep current units">
+              </label>
             </div>
             <label class="range-toggle">
               <input id="availabilityRangeClosed" type="checkbox">
