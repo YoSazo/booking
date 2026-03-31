@@ -73,7 +73,12 @@ const getExternalId = () => {
 
 // --- 2. UPDATE THE sendEventToServer FUNCTION ---
 
-const TRACKING_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/track`;
+const TRACKING_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
+    typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:3001'
+        : ''
+);
+const TRACKING_ENDPOINT = `${TRACKING_API_BASE_URL}/api/track`;
 
 const sendEventToServer = (eventName, payload) => {
     // Try multiple sources for fbc
