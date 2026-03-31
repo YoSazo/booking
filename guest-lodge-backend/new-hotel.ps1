@@ -2,6 +2,16 @@ param(
   [string]$BaseUrl = "https://guest-lodge-backend.onrender.com",
   [string]$AdminToken = "",
   [string]$HotelDataPath = "C:\Users\samat\BOOKING\hotel-booking-app\src\hotelData.js",
+  [string]$HotelId = "",
+  [string]$HotelName = "",
+  [string]$Pms = "",
+  [string]$Domains = "",
+  [string]$PrimaryDomain = "",
+  [string]$Pin = "",
+  [string]$PinLabel = "Owner",
+  [string]$PhoneForFrontend = "",
+  [string]$AddressForFrontend = "",
+  [switch]$NonInteractive,
   [switch]$DryRun,
   [switch]$PrintStarterBlock
 )
@@ -10,6 +20,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function Read-Required([string]$Prompt, [string]$Default = "") {
+  if ($NonInteractive -and -not $Default) {
+    throw "Missing required value for: $Prompt"
+  }
   while ($true) {
     $label = if ($Default) { "$Prompt [$Default]" } else { $Prompt }
     $value = Read-Host $label
@@ -139,6 +152,25 @@ function Invoke-AdminPost([string]$Url, [string]$Token, [hashtable]$Body, [switc
   return Invoke-RestMethod -Method Post -Uri $Url -Headers $headers -Body $json
 }
 
+function Test-AdminToken([string]$Base, [string]$Token, [switch]$DryRunMode) {
+  if ($DryRunMode) {
+    Write-Host "[DRY RUN] Skipping admin token validation call." -ForegroundColor Cyan
+    return
+  }
+
+  $url = "$($Base.TrimEnd('/'))/api/admin/hotels"
+  $headers = @{ "x-admin-token" = $Token }
+  try {
+    $null = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+  } catch {
+    $resp = $_.Exception.Response
+    if ($resp -and $resp.StatusCode) {
+      throw "Admin token validation failed ($([int]$resp.StatusCode)) against $url"
+    }
+    throw "Admin token validation failed against ${url}: $($_.Exception.Message)"
+  }
+}
+
 $base = $BaseUrl.TrimEnd('/')
 if ([string]::IsNullOrWhiteSpace($AdminToken)) {
   $AdminToken = $env:ADMIN_TOKEN
@@ -147,30 +179,41 @@ if ([string]::IsNullOrWhiteSpace($AdminToken)) {
   $AdminToken = Read-Required "Admin token (x-admin-token)"
 }
 
+Write-Host "Validating admin token..." -ForegroundColor Green
+Test-AdminToken -Base $base -Token $AdminToken -DryRunMode:$DryRun
+Write-Host "Admin token is valid." -ForegroundColor Green
+
 Write-Host ""
 Write-Host "=== New Hotel Onboarding ===" -ForegroundColor Green
 
-$hotelId = Read-Required "hotelId (example: east-grand-inn)"
-$hotelName = Read-Optional "Hotel name" $hotelId
+$hotelId = if (-not [string]::IsNullOrWhiteSpace($HotelId)) { $HotelId.Trim() } else { Read-Required "hotelId (example: east-grand-inn)" }
+$hotelName = if (-not [string]::IsNullOrWhiteSpace($HotelName)) { $HotelName.Trim() } else { Read-Optional "Hotel name" $hotelId }
 
-$pms = ""
+$pms = if (-not [string]::IsNullOrWhiteSpace($Pms)) { $Pms.Trim().ToLower() } else { "" }
 while ($true) {
-  $pms = (Read-Optional "PMS type: manual | cloudbeds | bookingcenter" "manual").ToLower()
+  if ([string]::IsNullOrWhiteSpace($pms)) {
+    $pms = (Read-Optional "PMS type: manual | cloudbeds | bookingcenter" "manual").ToLower()
+  }
   if (@("manual", "cloudbeds", "bookingcenter") -contains $pms) { break }
   Write-Host "PMS must be one of: manual, cloudbeds, bookingcenter." -ForegroundColor Yellow
+  if ($NonInteractive) { throw "Invalid PMS type provided: $pms" }
+  $pms = ""
 }
 
-$domainsRaw = Read-Optional "Domains (comma-separated, optional)"
-$domains = Parse-DomainList $domainsRaw
-$primaryDomain = ""
-if ($domains.Count -gt 0) {
-  $primaryDomain = Normalize-Domain (Read-Optional "Primary domain" $domains[0])
+$domainsRaw = if (-not [string]::IsNullOrWhiteSpace($Domains)) { $Domains.Trim() } else { Read-Optional "Domains (comma-separated, optional)" }
+$domains = @(Parse-DomainList $domainsRaw)
+$domainCount = @($domains).Length
+$primaryDomain = if (-not [string]::IsNullOrWhiteSpace($PrimaryDomain)) { Normalize-Domain $PrimaryDomain } else { "" }
+if ($domainCount -gt 0) {
+  if ([string]::IsNullOrWhiteSpace($primaryDomain)) {
+    $primaryDomain = Normalize-Domain (Read-Optional "Primary domain" $domains[0])
+  }
 }
 
-$pin = Read-Required "Front desk PIN"
-$pinLabel = Read-Optional "PIN label" "Owner"
-$phoneForFrontend = Read-Optional "Hotel phone for frontend (optional)"
-$addressForFrontend = Read-Optional "Hotel address for frontend (optional)"
+$pin = if (-not [string]::IsNullOrWhiteSpace($Pin)) { $Pin.Trim() } else { Read-Required "Front desk PIN" }
+$pinLabel = if (-not [string]::IsNullOrWhiteSpace($PinLabel)) { $PinLabel.Trim() } else { Read-Optional "PIN label" "Owner" }
+$phoneForFrontend = if (-not [string]::IsNullOrWhiteSpace($PhoneForFrontend)) { $PhoneForFrontend.Trim() } else { Read-Optional "Hotel phone for frontend (optional)" }
+$addressForFrontend = if (-not [string]::IsNullOrWhiteSpace($AddressForFrontend)) { $AddressForFrontend.Trim() } else { Read-Optional "Hotel address for frontend (optional)" }
 
 $hotelBody = @{
   hotelId = $hotelId
@@ -179,7 +222,7 @@ $hotelBody = @{
   active = $true
 }
 
-if ($domains.Count -gt 0) { $hotelBody.domains = $domains }
+if ($domainCount -gt 0) { $hotelBody.domains = @($domains) }
 if (-not [string]::IsNullOrWhiteSpace($primaryDomain)) { $hotelBody.primaryDomain = $primaryDomain }
 
 if ($pms -eq "cloudbeds") {
