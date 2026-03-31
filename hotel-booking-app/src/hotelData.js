@@ -30,7 +30,7 @@
       },
     ],
     rooms: [
-      { id: 1, name: 'Deluxe Single King', amenities: 'Free WiFi â€¢ 30" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg', imageUrls: [
+      { id: 1, name: 'King room', amenities: 'Free WiFi â€¢ 30" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: '/KING-BED.jpg', imageUrls: [
             '/kingbedbart.jpg',
             'https://placehold.co/400x400/667280/ffffff?text=King+Bathroom',
             'https://placehold.co/400x400/7989a1/ffffff?text=Workstation',
@@ -39,7 +39,7 @@
       
 
 
-      { id: 2, name: 'Deluxe Double Queen', amenities: 'Free WiFi â€¢ 30" TV â€¢ Workstation â€¢ Fridge â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg', imageUrls: [
+      { id: 2, name: 'Queen Room', amenities: 'Free WiFi â€¢ 30" TV â€¢ Workstation â€¢ Fridge â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: '/QWEEN-BED.jpg', imageUrls: [
             '/kingbedbart.jpg',
             'https://placehold.co/400x400/667280/ffffff?text=King+Bathroom',
             'https://placehold.co/400x400/7989a1/ffffff?text=Workstation',
