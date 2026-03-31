@@ -2,7 +2,7 @@
   // --- First Hotel ---
   'guest-lodge-minot': {
     name: 'Guest Lodge Minot',
-    url: 'https://booking-c4cmh236x-salahs-projects-5e29a7eb.vercel.app/',
+    url: 'booking-kappa-nine.vercel.app',
     subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
     address: '1937 N Broadway, Minot, ND 58703',
     phone: '(701) 289-5992',
