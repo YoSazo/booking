@@ -102,6 +102,8 @@ const corsOptions = {
         if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
         // Allow any Render deployment (*.onrender.com)
         if (origin.endsWith('.onrender.com')) return callback(null, true);
+        // Allow Vercel preview/production domains used by frontend deployments
+        if (origin.endsWith('.vercel.app')) return callback(null, true);
         callback(new Error('Not allowed by CORS'));
     }
 };
