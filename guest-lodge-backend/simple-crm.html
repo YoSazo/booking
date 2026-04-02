@@ -764,6 +764,7 @@
       }
       .tabs-slider {
         top: 4px;
+        left: 4px;
         height: calc(100% - 8px);
       }
       .card-inner { padding: 12px 14px; }
@@ -1275,7 +1276,11 @@ function moveSlider(activeTab) {
 
   const tabRect = activeTab.getBoundingClientRect();
   const tabsRect = tabs.getBoundingClientRect();
-  const left = (tabRect.left - tabsRect.left) + tabs.scrollLeft;
+  const cs = getComputedStyle(tabs);
+  const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
+  const padLeft = parseFloat(cs.paddingLeft) || 0;
+  // Slider is `left: Npx` from the padding edge; delta from border box must subtract border + padding.
+  const left = tabRect.left - tabsRect.left + tabs.scrollLeft - borderLeft - padLeft;
 
   slider.style.width = `${Math.round(tabRect.width)}px`;
   slider.style.transform = `translateX(${Math.round(left)}px)`;
