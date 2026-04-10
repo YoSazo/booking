@@ -11,6 +11,7 @@
     "scaffold:hotel": "node scripts/scaffold-hotel.mjs"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.8",
     "@stripe/react-stripe-js": "^4.0.2",
     "@stripe/stripe-js": "^7.9.0",
     "@vercel/analytics": "^1.4.1",
