@@ -2602,15 +2602,13 @@ padding: 6px 16px;
 }
 
 .apple-pay-logo {
-  height: 50px; /* Larger size for Apple Pay logo */
+  height: 42px; /* Adjusted size to keep buttons from getting too vertical */
   width: auto;
-  margin: -14px 0; /* Keeps the tab button from stretching too tall vertically */
 }
 
 @media (max-width: 480px) {
   .apple-pay-logo {
-    height: 60px; /* Increased size on phone */
-    margin: -19px 0; /* Maintain original tab box height visually */
+    height: 48px; /* Slightly larger on phone, but fits container */
   }
 }
 
