@@ -749,6 +749,141 @@
     }
 
     /* ── RESPONSIVE ── */
+    .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
+    .revenue-wrap { display: flex; flex-direction: column; gap: 12px; }
+    .revenue-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .revenue-period-btn {
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .revenue-period-btn:hover { border-color: var(--green); color: var(--green); }
+    .revenue-period-btn.active {
+      background: var(--green);
+      border-color: var(--green);
+      color: white;
+    }
+    .revenue-range-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .revenue-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .revenue-card,
+    .revenue-list-card {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .revenue-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .revenue-value {
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 7px;
+    }
+    .revenue-delta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      min-height: 18px;
+    }
+    .revenue-delta.up { color: var(--green); }
+    .revenue-delta.down { color: var(--red); }
+    .revenue-delta-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      background: currentColor;
+    }
+    .revenue-bottom-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .revenue-list-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    .revenue-room-row,
+    .revenue-stat-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .revenue-room-row:last-child,
+    .revenue-stat-row:last-child { border-bottom: none; }
+    .revenue-room-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .revenue-room-name,
+    .revenue-stat-key {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .revenue-room-name { font-weight: 600; }
+    .revenue-stat-key { color: var(--text-muted); }
+    .revenue-room-bar {
+      width: 64px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--bg);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .revenue-room-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--green);
+    }
+    .revenue-room-value,
+    .revenue-stat-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      flex-shrink: 0;
+    }
+    .revenue-empty-inline {
+      font-size: 13px;
+      color: var(--text-muted);
+      padding: 6px 0 2px;
+    }
+
     @media (max-width: 600px) {
       .header { padding: 6px 12px; }
       .header-right { gap: 6px; }
@@ -757,7 +892,7 @@
       .container { padding: 16px 12px; }
       .tabs-container {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
         gap: 4px;
         padding: 4px;
         overflow: visible;
@@ -785,6 +920,9 @@
       .range-toggle { font-size: 13px; margin-top: 6px; }
       .range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .range-btn { width: 100%; min-height: 42px; font-size: 13px; }
+      .revenue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .revenue-bottom-grid { grid-template-columns: 1fr; }
+      .revenue-value { font-size: 20px; }
     }
   </style>
 </head>
@@ -817,7 +955,7 @@
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn" onclick="addDummyBookings()">➕ Test Bookings</button>
       <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notifications</button>
-      <button class="refresh-btn" onclick="loadBookings()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
     </div>
   </header>
 
@@ -867,6 +1005,13 @@ let availabilityYear = new Date().getFullYear();
 let availabilityMonth = new Date().getMonth();
 let availabilityEditingDay = '';
 let editingRoomName = '';
+let currentHotelPms = '';
+let revenueEnabled = false;
+let revenuePeriod = '30d';
+let revenueCache = {};
+let revenueLoading = false;
+let revenueError = '';
+const REVENUE_ROOM_COLORS = ['#2E7D5B', '#4CAF7D', '#8BC4AA', '#C8EDD9', '#5A9E7D'];
 const CRM_HOTEL_BY_HOST = {
   'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
   'stcroix.clickinns.com': 'st-croix-wisconsin',
@@ -929,6 +1074,259 @@ const AVAIL_MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+function pctChange(currentValue, previousValue) {
+  const current = Number(currentValue || 0);
+  const previous = Number(previousValue);
+  if (!Number.isFinite(previous) || previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+function formatCurrencyCompact(value) {
+  const amount = Number(value || 0);
+  const abs = Math.abs(amount);
+  if (abs >= 1000) {
+    const compact = (amount / 1000).toFixed(abs >= 100000 ? 0 : 1).replace(/\.0$/, '');
+    return `$${compact}k`;
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatPercent(value) {
+  const num = Number(value || 0);
+  return `${Math.round(num * 10) / 10}%`;
+}
+
+function updateRevenuePeriodButtons() {
+  document.querySelectorAll('.revenue-period-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.period === revenuePeriod);
+  });
+}
+
+function syncRevenueUi() {
+  const existingBtn = document.getElementById('revenueTabBtn');
+  const existingView = document.getElementById('revenueView');
+
+  if (!revenueEnabled) {
+    if (existingBtn) existingBtn.remove();
+    if (existingView) existingView.remove();
+    if (currentFilter === 'revenue') currentFilter = 'needs-call';
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab) moveSlider(activeTab);
+    return;
+  }
+
+  const tabs = document.querySelector('.tabs-container');
+  if (tabs && !existingBtn) {
+    const btn = document.createElement('button');
+    btn.className = 'tab';
+    btn.id = 'revenueTabBtn';
+    btn.setAttribute('type', 'button');
+    btn.textContent = 'Revenue';
+    btn.onclick = function () { setFilter('revenue', btn); };
+    tabs.appendChild(btn);
+  }
+
+  const container = document.querySelector('.container');
+  if (container && !existingView) {
+    container.insertAdjacentHTML('beforeend', `
+      <div id="revenueView" class="revenue-view" style="display:none">
+        <div class="revenue-wrap">
+          <div class="revenue-toolbar">
+            <button class="revenue-period-btn" data-period="7d" onclick="setRevenuePeriod('7d', this)">7 days</button>
+            <button class="revenue-period-btn active" data-period="30d" onclick="setRevenuePeriod('30d', this)">30 days</button>
+            <button class="revenue-period-btn" data-period="90d" onclick="setRevenuePeriod('90d', this)">90 days</button>
+            <button class="revenue-period-btn" data-period="all" onclick="setRevenuePeriod('all', this)">All time</button>
+          </div>
+          <div id="revenueRangeNote" class="revenue-range-note">Stay-date revenue</div>
+          <div id="revenueStatus"></div>
+          <div id="revenueContent" style="display:none">
+            <div class="revenue-grid">
+              <div class="revenue-card">
+                <div class="revenue-label">Revenue</div>
+                <div class="revenue-value" id="revenueKpiRev">$0</div>
+                <div class="revenue-delta" id="revenueKpiRevDelta"></div>
+              </div>
+              <div class="revenue-card">
+                <div class="revenue-label">Bookings</div>
+                <div class="revenue-value" id="revenueKpiBookings">0</div>
+                <div class="revenue-delta" id="revenueKpiBookingsDelta"></div>
+              </div>
+              <div class="revenue-card">
+                <div class="revenue-label">Avg. stay value</div>
+                <div class="revenue-value" id="revenueKpiAvg">$0</div>
+                <div class="revenue-delta" id="revenueKpiAvgDelta"></div>
+              </div>
+            </div>
+            <div class="revenue-bottom-grid">
+              <div class="revenue-list-card">
+                <div class="revenue-list-title">By room type</div>
+                <div id="revenueRoomList"></div>
+              </div>
+              <div class="revenue-list-card">
+                <div class="revenue-list-title">Quick stats</div>
+                <div id="revenueQuickStats"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `);
+  }
+
+  updateRevenuePeriodButtons();
+  const activeTab = document.querySelector('.tab.active');
+  if (activeTab) moveSlider(activeTab);
+}
+
+function setRevenueDelta(id, currentValue, previousValue, emptyLabel = 'No prior period') {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const pct = pctChange(currentValue, previousValue);
+  if (pct === null) {
+    el.className = 'revenue-delta';
+    el.innerHTML = '<span class="revenue-delta-dot"></span>' + esc(emptyLabel);
+    return;
+  }
+
+  const up = pct >= 0;
+  el.className = `revenue-delta ${up ? 'up' : 'down'}`;
+  el.innerHTML = `<span class="revenue-delta-dot"></span>${up ? '+' : ''}${pct}% vs prior period`;
+}
+
+function renderRevenueRooms(rooms) {
+  const list = document.getElementById('revenueRoomList');
+  if (!list) return;
+
+  const items = Array.isArray(rooms) ? rooms : [];
+  const maxRev = items.reduce((max, room) => Math.max(max, Number(room.rev || 0)), 0);
+  if (!items.length || maxRev <= 0) {
+    list.innerHTML = '<div class="revenue-empty-inline">No room revenue yet for this period.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map((room, index) => {
+    const color = REVENUE_ROOM_COLORS[index % REVENUE_ROOM_COLORS.length];
+    const roomRevenue = Number(room.rev || 0);
+    const width = roomRevenue > 0 && maxRev > 0
+      ? Math.max(6, Math.round((roomRevenue / maxRev) * 100))
+      : 0;
+    return `
+      <div class="revenue-room-row">
+        <div class="revenue-room-dot" style="background:${color}"></div>
+        <div class="revenue-room-name">${esc(room.name || 'Room')}</div>
+        <div class="revenue-room-bar"><div class="revenue-room-bar-fill" style="width:${width}%;background:${color}"></div></div>
+        <div class="revenue-room-value">${esc(formatCurrencyCompact(room.rev))}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderRevenueStats(data) {
+  const statsEl = document.getElementById('revenueQuickStats');
+  if (!statsEl) return;
+
+  const stats = data && data.stats ? data.stats : {};
+  statsEl.innerHTML = `
+    <div class="revenue-stat-row"><span class="revenue-stat-key">Nights sold</span><span class="revenue-stat-value">${esc(String(stats.nights || 0))}</span></div>
+    <div class="revenue-stat-row"><span class="revenue-stat-key">Occupancy rate</span><span class="revenue-stat-value">${esc(formatPercent(stats.occupancyRate || 0))}</span></div>
+    <div class="revenue-stat-row"><span class="revenue-stat-key">Pay at hotel</span><span class="revenue-stat-value">${esc(String(stats.payLater || 0))} bookings</span></div>
+    <div class="revenue-stat-row"><span class="revenue-stat-key">Recovered declines</span><span class="revenue-stat-value">${esc(String(stats.recoveredDeclines || 0))}</span></div>
+    <div class="revenue-stat-row"><span class="revenue-stat-key">Revenue / booking</span><span class="revenue-stat-value">${esc(formatCurrencyCompact(data.avg || 0))}</span></div>
+  `;
+}
+
+function renderRevenueView() {
+  syncRevenueUi();
+  const view = document.getElementById('revenueView');
+  if (!view) return;
+
+  updateRevenuePeriodButtons();
+
+  const statusEl = document.getElementById('revenueStatus');
+  const contentEl = document.getElementById('revenueContent');
+  const noteEl = document.getElementById('revenueRangeNote');
+  const data = revenueCache[revenuePeriod] || null;
+
+  if (noteEl) {
+    noteEl.textContent = data && data.range && data.range.label
+      ? `Stay dates: ${data.range.label}`
+      : 'Stay-date revenue';
+  }
+
+  if (!data) {
+    if (contentEl) contentEl.style.display = 'none';
+    if (statusEl) {
+      if (revenueLoading) {
+        statusEl.innerHTML = '<div class="loading"><div class="spinner"></div> Loading revenue...</div>';
+      } else if (revenueError) {
+        statusEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">!</div>
+            <div class="empty-text">Could not load revenue</div>
+            <div class="empty-sub">${esc(revenueError)}</div>
+          </div>`;
+      } else {
+        statusEl.innerHTML = '';
+      }
+    }
+    return;
+  }
+
+  if (statusEl) statusEl.innerHTML = '';
+  if (contentEl) contentEl.style.display = 'block';
+
+  const revEl = document.getElementById('revenueKpiRev');
+  const bookingsEl = document.getElementById('revenueKpiBookings');
+  const avgEl = document.getElementById('revenueKpiAvg');
+  if (revEl) revEl.textContent = formatCurrencyCompact(data.rev);
+  if (bookingsEl) bookingsEl.textContent = String(data.bookings || 0);
+  if (avgEl) avgEl.textContent = formatCurrencyCompact(data.avg);
+
+  const noPriorLabel = revenuePeriod === 'all' ? 'All available data' : 'No prior period';
+  setRevenueDelta('revenueKpiRevDelta', data.rev, data.prevRev, noPriorLabel);
+  setRevenueDelta('revenueKpiBookingsDelta', data.bookings, data.prevBookings, noPriorLabel);
+  setRevenueDelta('revenueKpiAvgDelta', data.avg, data.prevAvg, noPriorLabel);
+  renderRevenueRooms(data.rooms);
+  renderRevenueStats(data);
+}
+
+async function loadRevenueData(force = false) {
+  if (!revenueEnabled) return;
+
+  const cached = revenueCache[revenuePeriod];
+  if (cached && !force) {
+    revenueError = '';
+    renderRevenueView();
+    return;
+  }
+
+  revenueLoading = true;
+  revenueError = '';
+  renderRevenueView();
+
+  try {
+    const data = await api('GET', `/api/crm/revenue?period=${encodeURIComponent(revenuePeriod)}`);
+    if (!data.success) throw new Error(data.message || 'Failed to load revenue');
+    revenueCache[revenuePeriod] = data.data || {};
+  } catch (e) {
+    revenueError = e.message || 'Failed to load revenue';
+  } finally {
+    revenueLoading = false;
+    renderRevenueView();
+  }
+}
+
+function setRevenuePeriod(period, btn) {
+  revenuePeriod = period;
+  if (btn) updateRevenuePeriodButtons();
+  loadRevenueData();
+}
 
 function ensureAvailabilityUi() {
   const tabs = document.querySelector('.tabs-container');
@@ -1098,6 +1496,33 @@ function bindAvailabilityUiEvents() {
 }
 
 // ── LOGIN ──────────────────────────────────────────────
+async function verifyCrmToken(pin) {
+  const res = await fetch(`/api/crm/verify?hotelId=${encodeURIComponent(activeHotelId)}`, {
+    headers: { 'x-crm-token': pin }
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || (res.status === 401 ? 'Wrong PIN' : 'Could not verify access'));
+  }
+  return json;
+}
+
+async function startCrmApp(verification) {
+  currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
+  revenueEnabled = !!(verification && verification.isManualPms);
+  revenueCache = {};
+  revenueLoading = false;
+  revenueError = '';
+  ensureAvailabilityUi();
+  syncRevenueUi();
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await Promise.allSettled([
+    loadManualAvailability(),
+    loadBookings(),
+  ]);
+}
+
 async function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   const err = document.getElementById('loginError');
@@ -1106,21 +1531,12 @@ async function doLogin() {
   
   // Verify PIN with server first
   try {
-    const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
-    const json = await res.json().catch(() => ({}));
-    if (res.ok && json.success) {
-      token = pin;
-      try { localStorage.setItem('crmToken', token); } catch(e) {}
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      ensureAvailabilityUi();
-      loadManualAvailability();
-      loadBookings();
-    } else {
-      err.textContent = 'Wrong PIN';
-    }
+    const verification = await verifyCrmToken(pin);
+    token = pin;
+    try { localStorage.setItem('crmToken', token); } catch(e) {}
+    await startCrmApp(verification);
   } catch (e) {
-    err.textContent = 'Connection failed';
+    err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : 'Connection failed';
   }
 }
 
@@ -1147,6 +1563,12 @@ function showLogin() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   token = '';
+  currentHotelPms = '';
+  revenueEnabled = false;
+  revenueCache = {};
+  revenueLoading = false;
+  revenueError = '';
+  syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
 }
 
@@ -1156,6 +1578,7 @@ async function loadBookings() {
     const data = await api('GET', '/api/crm/bookings');
     if (!data.success) throw new Error(data.message);
     bookings = data.data || [];
+    if (currentFilter !== 'revenue') revenueCache = {};
     
     // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
@@ -1171,10 +1594,21 @@ async function loadBookings() {
     document.getElementById('bookingsList').innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">⚠️</div>
-        <div class="empty-text">Could not load bookings</div>
-        <div class="empty-sub">${esc(e.message)}</div>
+      <div class="empty-text">Could not load bookings</div>
+      <div class="empty-sub">${esc(e.message)}</div>
       </div>`;
   }
+}
+
+async function refreshCurrentView() {
+  const tasks = [loadBookings()];
+  if (currentFilter === 'availability') {
+    tasks.push(loadManualAvailability());
+  }
+  if (currentFilter === 'revenue' && revenueEnabled) {
+    tasks.push(loadRevenueData(true));
+  }
+  await Promise.allSettled(tasks);
 }
 
 // ── RENDER ─────────────────────────────────────────────
@@ -1266,6 +1700,11 @@ function setFilter(filter, btn) {
     loadManualAvailability().then(applyFilter).catch(() => applyFilter());
     return;
   }
+  if (filter === 'revenue') {
+    applyFilter();
+    loadRevenueData();
+    return;
+  }
   applyFilter();
 }
 
@@ -1289,6 +1728,7 @@ function moveSlider(activeTab) {
 // Call on load to position slider under the default active tab
 document.addEventListener('DOMContentLoaded', () => {
   ensureAvailabilityUi();
+  syncRevenueUi();
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
 
@@ -1309,16 +1749,28 @@ document.addEventListener('DOMContentLoaded', () => {
 function applyFilter() {
   const bookingsEl = document.getElementById('bookingsList');
   const availabilityEl = document.getElementById('availabilityView');
+  const revenueEl = document.getElementById('revenueView');
 
   if (currentFilter === 'availability') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'flex';
+    if (revenueEl) revenueEl.style.display = 'none';
     renderAvailabilityView();
+    return;
+  }
+
+  if (currentFilter === 'revenue') {
+    if (bookingsEl) bookingsEl.style.display = 'none';
+    if (availabilityEl) availabilityEl.style.display = 'none';
+    if (revenueEl) revenueEl.style.display = 'flex';
+    closeAvailabilityDayPopover();
+    renderRevenueView();
     return;
   }
 
   if (bookingsEl) bookingsEl.style.display = '';
   if (availabilityEl) availabilityEl.style.display = 'none';
+  if (revenueEl) revenueEl.style.display = 'none';
   closeAvailabilityDayPopover();
   const filtered = currentFilter === 'needs-call' 
     ? bookings.filter(b => b.callStatus === 'not-called')
@@ -1911,8 +2363,9 @@ async function addDummyBookings() {
   try {
     const data = await api('POST', '/api/crm/add-dummy-bookings');
     if (data.success) {
+      revenueCache = {};
       toast(`Added ${data.count} test bookings`, 'success');
-      loadBookings();
+      refreshCurrentView();
     } else {
       toast('Failed to add test bookings', 'error');
     }
@@ -1982,14 +2435,12 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 if (token) {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  ensureAvailabilityUi();
-  loadManualAvailability();
-  loadBookings();
+  verifyCrmToken(token)
+    .then(startCrmApp)
+    .catch(() => showLogin());
 }
 
-setInterval(loadBookings, 30000);
+setInterval(refreshCurrentView, 30000);
 </script>
 </body>
 </html>

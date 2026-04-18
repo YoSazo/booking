@@ -130,6 +130,7 @@ app.set('trust proxy', true);
 const PORT = 3001;
 const CLOUDBEDS_API_KEY = process.env.CLOUDBEDS_API_KEY;
 const ALLOW_MANUAL_AVAILABILITY_FALLBACK = process.env.ALLOW_MANUAL_AVAILABILITY_FALLBACK === 'true';
+const REPORT_TIME_ZONE = process.env.REPORT_TIME_ZONE || 'America/Chicago';
 
 // BookingCenter (SOAP/XML) - use BCDEMO creds for test environment
 // Jeff: "You can only use BCDEMO in the TEST system"
@@ -341,6 +342,73 @@ function slugifyText(value) {
         .slice(0, 80);
 }
 
+function addDaysToIso(value, days) {
+    const iso = normalizeIsoDate(value);
+    if (!iso) return '';
+    const date = new Date(`${iso}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + Number(days || 0));
+    return date.toISOString().slice(0, 10);
+}
+
+function formatShortDateRange(startIso, endIso) {
+    const start = normalizeIsoDate(startIso);
+    const end = normalizeIsoDate(endIso);
+    if (!start || !end) return '';
+
+    const startDate = new Date(`${start}T12:00:00.000Z`);
+    const endDate = new Date(`${end}T12:00:00.000Z`);
+    const dateOptions = { month: 'short', day: 'numeric', timeZone: REPORT_TIME_ZONE };
+    const startLabel = startDate.toLocaleDateString('en-US', dateOptions);
+    const sameYear = startDate.getUTCFullYear() === endDate.getUTCFullYear();
+    const endLabel = endDate.toLocaleDateString('en-US', {
+        ...dateOptions,
+        ...(sameYear ? {} : { year: 'numeric' }),
+    });
+    return `${startLabel} - ${endLabel}`;
+}
+
+function roundMoney(value) {
+    return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function normalizeRevenueEmail(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function normalizeRevenuePhone(value) {
+    return String(value || '').replace(/\D+/g, '');
+}
+
+function normalizeRevenueRoom(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function buildRevenueRecoveryKeys(entry = {}) {
+    const roomName = normalizeRevenueRoom(entry.roomName);
+    const checkin = normalizeIsoDate(entry.checkinDate);
+    if (!roomName || !checkin) return [];
+
+    const keys = [];
+    const email = normalizeRevenueEmail(entry.guestEmail);
+    const phone = normalizeRevenuePhone(entry.guestPhone);
+
+    if (email) keys.push(`email|${email}|${roomName}|${checkin}`);
+    if (phone) keys.push(`phone|${phone}|${roomName}|${checkin}`);
+
+    return keys;
+}
+
+function getReportingTodayIso() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: REPORT_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(new Date());
+    const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${map.year}-${map.month}-${map.day}`;
+}
+
 function formatManualAvailabilityPayload(rooms) {
     const overrides = {};
     for (const room of rooms) {
@@ -475,6 +543,257 @@ async function createManualBooking(hotelId, bookingDetails) {
         reservationID: bookingDetails?.reservationCode || fallbackCode,
         provider: 'manual',
         hotelId,
+    };
+}
+
+const MANUAL_REVENUE_PERIODS = new Set(['7d', '30d', '90d', 'all']);
+
+function buildManualRevenueWindow(period, referenceIso, earliestIso = '') {
+    const endIso = normalizeIsoDate(referenceIso) || getReportingTodayIso();
+
+    if (period === 'all') {
+        const normalizedEarliest = normalizeIsoDate(earliestIso);
+        const startIso = normalizedEarliest && normalizedEarliest <= endIso ? normalizedEarliest : endIso;
+        return {
+            startIso,
+            endIso,
+            prevStartIso: '',
+            prevEndIso: '',
+        };
+    }
+
+    const spanDays = {
+        '7d': 7,
+        '30d': 30,
+        '90d': 90,
+    }[period];
+
+    if (!spanDays) {
+        throw new Error(`Unsupported revenue period: ${period}`);
+    }
+
+    const startIso = addDaysToIso(endIso, 1 - spanDays);
+    const prevEndIso = addDaysToIso(startIso, -1);
+    const prevStartIso = addDaysToIso(prevEndIso, 1 - spanDays);
+
+    return {
+        startIso,
+        endIso,
+        prevStartIso,
+        prevEndIso,
+    };
+}
+
+async function getEarliestManualRevenueStartIso(hotelId) {
+    const [firstBooking, firstRoom] = await Promise.all([
+        withRetry(() => prisma.booking.findFirst({
+            where: { hotelId },
+            orderBy: { checkinDate: 'asc' },
+            select: { checkinDate: true },
+        })),
+        prisma.manualRoom
+            ? withRetry(() => prisma.manualRoom.findFirst({
+                where: { hotelId },
+                orderBy: { createdAt: 'asc' },
+                select: { createdAt: true },
+            }))
+            : Promise.resolve(null),
+    ]);
+
+    const bookingStartIso = normalizeIsoDate(firstBooking?.checkinDate);
+    if (bookingStartIso) return bookingStartIso;
+
+    return normalizeIsoDate(firstRoom?.createdAt) || getReportingTodayIso();
+}
+
+async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
+    const start = normalizeIsoDate(startIso);
+    const end = normalizeIsoDate(endIso);
+    if (!start || !end || end < start) {
+        return {
+            rev: 0,
+            bookings: 0,
+            avg: 0,
+            rooms: [],
+            stats: {
+                nights: 0,
+                occupancyRate: 0,
+                payLater: 0,
+                recoveredDeclines: 0,
+                availableRoomNights: 0,
+            },
+        };
+    }
+
+    const periodDays = enumerateDatesInclusive(start, end, 5000);
+    const periodStartDate = new Date(`${start}T00:00:00.000Z`);
+    const periodEndExclusiveDate = new Date(`${addDaysToIso(end, 1)}T00:00:00.000Z`);
+
+    const [bookings, manualRooms, declinedLeads] = await Promise.all([
+        withRetry(() => prisma.booking.findMany({
+            where: {
+                hotelId,
+                checkinDate: { lt: periodEndExclusiveDate },
+                checkoutDate: { gt: periodStartDate },
+            },
+            select: {
+                id: true,
+                roomName: true,
+                checkinDate: true,
+                checkoutDate: true,
+                nights: true,
+                grandTotal: true,
+                bookingType: true,
+                guestEmail: true,
+                guestPhone: true,
+            },
+            orderBy: { checkinDate: 'asc' },
+        })),
+        prisma.manualRoom
+            ? withRetry(() => prisma.manualRoom.findMany({
+                where: { hotelId },
+                include: {
+                    overrides: {
+                        where: {
+                            date: {
+                                gte: start,
+                                lte: end,
+                            },
+                        },
+                    },
+                },
+                orderBy: { name: 'asc' },
+            }))
+            : Promise.resolve([]),
+        prisma.paymentDeclinedLead
+            ? withRetry(() => prisma.paymentDeclinedLead.findMany({
+                where: {
+                    hotelId,
+                    createdAt: { lt: periodEndExclusiveDate },
+                },
+                select: {
+                    guestEmail: true,
+                    guestPhone: true,
+                    roomName: true,
+                    checkinDate: true,
+                },
+            }))
+            : Promise.resolve([]),
+    ]);
+
+    const recoveredLeadKeys = new Set();
+    for (const lead of declinedLeads) {
+        for (const key of buildRevenueRecoveryKeys(lead)) {
+            recoveredLeadKeys.add(key);
+        }
+    }
+
+    const roomRevenue = {};
+    const bookedCounts = {};
+    let totalRevenue = 0;
+    let bookingCount = 0;
+    let nightsSold = 0;
+    let payLaterCount = 0;
+    let recoveredDeclines = 0;
+
+    for (const room of manualRooms) {
+        const roomName = String(room.name || '').trim();
+        if (roomName) roomRevenue[roomName] = 0;
+    }
+
+    for (const booking of bookings) {
+        const roomName = String(booking.roomName || '').trim() || 'Room';
+        const checkinIso = normalizeIsoDate(booking.checkinDate);
+        const checkoutIso = normalizeIsoDate(booking.checkoutDate);
+        if (!checkinIso || !checkoutIso || checkoutIso <= checkinIso) continue;
+
+        const stayEndIso = addDaysToIso(checkoutIso, -1);
+        if (!stayEndIso || stayEndIso < start || checkinIso > end) continue;
+
+        const overlapStartIso = checkinIso > start ? checkinIso : start;
+        const overlapEndIso = stayEndIso < end ? stayEndIso : end;
+        const overlapDays = enumerateDatesInclusive(overlapStartIso, overlapEndIso, 5000);
+        if (!overlapDays.length) continue;
+
+        const fullStayNights = Math.max(
+            1,
+            parseInt(booking.nights, 10)
+            || enumerateDatesInclusive(checkinIso, stayEndIso, 5000).length
+            || 1
+        );
+        const recognizedRevenue = (Number(booking.grandTotal) || 0) * (overlapDays.length / fullStayNights);
+
+        bookingCount += 1;
+        nightsSold += overlapDays.length;
+        totalRevenue += recognizedRevenue;
+        roomRevenue[roomName] = (roomRevenue[roomName] || 0) + recognizedRevenue;
+
+        const bookingType = String(booking.bookingType || '').trim().toLowerCase();
+        if (['paylater', 'reserve', 'manual'].includes(bookingType)) {
+            payLaterCount += 1;
+        }
+
+        const recoveryKeys = buildRevenueRecoveryKeys({
+            guestEmail: booking.guestEmail,
+            guestPhone: booking.guestPhone,
+            roomName,
+            checkinDate: checkinIso,
+        });
+        if (recoveryKeys.some(key => recoveredLeadKeys.has(key))) {
+            recoveredDeclines += 1;
+        }
+
+        for (const day of overlapDays) {
+            const key = `${roomName}|${day}`;
+            bookedCounts[key] = (bookedCounts[key] || 0) + 1;
+        }
+    }
+
+    let availableRoomNights = 0;
+
+    for (const room of manualRooms) {
+        const roomName = String(room.name || '').trim();
+        const totalUnits = Math.max(0, parseInt(room.totalUnits, 10) || 0);
+        if (!roomName) continue;
+
+        const overrideMap = Object.fromEntries((room.overrides || []).map(ov => [ov.date, ov]));
+
+        for (const day of periodDays) {
+            const booked = bookedCounts[`${roomName}|${day}`] || 0;
+            const override = overrideMap[day];
+
+            let sellableUnits = totalUnits;
+            if (override?.closed) {
+                sellableUnits = 0;
+            } else if (override && override.availableUnits !== null && override.availableUnits !== undefined) {
+                sellableUnits = Math.max(0, booked + (parseInt(override.availableUnits, 10) || 0));
+            }
+
+            availableRoomNights += sellableUnits;
+        }
+    }
+
+    const avgRevenue = bookingCount > 0 ? totalRevenue / bookingCount : 0;
+    const occupancyRate = availableRoomNights > 0
+        ? Math.min(100, (nightsSold / availableRoomNights) * 100)
+        : 0;
+
+    const rooms = Object.entries(roomRevenue)
+        .map(([name, rev]) => ({ name, rev: roundMoney(rev) }))
+        .sort((a, b) => b.rev - a.rev || a.name.localeCompare(b.name));
+
+    return {
+        rev: roundMoney(totalRevenue),
+        bookings: bookingCount,
+        avg: roundMoney(avgRevenue),
+        rooms,
+        stats: {
+            nights: nightsSold,
+            occupancyRate: Math.round(occupancyRate * 10) / 10,
+            payLater: payLaterCount,
+            recoveredDeclines,
+            availableRoomNights,
+        },
     };
 }
 
@@ -2916,12 +3235,78 @@ app.get('/analytics', (req, res) => {
 });
 
 // Verify PIN only (no DB) - helps debug auth vs DB issues
-app.get('/api/crm/verify', crmAuth, (req, res) => {
-    res.json({
-        success: true,
-        hotelId: req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID,
-        allowedHotels: req.crmAllowedHotels || [],
-    });
+app.get('/api/crm/verify', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const config = await resolveHotelConfig(hotelId);
+        res.json({
+            success: true,
+            hotelId,
+            allowedHotels: req.crmAllowedHotels || [],
+            pms: config.pms,
+            isManualPms: config.pms === 'manual',
+        });
+    } catch (e) {
+        console.error('crm:verify failed:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.get('/api/crm/revenue', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+
+        const config = await resolveHotelConfig(hotelId);
+        if (config.pms !== 'manual') {
+            return res.status(403).json({
+                success: false,
+                message: 'Revenue tab is available only for manual PMS hotels.',
+            });
+        }
+
+        const period = String(req.query?.period || '30d').trim().toLowerCase();
+        if (!MANUAL_REVENUE_PERIODS.has(period)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid revenue period. Use 7d, 30d, 90d, or all.',
+            });
+        }
+
+        const referenceIso = getReportingTodayIso();
+        const earliestIso = period === 'all'
+            ? await getEarliestManualRevenueStartIso(hotelId)
+            : referenceIso;
+        const window = buildManualRevenueWindow(period, referenceIso, earliestIso);
+        const current = await computeManualRevenueMetrics(hotelId, window.startIso, window.endIso);
+        const previous = (window.prevStartIso && window.prevEndIso)
+            ? await computeManualRevenueMetrics(hotelId, window.prevStartIso, window.prevEndIso)
+            : null;
+
+        res.json({
+            success: true,
+            data: {
+                period,
+                range: {
+                    start: window.startIso,
+                    end: window.endIso,
+                    label: formatShortDateRange(window.startIso, window.endIso),
+                },
+                rev: current.rev,
+                bookings: current.bookings,
+                avg: current.avg,
+                prevRev: previous ? previous.rev : null,
+                prevBookings: previous ? previous.bookings : null,
+                prevAvg: previous ? previous.avg : null,
+                rooms: current.rooms,
+                stats: current.stats,
+            },
+        });
+    } catch (e) {
+        console.error('crm:revenue failed:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 app.get('/api/crm/manual-availability', crmAuth, async (req, res) => {
