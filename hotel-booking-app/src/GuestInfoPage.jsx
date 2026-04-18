@@ -1782,10 +1782,11 @@ const handlePayLaterBooking = async (e) => {
     <>
       {walletType ? (
         // Show tabs only if wallet is available
-        <div className="payment-method-tabs" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="payment-method-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px', marginBottom: '20px' }}>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
+            style={{ padding: '12px 6px' }}
             onClick={() => {
               setPaymentMethod('card');
               setHasAttemptedSubmit(false);
@@ -1794,11 +1795,13 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
+            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> 
+            <span style={{ fontSize: '15px' }}>Card</span>
           </button>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'wallet' ? 'active' : ''}`} 
+            style={{ padding: '12px 6px' }}
             onClick={() => {
               setPaymentMethod('wallet');
               setHasAttemptedSubmit(false);
@@ -1807,12 +1810,12 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
-            {walletType}
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} style={{ margin: '0' }} />
           </button>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
+            style={{ padding: '12px 6px' }}
             onClick={() => {
               setPaymentMethod('klarna');
               setHasAttemptedSubmit(false);
@@ -1821,12 +1824,12 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '14px', width: 'auto' }} />
+            <img src="/klarna-badge.png" alt="Klarna" className="wallet-logo" style={{ height: '24px', width: 'auto', borderRadius: '4px' }} />
           </button>
         </div>
       ) : (
         // No native wallet, show Card and Klarna
-        <div className="payment-method-tabs">
+        <div className="payment-method-tabs" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
@@ -1838,7 +1841,8 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
+            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> 
+            <span style={{ fontSize: '15px' }}>Card</span>
           </button>
           <button 
             type="button" 
@@ -1851,7 +1855,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '14px', width: 'auto' }} />
+            <img src="/klarna-badge.png" alt="Klarna" className="wallet-logo" style={{ height: '24px', width: 'auto', borderRadius: '4px' }} />
           </button>
         </div>
       )}

@@ -74,7 +74,27 @@ function CheckoutReturnPage({ onComplete }) {
     }
     
     if (status === 'error') {
-        return <div style={{textAlign: 'center', padding: '50px'}}>There was an error with your payment. Please return to the booking page or contact us.</div>;
+        return (
+            <div style={{textAlign: 'center', padding: '50px', fontFamily: 'system-ui, sans-serif'}}>
+                <h2 style={{color: '#d32f2f', marginBottom: '16px'}}>Payment Incomplete</h2>
+                <p style={{marginBottom: '24px'}}>Your payment was not completed successfully. You may have cancelled the payment or there was an issue with the provider.</p>
+                <button 
+                    onClick={() => window.location.href = '/'} 
+                    style={{
+                        padding: '12px 24px', 
+                        backgroundColor: '#15803d', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        fontWeight: '600'
+                    }}
+                >
+                    Return to Booking
+                </button>
+            </div>
+        );
     }
 
     // Default loading state while we finalize
