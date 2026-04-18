@@ -2604,11 +2604,13 @@ padding: 6px 16px;
 .apple-pay-logo {
   height: 50px; /* Larger size for Apple Pay logo */
   width: auto;
+  margin: -14px 0; /* Keeps the tab button from stretching too tall vertically */
 }
 
 @media (max-width: 480px) {
   .apple-pay-logo {
     height: 60px; /* Increased size on phone */
+    margin: -19px 0; /* Maintain original tab box height visually */
   }
 }
 
@@ -2835,7 +2837,7 @@ padding: 6px 16px;
 /* You no longer need styles for .lock-text */
 
 .link-pay-logo{
-  height: 10px;
+  height: 15px; /* Sized to 15px according to user request */
 }
 
 /* =============================================== */
