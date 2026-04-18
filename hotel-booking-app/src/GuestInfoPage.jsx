@@ -2154,23 +2154,62 @@ const handlePayLaterBooking = async (e) => {
 
             {/* Klarna selected indicator */}
             {paymentMethod === 'klarna' && (
-              <div className="klarna-info-box" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '16px',
-                backgroundColor: '#FFF2F6',
-                border: '1px solid #FFCDE0',
-                borderRadius: '8px',
-                marginTop: '16px'
-              }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontWeight: '600', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    Pay in 4 interest-free payments
-                  </p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
-                    You will be redirected to Klarna to complete your payment securely.
-                  </p>
+              <div className="klarna-info-box" style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+                <div style={{
+                  background: '#fdf0f5',
+                  border: '1.5px solid #f0b8cc',
+                  borderRadius: '16px',
+                  padding: '1.25rem 1.5rem',
+                  maxWidth: '340px',
+                  width: '100%'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <div style={{
+                      background: '#ffb3c6',
+                      borderRadius: '50%',
+                      width: '40px', height: '40px',
+                      flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="5" width="20" height="16" rx="3" fill="#cc3a6b"/>
+                        <path d="M2 10h20" stroke="#fdf0f5" strokeWidth="2"/>
+                        <rect x="5" y="14" width="4" height="2" rx="1" fill="#fdf0f5"/>
+                        <rect x="11" y="14" width="4" height="2" rx="1" fill="#fdf0f5"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: '500', color: '#7a1a3a' }}>Pay in 4 interest-free payments</p>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#a0405f', lineHeight: '1.5' }}>You'll be redirected to Klarna to complete your payment securely.</p>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '1rem', display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>Today</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    </div>
+                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>2 weeks</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    </div>
+                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>4 weeks</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    </div>
+                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>6 weeks</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="7" stroke="#cc3a6b" strokeWidth="1.5"/>
+                      <path d="M8 5v4M8 11v.5" stroke="#cc3a6b" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#a0405f' }}>No interest. No fees. Split into 4 equal payments.</p>
+                  </div>
                 </div>
               </div>
             )}
