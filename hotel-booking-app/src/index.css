@@ -196,6 +196,16 @@ body {
     align-items: stretch;
   }
 
+  .rooms-grid--single {
+    grid-template-columns: minmax(420px, 760px);
+    justify-content: center;
+  }
+
+  .rooms-grid--single .room-card {
+    max-width: 760px;
+    justify-self: center;
+  }
+
   .room-card {
     flex-direction: column;
   }

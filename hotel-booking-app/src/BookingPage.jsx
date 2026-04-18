@@ -83,7 +83,7 @@ function BookingPage({
               <span className="spinner"></span>
             </p>
           ) : roomData && roomData.length > 0 ? (
-            <div className="rooms-grid">
+            <div className={`rooms-grid ${roomData.length === 1 ? 'rooms-grid--single' : ''}`.trim()}>
               {roomData.map(room => {
                 const currentRoomData = roomData.find(apiRoom => apiRoom.id === room.id) || room;
                 const nights = checkinDate && checkoutDate
