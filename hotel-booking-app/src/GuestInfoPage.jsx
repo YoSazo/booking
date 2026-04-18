@@ -2184,22 +2184,22 @@ const handlePayLaterBooking = async (e) => {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: '1rem', display: 'flex', gap: '8px' }}>
-                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>Today</p>
-                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                  <div style={{ marginTop: '1rem', display: 'flex', gap: '6px', flexWrap: 'nowrap', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, minWidth: 0, background: 'white', border: '1px solid #f0b8cc', borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '10px', color: '#a0405f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Today</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: '500', color: '#7a1a3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
                     </div>
-                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>2 weeks</p>
-                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    <div style={{ flex: 1, minWidth: 0, background: 'white', border: '1px solid #f0b8cc', borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '10px', color: '#a0405f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>2 weeks</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: '500', color: '#7a1a3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
                     </div>
-                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>4 weeks</p>
-                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    <div style={{ flex: 1, minWidth: 0, background: 'white', border: '1px solid #f0b8cc', borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '10px', color: '#a0405f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>4 weeks</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: '500', color: '#7a1a3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
                     </div>
-                    <div style={{ flex: 1, background: 'white', border: '1px solid #f0b8cc', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#a0405f' }}>6 weeks</p>
-                      <p style={{ margin: '4px 0 0', fontSize: '14px', fontWeight: '500', color: '#7a1a3a' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
+                    <div style={{ flex: 1, minWidth: 0, background: 'white', border: '1px solid #f0b8cc', borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '10px', color: '#a0405f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>6 weeks</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: '500', color: '#7a1a3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>${(bookingDetails.total / 4).toFixed(2)}</p>
                     </div>
                   </div>
 
