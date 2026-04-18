@@ -19,8 +19,15 @@ function CheckoutReturnPage({ onComplete }) {
             return;
         }
 
-        stripe.retrievePaymentIntent(clientSecret).then(({ paymentIntent }) => {
-            switch (paymentIntent.status) {
+        stripe.retrievePaymentIntent(clientSecret)
+            .then(({ paymentIntent, error }) => {
+                if (error || !paymentIntent) {
+                    console.error("Error returning from checkout:", error);
+                    setStatus('error');
+                    return;
+                }
+                
+                switch (paymentIntent.status) {
                 case 'succeeded':
                     // Payment was successful! Now, get the user data we saved earlier.
                     let savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
@@ -66,6 +73,9 @@ function CheckoutReturnPage({ onComplete }) {
                     setStatus('error');
                     break;
             }
+        }).catch((err) => {
+            console.error("Critical error retrieving payment intent:", err);
+            setStatus('error');
         });
     }, [stripe, onComplete]);
 

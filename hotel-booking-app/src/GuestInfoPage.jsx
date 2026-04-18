@@ -1815,7 +1815,7 @@ const handlePayLaterBooking = async (e) => {
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
-            style={{ padding: '12px 6px' }}
+            style={{ padding: '0px 6px', border: paymentMethod === 'klarna' ? '1px solid #0070f3' : '1px solid transparent', backgroundColor: '#FFA8CD', color: '#000' }}
             onClick={() => {
               setPaymentMethod('klarna');
               setHasAttemptedSubmit(false);
@@ -1824,15 +1824,16 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna-badge.png" alt="Klarna" className="wallet-logo" style={{ height: '24px', width: 'auto', borderRadius: '4px' }} />
+            <img src="/klarna-badge.svg" alt="Klarna" className="wallet-logo" style={{ height: '38px', width: 'auto', borderRadius: '4px' }} />
           </button>
         </div>
       ) : (
         // No native wallet, show Card and Klarna
-        <div className="payment-method-tabs" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="payment-method-tabs" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '7px', marginBottom: '20px' }}>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
+            style={{ padding: '8px 6px' }}
             onClick={() => {
               setPaymentMethod('card');
               setHasAttemptedSubmit(false);
@@ -1847,6 +1848,7 @@ const handlePayLaterBooking = async (e) => {
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
+            style={{ padding: '0px 6px', border: paymentMethod === 'klarna' ? '1px solid #0070f3' : '1px solid transparent', backgroundColor: '#FFA8CD', color: '#000' }}
             onClick={() => {
               setPaymentMethod('klarna');
               setHasAttemptedSubmit(false);
@@ -1855,7 +1857,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna-badge.png" alt="Klarna" className="wallet-logo" style={{ height: '24px', width: 'auto', borderRadius: '4px' }} />
+            <img src="/klarna-badge.svg" alt="Klarna" className="wallet-logo" style={{ height: '38px', width: 'auto', borderRadius: '4px' }} />
           </button>
         </div>
       )}
