@@ -754,6 +754,32 @@ useEffect(() => {
             } else if (paymentIntent && paymentIntent.status === 'succeeded') {
                 onComplete(formData, paymentIntent.id);
             }
+        } else if (paymentMethod === 'klarna') {
+            // KLARNA PAYMENT (Redirects from this page)
+            const { error } = await stripe.confirmKlarnaPayment(clientSecret, {
+                payment_method: {
+                    billing_details: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        address: {
+                            line1: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postal_code: formData.zip,
+                            country: 'US',
+                        },
+                    },
+                },
+                return_url: `${window.location.origin}/checkout/return`
+            });
+
+            if (error) {
+                setErrorMessage(error.message || "An error occurred connecting to Klarna.");
+                setIsProcessing(false);
+                setShowLoadingScreen(false);
+            }
+            // If successful, Stripe automatically redirects the user to Klarna
         } else if (paymentMethod === 'wallet') {
             // WALLET PAYMENT
             const fullAmountInCents = Math.round((bookingDetails.total / 2) * 100);
@@ -843,6 +869,9 @@ const handlePayLaterBooking = async (e) => {
 
     setHasAttemptedSubmit(true);
 
+    // Save guest info to session storage for redirects (like Klarna)
+    sessionStorage.setItem('guestInfo', JSON.stringify(formData));
+
     // Process payment based on method
     if (paymentMethod === 'card') {
         // ✅ Validate card is filled out FIRST
@@ -884,24 +913,45 @@ const handlePayLaterBooking = async (e) => {
     };
 
     try {
-        // Create pre-authorization hold (not a charge)
-        const response = await fetch(`${apiBaseUrl}/api/create-preauth-hold`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                bookingDetails: payLaterBooking,
-                guestInfo: formData,
-                hotelId: hotelId
-            }),
-        });
+        let response;
+        if (paymentMethod === 'klarna') {
+            // Klarna requires charging the full amount
+            const klarnaBooking = {
+                ...payLaterBooking,
+                bookingType: 'standard', // Full payment via Klarna
+                amountPaidNow: originalBooking.total,
+                amountDueAtArrival: 0,
+            };
+            response = await fetch(`${apiBaseUrl}/api/create-payment-intent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    amount: originalBooking.total,
+                    bookingDetails: klarnaBooking,
+                    guestInfo: formData,
+                    hotelId: hotelId
+                }),
+            });
+        } else {
+            // Create pre-authorization hold (not a charge)
+            response = await fetch(`${apiBaseUrl}/api/create-preauth-hold`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    bookingDetails: payLaterBooking,
+                    guestInfo: formData,
+                    hotelId: hotelId
+                }),
+            });
+        }
 
         const data = await response.json();
 
         if (!data.clientSecret) {
-            throw new Error("Failed to create pre-authorization hold");
+            throw new Error("Failed to create payment hold/intent");
         }
 
-        // Only show loading screen for card payments, not wallet
+        // Only show loading screen for card payments, not wallet/klarna
         if (paymentMethod === 'card') {
             setShowLoadingScreen(true);
         }
@@ -1004,6 +1054,42 @@ const handlePayLaterBooking = async (e) => {
                     setIsProcessing(false);
                     setShowLoadingScreen(false);
                 }
+            }
+        } else if (paymentMethod === 'klarna') {
+            // KLARNA DIRECT PAYMENT
+            setIsProcessing(true);
+            
+            // Save the Klarna booking representation to session storage before redirect
+            const klarnaBooking = {
+                ...payLaterBooking,
+                bookingType: 'standard', // Full payment via Klarna
+                amountPaidNow: originalBooking.total,
+                amountDueAtArrival: 0,
+            };
+            sessionStorage.setItem('finalBooking', JSON.stringify(klarnaBooking));
+            
+            const { error } = await stripe.confirmKlarnaPayment(data.clientSecret, {
+                payment_method: {
+                    billing_details: {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        address: {
+                            line1: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postal_code: formData.zip,
+                            country: 'US',
+                        },
+                    },
+                },
+                return_url: `${window.location.origin}/checkout/return`
+            });
+
+            if (error) {
+                setErrorMessage(error.message || "An unexpected error occurred connecting to Klarna.");
+                setIsProcessing(false);
+                setShowLoadingScreen(false);
             }
         } else if (paymentMethod === 'wallet') {
             // Create payment request for $1.00 hold
@@ -1696,7 +1782,7 @@ const handlePayLaterBooking = async (e) => {
     <>
       {walletType ? (
         // Show tabs only if wallet is available
-        <div className="payment-method-tabs">
+        <div className="payment-method-tabs" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
@@ -1724,12 +1810,49 @@ const handlePayLaterBooking = async (e) => {
             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} /> 
             {walletType}
           </button>
+          <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
+            onClick={() => {
+              setPaymentMethod('klarna');
+              setHasAttemptedSubmit(false);
+              setErrorMessage('');
+              setIsProcessing(false);
+              setIsProcessingTrial(false);
+            }}
+          >
+            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '14px', width: 'auto' }} />
+          </button>
         </div>
       ) : (
-        // No tabs if only card available - just show "Payment Details" header
-        <div className="payment-method-label">
-          <img src="/credit.svg" alt="Card" className="credit-card-icon" />
-          <span>Pay with Card</span>
+        // No native wallet, show Card and Klarna
+        <div className="payment-method-tabs">
+          <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'card' ? 'active' : ''}`} 
+            onClick={() => {
+              setPaymentMethod('card');
+              setHasAttemptedSubmit(false);
+              setErrorMessage('');
+              setIsProcessing(false);
+              setIsProcessingTrial(false);
+            }}
+          >
+            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> Card
+          </button>
+          <button 
+            type="button" 
+            className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
+            onClick={() => {
+              setPaymentMethod('klarna');
+              setHasAttemptedSubmit(false);
+              setErrorMessage('');
+              setIsProcessing(false);
+              setIsProcessingTrial(false);
+            }}
+          >
+            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '14px', width: 'auto' }} />
+          </button>
         </div>
       )}
       
@@ -2018,6 +2141,29 @@ const handlePayLaterBooking = async (e) => {
                   </p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
                     A payment modal will appear after clicking the final button
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Klarna selected indicator */}
+            {paymentMethod === 'klarna' && (
+              <div className="klarna-info-box" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '16px',
+                backgroundColor: '#FFF2F6',
+                border: '1px solid #FFCDE0',
+                borderRadius: '8px',
+                marginTop: '16px'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: '600', color: '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Pay in 4 interest-free payments
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
+                    You will be redirected to Klarna to complete your payment securely.
                   </p>
                 </div>
               </div>
