@@ -2154,14 +2154,14 @@ const handlePayLaterBooking = async (e) => {
 
             {/* Klarna selected indicator */}
             {paymentMethod === 'klarna' && (
-              <div className="klarna-info-box" style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+              <div className="klarna-info-box" style={{ width: '100%', marginTop: '16px', marginBottom: '16px' }}>
                 <div style={{
                   background: '#fdf0f5',
                   border: '1.5px solid #f0b8cc',
-                  borderRadius: '16px',
-                  padding: '1.25rem 1.5rem',
-                  maxWidth: '340px',
-                  width: '100%'
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <div style={{
