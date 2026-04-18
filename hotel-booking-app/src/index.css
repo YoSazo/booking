@@ -2606,6 +2606,12 @@ padding: 6px 16px;
   width: auto;
 }
 
+@media (max-width: 480px) {
+  .apple-pay-logo {
+    height: 60px; /* Increased size on phone */
+  }
+}
+
 .google-pay-logo {
   height: 50px; /* Slightly larger size for Google Pay logo */
   width: auto;
