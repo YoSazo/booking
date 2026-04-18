@@ -2603,12 +2603,14 @@ padding: 6px 16px;
 
 .apple-pay-logo {
   height: 42px; /* Adjusted size to keep buttons from getting too vertical */
+  margin: -10px 0; /* Shrinks the effective height so the container tab stays horizontal */
   width: auto;
 }
 
 @media (max-width: 480px) {
   .apple-pay-logo {
     height: 48px; /* Slightly larger on phone, but fits container */
+    margin: -13px 0; /* Forces the tab box to stay vertically compact like the other tabs */
   }
 }
 

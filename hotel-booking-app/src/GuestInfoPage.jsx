@@ -1824,7 +1824,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '15px', width: 'auto' }} />
+            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '13px', width: 'auto' }} />
           </button>
         </div>
       ) : (
@@ -1857,7 +1857,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '15px', width: 'auto' }} />
+            <img src="/klarna.svg" alt="Klarna" className="wallet-logo" style={{ height: '13px', width: 'auto' }} />
           </button>
         </div>
       )}
