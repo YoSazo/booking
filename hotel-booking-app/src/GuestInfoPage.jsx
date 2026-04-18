@@ -1795,8 +1795,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> 
-            <span style={{ fontSize: '15px' }}>Card</span>
+            <img src="/credit.svg" alt="Card" className="credit-card-logo" style={{ height: '35px', width: 'auto' }} /> 
           </button>
           <button 
             type="button" 
@@ -1810,12 +1809,12 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} style={{ margin: '0' }} />
+            <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} style={{ margin: '0', height: '35px', width: 'auto' }} />
           </button>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
-            style={{ padding: '0px 6px', border: paymentMethod === 'klarna' ? '1px solid #0070f3' : '1px solid transparent', backgroundColor: '#FFA8CD', color: '#000' }}
+            style={{ padding: '12px 6px', border: paymentMethod === 'klarna' ? '1px solid #0070f3' : '1px solid transparent', backgroundColor: '#FFA8CD', color: '#000' }}
             onClick={() => {
               setPaymentMethod('klarna');
               setHasAttemptedSubmit(false);
@@ -1824,7 +1823,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna-badge.svg" alt="Klarna" className="wallet-logo" style={{ height: '38px', width: 'auto', borderRadius: '4px' }} />
+            <img src="/klarna-badge.svg" alt="Klarna" className="wallet-logo" style={{ height: '35px', width: 'auto', borderRadius: '4px' }} />
           </button>
         </div>
       ) : (
@@ -1842,13 +1841,12 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/credit.svg" alt="Card" className="credit-card-logo" /> 
-            <span style={{ fontSize: '15px' }}>Card</span>
+            <img src="/credit.svg" alt="Card" className="credit-card-logo" style={{ height: '35px', width: 'auto' }} /> 
           </button>
           <button 
             type="button" 
             className={`tab-button ${paymentMethod === 'klarna' ? 'active' : ''}`} 
-            style={{ padding: '0px 6px', border: paymentMethod === 'klarna' ? '1px solid #0070f3' : '1px solid transparent', backgroundColor: '#FFA8CD', color: '#000' }}
+            style={{ padding: '8px 6px', border: paymentMethod === 'klarna' ? '1px solid #0070f3' : '1px solid transparent', backgroundColor: '#FFA8CD', color: '#000' }}
             onClick={() => {
               setPaymentMethod('klarna');
               setHasAttemptedSubmit(false);
@@ -1857,7 +1855,7 @@ const handlePayLaterBooking = async (e) => {
               setIsProcessingTrial(false);
             }}
           >
-            <img src="/klarna-badge.svg" alt="Klarna" className="wallet-logo" style={{ height: '38px', width: 'auto', borderRadius: '4px' }} />
+            <img src="/klarna-badge.svg" alt="Klarna" className="wallet-logo" style={{ height: '35px', width: 'auto', borderRadius: '4px' }} />
           </button>
         </div>
       )}
