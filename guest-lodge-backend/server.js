@@ -2931,6 +2931,18 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
 app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     try {
         const hotelId = req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
+        const now = new Date();
+        const dates = [
+            new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000), // tomorrow
+            new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000), // +4 days
+            new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000), // +2 days
+            new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000), // +5 days
+            new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000), // +6 days
+            new Date(now.getTime() + 11 * 24 * 60 * 60 * 1000), // +11 days
+            new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // +3 days
+            new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000), // +6 days
+        ];
+        
         const dummyBookings = [
             {
                 hotelId,
@@ -2939,8 +2951,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'john.smith@example.com',
                 guestPhone: '(555) 123-4567',
                 roomName: 'King Room',
-                checkinDate: new Date('2026-03-15'),
-                checkoutDate: new Date('2026-03-18'),
+                checkinDate: dates[0],
+                checkoutDate: dates[1],
                 nights: 3,
                 subtotal: 400.00,
                 taxesAndFees: 50.00,
@@ -2958,8 +2970,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'sarah.j@example.com',
                 guestPhone: '(555) 234-5678',
                 roomName: 'Double Queen',
-                checkinDate: new Date('2026-03-16'),
-                checkoutDate: new Date('2026-03-19'),
+                checkinDate: dates[2],
+                checkoutDate: dates[3],
                 nights: 3,
                 subtotal: 340.00,
                 taxesAndFees: 40.00,
@@ -2977,8 +2989,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'mchen@example.com',
                 guestPhone: '(555) 345-6789',
                 roomName: 'Suite Premium',
-                checkinDate: new Date('2026-03-20'),
-                checkoutDate: new Date('2026-03-25'),
+                checkinDate: dates[4],
+                checkoutDate: dates[5],
                 nights: 5,
                 subtotal: 750.00,
                 taxesAndFees: 100.00,
@@ -2996,8 +3008,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'emily.r@example.com',
                 guestPhone: '(555) 456-7890',
                 roomName: 'Standard Double',
-                checkinDate: new Date('2026-03-17'),
-                checkoutDate: new Date('2026-03-20'),
+                checkinDate: dates[6],
+                checkoutDate: dates[7],
                 nights: 3,
                 subtotal: 285.00,
                 taxesAndFees: 35.00,
