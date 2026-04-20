@@ -733,16 +733,21 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
         const overlapDays = enumerateDatesInclusive(overlapStartIso, overlapEndIso, 5000);
         if (!overlapDays.length) continue;
 
+        // Instead of partial accrual, attribute the full booking value to the window 
+        // if the check-in date falls within the start-end window.
+        // If check-in is before the window, we've already counted it in a previous window.
+        if (checkinIso < start) continue;
+
         const fullStayNights = Math.max(
             1,
             parseInt(booking.nights, 10)
             || enumerateDatesInclusive(checkinIso, stayEndIso, 5000).length
             || 1
         );
-        const recognizedRevenue = (Number(booking.grandTotal) || 0) * (overlapDays.length / fullStayNights);
+        const recognizedRevenue = Number(booking.grandTotal) || 0;
 
         bookingCount += 1;
-        nightsSold += overlapDays.length;
+        nightsSold += fullStayNights;
         totalRevenue += recognizedRevenue;
         roomRevenue[roomName] = (roomRevenue[roomName] || 0) + recognizedRevenue;
 
