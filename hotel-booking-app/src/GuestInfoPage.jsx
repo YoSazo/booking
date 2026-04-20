@@ -595,16 +595,19 @@ useEffect(() => {
             return;
         }
         
-        let value = e.target.value;
-        if (!value.startsWith('+1 ')) value = '+1 ';
-        
-        // Limit phone number to 10 digits (plus country code = 11 total)
-        const digitCount = value.replace(/\D/g, '').length;
-        if (digitCount > 11) {
-            return; // Don't update if exceeding max length
-        }
-        
-        setFormData(prev => ({ ...prev, phone: value }));
+    // Canonical US format: +1 + 10 local digits.
+    // If user pastes/types country code as leading 1, drop it once.
+    const rawDigits = String(e.target.value || '').replace(/\D/g, '');
+    let localDigits = rawDigits;
+    if (localDigits.length > 10 && localDigits.startsWith('1')) {
+      localDigits = localDigits.slice(1);
+    }
+    localDigits = localDigits.slice(0, 10);
+
+    const value = `+1 ${localDigits}`;
+    const digitCount = localDigits.length + 1;
+
+    setFormData(prev => ({ ...prev, phone: value }));
         
         // Real-time validation feedback for phone
         if (formErrors.phone) {

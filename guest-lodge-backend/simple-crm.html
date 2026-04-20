@@ -1520,6 +1520,14 @@ async function startCrmApp(verification) {
   syncRevenueUi();
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+
+  const realignActiveTab = () => {
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab) moveSlider(activeTab);
+  };
+  requestAnimationFrame(realignActiveTab);
+  setTimeout(realignActiveTab, 120);
+
   await Promise.allSettled([
     loadManualAvailability(),
     loadBookings(),
@@ -1633,8 +1641,13 @@ function renderBookings(list) {
     const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
     const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
     const ago = timeAgo(b.createdAt);
-    const normalizedPhone = String(b.guestPhone || '').replace(/[^\d+]/g, '');
-    const phoneHref = normalizedPhone ? `tel:${normalizedPhone}` : '';
+    const rawPhoneDigits = String(b.guestPhone || '').replace(/\D/g, '');
+    let localPhoneDigits = rawPhoneDigits;
+    if (localPhoneDigits.length > 10 && localPhoneDigits.startsWith('1')) {
+      localPhoneDigits = localPhoneDigits.slice(1);
+    }
+    localPhoneDigits = localPhoneDigits.slice(0, 10);
+    const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
 
     return `
     <div class="booking-card">
