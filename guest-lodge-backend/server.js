@@ -548,15 +548,20 @@ async function createManualBooking(hotelId, bookingDetails) {
 
 const MANUAL_REVENUE_PERIODS = new Set(['7d', '30d', '90d', 'all']);
 
-function buildManualRevenueWindow(period, referenceIso, earliestIso = '') {
+function buildManualRevenueWindow(period, referenceIso, earliestIso = '', latestIso = '') {
     const endIso = normalizeIsoDate(referenceIso) || getReportingTodayIso();
 
     if (period === 'all') {
         const normalizedEarliest = normalizeIsoDate(earliestIso);
-        const startIso = normalizedEarliest && normalizedEarliest <= endIso ? normalizedEarliest : endIso;
+        const normalizedLatest = normalizeIsoDate(latestIso) || endIso;
+        
+        let startIso = normalizedEarliest || endIso;
+        // If earliest is later than latest (edge case), swap or bound
+        if (startIso > normalizedLatest) startIso = normalizedLatest;
+        
         return {
             startIso,
-            endIso,
+            endIso: normalizedLatest, // Expand forward
             prevStartIso: '',
             prevEndIso: '',
         };
@@ -604,6 +609,19 @@ async function getEarliestManualRevenueStartIso(hotelId) {
     if (bookingStartIso) return bookingStartIso;
 
     return normalizeIsoDate(firstRoom?.createdAt) || getReportingTodayIso();
+}
+
+async function getLatestManualRevenueEndIso(hotelId) {
+    const lastBooking = await withRetry(() => prisma.booking.findFirst({
+        where: { hotelId },
+        orderBy: { checkoutDate: 'desc' },
+        select: { checkoutDate: true },
+    }));
+
+    const bookingEndIso = normalizeIsoDate(lastBooking?.checkoutDate);
+    if (bookingEndIso) return bookingEndIso;
+
+    return getReportingTodayIso();
 }
 
 async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
@@ -3330,7 +3348,11 @@ app.get('/api/crm/revenue', crmAuth, async (req, res) => {
         const earliestIso = period === 'all'
             ? await getEarliestManualRevenueStartIso(hotelId)
             : referenceIso;
-        const window = buildManualRevenueWindow(period, referenceIso, earliestIso);
+        const latestIso = period === 'all'
+            ? await getLatestManualRevenueEndIso(hotelId)
+            : referenceIso;
+            
+        const window = buildManualRevenueWindow(period, referenceIso, earliestIso, latestIso);
         const current = await computeManualRevenueMetrics(hotelId, window.startIso, window.endIso);
         const previous = (window.prevStartIso && window.prevEndIso)
             ? await computeManualRevenueMetrics(hotelId, window.prevStartIso, window.prevEndIso)
