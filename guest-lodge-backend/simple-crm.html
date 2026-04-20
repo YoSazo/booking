@@ -892,23 +892,25 @@
       .refresh-btn { padding: 5px 8px; font-size: 11px; }
       .container { padding: 16px 12px; }
       .tabs-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-        gap: 4px;
-        padding: 4px;
-        overflow: visible;
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 6px;
+        padding: 5px;
+        border-radius: 14px;
+        -webkit-overflow-scrolling: touch;
       }
       .tabs-slider {
-        top: 4px;
-        left: 4px;
-        height: calc(100% - 8px);
+        top: 5px;
+        left: 5px;
+        height: calc(100% - 10px);
       }
       .card-inner { padding: 12px 14px; }
       .contact-phone { font-size: 15px; }
       .guest-name { font-size: 20px; }
       .card-amount { font-size: 20px; }
       .date-value { font-size: 15px; }
-      .tab { padding: 8px 8px; font-size: 12px; justify-content: center; gap: 6px; min-width: 0; }
+      .tab { padding: 8px 12px; font-size: 13px; font-weight: 600; gap: 6px; flex-shrink: 0; white-space: nowrap; }
       .tab-badge { padding: 1px 6px; font-size: 11px; }
       .availability-card { padding: 12px; }
       .cal-grid { gap: 4px; }
