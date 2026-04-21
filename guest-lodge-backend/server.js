@@ -312,9 +312,17 @@ const getBestRatePlan = (nights) => {
 
 function normalizeIsoDate(value) {
     if (!value) return null;
+    if (typeof value === 'string' && value.length >= 10) {
+        return value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
+    }
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
-    return d.toISOString().slice(0, 10);
+    
+    // Extract local components to avoid UTC drift
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
 
 function enumerateDatesInclusive(startIso, endIso, maxDays = 180) {
