@@ -1094,7 +1094,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         holdStatus: 'active'
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1134,7 +1134,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         holdStatus: 'active'
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -2217,7 +2217,7 @@ app.post('/api/book', async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
             }
@@ -2335,7 +2335,7 @@ app.post('/api/track', async (req, res) => {
 
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
-    if (event_name === 'Purchase') notifyPurchase().catch(() => {});
+    // double-notification removed: if (event_name === 'Purchase') notifyPurchase().catch(() => {});
 
     // Send directly to Meta CAPI — no middleman needed
     sendToMetaCAPI(event_name, enrichedPayload).catch(err => {
@@ -2810,14 +2810,25 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
 });
 
 // Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
-async function notifyNewBooking(guestName, roomName) {
+async function notifyNewBooking(guestName, roomName, grandTotal) {
     if (!VAPID_PRIVATE) return;
     try {
         const subs = await prisma.pushSubscription.findMany();
+        
+        let bodyText = '';
+        if (guestName) bodyText += guestName;
+        if (roomName) bodyText += (bodyText ? ` - ${roomName}` : roomName);
+        if (grandTotal !== undefined && grandTotal !== null) {
+            bodyText += ` - $${Number(grandTotal).toFixed(2)}`;
+        }
+        
+        if (!bodyText) bodyText = 'A new booking just came in.';
+
         const payload = JSON.stringify({
-            title: 'New booking',
-            body: guestName ? `${guestName}${roomName ? ` – ${roomName}` : ''}` : 'A new booking just came in.',
-            url: '/crm',
+            title: 'New Booking!',
+            body: bodyText,
+            url: '/simple-crm',
+            icon: '/marketellogo.svg'
         });
         await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
@@ -2831,41 +2842,7 @@ async function notifyNewBooking(guestName, roomName) {
     }
 }
 
-// Notify subscribers when a purchase event is recorded (fire-and-forget)
-async function notifyPurchase() {
-    if (!VAPID_PRIVATE) return;
-    try {
-        // Send to both funnel and front desk
-        const subs = await prisma.pushSubscription.findMany({ 
-            where: { 
-                source: { in: ['funnel', 'simple-crm'] } 
-            } 
-        });
-        if (subs.length === 0) return;
-        
-        console.log(`🔔 Sending purchase notification to ${subs.length} subscriptions`);
-        
-        const payload = JSON.stringify({
-            title: 'New Booking!',
-            body: 'A purchase just came in.',
-            icon: '/marketellogo.svg',
-            badge: '/marketellogo.svg',
-            data: {
-                url: '/simple-crm'
-            }
-        });
-        
-        await Promise.allSettled(subs.map((s) =>
-            webpush.sendNotification(
-                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                payload,
-                { TTL: 60 }
-            )
-        ));
-    } catch (e) {
-        console.error('notifyPurchase:', e.message);
-    }
-}
+// Support for old notifyPurchase is removed to prevent double notifications
 
 
 // Notify about payment declined leads (URGENT - call within 60 seconds!)
