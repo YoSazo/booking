@@ -133,7 +133,59 @@ function BookingPage({
               })}
             </div>
           ) : (
-            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
+            <div
+              style={{
+                maxWidth: '560px',
+                margin: '20px auto 0',
+                padding: '28px 22px',
+                borderRadius: '18px',
+                border: '1px solid #D8E4DC',
+                background: 'linear-gradient(180deg, #FFFFFF 0%, #F6FBF8 100%)',
+                boxShadow: '0 8px 26px rgba(46,125,91,0.10)',
+                textAlign: 'center'
+              }}
+            >
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  margin: '0 auto 12px',
+                  borderRadius: '50%',
+                  background: '#E8F5EE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px'
+                }}
+                aria-hidden="true"
+              >
+                📅
+              </div>
+              <p style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#1A2B22' }}>
+                No rooms available for the selected dates.
+              </p>
+              <p style={{ margin: '8px 0 0', color: '#6B7D72', lineHeight: 1.5 }}>
+                Try different dates to see available options.
+              </p>
+              <button
+                type="button"
+                onClick={onCalendarOpen}
+                style={{
+                  marginTop: '16px',
+                  background: '#2E7D5B',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '11px 20px',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 14px rgba(46,125,91,0.22)'
+                }}
+              >
+                Try Again
+              </button>
+            </div>
           )}
         </main>
       </div>

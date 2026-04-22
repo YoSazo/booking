@@ -312,17 +312,9 @@ const getBestRatePlan = (nights) => {
 
 function normalizeIsoDate(value) {
     if (!value) return null;
-    if (typeof value === 'string' && value.length >= 10) {
-        return value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
-    }
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
-    
-    // Extract local components to avoid UTC drift
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return d.toISOString().slice(0, 10);
 }
 
 function enumerateDatesInclusive(startIso, endIso, maxDays = 180) {
@@ -556,20 +548,15 @@ async function createManualBooking(hotelId, bookingDetails) {
 
 const MANUAL_REVENUE_PERIODS = new Set(['7d', '30d', '90d', 'all']);
 
-function buildManualRevenueWindow(period, referenceIso, earliestIso = '', latestIso = '') {
+function buildManualRevenueWindow(period, referenceIso, earliestIso = '') {
     const endIso = normalizeIsoDate(referenceIso) || getReportingTodayIso();
 
     if (period === 'all') {
         const normalizedEarliest = normalizeIsoDate(earliestIso);
-        const normalizedLatest = normalizeIsoDate(latestIso) || endIso;
-        
-        let startIso = normalizedEarliest || endIso;
-        // If earliest is later than latest (edge case), swap or bound
-        if (startIso > normalizedLatest) startIso = normalizedLatest;
-        
+        const startIso = normalizedEarliest && normalizedEarliest <= endIso ? normalizedEarliest : endIso;
         return {
             startIso,
-            endIso: normalizedLatest, // Expand forward
+            endIso,
             prevStartIso: '',
             prevEndIso: '',
         };
@@ -617,19 +604,6 @@ async function getEarliestManualRevenueStartIso(hotelId) {
     if (bookingStartIso) return bookingStartIso;
 
     return normalizeIsoDate(firstRoom?.createdAt) || getReportingTodayIso();
-}
-
-async function getLatestManualRevenueEndIso(hotelId) {
-    const lastBooking = await withRetry(() => prisma.booking.findFirst({
-        where: { hotelId },
-        orderBy: { checkoutDate: 'desc' },
-        select: { checkoutDate: true },
-    }));
-
-    const bookingEndIso = normalizeIsoDate(lastBooking?.checkoutDate);
-    if (bookingEndIso) return bookingEndIso;
-
-    return getReportingTodayIso();
 }
 
 async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
@@ -741,21 +715,16 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
         const overlapDays = enumerateDatesInclusive(overlapStartIso, overlapEndIso, 5000);
         if (!overlapDays.length) continue;
 
-        // Instead of partial accrual, attribute the full booking value to the window 
-        // if the check-in date falls within the start-end window.
-        // If check-in is before the window, we've already counted it in a previous window.
-        if (checkinIso < start) continue;
-
         const fullStayNights = Math.max(
             1,
             parseInt(booking.nights, 10)
             || enumerateDatesInclusive(checkinIso, stayEndIso, 5000).length
             || 1
         );
-        const recognizedRevenue = Number(booking.grandTotal) || 0;
+        const recognizedRevenue = (Number(booking.grandTotal) || 0) * (overlapDays.length / fullStayNights);
 
         bookingCount += 1;
-        nightsSold += fullStayNights;
+        nightsSold += overlapDays.length;
         totalRevenue += recognizedRevenue;
         roomRevenue[roomName] = (roomRevenue[roomName] || 0) + recognizedRevenue;
 
@@ -1102,47 +1071,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         holdStatus: 'active'
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
-            } catch (dbError) {
-                console.error("Failed to save pay-later booking to database:", dbError);
-            }
-
-            return res.json({
-                success: true,
-                message: 'Reservation created successfully. $1.00 hold placed on card.',
-                reservationCode: pmsResponse.reservationID
-            });
-        }
-
-        // Manual PMS pay-later flow
-        if (config.pms === 'manual') {
-            const pmsResponse = await createManualBooking(hotelId, bookingDetails);
-
-            try {
-                await prisma.booking.create({
-                    data: {
-                        stripePaymentIntentId: paymentIntentId,
-                        ourReservationCode: bookingDetails.reservationCode,
-                        pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelId,
-                        roomName: bookingDetails.name || bookingDetails.roomName,
-                        bookingType: 'payLater',
-                        checkinDate: new Date(bookingDetails.checkin),
-                        checkoutDate: new Date(bookingDetails.checkout),
-                        nights: bookingDetails.nights,
-                        guestFirstName: guestInfo.firstName,
-                        guestLastName: guestInfo.lastName,
-                        guestEmail: guestInfo.email,
-                        guestPhone: guestInfo.phone,
-                        subtotal: bookingDetails.subtotal,
-                        taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total,
-                        amountPaidNow: 0,
-                        preAuthHoldAmount: 1.00,
-                        holdStatus: 'active'
-                    }
-                });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -2225,7 +2154,7 @@ app.post('/api/book', async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
             }
@@ -2343,7 +2272,7 @@ app.post('/api/track', async (req, res) => {
 
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
-    // double-notification removed: if (event_name === 'Purchase') notifyPurchase().catch(() => {});
+    if (event_name === 'Purchase') notifyPurchase().catch(() => {});
 
     // Send directly to Meta CAPI — no middleman needed
     sendToMetaCAPI(event_name, enrichedPayload).catch(err => {
@@ -2818,25 +2747,14 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
 });
 
 // Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
-async function notifyNewBooking(guestName, roomName, grandTotal) {
+async function notifyNewBooking(guestName, roomName) {
     if (!VAPID_PRIVATE) return;
     try {
         const subs = await prisma.pushSubscription.findMany();
-        
-        let bodyText = '';
-        if (guestName) bodyText += guestName;
-        if (roomName) bodyText += (bodyText ? ` - ${roomName}` : roomName);
-        if (grandTotal !== undefined && grandTotal !== null) {
-            bodyText += ` - $${Number(grandTotal).toFixed(2)}`;
-        }
-        
-        if (!bodyText) bodyText = 'A new booking just came in.';
-
         const payload = JSON.stringify({
-            title: 'New Booking!',
-            body: bodyText,
-            url: '/simple-crm',
-            icon: '/marketellogo.svg'
+            title: 'New booking',
+            body: guestName ? `${guestName}${roomName ? ` – ${roomName}` : ''}` : 'A new booking just came in.',
+            url: '/crm',
         });
         await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
@@ -2850,7 +2768,41 @@ async function notifyNewBooking(guestName, roomName, grandTotal) {
     }
 }
 
-// Support for old notifyPurchase is removed to prevent double notifications
+// Notify subscribers when a purchase event is recorded (fire-and-forget)
+async function notifyPurchase() {
+    if (!VAPID_PRIVATE) return;
+    try {
+        // Send to both funnel and front desk
+        const subs = await prisma.pushSubscription.findMany({ 
+            where: { 
+                source: { in: ['funnel', 'simple-crm'] } 
+            } 
+        });
+        if (subs.length === 0) return;
+        
+        console.log(`🔔 Sending purchase notification to ${subs.length} subscriptions`);
+        
+        const payload = JSON.stringify({
+            title: 'New Booking!',
+            body: 'A purchase just came in.',
+            icon: '/marketellogo.svg',
+            badge: '/marketellogo.svg',
+            data: {
+                url: '/simple-crm'
+            }
+        });
+        
+        await Promise.allSettled(subs.map((s) =>
+            webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload,
+                { TTL: 60 }
+            )
+        ));
+    } catch (e) {
+        console.error('notifyPurchase:', e.message);
+    }
+}
 
 
 // Notify about payment declined leads (URGENT - call within 60 seconds!)
@@ -2979,18 +2931,6 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
 app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     try {
         const hotelId = req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
-        const now = new Date();
-        const dates = [
-            new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000), // tomorrow
-            new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000), // +4 days
-            new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000), // +2 days
-            new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000), // +5 days
-            new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000), // +6 days
-            new Date(now.getTime() + 11 * 24 * 60 * 60 * 1000), // +11 days
-            new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // +3 days
-            new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000), // +6 days
-        ];
-        
         const dummyBookings = [
             {
                 hotelId,
@@ -2999,8 +2939,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'john.smith@example.com',
                 guestPhone: '(555) 123-4567',
                 roomName: 'King Room',
-                checkinDate: dates[0],
-                checkoutDate: dates[1],
+                checkinDate: new Date('2026-03-15'),
+                checkoutDate: new Date('2026-03-18'),
                 nights: 3,
                 subtotal: 400.00,
                 taxesAndFees: 50.00,
@@ -3018,8 +2958,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'sarah.j@example.com',
                 guestPhone: '(555) 234-5678',
                 roomName: 'Double Queen',
-                checkinDate: dates[2],
-                checkoutDate: dates[3],
+                checkinDate: new Date('2026-03-16'),
+                checkoutDate: new Date('2026-03-19'),
                 nights: 3,
                 subtotal: 340.00,
                 taxesAndFees: 40.00,
@@ -3037,8 +2977,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'mchen@example.com',
                 guestPhone: '(555) 345-6789',
                 roomName: 'Suite Premium',
-                checkinDate: dates[4],
-                checkoutDate: dates[5],
+                checkinDate: new Date('2026-03-20'),
+                checkoutDate: new Date('2026-03-25'),
                 nights: 5,
                 subtotal: 750.00,
                 taxesAndFees: 100.00,
@@ -3056,8 +2996,8 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
                 guestEmail: 'emily.r@example.com',
                 guestPhone: '(555) 456-7890',
                 roomName: 'Standard Double',
-                checkinDate: dates[6],
-                checkoutDate: dates[7],
+                checkinDate: new Date('2026-03-17'),
+                checkoutDate: new Date('2026-03-20'),
                 nights: 3,
                 subtotal: 285.00,
                 taxesAndFees: 35.00,
@@ -3338,11 +3278,7 @@ app.get('/api/crm/revenue', crmAuth, async (req, res) => {
         const earliestIso = period === 'all'
             ? await getEarliestManualRevenueStartIso(hotelId)
             : referenceIso;
-        const latestIso = period === 'all'
-            ? await getLatestManualRevenueEndIso(hotelId)
-            : referenceIso;
-            
-        const window = buildManualRevenueWindow(period, referenceIso, earliestIso, latestIso);
+        const window = buildManualRevenueWindow(period, referenceIso, earliestIso);
         const current = await computeManualRevenueMetrics(hotelId, window.startIso, window.endIso);
         const previous = (window.prevStartIso && window.prevEndIso)
             ? await computeManualRevenueMetrics(hotelId, window.prevStartIso, window.prevEndIso)
