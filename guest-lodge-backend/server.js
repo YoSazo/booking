@@ -1083,6 +1083,46 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
             });
         }
 
+        // Manual PMS pay-later flow
+        if (config.pms === 'manual') {
+            const pmsResponse = await createManualBooking(hotelId, bookingDetails);
+
+            try {
+                await prisma.booking.create({
+                    data: {
+                        stripePaymentIntentId: paymentIntentId,
+                        ourReservationCode: bookingDetails.reservationCode,
+                        pmsConfirmationCode: pmsResponse.reservationID,
+                        hotelId: hotelId,
+                        roomName: bookingDetails.name || bookingDetails.roomName,
+                        bookingType: 'payLater',
+                        checkinDate: new Date(bookingDetails.checkin),
+                        checkoutDate: new Date(bookingDetails.checkout),
+                        nights: bookingDetails.nights,
+                        guestFirstName: guestInfo.firstName,
+                        guestLastName: guestInfo.lastName,
+                        guestEmail: guestInfo.email,
+                        guestPhone: guestInfo.phone,
+                        subtotal: bookingDetails.subtotal,
+                        taxesAndFees: bookingDetails.taxes,
+                        grandTotal: bookingDetails.total,
+                        amountPaidNow: 0,
+                        preAuthHoldAmount: 1.00,
+                        holdStatus: 'active'
+                    }
+                });
+                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+            } catch (dbError) {
+                console.error("Failed to save pay-later booking to database:", dbError);
+            }
+
+            return res.json({
+                success: true,
+                message: 'Reservation created successfully. $1.00 hold placed on card.',
+                reservationCode: pmsResponse.reservationID
+            });
+        }
+
         // Cloudbeds pay-later flow
         if (config.pms !== 'cloudbeds') {
             return res.status(400).json({ 
