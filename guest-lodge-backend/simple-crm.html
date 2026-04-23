@@ -1060,6 +1060,23 @@ let activeHotelName = '';
 let activeHotelDomain = '';
 let activeHotelContext = null;
 let bootInFlight = false;
+const CRM_HOTEL_BY_HOST = {
+  'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
+  'booking-kappa-nine.vercel.app': 'guest-lodge-minot',
+  'stcroix.clickinns.com': 'st-croix-wisconsin',
+  'homeplacesuites.clickinns.com': 'home-place-suites',
+  'myhomeplacesuites.com': 'home-place-suites',
+  'www.myhomeplacesuites.com': 'home-place-suites',
+  'suitestay.clickinns.com': 'suite-stay',
+  'clickinns.com': 'suite-stay',
+  'www.clickinns.com': 'suite-stay',
+};
+const CRM_HOTEL_LABELS = {
+  'guest-lodge-minot': 'Guest Lodge Minot',
+  'st-croix-wisconsin': 'St. Croix Wisconsin',
+  'home-place-suites': 'Home Place Suites',
+  'suite-stay': 'Suite Stay',
+};
 const REVENUE_ROOM_COLORS = ['#2E7D5B', '#4CAF7D', '#8BC4AA', '#C8EDD9', '#5A9E7D'];
 
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
@@ -1075,6 +1092,40 @@ function getContextParam(name) {
 
 function getDetectedHostname() {
   return (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';
+}
+
+function resolveLegacyCrmHotelId() {
+  const overrideHotelId = getContextParam('hotelId');
+  if (overrideHotelId) return overrideHotelId;
+
+  const host = getDetectedHostname();
+  if (host && CRM_HOTEL_BY_HOST[host]) return CRM_HOTEL_BY_HOST[host];
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.onrender.com') || host.endsWith('.vercel.app')) {
+    return 'guest-lodge-minot';
+  }
+  return '';
+}
+
+function applyLegacyHotelContext(hotelId, reason = '') {
+  const cleanHotelId = String(hotelId || '').trim();
+  if (!cleanHotelId) return false;
+  activeHotelId = cleanHotelId;
+  activeHotelName = CRM_HOTEL_LABELS[cleanHotelId] || cleanHotelId;
+  activeHotelDomain = getDetectedHostname();
+  activeHotelContext = {
+    hotelId: cleanHotelId,
+    domain: activeHotelDomain || '',
+    config: {
+      id: cleanHotelId,
+      name: activeHotelName,
+      source: 'legacy-fallback',
+    },
+  };
+  updateHotelChrome();
+  if (reason && window.console && typeof window.console.warn === 'function') {
+    window.console.warn('Falling back to legacy CRM hotel resolution.', { hotelId: cleanHotelId, reason });
+  }
+  return true;
 }
 
 function buildHotelContextUrl() {
@@ -1756,6 +1807,21 @@ async function bootCrmApp() {
     }
     showLogin();
   } catch (e) {
+    const legacyHotelId = resolveLegacyCrmHotelId();
+    if (legacyHotelId && applyLegacyHotelContext(legacyHotelId, e && e.message ? e.message : 'hotel-context-load-failed')) {
+      if (token) {
+        try {
+          const verification = await verifyCrmToken(token);
+          await startCrmApp(verification);
+          return;
+        } catch (verifyError) {
+          showLogin();
+          return;
+        }
+      }
+      showLogin();
+      return;
+    }
     showHotelContextError(e);
   } finally {
     bootInFlight = false;

@@ -385,6 +385,219 @@ function roundMoney(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function toMoneyCents(value) {
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) return null;
+    return Math.round(amount * 100);
+}
+
+function parseJsonObject(value) {
+    if (!value) return {};
+    try {
+        const parsed = JSON.parse(value);
+        return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function normalizeBookingSnapshot(bookingDetails = {}) {
+    const nights = parseInt(bookingDetails?.nights, 10);
+    return {
+        reservationCode: String(bookingDetails?.reservationCode || '').trim(),
+        roomTypeID: String(bookingDetails?.roomTypeID || '').trim(),
+        rateID: String(bookingDetails?.rateID || '').trim(),
+        roomName: String(bookingDetails?.roomName || bookingDetails?.name || '').trim(),
+        checkin: normalizeIsoDate(bookingDetails?.checkin),
+        checkout: normalizeIsoDate(bookingDetails?.checkout),
+        nights: Number.isFinite(nights) ? nights : null,
+        totalCents: toMoneyCents(bookingDetails?.total),
+        amountPaidNowCents: toMoneyCents(bookingDetails?.amountPaidNow),
+        bookingType: String(bookingDetails?.bookingType || 'standard').trim().toLowerCase(),
+    };
+}
+
+function buildStripeIntentMetadata({ bookingDetails, guestInfo, hotelId, extra = {} }) {
+    const snapshot = normalizeBookingSnapshot(bookingDetails);
+    const metadata = {
+        bookingDetails: JSON.stringify(bookingDetails || {}),
+        guestInfo: JSON.stringify(guestInfo || {}),
+        hotelId: String(hotelId || '').trim(),
+        reservationCode: snapshot.reservationCode,
+        roomTypeID: snapshot.roomTypeID,
+        rateID: snapshot.rateID,
+        roomName: snapshot.roomName,
+        checkin: snapshot.checkin || '',
+        checkout: snapshot.checkout || '',
+        nights: snapshot.nights === null ? '' : String(snapshot.nights),
+        bookingTotalCents: snapshot.totalCents === null ? '' : String(snapshot.totalCents),
+        bookingType: snapshot.bookingType || '',
+        ...extra,
+    };
+    return Object.fromEntries(
+        Object.entries(metadata).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
+}
+
+function getStripeIntentSnapshot(paymentIntent) {
+    const metadata = paymentIntent?.metadata || {};
+    const booking = normalizeBookingSnapshot(parseJsonObject(metadata.bookingDetails));
+    if (!booking.reservationCode) booking.reservationCode = String(metadata.reservationCode || '').trim();
+    if (!booking.roomTypeID) booking.roomTypeID = String(metadata.roomTypeID || '').trim();
+    if (!booking.rateID) booking.rateID = String(metadata.rateID || '').trim();
+    if (!booking.roomName) booking.roomName = String(metadata.roomName || '').trim();
+    if (!booking.checkin) booking.checkin = normalizeIsoDate(metadata.checkin);
+    if (!booking.checkout) booking.checkout = normalizeIsoDate(metadata.checkout);
+    if (booking.nights === null && metadata.nights !== undefined) {
+        const parsedNights = parseInt(metadata.nights, 10);
+        booking.nights = Number.isFinite(parsedNights) ? parsedNights : null;
+    }
+    if (booking.totalCents === null && metadata.bookingTotalCents !== undefined) {
+        const parsedTotalCents = parseInt(metadata.bookingTotalCents, 10);
+        booking.totalCents = Number.isFinite(parsedTotalCents) ? parsedTotalCents : null;
+    }
+    return {
+        hotelId: String(metadata.hotelId || '').trim(),
+        holdType: String(metadata.holdType || '').trim().toLowerCase(),
+        bookingType: String(metadata.bookingType || booking.bookingType || '').trim().toLowerCase(),
+        booking,
+    };
+}
+
+function findBookingSnapshotMismatch(submitted, stored) {
+    const fields = [
+        ['reservationCode', 'reservation code'],
+        ['roomTypeID', 'room type'],
+        ['rateID', 'rate'],
+        ['checkin', 'check-in date'],
+        ['checkout', 'check-out date'],
+        ['nights', 'night count'],
+        ['totalCents', 'booking total'],
+    ];
+
+    for (const [key, label] of fields) {
+        const submittedValue = submitted?.[key];
+        const storedValue = stored?.[key];
+        if (submittedValue === null && storedValue === null) continue;
+        if (submittedValue === '' && storedValue === '') continue;
+        if (submittedValue === undefined && storedValue === undefined) continue;
+        if (String(submittedValue || '') !== String(storedValue || '')) {
+            return `Payment authorization does not match the submitted ${label}.`;
+        }
+    }
+
+    return '';
+}
+
+function getExpectedStandardChargeAmountsCents(bookingDetails) {
+    const snapshot = normalizeBookingSnapshot(bookingDetails);
+    const amounts = new Set();
+    if (snapshot.totalCents !== null && snapshot.totalCents > 0) {
+        amounts.add(snapshot.totalCents);
+        amounts.add(Math.round(snapshot.totalCents / 2));
+    }
+    if (snapshot.amountPaidNowCents !== null && snapshot.amountPaidNowCents > 0) {
+        amounts.add(snapshot.amountPaidNowCents);
+    }
+    return [...amounts];
+}
+
+function validateStripeIntentAgainstBooking(paymentIntent, {
+    hotelId,
+    bookingDetails,
+    allowedStatuses = [],
+    allowedAmountsCents = [],
+    requireManualCapture = false,
+    requireHoldType = '',
+}) {
+    if (!paymentIntent?.id) {
+        return 'Payment authorization could not be found.';
+    }
+
+    if (allowedStatuses.length && !allowedStatuses.includes(String(paymentIntent.status || '').trim().toLowerCase())) {
+        return 'Payment authorization is not in a valid state for this booking.';
+    }
+
+    if (requireManualCapture && String(paymentIntent.capture_method || '').trim().toLowerCase() !== 'manual') {
+        return 'Payment authorization is not a valid pre-authorization hold.';
+    }
+
+    const snapshot = getStripeIntentSnapshot(paymentIntent);
+    const requestedHotelId = String(hotelId || '').trim();
+    if (!requestedHotelId) return 'hotelId is required.';
+    if (!snapshot.hotelId || snapshot.hotelId !== requestedHotelId) {
+        return 'Payment authorization does not belong to this hotel.';
+    }
+
+    if (requireHoldType && snapshot.holdType !== String(requireHoldType || '').trim().toLowerCase()) {
+        return 'Payment authorization is not valid for pay-later booking.';
+    }
+
+    const mismatch = findBookingSnapshotMismatch(normalizeBookingSnapshot(bookingDetails), snapshot.booking);
+    if (mismatch) return mismatch;
+
+    if (allowedAmountsCents.length && !allowedAmountsCents.includes(Number(paymentIntent.amount || 0))) {
+        return 'Payment authorization amount does not match the booking.';
+    }
+
+    return '';
+}
+
+async function getActiveHotelValidation(hotelId) {
+    const cleanHotelId = String(hotelId || '').trim();
+    if (!cleanHotelId) {
+        return { ok: false, status: 400, message: 'hotelId is required.' };
+    }
+    const override = await getHotelOverrideStatus(cleanHotelId);
+    if (override.status === 'inactive') {
+        return { ok: false, status: 403, message: `Hotel is inactive: ${cleanHotelId}` };
+    }
+    if (override.status !== 'ok') {
+        return { ok: false, status: 400, message: `Invalid hotelId: ${cleanHotelId}` };
+    }
+    return { ok: true, hotelId: cleanHotelId };
+}
+
+const routeRateLimitStore = new Map();
+
+function getRateLimitClientKey(req) {
+    return String(req.ip || req.socket?.remoteAddress || 'unknown')
+        .split(',')[0]
+        .trim()
+        .toLowerCase();
+}
+
+function createRouteRateLimiter(name, { windowMs, max }) {
+    return (req, res, next) => {
+        const now = Date.now();
+        const key = `${name}:${getRateLimitClientKey(req)}`;
+        const existing = routeRateLimitStore.get(key);
+        if (!existing || existing.resetAt <= now) {
+            routeRateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+            return next();
+        }
+
+        existing.count += 1;
+        if (existing.count > max) {
+            const retryAfter = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
+            res.set('Retry-After', String(retryAfter));
+            return res.status(429).json({
+                success: false,
+                message: 'Too many requests. Please wait a moment and try again.',
+            });
+        }
+
+        next();
+    };
+}
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of routeRateLimitStore.entries()) {
+        if (!value || value.resetAt <= now) routeRateLimitStore.delete(key);
+    }
+}, 5 * 60 * 1000).unref?.();
+
 function normalizeRevenueEmail(value) {
     return String(value || '').trim().toLowerCase();
 }
@@ -965,7 +1178,14 @@ function pushFunnelEvent(event_name, eventData) {
 
 // File: guest-lodge-backend/server.js
 
-app.post('/api/create-payment-intent', async (req, res) => {
+const createPaymentIntentRateLimit = createRouteRateLimiter('create-payment-intent', { windowMs: 60 * 1000, max: 15 });
+const createPreauthHoldRateLimit = createRouteRateLimiter('create-preauth-hold', { windowMs: 60 * 1000, max: 12 });
+const completePayLaterRateLimit = createRouteRateLimiter('complete-pay-later-booking', { windowMs: 60 * 1000, max: 12 });
+const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1000, max: 12 });
+const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
+const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 25 });
+
+app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
     const { amount, bookingDetails, guestInfo, hotelId } = req.body;
     const amountInCents = Math.round(amount * 100);
 
@@ -974,17 +1194,22 @@ app.post('/api/create-payment-intent', async (req, res) => {
     }
 
     try {
+        const hotelValidation = await getActiveHotelValidation(hotelId);
+        if (!hotelValidation.ok) {
+            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        }
+
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency: 'usd',
             automatic_payment_methods: {
                 enabled: true,
             },
-            metadata: {
-                bookingDetails: JSON.stringify(bookingDetails),
-                guestInfo: JSON.stringify(guestInfo),
-                hotelId: hotelId
-            }
+            metadata: buildStripeIntentMetadata({
+                bookingDetails,
+                guestInfo,
+                hotelId: hotelValidation.hotelId,
+            }),
         });
         res.send({ clientSecret: paymentIntent.client_secret });
     } catch (error) {
@@ -1014,12 +1239,17 @@ app.post('/api/update-payment-intent', async (req, res) => {
 });
 
 // NEW: Create pre-authorization hold for "Reserve Now, Pay Later"
-app.post('/api/create-preauth-hold', async (req, res) => {
+app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res) => {
     const { bookingDetails, guestInfo, hotelId } = req.body;
     
     const noShowFeeInCents = 100; // $1.00
 
     try {
+        const hotelValidation = await getActiveHotelValidation(hotelId);
+        if (!hotelValidation.ok) {
+            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        }
+
         // Create a PaymentIntent with manual capture
         // This places a hold on the card without charging
         const paymentIntent = await stripe.paymentIntents.create({
@@ -1029,14 +1259,16 @@ app.post('/api/create-preauth-hold', async (req, res) => {
             automatic_payment_methods: {
                 enabled: true,
             },
-            metadata: {
-                bookingDetails: JSON.stringify(bookingDetails),
-                guestInfo: JSON.stringify(guestInfo),
-                hotelId: hotelId,
-                bookingType: 'payLater',
-                noShowFeeAmount: '100',
-                holdType: 'pre_authorization'
-            },
+            metadata: buildStripeIntentMetadata({
+                bookingDetails,
+                guestInfo,
+                hotelId: hotelValidation.hotelId,
+                extra: {
+                    bookingType: 'payLater',
+                    noShowFeeAmount: '100',
+                    holdType: 'pre_authorization',
+                },
+            }),
             description: `Pre-authorization hold for ${bookingDetails.roomName} - ${bookingDetails.nights} nights`
         });
         
@@ -1053,30 +1285,50 @@ app.post('/api/create-preauth-hold', async (req, res) => {
 });
 
 // NEW: Complete pay later booking after pre-auth hold succeeds
-app.post('/api/complete-pay-later-booking', async (req, res) => {
+app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (req, res) => {
     const { paymentIntentId, guestInfo, bookingDetails, hotelId } = req.body;
 
     try {
+        if (!paymentIntentId) {
+            return res.status(400).json({ success: false, message: 'paymentIntentId is required.' });
+        }
+
+        const hotelValidation = await getActiveHotelValidation(hotelId);
+        if (!hotelValidation.ok) {
+            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        }
+
         // Verify the payment intent is authorized (not captured)
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-        
-        if (paymentIntent.status !== 'requires_capture') {
+
+        const paymentValidation = validateStripeIntentAgainstBooking(paymentIntent, {
+            hotelId: hotelValidation.hotelId,
+            bookingDetails,
+            allowedStatuses: ['requires_capture', 'succeeded'],
+            allowedAmountsCents: [100],
+            requireManualCapture: true,
+            requireHoldType: 'pre_authorization',
+        });
+        if (paymentValidation) {
             return res.status(400).json({ 
                 success: false, 
-                message: 'Pre-authorization hold not successful.' 
+                message: paymentValidation,
             });
         }
 
         // Create booking in PMS with "Pay at Hotel" status
-        const config = await resolveHotelConfig(hotelId);
+        const holdStatus = String(paymentIntent.status || '').trim().toLowerCase() === 'succeeded' ? 'captured' : 'active';
+        const config = await resolveHotelConfig(hotelValidation.hotelId);
 
         // BookingCenter pay-later: we still save a booking (guarantee/verification handled by $1 hold on Stripe)
         if (config.pms === 'bookingcenter') {
-            const pmsResponse = await createBookingCenterBooking(hotelId, bookingDetails, guestInfo);
+            const pmsResponse = await createBookingCenterBooking(hotelValidation.hotelId, bookingDetails, guestInfo);
 
             if (!pmsResponse.success) {
                 // If booking fails, cancel the hold
-                await stripe.paymentIntents.cancel(paymentIntentId);
+                if (paymentIntent.status === 'requires_capture') {
+                    await stripe.paymentIntents.cancel(paymentIntentId);
+                }
                 return res.status(400).json({
                     success: false,
                     message: pmsResponse.message || 'Failed to create reservation.'
@@ -1090,7 +1342,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelId,
+                        hotelId: hotelValidation.hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
                         bookingType: 'payLater',
                         checkinDate: new Date(bookingDetails.checkin),
@@ -1105,10 +1357,12 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         grandTotal: bookingDetails.total,
                         amountPaidNow: 0,
                         preAuthHoldAmount: 1.00,
-                        holdStatus: 'active'
+                        holdStatus: holdStatus,
+                        noShowFeePaid: holdStatus === 'captured',
+                        holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1122,7 +1376,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
 
         // Manual PMS pay-later flow
         if (config.pms === 'manual') {
-            const pmsResponse = await createManualBooking(hotelId, bookingDetails);
+            const pmsResponse = await createManualBooking(hotelValidation.hotelId, bookingDetails);
 
             try {
                 await prisma.booking.create({
@@ -1130,7 +1384,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelId,
+                        hotelId: hotelValidation.hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
                         bookingType: 'payLater',
                         checkinDate: new Date(bookingDetails.checkin),
@@ -1145,10 +1399,12 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         grandTotal: bookingDetails.total,
                         amountPaidNow: 0,
                         preAuthHoldAmount: 1.00,
-                        holdStatus: 'active'
+                        holdStatus: holdStatus,
+                        noShowFeePaid: holdStatus === 'captured',
+                        holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1219,7 +1475,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                             stripePaymentIntentId: paymentIntentId,
                             ourReservationCode: bookingDetails.reservationCode,
                             pmsConfirmationCode: pmsResponse.data.reservationID,
-                            hotelId: hotelId,
+                            hotelId: hotelValidation.hotelId,
                             roomName: bookingDetails.name || bookingDetails.roomName,
                             bookingType: 'payLater',
                             checkinDate: new Date(bookingDetails.checkin),
@@ -1234,11 +1490,13 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                             grandTotal: bookingDetails.total,
                             amountPaidNow: 0,
                             preAuthHoldAmount: 1.00,
-                            holdStatus: 'active'
+                            holdStatus: holdStatus,
+                            noShowFeePaid: holdStatus === 'captured',
+                            holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                         }
                     });
                     dbSaveSuccess = true;
-                    notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                    notifyNewBooking(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -1264,7 +1522,9 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
             });
         } else {
             // If booking fails, cancel the hold
-            await stripe.paymentIntents.cancel(paymentIntentId);
+            if (paymentIntent.status === 'requires_capture') {
+                await stripe.paymentIntents.cancel(paymentIntentId);
+            }
 
             console.error('❌ Cloudbeds reservation failed:', JSON.stringify(pmsResponse.data, null, 2));
 
@@ -1281,7 +1541,10 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
         
         // Try to cancel hold if something went wrong
         try {
-            await stripe.paymentIntents.cancel(paymentIntentId);
+            const paymentIntent = paymentIntentId ? await stripe.paymentIntents.retrieve(paymentIntentId) : null;
+            if (paymentIntent?.status === 'requires_capture') {
+                await stripe.paymentIntents.cancel(paymentIntentId);
+            }
         } catch (cancelError) {
             console.error("Failed to cancel hold:", cancelError.message);
         }
@@ -1296,12 +1559,15 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
 });
 
 // NEW: Release pre-auth hold when guest checks in
-app.post('/api/release-hold', async (req, res) => {
+app.post('/api/release-hold', crmAuth, async (req, res) => {
     const { bookingId } = req.body;
 
     try {
-        const booking = await prisma.booking.findUnique({
-            where: { id: bookingId }
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+
+        const booking = await prisma.booking.findFirst({
+            where: { id: bookingId, hotelId }
         });
 
         if (!booking || booking.bookingType !== 'payLater') {
@@ -1345,12 +1611,15 @@ app.post('/api/release-hold', async (req, res) => {
 });
 
 // NEW: Capture pre-auth hold as no-show fee
-app.post('/api/capture-no-show-fee', async (req, res) => {
+app.post('/api/capture-no-show-fee', crmAuth, async (req, res) => {
     const { bookingId } = req.body;
 
     try {
-        const booking = await prisma.booking.findUnique({
-            where: { id: bookingId }
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+
+        const booking = await prisma.booking.findFirst({
+            where: { id: bookingId, hotelId }
         });
 
         if (!booking || booking.bookingType !== 'payLater') {
@@ -2182,23 +2451,43 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
     };
 }
 
-app.post('/api/book', async (req, res) => {
+app.post('/api/book', publicBookingRateLimit, async (req, res) => {
     const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
     
-    if (!bookingDetails.rateID) {
+    if (!bookingDetails?.rateID) {
         return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
     }
 
     try {
-        const config = await resolveHotelConfig(hotelId);
+        if (!paymentIntentId) {
+            return res.status(400).json({ success: false, message: 'paymentIntentId is required.' });
+        }
+
+        const hotelValidation = await getActiveHotelValidation(hotelId);
+        if (!hotelValidation.ok) {
+            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        }
+
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const paymentValidation = validateStripeIntentAgainstBooking(paymentIntent, {
+            hotelId: hotelValidation.hotelId,
+            bookingDetails,
+            allowedStatuses: ['succeeded'],
+            allowedAmountsCents: getExpectedStandardChargeAmountsCents(bookingDetails),
+        });
+        if (paymentValidation) {
+            return res.status(400).json({ success: false, message: paymentValidation });
+        }
+
+        const config = await resolveHotelConfig(hotelValidation.hotelId);
         let pmsResponse;
 
         if (config.pms === 'cloudbeds') {
-            pmsResponse = await createCloudbedsBooking(hotelId, bookingDetails, guestInfo);
+            pmsResponse = await createCloudbedsBooking(hotelValidation.hotelId, bookingDetails, guestInfo);
         } else if (config.pms === 'bookingcenter') {
-            pmsResponse = await createBookingCenterBooking(hotelId, bookingDetails, guestInfo);
+            pmsResponse = await createBookingCenterBooking(hotelValidation.hotelId, bookingDetails, guestInfo);
         } else if (config.pms === 'manual') {
-            pmsResponse = await createManualBooking(hotelId, bookingDetails);
+            pmsResponse = await createManualBooking(hotelValidation.hotelId, bookingDetails);
         } else {
             return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
         }
@@ -2211,7 +2500,7 @@ app.post('/api/book', async (req, res) => {
                         stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelId,
+                        hotelId: hotelValidation.hotelId,
                         roomName: bookingDetails.name || bookingDetails.roomName,
                         bookingType: bookingDetails.bookingType || 'standard',
                         checkinDate: new Date(bookingDetails.checkin),
@@ -2226,7 +2515,7 @@ app.post('/api/book', async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
-                notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
             }
@@ -2355,9 +2644,13 @@ app.post('/api/track', async (req, res) => {
 });
 
 // --- Payment declined leads (for front desk to call) ---
-app.post('/api/payment-declined', async (req, res) => {
+app.post('/api/payment-declined', paymentDeclinedRateLimit, async (req, res) => {
     try {
         const { guestInfo, bookingDetails, errorCode, errorDeclineCode, errorMessage, hotelId, paymentMethod } = req.body;
+        const hotelValidation = await getActiveHotelValidation(hotelId);
+        if (!hotelValidation.ok) {
+            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        }
         if (!guestInfo?.firstName || !guestInfo?.lastName || !guestInfo?.email || !guestInfo?.phone) {
             return res.status(400).json({ success: false, message: 'Missing guest info' });
         }
@@ -2368,7 +2661,7 @@ app.post('/api/payment-declined', async (req, res) => {
         const checkoutStr = typeof bookingDetails.checkout === 'string' ? bookingDetails.checkout.split('T')[0] : '';
         await withRetry(() => prisma.paymentDeclinedLead.create({
             data: {
-                hotelId: hotelId || 'suite-stay',
+                hotelId: hotelValidation.hotelId,
                 guestFirstName: guestInfo.firstName,
                 guestLastName: guestInfo.lastName,
                 guestEmail: guestInfo.email,
@@ -2386,7 +2679,7 @@ app.post('/api/payment-declined', async (req, res) => {
         }));
         
         // Send urgent push notification for payment decline
-        notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMessage).catch((err) => {
+        notifyPaymentDeclined(hotelValidation.hotelId, guestInfo, bookingDetails, errorMessage).catch((err) => {
             console.error('Failed to send payment declined notification:', err.message);
         });
         
@@ -2762,6 +3055,15 @@ async function resolveCrmHostHotelContext(req) {
         };
     }
     if (resolved.status !== 'mapped') {
+        const explicitHotelId = String(req.query?.hotelId || req.body?.hotelId || '').trim();
+        if (explicitHotelId) {
+            return {
+                ok: true,
+                hotelId: null,
+                domain: requestedDomain,
+                source: 'explicit-fallback',
+            };
+        }
         return {
             ok: false,
             status: 404,
@@ -3507,7 +3809,7 @@ app.get('/analytics', (req, res) => {
 });
 
 // Verify PIN only (no DB) - helps debug auth vs DB issues
-app.get('/api/crm/verify', crmAuth, async (req, res) => {
+app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
