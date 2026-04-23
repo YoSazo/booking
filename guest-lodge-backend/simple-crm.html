@@ -30,32 +30,10 @@
       background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
     }
-    .status-card {
-      width: min(420px, calc(100vw - 32px));
-      padding: 40px 32px;
-    }
     .login-logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
     .login-logo-icon { height: 48px; width: auto; }
     .login-logo-text { height: 28px; width: auto; }
     .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
-    .status-title {
-      font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 12px;
-    }
-    .status-message {
-      font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 0;
-    }
-    .status-spinner-wrap {
-      display: flex; align-items: center; justify-content: center; margin: 18px 0 8px;
-    }
-    .status-spinner {
-      width: 28px; height: 28px; border-width: 3px;
-    }
-    .status-debug {
-      margin-top: 18px; padding: 12px 14px; border-radius: 12px; background: var(--bg);
-      color: var(--text-muted); font-size: 12px; line-height: 1.5; text-align: left;
-      word-break: break-word; display: none;
-    }
-    .status-actions { margin-top: 18px; }
     .login-input {
       width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
       border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
@@ -953,27 +931,8 @@
 </head>
 <body>
 
-<!-- BOOT -->
-<div id="bootScreen" class="login-screen">
-  <div class="login-card status-card">
-    <div class="login-logo">
-      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
-      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
-    </div>
-    <div class="status-title" id="bootTitle">Connecting to hotel...</div>
-    <p class="status-message" id="bootMessage">Checking this domain and loading front desk context.</p>
-    <div class="status-spinner-wrap" id="bootSpinnerWrap">
-      <div class="spinner status-spinner"></div>
-    </div>
-    <div class="status-debug" id="bootDebug"></div>
-    <div class="status-actions">
-      <button class="login-btn" id="bootRetryBtn" onclick="bootCrmApp()" style="display:none">Retry</button>
-    </div>
-  </div>
-</div>
-
 <!-- LOGIN -->
-<div id="loginScreen" class="login-screen" style="display:none">
+<div id="loginScreen" class="login-screen">
   <div class="login-card">
     <div class="login-logo">
       <img src="/marketellogo.svg" alt="" class="login-logo-icon">
@@ -1055,123 +1014,34 @@ let revenuePeriod = '30d';
 let revenueCache = {};
 let revenueLoading = false;
 let revenueError = '';
-let activeHotelId = '';
-let activeHotelName = '';
-let activeHotelDomain = '';
-let activeHotelContext = null;
-let bootInFlight = false;
 const REVENUE_ROOM_COLORS = ['#2E7D5B', '#4CAF7D', '#8BC4AA', '#C8EDD9', '#5A9E7D'];
+const CRM_HOTEL_BY_HOST = {
+  'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
+  'stcroix.clickinns.com': 'st-croix-wisconsin',
+  'homeplacesuites.clickinns.com': 'home-place-suites',
+  'myhomeplacesuites.com': 'home-place-suites',
+  'www.myhomeplacesuites.com': 'home-place-suites',
+  'suitestay.clickinns.com': 'suite-stay',
+  'clickinns.com': 'suite-stay',
+  'www.clickinns.com': 'suite-stay',
+};
 
-try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
-
-function getContextParam(name) {
+function resolveCrmHotelId() {
   try {
     const params = new URLSearchParams(window.location.search || '');
-    return String(params.get(name) || '').trim();
-  } catch (e) {
-    return '';
-  }
+    const byParam = String(params.get('hotelId') || '').trim();
+    if (byParam) return byParam;
+  } catch (e) {}
+
+  const host = (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';
+  if (host && CRM_HOTEL_BY_HOST[host]) return CRM_HOTEL_BY_HOST[host];
+  if (host === 'localhost' || host === '127.0.0.1') return 'guest-lodge-minot';
+  return 'guest-lodge-minot';
 }
 
-function getDetectedHostname() {
-  return (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';
-}
+const activeHotelId = resolveCrmHotelId();
 
-function buildHotelContextUrl() {
-  const url = new URL('/api/hotel-context', window.location.origin);
-  const overrideHotelId = getContextParam('hotelId');
-  const overrideDomain = getContextParam('domain');
-  if (overrideHotelId) url.searchParams.set('hotelId', overrideHotelId);
-  if (overrideDomain) url.searchParams.set('domain', overrideDomain);
-  return url.toString();
-}
-
-function updateHotelChrome() {
-  const label = activeHotelName ? `Front Desk · ${activeHotelName}` : 'Front Desk';
-  const headerSuffix = document.querySelector('.header-logo-suffix');
-  if (headerSuffix) headerSuffix.textContent = label;
-  const loginCopy = document.querySelector('#loginScreen p');
-  if (loginCopy) {
-    loginCopy.textContent = activeHotelName
-      ? `${activeHotelName} — Enter your PIN to continue`
-      : 'Front Desk — Enter your PIN to continue';
-  }
-  document.title = activeHotelName ? `Marketel · ${activeHotelName} Front Desk` : 'Marketel · Front Desk';
-}
-
-function showBootState({ title, message, debug = '', showRetry = false } = {}) {
-  document.getElementById('bootScreen').style.display = 'flex';
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('bootTitle').textContent = title || 'Connecting to hotel...';
-  document.getElementById('bootMessage').textContent = message || 'Checking this domain and loading front desk context.';
-  const debugEl = document.getElementById('bootDebug');
-  debugEl.textContent = debug || '';
-  debugEl.style.display = debug ? 'block' : 'none';
-  document.getElementById('bootSpinnerWrap').style.display = showRetry ? 'none' : 'flex';
-  document.getElementById('bootRetryBtn').style.display = showRetry ? 'block' : 'none';
-}
-
-function formatContextDebugLines(lines) {
-  return lines.filter(Boolean).join('\n');
-}
-
-function showHotelContextError(error) {
-  const status = Number(error && error.status) || 0;
-  const host = getDetectedHostname() || 'unknown';
-  const domain = (error && error.domain) ? String(error.domain) : '';
-  const message = (error && error.message) ? String(error.message) : 'Could not load hotel context.';
-  const debug = formatContextDebugLines([
-    `Detected host: ${host}`,
-    domain && domain !== host ? `Resolved domain: ${domain}` : '',
-    activeHotelId ? `Hotel ID: ${activeHotelId}` : '',
-  ]);
-
-  if (!status) {
-    showBootState({
-      title: 'Network error',
-      message: 'Could not reach the server to resolve this hotel. Check the network connection and try again.',
-      debug,
-      showRetry: true,
-    });
-    return;
-  }
-
-  showBootState({
-    title: status === 404 ? 'Hotel not linked'
-      : status === 403 ? 'Hotel inactive'
-      : 'Hotel context error',
-    message,
-    debug,
-    showRetry: true,
-  });
-}
-
-async function loadHotelContext() {
-  const res = await fetch(buildHotelContextUrl(), { headers: { 'Accept': 'application/json' } });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.success) {
-    const err = new Error(json.message || `Failed to load hotel context (${res.status})`);
-    err.status = res.status;
-    err.domain = (json && json.domain) || getDetectedHostname();
-    throw err;
-  }
-
-  const data = json.data || {};
-  const config = data.config || {};
-  if (!data.hotelId) {
-    const err = new Error('Hotel context response is missing hotelId.');
-    err.status = 500;
-    throw err;
-  }
-
-  activeHotelId = String(data.hotelId || '').trim();
-  activeHotelName = String(config.name || data.hotelId || '').trim();
-  activeHotelDomain = String(data.domain || getDetectedHostname() || '').trim();
-  activeHotelContext = data;
-  updateHotelChrome();
-  return data;
-}
+try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1639,7 +1509,6 @@ function bindAvailabilityUiEvents() {
 
 // ── LOGIN ──────────────────────────────────────────────
 async function verifyCrmToken(pin) {
-  if (!activeHotelId) throw new Error('Hotel context is not ready yet.');
   const res = await fetch(`/api/crm/verify?hotelId=${encodeURIComponent(activeHotelId)}`, {
     headers: { 'x-crm-token': pin }
   });
@@ -1658,7 +1527,6 @@ async function startCrmApp(verification) {
   revenueError = '';
   ensureAvailabilityUi();
   syncRevenueUi();
-  document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
@@ -1679,7 +1547,6 @@ async function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   const err = document.getElementById('loginError');
   err.textContent = '';
-  if (!activeHotelId) { err.textContent = 'Hotel context is still loading'; return; }
   if (!pin) { err.textContent = 'Please enter PIN'; return; }
   
   // Verify PIN with server first
@@ -1689,13 +1556,12 @@ async function doLogin() {
     try { localStorage.setItem('crmToken', token); } catch(e) {}
     await startCrmApp(verification);
   } catch (e) {
-    err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : (e.message || 'Connection failed');
+    err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : 'Connection failed';
   }
 }
 
 // ── API ────────────────────────────────────────────────
 async function api(method, path, body) {
-  if (!activeHotelId) throw new Error('Hotel context is not loaded.');
   const url = new URL(path, window.location.origin);
   if (!url.searchParams.get('hotelId')) {
     url.searchParams.set('hotelId', activeHotelId);
@@ -1714,7 +1580,6 @@ async function api(method, path, body) {
 }
 
 function showLogin() {
-  document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   token = '';
@@ -1725,41 +1590,6 @@ function showLogin() {
   revenueError = '';
   syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
-}
-
-async function bootCrmApp() {
-  if (bootInFlight) return;
-  bootInFlight = true;
-  activeHotelId = '';
-  activeHotelName = '';
-  activeHotelDomain = '';
-  activeHotelContext = null;
-  updateHotelChrome();
-  showBootState({
-    title: 'Connecting to hotel...',
-    message: 'Checking this domain and loading front desk context.',
-    debug: formatContextDebugLines([`Detected host: ${getDetectedHostname() || 'unknown'}`]),
-    showRetry: false,
-  });
-
-  try {
-    await loadHotelContext();
-    if (token) {
-      try {
-        const verification = await verifyCrmToken(token);
-        await startCrmApp(verification);
-        return;
-      } catch (e) {
-        showLogin();
-        return;
-      }
-    }
-    showLogin();
-  } catch (e) {
-    showHotelContextError(e);
-  } finally {
-    bootInFlight = false;
-  }
 }
 
 // ── LOAD ───────────────────────────────────────────────
@@ -1791,7 +1621,6 @@ async function loadBookings() {
 }
 
 async function refreshCurrentView() {
-  if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -2632,7 +2461,13 @@ function toast(msg, type = '') {
 // ── INIT ───────────────────────────────────────────────
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-bootCrmApp();
+
+if (token) {
+  verifyCrmToken(token)
+    .then(startCrmApp)
+    .catch(() => showLogin());
+}
+
 setInterval(refreshCurrentView, 30000);
 </script>
 </body>
