@@ -1558,8 +1558,12 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
     }
 });
 
+function requireCrmAuthDeferred(req, res, next) {
+    return crmAuth(req, res, next);
+}
+
 // NEW: Release pre-auth hold when guest checks in
-app.post('/api/release-hold', crmAuth, async (req, res) => {
+app.post('/api/release-hold', requireCrmAuthDeferred, async (req, res) => {
     const { bookingId } = req.body;
 
     try {
@@ -1611,7 +1615,7 @@ app.post('/api/release-hold', crmAuth, async (req, res) => {
 });
 
 // NEW: Capture pre-auth hold as no-show fee
-app.post('/api/capture-no-show-fee', crmAuth, async (req, res) => {
+app.post('/api/capture-no-show-fee', requireCrmAuthDeferred, async (req, res) => {
     const { bookingId } = req.body;
 
     try {
