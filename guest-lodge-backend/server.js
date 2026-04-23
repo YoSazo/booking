@@ -227,7 +227,9 @@ const hotelConfig = {
 };
 
 const HOTEL_CONFIG_CACHE_TTL_MS = 30 * 1000;
+const HOTEL_DOMAIN_CACHE_TTL_MS = 30 * 1000;
 const hotelConfigCache = new Map();
+const hotelDomainCache = new Map();
 
 function normalizeHotelConfig(input = {}) {
     const normalized = {
@@ -238,6 +240,10 @@ function normalizeHotelConfig(input = {}) {
         normalized.roomIDMapping = {};
     }
     return normalized;
+}
+
+function clearHotelDomainCache() {
+    hotelDomainCache.clear();
 }
 
 async function getDbHotelConfig(hotelId) {
@@ -1102,7 +1108,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         holdStatus: 'active'
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1142,7 +1148,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         holdStatus: 'active'
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1232,7 +1238,7 @@ app.post('/api/complete-pay-later-booking', async (req, res) => {
                         }
                     });
                     dbSaveSuccess = true;
-                    notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName).catch(() => {});
+                    notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -1444,11 +1450,6 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 // If the record exists, the frontend was successful. Our job is done.
                 console.log('✅ Frontend call was successful. Webhook signing off. No duplicates created.');
                 
-                // Send push notification for new booking
-                const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
-                const roomName = bookingDetails.roomName || bookingDetails.name;
-                notifyNewBooking(guestName, roomName).catch(() => {});
-                
                 return res.json({ received: true });
             }
 
@@ -1518,7 +1519,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 // 3. Send push notification
                 const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
                 const roomName = bookingDetails.roomName || bookingDetails.name;
-                notifyNewBooking(guestName, roomName).catch(() => {});
+                notifyNewBooking(hotelId, guestName, roomName, bookingDetails.total).catch(() => {});
 
                 // 4. Fire purchase event via Meta CAPI since the webhook did the work.
                 sendToMetaCAPI('Purchase', {
@@ -2225,7 +2226,7 @@ app.post('/api/book', async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
-                notifyNewBooking([guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
+                notifyNewBooking(hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
             }
@@ -2385,7 +2386,7 @@ app.post('/api/payment-declined', async (req, res) => {
         }));
         
         // Send urgent push notification for payment decline
-        notifyPaymentDeclined(guestInfo, bookingDetails, errorMessage).catch((err) => {
+        notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMessage).catch((err) => {
             console.error('Failed to send payment declined notification:', err.message);
         });
         
@@ -2474,33 +2475,41 @@ async function getDbAllowedHotelsForToken(token) {
 function getRequestedCrmHotelId(req) {
     const queryHotel = String(req.query?.hotelId || '').trim();
     const bodyHotel = String(req.body?.hotelId || '').trim();
-    return queryHotel || bodyHotel || req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
+    return queryHotel || bodyHotel || req.crmResolvedHotelId || req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
 }
 
 function resolveScopedHotelId(req, { allowFallback = true } = {}) {
-    const requested = getRequestedCrmHotelId(req);
+    const queryHotel = String(req.query?.hotelId || '').trim();
+    const bodyHotel = String(req.body?.hotelId || '').trim();
+    const requested = queryHotel || bodyHotel;
     const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
+    const resolvedHotelId = String(req.crmResolvedHotelId || '').trim();
     if (!allowed.length) return null;
+    if (resolvedHotelId) {
+        if (!allowed.includes(resolvedHotelId)) return null;
+        if (requested && requested !== resolvedHotelId) return null;
+        return resolvedHotelId;
+    }
     if (requested && allowed.includes(requested)) return requested;
-    return allowFallback ? allowed[0] : null;
+    return allowFallback ? (req.crmDefaultHotelId || allowed[0]) : null;
 }
 
 function requireScopedHotelId(req, res) {
-    const requested = getRequestedCrmHotelId(req);
+    const requested = String(req.query?.hotelId || req.body?.hotelId || '').trim();
+    const resolvedHotelId = String(req.crmResolvedHotelId || '').trim();
     const hotelId = resolveScopedHotelId(req, { allowFallback: false });
     if (hotelId) return hotelId;
     res.status(403).json({
         success: false,
-        message: requested
-            ? `Unauthorized hotel context: ${requested}`
+        message: resolvedHotelId && requested && requested !== resolvedHotelId
+            ? `Unauthorized hotel context: ${requested}. This domain is locked to ${resolvedHotelId}.`
+            : requested
+                ? `Unauthorized hotel context: ${requested}`
+                : resolvedHotelId
+                    ? `PIN is not authorized for hotel: ${resolvedHotelId}`
             : 'Missing authorized hotel context.',
     });
     return null;
-}
-
-function getAllowedHotelFilter(req) {
-    const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
-    return { in: allowed.length ? allowed : [DEFAULT_CRM_HOTEL_ID] };
 }
 
 const crmAuth = async (req, res, next) => {
@@ -2508,9 +2517,26 @@ const crmAuth = async (req, res, next) => {
     const dbAllowedHotels = await getDbAllowedHotelsForToken(token).catch(() => []);
     const allowedHotels = dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []);
     if (!token || !allowedHotels?.length) return res.status(401).json({ error: 'Unauthorized' });
+    const hostContext = await resolveCrmHostHotelContext(req);
+    if (!hostContext.ok) {
+        return res.status(hostContext.status).json({
+            success: false,
+            message: hostContext.message,
+            domain: hostContext.domain || null,
+        });
+    }
+    if (hostContext.hotelId && !allowedHotels.includes(hostContext.hotelId)) {
+        return res.status(403).json({
+            success: false,
+            message: `PIN is not authorized for hotel: ${hostContext.hotelId}`,
+            hotelId: hostContext.hotelId,
+        });
+    }
     req.crmToken = token;
     req.crmAllowedHotels = allowedHotels;
-    req.crmDefaultHotelId = allowedHotels[0];
+    req.crmResolvedHotelId = hostContext.hotelId || null;
+    req.crmResolvedDomain = hostContext.domain || null;
+    req.crmDefaultHotelId = hostContext.hotelId || allowedHotels[0];
     next();
 };
 
@@ -2535,8 +2561,10 @@ function normalizePmsType(value) {
 
 function normalizeDomain(value) {
     return String(value || '').trim().toLowerCase()
+        .split(',')[0].trim()
         .replace(/^https?:\/\//, '')
-        .replace(/\/.*$/, '');
+        .replace(/\/.*$/, '')
+        .replace(/:\d+$/, '');
 }
 
 function normalizeDomainList(domains = [], primaryDomain = '') {
@@ -2566,28 +2594,203 @@ function sanitizeConfigForResponse(cfg) {
 
 async function resolveHotelIdFromDomain(domain) {
     const clean = normalizeDomain(domain);
-    if (!clean || !prisma.hotelDomain) return null;
+    const context = await resolveHotelDomainContext(clean);
+    return context.status === 'mapped' ? context.hotelId : null;
+}
+
+function isLocalDevelopmentHost(domain) {
+    const clean = normalizeDomain(domain);
+    return !clean
+        || clean === 'localhost'
+        || clean === '127.0.0.1'
+        || clean === '::1'
+        || clean === '[::1]'
+        || clean.endsWith('.onrender.com')
+        || clean.endsWith('.vercel.app');
+}
+
+function getRequestContextDomain(req, { preferQueryDomain = true } = {}) {
+    if (preferQueryDomain) {
+        const requestedDomain = normalizeDomain(req.query?.domain || '');
+        if (requestedDomain) return requestedDomain;
+    }
+    const forwardedHost = normalizeDomain(req.headers['x-forwarded-host'] || '');
+    if (forwardedHost) return forwardedHost;
+    return normalizeDomain(req.hostname || '');
+}
+
+async function getHotelOverrideStatus(hotelId) {
+    const cleanHotelId = String(hotelId || '').trim();
+    if (!cleanHotelId) return { status: 'invalid' };
+
+    if (prisma.hotelConfig) {
+        const row = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: cleanHotelId },
+            select: { id: true, active: true },
+        }));
+        if (row) {
+            return row.active
+                ? { status: 'ok', hotelId: cleanHotelId, source: 'db' }
+                : { status: 'inactive', hotelId: cleanHotelId, source: 'db' };
+        }
+    }
+
+    try {
+        getStaticHotelConfig(cleanHotelId);
+        return { status: 'ok', hotelId: cleanHotelId, source: 'static' };
+    } catch (err) {
+        return { status: 'invalid' };
+    }
+}
+
+async function resolveHotelDomainContext(domain) {
+    const clean = normalizeDomain(domain);
+    if (!clean) return { status: 'unmapped', domain: clean };
+    if (!prisma.hotelDomain) return { status: 'unmapped', domain: clean };
+
+    const cached = hotelDomainCache.get(clean);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
     const row = await withRetry(() => prisma.hotelDomain.findUnique({
         where: { domain: clean },
         select: { hotelId: true, hotel: { select: { active: true } } },
     }));
-    if (!row || !row.hotel?.active) return null;
-    return row.hotelId;
+
+    const value = !row
+        ? { status: 'unmapped', domain: clean }
+        : row.hotel?.active
+            ? { status: 'mapped', domain: clean, hotelId: row.hotelId }
+            : { status: 'inactive', domain: clean, hotelId: row.hotelId };
+
+    hotelDomainCache.set(clean, {
+        value,
+        expiresAt: Date.now() + HOTEL_DOMAIN_CACHE_TTL_MS,
+    });
+    return value;
+}
+
+async function resolveHotelContextRequest(req) {
+    const explicitHotelId = String(req.query?.hotelId || '').trim();
+    const requestedDomain = getRequestContextDomain(req, { preferQueryDomain: true });
+
+    if (explicitHotelId) {
+        if (!isLocalDevelopmentHost(requestedDomain)) {
+            return {
+                ok: false,
+                status: 400,
+                message: 'hotelId override is allowed only on localhost/dev requests.',
+                domain: requestedDomain,
+            };
+        }
+
+        const override = await getHotelOverrideStatus(explicitHotelId);
+        if (override.status === 'inactive') {
+            return {
+                ok: false,
+                status: 403,
+                message: `Hotel override is inactive: ${explicitHotelId}`,
+                domain: requestedDomain,
+                hotelId: explicitHotelId,
+            };
+        }
+        if (override.status !== 'ok') {
+            return {
+                ok: false,
+                status: 400,
+                message: `Invalid hotel override: ${explicitHotelId}`,
+                domain: requestedDomain,
+            };
+        }
+        return {
+            ok: true,
+            hotelId: explicitHotelId,
+            domain: requestedDomain,
+            source: 'override',
+        };
+    }
+
+    if (isLocalDevelopmentHost(requestedDomain)) {
+        return {
+            ok: false,
+            status: 400,
+            message: 'Local development requires ?hotelId=... to resolve hotel context.',
+            domain: requestedDomain,
+        };
+    }
+
+    const resolved = await resolveHotelDomainContext(requestedDomain);
+    if (resolved.status === 'inactive') {
+        return {
+            ok: false,
+            status: 403,
+            message: 'This domain is linked to an inactive hotel.',
+            domain: requestedDomain,
+            hotelId: resolved.hotelId,
+        };
+    }
+    if (resolved.status !== 'mapped') {
+        return {
+            ok: false,
+            status: 404,
+            message: 'This domain is not linked to a hotel.',
+            domain: requestedDomain,
+        };
+    }
+
+    return {
+        ok: true,
+        hotelId: resolved.hotelId,
+        domain: requestedDomain,
+        source: 'domain',
+    };
+}
+
+async function resolveCrmHostHotelContext(req) {
+    const requestedDomain = getRequestContextDomain(req, { preferQueryDomain: false });
+    if (isLocalDevelopmentHost(requestedDomain)) {
+        return { ok: true, hotelId: null, domain: requestedDomain, source: 'local' };
+    }
+
+    const resolved = await resolveHotelDomainContext(requestedDomain);
+    if (resolved.status === 'inactive') {
+        return {
+            ok: false,
+            status: 403,
+            message: 'This domain is linked to an inactive hotel.',
+            domain: requestedDomain,
+            hotelId: resolved.hotelId,
+        };
+    }
+    if (resolved.status !== 'mapped') {
+        return {
+            ok: false,
+            status: 404,
+            message: 'This domain is not linked to a hotel.',
+            domain: requestedDomain,
+        };
+    }
+
+    return {
+        ok: true,
+        hotelId: resolved.hotelId,
+        domain: requestedDomain,
+        source: 'domain',
+    };
 }
 
 app.get('/api/hotel-context', async (req, res) => {
     try {
-        const explicitHotelId = String(req.query.hotelId || '').trim();
-        const requestedDomain =
-            String(req.query.domain || '').trim() ||
-            String((req.headers['x-forwarded-host'] || '').split(',')[0] || '').trim() ||
-            String(req.hostname || '').trim();
-
-        let hotelId = explicitHotelId;
-        if (!hotelId) {
-            hotelId = await resolveHotelIdFromDomain(requestedDomain);
+        const context = await resolveHotelContextRequest(req);
+        if (!context.ok) {
+            return res.status(context.status).json({
+                success: false,
+                message: context.message,
+                domain: context.domain || null,
+                hotelId: context.hotelId || null,
+            });
         }
-        if (!hotelId) hotelId = DEFAULT_CRM_HOTEL_ID;
+
+        const hotelId = context.hotelId;
 
         const config = await resolveHotelConfig(hotelId);
         const manualRooms = (config.pms === 'manual' && prisma.manualRoom)
@@ -2602,7 +2805,7 @@ app.get('/api/hotel-context', async (req, res) => {
             success: true,
             data: {
                 hotelId,
-                domain: normalizeDomain(requestedDomain),
+                domain: context.domain || null,
                 config: sanitizeConfigForResponse(config),
                 manualRooms,
             },
@@ -2704,6 +2907,7 @@ app.post('/api/admin/hotels', adminAuth, async (req, res) => {
         }));
 
         hotelConfigCache.delete(hotelId);
+        clearHotelDomainCache();
         const config = await resolveHotelConfig(hotelId);
         res.json({ success: true, data: sanitizeConfigForResponse(config), hotelId, domains });
     } catch (e) {
@@ -2782,6 +2986,8 @@ app.get('/api/push/vapid-public', (req, res) => {
 // PWA push: save subscription (CRM auth required). Optional body.source: 'crm' | 'funnel'
 app.post('/api/push/subscribe', crmAuth, async (req, res) => {
     try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         console.log('Push subscribe called, body:', JSON.stringify(req.body));
         const { endpoint, p256dh, auth, source } = req.body || {};
         console.log('endpoint:', endpoint ? 'present' : 'missing');
@@ -2801,12 +3007,12 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
             console.log('Updating existing subscription...');
             await prisma.pushSubscription.update({
                 where: { id: existing.id },
-                data: { p256dh, auth, source: subSource },
+                data: { p256dh, auth, source: subSource, hotelId },
             });
         } else {
             console.log('Creating new subscription...');
             await prisma.pushSubscription.create({
-                data: { endpoint, p256dh, auth, source: subSource },
+                data: { endpoint, p256dh, auth, source: subSource, hotelId },
             });
         }
         console.log('Subscription saved successfully');
@@ -2818,10 +3024,11 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
 });
 
 // Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
-async function notifyNewBooking(guestName, roomName, grandTotal) {
-    if (!VAPID_PRIVATE) return;
+async function notifyNewBooking(hotelId, guestName, roomName, grandTotal) {
+    if (!VAPID_PRIVATE || !hotelId) return;
     try {
-        const subs = await prisma.pushSubscription.findMany();
+        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+        if (subs.length === 0) return;
         
         let bodyText = '';
         if (guestName) bodyText += guestName;
@@ -2854,10 +3061,10 @@ async function notifyNewBooking(guestName, roomName, grandTotal) {
 
 
 // Notify about payment declined leads (URGENT - call within 60 seconds!)
-async function notifyPaymentDeclined(guestInfo, bookingDetails, errorMessage) {
-    if (!VAPID_PRIVATE) return;
+async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMessage) {
+    if (!VAPID_PRIVATE || !hotelId) return;
     try {
-        const subs = await prisma.pushSubscription.findMany();
+        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
         if (subs.length === 0) return;
 
         const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || 'Guest';
@@ -2926,8 +3133,10 @@ app.get('/simple-crm', (req, res) => {
 app.post('/api/crm/bookings/:id/confirm', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const bookingMatch = await withRetry(() => prisma.booking.findFirst({
-            where: { id, hotelId: getAllowedHotelFilter(req) },
+            where: { id, hotelId },
             select: { id: true },
         }));
         if (!bookingMatch) return res.status(404).json({ error: 'Booking not found' });
@@ -2951,13 +3160,15 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { note } = req.body;
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         
         if (!note) {
             return res.status(400).json({ error: 'Note is required' });
         }
         
         const bookingMatch = await withRetry(() => prisma.booking.findFirst({
-            where: { id, hotelId: getAllowedHotelFilter(req) },
+            where: { id, hotelId },
             select: { id: true },
         }));
         if (!bookingMatch) return res.status(404).json({ error: 'Booking not found' });
@@ -2978,7 +3189,8 @@ app.post('/api/crm/bookings/:id/note', crmAuth, async (req, res) => {
 // Add dummy bookings (for testing)
 app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     try {
-        const hotelId = req.crmDefaultHotelId || DEFAULT_CRM_HOTEL_ID;
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const now = new Date();
         const dates = [
             new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000), // tomorrow
@@ -3661,7 +3873,7 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
             },
         }));
 
-        notifyNewBooking([guestFirstName, guestLastName].filter(Boolean).join(' ') || null, roomName).catch(() => {});
+        notifyNewBooking(hotelId, [guestFirstName, guestLastName].filter(Boolean).join(' ') || null, roomName, grandTotal).catch(() => {});
         res.json({ success: true, data: booking });
     } catch (e) {
         console.error('CRM manual booking create error:', e.message);
@@ -3673,8 +3885,10 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
 app.post('/api/crm/update', crmAuth, async (req, res) => {
     try {
         const { id, crmStage, callStatus, notes, callLog } = req.body;
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const bookingMatch = await withRetry(() => prisma.booking.findFirst({
-            where: { id, hotelId: getAllowedHotelFilter(req) },
+            where: { id, hotelId },
             select: { id: true },
         }));
         if (!bookingMatch) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -3712,8 +3926,10 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const { called, notes } = req.body;
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const leadMatch = await withRetry(() => prisma.paymentDeclinedLead.findFirst({
-            where: { id, hotelId: getAllowedHotelFilter(req) },
+            where: { id, hotelId },
             select: { id: true },
         }));
         if (!leadMatch) return res.status(404).json({ success: false, message: 'Lead not found' });
@@ -3732,8 +3948,10 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
 app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
         const bookingMatch = await withRetry(() => prisma.booking.findFirst({
-            where: { id, hotelId: getAllowedHotelFilter(req) },
+            where: { id, hotelId },
             select: { id: true },
         }));
         if (!bookingMatch) return res.status(404).json({ success: false, message: 'Booking not found or already deleted.' });
