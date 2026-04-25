@@ -135,6 +135,30 @@ const getMobileStyles = () => {
 
 const mobileStyles = getMobileStyles();
 
+const PHONE_PREFIX = '+1 ';
+
+function extractUsPhoneLocalDigits(inputValue) {
+    const normalizedInput = String(inputValue || '');
+    const rawDigits = normalizedInput.replace(/\D/g, '');
+    if (!rawDigits) return '';
+
+    let localDigits = rawDigits;
+
+    // The controlled field renders with a visible "+1 " prefix, so strip that
+    // country-code digit before we treat the rest as user-entered digits.
+    if (normalizedInput.trim().startsWith('+1')) {
+        localDigits = rawDigits.startsWith('1') ? rawDigits.slice(1) : rawDigits;
+    } else if (localDigits.length > 10 && localDigits.startsWith('1')) {
+        localDigits = localDigits.slice(1);
+    }
+
+    return localDigits.slice(0, 10);
+}
+
+function formatUsPhoneValue(localDigits) {
+    return `${PHONE_PREFIX}${String(localDigits || '')}`;
+}
+
     // In GuestInfoPage.jsx, add this function alongside your other handlers
 
 const handleAddressPaste = (e) => {
@@ -594,20 +618,12 @@ useEffect(() => {
             console.warn('handlePhoneChange called without valid event object');
             return;
         }
-        
-    // Canonical US format: +1 + 10 local digits.
-    // If user pastes/types country code as leading 1, drop it once.
-    const rawDigits = String(e.target.value || '').replace(/\D/g, '');
-    let localDigits = rawDigits;
-    if (localDigits.length > 10 && localDigits.startsWith('1')) {
-      localDigits = localDigits.slice(1);
-    }
-    localDigits = localDigits.slice(0, 10);
 
-    const value = `+1 ${localDigits}`;
-    const digitCount = localDigits.length + 1;
+        const localDigits = extractUsPhoneLocalDigits(e.target.value);
+        const value = formatUsPhoneValue(localDigits);
+        const digitCount = localDigits.length + 1;
 
-    setFormData(prev => ({ ...prev, phone: value }));
+        setFormData(prev => ({ ...prev, phone: value }));
         
         // Real-time validation feedback for phone
         if (formErrors.phone) {
