@@ -1196,6 +1196,52 @@
       .revenue-bottom-grid { grid-template-columns: 1fr; }
       .revenue-value { font-size: 20px; }
     }
+
+    /* Mobile overflow safeguards for header + calendar */
+    @media (max-width: 600px) {
+      .header {
+        flex-wrap: nowrap;
+        min-width: 0;
+      }
+      .header-logo {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .header-logo-suffix {
+        display: inline-block;
+        min-width: 0;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .header-right {
+        flex: 0 0 auto;
+        max-width: 46%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+      }
+      .container,
+      .availability-view,
+      .rooms-shell,
+      .availability-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+      .cal-grid {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+      }
+      .cal-day,
+      .cal-dow {
+        min-width: 0;
+      }
+    }
   </style>
 </head>
 <body>
