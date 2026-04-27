@@ -2,15 +2,18 @@ param(
   [string]$BaseUrl = "https://guest-lodge-backend.onrender.com",
   [string]$AdminToken = "",
   [string]$HotelDataPath = "C:\Users\samat\BOOKING\hotel-booking-app\src\hotelData.js",
+  [string]$GetHotelIdPath = "C:\Users\samat\BOOKING\hotel-booking-app\src\utils\getHotelId.js",
   [string]$HotelId = "",
   [string]$HotelName = "",
   [string]$Pms = "",
-  [string]$Domains = "",
+  [string[]]$Domains = @(),
   [string]$PrimaryDomain = "",
   [string]$Pin = "",
   [string]$PinLabel = "Owner",
   [string]$PhoneForFrontend = "",
   [string]$AddressForFrontend = "",
+  [string]$BookingBaseUrl = "",
+  [string]$ManualRooms = "",
   [switch]$NonInteractive,
   [switch]$DryRun,
   [switch]$PrintStarterBlock
@@ -55,12 +58,53 @@ function Escape-JsSingle([string]$Value) {
 
 function Parse-DomainList([string]$Raw) {
   if ([string]::IsNullOrWhiteSpace($Raw)) { return @() }
+  $pieces = [Regex]::Split($Raw.Trim(), '[,\s]+') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
   return @(
-    $Raw.Split(',') |
+    $pieces |
       ForEach-Object { Normalize-Domain $_ } |
       Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
       Select-Object -Unique
   )
+}
+
+function Parse-ManualRoomSeeds([string]$Raw) {
+  $items = New-Object System.Collections.Generic.List[hashtable]
+  if ([string]::IsNullOrWhiteSpace($Raw)) { return @() }
+
+  foreach ($piece in $Raw.Split(',')) {
+    $entry = [string]$piece
+    $entry = $entry.Trim()
+    if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+
+    $name = $entry
+    $units = 1
+    $parts = $entry.Split(':', 2)
+    if ($parts.Count -gt 0) {
+      $name = ([string]$parts[0]).Trim()
+    }
+    if ([string]::IsNullOrWhiteSpace($name)) {
+      throw "Invalid manual room seed '$entry'. Use Name:Units."
+    }
+    if ($parts.Count -gt 1 -and -not [string]::IsNullOrWhiteSpace($parts[1])) {
+      $parsedUnits = 0
+      if (-not [int]::TryParse(([string]$parts[1]).Trim(), [ref]$parsedUnits)) {
+        throw "Invalid unit count in manual room seed '$entry'. Use Name:Units."
+      }
+      $units = [Math]::Max(0, $parsedUnits)
+    }
+
+    $existing = $items | Where-Object { $_.name -eq $name } | Select-Object -First 1
+    if ($existing) {
+      $existing['totalUnits'] = $units
+    } else {
+      $items.Add(@{
+        name = $name
+        totalUnits = $units
+      })
+    }
+  }
+
+  return @($items)
 }
 
 function Build-HotelDataBlock(
@@ -100,6 +144,41 @@ function Build-HotelDataBlock(
 "@
 }
 
+function Insert-IntoObjectLiteral(
+  [string]$Source,
+  [string]$ObjectName,
+  [string]$Snippet
+) {
+  $startToken = "const $ObjectName = {"
+  $start = $Source.IndexOf($startToken)
+  if ($start -lt 0) {
+    throw "Could not find $ObjectName object literal in target file."
+  }
+
+  $bodyStart = $Source.IndexOf('{', $start)
+  $depth = 0
+  $end = -1
+  for ($i = $bodyStart; $i -lt $Source.Length; $i++) {
+    $ch = $Source[$i]
+    if ($ch -eq '{') { $depth += 1 }
+    elseif ($ch -eq '}') {
+      $depth -= 1
+      if ($depth -eq 0) {
+        $end = $i
+        break
+      }
+    }
+  }
+
+  if ($end -lt 0) {
+    throw "Could not find end of $ObjectName object literal in target file."
+  }
+
+  $prefix = $Source.Substring(0, $end).TrimEnd()
+  $suffix = $Source.Substring($end)
+  return "$prefix$Snippet`n$suffix"
+}
+
 function Upsert-HotelDataBare(
   [string]$Path,
   [string]$HotelId,
@@ -133,6 +212,86 @@ function Upsert-HotelDataBare(
   Copy-Item -LiteralPath $Path -Destination $backupPath -Force
   Set-Content -LiteralPath $Path -Value $updated -Encoding UTF8
   return @{ updated = $true; reason = "ok"; path = $Path; backup = $backupPath }
+}
+
+function Upsert-GetHotelIdBare(
+  [string]$Path,
+  [string]$HotelId,
+  [string[]]$Domains,
+  [switch]$DryRunMode
+) {
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return @{ updated = $false; reason = "getHotelId.js path not provided" }
+  }
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return @{ updated = $false; reason = "getHotelId.js not found at $Path" }
+  }
+
+  $raw = Get-Content -LiteralPath $Path -Raw
+  $updated = $raw
+  $domainSnippets = New-Object System.Collections.Generic.List[string]
+  $addedDomains = New-Object System.Collections.Generic.List[string]
+  $normalizedDomains = @($Domains | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+
+  foreach ($domain in $normalizedDomains) {
+    $pattern = "'$([Regex]::Escape($domain))'\s*:\s*'([^']+)'"
+    $match = [Regex]::Match($updated, $pattern)
+    if ($match.Success) {
+      if ($match.Groups[1].Value -ne $HotelId) {
+        return @{ updated = $false; reason = "Domain '$domain' already maps to '$($match.Groups[1].Value)' in getHotelId.js" }
+      }
+      continue
+    }
+
+    $domainSnippets.Add("`n  '$domain': '$HotelId',")
+    $addedDomains.Add($domain)
+  }
+
+  if ($domainSnippets.Count -gt 0) {
+    $updated = Insert-IntoObjectLiteral -Source $updated -ObjectName 'domainMap' -Snippet ($domainSnippets -join '')
+  }
+
+  $pathRoute = "/$HotelId"
+  $pathPattern = "'$([Regex]::Escape($pathRoute))'\s*:\s*'([^']+)'"
+  $pathMatch = [Regex]::Match($updated, $pathPattern)
+  $addedPath = $false
+  if ($pathMatch.Success) {
+    if ($pathMatch.Groups[1].Value -ne $HotelId) {
+      return @{ updated = $false; reason = "Path '$pathRoute' already maps to '$($pathMatch.Groups[1].Value)' in getHotelId.js" }
+    }
+  } else {
+    $updated = Insert-IntoObjectLiteral -Source $updated -ObjectName 'pathMap' -Snippet "`n  '$pathRoute': '$HotelId',"
+    $addedPath = $true
+  }
+
+  if ($DryRunMode) {
+    if ($addedDomains.Count -eq 0 -and -not $addedPath) {
+      return @{ updated = $false; reason = "No new getHotelId.js mappings were needed" }
+    }
+    return @{
+      updated = $true
+      reason = "dry-run"
+      path = $Path
+      domains = @($addedDomains)
+      pathRoute = if ($addedPath) { $pathRoute } else { "" }
+    }
+  }
+
+  if ($updated -eq $raw) {
+    return @{ updated = $false; reason = "No new getHotelId.js mappings were needed" }
+  }
+
+  $backupPath = "$Path.bak"
+  Copy-Item -LiteralPath $Path -Destination $backupPath -Force
+  Set-Content -LiteralPath $Path -Value $updated -Encoding UTF8
+  return @{
+    updated = $true
+    reason = "ok"
+    path = $Path
+    backup = $backupPath
+    domains = @($addedDomains)
+    pathRoute = if ($addedPath) { $pathRoute } else { "" }
+  }
 }
 
 function Invoke-AdminPost([string]$Url, [string]$Token, [hashtable]$Body, [switch]$DryRunMode) {
@@ -200,8 +359,18 @@ while ($true) {
   $pms = ""
 }
 
-$domainsRaw = if (-not [string]::IsNullOrWhiteSpace($Domains)) { $Domains.Trim() } else { Read-Optional "Domains (comma-separated, optional)" }
-$domains = @(Parse-DomainList $domainsRaw)
+$providedDomains = @($Domains | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$domains = if ($providedDomains.Count -gt 0) {
+  @(
+    $providedDomains |
+      ForEach-Object { Parse-DomainList ([string]$_) } |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+      Select-Object -Unique
+  )
+} else {
+  $domainsRaw = Read-Optional "Domains (comma-separated, optional)"
+  @(Parse-DomainList $domainsRaw)
+}
 $domainCount = @($domains).Length
 $primaryDomain = if (-not [string]::IsNullOrWhiteSpace($PrimaryDomain)) { Normalize-Domain $PrimaryDomain } else { "" }
 if ($domainCount -gt 0) {
@@ -214,6 +383,9 @@ $pin = if (-not [string]::IsNullOrWhiteSpace($Pin)) { $Pin.Trim() } else { Read-
 $pinLabel = if (-not [string]::IsNullOrWhiteSpace($PinLabel)) { $PinLabel.Trim() } else { Read-Optional "PIN label" "Owner" }
 $phoneForFrontend = if (-not [string]::IsNullOrWhiteSpace($PhoneForFrontend)) { $PhoneForFrontend.Trim() } else { Read-Optional "Hotel phone for frontend (optional)" }
 $addressForFrontend = if (-not [string]::IsNullOrWhiteSpace($AddressForFrontend)) { $AddressForFrontend.Trim() } else { Read-Optional "Hotel address for frontend (optional)" }
+$bookingBaseUrl = if (-not [string]::IsNullOrWhiteSpace($BookingBaseUrl)) { $BookingBaseUrl.Trim().TrimEnd('/') } else { "" }
+$manualRoomsRaw = if (-not [string]::IsNullOrWhiteSpace($ManualRooms)) { $ManualRooms.Trim() } elseif ($pms -eq "manual") { Read-Optional "Manual room seeds (Name:Units, comma-separated, optional)" } else { "" }
+$manualRoomSeeds = @(Parse-ManualRoomSeeds $manualRoomsRaw)
 
 $hotelBody = @{
   hotelId = $hotelId
@@ -224,6 +396,7 @@ $hotelBody = @{
 
 if ($domainCount -gt 0) { $hotelBody.domains = @($domains) }
 if (-not [string]::IsNullOrWhiteSpace($primaryDomain)) { $hotelBody.primaryDomain = $primaryDomain }
+if ($pms -eq "manual" -and $manualRoomSeeds.Count -gt 0) { $hotelBody.seedManualRooms = @($manualRoomSeeds) }
 
 if ($pms -eq "cloudbeds") {
   $propertyId = Read-Required "Cloudbeds propertyId"
@@ -256,10 +429,17 @@ $pinResp = Invoke-AdminPost -Url $createPinUrl -Token $AdminToken -Body $pinBody
 
 $bookingUrl = if (-not [string]::IsNullOrWhiteSpace($primaryDomain)) {
   "https://$primaryDomain"
+} elseif (-not [string]::IsNullOrWhiteSpace($bookingBaseUrl)) {
+  "$bookingBaseUrl/?hotelId=$hotelId"
 } else {
   "$base/?hotelId=$hotelId"
 }
-$frontDeskUrl = "$base/frontdesk?hotelId=$hotelId"
+$frontDeskUrl = if (-not [string]::IsNullOrWhiteSpace($primaryDomain)) {
+  "https://$primaryDomain/frontdesk"
+} else {
+  "$base/frontdesk?hotelId=$hotelId"
+}
+$frontDeskFallbackUrl = "$base/frontdesk?hotelId=$hotelId"
 
 Write-Host ""
 Write-Host "Updating hotelData.js bare entry..." -ForegroundColor Green
@@ -280,12 +460,47 @@ if (-not $hotelDataResult.updated) {
 }
 
 Write-Host ""
+Write-Host "Updating getHotelId.js route map..." -ForegroundColor Green
+$routeDomains = @($domains)
+if (-not [string]::IsNullOrWhiteSpace($primaryDomain) -and $routeDomains -notcontains $primaryDomain) {
+  $routeDomains += $primaryDomain
+}
+$getHotelIdResult = Upsert-GetHotelIdBare -Path $GetHotelIdPath -HotelId $hotelId -Domains $routeDomains -DryRunMode:$DryRun
+
+if (-not $getHotelIdResult.updated) {
+  Write-Host "getHotelId.js not updated: $($getHotelIdResult.reason)" -ForegroundColor Yellow
+} else {
+  if ($DryRun) {
+    Write-Host "getHotelId.js update dry-run OK ($($getHotelIdResult.path))" -ForegroundColor Cyan
+  } else {
+    Write-Host "getHotelId.js updated: $($getHotelIdResult.path)" -ForegroundColor Green
+    if ($getHotelIdResult.backup) {
+      Write-Host "Backup saved: $($getHotelIdResult.backup)" -ForegroundColor DarkGray
+    }
+  }
+  if ($getHotelIdResult.domains -and @($getHotelIdResult.domains).Count -gt 0) {
+    Write-Host "Added domains: $(@($getHotelIdResult.domains) -join ', ')" -ForegroundColor DarkGray
+  }
+  if (-not [string]::IsNullOrWhiteSpace($getHotelIdResult.pathRoute)) {
+    Write-Host "Added path route: $($getHotelIdResult.pathRoute)" -ForegroundColor DarkGray
+  }
+}
+
+Write-Host ""
 Write-Host "=== Done ===" -ForegroundColor Green
 Write-Host "Hotel ID: $hotelId"
 Write-Host "PMS: $pms"
 Write-Host "Booking URL: $bookingUrl"
 Write-Host "Front Desk URL: $frontDeskUrl"
+Write-Host "Front Desk Fallback URL: $frontDeskFallbackUrl"
 Write-Host "PIN: $pin"
+if ($manualRoomSeeds.Count -gt 0) {
+  $roomSummary = @($manualRoomSeeds | ForEach-Object { "$($_.name):$($_.totalUnits)" }) -join ', '
+  Write-Host "Seeded Manual Rooms: $roomSummary"
+}
+if ([string]::IsNullOrWhiteSpace($primaryDomain)) {
+  Write-Host "Note: No primary domain was provided, so fallback URLs still use ?hotelId=$hotelId." -ForegroundColor Yellow
+}
 
 if ($PrintStarterBlock) {
   Write-Host ""

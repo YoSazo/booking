@@ -771,6 +771,253 @@
     }
 
     /* ── RESPONSIVE ── */
+    /* Granny-proof mobile availability */
+    .availability-view {
+      max-width: 430px;
+      margin: 0 auto;
+      gap: 14px;
+    }
+    .rooms-shell { gap: 14px; }
+    .room-pill-bar {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding: 2px 2px 6px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .room-pill-bar::-webkit-scrollbar { display: none; }
+    .room-pill-wrap { flex-shrink: 0; }
+    .room-pill {
+      padding: 13px 18px;
+      border-width: 2px;
+      font-size: 15px;
+      min-height: 48px;
+    }
+    .room-pill-action { display: none; }
+    .room-pill-add {
+      flex-shrink: 0;
+      min-height: 48px;
+      padding: 13px 16px;
+      border-width: 2px;
+      font-size: 15px;
+      background: var(--white);
+    }
+    .availability-card {
+      border-radius: 20px;
+      padding: 16px;
+    }
+    .availability-card.mobile-cal-card { padding: 16px; }
+    .cal-header { margin-bottom: 14px; }
+    .cal-month-label { font-size: 21px; }
+    .cal-nav-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      font-size: 24px;
+      background: var(--bg);
+    }
+    .cal-grid { gap: 4px; }
+    .cal-day {
+      min-height: auto;
+      aspect-ratio: 1;
+      border-radius: 12px;
+      border-width: 2px;
+      padding: 3px;
+    }
+    .cal-day:active:not(.empty):not(.past) { transform: scale(0.94); }
+    .cal-day.open { border-color: var(--green-light); }
+    .cal-day.partial { border-color: var(--amber); }
+    .cal-day.full { border-color: var(--red); }
+    .cal-day.closed { border-color: var(--border); }
+    .day-num { font-size: 15px; }
+    .day-avail { font-size: 11px; font-family: 'DM Sans', sans-serif; font-weight: 700; }
+    .availability-sheet-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 260;
+      background: rgba(0,0,0,0.48);
+    }
+    .availability-sheet-backdrop.open { display: block; }
+    .availability-edit-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 261;
+      max-width: 430px;
+      max-height: 92vh;
+      margin: 0 auto;
+      overflow-y: auto;
+      background: var(--white);
+      border-radius: 28px 28px 0 0;
+      box-shadow: 0 16px 44px rgba(0,0,0,0.24);
+      transform: translateY(105%);
+      transition: transform .28s cubic-bezier(0.32,0.72,0,1);
+      padding-bottom: max(18px, env(safe-area-inset-bottom));
+    }
+    .availability-edit-sheet.open { transform: translateY(0); }
+    .sheet-handle {
+      width: 42px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--border);
+      margin: 14px auto 0;
+    }
+    .sheet-inner { padding: 18px 20px 0; }
+    .sheet-date-row { margin-bottom: 18px; }
+    .sheet-dow { font-size: 15px; color: var(--text-muted); font-weight: 700; }
+    .sheet-date { font-size: 30px; line-height: 1.05; font-weight: 700; color: var(--text); }
+    .range-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .range-toggle-label { font-size: 15px; font-weight: 700; color: var(--text); }
+    .toggle-switch {
+      width: 54px;
+      height: 31px;
+      border-radius: 999px;
+      background: var(--border);
+      position: relative;
+      border: 0;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .toggle-switch.on { background: var(--green); }
+    .toggle-knob {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: white;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+      transition: transform .18s;
+    }
+    .toggle-switch.on .toggle-knob { transform: translateX(23px); }
+    .range-grid.sheet-range-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .range-grid.sheet-range-grid .range-input {
+      min-height: 48px;
+      border-width: 2px;
+      border-radius: 14px;
+      background: var(--bg);
+      font-size: 15px;
+    }
+    .stepper-label {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .day-stepper.sheet-stepper {
+      background: var(--bg);
+      border-radius: 20px;
+      padding: 12px;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .day-step-btn {
+      width: 74px;
+      height: 74px;
+      border-width: 2.5px;
+      border-radius: 18px;
+      background: var(--white);
+      font-size: 38px;
+    }
+    .day-step-count {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 72px;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .closed-toggle {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      padding: 18px;
+      border-radius: 18px;
+      border: 2.5px solid var(--border);
+      background: var(--white);
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      margin-bottom: 18px;
+    }
+    .closed-toggle.active {
+      border-color: #F6B5B5;
+      background: #FEEEEE;
+    }
+    .closed-icon { font-size: 28px; line-height: 1; }
+    .closed-text { font-size: 18px; font-weight: 800; color: var(--text); }
+    .closed-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+    .sheet-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0 20px;
+    }
+    .sheet-save-btn,
+    .sheet-cancel-btn {
+      width: 100%;
+      border-radius: 18px;
+      font-family: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .sheet-save-btn {
+      border: 0;
+      padding: 20px;
+      background: var(--green);
+      color: white;
+      font-size: 20px;
+    }
+    .sheet-cancel-btn {
+      border: 2px solid var(--border);
+      padding: 16px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 17px;
+    }
+    .rooms-modal-bg {
+      align-items: flex-end;
+      padding: 0;
+    }
+    .rooms-modal {
+      width: 100%;
+      max-width: 430px;
+      border-radius: 28px 28px 0 0;
+      border: 0;
+      padding: 24px 20px max(34px, env(safe-area-inset-bottom));
+    }
+    .rooms-modal h3 { font-size: 22px; margin-bottom: 16px; }
+    .rooms-modal input {
+      min-height: 54px;
+      border-width: 2px;
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-size: 17px;
+      background: var(--bg);
+    }
+    .rooms-modal-btn {
+      min-height: 54px;
+      border-width: 2px;
+      border-radius: 16px;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
     .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .revenue-wrap { display: flex; flex-direction: column; gap: 12px; }
     .revenue-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -1539,7 +1786,7 @@ function ensureAvailabilityUi() {
         <div class="rooms-shell">
           <div id="roomsPillBar" class="room-pill-bar"></div>
 
-          <div class="availability-card">
+          <div class="availability-card mobile-cal-card">
             <div id="availabilityNoRoom" class="availability-empty">
               Add a room type to start managing manual availability.
             </div>
@@ -1561,33 +1808,6 @@ function ensureAvailabilityUi() {
             </div>
           </div>
 
-          <div class="availability-card">
-            <div class="availability-title">Quick Range Update</div>
-            <div class="availability-help" id="availabilityActiveRoomLabel">Select a room type first.</div>
-            <div class="range-grid">
-              <label class="range-field">
-                <span class="range-label">Start Date</span>
-                <input id="availabilityRangeStart" class="range-input" type="date">
-              </label>
-              <label class="range-field">
-                <span class="range-label">End Date</span>
-                <input id="availabilityRangeEnd" class="range-input" type="date">
-              </label>
-              <label class="range-field">
-                <span class="range-label">Available Units (Optional)</span>
-                <input id="availabilityRangeUnits" class="range-input" type="number" min="0" step="1" placeholder="Leave blank to keep current units">
-              </label>
-            </div>
-            <label class="range-toggle">
-              <input id="availabilityRangeClosed" type="checkbox">
-              Mark selected dates as closed
-            </label>
-            <div class="range-row">
-              <button id="availabilityApplyRangeBtn" class="range-btn" type="button">Apply Range</button>
-              <button id="availabilityClearRangeBtn" class="range-btn alt" type="button">Clear Range</button>
-            </div>
-            <div class="availability-help">Use this for closures or quick inventory adjustments.</div>
-          </div>
         </div>
       </div>
 
@@ -1595,7 +1815,7 @@ function ensureAvailabilityUi() {
         <div class="rooms-modal" onclick="event.stopPropagation()">
           <h3>New room type</h3>
           <input id="roomsAddNameInput" type="text" placeholder="Room name (e.g. King Room)">
-          <input id="roomsAddUnitsInput" type="number" min="0" step="1" placeholder="Total units">
+          <input id="roomsAddUnitsInput" type="number" min="1" step="1" placeholder="Total rooms">
           <div class="rooms-modal-row">
             <button id="roomsAddCancelBtn" class="rooms-modal-btn" type="button">Cancel</button>
             <button id="roomsAddSaveBtn" class="rooms-modal-btn primary" type="button">Save</button>
@@ -1607,7 +1827,7 @@ function ensureAvailabilityUi() {
         <div class="rooms-modal" onclick="event.stopPropagation()">
           <h3>Edit room type</h3>
           <input id="roomsEditNameInput" type="text" placeholder="Room name">
-          <input id="roomsEditUnitsInput" type="number" min="0" step="1" placeholder="Total units">
+          <input id="roomsEditUnitsInput" type="number" min="1" step="1" placeholder="Total rooms">
           <div class="rooms-modal-row">
             <button id="roomsEditCancelBtn" class="rooms-modal-btn" type="button">Cancel</button>
             <button id="roomsEditSaveBtn" class="rooms-modal-btn primary" type="button">Save changes</button>
@@ -1615,18 +1835,53 @@ function ensureAvailabilityUi() {
         </div>
       </div>
 
-      <div id="availabilityDayPopover" class="day-popover">
-        <div id="availabilityDayPopoverTitle" class="day-popover-title"></div>
-        <div class="day-stepper">
-          <button id="availabilityStepDownBtn" class="day-step-btn" type="button">-</button>
-          <div id="availabilityDayCount" class="day-step-count">0</div>
-          <button id="availabilityStepUpBtn" class="day-step-btn" type="button">+</button>
+      <div id="availabilitySheetBackdrop" class="availability-sheet-backdrop"></div>
+      <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true">
+        <div class="sheet-handle"></div>
+        <div class="sheet-inner">
+          <div class="sheet-date-row">
+            <div id="availabilityDayPopoverTitle" class="sheet-dow"></div>
+            <div id="availabilitySheetDate" class="sheet-date"></div>
+          </div>
+
+          <div class="range-toggle-row">
+            <div class="range-toggle-label">Update more than one day</div>
+            <button id="availabilityRangeToggle" class="toggle-switch" type="button" aria-label="Toggle date range">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+
+          <div id="availabilityRangeInputs" class="range-grid sheet-range-grid" style="display:none">
+            <label class="range-field">
+              <span class="range-label">From</span>
+              <input id="availabilityRangeStart" class="range-input" type="date">
+            </label>
+            <label class="range-field">
+              <span class="range-label">To</span>
+              <input id="availabilityRangeEnd" class="range-input" type="date">
+            </label>
+          </div>
+
+          <div id="availabilityActiveRoomLabel" class="stepper-label">Rooms available</div>
+          <div class="day-stepper sheet-stepper">
+            <button id="availabilityStepDownBtn" class="day-step-btn" type="button">-</button>
+            <div id="availabilityDayCount" class="day-step-count">0</div>
+            <button id="availabilityStepUpBtn" class="day-step-btn" type="button">+</button>
+          </div>
+
+          <input id="availabilityDayClosedInput" type="checkbox" hidden>
+          <button id="availabilityClosedToggle" class="closed-toggle" type="button">
+            <span class="closed-icon">X</span>
+            <span>
+              <span class="closed-text">Close these dates</span>
+              <span class="closed-sub">No rooms can be booked</span>
+            </span>
+          </button>
         </div>
-        <label class="day-toggle">
-          <input id="availabilityDayClosedInput" type="checkbox">
-          Mark as closed
-        </label>
-        <button id="availabilityDaySaveBtn" class="day-save-btn" type="button">Done</button>
+        <div class="sheet-actions">
+          <button id="availabilityDaySaveBtn" class="sheet-save-btn" type="button">Save</button>
+          <button id="availabilityDayCancelBtn" class="sheet-cancel-btn" type="button">Cancel</button>
+        </div>
       </div>
     `);
   }
@@ -1648,11 +1903,6 @@ function bindAvailabilityUiEvents() {
   const next = document.getElementById('availabilityNextMonthBtn');
   if (prev) prev.addEventListener('click', () => changeAvailabilityMonth(-1));
   if (next) next.addEventListener('click', () => changeAvailabilityMonth(1));
-
-  const applyBtn = document.getElementById('availabilityApplyRangeBtn');
-  const clearBtn = document.getElementById('availabilityClearRangeBtn');
-  if (applyBtn) applyBtn.addEventListener('click', applyAvailabilityRange);
-  if (clearBtn) clearBtn.addEventListener('click', clearAvailabilityRange);
 
   const modalBg = document.getElementById('roomsAddModalBg');
   const modalCancel = document.getElementById('roomsAddCancelBtn');
@@ -1680,12 +1930,18 @@ function bindAvailabilityUiEvents() {
   const stepUp = document.getElementById('availabilityStepUpBtn');
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const saveDayBtn = document.getElementById('availabilityDaySaveBtn');
+  const cancelDayBtn = document.getElementById('availabilityDayCancelBtn');
+  const rangeToggle = document.getElementById('availabilityRangeToggle');
+  const closedToggle = document.getElementById('availabilityClosedToggle');
+  const sheetBackdrop = document.getElementById('availabilitySheetBackdrop');
   if (stepDown) stepDown.addEventListener('click', () => stepAvailabilityDay(-1));
   if (stepUp) stepUp.addEventListener('click', () => stepAvailabilityDay(1));
   if (closedInput) closedInput.addEventListener('change', toggleAvailabilityDayClosed);
   if (saveDayBtn) saveDayBtn.addEventListener('click', saveAvailabilityDay);
-
-  document.addEventListener('click', closeAvailabilityPopoverIfOutside);
+  if (cancelDayBtn) cancelDayBtn.addEventListener('click', closeAvailabilityDayPopover);
+  if (rangeToggle) rangeToggle.addEventListener('click', toggleAvailabilityRangeMode);
+  if (closedToggle) closedToggle.addEventListener('click', toggleAvailabilityDayClosedButton);
+  if (sheetBackdrop) sheetBackdrop.addEventListener('click', closeAvailabilityDayPopover);
 }
 
 // ── LOGIN ──────────────────────────────────────────────
@@ -2319,40 +2575,48 @@ function changeAvailabilityMonth(delta) {
 function openAvailabilityDayPopover(event, dayIso) {
   const room = getManualRoomByName(manualSelectedRoom);
   const pop = document.getElementById('availabilityDayPopover');
+  const backdrop = document.getElementById('availabilitySheetBackdrop');
   const title = document.getElementById('availabilityDayPopoverTitle');
+  const dateTitle = document.getElementById('availabilitySheetDate');
   const countEl = document.getElementById('availabilityDayCount');
   const closedInput = document.getElementById('availabilityDayClosedInput');
-  if (!room || !pop || !title || !countEl || !closedInput) return;
+  const rangeToggle = document.getElementById('availabilityRangeToggle');
+  const rangeInputs = document.getElementById('availabilityRangeInputs');
+  const rangeStart = document.getElementById('availabilityRangeStart');
+  const rangeEnd = document.getElementById('availabilityRangeEnd');
+  const activeLabel = document.getElementById('availabilityActiveRoomLabel');
+  if (!room || !pop || !title || !dateTitle || !countEl || !closedInput) return;
 
   availabilityEditingDay = dayIso;
   const bookedMap = bookingsByRoomDate();
   const result = availabilityForDay(room, dayIso, bookedMap);
-  const pretty = new Date(`${dayIso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  title.textContent = pretty;
-  countEl.textContent = String(result.value);
+  const date = new Date(`${dayIso}T00:00:00`);
+  title.textContent = date.toLocaleDateString('en-US', { weekday: 'long' });
+  dateTitle.textContent = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   closedInput.checked = result.status === 'closed';
+  if (rangeStart) rangeStart.value = dayIso;
+  if (rangeEnd) rangeEnd.value = dayIso;
+  if (rangeToggle) rangeToggle.classList.remove('on');
+  if (rangeInputs) rangeInputs.style.display = 'none';
+  if (activeLabel) activeLabel.textContent = `${room.name} rooms available`;
   toggleAvailabilityDayClosed();
 
-  const rect = event.currentTarget.getBoundingClientRect();
-  let left = rect.left;
-  let top = rect.bottom + 8;
-  const popWidth = 228;
-  const popHeight = 176;
-  if (left + popWidth > window.innerWidth - 8) left = window.innerWidth - popWidth - 8;
-  if (top + popHeight > window.innerHeight - 8) top = rect.top - popHeight - 8;
-  if (left < 8) left = 8;
-  if (top < 8) top = 8;
-
-  pop.style.left = `${left}px`;
-  pop.style.top = `${top}px`;
+  if (backdrop) backdrop.classList.add('open');
   pop.classList.add('open');
-  event.stopPropagation();
+  pop.setAttribute('aria-hidden', 'false');
+  if (event) event.stopPropagation();
 }
 
 function closeAvailabilityDayPopover() {
   availabilityEditingDay = '';
+  const backdrop = document.getElementById('availabilitySheetBackdrop');
   const pop = document.getElementById('availabilityDayPopover');
-  if (pop) pop.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+  if (pop) {
+    pop.classList.remove('open');
+    pop.setAttribute('aria-hidden', 'true');
+  }
 }
 
 function closeAvailabilityPopoverIfOutside(event) {
@@ -2377,25 +2641,59 @@ function toggleAvailabilityDayClosed() {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const countEl = document.getElementById('availabilityDayCount');
   const stepButtons = document.querySelectorAll('.day-step-btn');
+  const closedToggle = document.getElementById('availabilityClosedToggle');
+  const stepper = document.querySelector('.sheet-stepper');
   if (!closedInput || !countEl) return;
   const isClosed = !!closedInput.checked;
   countEl.style.opacity = isClosed ? '0.35' : '1';
+  if (closedToggle) closedToggle.classList.toggle('active', isClosed);
+  if (stepper) {
+    stepper.style.opacity = isClosed ? '0.35' : '1';
+    stepper.style.pointerEvents = isClosed ? 'none' : '';
+  }
   stepButtons.forEach((btn) => {
     btn.disabled = isClosed;
     btn.style.opacity = isClosed ? '0.35' : '1';
   });
 }
 
+function toggleAvailabilityRangeMode() {
+  const toggle = document.getElementById('availabilityRangeToggle');
+  const inputs = document.getElementById('availabilityRangeInputs');
+  if (!toggle || !inputs) return;
+  const on = !toggle.classList.contains('on');
+  toggle.classList.toggle('on', on);
+  inputs.style.display = on ? 'grid' : 'none';
+}
+
+function toggleAvailabilityDayClosedButton() {
+  const closedInput = document.getElementById('availabilityDayClosedInput');
+  if (!closedInput) return;
+  closedInput.checked = !closedInput.checked;
+  toggleAvailabilityDayClosed();
+}
+
 async function saveAvailabilityDay() {
   if (!availabilityEditingDay || !manualSelectedRoom) return;
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const countEl = document.getElementById('availabilityDayCount');
+  const rangeToggle = document.getElementById('availabilityRangeToggle');
+  const rangeStart = document.getElementById('availabilityRangeStart');
+  const rangeEnd = document.getElementById('availabilityRangeEnd');
   if (!closedInput || !countEl) return;
+  const useRange = !!(rangeToggle && rangeToggle.classList.contains('on'));
+  const startDate = useRange && rangeStart ? rangeStart.value : availabilityEditingDay;
+  const endDate = useRange && rangeEnd ? rangeEnd.value : availabilityEditingDay;
+
+  if (!startDate || !endDate || endDate < startDate) {
+    toast('Check the dates and try again', 'error');
+    return;
+  }
 
   const payload = {
     roomName: manualSelectedRoom,
-    startDate: availabilityEditingDay,
-    endDate: availabilityEditingDay,
+    startDate,
+    endDate,
     closed: !!closedInput.checked,
   };
   if (!closedInput.checked) {
@@ -2408,9 +2706,9 @@ async function saveAvailabilityDay() {
     manualAvailability = data.data || manualAvailability;
     closeAvailabilityDayPopover();
     renderAvailabilityCalendar();
-    toast('Day updated', 'success');
+    toast(useRange ? `Dates updated (${data.affectedDays || 0} days)` : 'Day updated', 'success');
   } catch (e) {
-    toast('Failed to update day', 'error');
+    toast('Failed to update availability', 'error');
   }
 }
 
@@ -2419,7 +2717,7 @@ async function saveRoomType() {
   const unitsEl = document.getElementById('roomsAddUnitsInput');
   if (!nameEl || !unitsEl) return;
   const roomName = nameEl.value.trim();
-  const totalUnits = Math.max(0, parseInt(unitsEl.value, 10) || 0);
+  const totalUnits = Math.max(1, parseInt(unitsEl.value, 10) || 1);
   if (!roomName) {
     toast('Room name is required', 'error');
     return;
@@ -2445,7 +2743,7 @@ async function saveEditedRoomType() {
   if (!nameEl || !unitsEl || !editingRoomName) return;
 
   const newRoomName = nameEl.value.trim();
-  const totalUnits = Math.max(0, parseInt(unitsEl.value, 10) || 0);
+  const totalUnits = Math.max(1, parseInt(unitsEl.value, 10) || 1);
   if (!newRoomName) {
     toast('Room name is required', 'error');
     return;
