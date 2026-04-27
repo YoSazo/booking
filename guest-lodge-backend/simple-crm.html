@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#EEF2EF">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="/icon-192.png">
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -772,6 +773,7 @@
 
     /* ── RESPONSIVE ── */
     /* Granny-proof mobile availability */
+    @media (max-width: 600px) {
     .availability-view {
       max-width: 430px;
       margin: 0 auto;
@@ -1017,6 +1019,7 @@
       font-size: 17px;
       font-weight: 800;
     }
+    }
 
     .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .revenue-wrap { display: flex; flex-direction: column; gap: 12px; }
@@ -1199,29 +1202,43 @@
 
     /* Mobile overflow safeguards for header + calendar */
     @media (max-width: 600px) {
+      /* Two-row header: title/branding is never crushed by action buttons */
       .header {
-        flex-wrap: nowrap;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
         min-width: 0;
       }
       .header-logo {
-        flex: 1 1 auto;
-        min-width: 0;
-        overflow: hidden;
-      }
-      .header-logo-suffix {
-        display: inline-block;
+        flex: 0 1 auto;
         min-width: 0;
         max-width: 100%;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow: visible;
+        flex-wrap: wrap;
+        row-gap: 4px;
+      }
+      .header-logo-suffix {
+        display: inline;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.2;
+        word-break: break-word;
+        hyphens: auto;
       }
       .header-right {
+        display: flex;
         flex: 0 0 auto;
-        max-width: 46%;
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
+        max-width: none;
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        row-gap: 6px;
+      }
+      .header-right .refresh-btn {
+        padding: 5px 8px;
+        font-size: 11px;
       }
       .container,
       .availability-view,
@@ -1240,6 +1257,100 @@
       .cal-day,
       .cal-dow {
         min-width: 0;
+      }
+    }
+
+    /* Mobile-only floating bottom nav (Lucide icons) */
+    .mobile-bottom-nav {
+      display: none;
+    }
+    .mobile-nav-item.mobile-nav-item--hidden {
+      display: none !important;
+    }
+    @media (max-width: 600px) {
+      #app .container {
+        padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+      }
+      .tabs-container {
+        display: none !important;
+      }
+      .mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        z-index: 200;
+        left: 12px;
+        right: 12px;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        max-width: 420px;
+        margin: 0 auto;
+        align-items: flex-end;
+        justify-content: space-around;
+        gap: 2px;
+        padding: 8px 6px 10px;
+        background: var(--white);
+        border: 1.5px solid var(--border);
+        border-radius: 999px;
+        box-shadow: 0 10px 40px rgba(26, 43, 34, 0.12), 0 2px 12px rgba(46, 125, 91, 0.08);
+      }
+      .mobile-nav-item {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        padding: 4px 2px 2px;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #64748b;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .mobile-nav-item .mobile-nav-icon-wrap {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+      }
+      .mobile-nav-item .mobile-nav-icon-wrap svg {
+        width: 22px;
+        height: 22px;
+        stroke: #64748b;
+        flex-shrink: 0;
+      }
+      .mobile-nav-item.active .mobile-nav-icon-wrap svg {
+        stroke: #fff;
+      }
+      .mobile-nav-item.active {
+        color: var(--text);
+      }
+      .mobile-nav-item.active .mobile-nav-icon-wrap {
+        background: #111;
+        color: #fff;
+        transform: translateY(-2px);
+      }
+      .mobile-nav-item:active .mobile-nav-icon-wrap {
+        transform: scale(0.96);
+      }
+      .mobile-nav-item.active:active .mobile-nav-icon-wrap {
+        transform: translateY(-2px) scale(0.96);
+      }
+      .mobile-nav-label {
+        line-height: 1.1;
+        text-align: center;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
   </style>
@@ -1299,10 +1410,10 @@
   <div class="container">
     <div class="tabs-container">
       <div class="tabs-slider" id="tabsSlider"></div>
-      <button class="tab active" onclick="setFilter('needs-call', this)">
+      <button type="button" class="tab active" data-nav-filter="needs-call" onclick="setFilter('needs-call', this)">
         📞 Needs Call <span class="tab-badge" id="countNeedsCalled">0</span>
       </button>
-      <button class="tab" onclick="setFilter('called', this)">
+      <button type="button" class="tab" data-nav-filter="called" onclick="setFilter('called', this)">
         ✅ Called <span class="tab-badge" id="countCalled">0</span>
       </button>
     </div>
@@ -1310,6 +1421,25 @@
       <div class="loading"><div class="spinner"></div> Loading bookings…</div>
     </div>
   </div>
+
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
+    <button type="button" class="mobile-nav-item active" data-nav-filter="needs-call" aria-current="page">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="phone"></i></span>
+      <span class="mobile-nav-label">Calls</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="called">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="check"></i></span>
+      <span class="mobile-nav-label">Called</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="availability">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="door-open"></i></span>
+      <span class="mobile-nav-label">Rooms</span>
+    </button>
+    <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="revenue" id="mobileNavRevenueBtn">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
+      <span class="mobile-nav-label">Revenue</span>
+    </button>
+  </nav>
 </div>
 
 <div class="toast-container" id="toasts"></div>
@@ -1603,6 +1733,8 @@ function syncRevenueUi() {
     if (currentFilter === 'revenue') currentFilter = 'needs-call';
     const activeTab = document.querySelector('.tab.active');
     if (activeTab) moveSlider(activeTab);
+    updateMobileRevenueNavVisibility();
+    syncMobileNavActive(currentFilter);
     return;
   }
 
@@ -1612,6 +1744,7 @@ function syncRevenueUi() {
     btn.className = 'tab';
     btn.id = 'revenueTabBtn';
     btn.setAttribute('type', 'button');
+    btn.dataset.navFilter = 'revenue';
     btn.textContent = 'Revenue';
     btn.onclick = function () { setFilter('revenue', btn); };
     tabs.appendChild(btn);
@@ -1667,6 +1800,8 @@ function syncRevenueUi() {
   updateRevenuePeriodButtons();
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
+  updateMobileRevenueNavVisibility();
+  syncMobileNavActive(currentFilter);
 }
 
 function setRevenueDelta(id, currentValue, previousValue, emptyLabel = 'No prior period') {
@@ -1821,6 +1956,7 @@ function ensureAvailabilityUi() {
     btn.className = 'tab';
     btn.setAttribute('type', 'button');
     btn.innerHTML = 'Rooms <span class="tab-badge" id="countRooms">0</span>';
+    btn.dataset.navFilter = 'availability';
     btn.onclick = function () { setFilter('availability', btn); };
     tabs.appendChild(btn);
   }
@@ -2026,6 +2162,13 @@ async function startCrmApp(verification) {
     loadManualAvailability(),
     loadBookings(),
   ]);
+
+  initMobileBottomNav();
+  updateMobileRevenueNavVisibility();
+  syncMobileNavActive(currentFilter);
+  refreshMobileBottomNavIcons();
+  requestAnimationFrame(refreshMobileBottomNavIcons);
+  setTimeout(refreshMobileBottomNavIcons, 80);
 }
 
 async function doLogin() {
@@ -2258,11 +2401,67 @@ function renderBookings(list) {
 }
 
 // ── FILTER TABS ────────────────────────────────────────
+function refreshMobileBottomNavIcons() {
+  if (typeof lucide === 'undefined' || typeof lucide.createIcons !== 'function') return;
+  const root = document.getElementById('mobileBottomNav');
+  if (!root || !root.querySelector('i[data-lucide]')) return;
+  try {
+    lucide.createIcons();
+  } catch (e) { /* ignore */ }
+}
+
+function syncMobileNavActive(filter) {
+  const nav = document.getElementById('mobileBottomNav');
+  if (!nav) return;
+  nav.querySelectorAll('.mobile-nav-item').forEach((n) => {
+    const f = n.getAttribute('data-nav-filter');
+    if (f === 'revenue' && n.classList.contains('mobile-nav-item--hidden')) {
+      n.classList.remove('active');
+      n.removeAttribute('aria-current');
+      return;
+    }
+    const match = f === filter;
+    n.classList.toggle('active', match);
+    if (match) n.setAttribute('aria-current', 'page');
+    else n.removeAttribute('aria-current');
+  });
+}
+
+function updateMobileRevenueNavVisibility() {
+  const el = document.getElementById('mobileNavRevenueBtn');
+  if (!el) return;
+  el.classList.toggle('mobile-nav-item--hidden', !revenueEnabled);
+}
+
+function initMobileBottomNav() {
+  const nav = document.getElementById('mobileBottomNav');
+  if (!nav || nav.dataset.bound === '1') return;
+  nav.dataset.bound = '1';
+  nav.addEventListener('click', (e) => {
+    const item = e.target.closest('.mobile-nav-item');
+    if (!item || item.classList.contains('mobile-nav-item--hidden')) return;
+    const filter = item.getAttribute('data-nav-filter');
+    if (!filter) return;
+    if (filter === 'revenue' && !revenueEnabled) return;
+    setFilter(filter, item);
+  });
+}
+
 function setFilter(filter, btn) {
+  if (filter === 'revenue' && !revenueEnabled) return;
   currentFilter = filter;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  moveSlider(btn);
+  let tabBtn = null;
+  if (btn && btn.classList && btn.classList.contains('tab')) {
+    tabBtn = btn;
+  } else {
+    tabBtn = document.querySelector(`.tab[data-nav-filter="${filter}"]`);
+  }
+  if (tabBtn) {
+    tabBtn.classList.add('active');
+    moveSlider(tabBtn);
+  }
+  syncMobileNavActive(filter);
   if (filter === 'availability') {
     loadManualAvailability().then(applyFilter).catch(() => applyFilter());
     return;
@@ -2276,6 +2475,7 @@ function setFilter(filter, btn) {
 }
 
 function moveSlider(activeTab) {
+  if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches) return;
   const slider = document.getElementById('tabsSlider');
   const tabs = activeTab ? activeTab.closest('.tabs-container') : null;
   if (!slider || !activeTab || !tabs) return;
@@ -2296,6 +2496,10 @@ function moveSlider(activeTab) {
 document.addEventListener('DOMContentLoaded', () => {
   ensureAvailabilityUi();
   syncRevenueUi();
+  initMobileBottomNav();
+  updateMobileRevenueNavVisibility();
+  syncMobileNavActive(currentFilter);
+  refreshMobileBottomNavIcons();
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
 
@@ -2310,7 +2514,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => {
     const current = document.querySelector('.tab.active');
     if (current) moveSlider(current);
+    syncMobileNavActive(currentFilter);
   });
+
+  window.addEventListener('load', refreshMobileBottomNavIcons, { once: true });
 });
 
 function applyFilter() {
