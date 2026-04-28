@@ -2774,7 +2774,8 @@ function bookingsByRoomDate() {
     const ci = toIsoDate(b.checkinDate);
     const co = toIsoDate(b.checkoutDate);
     if (!ci || !co || co <= ci) continue;
-    const days = enumerateDates(ci, toIsoDate(new Date(new Date(`${co}T00:00:00.000Z`).getTime() - 86400000)));
+    const endDateObj = new Date(new Date(`${co}T00:00:00.000Z`).getTime() - 86400000);
+    const days = enumerateDates(ci, endDateObj.toISOString().slice(0, 10));
     for (const day of days) {
       const key = roomDateKey(roomName, day);
       counts[key] = (counts[key] || 0) + 1;
