@@ -878,55 +878,6 @@
         color: var(--text);
         line-height: 1.15;
       }
-      #availabilityDayPopover .range-toggle-row {
-        margin-bottom: 10px;
-        gap: 8px;
-      }
-      #availabilityDayPopover .range-toggle-label {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text);
-      }
-      #availabilityDayPopover .toggle-switch {
-        width: 40px;
-        height: 24px;
-        border-radius: 999px;
-        background: var(--border);
-        position: relative;
-        border: 0;
-        cursor: pointer;
-        flex-shrink: 0;
-      }
-      #availabilityDayPopover .toggle-switch.on {
-        background: var(--green);
-      }
-      #availabilityDayPopover .toggle-knob {
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: white;
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-        transition: transform 0.18s;
-      }
-      #availabilityDayPopover .toggle-switch.on .toggle-knob {
-        transform: translateX(16px);
-      }
-      #availabilityDayPopover .range-grid.sheet-range-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-        margin-bottom: 10px;
-      }
-      #availabilityDayPopover .range-grid.sheet-range-grid .range-input {
-        min-height: 36px;
-        border-width: 1.5px;
-        border-radius: 8px;
-        font-size: 13px;
-        padding: 6px 8px;
-        background: var(--white);
-      }
       #availabilityDayPopover .stepper-label {
         display: block;
         font-size: 12px;
@@ -1135,49 +1086,6 @@
     .sheet-date-row { margin-bottom: 18px; }
     .sheet-dow { font-size: 15px; color: var(--text-muted); font-weight: 700; }
     .sheet-date { font-size: 30px; line-height: 1.05; font-weight: 700; color: var(--text); }
-    .range-toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .range-toggle-label { font-size: 15px; font-weight: 700; color: var(--text); }
-    .toggle-switch {
-      width: 54px;
-      height: 31px;
-      border-radius: 999px;
-      background: var(--border);
-      position: relative;
-      border: 0;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    .toggle-switch.on { background: var(--green); }
-    .toggle-knob {
-      width: 25px;
-      height: 25px;
-      border-radius: 50%;
-      background: white;
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.22);
-      transition: transform .18s;
-    }
-    .toggle-switch.on .toggle-knob { transform: translateX(23px); }
-    .range-grid.sheet-range-grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 18px;
-    }
-    .range-grid.sheet-range-grid .range-input {
-      min-height: 48px;
-      border-width: 2px;
-      border-radius: 14px;
-      background: var(--bg);
-      font-size: 15px;
-    }
     .stepper-label {
       text-align: center;
       font-size: 12px;
@@ -2141,24 +2049,6 @@ function ensureAvailabilityUi() {
             <div id="availabilitySheetDate" class="sheet-date"></div>
           </div>
 
-          <div class="range-toggle-row">
-            <div class="range-toggle-label">Update more than one day</div>
-            <button id="availabilityRangeToggle" class="toggle-switch" type="button" aria-label="Toggle date range">
-              <span class="toggle-knob"></span>
-            </button>
-          </div>
-
-          <div id="availabilityRangeInputs" class="range-grid sheet-range-grid" style="display:none">
-            <label class="range-field">
-              <span class="range-label">From</span>
-              <input id="availabilityRangeStart" class="range-input" type="date">
-            </label>
-            <label class="range-field">
-              <span class="range-label">To</span>
-              <input id="availabilityRangeEnd" class="range-input" type="date">
-            </label>
-          </div>
-
           <div id="availabilityActiveRoomLabel" class="stepper-label">Rooms available</div>
           <div class="day-stepper sheet-stepper">
             <button id="availabilityStepDownBtn" class="day-step-btn" type="button">−</button>
@@ -2182,11 +2072,6 @@ function ensureAvailabilityUi() {
       </div>
     `);
   }
-
-  const startEl = document.getElementById('availabilityRangeStart');
-  const endEl = document.getElementById('availabilityRangeEnd');
-  if (startEl && !startEl.value) startEl.value = addDaysIso(0);
-  if (endEl && !endEl.value) endEl.value = addDaysIso(20);
 
   bindAvailabilityUiEvents();
 }
@@ -2228,7 +2113,6 @@ function bindAvailabilityUiEvents() {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const saveDayBtn = document.getElementById('availabilityDaySaveBtn');
   const cancelDayBtn = document.getElementById('availabilityDayCancelBtn');
-  const rangeToggle = document.getElementById('availabilityRangeToggle');
   const closedToggle = document.getElementById('availabilityClosedToggle');
   const sheetBackdrop = document.getElementById('availabilitySheetBackdrop');
   if (stepDown) stepDown.addEventListener('click', () => stepAvailabilityDay(-1));
@@ -2236,7 +2120,6 @@ function bindAvailabilityUiEvents() {
   if (closedInput) closedInput.addEventListener('change', toggleAvailabilityDayClosed);
   if (saveDayBtn) saveDayBtn.addEventListener('click', saveAvailabilityDay);
   if (cancelDayBtn) cancelDayBtn.addEventListener('click', closeAvailabilityDayPopover);
-  if (rangeToggle) rangeToggle.addEventListener('click', toggleAvailabilityRangeMode);
   if (closedToggle) closedToggle.addEventListener('click', toggleAvailabilityDayClosedButton);
   if (sheetBackdrop) sheetBackdrop.addEventListener('click', closeAvailabilityDayPopover);
 }
@@ -2949,10 +2832,6 @@ function openAvailabilityDayPopover(event, dayIso) {
   const dateTitle = document.getElementById('availabilitySheetDate');
   const countEl = document.getElementById('availabilityDayCount');
   const closedInput = document.getElementById('availabilityDayClosedInput');
-  const rangeToggle = document.getElementById('availabilityRangeToggle');
-  const rangeInputs = document.getElementById('availabilityRangeInputs');
-  const rangeStart = document.getElementById('availabilityRangeStart');
-  const rangeEnd = document.getElementById('availabilityRangeEnd');
   const activeLabel = document.getElementById('availabilityActiveRoomLabel');
   if (!room || !pop || !title || !dateTitle || !countEl || !closedInput) return;
 
@@ -2968,10 +2847,6 @@ function openAvailabilityDayPopover(event, dayIso) {
   dateTitle.style.display = '';
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   closedInput.checked = result.status === 'closed';
-  if (rangeStart) rangeStart.value = dayIso;
-  if (rangeEnd) rangeEnd.value = dayIso;
-  if (rangeToggle) rangeToggle.classList.remove('on');
-  if (rangeInputs) rangeInputs.style.display = 'none';
   if (activeLabel) activeLabel.textContent = `${room.name} rooms available`;
   toggleAvailabilityDayClosed();
 
@@ -3038,15 +2913,6 @@ function toggleAvailabilityDayClosed() {
   });
 }
 
-function toggleAvailabilityRangeMode() {
-  const toggle = document.getElementById('availabilityRangeToggle');
-  const inputs = document.getElementById('availabilityRangeInputs');
-  if (!toggle || !inputs) return;
-  const on = !toggle.classList.contains('on');
-  toggle.classList.toggle('on', on);
-  inputs.style.display = on ? 'grid' : 'none';
-}
-
 function toggleAvailabilityDayClosedButton() {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   if (!closedInput) return;
@@ -3058,23 +2924,12 @@ async function saveAvailabilityDay() {
   if (!availabilityEditingDay || !manualSelectedRoom) return;
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const countEl = document.getElementById('availabilityDayCount');
-  const rangeToggle = document.getElementById('availabilityRangeToggle');
-  const rangeStart = document.getElementById('availabilityRangeStart');
-  const rangeEnd = document.getElementById('availabilityRangeEnd');
   if (!closedInput || !countEl) return;
-  const useRange = !!(rangeToggle && rangeToggle.classList.contains('on'));
-  const startDate = useRange && rangeStart ? rangeStart.value : availabilityEditingDay;
-  const endDate = useRange && rangeEnd ? rangeEnd.value : availabilityEditingDay;
-
-  if (!startDate || !endDate || endDate < startDate) {
-    toast('Check the dates and try again', 'error');
-    return;
-  }
 
   const payload = {
     roomName: manualSelectedRoom,
-    startDate,
-    endDate,
+    startDate: availabilityEditingDay,
+    endDate: availabilityEditingDay,
     closed: !!closedInput.checked,
   };
   if (!closedInput.checked) {
@@ -3087,7 +2942,7 @@ async function saveAvailabilityDay() {
     manualAvailability = data.data || manualAvailability;
     closeAvailabilityDayPopover();
     renderAvailabilityCalendar();
-    toast(useRange ? `Dates updated (${data.affectedDays || 0} days)` : 'Day updated', 'success');
+    toast('Day updated', 'success');
   } catch (e) {
     toast('Failed to update availability', 'error');
   }
@@ -3168,54 +3023,6 @@ async function deleteRoomType(roomName) {
     toast('Room type deleted', 'success');
   } catch (e) {
     toast(e.message || 'Failed to delete room type', 'error');
-  }
-}
-
-async function applyAvailabilityRange() {
-  const roomName = manualSelectedRoom;
-  const startDate = (document.getElementById('availabilityRangeStart') || {}).value || '';
-  const endDate = (document.getElementById('availabilityRangeEnd') || {}).value || '';
-  const unitsRaw = (document.getElementById('availabilityRangeUnits') || {}).value;
-  const closed = !!((document.getElementById('availabilityRangeClosed') || {}).checked);
-
-  if (!roomName || !startDate || !endDate) {
-    toast('Room and date range are required', 'error');
-    return;
-  }
-
-  const payload = { roomName, startDate, endDate, closed };
-  if (unitsRaw !== '' && unitsRaw !== null && unitsRaw !== undefined) {
-    payload.availableUnits = Math.max(0, parseInt(unitsRaw, 10) || 0);
-  }
-
-  try {
-    const data = await api('POST', '/api/crm/manual-availability/range', payload);
-    if (!data.success) throw new Error(data.message || 'Failed to apply override');
-    manualAvailability = data.data || manualAvailability;
-    renderAvailabilityCalendar();
-    toast(`Override applied (${data.affectedDays || 0} days)`, 'success');
-  } catch (e) {
-    toast('Failed to apply override', 'error');
-  }
-}
-
-async function clearAvailabilityRange() {
-  const roomName = manualSelectedRoom;
-  const startDate = (document.getElementById('availabilityRangeStart') || {}).value || '';
-  const endDate = (document.getElementById('availabilityRangeEnd') || {}).value || '';
-  if (!roomName || !startDate || !endDate) {
-    toast('Room and date range are required', 'error');
-    return;
-  }
-
-  try {
-    const data = await api('POST', '/api/crm/manual-availability/range', { roomName, startDate, endDate, clear: true });
-    if (!data.success) throw new Error(data.message || 'Failed to clear override');
-    manualAvailability = data.data || manualAvailability;
-    renderAvailabilityCalendar();
-    toast(`Range cleared (${data.affectedDays || 0} days)`, 'success');
-  } catch (e) {
-    toast('Failed to clear range', 'error');
   }
 }
 
