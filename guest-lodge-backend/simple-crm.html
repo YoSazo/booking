@@ -1738,7 +1738,7 @@ let revenuePeriod = '30d';
 let revenueCache = {};
 let revenueLoading = false;
 let revenueError = '';
-const ALLOWED_REVENUE_PERIODS = new Set(['7d', '30d', '90d', 'all']);
+const ALLOWED_REVENUE_PERIODS = new Set(['today', '7d', '30d', 'all']);
 const OTA_COMMISSION_RATE = 0.25;
 let activeHotelId = '';
 let activeHotelName = '';
@@ -2022,10 +2022,10 @@ function syncRevenueUi() {
       <div id="revenueView" class="revenue-view" style="display:none">
         <div class="revenue-wrap">
           <div class="revenue-period-bar" id="revenuePeriodBar">
-            <button type="button" class="revenue-period-btn" data-period="all">All time</button>
+            <button type="button" class="revenue-period-btn" data-period="today">Today</button>
             <button type="button" class="revenue-period-btn" data-period="7d">7 days</button>
             <button type="button" class="revenue-period-btn active" data-period="30d">30 days</button>
-            <button type="button" class="revenue-period-btn" data-period="90d">90 days</button>
+            <button type="button" class="revenue-period-btn" data-period="all">All time</button>
           </div>
           <div class="revenue-subhint" id="revenueSubhint">Last 30 days · stay dates</div>
           <div id="revenueStatus"></div>
@@ -2080,12 +2080,10 @@ function revenuePeriodLabel(period) {
   if (period === 'all') return 'All time';
   if (period === 'today') return 'Today';
   if (period === '7d') return 'Last 7 days';
-  if (period === '90d') return 'Last 90 days';
   return 'Last 30 days';
 }
 
 function normalizeRevenuePeriod(period) {
-  if (period === 'today') return '7d';
   if (ALLOWED_REVENUE_PERIODS.has(period)) return period;
   return '30d';
 }

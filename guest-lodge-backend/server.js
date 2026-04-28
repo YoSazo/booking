@@ -773,7 +773,7 @@ async function createManualBooking(hotelId, bookingDetails) {
     };
 }
 
-const MANUAL_REVENUE_PERIODS = new Set(['7d', '30d', '90d', 'all']);
+const MANUAL_REVENUE_PERIODS = new Set(['today', '7d', '30d', '90d', 'all']);
 
 function buildManualRevenueWindow(period, referenceIso, earliestIso = '', latestIso = '') {
     const endIso = normalizeIsoDate(referenceIso) || getReportingTodayIso();
@@ -795,6 +795,7 @@ function buildManualRevenueWindow(period, referenceIso, earliestIso = '', latest
     }
 
     const spanDays = {
+        'today': 1,
         '7d': 7,
         '30d': 30,
         '90d': 90,
@@ -3848,7 +3849,7 @@ app.get('/api/crm/revenue', crmAuth, async (req, res) => {
         if (!MANUAL_REVENUE_PERIODS.has(period)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid revenue period. Use 7d, 30d, 90d, or all.',
+                message: 'Invalid revenue period. Use today, 7d, 30d, 90d, or all.',
             });
         }
 
