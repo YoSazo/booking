@@ -2717,7 +2717,11 @@ async function loadManualAvailability() {
 }
 
 function roomDateKey(roomName, day) {
-  return `${roomName}|${day}`;
+  const normalizedRoom = String(roomName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  return `${normalizedRoom}|${day}`;
 }
 
 function refreshRoomBadge() {
