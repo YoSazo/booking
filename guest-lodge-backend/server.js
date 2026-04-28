@@ -1363,7 +1363,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1405,7 +1405,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1497,7 +1497,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         }
                     });
                     dbSaveSuccess = true;
-                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total);
+                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -1793,7 +1793,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 // 3. Send push notification
                 const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
                 const roomName = bookingDetails.roomName || bookingDetails.name;
-                triggerBookingNotifications(hotelId, guestName, roomName, bookingDetails.total);
+                triggerBookingNotifications(hotelId, guestName, roomName, bookingDetails.total, bookingDetails.checkin);
 
                 // 4. Fire purchase event via Meta CAPI since the webhook did the work.
                 sendToMetaCAPI('Purchase', {
@@ -2520,7 +2520,7 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
             }
@@ -3449,9 +3449,13 @@ async function notifyRoomSoldOutToday(hotelId, roomName) {
     }
 }
 
-async function maybeNotifyRoomSoldOutToday(hotelId, roomName) {
+async function maybeNotifyRoomSoldOutToday(hotelId, roomName, referenceIso = '') {
     try {
-        const snapshot = await getManualRoomTodayAvailability(hotelId, roomName);
+        const todayIso = getReportingTodayIso();
+        const targetIso = normalizeIsoDate(referenceIso) || todayIso;
+        if (targetIso !== todayIso) return;
+
+        const snapshot = await getManualRoomTodayAvailability(hotelId, roomName, targetIso);
         if (!snapshot.tracked) return;
         const key = soldOutTodayKey(hotelId, snapshot.roomName, snapshot.todayIso);
         const wasSent = soldOutTodayNotificationState.get(key) === true;
@@ -3470,9 +3474,9 @@ async function maybeNotifyRoomSoldOutToday(hotelId, roomName) {
     }
 }
 
-function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal) {
+function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, checkinIso = '') {
     notifyNewBooking(hotelId, guestName, roomName, grandTotal).catch(() => {});
-    maybeNotifyRoomSoldOutToday(hotelId, roomName).catch(() => {});
+    maybeNotifyRoomSoldOutToday(hotelId, roomName, checkinIso).catch(() => {});
 }
 
 // Support for old notifyPurchase is removed to prevent double notifications
@@ -4294,7 +4298,7 @@ app.post('/api/crm/bookings', crmAuth, async (req, res) => {
             },
         }));
 
-        triggerBookingNotifications(hotelId, [guestFirstName, guestLastName].filter(Boolean).join(' ') || null, roomName, grandTotal);
+        triggerBookingNotifications(hotelId, [guestFirstName, guestLastName].filter(Boolean).join(' ') || null, roomName, grandTotal, checkIn);
         res.json({ success: true, data: booking });
     } catch (e) {
         console.error('CRM manual booking create error:', e.message);
