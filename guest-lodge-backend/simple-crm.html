@@ -95,6 +95,51 @@
       color: var(--green); cursor: pointer; transition: all 0.15s;
     }
     .refresh-btn:hover { background: var(--green); color: white; border-color: var(--green); }
+    .refresh-btn.notify-on {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+    .refresh-btn.notify-off {
+      background: #f2f4f3;
+      border-color: var(--border);
+      color: var(--text-muted);
+    }
+    .refresh-btn.notify-off:hover {
+      background: var(--green-pale);
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .header-action-hidden { display: none !important; }
+    .mobile-more-wrap { display: none; position: relative; }
+    .mobile-more-wrap.mobile-more-hidden { display: none !important; }
+    .mobile-more-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      min-width: 156px;
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      padding: 6px;
+      z-index: 220;
+    }
+    .mobile-more-wrap.open .mobile-more-menu { display: block; }
+    .mobile-more-item {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      padding: 9px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .mobile-more-item:hover { background: var(--bg); }
 
     /* ── LAYOUT ── */
     .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
@@ -291,6 +336,16 @@
     .btn-confirm:hover { background: #245f46; }
     .btn-note { background: var(--white); color: var(--text); border-color: var(--border); }
     .btn-note:hover { border-color: var(--green); color: var(--green); background: var(--green-pale); }
+    .btn-note-quiet {
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+    .btn-note-quiet:hover {
+      opacity: 1;
+      border-color: var(--border);
+      color: var(--text);
+      background: var(--bg);
+    }
 
     /* ── STATES ── */
     .empty-state {
@@ -1363,6 +1418,9 @@
         padding: 5px 8px;
         font-size: 11px;
       }
+      .mobile-more-wrap {
+        display: inline-flex;
+      }
       .container,
       .availability-view,
       .rooms-shell,
@@ -1524,9 +1582,15 @@
     </div>
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
-      <button class="refresh-btn" onclick="addDummyBookings()">➕ Test Bookings</button>
-      <button class="refresh-btn" id="btnNotify" onclick="enableNotifications()">🔔 Notifications</button>
+      <button class="refresh-btn" id="btnTestBookings" onclick="addDummyBookings()">➕ Test Bookings</button>
+      <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()">Notifications: Off</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
+      <div class="mobile-more-wrap mobile-more-hidden" id="mobileMoreWrap">
+        <button class="refresh-btn" type="button" id="mobileMoreBtn" aria-haspopup="menu" aria-expanded="false">⋯ More</button>
+        <div class="mobile-more-menu" id="mobileMoreMenu" role="menu">
+          <button class="mobile-more-item" type="button" id="mobileTestBookingsBtn">➕ Test Bookings</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -1556,7 +1620,7 @@
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="availability">
       <span class="mobile-nav-icon-wrap"><i data-lucide="door-open"></i></span>
-      <span class="mobile-nav-label">Rooms</span>
+      <span class="mobile-nav-label">Availability</span>
     </button>
     <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="revenue" id="mobileNavRevenueBtn">
       <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
@@ -1636,6 +1700,83 @@ function getContextParam(name) {
 
 function getDetectedHostname() {
   return (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';
+}
+
+function isProductionCrmHost() {
+  const host = getDetectedHostname();
+  if (!host) return false;
+  return !(
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.onrender.com') ||
+    host.endsWith('.vercel.app')
+  );
+}
+
+function setNotificationButtonState(enabled) {
+  const btn = document.getElementById('btnNotify');
+  if (!btn) return;
+  btn.classList.toggle('notify-on', !!enabled);
+  btn.classList.toggle('notify-off', !enabled);
+  btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  btn.textContent = enabled ? 'Notifications: On' : 'Notifications: Off';
+}
+
+function closeMobileMoreMenu() {
+  const wrap = document.getElementById('mobileMoreWrap');
+  const btn = document.getElementById('mobileMoreBtn');
+  if (!wrap || !btn) return;
+  wrap.classList.remove('open');
+  btn.setAttribute('aria-expanded', 'false');
+}
+
+function applyHeaderActionMode() {
+  const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
+  const testBtn = document.getElementById('btnTestBookings');
+  const moreWrap = document.getElementById('mobileMoreWrap');
+  if (!testBtn || !moreWrap) return;
+  const showMoreMenu = isMobile && isProductionCrmHost();
+  testBtn.classList.toggle('header-action-hidden', showMoreMenu);
+  moreWrap.classList.toggle('mobile-more-hidden', !showMoreMenu);
+  if (!showMoreMenu) closeMobileMoreMenu();
+}
+
+function initHeaderMenus() {
+  const moreWrap = document.getElementById('mobileMoreWrap');
+  const moreBtn = document.getElementById('mobileMoreBtn');
+  const testBtn = document.getElementById('mobileTestBookingsBtn');
+  if (!moreWrap || !moreBtn || !testBtn || moreWrap.dataset.bound === '1') return;
+  moreWrap.dataset.bound = '1';
+
+  moreBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !moreWrap.classList.contains('open');
+    moreWrap.classList.toggle('open', open);
+    moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  testBtn.addEventListener('click', () => {
+    closeMobileMoreMenu();
+    addDummyBookings();
+  });
+  document.addEventListener('click', (e) => {
+    if (!moreWrap.contains(e.target)) closeMobileMoreMenu();
+  });
+  window.addEventListener('resize', applyHeaderActionMode);
+}
+
+async function syncNotificationButtonState() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    setNotificationButtonState(false);
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    const enabled = Notification.permission === 'granted' && !!sub;
+    setNotificationButtonState(enabled);
+  } catch (e) {
+    setNotificationButtonState(false);
+  }
 }
 
 function resolveLegacyCrmHotelId() {
@@ -1977,7 +2118,7 @@ function ensureAvailabilityUi() {
     const btn = document.createElement('button');
     btn.className = 'tab';
     btn.setAttribute('type', 'button');
-    btn.innerHTML = 'Rooms <span class="tab-badge" id="countRooms">0</span>';
+    btn.innerHTML = 'Availability <span class="tab-badge" id="countRooms">0</span>';
     btn.dataset.navFilter = 'availability';
     btn.onclick = function () { setFilter('availability', btn); };
     tabs.appendChild(btn);
@@ -2049,7 +2190,7 @@ function ensureAvailabilityUi() {
             <div id="availabilitySheetDate" class="sheet-date"></div>
           </div>
 
-          <div id="availabilityActiveRoomLabel" class="stepper-label">Rooms available</div>
+          <div id="availabilityActiveRoomLabel" class="stepper-label">Rooms available tonight</div>
           <div class="day-stepper sheet-stepper">
             <button id="availabilityStepDownBtn" class="day-step-btn" type="button">−</button>
             <div id="availabilityDayCount" class="day-step-count">0</div>
@@ -2144,6 +2285,9 @@ async function startCrmApp(verification) {
   revenueLoading = false;
   revenueError = '';
   ensureAvailabilityUi();
+  initHeaderMenus();
+  applyHeaderActionMode();
+  syncNotificationButtonState();
   syncRevenueUi();
   document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
@@ -2338,6 +2482,7 @@ function renderBookings(list) {
     localPhoneDigits = localPhoneDigits.slice(0, 10);
     const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
 
+    const noteBtnClass = currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
     return `
     <div class="booking-card">
       <div class="card-accent ${isDeclined ? 'declined' : ''}"></div>
@@ -2391,7 +2536,7 @@ function renderBookings(list) {
 
         <div class="card-footer">
           <button class="btn btn-confirm" onclick="markConfirmed('${b.id}')">✓ Mark Called</button>
-          <button class="btn btn-note" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
+          <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
         </div>
       </div>
     </div>`;
@@ -2847,7 +2992,7 @@ function openAvailabilityDayPopover(event, dayIso) {
   dateTitle.style.display = '';
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   closedInput.checked = result.status === 'closed';
-  if (activeLabel) activeLabel.textContent = `${room.name} rooms available`;
+  if (activeLabel) activeLabel.textContent = `${room.name} rooms available tonight`;
   toggleAvailabilityDayClosed();
 
   if (backdrop) backdrop.classList.add('open');
@@ -3139,7 +3284,11 @@ async function enableNotifications() {
   if (!token) { toast('Sign in first', 'error'); return; }
   try {
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { toast('Notifications blocked', 'error'); return; }
+    if (perm !== 'granted') {
+      setNotificationButtonState(false);
+      toast('Notifications blocked', 'error');
+      return;
+    }
     const keyRes = await fetch('/api/push/vapid-public');
     const keyData = await keyRes.json().catch(() => ({}));
     if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
@@ -3156,8 +3305,11 @@ async function enableNotifications() {
       source: 'simple-crm'
     });
     toast('Notifications enabled', 'success');
-    document.getElementById('btnNotify').textContent = '🔔 On';
-  } catch(e) { toast('Failed: ' + (e.message || e), 'error'); }
+    setNotificationButtonState(true);
+  } catch(e) {
+    setNotificationButtonState(false);
+    toast('Failed: ' + (e.message || e), 'error');
+  }
 }
 
 // ── HELPERS ────────────────────────────────────────────
