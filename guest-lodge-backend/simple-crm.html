@@ -1256,33 +1256,15 @@
 
     .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .revenue-wrap { display: flex; flex-direction: column; gap: 12px; }
-    .revenue-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .revenue-period-btn {
-      border: 1.5px solid var(--border);
-      background: var(--white);
-      color: var(--text-muted);
-      border-radius: 999px;
-      padding: 7px 14px;
-      font-size: 13px;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .revenue-period-btn:hover { border-color: var(--green); color: var(--green); }
-    .revenue-period-btn.active {
-      background: var(--green);
-      border-color: var(--green);
-      color: white;
-    }
-    .revenue-range-note {
+    .revenue-subhint {
       font-size: 12px;
       color: var(--text-muted);
       font-weight: 600;
+      margin-bottom: 10px;
     }
     .revenue-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
     .revenue-card,
@@ -1307,29 +1289,10 @@
       font-weight: 600;
       color: var(--text);
       font-family: inherit;
-      margin-bottom: 7px;
-    }
-    .revenue-delta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-      min-height: 18px;
-    }
-    .revenue-delta.up { color: var(--green); }
-    .revenue-delta.down { color: var(--red); }
-    .revenue-delta-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      flex-shrink: 0;
-      background: currentColor;
     }
     .revenue-bottom-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: 1fr;
       gap: 12px;
       margin-top: 18px;
     }
@@ -1339,45 +1302,32 @@
       color: var(--text);
       margin-bottom: 14px;
     }
-    .revenue-room-row,
-    .revenue-stat-row {
+    .revenue-room-row {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 9px 0;
       border-bottom: 1px solid var(--border);
     }
-    .revenue-room-row:last-child,
-    .revenue-stat-row:last-child { border-bottom: none; }
-    .revenue-room-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      flex-shrink: 0;
-    }
-    .revenue-room-name,
-    .revenue-stat-key {
+    .revenue-room-row:last-child { border-bottom: none; }
+    .revenue-room-name {
       flex: 1;
       font-size: 13px;
+      font-weight: 600;
       color: var(--text);
     }
-    .revenue-room-name { font-weight: 600; }
-    .revenue-stat-key { color: var(--text-muted); }
-    .revenue-room-bar {
-      width: 64px;
-      height: 5px;
-      border-radius: 999px;
-      background: var(--bg);
-      overflow: hidden;
+    .revenue-room-row--simple {
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .revenue-room-row--simple .revenue-room-name {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .revenue-room-row--simple .revenue-room-value {
       flex-shrink: 0;
     }
-    .revenue-room-bar-fill {
-      height: 100%;
-      border-radius: 999px;
-      background: var(--green);
-    }
-    .revenue-room-value,
-    .revenue-stat-value {
+    .revenue-room-value {
       font-size: 13px;
       font-weight: 600;
       color: var(--text);
@@ -1733,8 +1683,6 @@ const CRM_HOTEL_LABELS = {
   'home-place-suites': 'Home Place Suites',
   'suite-stay': 'Suite Stay',
 };
-const REVENUE_ROOM_COLORS = ['#2E7D5B', '#4CAF7D', '#8BC4AA', '#C8EDD9', '#5A9E7D'];
-
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
 function getContextParam(name) {
@@ -1924,13 +1872,6 @@ const AVAIL_MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-function pctChange(currentValue, previousValue) {
-  const current = Number(currentValue || 0);
-  const previous = Number(previousValue);
-  if (!Number.isFinite(previous) || previous === 0) return null;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
 function formatCurrencyCompact(value) {
   const amount = Number(value || 0);
   const abs = Math.abs(amount);
@@ -1943,17 +1884,6 @@ function formatCurrencyCompact(value) {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-function formatPercent(value) {
-  const num = Number(value || 0);
-  return `${Math.round(num * 10) / 10}%`;
-}
-
-function updateRevenuePeriodButtons() {
-  document.querySelectorAll('.revenue-period-btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.period === revenuePeriod);
-  });
 }
 
 function syncRevenueUi() {
@@ -1988,40 +1918,23 @@ function syncRevenueUi() {
     container.insertAdjacentHTML('beforeend', `
       <div id="revenueView" class="revenue-view" style="display:none">
         <div class="revenue-wrap">
-          <div class="revenue-toolbar">
-            <button class="revenue-period-btn" data-period="7d" onclick="setRevenuePeriod('7d', this)">7 days</button>
-            <button class="revenue-period-btn active" data-period="30d" onclick="setRevenuePeriod('30d', this)">30 days</button>
-            <button class="revenue-period-btn" data-period="90d" onclick="setRevenuePeriod('90d', this)">90 days</button>
-            <button class="revenue-period-btn" data-period="all" onclick="setRevenuePeriod('all', this)">All time</button>
-          </div>
-          <div id="revenueRangeNote" class="revenue-range-note">Stay-date revenue</div>
+          <div class="revenue-subhint">Last 30 days · stay dates</div>
           <div id="revenueStatus"></div>
           <div id="revenueContent" style="display:none">
             <div class="revenue-grid">
               <div class="revenue-card">
                 <div class="revenue-label">Revenue</div>
                 <div class="revenue-value" id="revenueKpiRev">$0</div>
-                <div class="revenue-delta" id="revenueKpiRevDelta"></div>
               </div>
               <div class="revenue-card">
                 <div class="revenue-label">Bookings</div>
                 <div class="revenue-value" id="revenueKpiBookings">0</div>
-                <div class="revenue-delta" id="revenueKpiBookingsDelta"></div>
-              </div>
-              <div class="revenue-card">
-                <div class="revenue-label">Avg. stay value</div>
-                <div class="revenue-value" id="revenueKpiAvg">$0</div>
-                <div class="revenue-delta" id="revenueKpiAvgDelta"></div>
               </div>
             </div>
             <div class="revenue-bottom-grid">
               <div class="revenue-list-card">
                 <div class="revenue-list-title">By room type</div>
                 <div id="revenueRoomList"></div>
-              </div>
-              <div class="revenue-list-card">
-                <div class="revenue-list-title">Quick stats</div>
-                <div id="revenueQuickStats"></div>
               </div>
             </div>
           </div>
@@ -2030,27 +1943,10 @@ function syncRevenueUi() {
     `);
   }
 
-  updateRevenuePeriodButtons();
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
   updateMobileRevenueNavVisibility();
   syncMobileNavActive(currentFilter);
-}
-
-function setRevenueDelta(id, currentValue, previousValue, emptyLabel = 'No prior period') {
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  const pct = pctChange(currentValue, previousValue);
-  if (pct === null) {
-    el.className = 'revenue-delta';
-    el.innerHTML = '<span class="revenue-delta-dot"></span>' + esc(emptyLabel);
-    return;
-  }
-
-  const up = pct >= 0;
-  el.className = `revenue-delta ${up ? 'up' : 'down'}`;
-  el.innerHTML = `<span class="revenue-delta-dot"></span>${up ? '+' : ''}${pct}% vs prior period`;
 }
 
 function renderRevenueRooms(rooms) {
@@ -2058,41 +1954,17 @@ function renderRevenueRooms(rooms) {
   if (!list) return;
 
   const items = Array.isArray(rooms) ? rooms : [];
-  const maxRev = items.reduce((max, room) => Math.max(max, Number(room.rev || 0)), 0);
-  if (!items.length || maxRev <= 0) {
+  if (!items.length) {
     list.innerHTML = '<div class="revenue-empty-inline">No room revenue yet for this period.</div>';
     return;
   }
 
-  list.innerHTML = items.map((room, index) => {
-    const color = REVENUE_ROOM_COLORS[index % REVENUE_ROOM_COLORS.length];
-    const roomRevenue = Number(room.rev || 0);
-    const width = roomRevenue > 0 && maxRev > 0
-      ? Math.max(6, Math.round((roomRevenue / maxRev) * 100))
-      : 0;
-    return `
-      <div class="revenue-room-row">
-        <div class="revenue-room-dot" style="background:${color}"></div>
+  list.innerHTML = items.map((room) => `
+      <div class="revenue-room-row revenue-room-row--simple">
         <div class="revenue-room-name">${esc(room.name || 'Room')}</div>
-        <div class="revenue-room-bar"><div class="revenue-room-bar-fill" style="width:${width}%;background:${color}"></div></div>
         <div class="revenue-room-value">${esc(formatCurrencyCompact(room.rev))}</div>
       </div>
-    `;
-  }).join('');
-}
-
-function renderRevenueStats(data) {
-  const statsEl = document.getElementById('revenueQuickStats');
-  if (!statsEl) return;
-
-  const stats = data && data.stats ? data.stats : {};
-  statsEl.innerHTML = `
-    <div class="revenue-stat-row"><span class="revenue-stat-key">Nights sold</span><span class="revenue-stat-value">${esc(String(stats.nights || 0))}</span></div>
-    <div class="revenue-stat-row"><span class="revenue-stat-key">Occupancy rate</span><span class="revenue-stat-value">${esc(formatPercent(stats.occupancyRate || 0))}</span></div>
-    <div class="revenue-stat-row"><span class="revenue-stat-key">Pay at hotel</span><span class="revenue-stat-value">${esc(String(stats.payLater || 0))} bookings</span></div>
-    <div class="revenue-stat-row"><span class="revenue-stat-key">Recovered declines</span><span class="revenue-stat-value">${esc(String(stats.recoveredDeclines || 0))}</span></div>
-    <div class="revenue-stat-row"><span class="revenue-stat-key">Revenue / booking</span><span class="revenue-stat-value">${esc(formatCurrencyCompact(data.avg || 0))}</span></div>
-  `;
+    `).join('');
 }
 
 function renderRevenueView() {
@@ -2100,18 +1972,9 @@ function renderRevenueView() {
   const view = document.getElementById('revenueView');
   if (!view) return;
 
-  updateRevenuePeriodButtons();
-
   const statusEl = document.getElementById('revenueStatus');
   const contentEl = document.getElementById('revenueContent');
-  const noteEl = document.getElementById('revenueRangeNote');
   const data = revenueCache[revenuePeriod] || null;
-
-  if (noteEl) {
-    noteEl.textContent = data && data.range && data.range.label
-      ? `Stay dates: ${data.range.label}`
-      : 'Stay-date revenue';
-  }
 
   if (!data) {
     if (contentEl) contentEl.style.display = 'none';
@@ -2137,17 +2000,9 @@ function renderRevenueView() {
 
   const revEl = document.getElementById('revenueKpiRev');
   const bookingsEl = document.getElementById('revenueKpiBookings');
-  const avgEl = document.getElementById('revenueKpiAvg');
   if (revEl) revEl.textContent = formatCurrencyCompact(data.rev);
   if (bookingsEl) bookingsEl.textContent = String(data.bookings || 0);
-  if (avgEl) avgEl.textContent = formatCurrencyCompact(data.avg);
-
-  const noPriorLabel = revenuePeriod === 'all' ? 'All available data' : 'No prior period';
-  setRevenueDelta('revenueKpiRevDelta', data.rev, data.prevRev, noPriorLabel);
-  setRevenueDelta('revenueKpiBookingsDelta', data.bookings, data.prevBookings, noPriorLabel);
-  setRevenueDelta('revenueKpiAvgDelta', data.avg, data.prevAvg, noPriorLabel);
   renderRevenueRooms(data.rooms);
-  renderRevenueStats(data);
 }
 
 async function loadRevenueData(force = false) {
@@ -2174,12 +2029,6 @@ async function loadRevenueData(force = false) {
     revenueLoading = false;
     renderRevenueView();
   }
-}
-
-function setRevenuePeriod(period, btn) {
-  revenuePeriod = period;
-  if (btn) updateRevenuePeriodButtons();
-  loadRevenueData();
 }
 
 function ensureAvailabilityUi() {
