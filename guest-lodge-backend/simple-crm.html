@@ -590,6 +590,26 @@
       transition: all .15s;
     }
     .room-pill-add:hover { border-color: var(--green); color: var(--green); }
+    .room-mobile-actions {
+      display: none;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .room-mobile-action-btn {
+      flex: 1;
+      border: 1.5px solid var(--border);
+      border-radius: 999px;
+      background: var(--white);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .room-mobile-action-btn:hover { border-color: var(--green); color: var(--green); }
+    .room-mobile-action-btn.danger:hover { border-color: var(--red); color: var(--red); }
 
     .availability-card {
       background: var(--white);
@@ -1095,6 +1115,7 @@
       min-height: 48px;
     }
     .room-pill-action { display: none; }
+    .room-mobile-actions { display: flex; }
     .room-pill-add {
       flex-shrink: 0;
       min-height: 48px;
@@ -2178,6 +2199,10 @@ function ensureAvailabilityUi() {
                 <div class="legend-item"><div class="legend-dot" style="background:#FEE2E2;border:1px solid #E05252"></div>Full</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#f2f4f3;border:1px solid #d0d7d3"></div>Closed</div>
               </div>
+              <div id="roomMobileActions" class="room-mobile-actions" style="display:none">
+                <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">✎ Edit room</button>
+                <button id="roomMobileDeleteBtn" class="room-mobile-action-btn danger" type="button">🗑 Delete room</button>
+              </div>
             </div>
           </div>
 
@@ -2814,6 +2839,24 @@ function renderRoomPills() {
   bar.appendChild(addBtn);
 }
 
+function renderMobileRoomActions() {
+  const row = document.getElementById('roomMobileActions');
+  const editBtn = document.getElementById('roomMobileEditBtn');
+  const delBtn = document.getElementById('roomMobileDeleteBtn');
+  const room = getManualRoomByName(manualSelectedRoom);
+  const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
+  if (!row || !editBtn || !delBtn) return;
+
+  if (!isMobile || !room) {
+    row.style.display = 'none';
+    return;
+  }
+
+  row.style.display = 'flex';
+  editBtn.onclick = () => openRoomsEditModal(room.name);
+  delBtn.onclick = () => deleteRoomType(room.name);
+}
+
 function openRoomsAddModal() {
   const modal = document.getElementById('roomsAddModalBg');
   if (!modal) return;
@@ -2906,6 +2949,7 @@ function renderAvailabilityView() {
   if (manualSelectedRoom && !rooms.some(r => r.name === manualSelectedRoom)) {
     manualSelectedRoom = rooms.length ? rooms[0].name : '';
   }
+  renderMobileRoomActions();
 
   const noRoom = document.getElementById('availabilityNoRoom');
   const calWrap = document.getElementById('availabilityCalendarWrap');
