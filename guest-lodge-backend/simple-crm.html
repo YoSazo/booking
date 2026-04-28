@@ -776,7 +776,7 @@
       display: none;
     }
 
-    /* Desktop: day editor = small anchored popover; header actions left-aligned */
+    /* Desktop: day editor = bottom dock; header actions left-aligned */
     @media (min-width: 601px) {
       .header {
         justify-content: flex-start;
@@ -799,20 +799,26 @@
         display: block;
       }
 
-      /* Match availability-simple desktop popover (narrow card, compact stepper) */
+      /* Desktop: day editor = full-width bottom dock (room for range + stepper) */
       #availabilityDayPopover.availability-edit-sheet {
         position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
         z-index: 262;
-        width: min(220px, calc(100vw - 24px));
-        max-height: min(86vh, 520px);
+        width: 100%;
+        max-width: none;
+        max-height: min(78vh, 720px);
         margin: 0;
         overflow-y: auto;
         background: var(--white);
-        border: 1.5px solid var(--border);
-        border-radius: 14px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+        border: solid var(--border);
+        border-width: 1.5px 0 0;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.12);
         transform: none !important;
-        transition: opacity 0.12s ease;
+        transition: opacity 0.16s ease, transform 0.16s ease;
         padding: 0;
         visibility: hidden;
         opacity: 0;
@@ -851,28 +857,35 @@
       #availabilityDayPopover .sheet-inner {
         padding: 18px 20px 0;
         position: relative;
+        max-width: 640px;
+        margin: 0 auto;
+        box-sizing: border-box;
       }
       #availabilityDayPopover .sheet-date-row {
-        margin-bottom: 12px;
-        padding-right: 24px;
+        margin-bottom: 14px;
+        padding-right: 36px;
       }
       #availabilityDayPopover .sheet-dow {
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
+        font-size: 14px;
+        font-weight: 700;
         color: var(--text-muted);
       }
       #availabilityDayPopover .sheet-date {
-        display: none;
+        display: block;
+        margin-top: 4px;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1.15;
       }
       #availabilityDayPopover .range-toggle-row {
         margin-bottom: 10px;
         gap: 8px;
       }
       #availabilityDayPopover .range-toggle-label {
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 600;
-        color: var(--text-muted);
+        color: var(--text);
       }
       #availabilityDayPopover .toggle-switch {
         width: 40px;
@@ -915,24 +928,31 @@
         background: var(--white);
       }
       #availabilityDayPopover .stepper-label {
-        display: none;
+        display: block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 8px;
       }
       #availabilityDayPopover .day-stepper.sheet-stepper {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
-        padding: 0;
-        background: transparent;
-        border-radius: 0;
+        gap: 14px;
+        margin-bottom: 14px;
+        padding: 12px 14px;
+        background: var(--bg);
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
       }
       #availabilityDayPopover .day-step-btn {
-        width: 32px;
-        height: 32px;
+        width: 44px;
+        height: 44px;
         border-width: 1.5px;
-        border-radius: 8px;
-        font-size: 18px;
-        background: var(--bg);
+        border-radius: 10px;
+        font-size: 20px;
+        background: var(--white);
         flex-shrink: 0;
       }
       #availabilityDayPopover .day-step-btn:hover {
@@ -941,8 +961,8 @@
       }
       #availabilityDayPopover .day-step-count {
         font-family: 'DM Mono', monospace;
-        font-size: 22px;
-        font-weight: 500;
+        font-size: 28px;
+        font-weight: 600;
         flex: 1;
         text-align: center;
         line-height: 1;
@@ -968,24 +988,35 @@
         color: var(--text-muted);
       }
       #availabilityDayPopover .closed-sub {
-        display: none;
+        display: block;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 500;
       }
       #availabilityDayPopover .sheet-actions {
-        flex-direction: column;
-        padding: 0 20px 18px;
-        gap: 8px;
+        display: flex;
+        flex-direction: row-reverse;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 12px;
+        padding: 14px 20px 22px;
+        max-width: 640px;
+        margin: 0 auto;
+        box-sizing: border-box;
+        border-top: 1px solid var(--border);
       }
       #availabilityDayPopover .sheet-save-btn,
       #availabilityDayPopover .sheet-cancel-btn {
-        width: 100%;
-        border-radius: 9px;
+        width: auto;
+        border-radius: 10px;
         font-weight: 600;
-        font-size: 13px;
-        padding: 9px 12px;
+        font-size: 14px;
+        padding: 10px 20px;
         font-family: inherit;
         cursor: pointer;
       }
       #availabilityDayPopover .sheet-save-btn {
+        min-width: 120px;
         border: 0;
         background: var(--green);
         color: white;
@@ -994,6 +1025,7 @@
         background: #245f46;
       }
       #availabilityDayPopover .sheet-cancel-btn {
+        min-width: 96px;
         border: 1.5px solid var(--border);
         background: transparent;
         color: var(--text-muted);
@@ -1414,7 +1446,7 @@
         flex: 0 0 auto;
         max-width: none;
         width: 100%;
-        justify-content: flex-end;
+        justify-content: flex-start;
         flex-wrap: wrap;
         gap: 6px 8px;
         row-gap: 6px;
@@ -2929,15 +2961,11 @@ function openAvailabilityDayPopover(event, dayIso) {
   const result = availabilityForDay(room, dayIso, bookedMap);
   const date = new Date(`${dayIso}T00:00:00`);
   const isMobileSheet = window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
-  if (isMobileSheet) {
-    title.textContent = date.toLocaleDateString('en-US', { weekday: 'long' });
-    dateTitle.textContent = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-    dateTitle.style.display = '';
-  } else {
-    title.textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    dateTitle.textContent = '';
-    dateTitle.style.display = 'none';
-  }
+  title.textContent = date.toLocaleDateString('en-US', { weekday: 'long' });
+  dateTitle.textContent = isMobileSheet
+    ? date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+    : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  dateTitle.style.display = '';
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   closedInput.checked = result.status === 'closed';
   if (rangeStart) rangeStart.value = dayIso;
@@ -2949,46 +2977,9 @@ function openAvailabilityDayPopover(event, dayIso) {
 
   if (backdrop) backdrop.classList.add('open');
 
-  if (!isMobileSheet) {
-    const pad = 8;
-    const w = Math.min(220, window.innerWidth - 20);
-    pop.style.width = `${w}px`;
-    const cell = event && event.currentTarget && typeof event.currentTarget.getBoundingClientRect === 'function'
-      ? event.currentTarget
-      : null;
-    if (cell) {
-      const r = cell.getBoundingClientRect();
-      let left = r.left;
-      let top = r.bottom + pad;
-      if (left + w > window.innerWidth - 10) left = window.innerWidth - w - 10;
-      left = Math.max(10, left);
-      const estH = 200;
-      if (top + estH > window.innerHeight - 10) {
-        top = r.top - estH - pad;
-      }
-      top = Math.max(10, top);
-      pop.style.left = `${Math.round(left)}px`;
-      pop.style.top = `${Math.round(top)}px`;
-      requestAnimationFrame(() => {
-        if (!pop.classList.contains('open')) return;
-        const r2 = cell.getBoundingClientRect();
-        const h = pop.getBoundingClientRect().height;
-        let topCur = parseFloat(pop.style.top);
-        if (!Number.isFinite(topCur)) return;
-        if (topCur + h > window.innerHeight - 10) {
-          const above = r2.top - h - pad;
-          if (above >= 10) pop.style.top = `${Math.round(above)}px`;
-        }
-      });
-    } else {
-      pop.style.left = `${Math.round((window.innerWidth - w) / 2)}px`;
-      pop.style.top = '100px';
-    }
-  } else {
-    pop.style.removeProperty('left');
-    pop.style.removeProperty('top');
-    pop.style.removeProperty('width');
-  }
+  pop.style.removeProperty('left');
+  pop.style.removeProperty('top');
+  pop.style.removeProperty('width');
 
   pop.classList.add('open');
   pop.setAttribute('aria-hidden', 'false');
@@ -3003,11 +2994,9 @@ function closeAvailabilityDayPopover() {
   if (pop) {
     pop.classList.remove('open');
     pop.setAttribute('aria-hidden', 'true');
-    if (window.matchMedia && window.matchMedia('(min-width: 601px)').matches) {
-      pop.style.removeProperty('left');
-      pop.style.removeProperty('top');
-      pop.style.removeProperty('width');
-    }
+    pop.style.removeProperty('left');
+    pop.style.removeProperty('top');
+    pop.style.removeProperty('width');
   }
 }
 
