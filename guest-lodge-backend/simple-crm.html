@@ -1280,6 +1280,53 @@
 
     .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .revenue-wrap { display: flex; flex-direction: column; gap: 12px; }
+    .revenue-period-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .revenue-period-btn {
+      border: 2px solid var(--border);
+      background: var(--white);
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .revenue-period-btn.active {
+      border-color: var(--green);
+      background: var(--green-soft);
+      color: var(--green);
+    }
+    .revenue-savings-pill {
+      border: 2px solid #D3F2E2;
+      background: linear-gradient(135deg, #F3FFF8 0%, #E9FFF3 100%);
+      border-radius: 999px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .revenue-savings-copy {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .revenue-savings-value {
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text);
+      font-family: inherit;
+      margin-left: auto;
+    }
     .revenue-subhint {
       font-size: 12px;
       color: var(--text-muted);
@@ -1405,6 +1452,16 @@
       .revenue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .revenue-bottom-grid { grid-template-columns: 1fr; }
       .revenue-value { font-size: 20px; }
+      .revenue-savings-pill {
+        padding: 10px 14px;
+        gap: 8px;
+      }
+      .revenue-savings-copy {
+        font-size: 11px;
+      }
+      .revenue-savings-value {
+        font-size: 18px;
+      }
     }
 
     /* Mobile overflow safeguards for header + calendar */
@@ -1962,9 +2019,19 @@ function syncRevenueUi() {
     container.insertAdjacentHTML('beforeend', `
       <div id="revenueView" class="revenue-view" style="display:none">
         <div class="revenue-wrap">
-          <div class="revenue-subhint">Last 30 days · stay dates</div>
+          <div class="revenue-period-bar" id="revenuePeriodBar">
+            <button type="button" class="revenue-period-btn" data-period="today">Today</button>
+            <button type="button" class="revenue-period-btn" data-period="7d">7 days</button>
+            <button type="button" class="revenue-period-btn active" data-period="30d">30 days</button>
+            <button type="button" class="revenue-period-btn" data-period="90d">90 days</button>
+          </div>
+          <div class="revenue-subhint" id="revenueSubhint">Last 30 days · stay dates</div>
           <div id="revenueStatus"></div>
           <div id="revenueContent" style="display:none">
+            <div class="revenue-savings-pill">
+              <div class="revenue-savings-copy" id="revenueSavingsCopy">You saved today</div>
+              <div class="revenue-savings-value" id="revenueKpiSaved">$0</div>
+            </div>
             <div class="revenue-grid">
               <div class="revenue-card">
                 <div class="revenue-label">Revenue</div>
@@ -1987,10 +2054,47 @@ function syncRevenueUi() {
     `);
   }
 
+  const periodBar = document.getElementById('revenuePeriodBar');
+  if (periodBar && !periodBar.dataset.bound) {
+    periodBar.dataset.bound = '1';
+    periodBar.addEventListener('click', (event) => {
+      const btn = event.target.closest('.revenue-period-btn');
+      if (!btn) return;
+      const nextPeriod = btn.dataset.period || '';
+      if (!nextPeriod || nextPeriod === revenuePeriod) return;
+      revenuePeriod = nextPeriod;
+      renderRevenueView();
+      if (currentFilter === 'revenue') loadRevenueData();
+    });
+  }
+
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
   updateMobileRevenueNavVisibility();
   syncMobileNavActive(currentFilter);
+}
+
+function revenuePeriodLabel(period) {
+  if (period === 'today') return 'Today';
+  if (period === '7d') return 'Last 7 days';
+  if (period === '90d') return 'Last 90 days';
+  return 'Last 30 days';
+}
+
+function revenueSavingsValue(data) {
+  if (!data || typeof data !== 'object') return 0;
+  const possible = [
+    data.saved,
+    data.savings,
+    data.savedAmount,
+    data.commissionSaved,
+    data.commissionSavings,
+  ];
+  for (const val of possible) {
+    const n = Number(val);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
 }
 
 function renderRevenueRooms(rooms) {
@@ -2018,6 +2122,13 @@ function renderRevenueView() {
 
   const statusEl = document.getElementById('revenueStatus');
   const contentEl = document.getElementById('revenueContent');
+  const subhintEl = document.getElementById('revenueSubhint');
+  const periodButtons = document.querySelectorAll('.revenue-period-btn');
+  const currentPeriodLabel = revenuePeriodLabel(revenuePeriod);
+  if (subhintEl) subhintEl.textContent = `${currentPeriodLabel} · stay dates`;
+  periodButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.period === revenuePeriod);
+  });
   const data = revenueCache[revenuePeriod] || null;
 
   if (!data) {
@@ -2044,8 +2155,13 @@ function renderRevenueView() {
 
   const revEl = document.getElementById('revenueKpiRev');
   const bookingsEl = document.getElementById('revenueKpiBookings');
+  const savedEl = document.getElementById('revenueKpiSaved');
+  const savedCopyEl = document.getElementById('revenueSavingsCopy');
   if (revEl) revEl.textContent = formatCurrencyCompact(data.rev);
   if (bookingsEl) bookingsEl.textContent = String(data.bookings || 0);
+  const savedAmount = revenueSavingsValue(data);
+  if (savedEl) savedEl.textContent = formatCurrencyCompact(savedAmount);
+  if (savedCopyEl) savedCopyEl.textContent = revenuePeriod === 'today' ? 'You saved today' : `You saved (${currentPeriodLabel.toLowerCase()})`;
   renderRevenueRooms(data.rooms);
 }
 
