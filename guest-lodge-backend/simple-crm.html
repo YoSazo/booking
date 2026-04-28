@@ -752,6 +752,16 @@
       background: var(--green);
       color: white;
     }
+    .rooms-modal-delete-copy {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text-muted);
+      margin: 4px 0 14px;
+    }
+    .rooms-modal-delete-copy strong {
+      color: var(--text);
+      font-weight: 700;
+    }
 
     .day-popover {
       display: none;
@@ -1619,13 +1629,9 @@
   </div>
 
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
-    <button type="button" class="mobile-nav-item active" data-nav-filter="needs-call" aria-current="page">
+    <button type="button" class="mobile-nav-item active" data-nav-filter="calls" aria-current="page">
       <span class="mobile-nav-icon-wrap"><i data-lucide="phone"></i></span>
       <span class="mobile-nav-label">Calls</span>
-    </button>
-    <button type="button" class="mobile-nav-item" data-nav-filter="called">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="check"></i></span>
-      <span class="mobile-nav-label">Called</span>
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="availability">
       <span class="mobile-nav-icon-wrap"><i data-lucide="door-open"></i></span>
@@ -1668,6 +1674,7 @@ let availabilityYear = new Date().getFullYear();
 let availabilityMonth = new Date().getMonth();
 let availabilityEditingDay = '';
 let editingRoomName = '';
+let pendingDeleteRoomName = '';
 let currentHotelPms = '';
 let revenueEnabled = false;
 let revenuePeriod = '30d';
@@ -2140,6 +2147,19 @@ function ensureAvailabilityUi() {
         </div>
       </div>
 
+      <div id="roomsDeleteModalBg" class="rooms-modal-bg">
+        <div class="rooms-modal" onclick="event.stopPropagation()">
+          <h3>Delete room type?</h3>
+          <p class="rooms-modal-delete-copy" id="roomsDeleteCopy">
+            Deleting this room will remove its day-by-day overrides.
+          </p>
+          <div class="rooms-modal-row">
+            <button id="roomsDeleteCancelBtn" class="rooms-modal-btn" type="button">Keep room</button>
+            <button id="roomsDeleteConfirmBtn" class="rooms-modal-btn primary" type="button">Delete room</button>
+          </div>
+        </div>
+      </div>
+
       <div id="availabilitySheetBackdrop" class="availability-sheet-backdrop"></div>
       <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true">
         <div class="sheet-handle"></div>
@@ -2208,6 +2228,17 @@ function bindAvailabilityUiEvents() {
   }
   if (editModalCancel) editModalCancel.addEventListener('click', closeRoomsEditModal);
   if (editModalSave) editModalSave.addEventListener('click', saveEditedRoomType);
+
+  const deleteModalBg = document.getElementById('roomsDeleteModalBg');
+  const deleteModalCancel = document.getElementById('roomsDeleteCancelBtn');
+  const deleteModalConfirm = document.getElementById('roomsDeleteConfirmBtn');
+  if (deleteModalBg) {
+    deleteModalBg.addEventListener('click', (e) => {
+      if (e.target === deleteModalBg) closeRoomsDeleteModal();
+    });
+  }
+  if (deleteModalCancel) deleteModalCancel.addEventListener('click', closeRoomsDeleteModal);
+  if (deleteModalConfirm) deleteModalConfirm.addEventListener('click', confirmDeleteRoomType);
 
   const stepDown = document.getElementById('availabilityStepDownBtn');
   const stepUp = document.getElementById('availabilityStepUpBtn');
@@ -2546,6 +2577,12 @@ function initMobileBottomNav() {
     if (filter === 'revenue' && !revenueEnabled) return;
     setFilter(filter, item);
   });
+
+  // Mobile keeps a single Calls bucket instead of split Needs/Called tabs.
+  if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches && (currentFilter === 'needs-call' || currentFilter === 'called')) {
+    const callsBtn = nav.querySelector('.mobile-nav-item[data-nav-filter="calls"]');
+    setFilter('calls', callsBtn);
+  }
 }
 
 function setFilter(filter, btn) {
@@ -2615,6 +2652,11 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => {
     const current = document.querySelector('.tab.active');
     if (current) moveSlider(current);
+    if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches && (currentFilter === 'needs-call' || currentFilter === 'called')) {
+      const callsBtn = document.querySelector('.mobile-nav-item[data-nav-filter="calls"]');
+      setFilter('calls', callsBtn);
+      return;
+    }
     syncMobileNavActive(currentFilter);
   });
 
@@ -2647,9 +2689,11 @@ function applyFilter() {
   if (availabilityEl) availabilityEl.style.display = 'none';
   if (revenueEl) revenueEl.style.display = 'none';
   closeAvailabilityDayPopover();
-  const filtered = currentFilter === 'needs-call' 
+  const filtered = currentFilter === 'needs-call'
     ? bookings.filter(b => b.callStatus === 'not-called')
-    : bookings.filter(b => b.callStatus === 'called');
+    : currentFilter === 'called'
+      ? bookings.filter(b => b.callStatus === 'called')
+      : bookings;
   renderBookings(filtered);
 }
 
@@ -2799,6 +2843,24 @@ function closeRoomsEditModal() {
   const modal = document.getElementById('roomsEditModalBg');
   if (modal) modal.classList.remove('open');
   editingRoomName = '';
+}
+
+function openRoomsDeleteModal(roomName) {
+  const room = getManualRoomByName(roomName);
+  if (!room) return;
+  pendingDeleteRoomName = room.name;
+  const modal = document.getElementById('roomsDeleteModalBg');
+  const copy = document.getElementById('roomsDeleteCopy');
+  if (copy) {
+    copy.innerHTML = `Delete <strong>${esc(room.name)}</strong>? This removes its day-by-day overrides and cannot be undone.`;
+  }
+  if (modal) modal.classList.add('open');
+}
+
+function closeRoomsDeleteModal() {
+  const modal = document.getElementById('roomsDeleteModalBg');
+  if (modal) modal.classList.remove('open');
+  pendingDeleteRoomName = '';
 }
 
 function bookingsByRoomDate() {
@@ -3128,9 +3190,16 @@ async function saveEditedRoomType() {
 async function deleteRoomType(roomName) {
   const room = getManualRoomByName(roomName);
   if (!room) return;
+  openRoomsDeleteModal(room.name);
+}
 
-  const confirmDelete = confirm(`Delete room type "${room.name}"? This will also remove its day-by-day overrides.`);
-  if (!confirmDelete) return;
+async function confirmDeleteRoomType() {
+  if (!pendingDeleteRoomName) return;
+  const room = getManualRoomByName(pendingDeleteRoomName);
+  if (!room) {
+    closeRoomsDeleteModal();
+    return;
+  }
 
   try {
     const data = await api('DELETE', '/api/crm/manual-availability/rooms', { roomName: room.name });
@@ -3140,6 +3209,7 @@ async function deleteRoomType(roomName) {
       manualSelectedRoom = (manualAvailability.rooms && manualAvailability.rooms[0] && manualAvailability.rooms[0].name) || '';
     }
     closeAvailabilityDayPopover();
+    closeRoomsDeleteModal();
     refreshRoomBadge();
     renderAvailabilityView();
     toast('Room type deleted', 'success');
@@ -3212,12 +3282,14 @@ document.addEventListener('keydown', (e) => {
     }
     closeRoomsAddModal();
     closeRoomsEditModal();
+    closeRoomsDeleteModal();
     closeAvailabilityDayPopover();
   }
 
   if (e.key === 'Enter') {
     const roomModal = document.getElementById('roomsAddModalBg');
     const roomEditModal = document.getElementById('roomsEditModalBg');
+    const roomDeleteModal = document.getElementById('roomsDeleteModalBg');
     if (roomModal && roomModal.classList.contains('open')) {
       e.preventDefault();
       saveRoomType();
@@ -3226,6 +3298,11 @@ document.addEventListener('keydown', (e) => {
     if (roomEditModal && roomEditModal.classList.contains('open')) {
       e.preventDefault();
       saveEditedRoomType();
+      return;
+    }
+    if (roomDeleteModal && roomDeleteModal.classList.contains('open')) {
+      e.preventDefault();
+      confirmDeleteRoomType();
     }
   }
 });
