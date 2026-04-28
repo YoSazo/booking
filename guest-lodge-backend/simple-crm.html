@@ -110,36 +110,6 @@
       border-color: var(--green);
       color: var(--green);
     }
-    .header-action-hidden { display: none !important; }
-    .mobile-more-wrap { display: none; position: relative; }
-    .mobile-more-wrap.mobile-more-hidden { display: none !important; }
-    .mobile-more-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: calc(100% + 6px);
-      min-width: 156px;
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      box-shadow: var(--shadow-lg);
-      padding: 6px;
-      z-index: 220;
-    }
-    .mobile-more-wrap.open .mobile-more-menu { display: block; }
-    .mobile-more-item {
-      width: 100%;
-      text-align: left;
-      border: 0;
-      border-radius: 8px;
-      background: transparent;
-      padding: 9px 10px;
-      font-family: inherit;
-      font-size: 12px;
-      color: var(--text);
-      cursor: pointer;
-    }
-    .mobile-more-item:hover { background: var(--bg); }
 
     /* ── LAYOUT ── */
     .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
@@ -1467,9 +1437,6 @@
         padding: 5px 8px;
         font-size: 11px;
       }
-      .mobile-more-wrap {
-        display: inline-flex;
-      }
       .container,
       .availability-view,
       .rooms-shell,
@@ -1631,15 +1598,8 @@
     </div>
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
-      <button class="refresh-btn" id="btnTestBookings" onclick="addDummyBookings()">➕ Test Bookings</button>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()">Notifications: Off</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <div class="mobile-more-wrap mobile-more-hidden" id="mobileMoreWrap">
-        <button class="refresh-btn" type="button" id="mobileMoreBtn" aria-haspopup="menu" aria-expanded="false">⋯ More</button>
-        <div class="mobile-more-menu" id="mobileMoreMenu" role="menu">
-          <button class="mobile-more-item" type="button" id="mobileTestBookingsBtn">➕ Test Bookings</button>
-        </div>
-      </div>
     </div>
   </header>
 
@@ -1751,17 +1711,6 @@ function getDetectedHostname() {
   return (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';
 }
 
-function isProductionCrmHost() {
-  const host = getDetectedHostname();
-  if (!host) return false;
-  return !(
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host.endsWith('.onrender.com') ||
-    host.endsWith('.vercel.app')
-  );
-}
-
 function setNotificationButtonState(enabled) {
   const btn = document.getElementById('btnNotify');
   if (!btn) return;
@@ -1769,48 +1718,6 @@ function setNotificationButtonState(enabled) {
   btn.classList.toggle('notify-off', !enabled);
   btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
   btn.textContent = enabled ? 'Notifications: On' : 'Notifications: Off';
-}
-
-function closeMobileMoreMenu() {
-  const wrap = document.getElementById('mobileMoreWrap');
-  const btn = document.getElementById('mobileMoreBtn');
-  if (!wrap || !btn) return;
-  wrap.classList.remove('open');
-  btn.setAttribute('aria-expanded', 'false');
-}
-
-function applyHeaderActionMode() {
-  const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
-  const testBtn = document.getElementById('btnTestBookings');
-  const moreWrap = document.getElementById('mobileMoreWrap');
-  if (!testBtn || !moreWrap) return;
-  const showMoreMenu = isMobile && isProductionCrmHost();
-  testBtn.classList.toggle('header-action-hidden', showMoreMenu);
-  moreWrap.classList.toggle('mobile-more-hidden', !showMoreMenu);
-  if (!showMoreMenu) closeMobileMoreMenu();
-}
-
-function initHeaderMenus() {
-  const moreWrap = document.getElementById('mobileMoreWrap');
-  const moreBtn = document.getElementById('mobileMoreBtn');
-  const testBtn = document.getElementById('mobileTestBookingsBtn');
-  if (!moreWrap || !moreBtn || !testBtn || moreWrap.dataset.bound === '1') return;
-  moreWrap.dataset.bound = '1';
-
-  moreBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = !moreWrap.classList.contains('open');
-    moreWrap.classList.toggle('open', open);
-    moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
-  testBtn.addEventListener('click', () => {
-    closeMobileMoreMenu();
-    addDummyBookings();
-  });
-  document.addEventListener('click', (e) => {
-    if (!moreWrap.contains(e.target)) closeMobileMoreMenu();
-  });
-  window.addEventListener('resize', applyHeaderActionMode);
 }
 
 async function syncNotificationButtonState() {
@@ -2338,8 +2245,6 @@ async function startCrmApp(verification) {
   revenueLoading = false;
   revenueError = '';
   ensureAvailabilityUi();
-  initHeaderMenus();
-  applyHeaderActionMode();
   syncNotificationButtonState();
   syncRevenueUi();
   document.getElementById('bootScreen').style.display = 'none';
