@@ -31,11 +31,11 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       }
     }
 
-    // Suite Stay: after 6 PM Central, block same-day
+    // Suite Stay: after 4 PM Central, block same-day
     if (isSuiteStay) {
       const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
       const centralHour = new Date(centralTime).getHours();
-      if (centralHour >= 18) { // 6 PM or later
+      if (centralHour >= 16) { // 4 PM or later
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         return tomorrow;
@@ -182,8 +182,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       const centralTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
       const centralHour = new Date(centralTime).getHours();
 
-      // St. Croix: cutoff 4 PM, Suite Stay: cutoff 6 PM
-      const cutoffHour = isStCroix ? 16 : 18;
+      // St. Croix: cutoff 4 PM, Suite Stay: cutoff 4 PM
+      const cutoffHour = 16;
 
       if (centralHour >= cutoffHour) {
         minBookingDate = new Date(today);
