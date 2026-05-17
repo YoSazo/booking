@@ -9,6 +9,70 @@
     />
     <title>Suite Stay</title>
 
+    <!-- Hotel JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Hotel",
+      "name": "Suite Stay",
+      "description": "No Deposits. No Leases. No Credit Checks. Just Simple Extended Living. Fully furnished rooms with free WiFi, TV, fridge, workstation, free parking, and weekly housekeeping.",
+      "url": "https://suitestay.clickinns.com",
+      "telephone": "+1-256-207-8086",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "65600 AL-77",
+        "addressLocality": "Talladega",
+        "addressRegion": "AL",
+        "postalCode": "35160",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 33.452566,
+        "longitude": -86.114401
+      },
+      "image": "https://suitestay.clickinns.com/suitestayoutside.webp",
+      "priceRange": "$69 - $999",
+      "currenciesAccepted": "USD",
+      "paymentAccepted": "Credit Card, Apple Pay, Google Pay",
+      "checkinTime": "15:00",
+      "checkoutTime": "11:00",
+      "starRating": {
+        "@type": "Rating",
+        "ratingValue": "2.8"
+      },
+      "amenityFeature": [
+        { "@type": "LocationFeatureSpecification", "name": "Free WiFi", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Free Parking", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Weekly Housekeeping", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "In-Room Refrigerator", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Workstation", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Pet Friendly", "value": true }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "2.8",
+        "reviewCount": "231",
+        "bestRating": "5"
+      },
+      "potentialAction": {
+        "@type": "ReserveAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://suitestay.clickinns.com",
+          "actionPlatform": [
+            "http://schema.org/DesktopWebPlatform",
+            "http://schema.org/MobileWebPlatform"
+          ]
+        },
+        "result": {
+          "@type": "LodgingReservation",
+          "name": "Book a Room"
+        }
+      }
+    }
+    </script>
+
     <!-- Webkit/Safari Safety Script -->
     <script>
       (function() {
