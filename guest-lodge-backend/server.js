@@ -3747,15 +3747,28 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
 // Funnel dashboard API (no auth required)
 app.get('/api/funnel', async (req, res) => {
     try {
-        // Get events from last 7 days by default
-        const daysBack = parseInt(req.query.days) || 7;
-        const since = new Date();
-        since.setDate(since.getDate() - daysBack);
+        let since, until;
+
+        if (req.query.from && req.query.to) {
+            // Explicit date range
+            since = new Date(req.query.from + 'T00:00:00.000Z');
+            until = new Date(req.query.to + 'T23:59:59.999Z');
+            if (isNaN(since) || isNaN(until)) {
+                return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+            }
+        } else {
+            // Fallback: days param
+            const daysBack = parseInt(req.query.days) || 7;
+            until = new Date();
+            since = new Date();
+            since.setDate(since.getDate() - daysBack);
+            since.setHours(0, 0, 0, 0);
+        }
 
         const events = await withRetry(() => prisma.funnelEvent.findMany({
-            where: { createdAt: { gte: since } },
+            where: { createdAt: { gte: since, lte: until } },
             orderBy: { createdAt: 'desc' },
-            take: 200,
+            take: 500,
         }));
 
         // Build counts
@@ -3763,7 +3776,7 @@ app.get('/api/funnel', async (req, res) => {
         events.forEach(e => { if (counts[e.eventName] !== undefined) counts[e.eventName]++; });
 
         // Recent events with full detail
-        const recent = events.slice(0, 50).map(e => ({
+        const recent = events.map(e => ({
             event_name: e.eventName,
             timestamp: e.createdAt.getTime(),
             event_id: e.eventId,
