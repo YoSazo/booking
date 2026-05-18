@@ -3802,6 +3802,33 @@ app.get('/api/funnel', async (req, res) => {
     }
 });
 
+// Delete a funnel event
+app.delete('/api/funnel/events', async (req, res) => {
+    try {
+        const { eventId, timestamp } = req.body;
+        if (!eventId && !timestamp) {
+            return res.status(400).json({ success: false, message: 'eventId or timestamp required' });
+        }
+
+        // Try to find by eventId first, fall back to timestamp
+        let where = {};
+        if (eventId) {
+            where.eventId = eventId;
+        } else {
+            // Match by createdAt within 1 second of the timestamp
+            const ts = new Date(timestamp);
+            const tsEnd = new Date(timestamp + 1000);
+            where.createdAt = { gte: ts, lt: tsEnd };
+        }
+
+        const deleted = await withRetry(() => prisma.funnelEvent.deleteMany({ where }));
+        res.json({ success: true, deleted: deleted.count });
+    } catch (e) {
+        console.error('Delete funnel event error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to delete' });
+    }
+});
+
 // Meta Ads insights for funnel dashboard (no auth required)
 app.get('/api/meta-insights', async (req, res) => {
     try {

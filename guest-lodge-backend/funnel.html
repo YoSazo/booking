@@ -301,6 +301,26 @@
     color: var(--muted);
     white-space: nowrap;
   }
+  .event-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    opacity: 0;
+    font-size: 14px;
+  }
+  .event-card:hover .delete-btn { opacity: 1; }
+  .delete-btn:hover { color: var(--red); background: #fee2e2; }
   .event-guest {
     font-size: 14px;
     font-weight: 600;
@@ -637,9 +657,14 @@ function calApply() {
 document.addEventListener('click', function(e) {
   const popup = document.getElementById('calPopup');
   const btn = document.getElementById('dateBtn');
-  if (!popup.contains(e.target) && !btn.contains(e.target)) {
+  if (!popup.contains(e.target) && !btn.contains(e.target) && popup.classList.contains('open')) {
     popup.classList.remove('open');
   }
+});
+
+// Prevent clicks inside the calendar from bubbling to the document listener
+document.getElementById('calPopup').addEventListener('click', function(e) {
+  e.stopPropagation();
 });
 
 function switchView(view) {
@@ -731,19 +756,43 @@ function renderEvents() {
     if (e.value) detailParts.push('<span class="event-price">$' + e.value.toFixed(2) + '</span>');
 
     return `
-      <div class="event-card">
+      <div class="event-card" id="event-${e.event_id || ''}">
         <div class="event-badge ${typeClass}">${icon}</div>
         <div class="event-body">
           <div class="event-top">
             <span class="event-type ${typeClass}">${label}</span>
-            <span class="event-time">${formatTime(e.timestamp)}</span>
           </div>
           ${guestName ? `<div class="event-guest">${guestName}</div>` : ''}
           ${detailParts.length ? `<div class="event-details">${detailParts.join('')}</div>` : ''}
         </div>
+        <div class="event-right">
+          <span class="event-time">${formatTime(e.timestamp)}</span>
+          <button class="delete-btn" onclick="deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">🗑</button>
+        </div>
       </div>
     `;
   }).join('');
+}
+
+async function deleteEvent(eventId, timestamp) {
+  if (!confirm('Delete this event?')) return;
+  try {
+    const res = await fetch('/api/funnel/events', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, timestamp }),
+    });
+    if (res.ok) {
+      // Remove from local array and re-render
+      allEvents = allEvents.filter(e => !(e.event_id === eventId && e.timestamp === timestamp));
+      // Recount
+      allCounts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
+      allEvents.forEach(e => { if (allCounts[e.event_name] !== undefined) allCounts[e.event_name]++; });
+      renderEvents();
+    }
+  } catch (e) {
+    console.error('Delete failed:', e);
+  }
 }
 
 async function loadEvents() {
