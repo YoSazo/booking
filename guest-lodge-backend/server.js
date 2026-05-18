@@ -1162,6 +1162,7 @@ async function sendToMetaCAPI(eventName, eventData) {
 const FUNNEL_EVENTS = ['PageView', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'CardModalAcknowledged', 'ConfirmBookingClick', 'Purchase', 'CallModalDismissed', 'TapToCallFirst', 'CardDeclineModalShown'];
 const funnelStore = [];
 const FUNNEL_MAX = 500;
+let funnelTrackingEnabled = true;
 
 function pushFunnelEvent(event_name, eventData) {
     if (!FUNNEL_EVENTS.includes(event_name)) return;
@@ -2597,6 +2598,11 @@ app.post('/api/track', async (req, res) => {
         return res.status(400).json({ success: false, message: errorMessage });
     }
 
+    // Skip all logging if tracking is paused
+    if (!funnelTrackingEnabled) {
+        return res.status(200).json({ success: true, message: 'Tracking paused, event ignored.' });
+    }
+
     // Add event_time as Unix timestamp (required for accurate Meta tracking)
     const enrichedPayload = {
         ...eventData,
@@ -3564,9 +3570,9 @@ async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMe
     }
 }
 
-// Serve CRM HTML
+// /crm redirects to /frontdesk (crm.html removed)
 app.get('/crm', (req, res) => {
-    res.sendFile(path.join(__dirname, 'crm.html'));
+    res.redirect(301, '/frontdesk');
 });
 
 // Serve Simple CRM HTML (for front desk)
@@ -3827,6 +3833,17 @@ app.delete('/api/funnel/events', async (req, res) => {
         console.error('Delete funnel event error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to delete' });
     }
+});
+
+// Funnel tracking toggle
+app.get('/api/funnel/tracking', (req, res) => {
+    res.json({ enabled: funnelTrackingEnabled });
+});
+
+app.post('/api/funnel/tracking', (req, res) => {
+    funnelTrackingEnabled = req.body.enabled !== false;
+    console.log(`Funnel tracking ${funnelTrackingEnabled ? 'enabled' : 'paused'}`);
+    res.json({ success: true, enabled: funnelTrackingEnabled });
 });
 
 // Meta Ads insights for funnel dashboard (no auth required)
