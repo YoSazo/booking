@@ -3,2010 +3,372 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Marketel Funnel</title>
-<link rel="manifest" href="/manifest-funnel.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="/marketellogo.svg">
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lucide@latest"></script>
+<title>Marketel · Activity</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --white: #ffffff;
-    --bg: #f5f4f1;
-    --bg2: #eeecea;
+    --bg: #f8f9fa;
     --card: #ffffff;
-    --border: #e8e5e0;
-    --border2: #d8d4ce;
-    --ink: #1a1714;
-    --ink2: #3d3a36;
-    --muted: #8a8580;
-    --muted2: #b0aca6;
-    --green: #1a9e5c;
-    --green-lt: #e8f7ef;
-    --green-mid: #d0f0e0;
-    --green-bright: #22c76e;
-    --amber: #d97706;
-    --amber-lt: #fef3c7;
-    --red: #dc2626;
-    --red-lt: #fee2e2;
+    --border: #e9ecef;
+    --text: #1a1a2e;
+    --muted: #6c757d;
+    --green: #2E7D5B;
+    --green-lt: #e8f5ee;
     --blue: #3b82f6;
+    --amber: #f59e0b;
+    --red: #ef4444;
     --purple: #8b5cf6;
-    --pink: #ec4899;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow: 0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
-    --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
-    --r: 18px;
-    --r-sm: 12px;
-    --r-xs: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
   }
-
   body {
-    font-family: 'Geist', sans-serif;
-    background: var(--white);
-    min-height: 100vh;
-    color: var(--ink);
-  }
-
-  /* ── LOGIN SCREEN ── */
-  .login-screen {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, var(--ink) 0%, var(--green) 100%);
-    z-index: 9999;
-  }
-  .login-card {
-    background: white;
-    border-radius: 24px;
-    padding: 48px 40px;
-    width: 380px;
-    max-width: calc(100% - 32px);
-    box-shadow: var(--shadow-lg);
-    text-align: center;
-  }
-  .login-logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-  .login-logo-icon { height: 56px; width: auto; }
-  .login-logo-text { height: 32px; width: auto; }
-  .login-card p {
-    font-size: 14px;
-    color: var(--muted);
-    margin-bottom: 28px;
-  }
-  .login-input {
-    width: 100%;
-    padding: 14px 18px;
-    border: 2px solid var(--border);
-    border-radius: var(--r-sm);
-    font-family: inherit;
-    font-size: 18px;
-    text-align: center;
-    letter-spacing: 4px;
-    outline: none;
-    margin-bottom: 16px;
-    color: var(--ink);
-    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: 'DM Sans', sans-serif;
     background: var(--bg);
-  }
-  .login-input:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px var(--green-lt);
-  }
-  .login-btn {
-    width: 100%;
-    padding: 14px;
-    background: var(--green);
-    color: white;
-    border: none;
-    border-radius: var(--r-sm);
-    font-family: inherit;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: var(--shadow-sm);
-  }
-  .login-btn:hover {
-    background: #16844d;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow);
-  }
-  .login-btn:active {
-    transform: translateY(0);
-  }
-  .login-error {
-    color: var(--red);
-    font-size: 13px;
-    margin-top: 12px;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
   }
 
-  /* ── MAIN CONTAINER ── */
-  .container {
-    max-width: 100%;
-    margin: 0 auto;
-    padding: 24px 16px 80px;
-  }
-
-  @media (min-width: 768px) {
-    .container {
-      max-width: 1200px;
-      padding: 40px 32px 40px;
-      display: grid;
-      grid-template-columns: 240px 1fr;
-      gap: 40px;
-      align-items: start;
-    }
-  }
-
-  @media (min-width: 1400px) {
-    .container {
-      max-width: 1400px;
-    }
-  }
-
-  /* ── HEADER ── */
+  /* Header */
   .header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
-  
-  @media (min-width: 768px) {
-    .header {
-      display: none;
-    }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
-  .header-brand {
-    font-family: 'Instrument Serif', serif;
-    font-size: 24px;
-    color: var(--ink);
-    letter-spacing: -0.3px;
-  }
-  .header-brand em {
-    color: var(--green);
-    font-style: italic;
+  .header-logo {
+    height: 36px;
+    width: auto;
   }
   .header-right {
     display: flex;
-    gap: 8px;
     align-items: center;
+    gap: 12px;
   }
-  .icon-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+  .refresh-btn {
+    background: var(--green-lt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .refresh-btn:hover {
+    background: var(--green);
+    color: white;
+  }
+  .event-count {
+    background: var(--green-lt);
+    color: var(--green);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  /* Filter tabs */
+  .filters {
+    padding: 16px 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
     background: var(--card);
     border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    box-shadow: var(--shadow-sm);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s;
   }
-  .icon-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow);
+  .filter-btn:hover {
+    border-color: var(--green);
+    color: var(--green);
   }
-  .icon-btn.active {
+  .filter-btn.active {
     background: var(--green);
     border-color: var(--green);
     color: white;
   }
 
-  /* ── GREETING ── */
-  .greeting {
-    margin-bottom: 8px;
-  }
-  .greeting-sub {
-    font-size: 13px;
-    color: var(--muted);
-    font-weight: 400;
-    margin-bottom: 4px;
-  }
-  .greeting-title {
-    font-family: 'Instrument Serif', serif;
-    font-size: 32px;
-    color: var(--ink);
-    line-height: 1.1;
-    letter-spacing: -0.5px;
-  }
-
-  /* ── LIVE TAG ── */
-  .live-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--green-lt);
-    border: 1px solid var(--green-mid);
-    border-radius: 20px;
-    padding: 6px 14px 6px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--green);
-    margin: 12px 0 16px;
-  }
-  .live-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--green-bright);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 199, 110, 0.4); }
-    50% { box-shadow: 0 0 0 5px rgba(34, 199, 110, 0); }
-  }
-
-  /* ── HERO CARD ── */
-  .hero-card {
-    background: var(--ink);
-    border-radius: var(--r);
-    padding: 24px;
-    color: #fff;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow-lg);
-  }
-  .hero-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 90% -20%, rgba(34, 199, 110, 0.3) 0%, transparent 55%),
-      radial-gradient(ellipse at -10% 110%, rgba(34, 199, 110, 0.12) 0%, transparent 50%);
-    pointer-events: none;
-  }
-  .hero-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.45);
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    margin-bottom: 10px;
-    position: relative;
-  }
-  .hero-amount {
-    font-family: 'Instrument Serif', serif;
-    font-size: 52px;
-    letter-spacing: -2px;
-    line-height: 1;
-    margin-bottom: 8px;
-    position: relative;
-  }
-  .hero-amount-sm {
-    font-size: 28px;
-    color: rgba(255, 255, 255, 0.65);
-  }
-  .hero-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
-    position: relative;
-  }
-  .hero-badge {
-    background: rgba(34, 199, 110, 0.2);
-    color: #5de89a;
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 11.5px;
-    font-weight: 700;
-  }
-  .hero-badge.red {
-    background: rgba(220, 38, 38, 0.2);
-    color: #fca5a5;
-  }
-  .hero-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.08);
-    margin: 18px 0;
-    position: relative;
-  }
-  .hero-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    position: relative;
-  }
-  .hstat {
-    padding: 0 12px;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    text-align: center;
-  }
-  .hstat:first-child {
-    padding-left: 0;
-    text-align: left;
-  }
-  .hstat:last-child {
-    border-right: none;
-    text-align: right;
-  }
-  .hstat-val {
-    font-family: 'Instrument Serif', serif;
-    font-size: 22px;
-    letter-spacing: -0.5px;
-    color: #fff;
-    margin-bottom: 2px;
-  }
-  .hstat-val.green {
-    color: #5de89a;
-  }
-  .hstat-val.amber {
-    color: #fbbf24;
-  }
-  .hstat-lbl {
-    font-size: 10px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.35);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-  }
-
-  /* ── SECTION HEADER ── */
-  .sec-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 24px 0 12px;
-  }
-  .sec-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.2px;
-  }
-  .sec-action {
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--green);
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  .sec-action:hover {
-    opacity: 0.7;
-  }
-
-  /* ── META TOOLBAR ── */
-  .meta-toolbar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-  .meta-btn {
-    padding: 7px 14px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--ink);
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: var(--shadow-sm);
-  }
-  .meta-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow);
-  }
-  .meta-btn:active {
-    transform: translateY(0);
-  }
-
-  /* ── CARD ── */
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 20px;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 16px;
-  }
-
-  /* ── FUNNEL STEPS ── */
-  .funnel-steps {
+  /* Event cards */
+  .events-list {
+    padding: 0 24px 100px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
-  .funnel-step {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
-    background: var(--white);
-    border-radius: var(--r-sm);
-    border: 1px solid var(--border);
-    transition: all 0.2s;
-    cursor: pointer;
-    box-shadow: var(--shadow-sm);
-  }
-  .funnel-step:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-    border-color: var(--border2);
-  }
-  
-  .funnel-step-icon-wrapper {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: all 0.2s;
-  }
-  .funnel-step:nth-child(1) .funnel-step-icon-wrapper { background: #eff6ff; }
-  .funnel-step:nth-child(2) .funnel-step-icon-wrapper { background: #f5f3ff; }
-  .funnel-step:nth-child(3) .funnel-step-icon-wrapper { background: #fdf2f8; }
-  .funnel-step:nth-child(4) .funnel-step-icon-wrapper { background: #fffbeb; }
-  .funnel-step:nth-child(5) .funnel-step-icon-wrapper { background: var(--green-lt); }
-  
-  .funnel-step-icon {
-    width: 20px;
-    height: 20px;
-  }
-  .funnel-step:nth-child(1) .funnel-step-icon { color: var(--blue); }
-  .funnel-step:nth-child(2) .funnel-step-icon { color: var(--purple); }
-  .funnel-step:nth-child(3) .funnel-step-icon { color: var(--pink); }
-  .funnel-step:nth-child(4) .funnel-step-icon { color: var(--amber); }
-  .funnel-step:nth-child(5) .funnel-step-icon { color: var(--green); }
-  
-  .funnel-step-label {
-    flex: 1;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--ink);
-  }
-  .funnel-step-count {
-    background: var(--bg);
-    color: var(--ink);
-    border-radius: 8px;
-    padding: 5px 12px;
-    font-size: 13px;
-    font-weight: 700;
-    font-family: 'Geist', monospace;
-    min-width: 44px;
-    text-align: center;
-  }
-  .funnel-step-pct {
-    font-size: 11px;
-    color: var(--muted);
-    font-weight: 600;
-    min-width: 48px;
-    text-align: right;
-  }
-
-  /* ── CHART CARD ── */
-  .chart-card {
+  .event-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 20px;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 16px;
-  }
-  .chart-top {
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--shadow);
     display: flex;
+    gap: 12px;
     align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 4px;
+    transition: box-shadow 0.15s;
   }
-  .chart-kpi {
-    font-family: 'Instrument Serif', serif;
-    font-size: 28px;
-    letter-spacing: -1px;
-    color: var(--ink);
+  .event-card:hover {
+    box-shadow: var(--shadow-md);
   }
-  .chart-kpi-lbl {
-    font-size: 11px;
-    color: var(--muted);
-    font-weight: 500;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-  }
-  .chart-kpi-change {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--green);
-    background: var(--green-lt);
-    border-radius: 6px;
-    padding: 3px 8px;
-    margin-top: 6px;
-  }
-  .chart-tabs {
-    display: flex;
-    gap: 2px;
-    background: var(--bg2);
-    border-radius: 10px;
-    padding: 3px;
-  }
-  .ctab {
-    padding: 5px 11px;
-    border-radius: 8px;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--muted);
-    cursor: pointer;
-    transition: all 0.18s;
-    white-space: nowrap;
-  }
-  .ctab.on {
-    background: var(--white);
-    color: var(--ink);
-    box-shadow: var(--shadow-sm);
-  }
-
-  /* ── META METRICS GRID ── */
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  
-  @media (min-width: 768px) {
-    .metrics-grid {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-  }
-  
-  @media (min-width: 1200px) {
-    .metrics-grid {
-      grid-template-columns: repeat(5, 1fr);
-    }
-  }
-  .metric-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 14px;
-    box-shadow: var(--shadow-sm);
-  }
-  .metric-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--muted);
-    margin-bottom: 6px;
-    font-weight: 600;
-  }
-  .metric-value {
-    font-family: 'Instrument Serif', serif;
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: -0.5px;
-  }
-
-  /* ── RECENT ACTIVITY ── */
-  .recent-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .recent-item {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    overflow: hidden;
-    transition: all 0.2s;
-  }
-  .recent-item:hover {
-    transform: translateX(4px);
-  }
-  .recent-stripe {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--green-bright);
-    border-radius: 0 2px 2px 0;
-  }
-  .recent-icon {
+  .event-badge {
+    flex-shrink: 0;
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: var(--bg);
-    border: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 16px;
-    flex-shrink: 0;
   }
-  .recent-info {
+  .event-badge.search { background: #dbeafe; }
+  .event-badge.addtocart { background: #fef3c7; }
+  .event-badge.initiatecheckout { background: #e0e7ff; }
+  .event-badge.addpaymentinfo { background: #ede9fe; }
+  .event-badge.confirmbookingclick { background: #fce7f3; }
+  .event-badge.purchase { background: #d1fae5; }
+  .event-badge.pageview { background: #f3f4f6; }
+  .event-badge.other { background: #f3f4f6; }
+
+  .event-body {
     flex: 1;
     min-width: 0;
   }
-  .recent-event {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 2px;
-  }
-  .recent-meta {
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .recent-time {
-    font-size: 10px;
-    color: var(--muted2);
-    font-weight: 500;
-    font-family: 'Geist', monospace;
-    flex-shrink: 0;
-  }
-  .recent-empty {
-    color: var(--muted);
-    font-size: 13px;
-    padding: 32px;
-    text-align: center;
-  }
-
-  /* ── META MODAL ── */
-  .meta-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-    padding: 16px;
-  }
-  .meta-modal {
-    background: var(--white);
-    border-radius: var(--r);
-    padding: 20px;
-    box-shadow: var(--shadow-lg);
-    max-width: 420px;
-    width: 100%;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  .meta-modal-header {
+  .event-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .meta-modal-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--ink);
-  }
-  .meta-modal-body {
-    display: flex;
-    flex-wrap: wrap;
     gap: 8px;
+    margin-bottom: 4px;
   }
-  .meta-date-btn {
-    padding: 10px 14px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
+  .event-type {
     font-size: 12px;
     font-weight: 600;
-    color: var(--ink);
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
-  .meta-date-btn:hover {
-    background: var(--bg2);
+  .event-type.search { color: #2563eb; }
+  .event-type.addtocart { color: #d97706; }
+  .event-type.initiatecheckout { color: #4f46e5; }
+  .event-type.addpaymentinfo { color: #7c3aed; }
+  .event-type.confirmbookingclick { color: #db2777; }
+  .event-type.purchase { color: #059669; }
+  .event-type.pageview { color: #6b7280; }
+  .event-type.other { color: #6b7280; }
+
+  .event-time {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
   }
-  .meta-date-btn.selected {
-    background: var(--green);
-    color: #fff;
-    border-color: var(--green);
+  .event-guest {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .event-details {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .event-details span {
+    display: inline-block;
+    margin-right: 12px;
+  }
+  .event-price {
+    font-weight: 700;
+    color: var(--green);
   }
 
-  /* ── ANIMATIONS ── */
-  @keyframes fadeUp {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--muted);
   }
-  .anim {
-    animation: fadeUp 0.5s ease both;
-  }
-  .a1 { animation-delay: 0.05s; }
-  .a2 { animation-delay: 0.12s; }
-  .a3 { animation-delay: 0.20s; }
-  .a4 { animation-delay: 0.28s; }
-  .a5 { animation-delay: 0.36s; }
-  .a6 { animation-delay: 0.44s; }
-  .a7 { animation-delay: 0.52s; }
-  
-  /* ── VIEW CONTAINER ── */
-  .view-container {
-    animation: fadeIn 0.3s ease;
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+  .empty-state p {
+    font-size: 14px;
+    margin-top: 8px;
   }
 
-  .placeholder {
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 40px;
     color: var(--muted);
     font-size: 14px;
-    padding: 40px 20px;
-    text-align: center;
-    line-height: 1.6;
   }
 
-  /* ── DESKTOP SIDEBAR ── */
-  .desktop-sidebar {
-    display: none;
-  }
-
-  @media (min-width: 768px) {
-    .desktop-sidebar {
-      display: block;
-      position: sticky;
-      top: 40px;
-    }
-    
-    .sidebar-logo {
-      font-family: 'Instrument Serif', serif;
-      font-size: 24px;
-      color: var(--ink);
-      margin-bottom: 32px;
-      letter-spacing: -0.3px;
-    }
-    
-    .sidebar-logo em {
-      color: var(--green);
-      font-style: italic;
-    }
-    
-    .sidebar-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    
-    .sidebar-nav-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border-radius: var(--r-sm);
-      text-decoration: none;
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 600;
-      transition: all 0.2s;
-      cursor: pointer;
-      background: transparent;
-      border: none;
-      width: 100%;
-      text-align: left;
-    }
-    
-    .sidebar-nav-item:hover {
-      background: var(--bg);
-      color: var(--ink);
-    }
-    
-    .sidebar-nav-item.active {
-      background: var(--green);
-      color: white;
-    }
-    
-    .sidebar-nav-icon {
-      width: 20px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-    
-    .sidebar-divider {
-      height: 1px;
-      background: var(--border);
-      margin: 16px 0;
-    }
-  }
-
-  .main-content {
-    min-width: 0;
-  }
-
-  @media (min-width: 768px) {
-    .greeting {
-      margin-bottom: 16px;
-    }
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 640px) {
-    .hero-amount { font-size: 42px; }
-    .hero-stats { grid-template-columns: 1fr; gap: 12px; }
-    .hstat { border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 0; text-align: left !important; }
-    .hstat:last-child { border-bottom: none; }
-  }
-
-  /* ── BOTTOM NAV (Yuto Glass Style) ── */
-  .bottom-nav {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 32px);
-    max-width: 280px;
-    height: 60px;
-    z-index: 100;
-    touch-action: none;
-    user-select: none;
-  }
-  
-  .nav-glass {
-    position: absolute;
-    inset: 0;
-    border-radius: 30px;
-    overflow: hidden;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-  }
-  
-  .nav-pill {
-    position: absolute;
-    top: 5px;
-    bottom: 5px;
-    border-radius: 25px;
-    background: var(--ink);
-    z-index: 20;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    left: calc(0 * 50% + 5px);
-    width: calc(50% - 10px);
-  }
-  
-  .nav-pill.dragging {
-    transition: none;
-    transform: scaleY(1.03);
-  }
-  
-  .nav-items {
-    position: relative;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    z-index: 30;
-  }
-  
-  .nav-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    height: 100%;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    text-decoration: none;
-    transition: all 0.15s ease-out;
-  }
-  
-  .nav-icon-wrapper {
-    transition: transform 0.15s ease-out;
-  }
-  
-  .nav-icon {
-    width: 22px;
-    height: 22px;
-    transition: all 0.2s;
-  }
-  
-  .nav-item.active .nav-icon {
-    color: #fff;
-  }
-  
-  .nav-item:not(.active) .nav-icon {
-    color: #9ca3af;
-  }
-  
-  .nav-label {
-    font-size: 10px;
-    font-weight: 600;
-    transition: color 0.2s;
-  }
-  
-  .nav-item.active .nav-label {
-    color: #fff;
-  }
-  
-  .nav-item:not(.active) .nav-label {
-    color: #9ca3af;
-  }
-  
-  @media (min-width: 768px) {
-    .bottom-nav {
-      display: none;
-    }
+  @media (max-width: 600px) {
+    .header { padding: 12px 16px; }
+    .filters { padding: 12px 16px; }
+    .events-list { padding: 0 16px 80px; }
+    .event-card { padding: 12px; }
   }
 </style>
 </head>
 <body>
 
-<!-- LOGIN (disabled - no PIN required) -->
-<div id="loginScreen" class="login-screen" style="display:none">
-  <div class="login-card">
-    <div class="login-logo">
-      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
-      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
-    </div>
-    <p>Enter your PIN to continue</p>
-    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
-      onkeydown="if(event.key==='Enter') doLogin()">
-    <button class="login-btn" onclick="doLogin()">Sign In</button>
-    <div class="login-error" id="loginError"></div>
+<div class="header">
+  <div class="header-left">
+    <img src="/marketellogo.svg" alt="Marketel" class="header-logo">
+    <span class="event-count" id="totalCount">0 events</span>
+  </div>
+  <div class="header-right">
+    <select id="daysFilter" onchange="loadEvents()" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; font-size: 13px; color: var(--text);">
+      <option value="1">Today</option>
+      <option value="3">Last 3 days</option>
+      <option value="7" selected>Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">All time</option>
+    </select>
+    <button class="refresh-btn" onclick="loadEvents()">Refresh</button>
   </div>
 </div>
 
-<!-- APP -->
-<div id="app" style="display:none">
-<div class="container">
-  <!-- DESKTOP SIDEBAR -->
-  <aside class="desktop-sidebar">
-    <div class="sidebar-logo">Marketel <em>Funnel</em></div>
-    
-    <nav class="sidebar-nav">
-      <button type="button" class="sidebar-nav-item active" data-view="funnel" onclick="switchView('funnel')">
-        <i data-lucide="bar-chart-3" class="sidebar-nav-icon"></i>
-        <span>Funnel</span>
-      </button>
-      <button type="button" class="sidebar-nav-item" data-view="analytics" onclick="switchView('analytics')">
-        <i data-lucide="trending-up" class="sidebar-nav-icon"></i>
-        <span>Analytics</span>
-      </button>
-      <a href="/crm" class="sidebar-nav-item">
-        <i data-lucide="users" class="sidebar-nav-icon"></i>
-        <span>Bookings</span>
-      </a>
-    </nav>
-    
-    <div class="sidebar-divider"></div>
-    
-    <nav class="sidebar-nav">
-      <button class="sidebar-nav-item" id="btnNotifyDesktop" onclick="enableFunnelNotifications()" title="Get notified for new bookings">
-        <i data-lucide="bell" class="sidebar-nav-icon"></i>
-        <span>Notifications</span>
-      </button>
-      <button class="sidebar-nav-item" onclick="handleRefresh()" title="Refresh data">
-        <i data-lucide="refresh-cw" class="sidebar-nav-icon"></i>
-        <span>Refresh</span>
-      </button>
-    </nav>
-  </aside>
-
-  <!-- MAIN CONTENT -->
-  <div class="main-content">
-    <!-- HEADER (Mobile only) -->
-    <div class="header anim a1">
-      <div class="header-brand">Marketel <em>Funnel</em></div>
-      <div class="header-right">
-        <button class="icon-btn" id="btnNotify" onclick="enableFunnelNotifications()" title="Get notified for new bookings">
-          <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
-        </button>
-        <button class="icon-btn" onclick="handleRefresh()" title="Refresh data">
-          <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
-        </button>
-      </div>
-    </div>
-
-    <!-- GREETING -->
-    <div class="greeting anim a2">
-      <div class="greeting-sub" id="headerDate"></div>
-      <div class="greeting-title" id="pageTitle">Conversion<br>Analytics</div>
-    </div>
-
-  <!-- FUNNEL VIEW -->
-  <div id="funnelView" class="view-container">
-    <!-- LIVE TAG -->
-    <div class="live-tag anim a2">
-      <div class="live-dot"></div>
-      <span id="liveStatus">Live tracking · Updates every 3s</span>
-    </div>
-
-    <!-- HERO CARD: Conversion Rate -->
-    <div class="hero-card anim a3">
-    <div class="hero-label">Overall Conversion Rate</div>
-    <div class="hero-amount"><span class="hero-amount-sm" id="heroConversionRate">0%</span></div>
-    <div class="hero-meta">
-      <span class="hero-badge" id="heroConversionBadge">—</span>
-      <span id="heroConversionMeta">Search to Purchase</span>
-    </div>
-    <div class="hero-divider"></div>
-    <div class="hero-stats">
-      <div class="hstat">
-        <div class="hstat-val green" id="heroSearches">0</div>
-        <div class="hstat-lbl">Searches</div>
-      </div>
-      <div class="hstat">
-        <div class="hstat-val" id="heroCarts">0</div>
-        <div class="hstat-lbl">Add to Cart</div>
-      </div>
-      <div class="hstat">
-        <div class="hstat-val amber" id="heroPurchases">0</div>
-        <div class="hstat-lbl">Purchases</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- META ADS SECTION -->
-  <div class="sec-header anim a4">
-    <span class="sec-title">Meta Ads Performance</span>
-  </div>
-
-  <div class="meta-toolbar anim a4">
-    <button class="meta-btn" onclick="setMetaRange('today')">Today</button>
-    <button class="meta-btn" onclick="setMetaRange('yesterday')">Yesterday</button>
-    <button class="meta-btn" onclick="setMetaRange('last7')">Last 7 days</button>
-    <button class="meta-btn" onclick="setMetaRange('max')">All time</button>
-    <button class="meta-btn" onclick="openMetaModal()">Choose dates</button>
-    <button class="meta-btn" onclick="copyMetaSummary()">
-      <i data-lucide="clipboard" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
-      Copy
-    </button>
-  </div>
-
-  <div class="metrics-grid anim a4" id="metaMetrics" style="display:none">
-    <div class="metric-card">
-      <div class="metric-label">Ad Spend</div>
-      <div class="metric-value" id="meta-spend">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">CPM</div>
-      <div class="metric-value" id="meta-cpm">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">CTR</div>
-      <div class="metric-value" id="meta-ctr">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">ROAS</div>
-      <div class="metric-value" id="meta-roas">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">LP Views</div>
-      <div class="metric-value" id="meta-lpv">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Searches</div>
-      <div class="metric-value" id="meta-search">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Add to Cart</div>
-      <div class="metric-value" id="meta-atc">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Checkouts</div>
-      <div class="metric-value" id="meta-ic">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Payment Info</div>
-      <div class="metric-value" id="meta-api">–</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Purchases</div>
-      <div class="metric-value" id="meta-purchase">–</div>
-    </div>
-  </div>
-
-  <!-- FUNNEL STEPS -->
-  <div class="sec-header anim a5">
-    <span class="sec-title">Funnel Steps</span>
-  </div>
-
-  <div class="card anim a5">
-    <div class="funnel-steps" id="funnelSteps">
-      <div class="funnel-step">
-        <div class="funnel-step-icon-wrapper">
-          <i data-lucide="search" class="funnel-step-icon"></i>
-        </div>
-        <span class="funnel-step-label">Search</span>
-        <span class="funnel-step-count" id="count-Search">0</span>
-        <span class="funnel-step-pct" id="pct-Search"></span>
-      </div>
-      <div class="funnel-step">
-        <div class="funnel-step-icon-wrapper">
-          <i data-lucide="shopping-cart" class="funnel-step-icon"></i>
-        </div>
-        <span class="funnel-step-label">Add to Cart</span>
-        <span class="funnel-step-count" id="count-AddToCart">0</span>
-        <span class="funnel-step-pct" id="pct-AddToCart"></span>
-      </div>
-      <div class="funnel-step">
-        <div class="funnel-step-icon-wrapper">
-          <i data-lucide="clipboard-list" class="funnel-step-icon"></i>
-        </div>
-        <span class="funnel-step-label">Initiate Checkout</span>
-        <span class="funnel-step-count" id="count-InitiateCheckout">0</span>
-        <span class="funnel-step-pct" id="pct-InitiateCheckout"></span>
-      </div>
-      <div class="funnel-step">
-        <div class="funnel-step-icon-wrapper">
-          <i data-lucide="credit-card" class="funnel-step-icon"></i>
-        </div>
-        <span class="funnel-step-label">Add Payment Info</span>
-        <span class="funnel-step-count" id="count-AddPaymentInfo">0</span>
-        <span class="funnel-step-pct" id="pct-AddPaymentInfo"></span>
-      </div>
-      <div class="funnel-step">
-        <div class="funnel-step-icon-wrapper">
-          <i data-lucide="check-circle" class="funnel-step-icon"></i>
-        </div>
-        <span class="funnel-step-label">Purchase</span>
-        <span class="funnel-step-count" id="count-Purchase">0</span>
-        <span class="funnel-step-pct" id="pct-Purchase"></span>
-      </div>
-    </div>
-  </div>
-
-  <!-- RECENT ACTIVITY -->
-  <div class="sec-header anim a6">
-    <span class="sec-title">Recent Activity</span>
-  </div>
-
-  <div class="recent-list anim a6" id="recentList">
-    <div class="recent-empty">Loading...</div>
-  </div>
-
-  </div>
-  <!-- END FUNNEL VIEW -->
-
-  <!-- ANALYTICS VIEW -->
-  <div id="analyticsView" class="view-container" style="display:none">
-    <div class="card anim a3">
-      <div class="placeholder">
-        <i data-lucide="trending-up" style="width: 48px; height: 48px; margin: 0 auto 16px; display: block; color: var(--muted2);"></i>
-        <strong>Analytics dashboard coming soon!</strong><br><br>
-        This page will show detailed charts and insights about your booking performance.
-      </div>
-    </div>
-  </div>
-  <!-- END ANALYTICS VIEW -->
-
-  </div>
-  <!-- END MAIN CONTENT -->
-
-</div>
+<div class="filters">
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
+  <button class="filter-btn" data-filter="AddPaymentInfo" onclick="setFilter('AddPaymentInfo')">Info Entered</button>
+  <button class="filter-btn" data-filter="ConfirmBookingClick" onclick="setFilter('ConfirmBookingClick')">Confirm Click</button>
+  <button class="filter-btn" data-filter="Purchase" onclick="setFilter('Purchase')">Purchased</button>
+  <button class="filter-btn" data-filter="AddToCart" onclick="setFilter('AddToCart')">Add to Cart</button>
+  <button class="filter-btn" data-filter="Search" onclick="setFilter('Search')">Search</button>
 </div>
 
-<!-- BOTTOM NAV (Yuto Glass Style) -->
-<nav class="bottom-nav" id="navBar">
-  <div class="nav-glass"></div>
-  <div class="nav-pill" id="navPill"></div>
-  <div class="nav-items" id="navItems">
-    <button type="button" class="nav-item active" data-index="0" data-view="funnel">
-      <div class="nav-icon-wrapper">
-        <i data-lucide="bar-chart-3" class="nav-icon"></i>
-      </div>
-      <span class="nav-label">Funnel</span>
-    </button>
-    <button type="button" class="nav-item" data-index="1" data-view="analytics">
-      <div class="nav-icon-wrapper">
-        <i data-lucide="trending-up" class="nav-icon"></i>
-      </div>
-      <span class="nav-label">Analytics</span>
-    </button>
-  </div>
-</nav>
-
-<div id="metaModal" class="meta-modal-overlay" onclick="handleMetaModalOverlay(event)">
-  <div class="meta-modal" onclick="event.stopPropagation()">
-    <div class="meta-modal-header">
-      <span class="meta-modal-title">Choose date range</span>
-      <div style="display: flex; gap: 6px;">
-        <button class="meta-btn" id="metaSelectBtn" onclick="toggleMetaRangeMode()">Range</button>
-        <button class="meta-btn" onclick="applyMetaRange()">Done</button>
-        <button class="meta-btn" onclick="closeMetaModal()">×</button>
-      </div>
-    </div>
-    <div class="meta-modal-body" id="metaModalBody"></div>
-  </div>
+<div class="events-list" id="eventsList">
+  <div class="loading">Loading...</div>
 </div>
 
 <script>
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
+let allEvents = [];
+let currentFilter = 'all';
 
-  const ICON_MAP = { 
-    Search: 'search', 
-    AddToCart: 'shopping-cart', 
-    InitiateCheckout: 'clipboard-list', 
-    AddPaymentInfo: 'credit-card', 
-    Purchase: 'check-circle', 
-    PageView: 'eye' 
-  };
-  let token = '';
-  let metaRange = { type: 'last7' };
-  let lastMeta = null;
-  let metaModalDates = [];
-  let metaSelectRange = false;
-  let metaRangeStartIndex = null;
-  let metaRangeEndIndex = null;
+const ICONS = {
+  PageView: '👁',
+  Search: '🔍',
+  AddToCart: '🛒',
+  InitiateCheckout: '📋',
+  AddPaymentInfo: '💳',
+  CardModalAcknowledged: '✅',
+  ConfirmBookingClick: '🖱',
+  Purchase: '✅',
+  CallModalDismissed: '📞',
+  TapToCallFirst: '📱',
+  CardDeclineModalShown: '⚠️',
+};
 
-  function formatTime(ts) {
-    const d = new Date(ts);
-    const now = Date.now();
-    const diff = Math.floor((now - ts) / 1000);
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const TYPE_LABELS = {
+  PageView: 'Page View',
+  Search: 'Search',
+  AddToCart: 'Add to Cart',
+  InitiateCheckout: 'Checkout Started',
+  AddPaymentInfo: 'Info Entered',
+  CardModalAcknowledged: 'Card Modal OK',
+  ConfirmBookingClick: 'Confirm Click',
+  Purchase: 'Purchase',
+  CallModalDismissed: 'Call Modal',
+  TapToCallFirst: 'Tap to Call',
+  CardDeclineModalShown: 'Card Declined',
+};
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  const now = Date.now();
+  const diff = Math.floor((now - ts) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  renderEvents();
+}
+
+function renderEvents() {
+  const list = document.getElementById('eventsList');
+  const filtered = currentFilter === 'all' ? allEvents : allEvents.filter(e => e.event_name === currentFilter);
+
+  document.getElementById('totalCount').textContent = filtered.length + ' event' + (filtered.length !== 1 ? 's' : '');
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>No events found for this filter.</p></div>';
+    return;
   }
 
-  function renderMeta(payload) {
-    const container = document.getElementById('metaMetrics');
-    if (!container) return;
-
-    if (!payload || payload.enabled === false) {
-      console.log('Meta insights not enabled or no payload:', payload);
-      container.style.display = 'none';
-      return;
-    }
-
-    // Show the grid even if data is null (no activity yet for that period)
-    console.log('Meta insights data:', payload);
-    container.style.display = 'grid';
-
-    const d = payload.data || {};
-    if (payload.data) lastMeta = d;
-
-    const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
-    const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
-
-    const set = (id, text) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = text;
-    };
-
-    set('meta-spend', d.spend != null ? fmtMoney(d.spend) : '–');
-    set('meta-cpm', d.cpm != null ? fmtMoney(d.cpm) : '–');
-    set('meta-ctr', d.ctr != null ? fmtPct(d.ctr) : '–');
-    set('meta-roas', d.roas != null ? d.roas.toFixed(2) + 'x' : '–');
-
-    const ev = d.events || {};
-    set('meta-lpv', ev.landing_page_view != null ? ev.landing_page_view : '–');
-    set('meta-search', ev.search != null ? ev.search : '–');
-    set('meta-atc', ev.add_to_cart != null ? ev.add_to_cart : '–');
-    set('meta-ic', ev.initiate_checkout != null ? ev.initiate_checkout : '–');
-    set('meta-api', ev.add_payment_info != null ? ev.add_payment_info : '–');
-    set('meta-purchase', ev.purchase != null ? ev.purchase : '–');
-  }
-
-  function render(data) {
-    const { counts, recent } = data || { counts: {}, recent: [] };
-    const steps = ['Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
-    const top = counts.Search || 1;
-
-    // Update hero card with conversion metrics
-    const searches = counts.Search || 0;
-    const carts = counts.AddToCart || 0;
-    const purchases = counts.Purchase || 0;
-    const conversionRate = searches > 0 ? ((purchases / searches) * 100) : 0;
+  list.innerHTML = filtered.map(e => {
+    const typeClass = e.event_name.toLowerCase().replace(/[^a-z]/g, '') || 'other';
+    const icon = ICONS[e.event_name] || '•';
+    const label = TYPE_LABELS[e.event_name] || e.event_name;
     
-    const heroConvEl = document.getElementById('heroConversionRate');
-    const heroBadgeEl = document.getElementById('heroConversionBadge');
-    const heroSearchesEl = document.getElementById('heroSearches');
-    const heroCartsEl = document.getElementById('heroCarts');
-    const heroPurchasesEl = document.getElementById('heroPurchases');
+    const guestName = ((e.guest_first_name || '') + ' ' + (e.guest_last_name || '')).trim();
     
-    if (heroConvEl) heroConvEl.textContent = conversionRate.toFixed(1) + '%';
-    if (heroSearchesEl) heroSearchesEl.textContent = searches;
-    if (heroCartsEl) heroCartsEl.textContent = carts;
-    if (heroPurchasesEl) heroPurchasesEl.textContent = purchases;
-    
-    // Update badge based on conversion rate
-    if (heroBadgeEl) {
-      if (conversionRate >= 5) {
-        heroBadgeEl.textContent = '↑ Strong';
-        heroBadgeEl.className = 'hero-badge';
-      } else if (conversionRate >= 2) {
-        heroBadgeEl.textContent = '→ Normal';
-        heroBadgeEl.className = 'hero-badge';
-      } else if (conversionRate > 0) {
-        heroBadgeEl.textContent = '↓ Low';
-        heroBadgeEl.className = 'hero-badge red';
-      } else {
-        heroBadgeEl.textContent = '—';
-        heroBadgeEl.className = 'hero-badge';
-      }
-    }
+    let detailParts = [];
+    if (e.guest_email) detailParts.push('<span>' + e.guest_email + '</span>');
+    if (e.guest_phone) detailParts.push('<span>' + e.guest_phone + '</span>');
+    if (e.content_name) detailParts.push('<span>' + e.content_name + '</span>');
+    if (e.nights) detailParts.push('<span>' + e.nights + ' night' + (e.nights > 1 ? 's' : '') + '</span>');
+    if (e.checkin_date) detailParts.push('<span>Check-in: ' + e.checkin_date + '</span>');
+    if (e.value) detailParts.push('<span class="event-price">$' + e.value.toFixed(2) + '</span>');
 
-    // Update funnel steps
-    steps.forEach(name => {
-      const n = counts[name] || 0;
-      const el = document.getElementById('count-' + name);
-      const pctEl = document.getElementById('pct-' + name);
-      if (el) el.textContent = n;
-      if (pctEl) pctEl.textContent = top ? Math.round((n / top) * 100) + '%' : '';
-    });
-
-    // Update recent activity with new card design
-    const list = document.getElementById('recentList');
-    if (recent.length === 0) {
-      list.innerHTML = '<div class="recent-empty">No events yet. Events appear when users interact with your booking site.</div>';
-    } else {
-      list.innerHTML = recent.map(e => {
-        const iconName = ICON_MAP[e.event_name] || 'circle';
-        const hasGuest = e.guest_first_name || e.guest_email;
-        const guestName = (e.guest_first_name || '') + (e.guest_last_name ? ' ' + e.guest_last_name : '');
-        
-        let metaLine = '';
-        if (e.content_name) metaLine += e.content_name;
-        if (e.value) metaLine += (metaLine ? ' · ' : '') + '$' + e.value.toFixed(0);
-        if (e.nights) metaLine += (metaLine ? ' · ' : '') + e.nights + 'n';
-        if (e.checkin_date) metaLine += (metaLine ? ' · ' : '') + e.checkin_date;
-        
-        let guestLine = '';
-        if (hasGuest) {
-          const parts = [];
-          if (guestName.trim()) parts.push('<strong>' + guestName.trim() + '</strong>');
-          if (e.guest_email) parts.push(e.guest_email);
-          if (e.guest_phone) parts.push(e.guest_phone);
-          guestLine = parts.join(' · ');
-        }
-
-        return `
-          <div class="recent-item">
-            <div class="recent-stripe"></div>
-            <div class="recent-icon">
-              <i data-lucide="${iconName}" style="width: 16px; height: 16px;"></i>
-            </div>
-            <div class="recent-info">
-              <div class="recent-event">${e.event_name}</div>
-              ${guestLine ? `<div class="recent-meta" style="color: var(--ink2); font-weight: 500;">${guestLine}</div>` : ''}
-              ${metaLine ? `<div class="recent-meta">${metaLine}</div>` : ''}
-            </div>
-            <div class="recent-time">${formatTime(e.timestamp)}</div>
+    return `
+      <div class="event-card">
+        <div class="event-badge ${typeClass}">${icon}</div>
+        <div class="event-body">
+          <div class="event-top">
+            <span class="event-type ${typeClass}">${label}</span>
+            <span class="event-time">${formatTime(e.timestamp)}</span>
           </div>
-        `;
-      }).join('');
-      
-      // Re-initialize Lucide icons for the new elements
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-    }
+          ${guestName ? `<div class="event-guest">${guestName}</div>` : ''}
+          ${detailParts.length ? `<div class="event-details">${detailParts.join('')}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
-    // Update header date
-    document.getElementById('headerDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+async function loadEvents() {
+  const days = document.getElementById('daysFilter').value;
+  try {
+    const res = await fetch('/api/funnel?days=' + days);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+    allEvents = data.recent || [];
+    renderEvents();
+  } catch (e) {
+    document.getElementById('eventsList').innerHTML = '<div class="empty-state"><p>Failed to load events. Try refreshing.</p></div>';
   }
+}
 
-  async function doLogin() {
-    const pin = document.getElementById('pinInput').value.trim();
-    const err = document.getElementById('loginError');
-    err.textContent = '';
-    if (!pin) { err.textContent = 'Enter PIN.'; return; }
-    
-    // Verify against the server-managed CRM PIN only
-    try {
-      const res = await fetch('/api/crm/verify', { headers: { 'x-crm-token': pin } });
-      const json = await res.json().catch(() => ({}));
-      if (res.ok && json.success) {
-        token = pin;
-        try { localStorage.setItem('crm_token', pin); } catch (e) {}
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        load();
-        loadMeta();
-      } else {
-        err.textContent = 'Wrong PIN';
-      }
-    } catch (e) {
-      err.textContent = 'Connection failed';
-    }
-  }
+// Load on page open
+loadEvents();
 
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-    return outputArray;
-  }
-
-
-  async function load() {
-    try {
-      const res = await fetch('/api/funnel');
-      if (!res.ok) {
-        return;
-      }
-      const data = await res.json();
-      render(data);
-    } catch (e) {
-      document.getElementById('recentList').innerHTML = '<div class="recent-empty">Failed to load.</div>';
-    }
-  }
-
-  async function loadMeta() {
-    try {
-      let qs = '';
-      if (metaRange.type === 'today' || metaRange.type === 'yesterday') {
-        qs = '?range=' + encodeURIComponent(metaRange.type);
-      } else if (metaRange.type === 'max') {
-        qs = '?range=' + encodeURIComponent('max');
-      } else if (metaRange.type === 'custom') {
-        qs =
-          '?from=' +
-          encodeURIComponent(metaRange.from) +
-          '&to=' +
-          encodeURIComponent(metaRange.to);
-      } // last7 -> default on backend
-
-      const res = await fetch('/api/meta-insights' + qs);
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        renderMeta(null);
-        return;
-      }
-      renderMeta(json);
-    } catch (e) {
-      renderMeta(null);
-    }
-  }
-
-  function handleRefresh() {
-    load();
-    loadMeta();
-  }
-
-  function setMetaRange(type) {
-    metaRange = { type };
-    loadMeta();
-  }
-
-  function openMetaModal() {
-    const modal = document.getElementById('metaModal');
-    const body = document.getElementById('metaModalBody');
-    if (!modal || !body) return;
-    body.innerHTML = '';
-
-    metaModalDates = [];
-    metaSelectRange = false;
-    metaRangeStartIndex = null;
-    metaRangeEndIndex = null;
-    const selectBtn = document.getElementById('metaSelectBtn');
-    if (selectBtn) selectBtn.textContent = 'Range';
-
-    const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-      const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      const iso = d.toISOString().split('T')[0];
-      metaModalDates.push({ iso });
-      const btn = document.createElement('button');
-      btn.className = 'meta-date-btn';
-      btn.textContent = label;
-      btn.dataset.index = String(i);
-      btn.onclick = () => onMetaDateClick(i);
-      body.appendChild(btn);
-    }
-
-    modal.style.display = 'flex';
-  }
-
-  function closeMetaModal() {
-    const modal = document.getElementById('metaModal');
-    if (modal) modal.style.display = 'none';
-  }
-
-  function handleMetaModalOverlay(e) {
-    if (e.target && e.target.id === 'metaModal') {
-      closeMetaModal();
-    }
-  }
-
-  function onMetaDateClick(index) {
-    const entry = metaModalDates[index];
-    if (!entry) return;
-
-    if (!metaSelectRange) {
-      // Single-day selection
-      metaRange = { type: 'custom', from: entry.iso, to: entry.iso };
-      closeMetaModal();
-      loadMeta();
-      return;
-    }
-
-    // Range selection mode
-    if (metaRangeStartIndex === null) {
-      metaRangeStartIndex = index;
-      metaRangeEndIndex = index;
-    } else {
-      metaRangeEndIndex = index;
-    }
-
-    if (metaRangeEndIndex < metaRangeStartIndex) {
-      const tmp = metaRangeStartIndex;
-      metaRangeStartIndex = metaRangeEndIndex;
-      metaRangeEndIndex = tmp;
-    }
-    updateMetaModalSelection();
-  }
-
-  function updateMetaModalSelection() {
-    const body = document.getElementById('metaModalBody');
-    if (!body) return;
-    const buttons = body.querySelectorAll('.meta-date-btn');
-    buttons.forEach(btn => {
-      const idx = parseInt(btn.dataset.index || '-1', 10);
-      if (
-        metaRangeStartIndex != null &&
-        metaRangeEndIndex != null &&
-        idx >= metaRangeStartIndex &&
-        idx <= metaRangeEndIndex
-      ) {
-        btn.classList.add('selected');
-      } else {
-        btn.classList.remove('selected');
-      }
-    });
-  }
-
-  function toggleMetaRangeMode() {
-    metaSelectRange = !metaSelectRange;
-    metaRangeStartIndex = null;
-    metaRangeEndIndex = null;
-    updateMetaModalSelection();
-    const btn = document.getElementById('metaSelectBtn');
-    if (btn) btn.textContent = metaSelectRange ? 'Single' : 'Range';
-  }
-
-  function applyMetaRange() {
-    if (metaRangeStartIndex == null || metaRangeEndIndex == null) {
-      closeMetaModal();
-      return;
-    }
-    // Indices are newest-first (0 = today), so higher index = earlier date
-    const earlierIndex = Math.max(metaRangeStartIndex, metaRangeEndIndex);
-    const laterIndex   = Math.min(metaRangeStartIndex, metaRangeEndIndex);
-    const start = metaModalDates[earlierIndex];
-    const end   = metaModalDates[laterIndex];
-    if (!start || !end) {
-      closeMetaModal();
-      return;
-    }
-    metaRange = { type: 'custom', from: start.iso, to: end.iso };
-    closeMetaModal();
-    loadMeta();
-  }
-
-  async function copyMetaSummary() {
-    if (!lastMeta) return;
-    const d = lastMeta;
-    const ev = d.events || {};
-
-    const fmtMoney = v => (v != null ? '$' + v.toFixed(2) : '–');
-    const fmtPct = v => (v != null ? v.toFixed(2) + '%' : '–');
-
-    const localTime = new Date().toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-    const lines = [
-      `Copied at: ${localTime} (local time)`,
-      '',
-      `Date range: ${d.since || ''} → ${d.until || ''}`,
-      '',
-      `Spend: ${fmtMoney(d.spend)}`,
-      `CPM: ${fmtMoney(d.cpm)}`,
-      `CTR: ${fmtPct(d.ctr)}`,
-      `ROAS: ${d.roas != null ? d.roas.toFixed(2) + 'x' : '–'}`,
-      `Cost per LP view: ${fmtMoney(d.cost_per_landing_page_view)}`,
-      '',
-      `LP views (Meta): ${ev.landing_page_view ?? '–'}`,
-      `Searches (Meta): ${ev.search ?? '–'}`,
-      `Add to Cart (Meta): ${ev.add_to_cart ?? '–'}`,
-      `Initiate Checkout (Meta): ${ev.initiate_checkout ?? '–'}`,
-      `Add Payment Info (Meta): ${ev.add_payment_info ?? '–'}`,
-      `Purchases (Meta): ${ev.purchase ?? '–'}`,
-    ];
-
-    const text = lines.join('\n');
-
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (e) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-  }
-
-  (function init() {
-    // No PIN required - load directly
-    token = 'no-auth';
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    load();
-    loadMeta();
-  })();
-  setInterval(load, 3000);
-
-  // Push Notification Functions
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
-  async function enableFunnelNotifications() {
-    try {
-      // Check for browser support
-      if (!('Notification' in window)) {
-        alert('This browser does not support notifications.');
-        return;
-      }
-
-      if (!('serviceWorker' in navigator)) {
-        alert('This browser does not support service workers.');
-        return;
-      }
-
-      if (!('PushManager' in window)) {
-        alert('Push notifications are not supported on this device. Try Chrome on Android or desktop.');
-        return;
-      }
-
-      // Request permission
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        alert('Notification permission denied. Enable in browser settings.');
-        return;
-      }
-
-      // Register service worker
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      console.log('Service Worker registered');
-
-      // Get VAPID public key
-      const keyRes = await fetch('/api/push/vapid-public');
-      const keyData = await keyRes.json();
-      if (!keyData.publicKey) {
-        alert('Push notifications not configured on server.');
-        return;
-      }
-
-      // Check if push manager is available
-      if (!registration.pushManager) {
-        alert('Push notifications not available in this browser.');
-        return;
-      }
-
-      // Subscribe to push
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
-      });
-
-      // Convert keys to base64
-      const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh'))));
-      const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))));
-
-      // Save subscription to server
-      const res = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          endpoint: subscription.endpoint,
-          p256dh: p256dh,
-          auth: auth,
-          source: 'funnel'
-        })
-      });
-
-      const data = await res.json();
-      if (data.ok || data.success) {
-        const btn = document.getElementById('btnNotify');
-        const btnDesktop = document.getElementById('btnNotifyDesktop');
-        if (btn) btn.classList.add('active');
-        if (btnDesktop) btnDesktop.classList.add('active');
-        alert('✅ Notifications enabled! You\'ll receive alerts when bookings come in.');
-      } else {
-        alert('Failed to enable notifications: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Notification error:', error);
-      alert('Error enabling notifications: ' + error.message + ' | ' + JSON.stringify(error));
-    }
-  }
-
-  // Check if already subscribed on load
-  async function checkNotificationStatus() {
-    if (!('serviceWorker' in navigator)) return;
-    
-    try {
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (registration && registration.pushManager) {
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          const btn = document.getElementById('btnNotify');
-          const btnDesktop = document.getElementById('btnNotifyDesktop');
-          if (btn) btn.classList.add('active');
-          if (btnDesktop) btnDesktop.classList.add('active');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking notification status:', error);
-    }
-  }
-
-  // Check status after login
-  setTimeout(checkNotificationStatus, 1000);
-
-  // Initialize Lucide icons
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  }
-
-  // ── VIEW SWITCHING ──
-  let currentView = 'funnel';
-  
-  function switchView(viewName) {
-    // Hide all views
-    document.getElementById('funnelView').style.display = 'none';
-    document.getElementById('analyticsView').style.display = 'none';
-    
-    // Show selected view
-    if (viewName === 'funnel') {
-      document.getElementById('funnelView').style.display = 'block';
-      document.getElementById('pageTitle').innerHTML = 'Conversion<br>Analytics';
-    } else if (viewName === 'analytics') {
-      document.getElementById('analyticsView').style.display = 'block';
-      document.getElementById('pageTitle').innerHTML = 'Analytics<br>Dashboard';
-    }
-    
-    currentView = viewName;
-    
-    // Update desktop sidebar active states
-    document.querySelectorAll('.sidebar-nav-item').forEach(item => {
-      if (item.getAttribute('data-view') === viewName) {
-        item.classList.add('active');
-      } else {
-        item.classList.remove('active');
-      }
-    });
-  }
-
-  // ── NAVBAR DRAG ANIMATION (Yuto Style) ──
-  (function() {
-    const navBar = document.getElementById('navBar');
-    const navPill = document.getElementById('navPill');
-    const navItems = document.querySelectorAll('.nav-item');
-    const numTabs = navItems.length;
-    
-    if (!navBar || !navPill || numTabs === 0) return;
-
-    let isDragging = false;
-    let dragStart = { x: 0, pillLeft: 0 };
-    let currentActiveIndex = 0;
-
-    // Find active tab
-    navItems.forEach((item, i) => {
-      if (item.classList.contains('active')) {
-        currentActiveIndex = i;
-      }
-    });
-
-    const getPillWidth = () => {
-      const rect = navBar.getBoundingClientRect();
-      return rect.width / numTabs - 10;
-    };
-
-    const getHoverIndex = (dragLeft) => {
-      const rect = navBar.getBoundingClientRect();
-      const pillW = getPillWidth();
-      const center = dragLeft + pillW / 2;
-      return Math.min(numTabs - 1, Math.max(0, Math.floor(center / (rect.width / numTabs))));
-    };
-
-    const updatePillPosition = (index, dragging = false, customLeft = null) => {
-      if (customLeft !== null) {
-        navPill.style.left = `${customLeft}px`;
-        navPill.style.width = `${getPillWidth()}px`;
-      } else {
-        navPill.style.left = `calc(${index * (100 / numTabs)}% + 5px)`;
-        navPill.style.width = `calc(${100 / numTabs}% - 10px)`;
-      }
-      
-      if (dragging) {
-        navPill.classList.add('dragging');
-      } else {
-        navPill.classList.remove('dragging');
-      }
-    };
-
-    const updateMagnification = (dragLeft) => {
-      const rect = navBar.getBoundingClientRect();
-      const pillW = getPillWidth();
-      const pillCenter = dragLeft + pillW / 2;
-
-      navItems.forEach((item, i) => {
-        const wrapper = item.querySelector('.nav-icon-wrapper');
-        if (!wrapper) return;
-
-        const tabCenter = (i * (100 / numTabs) + (50 / numTabs)) / 100 * rect.width;
-        const distance = Math.abs(pillCenter - tabCenter);
-        const maxDist = rect.width / numTabs;
-        const proximity = Math.max(0, 1 - distance / maxDist);
-        const scale = 1 + proximity * 0.35;
-        
-        wrapper.style.transform = `scale(${scale})`;
-      });
-    };
-
-    const resetMagnification = () => {
-      navItems.forEach((item) => {
-        const wrapper = item.querySelector('.nav-icon-wrapper');
-        if (wrapper) {
-          wrapper.style.transform = 'scale(1)';
-        }
-      });
-    };
-
-    const updateActiveStates = (index) => {
-      navItems.forEach((item, i) => {
-        if (i === index) {
-          item.classList.add('active');
-        } else {
-          item.classList.remove('active');
-        }
-      });
-    };
-
-    navBar.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      navBar.setPointerCapture(e.pointerId);
-
-      const rect = navBar.getBoundingClientRect();
-      const currentLeft = (currentActiveIndex / numTabs) * rect.width + 5;
-
-      dragStart = { x: e.clientX, pillLeft: currentLeft };
-      isDragging = true;
-      updatePillPosition(currentActiveIndex, true, currentLeft);
-    });
-
-    navBar.addEventListener('pointermove', (e) => {
-      if (!isDragging) return;
-
-      const rect = navBar.getBoundingClientRect();
-      const pillW = getPillWidth();
-      const delta = e.clientX - dragStart.x;
-      const newLeft = dragStart.pillLeft + delta;
-      const clampedLeft = Math.max(5, Math.min(newLeft, rect.width - pillW - 5));
-
-      updatePillPosition(null, true, clampedLeft);
-      updateMagnification(clampedLeft);
-      
-      const hoverIndex = getHoverIndex(clampedLeft);
-      updateActiveStates(hoverIndex);
-    });
-
-    navBar.addEventListener('pointerup', (e) => {
-      if (!isDragging) return;
-      isDragging = false;
-      resetMagnification();
-
-      const moved = Math.abs(e.clientX - dragStart.x);
-      
-      if (moved < 8) {
-        // Treat as click
-        const rect = navBar.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const clickedIndex = Math.min(numTabs - 1, Math.max(0, Math.floor(x / (rect.width / numTabs))));
-        currentActiveIndex = clickedIndex;
-        updatePillPosition(clickedIndex, false);
-        updateActiveStates(clickedIndex);
-        
-        // Switch view
-        const viewName = navItems[clickedIndex].getAttribute('data-view');
-        if (viewName) {
-          switchView(viewName);
-        }
-      } else {
-        // Snap to nearest
-        const rect = navBar.getBoundingClientRect();
-        const pillW = getPillWidth();
-        const currentLeft = parseFloat(navPill.style.left);
-        const snapIndex = getHoverIndex(currentLeft);
-        currentActiveIndex = snapIndex;
-        updatePillPosition(snapIndex, false);
-        updateActiveStates(snapIndex);
-        
-        // Switch view
-        const viewName = navItems[snapIndex].getAttribute('data-view');
-        if (viewName) {
-          switchView(viewName);
-        }
-      }
-    });
-
-    navBar.addEventListener('pointercancel', () => {
-      if (!isDragging) return;
-      isDragging = false;
-      resetMagnification();
-      updatePillPosition(currentActiveIndex, false);
-      updateActiveStates(currentActiveIndex);
-    });
-
-    // Click handlers
-    navItems.forEach((item, index) => {
-      item.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (isDragging && Math.abs(e.clientX - dragStart.x) > 8) {
-          return; // Let drag handler manage this
-        }
-        currentActiveIndex = index;
-        updatePillPosition(index, false);
-        updateActiveStates(index);
-        
-        // Switch view
-        const viewName = item.getAttribute('data-view');
-        if (viewName) {
-          switchView(viewName);
-        }
-      });
-    });
-
-    // Initialize position
-    updatePillPosition(currentActiveIndex, false);
-  })();
+// Auto-refresh every 30 seconds
+setInterval(loadEvents, 30000);
 </script>
 </body>
 </html>
