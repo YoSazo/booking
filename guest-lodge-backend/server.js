@@ -2638,6 +2638,34 @@ app.post('/api/track', async (req, res) => {
 
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
+
+    // Persist to database for permanent funnel analytics
+    try {
+        const user = enrichedPayload.user_data || {};
+        const hotelId = process.env.HOTEL_ID || 'guest-lodge-minot';
+        await withRetry(() => prisma.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: event_name,
+                eventId: enrichedPayload.event_id || null,
+                value: parseFloat(enrichedPayload.value) || null,
+                currency: enrichedPayload.currency || 'USD',
+                contentName: enrichedPayload.content_name || null,
+                checkinDate: enrichedPayload.checkin_date || null,
+                checkoutDate: enrichedPayload.checkout_date || null,
+                nights: parseInt(enrichedPayload.nights, 10) || null,
+                guestFirstName: user.fn || null,
+                guestLastName: user.ln || null,
+                guestEmail: user.em || null,
+                guestPhone: user.ph || null,
+                externalId: user.external_id || null,
+                userAgent: enrichedPayload.user_agent || null,
+                ipAddress: enrichedPayload.client_ip_address || null,
+            }
+        }));
+    } catch (e) {
+        console.error('Failed to persist FunnelEvent:', e.message);
+    }
     // double-notification removed: if (event_name === 'Purchase') notifyPurchase().catch(() => {});
 
     // Send directly to Meta CAPI — no middleman needed
@@ -3716,16 +3744,53 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     }
 });
 
-// Funnel dashboard API (same auth as CRM)
-app.get('/api/funnel', crmAuth, (req, res) => {
-    const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
-    funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
-    const recent = funnelStore.slice(0, 50);
-    res.json({ counts, recent });
+// Funnel dashboard API (no auth required)
+app.get('/api/funnel', async (req, res) => {
+    try {
+        // Get events from last 7 days by default
+        const daysBack = parseInt(req.query.days) || 7;
+        const since = new Date();
+        since.setDate(since.getDate() - daysBack);
+
+        const events = await withRetry(() => prisma.funnelEvent.findMany({
+            where: { createdAt: { gte: since } },
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+        }));
+
+        // Build counts
+        const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
+        events.forEach(e => { if (counts[e.eventName] !== undefined) counts[e.eventName]++; });
+
+        // Recent events with full detail
+        const recent = events.slice(0, 50).map(e => ({
+            event_name: e.eventName,
+            timestamp: e.createdAt.getTime(),
+            event_id: e.eventId,
+            value: e.value,
+            content_name: e.contentName,
+            checkin_date: e.checkinDate,
+            checkout_date: e.checkoutDate,
+            nights: e.nights,
+            guest_first_name: e.guestFirstName,
+            guest_last_name: e.guestLastName,
+            guest_email: e.guestEmail,
+            guest_phone: e.guestPhone,
+        }));
+
+        res.json({ counts, recent });
+    } catch (e) {
+        console.error('Funnel API error:', e.message);
+        // Fallback to in-memory if DB fails
+        const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
+        funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
+        const recent = funnelStore.slice(0, 50);
+        res.json({ counts, recent });
+    }
 });
 
-// Meta Ads insights for funnel dashboard
-app.get('/api/meta-insights', crmAuth, async (req, res) => {
+// Meta Ads insights for funnel dashboard (no auth required)
+app.get('/api/meta-insights', async (req, res) => {
     try {
         if (!META_AD_ACCOUNT_ID || !META_ACCESS_TOKEN) {
             return res.json({

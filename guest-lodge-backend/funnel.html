@@ -972,8 +972,8 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginScreen" class="login-screen">
+<!-- LOGIN (disabled - no PIN required) -->
+<div id="loginScreen" class="login-screen" style="display:none">
   <div class="login-card">
     <div class="login-logo">
       <img src="/marketellogo.svg" alt="" class="login-logo-icon">
@@ -1374,6 +1374,24 @@
     } else {
       list.innerHTML = recent.map(e => {
         const iconName = ICON_MAP[e.event_name] || 'circle';
+        const hasGuest = e.guest_first_name || e.guest_email;
+        const guestName = (e.guest_first_name || '') + (e.guest_last_name ? ' ' + e.guest_last_name : '');
+        
+        let metaLine = '';
+        if (e.content_name) metaLine += e.content_name;
+        if (e.value) metaLine += (metaLine ? ' · ' : '') + '$' + e.value.toFixed(0);
+        if (e.nights) metaLine += (metaLine ? ' · ' : '') + e.nights + 'n';
+        if (e.checkin_date) metaLine += (metaLine ? ' · ' : '') + e.checkin_date;
+        
+        let guestLine = '';
+        if (hasGuest) {
+          const parts = [];
+          if (guestName.trim()) parts.push('<strong>' + guestName.trim() + '</strong>');
+          if (e.guest_email) parts.push(e.guest_email);
+          if (e.guest_phone) parts.push(e.guest_phone);
+          guestLine = parts.join(' · ');
+        }
+
         return `
           <div class="recent-item">
             <div class="recent-stripe"></div>
@@ -1382,7 +1400,8 @@
             </div>
             <div class="recent-info">
               <div class="recent-event">${e.event_name}</div>
-              ${e.content_name ? `<div class="recent-meta">${e.content_name}${e.value ? ' · $' + e.value.toFixed(0) : ''}</div>` : ''}
+              ${guestLine ? `<div class="recent-meta" style="color: var(--ink2); font-weight: 500;">${guestLine}</div>` : ''}
+              ${metaLine ? `<div class="recent-meta">${metaLine}</div>` : ''}
             </div>
             <div class="recent-time">${formatTime(e.timestamp)}</div>
           </div>
@@ -1435,14 +1454,9 @@
 
 
   async function load() {
-    if (!token) return;
     try {
-      const res = await fetch('/api/funnel', { headers: { 'x-crm-token': token } });
-      if (res.status === 401) {
-        token = '';
-        try { localStorage.removeItem('crm_token'); } catch (e) {}
-        document.getElementById('loginScreen').style.display = 'flex';
-        document.getElementById('app').style.display = 'none';
+      const res = await fetch('/api/funnel');
+      if (!res.ok) {
         return;
       }
       const data = await res.json();
@@ -1453,7 +1467,6 @@
   }
 
   async function loadMeta() {
-    if (!token) return;
     try {
       let qs = '';
       if (metaRange.type === 'today' || metaRange.type === 'yesterday') {
@@ -1468,7 +1481,7 @@
           encodeURIComponent(metaRange.to);
       } // last7 -> default on backend
 
-      const res = await fetch('/api/meta-insights' + qs, { headers: { 'x-crm-token': token } });
+      const res = await fetch('/api/meta-insights' + qs);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         renderMeta(null);
@@ -1649,16 +1662,12 @@
   }
 
   (function init() {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('crm_token') : null;
-    if (saved) {
-      token = saved;
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      load();
-      loadMeta();
-    } else if (document.getElementById('pinInput')) {
-      document.getElementById('pinInput').focus();
-    }
+    // No PIN required - load directly
+    token = 'no-auth';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    load();
+    loadMeta();
   })();
   setInterval(load, 3000);
 
@@ -1675,11 +1684,6 @@
   }
 
   async function enableFunnelNotifications() {
-    if (!token) {
-      alert('Please sign in first.');
-      return;
-    }
-
     try {
       // Check for browser support
       if (!('Notification' in window)) {
@@ -1737,8 +1741,7 @@
       const res = await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-crm-token': token
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           endpoint: subscription.endpoint,
@@ -1766,7 +1769,7 @@
 
   // Check if already subscribed on load
   async function checkNotificationStatus() {
-    if (!token || !('serviceWorker' in navigator)) return;
+    if (!('serviceWorker' in navigator)) return;
     
     try {
       const registration = await navigator.serviceWorker.getRegistration();

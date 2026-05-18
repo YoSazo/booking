@@ -162,3 +162,27 @@ model CrmPin {
   @@unique([hotelId, pinHash])
   @@index([pinHash, active])
 }
+
+model FunnelEvent {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  hotelId        String
+  eventName      String
+  eventId        String?
+  value          Float?
+  currency       String?  @default("USD")
+  contentName    String?  // room name
+  checkinDate    String?
+  checkoutDate   String?
+  nights         Int?
+  guestFirstName String?
+  guestLastName  String?
+  guestEmail     String?
+  guestPhone     String?
+  externalId     String?  // cookie-based visitor ID
+  userAgent      String?
+  ipAddress      String?
+
+  @@index([hotelId, createdAt])
+  @@index([eventName, createdAt])
+}
