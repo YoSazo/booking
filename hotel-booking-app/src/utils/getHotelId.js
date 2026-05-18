@@ -66,6 +66,14 @@ export function getHotelId() {
     return domainMap[hostname];
   }
 
+  // Dynamic subdomains: {slug}.clickinns.com → use slug as hotelId
+  if (hostname.endsWith('.clickinns.com') && !domainMap[hostname]) {
+    const slug = hostname.replace('.clickinns.com', '');
+    if (slug && !slug.includes('.')) {
+      return slug; // e.g. "sunset-inn" from "sunset-inn.clickinns.com"
+    }
+  }
+
   // Check for ngrok or other dev tunnels - use env var
   if (hostname.includes('ngrok') || hostname.includes('vercel.app')) {
     return import.meta.env.VITE_HOTEL_ID || 'suite-stay';

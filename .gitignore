@@ -18,3 +18,14 @@ build/
 
 # Ignore system files
 .DS_Store
+
+# Ignore uploaded images and videos
+*.mp4
+*.mov
+*.avi
+guest-lodge-backend/public/uploads/
+landing-page/0518.mp4
+hotel-booking-app/0518.mp4
+
+# Ignore temp files
+.memla_patch_exec_tmp/

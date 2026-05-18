@@ -92,6 +92,7 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:3001',
+    'http://localhost:55031',
 ].concat((process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean));
 
 const corsOptions = {
@@ -259,7 +260,7 @@ async function getDbHotelConfig(hotelId) {
         include: { domains: true },
     }));
 
-    const config = row && row.active
+    const config = row
         ? normalizeHotelConfig({
             id: row.id,
             name: row.name || row.id,
@@ -1688,6 +1689,38 @@ app.post('/api/stripe-webhook', async (req, res) => {
     } catch (err) {
         console.error('Webhook signature verification failed:', err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Auto-provision hotel when $997 payment link is completed
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        // Only process if this is from our $997 product (check metadata or amount)
+        const amountTotal = session.amount_total; // in cents
+        if (amountTotal === 99700 || session.metadata?.product === 'hotel-onboarding') {
+            try {
+                const email = session.customer_details?.email || session.customer_email || '';
+                const hotelSlug = 'hotel-' + crypto.randomBytes(4).toString('hex');
+                const setupToken = crypto.randomBytes(16).toString('hex');
+
+                await prisma.hotelConfig.create({
+                    data: {
+                        id: hotelSlug,
+                        name: 'My Hotel',
+                        pms: 'manual',
+                        active: false,
+                        setupToken,
+                        ownerEmail: email,
+                        setupComplete: false,
+                    }
+                });
+
+                console.log(`✅ New hotel provisioned: ${hotelSlug}, setup token: ${setupToken}, email: ${email}`);
+                // TODO: Send email with setup link to customer
+                // For now, log it. The customer gets redirected to /setup/:token after payment via Stripe's success_url.
+            } catch (e) {
+                console.error('Failed to auto-provision hotel from checkout:', e.message);
+            }
+        }
     }
 
     if (event.type === 'payment_intent.succeeded') {
@@ -4048,6 +4081,385 @@ app.get('/api/meta-insights', async (req, res) => {
 app.get('/funnel', (req, res) => {
     res.sendFile(path.join(__dirname, 'funnel.html'));
 });
+
+// Serve landing page
+app.get('/landing', (req, res) => {
+    res.sendFile(path.join(__dirname, 'landing.html'));
+});
+
+// ── SELF-SERVE SETUP ──────────────────────────────────────────
+
+// Start free setup — create hotel and redirect to wizard (no payment needed)
+app.post('/api/setup/start', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ error: 'Valid email required' });
+        }
+
+        const hotelSlug = 'hotel-' + crypto.randomBytes(4).toString('hex');
+        const setupToken = crypto.randomBytes(16).toString('hex');
+
+        await prisma.hotelConfig.create({
+            data: {
+                id: hotelSlug,
+                name: 'My Hotel',
+                pms: 'manual',
+                active: false,
+                setupToken,
+                ownerEmail: email.trim().toLowerCase(),
+                setupComplete: false,
+            }
+        });
+
+        console.log(`✅ Free setup started: ${hotelSlug}, token: ${setupToken}, email: ${email}`);
+        res.json({ success: true, setupUrl: '/setup/' + setupToken, token: setupToken });
+    } catch (e) {
+        console.error('Start setup error:', e.message);
+        res.status(500).json({ error: 'Failed to start setup' });
+    }
+});
+
+// Serve setup wizard
+app.get('/setup/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'setup.html'));
+});
+
+// Post-payment redirect: look up setup token by Stripe session
+app.get('/setup-redirect', async (req, res) => {
+    const sessionId = req.query.session_id;
+    if (!sessionId) return res.redirect('/');
+    try {
+        // Find the hotel created by the webhook for this session
+        // The webhook fires before the redirect, so the hotel should exist
+        // Look for the most recently created hotel with the customer's email
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const email = session.customer_details?.email || session.customer_email;
+        if (!email) return res.redirect('/');
+
+        const hotel = await prisma.hotelConfig.findFirst({
+            where: { ownerEmail: email, setupComplete: false },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (hotel?.setupToken) {
+            return res.redirect('/setup/' + hotel.setupToken);
+        }
+        // Webhook might not have fired yet — wait briefly and retry
+        await new Promise(r => setTimeout(r, 2000));
+        const retryHotel = await prisma.hotelConfig.findFirst({
+            where: { ownerEmail: email, setupComplete: false },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (retryHotel?.setupToken) {
+            return res.redirect('/setup/' + retryHotel.setupToken);
+        }
+        res.redirect('/');
+    } catch (e) {
+        console.error('Setup redirect error:', e.message);
+        res.redirect('/');
+    }
+});
+
+// Get setup state
+app.get('/api/setup/:token', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { setupToken: req.params.token },
+            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } }, rates: true },
+        });
+        if (!hotel) return res.status(404).json({ error: 'Invalid setup token' });
+        res.json({
+            hotel: { id: hotel.id, name: hotel.name, address: hotel.address, phone: hotel.phone, subtitle: hotel.subtitle, checkInTime: hotel.checkInTime, checkOutTime: hotel.checkOutTime, setupComplete: hotel.setupComplete },
+            rooms: hotel.rooms.map(r => ({ id: r.id, name: r.name, description: r.description, amenities: r.amenities, maxOccupancy: r.maxOccupancy, totalUnits: r.totalUnits, images: r.images.map(i => ({ id: i.id, url: i.url, sortOrder: i.sortOrder })) })),
+            rates: hotel.rates ? { nightly: hotel.rates.nightly, weekly: hotel.rates.weekly, monthly: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : null,
+        });
+    } catch (e) {
+        console.error('Setup GET error:', e.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Save hotel info
+app.post('/api/setup/:token/hotel', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        const { name, address, phone, subtitle, checkInTime, checkOutTime } = req.body;
+        await prisma.hotelConfig.update({
+            where: { id: hotel.id },
+            data: { name: name || hotel.name, address, phone, subtitle, checkInTime, checkOutTime },
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Setup hotel save error:', e.message);
+        res.status(500).json({ error: 'Failed to save' });
+    }
+});
+
+// Create/update room
+app.post('/api/setup/:token/rooms', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        const { id, name, description, amenities, maxOccupancy, totalUnits } = req.body;
+        if (!name) return res.status(400).json({ error: 'Room name required' });
+
+        let room;
+        if (id) {
+            room = await prisma.room.update({ where: { id }, data: { name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 } });
+        } else {
+            const count = await prisma.room.count({ where: { hotelId: hotel.id } });
+            room = await prisma.room.create({ data: { hotelId: hotel.id, name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1, sortOrder: count } });
+        }
+
+        // Also create/update ManualRoom for availability tracking
+        await prisma.manualRoom.upsert({
+            where: { hotelId_name: { hotelId: hotel.id, name } },
+            create: { hotelId: hotel.id, name, totalUnits: totalUnits || 1 },
+            update: { totalUnits: totalUnits || 1 },
+        });
+
+        res.json({ success: true, room: { id: room.id, name: room.name } });
+    } catch (e) {
+        console.error('Setup room save error:', e.message);
+        res.status(500).json({ error: 'Failed to save room' });
+    }
+});
+
+// Delete room
+app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        await prisma.room.delete({ where: { id: req.params.roomId } });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Setup room delete error:', e.message);
+        res.status(500).json({ error: 'Failed to delete' });
+    }
+});
+
+// Upload room image
+const multer = require('multer');
+const fs = require('fs');
+const uploadStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || '.jpg';
+        cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+    },
+});
+const upload = multer({ storage: uploadStorage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    cb(null, allowed.includes(file.mimetype));
+}});
+
+app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        req.hotelId = hotel.id;
+        next();
+    } catch (e) { res.status(500).json({ error: 'Server error' }); }
+}, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+        const url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
+        const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
+        res.json({ success: true, image: { id: image.id, url: image.url } });
+    } catch (e) {
+        console.error('Image upload error:', e.message);
+        res.status(500).json({ error: 'Failed to upload' });
+    }
+});
+
+// Delete room image
+app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        await prisma.roomImage.delete({ where: { id: req.params.imageId } });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to delete image' });
+    }
+});
+
+// Create Stripe Checkout session for $997 (pay to go live)
+app.post('/api/setup/:token/checkout', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+
+        const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+
+        const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            line_items: [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: `Marketel Booking Site — ${hotel.name || 'Hotel'}`,
+                        description: 'Direct booking website with front desk app. Live in minutes.',
+                    },
+                    unit_amount: 99700, // $997
+                },
+                quantity: 1,
+            }],
+            customer_email: hotel.ownerEmail || undefined,
+            metadata: {
+                product: 'hotel-onboarding',
+                hotelId: hotel.id,
+                setupToken: req.params.token,
+            },
+            success_url: `${baseUrl}/setup/${req.params.token}/success`,
+            cancel_url: `${baseUrl}/setup/${req.params.token}`,
+        });
+
+        res.json({ success: true, url: session.url });
+    } catch (e) {
+        console.error('Checkout session error:', e.message);
+        res.status(500).json({ error: 'Failed to create checkout' });
+    }
+});
+
+// Success page after payment — activate hotel and show confirmation
+app.get('/setup/:token/success', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.redirect('/');
+
+        // Activate the hotel
+        const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const domain = slug + '.clickinns.com';
+
+        // Create domain record
+        try {
+            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
+        } catch (e) { /* domain might exist */ }
+
+        // Mark complete and activate
+        await prisma.hotelConfig.update({
+            where: { id: hotel.id },
+            data: { setupComplete: true, active: true },
+        });
+
+        // Create default CRM PIN
+        const defaultPin = 'frontdesk' + Math.floor(1000 + Math.random() * 9000);
+        const pinHash = crypto.createHash('sha256').update(defaultPin).digest('hex');
+        try {
+            await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
+        } catch (e) { /* ignore */ }
+
+        // Send a simple success page
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:40px;max-width:500px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:28px;margin-bottom:8px;color:#1a1a2e}p{color:#6b7280;font-size:15px;margin-bottom:20px;line-height:1.6}.url{background:#e8f5ee;border-radius:10px;padding:14px;font-family:monospace;font-size:14px;color:#2E7D5B;font-weight:600;margin-bottom:12px;word-break:break-all}.info{background:#f8f9fa;border-radius:10px;padding:14px;font-size:13px;color:#6b7280;text-align:left;line-height:1.8;margin-bottom:20px}.btn{display:inline-block;background:#2E7D5B;color:white;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:700;text-decoration:none;transition:all 0.15s}.btn:hover{background:#1a5c3f;transform:translateY(-1px)}</style></head><body><div class="card"><h1>🎉 You're Live!</h1><p>Your direct booking site is now active.</p><div class="url">https://${domain}</div><div class="info"><strong>Front Desk App:</strong> https://${domain}/frontdesk<br><strong>Front Desk PIN:</strong> ${defaultPin}<br><strong>Funnel Dashboard:</strong> https://${domain}/funnel</div><a href="https://${domain}" target="_blank" class="btn">View Your Booking Site →</a></div></body></html>`);
+    } catch (e) {
+        console.error('Setup success error:', e.message);
+        res.redirect('/');
+    }
+});
+
+// Save rates
+app.post('/api/setup/:token/rates', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        const { nightly, weekly, monthly, taxRate } = req.body;
+        await prisma.hotelRates.upsert({
+            where: { hotelId: hotel.id },
+            create: { hotelId: hotel.id, nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
+            update: { nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Setup rates save error:', e.message);
+        res.status(500).json({ error: 'Failed to save rates' });
+    }
+});
+
+// Complete setup — go live
+app.post('/api/setup/:token/complete', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+
+        // Generate slug from hotel name
+        const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const domain = slug + '.clickinns.com';
+
+        // Create domain record (ignore if exists)
+        try {
+            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
+        } catch (e) {
+            // Domain might already exist — that's fine
+        }
+
+        // Mark setup complete and activate
+        await prisma.hotelConfig.update({
+            where: { id: hotel.id },
+            data: { setupComplete: true, active: true },
+        });
+
+        // Create a default CRM PIN
+        const defaultPin = 'frontdesk' + Math.floor(1000 + Math.random() * 9000);
+        const pinHash = crypto.createHash('sha256').update(defaultPin).digest('hex');
+        try {
+            await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
+        } catch (e) { /* ignore duplicate */ }
+
+        res.json({ success: true, bookingUrl: 'https://' + domain, frontdeskUrl: 'https://' + domain + '/frontdesk', crmPin: defaultPin });
+    } catch (e) {
+        console.error('Setup complete error:', e.message);
+        res.status(500).json({ error: 'Failed to complete setup' });
+    }
+});
+
+// Public hotel config API (for dynamic frontend loading)
+app.get('/api/hotel/:hotelId/public', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: req.params.hotelId },
+            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } }, rates: true },
+        });
+        if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+
+        // Build absolute image URLs
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+        // Allow preview for unpaid hotels (setupComplete=false) — they just can't have a public domain yet
+        res.json({
+            id: hotel.id,
+            name: hotel.name,
+            phone: hotel.phone,
+            address: hotel.address,
+            subtitle: hotel.subtitle,
+            pms: hotel.pms,
+            checkInTime: hotel.checkInTime,
+            checkOutTime: hotel.checkOutTime,
+            rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
+            rooms: hotel.rooms.map((r, i) => ({
+                id: i + 1,
+                name: r.name,
+                description: r.description,
+                amenities: r.amenities,
+                maxOccupancy: r.maxOccupancy,
+                imageUrl: r.images[0]?.url ? baseUrl + r.images[0].url : '/logo.jpg',
+                imageUrls: r.images.map(img => baseUrl + img.url),
+            })),
+        });
+    } catch (e) {
+        console.error('Public hotel config error:', e.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ── END SELF-SERVE SETUP ──────────────────────────────────────
 
 app.get('/analytics', (req, res) => {
     res.sendFile(path.join(__dirname, 'analytics.html'));

@@ -16,7 +16,8 @@ const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 
 
 const hotelId = getHotelId();
-const currentHotel = hotelData[hotelId] || {
+const staticHotel = hotelData[hotelId] || null;
+const fallbackHotel = {
   name: `Click Inns (${hotelId})`,
   url: '',
   subtitle: 'No deposits. No leases. No credit checks.',
@@ -32,7 +33,6 @@ const currentHotel = hotelData[hotelId] || {
 };
 
 // (document title is set inside App() via a useEffect hook)
-const RATES = currentHotel.rates;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3001'
@@ -96,6 +96,40 @@ function PageTransition({ children }) {
 
 function App() {
   const navigate = useNavigate();
+  const [currentHotel, setCurrentHotel] = useState(staticHotel || fallbackHotel);
+  const [hotelLoading, setHotelLoading] = useState(!staticHotel);
+  const RATES = currentHotel.rates;
+
+  // Fetch dynamic hotel config from API if not in static hotelData
+  useEffect(() => {
+    if (staticHotel) return; // Already have static data, no need to fetch
+    
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/hotel/${hotelId}/public`);
+        if (!res.ok) throw new Error('Not found');
+        const data = await res.json();
+        if (cancelled) return;
+        setCurrentHotel({
+          name: data.name || fallbackHotel.name,
+          url: '',
+          subtitle: data.subtitle || fallbackHotel.subtitle,
+          phone: data.phone || '',
+          address: data.address || '',
+          pms: data.pms || 'manual',
+          rates: data.rates || fallbackHotel.rates,
+          rooms: data.rooms || [],
+          reviews: [],
+        });
+      } catch (e) {
+        // Hotel not found in API — use fallback
+        if (!cancelled) setCurrentHotel(fallbackHotel);
+      }
+      if (!cancelled) setHotelLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Set page title per hotel (single deployment serving multiple properties)
   useEffect(() => {
@@ -128,7 +162,7 @@ function App() {
     setCheckinDate(today);
     setCheckoutDate(null);
     setAvailableRooms(currentHotel.rooms);
-  }, [hotelId]);
+  }, [hotelId, currentHotel]);
 
   // IMPORTANT: Avoid preloading entire room galleries on initial load.
   // Preloading every image can easily add 10–20MB to first load and destroy mobile performance.
@@ -496,6 +530,11 @@ const handleConfirmBooking = async (bookingDetails) => {
   const handleCloseLightbox = () => {
     setLightboxData(null);
   };
+
+  // Show nothing while loading dynamic hotel
+  if (hotelLoading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui' }}>Loading...</div>;
+  }
 
   return (
     <>
