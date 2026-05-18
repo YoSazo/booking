@@ -3795,6 +3795,9 @@ app.get('/api/funnel', async (req, res) => {
             guest_last_name: e.guestLastName,
             guest_email: e.guestEmail,
             guest_phone: e.guestPhone,
+            user_agent: e.userAgent,
+            ip_address: e.ipAddress,
+            external_id: e.externalId,
         }));
 
         res.json({ counts, recent });

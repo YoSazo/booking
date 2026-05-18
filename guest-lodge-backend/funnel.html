@@ -355,6 +355,80 @@
   }
   .event-card:hover .delete-btn { opacity: 1; }
   .delete-btn:hover { color: var(--red); background: #fee2e2; }
+
+  /* Detail modal */
+  .detail-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .detail-overlay.open { display: flex; }
+  .detail-sheet {
+    background: var(--card);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    padding: 24px;
+  }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .detail-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .detail-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .detail-close:hover { background: var(--bg); color: var(--text); }
+  .detail-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+  }
+  .detail-value {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.4;
+  }
+  .detail-value.mono {
+    font-family: 'DM Mono', monospace, monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
   .event-guest {
     font-size: 14px;
     font-weight: 600;
@@ -565,6 +639,17 @@
 </div>
 </div>
 
+<!-- Detail Modal -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail(event)">
+  <div class="detail-sheet" onclick="event.stopPropagation()">
+    <div class="detail-header">
+      <h3 id="detailTitle">Event Details</h3>
+      <button class="detail-close" onclick="closeDetail()">&times;</button>
+    </div>
+    <div class="detail-rows" id="detailRows"></div>
+  </div>
+</div>
+
 <script>
 let allEvents = [];
 let allCounts = {};
@@ -745,6 +830,71 @@ function switchView(view) {
   document.getElementById('activityView').style.display = view === 'activity' ? 'block' : 'none';
 }
 
+// Detail modal
+function showDetail(index) {
+  const e = allEvents[index];
+  if (!e) return;
+
+  const label = TYPE_LABELS[e.event_name] || e.event_name;
+  document.getElementById('detailTitle').textContent = label;
+
+  // Parse user agent for device/browser info
+  const ua = e.user_agent || '';
+  let device = 'Unknown';
+  if (/iPhone/.test(ua)) device = 'iPhone';
+  else if (/iPad/.test(ua)) device = 'iPad';
+  else if (/Android/.test(ua)) device = 'Android';
+  else if (/Windows/.test(ua)) device = 'Windows';
+  else if (/Mac/.test(ua)) device = 'Mac';
+  else if (/Linux/.test(ua)) device = 'Linux';
+
+  let browser = 'Unknown';
+  if (/FBAV|FBAN/.test(ua)) browser = 'Facebook In-App';
+  else if (/Instagram/.test(ua)) browser = 'Instagram In-App';
+  else if (/CriOS/.test(ua)) browser = 'Chrome (iOS)';
+  else if (/Chrome/.test(ua) && !/Edg/.test(ua)) browser = 'Chrome';
+  else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  else if (/Firefox/.test(ua)) browser = 'Firefox';
+  else if (/Edg/.test(ua)) browser = 'Edge';
+
+  const rows = [
+    { label: 'Event', value: label },
+    { label: 'Time', value: new Date(e.timestamp).toLocaleString() },
+    { label: 'Name', value: ((e.guest_first_name || '') + ' ' + (e.guest_last_name || '')).trim() || '—' },
+    { label: 'Email', value: e.guest_email || '—' },
+    { label: 'Phone', value: e.guest_phone || '—' },
+    { label: 'Room', value: e.content_name || '—' },
+    { label: 'Amount', value: e.value ? '$' + e.value.toFixed(2) : '—' },
+    { label: 'Nights', value: e.nights || '—' },
+    { label: 'Check-in', value: e.checkin_date || '—' },
+    { label: 'Check-out', value: e.checkout_date || '—' },
+    { label: 'Device', value: device },
+    { label: 'Browser', value: browser },
+    { label: 'IP Address', value: e.ip_address || '—' },
+    { label: 'Visitor ID', value: e.external_id || '—', mono: true },
+    { label: 'Event ID', value: e.event_id || '—', mono: true },
+    { label: 'User Agent', value: ua || '—', mono: true },
+  ];
+
+  document.getElementById('detailRows').innerHTML = rows
+    .filter(r => r.value && r.value !== '—')
+    .map(r => `
+      <div class="detail-row">
+        <div class="detail-label">${r.label}</div>
+        <div class="detail-value${r.mono ? ' mono' : ''}">${r.value}</div>
+      </div>
+    `).join('');
+
+  document.getElementById('detailOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetail(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('detailOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
 const ICONS = {
   PageView: '👁',
   Search: '🔍',
@@ -815,6 +965,7 @@ function renderEvents() {
     const typeClass = e.event_name.toLowerCase().replace(/[^a-z]/g, '') || 'other';
     const icon = ICONS[e.event_name] || '•';
     const label = TYPE_LABELS[e.event_name] || e.event_name;
+    const idx = allEvents.indexOf(e);
     
     const guestName = ((e.guest_first_name || '') + ' ' + (e.guest_last_name || '')).trim();
     
@@ -827,7 +978,7 @@ function renderEvents() {
     if (e.value) detailParts.push('<span class="event-price">$' + e.value.toFixed(2) + '</span>');
 
     return `
-      <div class="event-card" id="event-${e.event_id || ''}">
+      <div class="event-card" id="event-${e.event_id || ''}" onclick="showDetail(${idx})" style="cursor:pointer;">
         <div class="event-badge ${typeClass}">${icon}</div>
         <div class="event-body">
           <div class="event-top">
@@ -838,7 +989,7 @@ function renderEvents() {
         </div>
         <div class="event-right">
           <span class="event-time">${formatTime(e.timestamp)}</span>
-          <button class="delete-btn" onclick="deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">🗑</button>
+          <button class="delete-btn" onclick="event.stopPropagation(); deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">🗑</button>
         </div>
       </div>
     `;
