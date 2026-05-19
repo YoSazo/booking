@@ -172,18 +172,9 @@ a { color: inherit; text-decoration: none; }
 .demo-section .subtitle {
   text-align: center; font-size: 15px; color: var(--muted); margin-bottom: 40px;
 }
-.demo-video-wrap {
-  border-radius: var(--r); overflow: hidden;
-  box-shadow: var(--shadow-lg); border: 1px solid var(--border);
-  background: #000;
-  max-width: 100%; margin: 0 auto;
-  display: flex; align-items: center; justify-content: center;
-}
-.demo-video-wrap video {
-  width: 100%; height: auto; display: block;
-}
 .demo-video-placeholder {
   color: #666; font-size: 16px; text-align: center; padding: 40px;
+  display: none;
 }
 
 /* FEATURES */
@@ -340,18 +331,18 @@ a { color: inherit; text-decoration: none; }
   <div class="how-steps">
     <div class="how-step">
       <div class="how-step-num">1</div>
-      <h3>You pay & submit your info</h3>
-      <p>Room photos, rates, hotel name. Takes 5 minutes. We handle everything else.</p>
+      <h3>Enter your hotel details</h3>
+      <p>Hotel name, rooms, photos, rates. Takes 5 minutes. Free to set up — no payment yet.</p>
     </div>
     <div class="how-step">
       <div class="how-step-num">2</div>
-      <h3>We build your booking site</h3>
-      <p>Custom domain, your branding, mobile-optimized checkout. Done in 48 hours.</p>
+      <h3>Preview your booking site</h3>
+      <p>See your hotel on a live booking page with your photos and rates. Click around, make sure it looks right.</p>
     </div>
     <div class="how-step">
       <div class="how-step-num">3</div>
-      <h3>We connect it to Google</h3>
-      <p>Your direct booking link goes on your Google Business Profile. Guests who find you on Maps book direct.</p>
+      <h3>Pay & go live instantly</h3>
+      <p>One payment of $997. Your booking site activates immediately on your own domain.</p>
     </div>
     <div class="how-step">
       <div class="how-step-num">4</div>
@@ -361,14 +352,21 @@ a { color: inherit; text-decoration: none; }
   </div>
 </section>
 
-<!-- DEMO VIDEO -->
+<!-- LIVE CLIENTS -->
 <section class="demo-section" id="demo">
-  <h2>See it in action</h2>
-  <p class="subtitle">A guest books on their phone. Your front desk gets it instantly.</p>
-  <div class="demo-video-wrap">
-    <video autoplay loop muted playsinline>
-      <source src="/0518.mp4" type="video/mp4">
-    </video>
+  <h2>Live client sites — try them yourself</h2>
+  <p class="subtitle">These are real hotels using Marketel right now. Click around, pick dates, select a room — it all works.</p>
+  
+  <div style="display:flex; gap:12px; justify-content:center; margin-bottom:24px; flex-wrap:wrap;">
+    <button onclick="switchDemo('suite')" id="demoTab1" style="padding:10px 20px; border-radius:10px; border:1.5px solid var(--green); background:var(--green); color:white; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">Suite Stay — Alabama</button>
+    <button onclick="switchDemo('stcroix')" id="demoTab2" style="padding:10px 20px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">St Croix Falls — Wisconsin</button>
+  </div>
+
+  <div style="max-width:375px; margin:0 auto; border:8px solid #1a1a2e; border-radius:40px; overflow:hidden; background:#1a1a2e; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
+    <div style="background:#1a1a2e; padding:8px 0; text-align:center;">
+      <div id="demoUrlBar" style="display:inline-block; background:rgba(255,255,255,0.1); border-radius:12px; padding:4px 14px; font-size:11px; color:rgba(255,255,255,0.6); font-family:monospace;">suitestay.clickinns.com</div>
+    </div>
+    <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:680px; border:none; display:block; border-radius:0 0 32px 32px;"></iframe>
   </div>
 </section>
 
@@ -542,6 +540,25 @@ function updateCalc() {
 // Init
 updateCalc();
 
+function switchDemo(which) {
+  const frame = document.getElementById('demoFrame');
+  const urlBar = document.getElementById('demoUrlBar');
+  const tab1 = document.getElementById('demoTab1');
+  const tab2 = document.getElementById('demoTab2');
+  
+  if (which === 'suite') {
+    frame.src = 'https://suitestay.clickinns.com';
+    urlBar.textContent = 'suitestay.clickinns.com';
+    tab1.style.background = 'var(--green)'; tab1.style.color = 'white'; tab1.style.borderColor = 'var(--green)';
+    tab2.style.background = 'var(--card)'; tab2.style.color = 'var(--text)'; tab2.style.borderColor = 'var(--border)';
+  } else {
+    frame.src = 'https://stcroix.clickinns.com';
+    urlBar.textContent = 'stcroix.clickinns.com';
+    tab2.style.background = 'var(--green)'; tab2.style.color = 'white'; tab2.style.borderColor = 'var(--green)';
+    tab1.style.background = 'var(--card)'; tab1.style.color = 'var(--text)'; tab1.style.borderColor = 'var(--border)';
+  }
+}
+
 async function startFreeSetup() {
   const email = document.getElementById('setupEmail').value.trim();
   if (!email || !email.includes('@')) {
@@ -552,7 +569,7 @@ async function startFreeSetup() {
   btn.textContent = 'Setting up...';
   btn.disabled = true;
   try {
-    const API = 'http://localhost:3001'; // point to backend
+    const API = ''; // same origin
     const res = await fetch(API + '/api/setup/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
