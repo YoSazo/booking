@@ -37,7 +37,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
   // Extract amenities from room.amenities string
   const getAmenityList = () => {
-    const amenitiesText = room.amenities.toLowerCase();
+    const amenitiesText = (room.amenities || '').toLowerCase();
     const foundAmenities = [];
     
     Object.keys(amenityIcons).forEach(key => {
