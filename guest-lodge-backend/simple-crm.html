@@ -1665,11 +1665,8 @@
   <div class="container">
     <div class="tabs-container">
       <div class="tabs-slider" id="tabsSlider"></div>
-      <button type="button" class="tab active" data-nav-filter="needs-call" onclick="setFilter('needs-call', this)">
-        📞 Needs Call <span class="tab-badge" id="countNeedsCalled">0</span>
-      </button>
-      <button type="button" class="tab" data-nav-filter="called" onclick="setFilter('called', this)">
-        ✅ Called <span class="tab-badge" id="countCalled">0</span>
+      <button type="button" class="tab active" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
+        Bookings <span class="tab-badge" id="countNeedsCalled">0</span>
       </button>
     </div>
     <div id="bookingsList">
@@ -1716,7 +1713,7 @@
 <script>
 let token = '';
 let bookings = [];
-let currentFilter = 'needs-call';
+let currentFilter = 'bookings';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
@@ -1988,7 +1985,7 @@ function syncRevenueUi() {
   if (!revenueEnabled) {
     if (existingBtn) existingBtn.remove();
     if (existingView) existingView.remove();
-    if (currentFilter === 'revenue') currentFilter = 'needs-call';
+    if (currentFilter === 'revenue') currentFilter = 'bookings';
     const activeTab = document.querySelector('.tab.active');
     if (activeTab) moveSlider(activeTab);
     updateMobileRevenueNavVisibility();
@@ -2541,9 +2538,7 @@ async function loadBookings() {
     
     // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    const called = bookings.filter(b => b.callStatus === 'called');
-    document.getElementById('countNeedsCalled').textContent = needsCalls.length;
-    document.getElementById('countCalled').textContent = called.length;
+    document.getElementById('countNeedsCalled').textContent = bookings.length;
     document.getElementById('statCount').textContent = needsCalls.length;
     
     // Render based on current filter
@@ -2830,12 +2825,7 @@ function applyFilter() {
   if (revenueEl) revenueEl.style.display = 'none';
   if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
-  const filtered = currentFilter === 'needs-call'
-    ? bookings.filter(b => b.callStatus === 'not-called')
-    : currentFilter === 'called'
-      ? bookings.filter(b => b.callStatus === 'called')
-      : bookings;
-  renderBookings(filtered);
+  renderBookings(bookings);
 }
 
 async function loadManualAvailability() {
@@ -3384,9 +3374,7 @@ async function markConfirmed(id) {
     
     // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    const called = bookings.filter(b => b.callStatus === 'called');
-    document.getElementById('countNeedsCalled').textContent = needsCalls.length;
-    document.getElementById('countCalled').textContent = called.length;
+    document.getElementById('countNeedsCalled').textContent = bookings.length;
     document.getElementById('statCount').textContent = needsCalls.length;
     
     applyFilter();
