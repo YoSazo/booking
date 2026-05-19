@@ -244,20 +244,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="form-card" style="padding:16px;">
       <h2 style="margin-bottom:8px;">This is your booking site</h2>
       <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">Navigate around — this is exactly what your guests will see.</p>
-      <div style="max-width:375px; margin:0 auto; border:8px solid #1a1a2e; border-radius:40px; overflow:hidden; background:#1a1a2e; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
-        <div style="background:#1a1a2e; padding:8px 0; text-align:center;">
-          <div id="previewUrlBar" style="display:inline-block; background:rgba(255,255,255,0.1); border-radius:12px; padding:4px 14px; font-size:11px; color:rgba(255,255,255,0.6); font-family:monospace;"></div>
-        </div>
-        <div style="overflow:hidden; border-radius:0 0 32px 32px;">
-          <iframe id="previewFrame" style="width:calc(100% + 17px); height:680px; border:none; display:block;" src="about:blank" scrolling="yes"></iframe>
+      
+      <div style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+        <button onclick="switchPreviewView('mobile')" id="prevMobile" style="padding:6px 14px; border-radius:8px; border:1.5px solid var(--green); background:var(--green); color:white; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">📱 Mobile</button>
+        <button onclick="switchPreviewView('desktop')" id="prevDesktop" style="padding:6px 14px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">🖥 Desktop</button>
+      </div>
+
+      <div id="previewContainer" style="max-width:375px; margin:0 auto; border-radius:20px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); transition: max-width 0.3s ease;">
+        <div style="overflow:hidden; border-radius:20px;">
+          <iframe id="previewFrame" style="width:calc(100% + 17px); height:680px; border:none; display:block;" src="about:blank"></iframe>
         </div>
       </div>
     </div>
     <div class="live-card" style="margin-top:16px;">
-      <h2>Like what you see?</h2>
-      <p>One payment to make it live. Your guests can start booking today.</p>
-      <div class="live-url" id="liveUrl">loading...</div>
-      <p style="opacity:0.8; font-size:13px; margin-bottom:20px;">$997 one-time. No monthly fees. Instant activation.</p>
+      <h2>Ready to go live?</h2>
+      <p>One payment and your booking site is active. We'll get your custom domain set up within minutes.</p>
+      <p style="opacity:0.8; font-size:13px; margin-bottom:20px;">$997 one-time. No monthly fees. No commission.</p>
       <button class="btn btn-primary" onclick="payAndGoLive()" style="width:100%; background:white; color:var(--green-dark); border-color:white; font-size:17px; padding:16px;">
         Pay $997 & Go Live →
       </button>
@@ -343,17 +345,33 @@ function goToStep(n) {
 }
 
 function updateLiveUrls() {
-  const slug = (hotelData.name || 'my-hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const domain = slug + '.clickinns.com';
-  document.getElementById('liveUrl').textContent = domain;
-  document.getElementById('previewUrlBar').textContent = domain;
-  
-  // Load the real frontend in the iframe — use localhost for local dev
+  // Load the real frontend in the iframe
   const frontendBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5173'
     : 'https://suitestay.clickinns.com';
   const previewUrl = frontendBase + '?hotelId=' + (hotelData.id || 'demo-test-hotel');
   document.getElementById('previewFrame').src = previewUrl;
+}
+
+function switchPreviewView(view) {
+  const container = document.getElementById('previewContainer');
+  const frame = document.getElementById('previewFrame');
+  const btnMobile = document.getElementById('prevMobile');
+  const btnDesktop = document.getElementById('prevDesktop');
+  
+  if (view === 'desktop') {
+    container.style.maxWidth = '100%';
+    frame.style.width = '100%';
+    frame.style.height = '700px';
+    btnDesktop.style.background = 'var(--green)'; btnDesktop.style.color = 'white'; btnDesktop.style.borderColor = 'var(--green)';
+    btnMobile.style.background = 'var(--card)'; btnMobile.style.color = 'var(--text)'; btnMobile.style.borderColor = 'var(--border)';
+  } else {
+    container.style.maxWidth = '375px';
+    frame.style.width = 'calc(100% + 17px)';
+    frame.style.height = '680px';
+    btnMobile.style.background = 'var(--green)'; btnMobile.style.color = 'white'; btnMobile.style.borderColor = 'var(--green)';
+    btnDesktop.style.background = 'var(--card)'; btnDesktop.style.color = 'var(--text)'; btnDesktop.style.borderColor = 'var(--border)';
+  }
 }
 
 // Load existing setup state
