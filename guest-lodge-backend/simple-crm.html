@@ -2924,7 +2924,10 @@ function renderRoomPills() {
   addBtn.className = 'room-pill-add';
   addBtn.textContent = '+ Add room type';
   addBtn.addEventListener('click', openRoomsAddModal);
-  bar.appendChild(addBtn);
+  // Only show if no rooms exist yet (otherwise use Edit tab)
+  if (bar.querySelectorAll('.room-pill').length === 0) {
+    bar.appendChild(addBtn);
+  }
 }
 
 function renderMobileRoomActions() {
