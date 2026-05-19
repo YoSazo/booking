@@ -1675,9 +1675,13 @@
   </div>
 
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
-    <button type="button" class="mobile-nav-item active" data-nav-filter="calls" aria-current="page">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="phone"></i></span>
-      <span class="mobile-nav-label">Calls</span>
+    <button type="button" class="mobile-nav-item active" data-nav-filter="bookings" aria-current="page">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="inbox"></i></span>
+      <span class="mobile-nav-label">Bookings</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="edit">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="pencil"></i></span>
+      <span class="mobile-nav-label">Edit</span>
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="availability">
       <span class="mobile-nav-icon-wrap"><i data-lucide="door-open"></i></span>
@@ -2700,10 +2704,10 @@ function initMobileBottomNav() {
     setFilter(filter, item);
   });
 
-  // Mobile keeps a single Calls bucket instead of split Needs/Called tabs.
+  // Mobile keeps a single Bookings bucket.
   if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches && (currentFilter === 'needs-call' || currentFilter === 'called')) {
-    const callsBtn = nav.querySelector('.mobile-nav-item[data-nav-filter="calls"]');
-    setFilter('calls', callsBtn);
+    const bookingsBtn = nav.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
+    setFilter('bookings', bookingsBtn);
   }
 }
 
@@ -2775,8 +2779,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const current = document.querySelector('.tab.active');
     if (current) moveSlider(current);
     if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches && (currentFilter === 'needs-call' || currentFilter === 'called')) {
-      const callsBtn = document.querySelector('.mobile-nav-item[data-nav-filter="calls"]');
-      setFilter('calls', callsBtn);
+      const bookingsBtn = document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
+      setFilter('bookings', bookingsBtn);
       return;
     }
     syncMobileNavActive(currentFilter);
