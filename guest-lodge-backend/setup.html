@@ -14,129 +14,90 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,0.08); --r: 16px;
 }
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+.setup-container { max-width: 500px; margin: 0 auto; padding: 32px 20px 100px; }
+.setup-header { text-align: center; margin-bottom: 24px; }
+.setup-logo { height: 36px; margin-bottom: 12px; }
+.setup-title { font-size: 20px; font-weight: 700; }
 
-.setup-container { max-width: 640px; margin: 0 auto; padding: 32px 20px 100px; }
-
-/* Header */
-.setup-header { text-align: center; margin-bottom: 32px; }
-.setup-logo { height: 40px; margin-bottom: 16px; }
-.setup-title { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
-.setup-subtitle { font-size: 14px; color: var(--muted); }
-
-/* Progress */
-.progress-bar { display: flex; gap: 6px; margin-bottom: 32px; }
-.progress-step {
-  flex: 1; height: 6px; border-radius: 3px; background: var(--border); transition: background 0.3s;
-}
+.progress-bar { display: flex; gap: 6px; margin-bottom: 28px; }
+.progress-step { flex: 1; height: 5px; border-radius: 3px; background: var(--border); transition: background 0.3s; }
 .progress-step.done { background: var(--green); }
 .progress-step.active { background: var(--green); opacity: 0.6; }
 
-/* Steps */
 .step { display: none; }
 .step.active { display: block; }
 
-/* Form */
 .form-card {
   background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 28px; box-shadow: var(--shadow-md); margin-bottom: 16px;
+  border-radius: var(--r); padding: 24px; box-shadow: var(--shadow-md); margin-bottom: 12px;
 }
-.form-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
-.field { margin-bottom: 16px; }
-.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-.field input, .field textarea {
+.form-card h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+.field input {
   width: 100%; padding: 12px 14px; border: 1.5px solid var(--border);
-  border-radius: 10px; font-family: inherit; font-size: 15px; color: var(--text);
-  transition: border-color 0.15s; outline: none;
+  border-radius: 10px; font-family: inherit; font-size: 15px; outline: none;
 }
-.field input:focus, .field textarea:focus { border-color: var(--green); }
-.field textarea { min-height: 80px; resize: vertical; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.field-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.field input:focus { border-color: var(--green); }
 
-/* Buttons */
-.btn-row { display: flex; gap: 12px; margin-top: 24px; }
 .btn {
-  flex: 1; padding: 14px; border-radius: 10px; font-family: inherit;
-  font-size: 15px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border);
-  background: var(--card); color: var(--text); transition: all 0.15s;
+  width: 100%; padding: 14px; border-radius: 10px; font-family: inherit;
+  font-size: 15px; font-weight: 600; cursor: pointer; border: none;
+  transition: all 0.15s;
 }
-.btn:hover { border-color: var(--green); color: var(--green); }
-.btn-primary { background: var(--green); border-color: var(--green); color: white; }
+.btn-primary { background: var(--green); color: white; }
 .btn-primary:hover { background: var(--green-dark); }
-.btn-danger { color: var(--red); border-color: var(--red); background: #fef2f2; }
-.btn-danger:hover { background: var(--red); color: white; }
+.btn-back {
+  background: none; border: 1.5px solid var(--border); color: var(--muted);
+  margin-top: 8px;
+}
+.btn-back:hover { border-color: var(--green); color: var(--green); }
 
 /* Room cards */
-.room-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-.room-card {
-  background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px;
+.room-item {
+  background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px;
 }
-.room-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.room-card-name { font-size: 15px; font-weight: 700; }
-.room-card-meta { font-size: 12px; color: var(--muted); }
-.room-card-actions { display: flex; gap: 8px; }
-.room-card-btn {
-  background: none; border: none; font-size: 13px; font-weight: 600;
-  cursor: pointer; color: var(--muted); padding: 4px 8px; border-radius: 6px;
-}
-.room-card-btn:hover { color: var(--green); background: var(--green-lt); }
-.room-card-btn.delete:hover { color: var(--red); background: #fef2f2; }
+.room-item img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; }
+.room-item-placeholder { width: 50px; height: 50px; border-radius: 8px; background: var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 18px; }
+.room-item-info { flex: 1; }
+.room-item-name { font-size: 14px; font-weight: 700; }
+.room-item-actions { display: flex; gap: 6px; }
+.room-item-btn { background: none; border: none; font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 4px; }
+.room-item-btn:hover { color: var(--red); background: #fef2f2; }
 
 /* Image upload */
-.image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; margin-top: 8px; }
-.image-thumb {
-  width: 100%; aspect-ratio: 1; border-radius: 8px; object-fit: cover;
-  border: 1px solid var(--border);
+.upload-area {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 24px;
+  text-align: center; cursor: pointer; transition: all 0.15s; margin-top: 8px;
 }
-.image-upload-btn {
-  width: 100%; aspect-ratio: 1; border-radius: 8px; border: 2px dashed var(--border);
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  font-size: 24px; color: var(--muted); transition: all 0.15s;
-}
-.image-upload-btn:hover { border-color: var(--green); color: var(--green); }
+.upload-area:hover { border-color: var(--green); }
+.upload-area p { font-size: 13px; color: var(--muted); }
+.upload-preview { margin-top: 8px; }
+.upload-preview img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; margin: 4px; }
 
-/* Room form modal */
-.modal-bg {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-  z-index: 200; align-items: center; justify-content: center; padding: 20px;
-}
-.modal-bg.open { display: flex; }
-.modal {
-  background: var(--card); border-radius: var(--r); width: 100%; max-width: 480px;
-  padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-}
-.modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
-
-/* Go Live */
+/* Live card */
 .live-card {
   background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
-  border-radius: var(--r); padding: 32px; color: white; text-align: center;
+  border-radius: var(--r); padding: 28px; color: white; text-align: center;
 }
-.live-card h2 { font-size: 22px; margin-bottom: 8px; }
-.live-card p { opacity: 0.85; font-size: 14px; margin-bottom: 20px; }
-.live-url {
-  background: rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 16px;
-  font-family: monospace; font-size: 14px; margin-bottom: 20px; word-break: break-all;
-}
+.live-card h2 { font-size: 20px; margin-bottom: 8px; }
+.live-card p { opacity: 0.85; font-size: 14px; margin-bottom: 16px; }
 
-/* Toast */
 .toast {
-  position: fixed; bottom: 20px; right: 20px; background: var(--green); color: white;
-  padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
-  box-shadow: var(--shadow-md); z-index: 300; display: none;
-  animation: slideIn 0.2s ease;
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--green); color: white; padding: 10px 20px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; box-shadow: var(--shadow-md); z-index: 300; display: none;
 }
 .toast.show { display: block; }
 .toast.error { background: var(--red); }
-@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* Loading */
 .loading-overlay {
   display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8);
   z-index: 250; align-items: center; justify-content: center;
 }
 .loading-overlay.show { display: flex; }
-.spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+.spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -145,8 +106,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="setup-container">
   <div class="setup-header">
     <img src="/marketellogo.svg" alt="Marketel" class="setup-logo">
-    <div class="setup-title">Set Up Your Hotel</div>
-    <div class="setup-subtitle">Fill in your details and go live in minutes.</div>
+    <div class="setup-title">Set up your booking site</div>
   </div>
 
   <div class="progress-bar">
@@ -156,94 +116,68 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-4"></div>
   </div>
 
-  <!-- STEP 1: Hotel Info -->
+  <!-- STEP 1: Hotel Info (3 fields) -->
   <div class="step active" id="step-1">
     <div class="form-card">
-      <h2>Hotel Information</h2>
+      <h2>Your hotel</h2>
       <div class="field">
-        <label>Hotel Name *</label>
+        <label>Hotel Name</label>
         <input type="text" id="hotelName" placeholder="e.g. Sunset Inn">
       </div>
       <div class="field">
-        <label>Address *</label>
+        <label>Phone Number</label>
+        <input type="tel" id="hotelPhone" placeholder="(555) 123-4567">
+      </div>
+      <div class="field">
+        <label>Address</label>
         <input type="text" id="hotelAddress" placeholder="123 Main St, City, State ZIP">
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Phone *</label>
-          <input type="tel" id="hotelPhone" placeholder="(555) 123-4567">
-        </div>
-        <div class="field">
-          <label>Subtitle</label>
-          <input type="text" id="hotelSubtitle" placeholder="Your tagline">
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Check-in Time</label>
-          <input type="text" id="hotelCheckIn" placeholder="3:00 PM" value="3:00 PM">
-        </div>
-        <div class="field">
-          <label>Check-out Time</label>
-          <input type="text" id="hotelCheckOut" placeholder="11:00 AM" value="11:00 AM">
-        </div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="saveHotelInfo()">Next — Rooms →</button>
-      </div>
+      <button class="btn btn-primary" onclick="saveStep1()">Next →</button>
     </div>
   </div>
 
-  <!-- STEP 2: Rooms -->
+  <!-- STEP 2: Rooms (name + photo only) -->
   <div class="step" id="step-2">
     <div class="form-card">
-      <h2>Your Rooms</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Add each room type you offer. Upload photos for each.</p>
-      <div class="room-list" id="roomList"></div>
-      <button class="btn" onclick="openRoomModal()" style="width:100%;">+ Add Room Type</button>
-      <div class="btn-row">
-        <button class="btn" onclick="goToStep(1)">← Back</button>
-        <button class="btn btn-primary" onclick="goToStep(3)">Next — Rates →</button>
+      <h2>Add your rooms</h2>
+      <div id="roomList"></div>
+      <div class="field">
+        <label>Room Name</label>
+        <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
+      <div class="field">
+        <label>Photo</label>
+        <div class="upload-area" onclick="document.getElementById('rmFile').click()">
+          <p>Tap to upload a photo</p>
+        </div>
+        <input type="file" id="rmFile" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+        <div class="upload-preview" id="rmPreview"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addRoom()">+ Add Room</button>
+      <button class="btn btn-back" onclick="goToStep(3)" id="roomNextBtn" style="display:none;">Next →</button>
+      <button class="btn btn-back" onclick="goToStep(1)">← Back</button>
     </div>
   </div>
 
-  <!-- STEP 3: Rates -->
+  <!-- STEP 3: Rate (1 field) -->
   <div class="step" id="step-3">
     <div class="form-card">
-      <h2>Pricing</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Set your rates. Guests staying 7+ nights get the weekly rate, 28+ get monthly.</p>
+      <h2>Set your nightly rate</h2>
       <div class="field">
-        <label>Nightly Rate ($)</label>
+        <label>Price per night ($)</label>
         <input type="number" id="rateNightly" placeholder="69" value="69">
-        <div class="field-hint">For stays under 7 nights</div>
       </div>
-      <div class="field">
-        <label>Weekly Rate ($ total for 7 nights)</label>
-        <input type="number" id="rateWeekly" placeholder="299" value="299">
-        <div class="field-hint">For stays 7-27 nights</div>
-      </div>
-      <div class="field">
-        <label>Monthly Rate ($ total for 28 nights)</label>
-        <input type="number" id="rateMonthly" placeholder="999" value="999">
-        <div class="field-hint">For stays 28+ nights</div>
-      </div>
-      <div class="field">
-        <label>Tax Rate (%)</label>
-        <input type="number" id="rateTax" placeholder="10" value="10" step="0.1">
-      </div>
-      <div class="btn-row">
-        <button class="btn" onclick="goToStep(2)">← Back</button>
-        <button class="btn btn-primary" onclick="saveRates()">Next — Go Live →</button>
-      </div>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">Weekly and monthly rates are auto-calculated. You can adjust later.</p>
+      <button class="btn btn-primary" onclick="saveStep3()">See My Booking Site →</button>
+      <button class="btn btn-back" onclick="goToStep(2)">← Back</button>
     </div>
   </div>
 
   <!-- STEP 4: Preview & Pay -->
   <div class="step" id="step-4">
     <div class="form-card" style="padding:16px;">
-      <h2 style="margin-bottom:8px;">This is your booking site</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">Navigate around — this is exactly what your guests will see.</p>
+      <h2 style="margin-bottom:4px;">This is your booking site</h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">This is what your guests see.</p>
     </div>
 
     <div id="previewContainer" style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border);">
@@ -253,56 +187,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="live-card" style="margin-top:16px;">
       <h2>Ready to go live?</h2>
       <p>One payment and your booking site is active. We'll get your custom domain set up within minutes.</p>
-      <p style="opacity:0.8; font-size:13px; margin-bottom:20px;">$997 one-time. No monthly fees. No commission.</p>
-      <button class="btn btn-primary" onclick="payAndGoLive()" style="width:100%; background:white; color:var(--green-dark); border-color:white; font-size:17px; padding:16px;">
+      <p style="opacity:0.8; font-size:13px; margin-bottom:16px;">$997 one-time. No monthly fees. No commission.</p>
+      <button class="btn btn-primary" onclick="payAndGoLive()" style="background:white; color:var(--green-dark); font-size:16px;">
         Pay $997 & Go Live →
       </button>
-      <p style="opacity:0.6; font-size:12px; margin-top:12px;">🔒 Secure payment via Stripe. 7-day money-back guarantee.</p>
+      <p style="opacity:0.5; font-size:11px; margin-top:10px;">🔒 Stripe. 7-day money-back guarantee.</p>
     </div>
-    <div class="form-card" style="margin-top:16px;">
-      <div class="btn-row">
-        <button class="btn" onclick="goToStep(3)">← Back to Rates</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Room Modal -->
-<div class="modal-bg" id="roomModal">
-  <div class="modal">
-    <h3 id="roomModalTitle">Add Room Type</h3>
-    <div class="field">
-      <label>Room Name *</label>
-      <input type="text" id="rmName" placeholder="e.g. King Suite">
-    </div>
-    <div class="field">
-      <label>Description</label>
-      <textarea id="rmDesc" placeholder="Spacious room with king bed, free WiFi..."></textarea>
-    </div>
-    <div class="field">
-      <label>Amenities</label>
-      <input type="text" id="rmAmenities" placeholder="Free WiFi • TV • Fridge • Parking">
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Max Guests</label>
-        <input type="number" id="rmOccupancy" value="4" min="1">
-      </div>
-      <div class="field">
-        <label>Total Units</label>
-        <input type="number" id="rmUnits" value="5" min="1">
-        <div class="field-hint">How many of this room type</div>
-      </div>
-    </div>
-    <div class="field">
-      <label>Photos</label>
-      <div class="image-grid" id="rmImages"></div>
-      <input type="file" id="rmFileInput" accept="image/*" multiple style="display:none" onchange="handleImageUpload(event)">
-    </div>
-    <div class="btn-row">
-      <button class="btn" onclick="closeRoomModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveRoom()">Save Room</button>
-    </div>
+    <button class="btn btn-back" onclick="goToStep(3)" style="margin-top:12px;">← Back</button>
   </div>
 </div>
 
@@ -310,12 +201,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-const TOKEN = window.location.pathname.split('/setup/')[1] || '';
+const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
 const API = '';
 let hotelData = {};
 let rooms = [];
-let editingRoomId = null;
-let pendingImages = []; // files to upload after room save
+let pendingFile = null;
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -323,10 +213,7 @@ function showToast(msg, isError) {
   t.className = 'toast show' + (isError ? ' error' : '');
   setTimeout(() => t.className = 'toast', 3000);
 }
-
-function showLoading(show) {
-  document.getElementById('loadingOverlay').className = 'loading-overlay' + (show ? ' show' : '');
-}
+function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
 
 function goToStep(n) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -334,257 +221,150 @@ function goToStep(n) {
   document.querySelectorAll('.progress-step').forEach((s, i) => {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
-  if (n === 4) updateLiveUrls();
+  if (n === 4) loadPreview();
   window.scrollTo(0, 0);
 }
 
-function updateLiveUrls() {
-  // Load the real frontend in the iframe
+function loadPreview() {
   const frontendBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5173'
     : 'https://suitestay.clickinns.com';
-  const previewUrl = frontendBase + '?hotelId=' + (hotelData.id || 'demo-test-hotel');
-  document.getElementById('previewFrame').src = previewUrl;
+  document.getElementById('previewFrame').src = frontendBase + '?hotelId=' + (hotelData.id || '');
 }
 
-// Load existing setup state
+// Load existing data
 async function loadSetup() {
-  if (!TOKEN) { showToast('Invalid setup link', true); return; }
+  if (!TOKEN) return;
   try {
     const res = await fetch(API + '/api/setup/' + TOKEN);
-    if (!res.ok) { showToast('Setup link expired or invalid', true); return; }
+    if (!res.ok) return;
     const data = await res.json();
     hotelData = data.hotel || {};
     rooms = data.rooms || [];
-
-    // Populate fields
     if (hotelData.name) document.getElementById('hotelName').value = hotelData.name;
-    if (hotelData.address) document.getElementById('hotelAddress').value = hotelData.address;
     if (hotelData.phone) document.getElementById('hotelPhone').value = hotelData.phone;
-    if (hotelData.subtitle) document.getElementById('hotelSubtitle').value = hotelData.subtitle;
-    if (hotelData.checkInTime) document.getElementById('hotelCheckIn').value = hotelData.checkInTime;
-    if (hotelData.checkOutTime) document.getElementById('hotelCheckOut').value = hotelData.checkOutTime;
-    if (data.rates) {
-      document.getElementById('rateNightly').value = data.rates.nightly || 69;
-      document.getElementById('rateWeekly').value = data.rates.weekly || 299;
-      document.getElementById('rateMonthly').value = data.rates.monthly || 999;
-      document.getElementById('rateTax').value = (data.rates.taxRate || 0.10) * 100;
-    }
+    if (hotelData.address) document.getElementById('hotelAddress').value = hotelData.address;
+    if (data.rates) document.getElementById('rateNightly').value = data.rates.nightly || 69;
     renderRooms();
-  } catch (e) {
-    showToast('Failed to load setup data', true);
-  }
+  } catch (e) {}
 }
 
 // Step 1: Save hotel info
-async function saveHotelInfo() {
+async function saveStep1() {
   const name = document.getElementById('hotelName').value.trim();
-  const address = document.getElementById('hotelAddress').value.trim();
   const phone = document.getElementById('hotelPhone').value.trim();
-  if (!name || !address || !phone) { showToast('Please fill in name, address, and phone', true); return; }
+  const address = document.getElementById('hotelAddress').value.trim();
+  if (!name) { showToast('Enter your hotel name', true); return; }
 
   showLoading(true);
   try {
-    const res = await fetch(API + '/api/setup/' + TOKEN + '/hotel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, address, phone,
-        subtitle: document.getElementById('hotelSubtitle').value.trim(),
-        checkInTime: document.getElementById('hotelCheckIn').value.trim(),
-        checkOutTime: document.getElementById('hotelCheckOut').value.trim(),
-      }),
+    await fetch(API + '/api/setup/' + TOKEN + '/hotel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, address }),
     });
-    if (!res.ok) throw new Error('Failed to save');
-    hotelData = { ...hotelData, name, address, phone };
+    hotelData = { ...hotelData, name, phone, address };
     goToStep(2);
-    showToast('Hotel info saved!');
-  } catch (e) {
-    showToast('Failed to save hotel info', true);
-  }
+  } catch (e) { showToast('Failed to save', true); }
   showLoading(false);
 }
 
-// Rooms
+// Step 2: Rooms
 function renderRooms() {
   const list = document.getElementById('roomList');
-  if (!rooms.length) {
-    list.innerHTML = '<p style="text-align:center; color:var(--muted); font-size:13px; padding:20px;">No rooms yet. Add your first room type.</p>';
-    return;
-  }
-  list.innerHTML = rooms.map(r => `
-    <div class="room-card">
-      <div class="room-card-header">
-        <span class="room-card-name">${r.name}</span>
-        <div class="room-card-actions">
-          <button class="room-card-btn" onclick="editRoom('${r.id}')">Edit</button>
-          <button class="room-card-btn delete" onclick="deleteRoom('${r.id}')">Delete</button>
-        </div>
-      </div>
-      <div class="room-card-meta">${r.totalUnits} units • Max ${r.maxOccupancy} guests • ${(r.images || []).length} photos</div>
-    </div>
-  `).join('');
+  const nextBtn = document.getElementById('roomNextBtn');
+  if (!rooms.length) { list.innerHTML = ''; nextBtn.style.display = 'none'; return; }
+  nextBtn.style.display = 'block';
+  list.innerHTML = rooms.map(r => {
+    const img = r.images?.length ? r.images[0].url : '';
+    return `<div class="room-item">
+      ${img ? `<img src="${img}" alt="">` : `<div class="room-item-placeholder">📷</div>`}
+      <div class="room-item-info"><div class="room-item-name">${r.name}</div></div>
+      <div class="room-item-actions"><button class="room-item-btn" onclick="deleteRoom('${r.id}')">✕</button></div>
+    </div>`;
+  }).join('');
 }
 
-function openRoomModal(room) {
-  editingRoomId = room ? room.id : null;
-  document.getElementById('roomModalTitle').textContent = room ? 'Edit Room' : 'Add Room Type';
-  document.getElementById('rmName').value = room ? room.name : '';
-  document.getElementById('rmDesc').value = room ? (room.description || '') : '';
-  document.getElementById('rmAmenities').value = room ? (room.amenities || '') : '';
-  document.getElementById('rmOccupancy').value = room ? room.maxOccupancy : 4;
-  document.getElementById('rmUnits').value = room ? room.totalUnits : 5;
-  pendingImages = [];
-  renderRoomImages(room ? (room.images || []) : []);
-  document.getElementById('roomModal').classList.add('open');
+function handlePhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  pendingFile = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('rmPreview').innerHTML = `<img src="${url}" alt="">`;
 }
 
-function closeRoomModal() {
-  document.getElementById('roomModal').classList.remove('open');
-  editingRoomId = null;
-  pendingImages = [];
-}
-
-function renderRoomImages(images) {
-  const grid = document.getElementById('rmImages');
-  let html = images.map(img => `
-    <img src="${img.url}" class="image-thumb" alt="">
-  `).join('');
-  html += `<div class="image-upload-btn" onclick="document.getElementById('rmFileInput').click()">+</div>`;
-  grid.innerHTML = html;
-}
-
-function handleImageUpload(event) {
-  const files = Array.from(event.target.files);
-  pendingImages.push(...files);
-  // Show previews
-  const grid = document.getElementById('rmImages');
-  const existing = grid.querySelectorAll('.image-thumb');
-  let html = Array.from(existing).map(img => img.outerHTML).join('');
-  files.forEach(f => {
-    const url = URL.createObjectURL(f);
-    html += `<img src="${url}" class="image-thumb" alt="">`;
-  });
-  html += `<div class="image-upload-btn" onclick="document.getElementById('rmFileInput').click()">+</div>`;
-  grid.innerHTML = html;
-  event.target.value = '';
-}
-
-async function saveRoom() {
+async function addRoom() {
   const name = document.getElementById('rmName').value.trim();
-  if (!name) { showToast('Room name is required', true); return; }
+  if (!name) { showToast('Enter a room name', true); return; }
 
   showLoading(true);
   try {
-    const body = {
-      name,
-      description: document.getElementById('rmDesc').value.trim(),
-      amenities: document.getElementById('rmAmenities').value.trim(),
-      maxOccupancy: parseInt(document.getElementById('rmOccupancy').value) || 4,
-      totalUnits: parseInt(document.getElementById('rmUnits').value) || 1,
-    };
-    if (editingRoomId) body.id = editingRoomId;
-
     const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, maxOccupancy: 4, totalUnits: 5 }),
     });
-    if (!res.ok) throw new Error('Failed to save room');
-    const result = await res.json();
-    const roomId = result.room?.id || editingRoomId;
+    const data = await res.json();
+    const roomId = data.room?.id;
 
-    // Upload images if any
-    if (pendingImages.length && roomId) {
-      for (const file of pendingImages) {
-        const formData = new FormData();
-        formData.append('image', file);
-        await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + roomId + '/images', {
-          method: 'POST',
-          body: formData,
-        });
-      }
+    // Upload photo if selected
+    if (pendingFile && roomId) {
+      const fd = new FormData();
+      fd.append('image', pendingFile);
+      await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + roomId + '/images', { method: 'POST', body: fd });
     }
 
-    // Reload rooms
+    // Reload
     const setupRes = await fetch(API + '/api/setup/' + TOKEN);
     const setupData = await setupRes.json();
     rooms = setupData.rooms || [];
     renderRooms();
-    closeRoomModal();
-    showToast('Room saved!');
-  } catch (e) {
-    showToast('Failed to save room', true);
-  }
+
+    // Reset fields
+    document.getElementById('rmName').value = '';
+    document.getElementById('rmPreview').innerHTML = '';
+    pendingFile = null;
+    showToast('Room added!');
+  } catch (e) { showToast('Failed to add room', true); }
   showLoading(false);
 }
 
-async function deleteRoom(roomId) {
-  if (!confirm('Delete this room type?')) return;
+async function deleteRoom(id) {
   showLoading(true);
   try {
-    await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + roomId, { method: 'DELETE' });
-    rooms = rooms.filter(r => r.id !== roomId);
+    await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + id, { method: 'DELETE' });
+    rooms = rooms.filter(r => r.id !== id);
     renderRooms();
-    showToast('Room deleted');
-  } catch (e) {
-    showToast('Failed to delete', true);
-  }
+  } catch (e) { showToast('Failed to delete', true); }
   showLoading(false);
 }
 
-function editRoom(roomId) {
-  const room = rooms.find(r => r.id === roomId);
-  if (room) openRoomModal(room);
-}
+// Step 3: Rate
+async function saveStep3() {
+  const nightly = parseFloat(document.getElementById('rateNightly').value) || 69;
+  const weekly = Math.round(nightly * 5);
+  const monthly = Math.round(nightly * 20);
 
-// Step 3: Save rates
-async function saveRates() {
   showLoading(true);
   try {
-    const res = await fetch(API + '/api/setup/' + TOKEN + '/rates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nightly: parseFloat(document.getElementById('rateNightly').value) || 69,
-        weekly: parseFloat(document.getElementById('rateWeekly').value) || 299,
-        monthly: parseFloat(document.getElementById('rateMonthly').value) || 999,
-        taxRate: (parseFloat(document.getElementById('rateTax').value) || 10) / 100,
-      }),
+    await fetch(API + '/api/setup/' + TOKEN + '/rates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nightly, weekly, monthly, taxRate: 0.10 }),
     });
-    if (!res.ok) throw new Error('Failed to save');
     goToStep(4);
-    showToast('Rates saved!');
-  } catch (e) {
-    showToast('Failed to save rates', true);
-  }
+  } catch (e) { showToast('Failed to save', true); }
   showLoading(false);
 }
 
-// Step 4: Pay & Go Live
+// Step 4: Pay
 async function payAndGoLive() {
-  // Redirect to Stripe checkout with the setup token in metadata
-  // After payment, Stripe webhook activates the hotel
-  const slug = (hotelData.name || 'my-hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  
   showLoading(true);
   try {
-    // Create a checkout session via our API
     const res = await fetch(API + '/api/setup/' + TOKEN + '/checkout', { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to create checkout');
     const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      throw new Error('No checkout URL returned');
-    }
-  } catch (e) {
-    showToast('Failed to start payment. Try again.', true);
-    showLoading(false);
-  }
+    if (data.url) { window.location.href = data.url; }
+    else { throw new Error(); }
+  } catch (e) { showToast('Failed to start payment', true); showLoading(false); }
 }
 
-// Init
 loadSetup();
 </script>
 </body>
