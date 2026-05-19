@@ -132,6 +132,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <section class="demo-section">
   <div class="demo-label">Hotels using this right now:</div>
+  <div style="text-align:center; margin-bottom:16px;">
+    <span style="font-size:28px; font-weight:800; color:#2E7D5B;">$5,800</span>
+    <span style="font-size:13px; color:#6b7280; display:block; margin-top:2px;">booked direct last month through Suite Stay's engine.</span>
+    <span style="font-size:13px; color:#dc2626; display:block; margin-top:4px; font-weight:600;">Without it, $1,160 of that would've gone to OTAs.</span>
+  </div>
   <div class="demo-tabs">
     <button class="demo-tab active" onclick="switchDemo('suite')">Suite Stay — AL</button>
     <button class="demo-tab" onclick="switchDemo('stcroix')">St Croix Falls — WI</button>
@@ -139,9 +144,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
   <div class="demo-frame-wrap" id="demoWrap" style="max-width:100%; margin:0 8px; position:relative;">
     <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:750px;"></iframe>
-  </div>
-  <div style="text-align:center; margin-top:12px;">
-    <a id="demoDirectLink" href="https://suitestay.clickinns.com" target="_blank" style="font-size:13px; color:var(--green); font-weight:600; text-decoration:none;">Open in new tab for full experience →</a>
   </div>
 </section>
 
@@ -166,19 +168,15 @@ function startFreeSetup() {
 
 function switchDemo(which) {
   const frame = document.getElementById('demoFrame');
-  const link = document.getElementById('demoDirectLink');
   document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
   if (which === 'suite') {
     frame.src = 'https://suitestay.clickinns.com';
-    link.href = 'https://suitestay.clickinns.com';
     document.querySelectorAll('.demo-tab')[0].classList.add('active');
   } else if (which === 'stcroix') {
     frame.src = 'https://stcroix.clickinns.com';
-    link.href = 'https://stcroix.clickinns.com';
     document.querySelectorAll('.demo-tab')[1].classList.add('active');
   } else {
     frame.src = 'https://hp.clickinns.com';
-    link.href = 'https://hp.clickinns.com';
     document.querySelectorAll('.demo-tab')[2].classList.add('active');
   }
 }

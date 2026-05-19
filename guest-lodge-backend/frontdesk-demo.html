@@ -36,6 +36,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tour-next:hover { background: #245f46; }
 .tour-step { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
 
+/* Tabs - pill style like simple-crm */
+.tabs {
+  display: flex; gap: 0; margin: 12px 16px 0; padding: 4px;
+  background: var(--bg); border: 2px solid var(--border); border-radius: 14px;
+}
+.tab {
+  flex: 1; padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--text-muted);
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  border-radius: 10px; transition: all 0.2s; text-align: center;
+}
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--white); color: var(--green); box-shadow: 0 2px 8px rgba(46,125,91,0.1); }
+
 /* Booking cards */
 .booking-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow); }
 .card-accent { height: 4px; background: var(--green); }
