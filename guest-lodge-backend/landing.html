@@ -3,609 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marketel — Stop Paying OTAs 15-20% Per Booking</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Marketel — Stop Paying OTAs for Guests Who Already Found You</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #fafaf9;
-  --white: #ffffff;
-  --text: #1a1a2e;
-  --muted: #6b7280;
-  --green: #2E7D5B;
-  --green-dark: #1a5c3f;
-  --green-lt: #e8f5ee;
-  --green-bright: #22c76e;
-  --border: #e5e7eb;
-  --red: #dc2626;
-  --red-lt: #fef2f2;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
-  --r: 16px;
+  --bg: #fafaf9; --white: #ffffff; --text: #1a1a2e; --muted: #6b7280;
+  --green: #2E7D5B; --green-dark: #1a5c3f; --green-lt: #e8f5ee;
+  --border: #e5e7eb; --red: #dc2626;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06); --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
 }
 html { scroll-behavior: smooth; }
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-a { color: inherit; text-decoration: none; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); }
 
 /* NAV */
 .nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
   background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-  padding: 14px 32px;
+  border-bottom: 1px solid var(--border); padding: 14px 24px;
   display: flex; align-items: center; justify-content: space-between;
 }
-.nav-logo { height: 32px; width: auto; }
-.nav-cta {
-  background: var(--green); color: white; padding: 10px 22px;
-  border-radius: 10px; font-weight: 600; font-size: 14px;
-  transition: all 0.15s; border: none; cursor: pointer;
-}
-.nav-cta:hover { background: var(--green-dark); transform: translateY(-1px); }
+.nav-logo { height: 30px; }
 
 /* HERO */
 .hero {
-  padding: 140px 32px 80px; text-align: center;
-  max-width: 900px; margin: 0 auto;
-}
-.hero-badge {
-  display: inline-block; background: var(--green-lt); color: var(--green);
-  font-size: 13px; font-weight: 600; padding: 6px 16px;
-  border-radius: 20px; margin-bottom: 24px;
+  padding: 120px 24px 60px; text-align: center; max-width: 680px; margin: 0 auto;
 }
 .hero h1 {
-  font-size: clamp(34px, 5.5vw, 56px); font-weight: 800;
-  line-height: 1.1; margin-bottom: 20px; letter-spacing: -1px;
+  font-size: clamp(28px, 5vw, 44px); font-weight: 800; line-height: 1.15;
+  margin-bottom: 16px; letter-spacing: -0.5px;
 }
-.hero h1 span { color: var(--green); }
 .hero h1 .red { color: var(--red); }
+.hero h1 .green { color: var(--green); }
 .hero p {
-  font-size: 18px; color: var(--muted); max-width: 620px;
-  margin: 0 auto 32px; line-height: 1.7;
-}
-.hero-cta {
-  display: inline-flex; align-items: center; gap: 10px;
-  background: var(--green); color: white; padding: 16px 36px;
-  border-radius: 12px; font-size: 17px; font-weight: 700;
-  transition: all 0.2s; box-shadow: 0 4px 16px rgba(46,125,91,0.3);
-}
-.hero-cta:hover { background: var(--green-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(46,125,91,0.35); }
-.hero-sub { margin-top: 14px; font-size: 13px; color: var(--muted); }
-
-/* CALCULATOR */
-.calc-section {
-  padding: 80px 32px; max-width: 700px; margin: 0 auto;
-}
-.calc-section h2 {
-  text-align: center; font-size: 30px; font-weight: 700; margin-bottom: 8px;
-}
-.calc-section .subtitle {
-  text-align: center; font-size: 15px; color: var(--muted); margin-bottom: 40px;
-}
-.calc-card {
-  background: var(--white); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 32px; box-shadow: var(--shadow-md);
-}
-.calc-field { margin-bottom: 24px; }
-.calc-field label {
-  display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;
-}
-.calc-field input[type="range"] {
-  width: 100%; height: 6px; border-radius: 3px;
-  -webkit-appearance: none; appearance: none;
-  background: var(--border); outline: none;
-}
-.calc-field input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 22px; height: 22px;
-  border-radius: 50%; background: var(--green); cursor: pointer;
-  box-shadow: 0 2px 6px rgba(46,125,91,0.3);
-}
-.calc-value {
-  display: inline-block; background: var(--green-lt); color: var(--green);
-  font-weight: 700; font-size: 15px; padding: 4px 12px;
-  border-radius: 8px; margin-left: 8px;
-}
-.calc-result {
-  background: var(--red-lt); border: 1px solid #fecaca;
-  border-radius: 12px; padding: 20px; text-align: center; margin-top: 8px;
-}
-.calc-result .lost-label {
-  font-size: 13px; color: var(--red); font-weight: 500; margin-bottom: 4px;
-}
-.calc-result .lost-amount {
-  font-size: 36px; font-weight: 800; color: var(--red); line-height: 1.2;
-}
-.calc-result .lost-sub {
-  font-size: 13px; color: var(--muted); margin-top: 6px;
-}
-.calc-savings {
-  background: var(--green-lt); border: 1px solid #a7f3d0;
-  border-radius: 12px; padding: 20px; text-align: center; margin-top: 16px;
-}
-.calc-savings .save-label {
-  font-size: 13px; color: var(--green-dark); font-weight: 500; margin-bottom: 4px;
-}
-.calc-savings .save-amount {
-  font-size: 28px; font-weight: 800; color: var(--green); line-height: 1.2;
-}
-.calc-savings .save-sub {
-  font-size: 13px; color: var(--green-dark); margin-top: 6px;
+  font-size: 16px; color: var(--muted); max-width: 520px;
+  margin: 0 auto 28px; line-height: 1.6;
 }
 
-/* HOW IT WORKS */
-.how-section {
-  padding: 80px 32px; background: var(--white); border-top: 1px solid var(--border);
+/* CTA FORM */
+.cta-box {
+  max-width: 400px; margin: 0 auto;
 }
-.how-section h2 {
-  text-align: center; font-size: 30px; font-weight: 700; margin-bottom: 48px;
+.cta-box input {
+  width: 100%; padding: 14px 16px; border: 1.5px solid var(--border);
+  border-radius: 10px; font-family: inherit; font-size: 15px;
+  margin-bottom: 10px; outline: none; transition: border-color 0.15s;
 }
-.how-steps {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 24px; max-width: 900px; margin: 0 auto;
+.cta-box input:focus { border-color: var(--green); }
+.cta-btn {
+  width: 100%; padding: 15px; background: var(--green); color: white;
+  border: none; border-radius: 10px; font-family: inherit; font-size: 16px;
+  font-weight: 700; cursor: pointer; transition: all 0.15s;
+  box-shadow: 0 4px 12px rgba(46,125,91,0.25);
 }
-.how-step {
-  text-align: center; padding: 24px;
+.cta-btn:hover { background: var(--green-dark); transform: translateY(-1px); }
+.cta-sub {
+  margin-top: 10px; font-size: 12px; color: var(--muted); text-align: center;
 }
-.how-step-num {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--green); color: white; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 14px; font-size: 16px;
-}
-.how-step h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-.how-step p { font-size: 13px; color: var(--muted); line-height: 1.6; }
 
-/* DEMO SECTION */
+/* DEMO */
 .demo-section {
-  padding: 80px 32px; max-width: 1000px; margin: 0 auto;
+  padding: 60px 24px 80px; max-width: 900px; margin: 0 auto;
 }
-.demo-section h2 {
-  text-align: center; font-size: 30px; font-weight: 700; margin-bottom: 12px;
+.demo-label {
+  text-align: center; font-size: 14px; font-weight: 600; color: var(--muted);
+  margin-bottom: 16px;
 }
-.demo-section .subtitle {
-  text-align: center; font-size: 15px; color: var(--muted); margin-bottom: 40px;
+.demo-tabs {
+  display: flex; gap: 8px; justify-content: center; margin-bottom: 16px;
 }
-.demo-video-placeholder {
-  color: #666; font-size: 16px; text-align: center; padding: 40px;
-  display: none;
+.demo-tab {
+  padding: 8px 16px; border-radius: 8px; border: 1.5px solid var(--border);
+  background: var(--white); color: var(--text); font-family: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
 }
-
-/* FEATURES */
-.features-section {
-  padding: 80px 32px; border-top: 1px solid var(--border);
+.demo-tab.active { background: var(--green); color: white; border-color: var(--green); }
+.demo-view-tabs {
+  display: flex; gap: 6px; justify-content: center; margin-bottom: 12px;
 }
-.features-section h2 {
-  text-align: center; font-size: 30px; font-weight: 700; margin-bottom: 48px;
+.demo-view-tab {
+  padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--white); color: var(--muted); font-family: inherit;
+  font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;
 }
-.features-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px; max-width: 1000px; margin: 0 auto;
+.demo-view-tab.active { background: var(--green); color: white; border-color: var(--green); }
+.demo-frame-wrap {
+  max-width: 375px; margin: 0 auto; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1); border: 1px solid var(--border);
+  transition: max-width 0.3s ease;
 }
-.feature-card {
-  padding: 24px; border-radius: var(--r);
-  border: 1px solid var(--border); background: var(--white);
-}
-.feature-icon { font-size: 24px; margin-bottom: 10px; }
-.feature-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-.feature-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
-
-/* PRICING */
-.pricing-section {
-  padding: 80px 32px; background: var(--white);
-  border-top: 1px solid var(--border); text-align: center;
-}
-.pricing-section h2 { font-size: 30px; font-weight: 700; margin-bottom: 8px; }
-.pricing-section .subtitle { font-size: 15px; color: var(--muted); margin-bottom: 40px; }
-.pricing-card {
-  max-width: 440px; margin: 0 auto; background: var(--bg);
-  border: 2px solid var(--green); border-radius: 20px;
-  padding: 40px 32px; box-shadow: 0 8px 32px rgba(46,125,91,0.12);
-}
-.pricing-price {
-  font-size: 56px; font-weight: 800; color: var(--text); line-height: 1; margin-bottom: 4px;
-}
-.pricing-price span { font-size: 20px; font-weight: 500; color: var(--muted); }
-.pricing-desc { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
-.pricing-features { text-align: left; margin-bottom: 28px; }
-.pricing-features li {
-  list-style: none; padding: 7px 0; font-size: 14px;
-  display: flex; align-items: center; gap: 10px;
-}
-.pricing-features li::before { content: '✓'; color: var(--green); font-weight: 700; font-size: 16px; }
-.pricing-btn {
-  display: block; width: 100%; padding: 16px;
-  background: var(--green); color: white; border: none;
-  border-radius: 12px; font-family: inherit; font-size: 17px;
-  font-weight: 700; cursor: pointer; transition: all 0.2s;
-  box-shadow: 0 4px 16px rgba(46,125,91,0.3);
-}
-.pricing-btn:hover { background: var(--green-dark); transform: translateY(-2px); }
-.pricing-guarantee { margin-top: 16px; font-size: 13px; color: var(--muted); }
-
-/* FAQ */
-.faq-section { padding: 80px 32px; max-width: 700px; margin: 0 auto; }
-.faq-section h2 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 40px; }
-.faq-item { border-bottom: 1px solid var(--border); padding: 20px 0; }
-.faq-q {
-  font-size: 15px; font-weight: 600; cursor: pointer;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.faq-q::after { content: '+'; font-size: 20px; color: var(--muted); }
-.faq-item.open .faq-q::after { content: '−'; }
-.faq-a {
-  font-size: 14px; color: var(--muted); line-height: 1.7;
-  max-height: 0; overflow: hidden; transition: max-height 0.3s, padding 0.3s; padding-top: 0;
-}
-.faq-item.open .faq-a { max-height: 300px; padding-top: 12px; }
-
-/* FINAL CTA */
-.final-cta {
-  padding: 80px 32px; text-align: center;
-  background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%); color: white;
-}
-.final-cta h2 { font-size: 30px; font-weight: 700; margin-bottom: 12px; }
-.final-cta p { font-size: 16px; opacity: 0.85; margin-bottom: 28px; }
-.final-cta-btn {
-  display: inline-flex; align-items: center; gap: 10px;
-  background: white; color: var(--green-dark); padding: 16px 36px;
-  border-radius: 12px; font-size: 17px; font-weight: 700;
-  transition: all 0.2s; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-}
-.final-cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-
-.footer {
-  padding: 32px; text-align: center; font-size: 13px;
-  color: var(--muted); border-top: 1px solid var(--border);
+.demo-frame-wrap iframe {
+  width: calc(100% + 17px); height: 650px; border: none; display: block;
 }
 
-@media (max-width: 768px) {
-  .nav { padding: 12px 16px; }
-  .hero { padding: 120px 20px 60px; }
-  .calc-card { padding: 24px; }
-  .pricing-card { padding: 32px 24px; }
-  .pricing-price { font-size: 44px; }
-  .how-steps { grid-template-columns: 1fr; }
+/* BULLETS */
+.bullets {
+  max-width: 500px; margin: 0 auto; padding: 0 24px 60px;
+}
+.bullet {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 0;
+}
+.bullet-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.bullet-text { font-size: 14px; color: var(--text); line-height: 1.5; }
+.bullet-text strong { font-weight: 700; }
+
+@media (max-width: 600px) {
+  .hero { padding: 100px 16px 40px; }
+  .hero h1 { font-size: 26px; }
+  .demo-section { padding: 40px 16px 60px; }
 }
 </style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav class="nav">
   <img src="/marketellogo.svg" alt="Marketel" class="nav-logo">
-  <a href="#pricing" class="nav-cta">Build My Free Preview</a>
 </nav>
 
-<!-- HERO -->
 <section class="hero">
-  <div class="hero-badge">For independent hotels losing revenue to OTAs</div>
-  <h1>Stop paying Booking.com for guests who <span class="red">already found</span> your hotel.</h1>
-  <p>When someone searches your hotel on Google and books through an OTA, you just paid 15–25% commission on demand you already earned. We install a direct booking engine on your domain so those guests book direct. Live in 48 hours.</p>
-  <a href="#pricing" class="hero-cta">Build My Free Preview →</a>
-  <div class="hero-sub">No credit card. See your hotel's booking page before paying.</div>
-</section>
-
-<!-- CALCULATOR -->
-<section class="calc-section" id="calculator">
-  <h2>OTA Leakage Calculator</h2>
-  <p class="subtitle">See how much revenue is walking out the door to Booking.com and Expedia every month.</p>
-
-  <div class="calc-card">
-    <div class="calc-field">
-      <label>OTA bookings per month <span class="calc-value" id="bookingsVal">15</span></label>
-      <input type="range" min="1" max="100" value="15" id="bookingsSlider" oninput="updateCalc()">
-    </div>
-    <div class="calc-field">
-      <label>Average booking value <span class="calc-value" id="avgVal">$250</span></label>
-      <input type="range" min="50" max="1000" step="10" value="250" id="avgSlider" oninput="updateCalc()">
-    </div>
-    <div class="calc-field">
-      <label>OTA commission rate <span class="calc-value" id="commVal">18%</span></label>
-      <input type="range" min="10" max="25" value="18" id="commSlider" oninput="updateCalc()">
-    </div>
-
-    <div class="calc-result">
-      <div class="lost-label">You're leaking to OTAs</div>
-      <div class="lost-amount" id="lostAmount">$675/mo</div>
-      <div class="lost-sub">That's <strong id="lostYear">$8,100</strong> per year in revenue you already earned — going to Booking.com.</div>
-    </div>
-
-    <div class="calc-savings">
-      <div class="save-label">With a direct booking engine, you keep that revenue. Pays for itself in</div>
-      <div class="save-amount" id="paybackTime">Less than 2 months</div>
-      <div class="save-sub">One payment of $997. Then $0 commission on every direct booking.</div>
-    </div>
+  <h1>Stop paying <span class="red">15–25%</span> to OTAs on guests who <span class="green">already found you</span>.</h1>
+  <p>Build your hotel's direct booking page in 10 minutes.</p>
+  <div class="cta-box">
+    <input type="email" id="setupEmail" placeholder="Your email">
+    <button class="cta-btn" onclick="startFreeSetup()">Build My Free Preview →</button>
+    <div class="cta-sub">No credit card. Takes 10 minutes. Completely free.</div>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
-<section class="how-section">
-  <h2>How it works</h2>
-  <div class="how-steps">
-    <div class="how-step">
-      <div class="how-step-num">1</div>
-      <h3>Enter your hotel details</h3>
-      <p>Hotel name, rooms, photos, rates. Takes 5 minutes. Free to set up — no payment yet.</p>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">2</div>
-      <h3>Preview your booking site</h3>
-      <p>See your hotel on a live booking page with your photos and rates. Click around, make sure it looks right.</p>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">3</div>
-      <h3>Pay & go live instantly</h3>
-      <p>One payment of $997. Your booking site activates immediately on your own domain.</p>
-    </div>
-    <div class="how-step">
-      <div class="how-step-num">4</div>
-      <h3>Bookings come in, $0 commission</h3>
-      <p>Your front desk gets instant notifications. Guests pay at check-in. You keep 100% of the revenue.</p>
-    </div>
+<section class="demo-section">
+  <div class="demo-label">Hotels using this right now:</div>
+  <div class="demo-tabs">
+    <button class="demo-tab active" onclick="switchDemo('suite')">Suite Stay — AL</button>
+    <button class="demo-tab" onclick="switchDemo('stcroix')">St Croix Falls — WI</button>
+  </div>
+  <div class="demo-frame-wrap" id="demoWrap" style="max-width:100%; margin:0 16px;">
+    <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:650px;"></iframe>
   </div>
 </section>
-
-<!-- LIVE CLIENTS -->
-<section class="demo-section" id="demo">
-  <h2>Live client sites — try them yourself</h2>
-  <p class="subtitle">These are real hotels using Marketel right now. Click around, pick dates, select a room — it all works.</p>
-  
-  <div style="display:flex; gap:12px; justify-content:center; margin-bottom:24px; flex-wrap:wrap;">
-    <button onclick="switchDemo('suite')" id="demoTab1" style="padding:10px 20px; border-radius:10px; border:1.5px solid var(--green); background:var(--green); color:white; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">Suite Stay — Alabama</button>
-    <button onclick="switchDemo('stcroix')" id="demoTab2" style="padding:10px 20px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">St Croix Falls — Wisconsin</button>
-  </div>
-
-  <div style="display:flex; gap:8px; justify-content:center; margin-bottom:16px;">
-    <button onclick="switchView('mobile')" id="viewMobile" style="padding:6px 14px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">📱 Mobile</button>
-    <button onclick="switchView('desktop')" id="viewDesktop" style="padding:6px 14px; border-radius:8px; border:1.5px solid var(--green); background:var(--green); color:white; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">🖥 Desktop</button>
-  </div>
-
-  <div id="demoContainer" style="max-width:100%; margin:0 auto; border-radius:20px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); transition: max-width 0.3s ease;">
-    <div style="overflow:hidden; border-radius:20px;">
-      <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:700px; border:none; display:block;"></iframe>
-    </div>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section class="features-section">
-  <h2>Everything included</h2>
-  <div class="features-grid">
-    <div class="feature-card">
-      <div class="feature-icon">📱</div>
-      <h3>Mobile-First Checkout</h3>
-      <p>Works perfectly in Facebook, Instagram, and Google in-app browsers where most traffic comes from.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🔔</div>
-      <h3>Instant Notifications</h3>
-      <p>Push notification to your phone the second a booking comes in. Name, room, dates, total — all there.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">💳</div>
-      <h3>$0 Upfront for Guests</h3>
-      <p>Guests reserve free, pay at check-in. $1 card verification prevents fakes. 3x higher conversion than charging upfront.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📋</div>
-      <h3>Front Desk App</h3>
-      <p>Simple board on any phone — all bookings, guest info, notes, call tracking. No software to install.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🌐</div>
-      <h3>Your Domain</h3>
-      <p>Runs on book.yourhotel.com. Your brand, your guests, your data. No "powered by" anywhere.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📞</div>
-      <h3>Declined Card Recovery</h3>
-      <p>Card fails? Guest sees "we'll call you." Your desk gets their info. Close it over the phone.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🍎</div>
-      <h3>Apple Pay & Google Pay</h3>
-      <p>One-tap booking with phone wallet. No typing card numbers. Fastest checkout in hospitality.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📊</div>
-      <h3>Live Analytics</h3>
-      <p>See who's searching, who's booking, where they drop off. Real-time dashboard, no login needed.</p>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">⚡</div>
-      <h3>Live in 48 Hours</h3>
-      <p>Not 2 weeks. Not 2 months. Send your info, we build it, you're taking bookings in 2 days.</p>
-    </div>
-  </div>
-</section>
-
-<!-- PRICING -->
-<section class="pricing-section" id="pricing">
-  <h2>Build your direct booking page in 10 minutes</h2>
-  <p class="subtitle">Enter your hotel details, upload photos, and preview your booking site — completely free. No credit card.</p>
-
-  <div class="pricing-card">
-    <ul class="pricing-features">
-      <li>Direct booking engine on your domain</li>
-      <li>Mobile-optimized for Google, social, and direct traffic</li>
-      <li>Front desk app with instant push notifications</li>
-      <li>Apple Pay & Google Pay checkout</li>
-      <li>Declined card recovery system</li>
-      <li>Room availability management</li>
-      <li>Real-time booking analytics</li>
-      <li>Live within minutes of going live</li>
-      <li>12 months hosting included</li>
-    </ul>
-
-    <div id="startSetupForm">
-      <input type="email" id="setupEmail" placeholder="Enter your email to start" style="width:100%; padding:14px 16px; border:1.5px solid var(--border); border-radius:10px; font-family:inherit; font-size:15px; margin-bottom:12px; outline:none;">
-      <button class="pricing-btn" onclick="startFreeSetup()">
-        Build My Free Preview →
-      </button>
-    </div>
-    <div class="pricing-guarantee">
-      <strong>Preview Before You Pay</strong> — See your booking page first. If you don't like it, don't launch. No payment, no obligation.
-    </div>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="faq-section">
-  <h2>Questions</h2>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do I need to be technical?</div>
-    <div class="faq-a">No. You send us room photos, rates, and your hotel name. We build everything. Your front desk app is just a webpage on their phone — no app store, no downloads.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How do guests find my booking site?</div>
-    <div class="faq-a">We add your direct booking link to your Google Business Profile. When someone finds you on Google Maps or Search, they click "Book" and go to your site instead of Booking.com. Same traffic you're already getting — just routed to you directly.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Will this mess up my current operations?</div>
-    <div class="faq-a">No. A booking comes in, your front desk gets a notification with the guest's name, phone, room, and dates. They handle it the same way they handle a phone reservation. Nothing changes about your check-in process.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Should I remove my OTA listings?</div>
-    <div class="faq-a">No — keep them. This gives you a direct channel alongside your OTAs. Over time, more guests book direct (0% commission) instead of through Booking.com (15-20%). You gradually shift revenue without losing any bookings.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do guests really pay $0 at booking?</div>
-    <div class="faq-a">Yes. We place a $1 card verification (released instantly) to prevent fake bookings. The guest pays the full amount at your front desk when they check in. This increases conversion dramatically — people are 3x more likely to book when there's no upfront charge.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What happens after 12 months?</div>
-    <div class="faq-a">Hosting continues at $97/month. Or you can self-host — we hand over everything. No lock-in ever.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What's the money-back guarantee?</div>
-    <div class="faq-a">If you're not live and happy within 7 days, full refund. No questions.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I run Facebook ads to my booking site?</div>
-    <div class="faq-a">Absolutely — it's built for that. The checkout is optimized for cold traffic from social media ads. Handles in-app browsers, slow connections, and impatient scrollers. Refined over months of real ad spend.</div>
-  </div>
-</section>
-
-<!-- FINAL CTA -->
-<section class="final-cta">
-  <h2>Every OTA booking costs you 15–25% on guests who already found you.</h2>
-  <p>See your hotel's direct booking page before paying. Live in 48 hours.</p>
-  <a href="#pricing" class="final-cta-btn">Build My Free Preview →</a>
-</section>
-
-<footer class="footer">
-  <p>© 2026 Marketel. Built for independent hotels.</p>
-</footer>
 
 <script>
-function updateCalc() {
-  const bookings = document.getElementById('bookingsSlider').value;
-  const avg = document.getElementById('avgSlider').value;
-  const comm = document.getElementById('commSlider').value;
-
-  document.getElementById('bookingsVal').textContent = bookings;
-  document.getElementById('avgVal').textContent = '$' + avg;
-  document.getElementById('commVal').textContent = comm + '%';
-
-  const monthlyLoss = Math.round(bookings * avg * (comm / 100));
-  const yearlyLoss = monthlyLoss * 12;
-  const payback = monthlyLoss > 0 ? Math.ceil(997 / monthlyLoss) : 99;
-
-  document.getElementById('lostAmount').textContent = '$' + monthlyLoss.toLocaleString() + '/mo';
-  document.getElementById('lostYear').textContent = '$' + yearlyLoss.toLocaleString();
-
-  let paybackText = '';
-  if (payback <= 1) paybackText = 'Less than 1 month';
-  else if (payback <= 2) paybackText = 'Less than 2 months';
-  else if (payback <= 3) paybackText = 'About ' + payback + ' months';
-  else paybackText = payback + ' months';
-
-  document.getElementById('paybackTime').textContent = paybackText;
+function startFreeSetup() {
+  const email = document.getElementById('setupEmail').value.trim();
+  if (!email || !email.includes('@')) { alert('Enter a valid email.'); return; }
+  const btn = document.querySelector('.cta-btn');
+  btn.textContent = 'Setting up...'; btn.disabled = true;
+  const API = '';
+  fetch(API + '/api/setup/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }).then(r => r.json()).then(data => {
+    if (data.setupUrl) { window.location.href = API + data.setupUrl; }
+    else { throw new Error(); }
+  }).catch(() => {
+    alert('Something went wrong. Try again.');
+    btn.textContent = 'Build My Free Preview →'; btn.disabled = false;
+  });
 }
-
-// Init
-updateCalc();
 
 function switchDemo(which) {
   const frame = document.getElementById('demoFrame');
-  const tab1 = document.getElementById('demoTab1');
-  const tab2 = document.getElementById('demoTab2');
-  
+  document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
   if (which === 'suite') {
     frame.src = 'https://suitestay.clickinns.com';
-    tab1.style.background = 'var(--green)'; tab1.style.color = 'white'; tab1.style.borderColor = 'var(--green)';
-    tab2.style.background = 'var(--card)'; tab2.style.color = 'var(--text)'; tab2.style.borderColor = 'var(--border)';
+    document.querySelectorAll('.demo-tab')[0].classList.add('active');
   } else {
     frame.src = 'https://stcroix.clickinns.com';
-    tab2.style.background = 'var(--green)'; tab2.style.color = 'white'; tab2.style.borderColor = 'var(--green)';
-    tab1.style.background = 'var(--card)'; tab1.style.color = 'var(--text)'; tab1.style.borderColor = 'var(--border)';
+    document.querySelectorAll('.demo-tab')[1].classList.add('active');
   }
 }
 
-function switchView(view) {
-  const container = document.getElementById('demoContainer');
-  const frame = document.getElementById('demoFrame');
-  const btnMobile = document.getElementById('viewMobile');
-  const btnDesktop = document.getElementById('viewDesktop');
-  
-  if (view === 'desktop') {
-    container.style.maxWidth = '100%';
-    frame.style.width = '100%';
-    frame.style.height = '700px';
-    btnDesktop.style.background = 'var(--green)'; btnDesktop.style.color = 'white'; btnDesktop.style.borderColor = 'var(--green)';
-    btnMobile.style.background = 'var(--card)'; btnMobile.style.color = 'var(--text)'; btnMobile.style.borderColor = 'var(--border)';
-  } else {
-    container.style.maxWidth = '375px';
-    frame.style.width = 'calc(100% + 17px)';
-    frame.style.height = '680px';
-    btnMobile.style.background = 'var(--green)'; btnMobile.style.color = 'white'; btnMobile.style.borderColor = 'var(--green)';
-    btnDesktop.style.background = 'var(--card)'; btnDesktop.style.color = 'var(--text)'; btnDesktop.style.borderColor = 'var(--border)';
-  }
-}
-
-async function startFreeSetup() {
-  const email = document.getElementById('setupEmail').value.trim();
-  if (!email || !email.includes('@')) {
-    alert('Please enter a valid email address.');
-    return;
-  }
-  const btn = document.querySelector('.pricing-btn');
-  btn.textContent = 'Setting up...';
-  btn.disabled = true;
-  try {
-    const API = ''; // same origin
-    const res = await fetch(API + '/api/setup/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (data.setupUrl) {
-      window.location.href = API + data.setupUrl;
-    } else {
-      throw new Error(data.error || 'Failed');
-    }
-  } catch (e) {
-    alert('Something went wrong. Please try again.');
-    btn.textContent = 'Start Free Setup →';
-    btn.disabled = false;
-  }
-}
+function switchDemoView() {}
 </script>
 </body>
 </html>
