@@ -3618,6 +3618,11 @@ app.get('/frontdesk', (req, res) => {
     res.sendFile(path.join(__dirname, 'simple-crm.html'));
 });
 
+// Serve front desk demo (for setup wizard preview)
+app.get('/frontdesk-demo', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontdesk-demo.html'));
+});
+
 // Legacy route redirect
 app.get('/simple-crm', (req, res) => {
     res.redirect(301, '/frontdesk');
@@ -4297,10 +4302,13 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
 
 // Create Stripe Checkout session for $997 (pay to go live)
 // Uses separate Marketel Stripe account (not the hotel booking account)
-const marketelStripe = require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY);
+const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
+    ? require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY)
+    : null;
 
 app.post('/api/setup/:token/checkout', async (req, res) => {
     try {
+        if (!marketelStripe) return res.status(503).json({ error: 'Payment not configured' });
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
 

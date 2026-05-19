@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rooms</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f2ee;
+    --card: #ffffff;
+    --ink: #1a1814;
+    --muted: #8a857d;
+    --green: #2d6a4f;
+    --green-light: #d8f3dc;
+    --amber: #e76f00;
+    --amber-light: #fff3e0;
+    --red: #c0392b;
+    --red-light: #fdecea;
+    --border: #e8e4de;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 32px 20px;
+  }
+
+  h1 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  /* ── Room type pills ── */
+  .room-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+    align-items: center;
+  }
+
+  .room-pill {
+    padding: 8px 18px;
+    border-radius: 99px;
+    border: 1.5px solid var(--border);
+    background: var(--card);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .room-pill:hover { border-color: var(--green); color: var(--green); }
+  .room-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
+
+  .add-room-btn {
+    padding: 8px 14px;
+    border-radius: 99px;
+    border: 1.5px dashed var(--border);
+    background: transparent;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+  }
+  .add-room-btn:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── Add room modal ── */
+  .modal-bg {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 28px;
+    width: 320px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .modal input {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 10px;
+    transition: border-color .15s;
+  }
+  .modal input:focus { border-color: var(--green); }
+  .modal-row { display: flex; gap: 8px; margin-top: 4px; }
+  .btn { padding: 10px 20px; border-radius: 10px; border: none; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s; }
+  .btn-primary { background: var(--green); color: #fff; flex: 1; }
+  .btn-primary:hover { background: #235c41; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
+
+  /* ── Calendar grid ── */
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .cal-header span {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .cal-nav {
+    display: flex;
+    gap: 4px;
+  }
+  .cal-nav button {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--card);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cal-nav button:hover { border-color: var(--green); color: var(--green); }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-dow {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 0 8px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 1.5px solid transparent;
+    background: var(--card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all .12s;
+    position: relative;
+    min-height: 52px;
+  }
+  .cal-day:hover { border-color: var(--green); }
+  .cal-day.empty { background: transparent; cursor: default; border-color: transparent !important; }
+  .cal-day.past { opacity: 0.4; cursor: default; }
+  .cal-day.past:hover { border-color: transparent; }
+  .cal-day.today { border-color: var(--green) !important; }
+  .cal-day .day-num {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+  .cal-day .day-avail {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+  }
+  .cal-day.full { background: var(--red-light); }
+  .cal-day.full .day-avail { color: var(--red); }
+  .cal-day.partial { background: var(--amber-light); }
+  .cal-day.partial .day-avail { color: var(--amber); }
+  .cal-day.open { background: var(--green-light); }
+  .cal-day.open .day-avail { color: var(--green); }
+  .cal-day.closed { background: #f0f0f0; }
+  .cal-day.closed .day-avail { color: var(--muted); }
+
+  /* ── Edit popover ── */
+  .popover {
+    display: none;
+    position: fixed;
+    z-index: 200;
+    background: var(--card);
+    border-radius: 14px;
+    padding: 18px 20px;
+    width: 220px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+    border: 1.5px solid var(--border);
+  }
+  .popover.open { display: block; }
+  .popover h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .stepper button {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .12s;
+    font-family: inherit;
+    line-height: 1;
+  }
+  .stepper button:hover { border-color: var(--green); color: var(--green); }
+  .stepper .count {
+    font-size: 22px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    flex: 1;
+    text-align: center;
+  }
+
+  .close-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 12px;
+  }
+  .close-toggle input { accent-color: var(--red); }
+
+  .popover-save {
+    width: 100%;
+    padding: 9px;
+    border-radius: 9px;
+    border: none;
+    background: var(--green);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .popover-save:hover { background: #235c41; }
+
+  .popover-close {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: none; border: none;
+    font-size: 16px; color: var(--muted);
+    cursor: pointer;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 580px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .no-room {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .no-room span { font-size: 32px; display: block; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Room Availability</h1>
+
+  <!-- Room type bar -->
+  <div class="room-bar" id="roomBar">
+    <button class="add-room-btn" onclick="openAddModal()">+ Add room type</button>
+  </div>
+
+  <!-- Calendar card -->
+  <div class="card" id="calCard">
+    <div id="noRoom" class="no-room">
+      <span>🛏️</span>Add a room type to get started
+    </div>
+    <div id="calContent" style="display:none">
+      <div class="cal-header">
+        <span id="calMonthLabel"></span>
+        <div class="cal-nav">
+          <button onclick="changeMonth(-1)">‹</button>
+          <button onclick="changeMonth(1)">›</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green-light);border:1px solid var(--green)"></div> Open</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--amber-light);border:1px solid var(--amber)"></div> Partial</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--red-light);border:1px solid var(--red)"></div> Full</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f0f0f0;border:1px solid #ccc"></div> Closed</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add room modal -->
+<div class="modal-bg" id="addModal" onclick="e => e.target===this && closeAddModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>New room type</h2>
+    <input type="text" id="newRoomName" placeholder="e.g. Queen Room, Cabin, Suite" />
+    <input type="number" id="newRoomTotal" placeholder="Total units (e.g. 5)" min="1" max="99" />
+    <div class="modal-row">
+      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRoom()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit day popover -->
+<div class="popover" id="dayPopover">
+  <button class="popover-close" onclick="closePopover()">×</button>
+  <h3 id="popDate"></h3>
+  <div class="stepper">
+    <button onclick="stepAvail(-1)">−</button>
+    <div class="count" id="popCount">5</div>
+    <button onclick="stepAvail(1)">+</button>
+  </div>
+  <label class="close-toggle">
+    <input type="checkbox" id="popClosed" onchange="toggleClosed()"> Mark as closed
+  </label>
+  <button class="popover-save" onclick="saveDay()">Done</button>
+</div>
+
+<script>
+  // ── State ──
+  let rooms = []; // { name, total, overrides: { 'YYYY-MM-DD': { avail, closed } } }
+  let activeRoom = null;
+  let viewYear = new Date().getFullYear();
+  let viewMonth = new Date().getMonth();
+  let editingDate = null;
+
+  const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function dateKey(y, m, d) {
+    return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  function getRoomData(room, y, m, d) {
+    const key = dateKey(y, m, d);
+    const ov = room.overrides[key];
+    if (ov) return ov;
+    return { avail: room.total, closed: false };
+  }
+
+  // ── Room management ──
+  function openAddModal() {
+    document.getElementById('addModal').classList.add('open');
+    document.getElementById('newRoomName').focus();
+  }
+  function closeAddModal() {
+    document.getElementById('addModal').classList.remove('open');
+    document.getElementById('newRoomName').value = '';
+    document.getElementById('newRoomTotal').value = '';
+  }
+  function saveRoom() {
+    const name = document.getElementById('newRoomName').value.trim();
+    const total = parseInt(document.getElementById('newRoomTotal').value) || 1;
+    if (!name) return;
+    const room = { name, total, overrides: {} };
+    rooms.push(room);
+    closeAddModal();
+    renderRoomBar();
+    setActiveRoom(rooms.length - 1);
+  }
+
+  function renderRoomBar() {
+    const bar = document.getElementById('roomBar');
+    bar.innerHTML = '';
+    rooms.forEach((r, i) => {
+      const pill = document.createElement('button');
+      pill.className = 'room-pill' + (activeRoom === i ? ' active' : '');
+      pill.textContent = r.name;
+      pill.onclick = () => setActiveRoom(i);
+      bar.appendChild(pill);
+    });
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-room-btn';
+    addBtn.textContent = '+ Add room type';
+    addBtn.onclick = openAddModal;
+    bar.appendChild(addBtn);
+  }
+
+  function setActiveRoom(i) {
+    activeRoom = i;
+    renderRoomBar();
+    if (rooms.length > 0) {
+      document.getElementById('noRoom').style.display = 'none';
+      document.getElementById('calContent').style.display = 'block';
+      renderCalendar();
+    }
+  }
+
+  // ── Calendar ──
+  function changeMonth(delta) {
+    viewMonth += delta;
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const room = rooms[activeRoom];
+    document.getElementById('calMonthLabel').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    // Day of week headers
+    DOW.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const today = new Date();
+
+    // Empty cells
+    for (let i = 0; i < firstDay; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day empty';
+      grid.appendChild(el);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(viewYear, viewMonth, d);
+      const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const isToday = date.toDateString() === today.toDateString();
+      const data = getRoomData(room, viewYear, viewMonth, d);
+
+      let status = 'open';
+      if (data.closed) status = 'closed';
+      else if (data.avail === 0) status = 'full';
+      else if (data.avail < room.total) status = 'partial';
+
+      const el = document.createElement('div');
+      el.className = `cal-day ${status}${isPast ? ' past' : ''}${isToday ? ' today' : ''}`;
+
+      const num = document.createElement('div');
+      num.className = 'day-num';
+      num.textContent = d;
+
+      const avail = document.createElement('div');
+      avail.className = 'day-avail';
+      avail.textContent = data.closed ? '—' : `${data.avail}`;
+
+      el.appendChild(num);
+      el.appendChild(avail);
+
+      if (!isPast) {
+        el.onclick = (e) => openPopover(e, d);
+      }
+
+      grid.appendChild(el);
+    }
+  }
+
+  // ── Day popover ──
+  function openPopover(e, day) {
+    editingDate = { y: viewYear, m: viewMonth, d: day };
+    const room = rooms[activeRoom];
+    const data = getRoomData(room, viewYear, viewMonth, day);
+
+    const key = dateKey(viewYear, viewMonth, day);
+    const label = new Date(viewYear, viewMonth, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    document.getElementById('popDate').textContent = label;
+    document.getElementById('popCount').textContent = data.closed ? '—' : data.avail;
+    document.getElementById('popClosed').checked = data.closed;
+    toggleClosed();
+
+    const pop = document.getElementById('dayPopover');
+    pop.classList.add('open');
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    let top = rect.bottom + 8;
+    let left = rect.left;
+    if (left + 220 > window.innerWidth) left = window.innerWidth - 230;
+    if (top + 160 > window.innerHeight) top = rect.top - 168;
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+
+    e.stopPropagation();
+  }
+
+  function closePopover() {
+    document.getElementById('dayPopover').classList.remove('open');
+    editingDate = null;
+  }
+
+  document.addEventListener('click', (e) => {
+    const pop = document.getElementById('dayPopover');
+    if (pop.classList.contains('open') && !pop.contains(e.target)) closePopover();
+  });
+
+  function stepAvail(delta) {
+    if (document.getElementById('popClosed').checked) return;
+    const room = rooms[activeRoom];
+    const cur = parseInt(document.getElementById('popCount').textContent) || 0;
+    const next = Math.max(0, Math.min(room.total, cur + delta));
+    document.getElementById('popCount').textContent = next;
+  }
+
+  function toggleClosed() {
+    const closed = document.getElementById('popClosed').checked;
+    document.getElementById('popCount').style.opacity = closed ? '0.3' : '1';
+    document.querySelectorAll('.stepper button').forEach(b => b.style.opacity = closed ? '0.3' : '1');
+  }
+
+  function saveDay() {
+    if (!editingDate) return;
+    const { y, m, d } = editingDate;
+    const key = dateKey(y, m, d);
+    const room = rooms[activeRoom];
+    const closed = document.getElementById('popClosed').checked;
+    const avail = closed ? 0 : parseInt(document.getElementById('popCount').textContent) || 0;
+    room.overrides[key] = { avail, closed };
+    closePopover();
+    renderCalendar();
+  }
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closePopover();
+    if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('open')) saveRoom();
+  });
+</script>
+</body>
+</html>

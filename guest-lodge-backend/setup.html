@@ -114,6 +114,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-2"></div>
     <div class="progress-step" id="prog-3"></div>
     <div class="progress-step" id="prog-4"></div>
+    <div class="progress-step" id="prog-5"></div>
   </div>
 
   <!-- STEP 1: Hotel Info (3 fields) -->
@@ -173,7 +174,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 4: Preview & Pay -->
+  <!-- STEP 4: Preview booking site -->
   <div class="step" id="step-4">
     <div class="form-card" style="padding:16px;">
       <h2 style="margin-bottom:4px;">This is your booking site</h2>
@@ -182,6 +183,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
     <div id="previewContainer" style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border);">
       <iframe id="previewFrame" style="width:100%; height:750px; border:none; display:block;" src="about:blank"></iframe>
+    </div>
+
+    <button class="btn btn-primary" onclick="goToStep(5)">Next — See Your Front Desk →</button>
+    <button class="btn btn-back" onclick="goToStep(3)">← Back</button>
+  </div>
+
+  <!-- STEP 5: Front desk demo + pay -->
+  <div class="step" id="step-5">
+    <div class="form-card" style="padding:16px;">
+      <h2 style="margin-bottom:4px;">Your front desk</h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">When guests book, everything lands here. Tap around.</p>
+    </div>
+
+    <div style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border);">
+      <iframe id="frontdeskDemoFrame" style="width:100%; height:700px; border:none; display:block;" src="about:blank"></iframe>
     </div>
 
     <div class="live-card" style="margin-top:16px;">
@@ -193,7 +209,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       </button>
       <p style="opacity:0.5; font-size:11px; margin-top:10px;">🔒 Stripe. 7-day money-back guarantee.</p>
     </div>
-    <button class="btn btn-back" onclick="goToStep(3)" style="margin-top:12px;">← Back</button>
+    <button class="btn btn-back" onclick="goToStep(4)" style="margin-top:12px;">← Back</button>
   </div>
 </div>
 
@@ -222,6 +238,7 @@ function goToStep(n) {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
   if (n === 4) loadPreview();
+  if (n === 5) loadFrontdeskDemo();
   window.scrollTo(0, 0);
 }
 
@@ -230,6 +247,12 @@ function loadPreview() {
     ? 'http://localhost:5173'
     : 'https://suitestay.clickinns.com';
   document.getElementById('previewFrame').src = frontendBase + '?hotelId=' + (hotelData.id || '');
+}
+
+function loadFrontdeskDemo() {
+  const base = window.location.origin;
+  const name = encodeURIComponent(hotelData.name || 'Your Hotel');
+  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name;
 }
 
 // Load existing data

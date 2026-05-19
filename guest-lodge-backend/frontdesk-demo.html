@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Front Desk Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #2E7D5B; --green-pale: #E8F5EE;
+  --bg: #EEF2EF; --white: #FFFFFF; --text: #1A2B22; --text-muted: #6B7D72;
+  --border: #D8E4DC; --red: #E05252; --amber: #F59E0B;
+  --shadow: 0 2px 12px rgba(46,125,91,0.10);
+}
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0; overflow-x: hidden; }
+
+.header { background: var(--white); border-bottom: 1.5px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.header-left { display: flex; align-items: center; gap: 8px; }
+.header-logo { height: 26px; }
+.header-name { font-size: 14px; font-weight: 700; }
+
+.container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+/* Tour overlay */
+.tour-bar {
+  background: var(--text); color: white; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  position: sticky; top: 48px; z-index: 90;
+}
+.tour-text { font-size: 13px; font-weight: 500; line-height: 1.4; }
+.tour-next {
+  background: var(--green); color: white; border: none; padding: 8px 16px; border-radius: 8px;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: all 0.15s;
+}
+.tour-next:hover { background: #245f46; }
+.tour-step { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+/* Booking cards */
+.booking-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow); }
+.card-accent { height: 4px; background: var(--green); }
+.card-inner { padding: 14px; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.guest-name { font-size: 16px; font-weight: 700; }
+.guest-time { font-size: 11px; color: var(--text-muted); }
+.card-amount { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 700; color: var(--green); }
+.card-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.meta-chip { background: var(--bg); border-radius: 6px; padding: 2px 7px; font-size: 11px; color: var(--text-muted); }
+.card-dates { display: flex; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 8px; }
+.date-block { flex: 1; padding: 6px 10px; }
+.date-block + .date-block { border-left: 1px solid var(--border); }
+.date-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+.date-value { font-size: 13px; font-weight: 600; }
+.contact-phone { font-size: 14px; font-weight: 700; color: var(--green); font-family: 'DM Mono', monospace; }
+.contact-email { font-size: 11px; color: var(--text-muted); }
+
+/* Availability */
+.room-pills { display: flex; gap: 6px; margin-bottom: 10px; }
+.room-pill { padding: 6px 12px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--white); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.room-pill.active { background: var(--green); border-color: var(--green); color: white; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-dow { text-align: center; font-size: 9px; font-weight: 700; color: var(--text-muted); padding: 3px 0; }
+.cal-day { aspect-ratio: 1; border-radius: 8px; background: var(--white); border: 1.5px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.12s; }
+.cal-day:hover { border-color: var(--green); }
+.cal-day.open { background: var(--green-pale); }
+.cal-day.partial { background: #FEF3C7; }
+.cal-day.full { background: #FEE2E2; }
+.cal-day .day-num { font-weight: 600; font-size: 11px; }
+.cal-day .day-avail { font-size: 9px; font-family: 'DM Mono', monospace; }
+.cal-day.open .day-avail { color: var(--green); }
+.cal-day.partial .day-avail { color: var(--amber); }
+.cal-day.full .day-avail { color: var(--red); }
+
+/* Popover */
+.popover { display: none; position: fixed; z-index: 200; background: var(--white); border-radius: 12px; padding: 14px; width: 190px; box-shadow: 0 8px 32px rgba(0,0,0,0.14); border: 1.5px solid var(--border); }
+.popover.open { display: block; }
+.popover h3 { font-size: 11px; font-weight: 600; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; }
+.stepper { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.stepper button { width: 28px; height: 28px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--bg); font-size: 15px; cursor: pointer; font-family: inherit; }
+.stepper button:hover { border-color: var(--green); color: var(--green); }
+.stepper .count { font-size: 18px; font-family: 'DM Mono', monospace; flex: 1; text-align: center; }
+.popover-done { width: 100%; padding: 7px; border-radius: 7px; border: none; background: var(--green); color: white; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* Tour pointer */
+.tour-pointer { position: fixed; z-index: 300; pointer-events: none; animation: bounce 1s ease-in-out infinite; }
+.tour-pointer::after { content: '👆'; font-size: 26px; display: block; }
+@keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* Revenue / Calculator */
+.calc-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.calc-card label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
+.calc-card input[type="range"] { width: 100%; height: 5px; border-radius: 3px; -webkit-appearance: none; appearance: none; background: var(--border); outline: none; margin-bottom: 14px; }
+.calc-card input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--green); cursor: pointer; }
+.calc-val { display: inline-block; background: var(--green-pale); color: var(--green); padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-left: 6px; }
+.result-card { background: var(--green-pale); border: 1.5px solid var(--green); border-radius: 14px; padding: 18px; text-align: center; }
+.result-big { font-size: 28px; font-weight: 800; color: var(--green); }
+.result-sub { font-size: 12px; color: var(--green); margin-top: 4px; }
+.result-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; border-bottom: 1px solid rgba(46,125,91,0.15); }
+.result-row:last-child { border-bottom: none; }
+.result-row .v { font-weight: 700; color: var(--green); }
+
+.view { display: none; }
+.view.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <img src="/marketellogo.svg" alt="" class="header-logo">
+    <span class="header-name" id="demoHotelName">Your Hotel</span>
+  </div>
+</div>
+
+<!-- Tour bar -->
+<div class="tour-bar" id="tourBar">
+  <div>
+    <div class="tour-text" id="tourText">These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.</div>
+    <div class="tour-step" id="tourStepLabel">Step 1 of 3</div>
+  </div>
+  <button class="tour-next" id="tourNextBtn" onclick="nextTourStep()">Next →</button>
+</div>
+
+<div class="tabs" id="tabBar">
+  <button class="tab active" onclick="switchTab('bookings')">Bookings</button>
+  <button class="tab" onclick="switchTab('availability')">Availability</button>
+  <button class="tab" onclick="switchTab('revenue')">Revenue</button>
+</div>
+
+<div class="container">
+  <!-- BOOKINGS -->
+  <div class="view active" id="view-bookings">
+    <div class="booking-card"><div class="card-accent"></div><div class="card-inner">
+      <div class="card-top"><div><div class="guest-name">Sarah Johnson</div><div class="guest-time">2 hours ago</div></div><div class="card-amount">$483</div></div>
+      <div class="card-meta"><span class="meta-chip">King Suite</span><span class="meta-chip">7 nights</span></div>
+      <div class="card-dates"><div class="date-block"><div class="date-label">Check-in</div><div class="date-value">May 22</div></div><div class="date-block"><div class="date-label">Check-out</div><div class="date-value">May 29</div></div></div>
+      <div class="contact-phone">(555) 234-5678</div><div class="contact-email">sarah.j@gmail.com</div>
+    </div></div>
+    <div class="booking-card"><div class="card-accent"></div><div class="card-inner">
+      <div class="card-top"><div><div class="guest-name">Mike Torres</div><div class="guest-time">5 hours ago</div></div><div class="card-amount">$345</div></div>
+      <div class="card-meta"><span class="meta-chip">Queen Room</span><span class="meta-chip">5 nights</span></div>
+      <div class="card-dates"><div class="date-block"><div class="date-label">Check-in</div><div class="date-value">May 20</div></div><div class="date-block"><div class="date-label">Check-out</div><div class="date-value">May 25</div></div></div>
+      <div class="contact-phone">(555) 876-5432</div><div class="contact-email">miketorres@yahoo.com</div>
+    </div></div>
+    <div class="booking-card"><div class="card-accent"></div><div class="card-inner">
+      <div class="card-top"><div><div class="guest-name">Lisa Chen</div><div class="guest-time">Yesterday</div></div><div class="card-amount">$999</div></div>
+      <div class="card-meta"><span class="meta-chip">King Suite</span><span class="meta-chip">28 nights</span></div>
+      <div class="card-dates"><div class="date-block"><div class="date-label">Check-in</div><div class="date-value">Jun 1</div></div><div class="date-block"><div class="date-label">Check-out</div><div class="date-value">Jun 29</div></div></div>
+      <div class="contact-phone">(555) 111-9999</div><div class="contact-email">lisachen88@gmail.com</div>
+    </div></div>
+  </div>
+
+  <!-- AVAILABILITY -->
+  <div class="view" id="view-availability">
+    <div class="room-pills">
+      <button class="room-pill active" onclick="selectRoom(0)">King Suite</button>
+      <button class="room-pill" onclick="selectRoom(1)">Queen Room</button>
+    </div>
+    <div style="font-size:13px; font-weight:700; margin-bottom:6px;">May 2026</div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="pointerWrap"></div>
+  </div>
+
+  <!-- REVENUE -->
+  <div class="view" id="view-revenue">
+    <div class="calc-card">
+      <div style="font-size:28px; font-weight:800; color:var(--green); margin-bottom:4px;">$4,830</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Direct booking revenue this month</div>
+      <div class="result-row"><span>Total bookings</span><span class="v">12</span></div>
+      <div class="result-row"><span>Average booking value</span><span class="v">$402</span></div>
+      <div class="result-row"><span>Occupancy rate</span><span class="v">74%</span></div>
+    </div>
+    <div class="result-card">
+      <div class="result-big">$869/mo saved</div>
+      <div class="result-sub">vs. paying 18% to Booking.com on these same guests</div>
+      <div style="margin-top:14px; text-align:left;">
+        <div class="result-row"><span>Annual OTA savings</span><span class="v">$10,434</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Popover -->
+<div class="popover" id="dayPop">
+  <h3 id="popDate"></h3>
+  <div class="stepper">
+    <button onclick="stepCal(-1)">−</button>
+    <div class="count" id="popCount">5</div>
+    <button onclick="stepCal(1)">+</button>
+  </div>
+  <button class="popover-done" onclick="closePop()">Done</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const hotelName = params.get('name');
+if (hotelName) document.getElementById('demoHotelName').textContent = decodeURIComponent(hotelName);
+
+// Tour
+let tourStep = 0;
+const tourSteps = [
+  { view: 'bookings', text: 'These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.', label: 'Step 1 of 3' },
+  { view: 'availability', text: 'Control what\'s available on your booking engine. Tap any date to open or close rooms — your site updates instantly.', label: 'Step 2 of 3' },
+  { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\'re saving vs. OTA commissions. Adjust the sliders to match your hotel.', label: 'Step 3 of 3', btnText: 'Got it ✓' },
+];
+
+function showTourStep() {
+  const step = tourSteps[tourStep];
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + step.view).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[tourStep].classList.add('active');
+  document.getElementById('tourText').textContent = step.text;
+  document.getElementById('tourStepLabel').textContent = step.label;
+  document.getElementById('tourNextBtn').textContent = step.btnText || 'Next →';
+  if (step.view === 'availability') { renderCal(); setTimeout(showPointer, 500); }
+}
+
+function nextTourStep() {
+  tourStep++;
+  if (tourStep >= tourSteps.length) {
+    // Tour done — hide bar, let them explore freely
+    document.getElementById('tourBar').style.display = 'none';
+    return;
+  }
+  showTourStep();
+}
+showTourStep();
+
+function switchTab(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'availability') { renderCal(); setTimeout(showPointer, 500); }
+}
+
+// Availability
+const rooms = [{ name: 'King Suite', total: 8 }, { name: 'Queen Room', total: 6 }];
+let activeRoom = 0;
+let calData = {};
+
+function initCal() {
+  calData = {};
+  for (let d = 1; d <= 31; d++) {
+    const booked = Math.floor(Math.random() * 4);
+    calData[d] = Math.max(0, rooms[activeRoom].total - booked);
+  }
+}
+initCal();
+
+function selectRoom(i) {
+  activeRoom = i;
+  document.querySelectorAll('.room-pill').forEach((p, idx) => p.classList.toggle('active', idx === i));
+  initCal(); renderCal();
+}
+
+function renderCal() {
+  const grid = document.getElementById('calGrid');
+  const room = rooms[activeRoom];
+  grid.innerHTML = '';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => grid.innerHTML += `<div class="cal-dow">${d}</div>`);
+  for (let i = 0; i < 4; i++) grid.innerHTML += '<div></div>'; // May 2026 starts Thu
+  for (let d = 1; d <= 31; d++) {
+    const a = calData[d];
+    const s = a >= Math.ceil(room.total * 0.6) ? 'open' : a >= 1 ? 'partial' : 'full';
+    grid.innerHTML += `<div class="cal-day ${s}" onclick="openPop(event,${d})" id="d${d}"><div class="day-num">${d}</div><div class="day-avail">${a}</div></div>`;
+  }
+}
+
+function showPointer() {
+  const el = document.getElementById('d15');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  document.getElementById('pointerWrap').innerHTML = `<div class="tour-pointer" style="position:fixed;top:${r.top-38}px;left:${r.left+6}px;"></div>`;
+  setTimeout(() => document.getElementById('pointerWrap').innerHTML = '', 3500);
+}
+
+let editDay = 0;
+function openPop(e, d) {
+  editDay = d;
+  document.getElementById('pointerWrap').innerHTML = '';
+  const pop = document.getElementById('dayPop');
+  const date = new Date(2026, 4, d);
+  document.getElementById('popDate').textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  document.getElementById('popCount').textContent = calData[d];
+  const r = e.currentTarget.getBoundingClientRect();
+  let top = r.bottom + 6, left = r.left;
+  if (left + 190 > window.innerWidth) left = window.innerWidth - 200;
+  if (top + 110 > window.innerHeight) top = r.top - 120;
+  pop.style.top = top + 'px'; pop.style.left = left + 'px';
+  pop.classList.add('open');
+  e.stopPropagation();
+}
+function closePop() { document.getElementById('dayPop').classList.remove('open'); renderCal(); }
+function stepCal(delta) {
+  calData[editDay] = Math.max(0, Math.min(rooms[activeRoom].total, calData[editDay] + delta));
+  document.getElementById('popCount').textContent = calData[editDay];
+}
+document.addEventListener('click', e => { const p = document.getElementById('dayPop'); if (p.classList.contains('open') && !p.contains(e.target)) closePop(); });
+</script>
+</body>
+</html>

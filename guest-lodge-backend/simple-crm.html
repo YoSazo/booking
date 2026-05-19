@@ -848,30 +848,22 @@
         position: fixed;
         inset: 0;
         z-index: 259;
-        background: rgba(8, 15, 20, 0.28);
+        background: transparent;
       }
       .availability-sheet-backdrop.open {
         display: block;
       }
 
-      /* Desktop: day editor = regular centered modal */
+      /* Desktop: day editor = small popover near cell */
       #availabilityDayPopover.availability-edit-sheet {
         position: fixed;
-        left: 50%;
-        top: 56%;
-        right: auto;
-        bottom: auto;
         z-index: 262;
-        width: min(640px, calc(100vw - 28px));
-        max-width: 640px;
-        max-height: min(84vh, 760px);
-        margin: 0;
-        overflow-y: auto;
+        width: 220px;
+        max-width: 220px;
         background: var(--white);
         border: 1.5px solid var(--border);
-        border-radius: 16px;
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
-        transform: translate(-50%, -50%);
+        border-radius: 14px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
         transition: opacity 0.12s ease;
         padding: 0;
         visibility: hidden;
@@ -3137,22 +3129,35 @@ function openAvailabilityDayPopover(event, dayIso) {
   const bookedMap = bookingsByRoomDate();
   const result = availabilityForDay(room, dayIso, bookedMap);
   const date = new Date(`${dayIso}T00:00:00`);
-  const isMobileSheet = window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
-  title.textContent = date.toLocaleDateString('en-US', { weekday: 'long' });
-  dateTitle.textContent = isMobileSheet
-    ? date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-    : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  dateTitle.style.display = '';
+  title.textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  dateTitle.style.display = 'none';
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   closedInput.checked = result.status === 'closed';
-  if (activeLabel) activeLabel.textContent = `${room.name} rooms available tonight`;
+  if (activeLabel) activeLabel.textContent = `${room.name} available`;
   toggleAvailabilityDayClosed();
 
   if (backdrop) backdrop.classList.add('open');
 
-  pop.style.removeProperty('left');
-  pop.style.removeProperty('top');
-  pop.style.removeProperty('width');
+  // Position next to the clicked cell
+  const rect = event.currentTarget.getBoundingClientRect();
+  let top = rect.bottom + 8;
+  let left = rect.left;
+  if (left + 240 > window.innerWidth) left = window.innerWidth - 250;
+  if (top + 200 > window.innerHeight) top = rect.top - 210;
+  if (top < 10) top = 10;
+
+  pop.style.position = 'fixed';
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  pop.style.width = '220px';
+  pop.style.maxWidth = '220px';
+  pop.style.transform = 'none';
+  pop.style.borderRadius = '14px';
+  pop.style.padding = '0';
+  pop.style.maxHeight = 'none';
+  pop.style.visibility = 'visible';
+  pop.style.opacity = '1';
+  pop.style.pointerEvents = 'auto';
 
   pop.classList.add('open');
   pop.setAttribute('aria-hidden', 'false');
