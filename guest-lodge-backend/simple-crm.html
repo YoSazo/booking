@@ -3627,9 +3627,27 @@ async function deleteEditRoom(roomId) {
 }
 
 function openEditAddRoom() {
-  const name = prompt('Room type name:');
-  if (!name || !name.trim()) return;
-  api('POST', '/api/crm/rooms', { name: name.trim(), maxOccupancy: 4, totalUnits: 5 })
+  const list = document.getElementById('editRoomsList');
+  // Check if add form already exists
+  if (document.getElementById('editAddForm')) return;
+  list.insertAdjacentHTML('beforeend', `
+    <div id="editAddForm" class="booking-card" style="margin-bottom:12px; border-color:var(--green);">
+      <div style="padding:16px;">
+        <input type="text" id="editNewRoomName" placeholder="Room type name (e.g. King Suite)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:16px;outline:none;margin-bottom:10px;">
+        <div style="display:flex;gap:8px;">
+          <button onclick="confirmEditAddRoom()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Add</button>
+          <button onclick="document.getElementById('editAddForm').remove()" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--text-muted);">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `);
+  document.getElementById('editNewRoomName').focus();
+}
+
+function confirmEditAddRoom() {
+  const name = document.getElementById('editNewRoomName').value.trim();
+  if (!name) return;
+  api('POST', '/api/crm/rooms', { name, maxOccupancy: 4, totalUnits: 5 })
     .then(() => { toast('Room added', 'success'); loadEditRooms(); })
     .catch(() => toast('Failed to add', 'error'));
 }

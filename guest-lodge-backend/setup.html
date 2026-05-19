@@ -147,7 +147,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
       <button class="btn btn-primary" onclick="addRoom()">+ Add Room</button>
-      <button class="btn btn-back" onclick="goToStep(3)" id="roomNextBtn" style="display:none;">Next →</button>
+      <button class="btn btn-primary" onclick="goToStep(3)" id="roomNextBtn" style="margin-top:8px; opacity:0.4; pointer-events:none;">Next →</button>
       <button class="btn btn-back" onclick="goToStep(1)">← Back</button>
     </div>
   </div>
@@ -173,8 +173,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <p style="font-size:13px; color:var(--muted); margin-bottom:0;">This is what your guests see.</p>
     </div>
 
-    <div id="previewContainer" style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border);">
-      <iframe id="previewFrame" style="width:100%; height:750px; border:none; display:block;" src="about:blank"></iframe>
+    <div id="previewContainer" style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); position:relative;">
+      <div id="previewLoading" style="position:absolute;inset:0;background:var(--card);display:flex;align-items:center;justify-content:center;z-index:2;"><div class="spinner"></div></div>
+      <iframe id="previewFrame" style="width:100%; height:750px; border:none; display:block;" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
     </div>
 
     <button class="btn btn-primary" onclick="goToStep(5)">Next — See Your Front Desk →</button>
@@ -188,8 +189,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <p style="font-size:13px; color:var(--muted); margin-bottom:0;">When guests book, everything lands here. Tap around.</p>
     </div>
 
-    <div style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border);">
-      <iframe id="frontdeskDemoFrame" style="width:100%; height:700px; border:none; display:block;" src="about:blank"></iframe>
+    <div style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); position:relative;">
+      <div id="frontdeskLoading" style="position:absolute;inset:0;background:var(--card);display:flex;align-items:center;justify-content:center;z-index:2;"><div class="spinner"></div></div>
+      <iframe id="frontdeskDemoFrame" style="width:100%; height:700px; border:none; display:block;" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
     </div>
 
     <div class="live-card" style="margin-top:16px;">
@@ -214,8 +216,6 @@ const API = '';
 let hotelData = {};
 let rooms = [];
 let pendingFile = null;
-
-function handlePhoto() {}  // removed - photos added via front desk edit tab
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -289,22 +289,18 @@ async function saveStep1() {
 function renderRooms() {
   const list = document.getElementById('roomList');
   const nextBtn = document.getElementById('roomNextBtn');
-  if (!rooms.length) { list.innerHTML = ''; nextBtn.style.display = 'none'; return; }
-  nextBtn.style.display = 'block';
+  if (!rooms.length) {
+    list.innerHTML = '';
+    nextBtn.style.opacity = '0.4'; nextBtn.style.pointerEvents = 'none';
+    return;
+  }
+  nextBtn.style.opacity = '1'; nextBtn.style.pointerEvents = 'auto';
   list.innerHTML = rooms.map(r => {
     return `<div class="room-item">
       <div class="room-item-info"><div class="room-item-name">${r.name}</div></div>
       <div class="room-item-actions"><button class="room-item-btn" onclick="deleteRoom('${r.id}')">✕</button></div>
     </div>`;
   }).join('');
-}
-
-function handlePhoto(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  pendingFile = file;
-  const url = URL.createObjectURL(file);
-  document.getElementById('rmPreview').innerHTML = `<img src="${url}" alt="">`;
 }
 
 async function addRoom() {
