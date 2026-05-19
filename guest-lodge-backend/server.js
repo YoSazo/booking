@@ -4295,25 +4295,20 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
 });
 
 // Create Stripe Checkout session for $997 (pay to go live)
+// Uses separate Marketel Stripe account (not the hotel booking account)
+const marketelStripe = require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY);
+
 app.post('/api/setup/:token/checkout', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
 
-        const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
 
-        const session = await stripe.checkout.sessions.create({
+        const session = await marketelStripe.checkout.sessions.create({
             mode: 'payment',
             line_items: [{
-                price_data: {
-                    currency: 'usd',
-                    product_data: {
-                        name: `Marketel Booking Site — ${hotel.name || 'Hotel'}`,
-                        description: 'Direct booking website with front desk app. Live in minutes.',
-                    },
-                    unit_amount: 99700, // $997
-                },
+                price: 'price_1TYZN2BFnVCGiXwenvSOITs2',
                 quantity: 1,
             }],
             customer_email: hotel.ownerEmail || undefined,
