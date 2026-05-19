@@ -114,6 +114,10 @@ const corsOptions = {
 // Webhook needs raw body
 app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
+app.use('/uploads', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
