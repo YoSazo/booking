@@ -4343,15 +4343,6 @@ app.get('/setup/:token/success', async (req, res) => {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.redirect('/');
 
-        // Activate the hotel
-        const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const domain = slug + '.clickinns.com';
-
-        // Create domain record
-        try {
-            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
-        } catch (e) { /* domain might exist */ }
-
         // Mark complete and activate
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
@@ -4365,11 +4356,49 @@ app.get('/setup/:token/success', async (req, res) => {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore */ }
 
-        // Send a simple success page
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:40px;max-width:500px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:28px;margin-bottom:8px;color:#1a1a2e}p{color:#6b7280;font-size:15px;margin-bottom:20px;line-height:1.6}.url{background:#e8f5ee;border-radius:10px;padding:14px;font-family:monospace;font-size:14px;color:#2E7D5B;font-weight:600;margin-bottom:12px;word-break:break-all}.info{background:#f8f9fa;border-radius:10px;padding:14px;font-size:13px;color:#6b7280;text-align:left;line-height:1.8;margin-bottom:20px}.btn{display:inline-block;background:#2E7D5B;color:white;padding:14px 28px;border-radius:10px;font-size:15px;font-weight:700;text-decoration:none;transition:all 0.15s}.btn:hover{background:#1a5c3f;transform:translateY(-1px)}</style></head><body><div class="card"><h1>🎉 You're Live!</h1><p>Your direct booking site is now active.</p><div class="url">https://${domain}</div><div class="info"><strong>Front Desk App:</strong> https://${domain}/frontdesk<br><strong>Front Desk PIN:</strong> ${defaultPin}<br><strong>Funnel Dashboard:</strong> https://${domain}/funnel</div><a href="https://${domain}" target="_blank" class="btn">View Your Booking Site →</a></div></body></html>`);
+        const hotelName = hotel.name || 'Your Hotel';
+        const token = req.params.token;
+
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Payment Successful</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:24px;line-height:1.5}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input,.field select{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus,.field select:focus{border-color:#2E7D5B}.or{color:#6b7280;font-size:12px;margin:10px 0;font-weight:500}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px;transition:all 0.15s}.btn:hover{background:#1a5c3f}.note{margin-top:14px;font-size:12px;color:#6b7280;line-height:1.5}</style></head><body><div class="card"><h1>🎉 Payment successful!</h1><p class="subtitle">${hotelName} is ready to go live. One last step — how should guests find your booking site?</p><div class="field"><label>Your phone number</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="field"><label>Domain preference</label><select id="domainPref"><option value="subdomain">Free subdomain (e.g. ${(hotelName).toLowerCase().replace(/[^a-z0-9]+/g,'-')}.marketel.com)</option><option value="custom">I have my own domain (we'll help you connect it)</option></select></div><div id="customDomainField" style="display:none;" class="field"><label>Your domain</label><input type="text" id="customDomain" placeholder="e.g. book.myhotel.com"></div><button class="btn" onclick="submitFinal()">Finish Setup →</button><p class="note">We'll text you within the hour with your live link and front desk access.</p></div><script>document.getElementById('domainPref').addEventListener('change',function(){document.getElementById('customDomainField').style.display=this.value==='custom'?'block':'none';});function submitFinal(){var phone=document.getElementById('ownerPhone').value.trim();var pref=document.getElementById('domainPref').value;var custom=document.getElementById('customDomain').value.trim();if(!phone){alert('Please enter your phone number');return;}fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,domainPref:pref,customDomain:custom})}).then(function(r){return r.json()}).then(function(){document.querySelector('.card').innerHTML='<h1>✅ All done!</h1><p class=\"subtitle\">We\\'ll text you at '+phone+' within the hour with your live booking site link, front desk app access, and PIN.</p><p class=\"note\">Keep an eye on your phone. Talk soon!</p>';}).catch(function(){document.querySelector('.card').innerHTML='<h1>✅ All done!</h1><p class=\"subtitle\">We\\'ll be in touch shortly to get you live.</p>';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');
+    }
+});
+
+// Finalize — save phone and domain preference after payment
+app.post('/api/setup/:token/finalize', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        const { phone, domainPref, customDomain } = req.body;
+
+        await prisma.hotelConfig.update({
+            where: { id: hotel.id },
+            data: { ownerPhone: phone || hotel.ownerPhone },
+        });
+
+        // Log for you to action manually
+        console.log(`\n🔔 NEW CUSTOMER PAID — ACTION NEEDED`);
+        console.log(`   Hotel: ${hotel.name} (${hotel.id})`);
+        console.log(`   Email: ${hotel.ownerEmail}`);
+        console.log(`   Phone: ${phone}`);
+        console.log(`   Domain: ${domainPref === 'custom' ? customDomain : 'subdomain (auto)'}`);
+        console.log(`   Setup token: ${req.params.token}\n`);
+
+        // If subdomain, create the domain record
+        if (domainPref === 'subdomain') {
+            const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const domain = slug + '.marketel.com'; // Replace with your actual domain
+            try {
+                await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
+            } catch (e) { /* might exist */ }
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Finalize error:', e.message);
+        res.status(500).json({ error: 'Failed' });
     }
 });
 
