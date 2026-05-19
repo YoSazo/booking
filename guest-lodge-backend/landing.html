@@ -362,12 +362,14 @@ a { color: inherit; text-decoration: none; }
     <button onclick="switchDemo('stcroix')" id="demoTab2" style="padding:10px 20px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">St Croix Falls — Wisconsin</button>
   </div>
 
-  <div style="max-width:375px; margin:0 auto; border:8px solid #1a1a2e; border-radius:40px; overflow:hidden; background:#1a1a2e; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
-    <div style="background:#1a1a2e; padding:8px 0; text-align:center;">
-      <div id="demoUrlBar" style="display:inline-block; background:rgba(255,255,255,0.1); border-radius:12px; padding:4px 14px; font-size:11px; color:rgba(255,255,255,0.6); font-family:monospace;">suitestay.clickinns.com</div>
-    </div>
-    <div style="overflow:hidden; border-radius:0 0 32px 32px;">
-      <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:calc(100% + 17px); height:680px; border:none; display:block;" scrolling="yes"></iframe>
+  <div style="display:flex; gap:8px; justify-content:center; margin-bottom:16px;">
+    <button onclick="switchView('mobile')" id="viewMobile" style="padding:6px 14px; border-radius:8px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">📱 Mobile</button>
+    <button onclick="switchView('desktop')" id="viewDesktop" style="padding:6px 14px; border-radius:8px; border:1.5px solid var(--green); background:var(--green); color:white; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">🖥 Desktop</button>
+  </div>
+
+  <div id="demoContainer" style="max-width:100%; margin:0 auto; border-radius:20px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); transition: max-width 0.3s ease;">
+    <div style="overflow:hidden; border-radius:20px;">
+      <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:700px; border:none; display:block;"></iframe>
     </div>
   </div>
 </section>
@@ -544,20 +546,38 @@ updateCalc();
 
 function switchDemo(which) {
   const frame = document.getElementById('demoFrame');
-  const urlBar = document.getElementById('demoUrlBar');
   const tab1 = document.getElementById('demoTab1');
   const tab2 = document.getElementById('demoTab2');
   
   if (which === 'suite') {
     frame.src = 'https://suitestay.clickinns.com';
-    urlBar.textContent = 'suitestay.clickinns.com';
     tab1.style.background = 'var(--green)'; tab1.style.color = 'white'; tab1.style.borderColor = 'var(--green)';
     tab2.style.background = 'var(--card)'; tab2.style.color = 'var(--text)'; tab2.style.borderColor = 'var(--border)';
   } else {
     frame.src = 'https://stcroix.clickinns.com';
-    urlBar.textContent = 'stcroix.clickinns.com';
     tab2.style.background = 'var(--green)'; tab2.style.color = 'white'; tab2.style.borderColor = 'var(--green)';
     tab1.style.background = 'var(--card)'; tab1.style.color = 'var(--text)'; tab1.style.borderColor = 'var(--border)';
+  }
+}
+
+function switchView(view) {
+  const container = document.getElementById('demoContainer');
+  const frame = document.getElementById('demoFrame');
+  const btnMobile = document.getElementById('viewMobile');
+  const btnDesktop = document.getElementById('viewDesktop');
+  
+  if (view === 'desktop') {
+    container.style.maxWidth = '100%';
+    frame.style.width = '100%';
+    frame.style.height = '700px';
+    btnDesktop.style.background = 'var(--green)'; btnDesktop.style.color = 'white'; btnDesktop.style.borderColor = 'var(--green)';
+    btnMobile.style.background = 'var(--card)'; btnMobile.style.color = 'var(--text)'; btnMobile.style.borderColor = 'var(--border)';
+  } else {
+    container.style.maxWidth = '375px';
+    frame.style.width = 'calc(100% + 17px)';
+    frame.style.height = '680px';
+    btnMobile.style.background = 'var(--green)'; btnMobile.style.color = 'white'; btnMobile.style.borderColor = 'var(--green)';
+    btnDesktop.style.background = 'var(--card)'; btnDesktop.style.color = 'var(--text)'; btnDesktop.style.borderColor = 'var(--border)';
   }
 }
 
