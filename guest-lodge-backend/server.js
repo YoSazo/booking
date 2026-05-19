@@ -83,6 +83,7 @@ const allowedOrigins = [
     'https://www.suitestay.clickinns.com',
     'https://homeplacesuites.clickinns.com',
     'https://www.homeplacesuites.clickinns.com',
+    'https://hp.clickinns.com',
     'https://myhomeplacesuites.com',
     'https://www.myhomeplacesuites.com',
     'https://guestlodgeminot.clickinns.com',

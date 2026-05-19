@@ -135,6 +135,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="demo-tabs">
     <button class="demo-tab active" onclick="switchDemo('suite')">Suite Stay — AL</button>
     <button class="demo-tab" onclick="switchDemo('stcroix')">St Croix Falls — WI</button>
+    <button class="demo-tab" onclick="switchDemo('hp')">Home Place Suites — OK</button>
   </div>
   <div class="demo-frame-wrap" id="demoWrap" style="max-width:100%; margin:0 8px;">
     <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:750px;"></iframe>
@@ -166,9 +167,12 @@ function switchDemo(which) {
   if (which === 'suite') {
     frame.src = 'https://suitestay.clickinns.com';
     document.querySelectorAll('.demo-tab')[0].classList.add('active');
-  } else {
+  } else if (which === 'stcroix') {
     frame.src = 'https://stcroix.clickinns.com';
     document.querySelectorAll('.demo-tab')[1].classList.add('active');
+  } else {
+    frame.src = 'https://hp.clickinns.com';
+    document.querySelectorAll('.demo-tab')[2].classList.add('active');
   }
 }
 

@@ -15,6 +15,7 @@ const domainMap = {
   
   // Home Place Suites
   'homeplacesuites.clickinns.com': 'home-place-suites',
+  'hp.clickinns.com': 'home-place-suites',
   'myhomeplacesuites.com': 'home-place-suites',
   'www.myhomeplacesuites.com': 'home-place-suites',
   
