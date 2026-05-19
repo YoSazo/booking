@@ -50,6 +50,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   margin-bottom: 10px; outline: none; transition: border-color 0.15s;
 }
 .cta-box input:focus { border-color: var(--green); }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+.shake { animation: shake 0.4s ease; }
 .cta-btn {
   width: 100%; padding: 15px; background: var(--green); color: white;
   border: none; border-radius: 10px; font-family: inherit; font-size: 16px;
@@ -150,7 +152,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 function startFreeSetup() {
   const email = document.getElementById('setupEmail').value.trim();
-  if (!email || !email.includes('@')) { alert('Enter a valid email.'); return; }
+  if (!email || !email.includes('@')) {
+    const input = document.getElementById('setupEmail');
+    input.style.borderColor = '#dc2626';
+    input.placeholder = 'Please enter your email';
+    input.classList.add('shake');
+    setTimeout(() => { input.classList.remove('shake'); input.style.borderColor = ''; }, 600);
+    return;
+  }
   const btn = document.querySelector('.cta-btn');
   btn.textContent = 'Setting up...'; btn.disabled = true;
   const API = '';

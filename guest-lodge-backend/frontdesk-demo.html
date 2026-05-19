@@ -136,6 +136,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <div class="tabs" id="tabBar">
   <button class="tab active" onclick="switchTab('bookings')">Bookings</button>
+  <button class="tab" onclick="switchTab('edit')">Edit</button>
   <button class="tab" onclick="switchTab('availability')">Availability</button>
   <button class="tab" onclick="switchTab('revenue')">Revenue</button>
 </div>
@@ -172,6 +173,43 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div style="font-size:13px; font-weight:700; margin-bottom:6px;">May 2026</div>
     <div class="cal-grid" id="calGrid"></div>
     <div id="pointerWrap"></div>
+  </div>
+
+  <!-- EDIT VIEW -->
+  <div class="view" id="view-edit">
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Tap any field to edit. Changes update your booking site instantly.</div>
+    
+    <div class="booking-card" style="cursor:pointer;">
+      <div style="position:relative;">
+        <img src="https://suitestay.clickinns.com/kingbedsuitestay.webp" style="width:100%; height:140px; object-fit:cover; display:block;">
+        <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;">📷 Replace photo</div>
+      </div>
+      <div class="card-inner" style="padding:14px;">
+        <div style="font-size:16px; font-weight:700; margin-bottom:4px; padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border);">King Suite</div>
+        <div style="font-size:12px; color:var(--text-muted); padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-top:6px;">Free WiFi • TV • Fridge • Parking • Housekeeping</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+          <span style="font-size:12px; color:var(--text-muted);">Max 4 guests • 8 units</span>
+          <span style="font-size:16px; font-weight:700; color:var(--green);">$69/night</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="booking-card" style="cursor:pointer;">
+      <div style="position:relative;">
+        <img src="https://suitestay.clickinns.com/doublesuitestay.webp" style="width:100%; height:140px; object-fit:cover; display:block;">
+        <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;">📷 Replace photo</div>
+      </div>
+      <div class="card-inner" style="padding:14px;">
+        <div style="font-size:16px; font-weight:700; margin-bottom:4px; padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border);">Queen Room</div>
+        <div style="font-size:12px; color:var(--text-muted); padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-top:6px;">Free WiFi • TV • Fridge • Parking • Housekeeping</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+          <span style="font-size:12px; color:var(--text-muted);">Max 4 guests • 6 units</span>
+          <span style="font-size:16px; font-weight:700; color:var(--green);">$69/night</span>
+        </div>
+      </div>
+    </div>
+
+    <button style="width:100%; padding:12px; border-radius:10px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px;">+ Add another room type</button>
   </div>
 
   <!-- REVENUE -->
@@ -212,9 +250,10 @@ if (hotelName) document.getElementById('demoHotelName').textContent = decodeURIC
 // Tour
 let tourStep = 0;
 const tourSteps = [
-  { view: 'bookings', text: 'These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.', label: 'Step 1 of 3' },
-  { view: 'availability', text: 'Control what\'s available on your booking engine. Tap any date to open or close rooms — your site updates instantly.', label: 'Step 2 of 3' },
-  { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\'re saving vs. OTA commissions. Adjust the sliders to match your hotel.', label: 'Step 3 of 3', btnText: 'Got it ✓' },
+  { view: 'bookings', text: 'These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.', label: 'Step 1 of 4' },
+  { view: 'edit', text: 'Edit your rooms, photos, rates, and amenities. Tap any field to change it — updates your booking site instantly.', label: 'Step 2 of 4' },
+  { view: 'availability', text: 'Control what\'s available on your booking engine. Tap any date to open or close rooms — your site updates instantly.', label: 'Step 3 of 4' },
+  { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\'re saving vs. OTA commissions.', label: 'Step 4 of 4', btnText: 'Got it ✓' },
 ];
 
 function showTourStep() {

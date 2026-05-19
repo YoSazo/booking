@@ -4485,8 +4485,8 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
                 description: r.description,
                 amenities: r.amenities,
                 maxOccupancy: r.maxOccupancy,
-                imageUrl: r.images[0]?.url ? baseUrl + r.images[0].url : '/logo.jpg',
-                imageUrls: r.images.map(img => baseUrl + img.url),
+                imageUrl: r.images[0]?.url ? baseUrl + r.images[0].url : 'https://suitestay.clickinns.com/kingbedsuitestay.webp',
+                imageUrls: r.images.length ? r.images.map(img => baseUrl + img.url) : ['https://suitestay.clickinns.com/kingbedsuitestay.webp'],
             })),
         });
     } catch (e) {
@@ -4757,6 +4757,134 @@ app.post('/api/crm/manual-availability/range', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('manual-availability:range failed:', e.message);
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ── CRM Room Management (Edit tab) ──────────────────────────────
+
+// Get rooms for this hotel
+app.get('/api/crm/rooms', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const rooms = await withRetry(() => prisma.room.findMany({
+            where: { hotelId },
+            include: { images: { orderBy: { sortOrder: 'asc' } } },
+            orderBy: { sortOrder: 'asc' },
+        }));
+        const rates = await withRetry(() => prisma.hotelRates.findUnique({ where: { hotelId } }));
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        res.json({
+            success: true,
+            rooms: rooms.map(r => ({
+                id: r.id,
+                name: r.name,
+                description: r.description,
+                amenities: r.amenities,
+                maxOccupancy: r.maxOccupancy,
+                totalUnits: r.totalUnits,
+                imageUrl: r.images[0]?.url ? baseUrl + r.images[0].url : null,
+                images: r.images.map(i => ({ id: i.id, url: baseUrl + i.url })),
+            })),
+            rates: rates ? { nightly: rates.nightly, weekly: rates.weekly, monthly: rates.monthly, taxRate: rates.taxRate } : null,
+        });
+    } catch (e) {
+        console.error('CRM rooms GET error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to load rooms' });
+    }
+});
+
+// Create or update a room
+app.post('/api/crm/rooms', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const { id, name, description, amenities, maxOccupancy, totalUnits } = req.body;
+        if (!name) return res.status(400).json({ success: false, message: 'Room name required' });
+
+        let room;
+        if (id) {
+            room = await withRetry(() => prisma.room.update({
+                where: { id },
+                data: { name, description: description || null, amenities: amenities || null, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 },
+            }));
+        } else {
+            const count = await prisma.room.count({ where: { hotelId } });
+            room = await withRetry(() => prisma.room.create({
+                data: { hotelId, name, description: description || null, amenities: amenities || null, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1, sortOrder: count },
+            }));
+        }
+
+        // Sync ManualRoom for availability
+        await prisma.manualRoom.upsert({
+            where: { hotelId_name: { hotelId, name } },
+            create: { hotelId, name, totalUnits: totalUnits || 1 },
+            update: { totalUnits: totalUnits || 1 },
+        });
+
+        res.json({ success: true, room: { id: room.id, name: room.name } });
+    } catch (e) {
+        console.error('CRM rooms POST error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to save room' });
+    }
+});
+
+// Delete a room
+app.delete('/api/crm/rooms/:roomId', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        await withRetry(() => prisma.room.delete({ where: { id: req.params.roomId } }));
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CRM rooms DELETE error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to delete room' });
+    }
+});
+
+// Upload room image
+app.post('/api/crm/rooms/:roomId/images', crmAuth, (req, res, next) => {
+    req.hotelId = req.crmDefaultHotelId || req.crmResolvedHotelId || 'unknown';
+    next();
+}, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'No image' });
+        const url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
+        const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        res.json({ success: true, image: { id: image.id, url: baseUrl + image.url } });
+    } catch (e) {
+        console.error('CRM image upload error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to upload' });
+    }
+});
+
+// Delete room image
+app.delete('/api/crm/rooms/:roomId/images/:imageId', crmAuth, async (req, res) => {
+    try {
+        await withRetry(() => prisma.roomImage.delete({ where: { id: req.params.imageId } }));
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Failed to delete image' });
+    }
+});
+
+// Update rates
+app.post('/api/crm/rates', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const { nightly, weekly, monthly, taxRate } = req.body;
+        await prisma.hotelRates.upsert({
+            where: { hotelId },
+            create: { hotelId, nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
+            update: { nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CRM rates error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to save rates' });
     }
 });
 

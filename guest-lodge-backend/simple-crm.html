@@ -2189,7 +2189,32 @@ function ensureAvailabilityUi() {
     tabs.appendChild(btn);
   }
 
+  // Add Edit tab if not present
+  if (tabs && !document.querySelector('[data-nav-filter="edit"]')) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'tab';
+    editBtn.setAttribute('type', 'button');
+    editBtn.innerHTML = 'Edit';
+    editBtn.dataset.navFilter = 'edit';
+    editBtn.onclick = function () { setFilter('edit', editBtn); };
+    // Insert before availability
+    const availBtn = document.querySelector('[data-nav-filter="availability"]');
+    if (availBtn) tabs.insertBefore(editBtn, availBtn);
+    else tabs.appendChild(editBtn);
+  }
+
   const container = document.querySelector('.container');
+
+  // Add Edit view if not present
+  if (container && !document.getElementById('editView')) {
+    container.insertAdjacentHTML('beforeend', `
+      <div id="editView" style="display:none; margin-top:8px;">
+        <div id="editRoomsList"></div>
+        <button id="editAddRoomBtn" style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:12px;" onclick="openEditAddRoom()">+ Add room type</button>
+      </div>
+    `);
+  }
+
   if (container && !document.getElementById('availabilityView')) {
     container.insertAdjacentHTML('beforeend', `
       <div id="availabilityView" class="availability-view" style="display:none">
@@ -2769,11 +2794,23 @@ function applyFilter() {
   const bookingsEl = document.getElementById('bookingsList');
   const availabilityEl = document.getElementById('availabilityView');
   const revenueEl = document.getElementById('revenueView');
+  const editEl = document.getElementById('editView');
+
+  if (currentFilter === 'edit') {
+    if (bookingsEl) bookingsEl.style.display = 'none';
+    if (availabilityEl) availabilityEl.style.display = 'none';
+    if (revenueEl) revenueEl.style.display = 'none';
+    if (editEl) editEl.style.display = 'block';
+    closeAvailabilityDayPopover();
+    loadEditRooms();
+    return;
+  }
 
   if (currentFilter === 'availability') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'flex';
     if (revenueEl) revenueEl.style.display = 'none';
+    if (editEl) editEl.style.display = 'none';
     renderAvailabilityView();
     return;
   }
@@ -2782,6 +2819,7 @@ function applyFilter() {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'flex';
+    if (editEl) editEl.style.display = 'none';
     closeAvailabilityDayPopover();
     renderRevenueView();
     return;
@@ -2790,6 +2828,7 @@ function applyFilter() {
   if (bookingsEl) bookingsEl.style.display = '';
   if (availabilityEl) availabilityEl.style.display = 'none';
   if (revenueEl) revenueEl.style.display = 'none';
+  if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
   const filtered = currentFilter === 'needs-call'
     ? bookings.filter(b => b.callStatus === 'not-called')
@@ -3504,6 +3543,107 @@ function toast(msg, type = '') {
   el.textContent = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'} ${msg}`;
   c.appendChild(el);
   setTimeout(() => el.remove(), 3100);
+}
+
+// ── EDIT TAB ───────────────────────────────────────────────
+
+let editRooms = [];
+
+async function loadEditRooms() {
+  const list = document.getElementById('editRoomsList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading rooms…</div>';
+  try {
+    const res = await api('GET', '/api/crm/rooms');
+    if (!res.rooms) throw new Error('No data');
+    editRooms = res.rooms;
+    renderEditRooms();
+  } catch (e) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
+  }
+}
+
+function renderEditRooms() {
+  const list = document.getElementById('editRoomsList');
+  if (!editRooms.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
+    return;
+  }
+  list.innerHTML = editRooms.map(r => `
+    <div class="booking-card" style="margin-bottom:12px;">
+      <div style="position:relative;">
+        ${r.imageUrl ? `<img src="${r.imageUrl}" style="width:100%;height:140px;object-fit:cover;display:block;">` : `<div style="width:100%;height:100px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photo</div>`}
+        <label style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.6);color:white;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+          📷 Replace
+          <input type="file" accept="image/*" style="display:none;" onchange="uploadEditImage(event,'${r.id}')">
+        </label>
+      </div>
+      <div style="padding:16px;">
+        <div contenteditable="true" style="font-size:18px;font-weight:700;padding:4px 6px;border-radius:6px;border:1.5px dashed transparent;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='transparent'; saveEditField('${r.id}','name',this.textContent)">${r.name}</div>
+        <div contenteditable="true" style="font-size:13px;color:var(--text-muted);padding:4px 6px;margin-top:6px;border-radius:6px;border:1.5px dashed transparent;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='transparent'; saveEditField('${r.id}','amenities',this.textContent)" data-placeholder="Tap to add amenities">${r.amenities || ''}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+          <span style="font-size:12px;color:var(--text-muted);">Max ${r.maxOccupancy} guests • ${r.totalUnits} units</span>
+          <button onclick="deleteEditRoom('${r.id}')" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;" onmouseover="this.style.color='#E05252'" onmouseout="this.style.color='var(--text-muted)'">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function saveEditField(roomId, field, value) {
+  const room = editRooms.find(r => r.id === roomId);
+  if (!room) return;
+  const body = { id: roomId, name: room.name, amenities: room.amenities, maxOccupancy: room.maxOccupancy, totalUnits: room.totalUnits };
+  body[field] = value.trim();
+  try {
+    await api('POST', '/api/crm/rooms', body);
+    room[field] = value.trim();
+    toast('Saved', 'success');
+  } catch (e) {
+    toast('Failed to save', 'error');
+  }
+}
+
+async function uploadEditImage(event, roomId) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('image', file);
+  try {
+    const res = await fetch(`/api/crm/rooms/${roomId}/images`, {
+      method: 'POST',
+      headers: { 'x-crm-token': token },
+      body: fd,
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast('Photo updated', 'success');
+      loadEditRooms();
+    } else {
+      toast('Upload failed', 'error');
+    }
+  } catch (e) {
+    toast('Upload failed', 'error');
+  }
+}
+
+async function deleteEditRoom(roomId) {
+  if (!confirm('Delete this room type?')) return;
+  try {
+    await api('DELETE', `/api/crm/rooms/${roomId}`);
+    toast('Room deleted', 'success');
+    loadEditRooms();
+  } catch (e) {
+    toast('Failed to delete', 'error');
+  }
+}
+
+function openEditAddRoom() {
+  const name = prompt('Room type name:');
+  if (!name || !name.trim()) return;
+  api('POST', '/api/crm/rooms', { name: name.trim(), maxOccupancy: 4, totalUnits: 5 })
+    .then(() => { toast('Room added', 'success'); loadEditRooms(); })
+    .catch(() => toast('Failed to add', 'error'));
 }
 
 // ── INIT ───────────────────────────────────────────────

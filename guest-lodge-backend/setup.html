@@ -146,14 +146,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Room Name</label>
         <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
-      <div class="field">
-        <label>Photo</label>
-        <div class="upload-area" onclick="document.getElementById('rmFile').click()">
-          <p>Tap to upload a photo</p>
-        </div>
-        <input type="file" id="rmFile" accept="image/*" style="display:none" onchange="handlePhoto(event)">
-        <div class="upload-preview" id="rmPreview"></div>
-      </div>
       <button class="btn btn-primary" onclick="addRoom()">+ Add Room</button>
       <button class="btn btn-back" onclick="goToStep(3)" id="roomNextBtn" style="display:none;">Next →</button>
       <button class="btn btn-back" onclick="goToStep(1)">← Back</button>
@@ -222,6 +214,8 @@ const API = '';
 let hotelData = {};
 let rooms = [];
 let pendingFile = null;
+
+function handlePhoto() {}  // removed - photos added via front desk edit tab
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -298,9 +292,7 @@ function renderRooms() {
   if (!rooms.length) { list.innerHTML = ''; nextBtn.style.display = 'none'; return; }
   nextBtn.style.display = 'block';
   list.innerHTML = rooms.map(r => {
-    const img = r.images?.length ? r.images[0].url : '';
     return `<div class="room-item">
-      ${img ? `<img src="${img}" alt="">` : `<div class="room-item-placeholder">📷</div>`}
       <div class="room-item-info"><div class="room-item-name">${r.name}</div></div>
       <div class="room-item-actions"><button class="room-item-btn" onclick="deleteRoom('${r.id}')">✕</button></div>
     </div>`;
@@ -325,6 +317,7 @@ async function addRoom() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, maxOccupancy: 4, totalUnits: 5 }),
     });
+    if (!res.ok) throw new Error('Server error');
     const data = await res.json();
     const roomId = data.room?.id;
 
@@ -343,7 +336,6 @@ async function addRoom() {
 
     // Reset fields
     document.getElementById('rmName').value = '';
-    document.getElementById('rmPreview').innerHTML = '';
     pendingFile = null;
     showToast('Room added!');
   } catch (e) { showToast('Failed to add room', true); }
