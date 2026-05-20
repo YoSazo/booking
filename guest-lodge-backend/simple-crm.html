@@ -3523,15 +3523,22 @@ async function loadEditRooms() {
     if (!res.rooms) throw new Error('No data');
     editRooms = res.rooms;
 
-    // Fetch hotel info for name/subtitle editing
+    // Fetch hotel info for name/subtitle/address/phone editing
     const hotelRes = await api('GET', '/api/crm/verify');
     const hotelName = hotelRes?.hotelName || '';
     const hotelSubtitle = hotelRes?.hotelSubtitle || '';
+    const hotelAddress = hotelRes?.hotelAddress || '';
+    const hotelPhone = hotelRes?.hotelPhone || '';
 
-    // Render hotel info section + rooms
+    // Fetch rates
+    let rates = { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 };
+    if (res.rates) rates = res.rates;
+
+    // Render hotel info section + rates + PIN + rooms
     let html = `
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Hotel Info</div>
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Hotel Name</div>
             <input type="text" value="${hotelName}" id="edit-hotel-name" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
@@ -3540,7 +3547,45 @@ async function loadEditRooms() {
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Subtitle / Slogan</div>
             <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="e.g. Your home away from home" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
           </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Address</div>
+            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State ZIP" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Phone</div>
+            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
+          </div>
           <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Hotel Info</button>
+        </div>
+      </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Rates</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
+              <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
+              <input type="number" value="${rates.weekly}" id="edit-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
+              <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+          </div>
+          <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
+        </div>
+      </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Change PIN</div>
+          <div style="margin-bottom:12px;">
+            <input type="text" id="edit-new-pin" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+          </div>
+          <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
         </div>
       </div>
       <div id="editRoomsCards"></div>
@@ -3727,11 +3772,40 @@ function removeAmenity(roomId, amenity) {
 async function saveHotelInfo() {
   const name = document.getElementById('edit-hotel-name')?.value.trim();
   const subtitle = document.getElementById('edit-hotel-subtitle')?.value.trim();
+  const address = document.getElementById('edit-hotel-address')?.value.trim();
+  const phone = document.getElementById('edit-hotel-phone')?.value.trim();
   try {
-    await api('POST', '/api/crm/hotel-info', { name, subtitle });
+    await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone });
     toast('Hotel info saved!', 'success');
   } catch (e) {
     toast('Failed to save', 'error');
+  }
+}
+
+async function saveRates() {
+  const nightly = parseFloat(document.getElementById('edit-rate-nightly')?.value) || 69;
+  const weekly = parseFloat(document.getElementById('edit-rate-weekly')?.value) || 299;
+  const monthly = parseFloat(document.getElementById('edit-rate-monthly')?.value) || 999;
+  try {
+    await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
+    toast('Rates saved!', 'success');
+  } catch (e) {
+    toast('Failed to save rates', 'error');
+  }
+}
+
+async function changePin() {
+  const newPin = document.getElementById('edit-new-pin')?.value.trim();
+  if (!newPin || newPin.length < 4) {
+    toast('PIN must be at least 4 characters', 'error');
+    return;
+  }
+  try {
+    await api('POST', '/api/crm/change-pin', { newPin });
+    toast('PIN updated! Use your new PIN next time.', 'success');
+    document.getElementById('edit-new-pin').value = '';
+  } catch (e) {
+    toast('Failed to change PIN', 'error');
   }
 }
 

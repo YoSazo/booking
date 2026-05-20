@@ -572,14 +572,28 @@ async function getActiveHotelValidation(hotelId) {
     if (!cleanHotelId) {
         return { ok: false, status: 400, message: 'hotelId is required.' };
     }
+    // Try direct lookup first
     const override = await getHotelOverrideStatus(cleanHotelId);
+    if (override.status === 'ok') {
+        return { ok: true, hotelId: cleanHotelId };
+    }
     if (override.status === 'inactive') {
         return { ok: false, status: 403, message: `Hotel is inactive: ${cleanHotelId}` };
     }
-    if (override.status !== 'ok') {
-        return { ok: false, status: 400, message: `Invalid hotelId: ${cleanHotelId}` };
+    // Fallback: resolve via domain (e.g. "john-hotel" → "john-hotel.bookmarketel.com" → real ID)
+    if (prisma.hotelDomain) {
+        const domainGuess = cleanHotelId + '.bookmarketel.com';
+        const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } }).catch(() => null);
+        if (domainRecord) {
+            const row = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId }, select: { id: true, active: true } }).catch(() => null);
+            if (row) {
+                return row.active
+                    ? { ok: true, hotelId: row.id }
+                    : { ok: false, status: 403, message: `Hotel is inactive: ${row.id}` };
+            }
+        }
     }
-    return { ok: true, hotelId: cleanHotelId };
+    return { ok: false, status: 400, message: `Invalid hotelId: ${cleanHotelId}` };
 }
 
 const routeRateLimitStore = new Map();
@@ -2284,14 +2298,15 @@ app.post('/api/availability', async (req, res) => {
     
     try {
         const config = await resolveHotelConfig(hotelId);
+        const resolvedHotelId = config.id || hotelId;
         let availableRooms;
 
         if (config.pms === 'cloudbeds') {
-            availableRooms = await getCloudbedsAvailability(hotelId, checkin, checkout);
+            availableRooms = await getCloudbedsAvailability(resolvedHotelId, checkin, checkout);
         } else if (config.pms === 'bookingcenter') {
-            availableRooms = await getBookingCenterAvailability(hotelId, checkin, checkout);
+            availableRooms = await getBookingCenterAvailability(resolvedHotelId, checkin, checkout);
         } else if (config.pms === 'manual') {
-            availableRooms = await getManualAvailability(hotelId, checkin, checkout);
+            availableRooms = await getManualAvailability(resolvedHotelId, checkin, checkout);
         } else {
             return res.status(400).json({ success: false, message: `Unknown PMS type: ${config.pms}` });
         }
@@ -4591,7 +4606,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Missing authorized hotel context.' });
         }
         const config = await resolveHotelConfig(hotelId);
-        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true } });
+        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true } });
         res.json({
             success: true,
             hotelId,
@@ -4600,6 +4615,8 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             isManualPms: config.pms === 'manual',
             hotelName: dbHotel?.name || config.name || '',
             hotelSubtitle: dbHotel?.subtitle || '',
+            hotelAddress: dbHotel?.address || '',
+            hotelPhone: dbHotel?.phone || '',
         });
     } catch (e) {
         console.error('crm:verify failed:', e.message);
@@ -4607,20 +4624,50 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
     }
 });
 
-// Update hotel name/subtitle
+// Update hotel name/subtitle/address/phone
 app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const { name, subtitle } = req.body;
+        const { name, subtitle, address, phone } = req.body;
+        const data = {};
+        if (name !== undefined) data.name = name || undefined;
+        if (subtitle !== undefined) data.subtitle = subtitle;
+        if (address !== undefined) data.address = address;
+        if (phone !== undefined) data.phone = phone;
         await prisma.hotelConfig.update({
             where: { id: hotelId },
-            data: { name: name || undefined, subtitle: subtitle !== undefined ? subtitle : undefined },
+            data,
         });
         res.json({ success: true });
     } catch (e) {
         console.error('crm:hotel-info failed:', e.message);
         res.status(500).json({ success: false, message: 'Failed to save' });
+    }
+});
+
+// Change PIN (CRM-authenticated — owner can change their own PIN)
+app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const newPin = String(req.body?.newPin || '').trim();
+        if (!newPin || newPin.length < 4) {
+            return res.status(400).json({ success: false, message: 'PIN must be at least 4 characters.' });
+        }
+        const pinHash = hashCrmPin(newPin);
+        // Deactivate all existing PINs for this hotel
+        await prisma.crmPin.updateMany({ where: { hotelId }, data: { active: false } });
+        // Create the new PIN
+        await prisma.crmPin.upsert({
+            where: { hotelId_pinHash: { hotelId, pinHash } },
+            create: { hotelId, pinHash, label: 'Owner PIN', active: true },
+            update: { active: true, label: 'Owner PIN' },
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('crm:change-pin failed:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to change PIN' });
     }
 });
 
