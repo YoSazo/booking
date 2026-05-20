@@ -20,7 +20,7 @@ const staticHotel = hotelData[hotelId] || null;
 const fallbackHotel = {
   name: `Click Inns (${hotelId})`,
   url: '',
-  subtitle: 'No deposits. No leases. No credit checks.',
+  subtitle: '',
   phone: '',
   address: '',
   pms: 'manual',

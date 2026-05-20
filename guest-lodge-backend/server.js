@@ -4507,16 +4507,36 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
         const config = await resolveHotelConfig(hotelId);
+        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true } });
         res.json({
             success: true,
             hotelId,
             allowedHotels: req.crmAllowedHotels || [],
             pms: config.pms,
             isManualPms: config.pms === 'manual',
+            hotelName: dbHotel?.name || config.name || '',
+            hotelSubtitle: dbHotel?.subtitle || '',
         });
     } catch (e) {
         console.error('crm:verify failed:', e.message);
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Update hotel name/subtitle
+app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const { name, subtitle } = req.body;
+        await prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: { name: name || undefined, subtitle: subtitle !== undefined ? subtitle : undefined },
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('crm:hotel-info failed:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to save' });
     }
 });
 

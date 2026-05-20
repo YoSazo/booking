@@ -27,37 +27,44 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
   const amenityIcons = {
     'wifi': { icon: Wifi, label: 'Free WiFi' },
     'tv': { icon: Tv, label: 'Smart TV' },
-    'kitchen': { icon: Refrigerator, label: 'Kitchen' },
+    'kitchen': { icon: Refrigerator, label: 'Kitchenette' },
+    'fridge': { icon: Refrigerator, label: 'Fridge' },
+    'refrigerator': { icon: Refrigerator, label: 'Fridge' },
     'workspace': { icon: Briefcase, label: 'Workspace' },
     'workstation': { icon: Briefcase, label: 'Workstation' },
-    'bath': { icon: Bath, label: 'Private Bath' },
+    'bath': { icon: Bath, label: 'Bath' },
+    'shower': { icon: Bath, label: 'Shower' },
     'parking': { icon: Car, label: 'Free Parking' },
-    'cleaning': { icon: Sparkles, label: 'Weekly Cleaning' }
+    'cleaning': { icon: Sparkles, label: 'Weekly Cleaning' },
+    'housekeeping': { icon: Sparkles, label: 'Housekeeping' },
+    'pet': { icon: PawPrint, label: 'Pet Friendly' },
+    'dog': { icon: PawPrint, label: 'Pet Friendly' },
   };
 
   // Extract amenities from room.amenities string
   const getAmenityList = () => {
-    const amenitiesText = (room.amenities || '').toLowerCase();
-    const foundAmenities = [];
-    
-    Object.keys(amenityIcons).forEach(key => {
-      if (amenitiesText.includes(key)) {
-        foundAmenities.push(amenityIcons[key]);
-      }
-    });
-    
-    // If we don't find enough, add default ones
-    if (foundAmenities.length < 4) {
-      const defaults = [
+    const amenitiesText = (room.amenities || '');
+    if (!amenitiesText.trim()) {
+      // No amenities at all — show defaults
+      return [
         { icon: Wifi, label: 'Free WiFi' },
         { icon: Tv, label: 'Smart TV' },
         { icon: Car, label: 'Free Parking' },
         { icon: Sparkles, label: 'Weekly Cleaning' }
       ];
-      return defaults.slice(0, 4);
     }
-    
-    return foundAmenities.slice(0, 7);
+
+    // Split by bullet separator and map each to an icon
+    const items = amenitiesText.split('•').map(a => a.trim()).filter(Boolean);
+    return items.slice(0, 7).map(item => {
+      const lower = item.toLowerCase();
+      // Find matching icon
+      for (const [key, val] of Object.entries(amenityIcons)) {
+        if (lower.includes(key)) return { icon: val.icon, label: item };
+      }
+      // No match — use generic checkmark
+      return { icon: Sparkles, label: item };
+    });
   };
 
   const amenityList = getAmenityList();
@@ -118,7 +125,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
         <div className="room-header">
           <div>
             <h3>{room.name}</h3>
-            <p className="room-subtitle">Spacious • Fully Furnished</p>
+            <p className="room-subtitle">{room.description || 'Spacious • Fully Furnished'}</p>
           </div>
         </div>
 
@@ -134,8 +141,8 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           ))}
         </div>
 
-        {/* Description */}
-        <p className="room-description">{room.description}</p>
+        {/* Description - only show if different from subtitle */}
+        {room.description && room.description.length > 60 && <p className="room-description">{room.description}</p>}
 
         {/* Selected Dates Display */}
         {nights > 0 && checkinDate && checkoutDate && (

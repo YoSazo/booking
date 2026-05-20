@@ -858,22 +858,19 @@
       #availabilityDayPopover.availability-edit-sheet {
         position: fixed;
         z-index: 262;
-        width: 220px;
-        max-width: 220px;
+        width: 240px;
+        max-width: 240px;
         background: var(--white);
         border: 1.5px solid var(--border);
         border-radius: 14px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
         transition: opacity 0.12s ease;
         padding: 0;
-        visibility: hidden;
-        opacity: 0;
-        pointer-events: none;
+        display: none;
+        overflow: hidden;
       }
       #availabilityDayPopover.availability-edit-sheet.open {
-        visibility: visible;
-        opacity: 1;
-        pointer-events: auto;
+        display: block;
       }
       #availabilityDayPopover .sheet-handle {
         display: none;
@@ -1302,6 +1299,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      margin-bottom: 16px;
     }
     .revenue-savings-copy {
       font-size: 13px;
@@ -2289,36 +2287,23 @@ function ensureAvailabilityUi() {
       </div>
 
       <div id="availabilitySheetBackdrop" class="availability-sheet-backdrop"></div>
-      <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true">
-        <div class="sheet-handle"></div>
-        <div class="sheet-inner">
-          <button type="button" class="avail-desktop-popover-x" id="availabilityDesktopPopX" onclick="closeAvailabilityDayPopover()" aria-label="Close">×</button>
-          <div class="sheet-date-row">
-            <div id="availabilityDayPopoverTitle" class="sheet-dow"></div>
-            <div id="availabilitySheetDate" class="sheet-date"></div>
+      <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true" style="display:none;">
+        <button type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:15px;color:var(--text-muted);cursor:pointer;" onclick="closeAvailabilityDayPopover()">×</button>
+        <div style="padding:14px 16px;">
+          <div id="availabilityDayPopoverTitle" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;"></div>
+          <div id="availabilitySheetDate" style="display:none;"></div>
+          <div id="availabilityActiveRoomLabel" style="display:none;"></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <button id="availabilityStepDownBtn" type="button" onclick="stepAvailabilityDay(-1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">−</button>
+            <div id="availabilityDayCount" style="font-size:22px;font-family:'DM Mono',monospace;font-weight:500;flex:1;text-align:center;">0</div>
+            <button id="availabilityStepUpBtn" type="button" onclick="stepAvailabilityDay(1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">+</button>
           </div>
-
-          <div id="availabilityActiveRoomLabel" class="stepper-label">Rooms available tonight</div>
-          <div class="day-stepper sheet-stepper">
-            <button id="availabilityStepDownBtn" class="day-step-btn" type="button">−</button>
-            <div id="availabilityDayCount" class="day-step-count">0</div>
-            <button id="availabilityStepUpBtn" class="day-step-btn" type="button">+</button>
-          </div>
-
           <input id="availabilityDayClosedInput" type="checkbox" hidden>
-          <button id="availabilityClosedToggle" class="closed-toggle" type="button">
-            <span class="closed-icon">X</span>
-            <span>
-              <span class="closed-text">Close these dates</span>
-              <span class="closed-sub">No rooms can be booked</span>
-            </span>
-          </button>
-        </div>
-        <div class="sheet-actions">
-          <button id="availabilityDaySaveBtn" class="sheet-save-btn" type="button">Done</button>
-          <button id="availabilityDayCancelBtn" class="sheet-cancel-btn" type="button">Cancel</button>
+          <button id="availabilityDaySaveBtn" type="button" onclick="saveAvailabilityDay()" style="width:100%;padding:9px;border-radius:9px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Done</button>
         </div>
       </div>
+      <button id="availabilityClosedToggle" style="display:none;"></button>
+      <button id="availabilityDayCancelBtn" style="display:none;" onclick="closeAvailabilityDayPopover()"></button>
     `);
   }
 
@@ -2375,12 +2360,7 @@ function bindAvailabilityUiEvents() {
   const cancelDayBtn = document.getElementById('availabilityDayCancelBtn');
   const closedToggle = document.getElementById('availabilityClosedToggle');
   const sheetBackdrop = document.getElementById('availabilitySheetBackdrop');
-  if (stepDown) stepDown.addEventListener('click', () => stepAvailabilityDay(-1));
-  if (stepUp) stepUp.addEventListener('click', () => stepAvailabilityDay(1));
-  if (closedInput) closedInput.addEventListener('change', toggleAvailabilityDayClosed);
-  if (saveDayBtn) saveDayBtn.addEventListener('click', saveAvailabilityDay);
-  if (cancelDayBtn) cancelDayBtn.addEventListener('click', closeAvailabilityDayPopover);
-  if (closedToggle) closedToggle.addEventListener('click', toggleAvailabilityDayClosedButton);
+  // Event listeners now handled via inline onclick — no need to bind here
   if (sheetBackdrop) sheetBackdrop.addEventListener('click', closeAvailabilityDayPopover);
 }
 
@@ -2852,11 +2832,7 @@ async function loadManualAvailability() {
 }
 
 function roomDateKey(roomName, day) {
-  const normalizedRoom = String(roomName || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-  return `${normalizedRoom}|${day}`;
+  return `${String(roomName || '').trim()}|${day}`;
 }
 
 function refreshRoomBadge() {
@@ -3155,22 +3131,17 @@ function openAvailabilityDayPopover(event, dayIso) {
   const pop = document.getElementById('availabilityDayPopover');
   const backdrop = document.getElementById('availabilitySheetBackdrop');
   const title = document.getElementById('availabilityDayPopoverTitle');
-  const dateTitle = document.getElementById('availabilitySheetDate');
   const countEl = document.getElementById('availabilityDayCount');
   const closedInput = document.getElementById('availabilityDayClosedInput');
-  const activeLabel = document.getElementById('availabilityActiveRoomLabel');
-  if (!room || !pop || !title || !dateTitle || !countEl || !closedInput) return;
+  if (!room || !pop || !title || !countEl) return;
 
   availabilityEditingDay = dayIso;
   const bookedMap = bookingsByRoomDate();
   const result = availabilityForDay(room, dayIso, bookedMap);
   const date = new Date(`${dayIso}T00:00:00`);
   title.textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  dateTitle.style.display = 'none';
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
-  closedInput.checked = result.status === 'closed';
-  if (activeLabel) activeLabel.textContent = `${room.name} available`;
-  toggleAvailabilityDayClosed();
+  if (closedInput) closedInput.checked = result.status === 'closed';
 
   if (backdrop) backdrop.classList.add('open');
 
@@ -3178,22 +3149,20 @@ function openAvailabilityDayPopover(event, dayIso) {
   const rect = event.currentTarget.getBoundingClientRect();
   let top = rect.bottom + 8;
   let left = rect.left;
-  if (left + 240 > window.innerWidth) left = window.innerWidth - 250;
-  if (top + 200 > window.innerHeight) top = rect.top - 210;
+  if (left + 250 > window.innerWidth) left = window.innerWidth - 260;
+  if (top + 140 > window.innerHeight) top = rect.top - 150;
   if (top < 10) top = 10;
 
   pop.style.position = 'fixed';
   pop.style.left = left + 'px';
   pop.style.top = top + 'px';
-  pop.style.width = '220px';
-  pop.style.maxWidth = '220px';
-  pop.style.transform = 'none';
+  pop.style.width = '200px';
+  pop.style.display = 'block';
+  pop.style.zIndex = '262';
+  pop.style.background = 'var(--white)';
   pop.style.borderRadius = '14px';
-  pop.style.padding = '0';
-  pop.style.maxHeight = 'none';
-  pop.style.visibility = 'visible';
-  pop.style.opacity = '1';
-  pop.style.pointerEvents = 'auto';
+  pop.style.border = '1.5px solid var(--border)';
+  pop.style.boxShadow = '0 8px 32px rgba(0,0,0,0.14)';
 
   pop.classList.add('open');
   pop.setAttribute('aria-hidden', 'false');
@@ -3208,9 +3177,7 @@ function closeAvailabilityDayPopover() {
   if (pop) {
     pop.classList.remove('open');
     pop.setAttribute('aria-hidden', 'true');
-    pop.style.removeProperty('left');
-    pop.style.removeProperty('top');
-    pop.style.removeProperty('width');
+    pop.style.display = 'none';
   }
 }
 
@@ -3547,53 +3514,239 @@ let editRooms = [];
 async function loadEditRooms() {
   const list = document.getElementById('editRoomsList');
   if (!list) return;
-  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading rooms…</div>';
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
   try {
     const res = await api('GET', '/api/crm/rooms');
     if (!res.rooms) throw new Error('No data');
     editRooms = res.rooms;
-    renderEditRooms();
+
+    // Fetch hotel info for name/subtitle editing
+    const hotelRes = await api('GET', '/api/crm/verify');
+    const hotelName = hotelRes?.hotelName || '';
+    const hotelSubtitle = hotelRes?.hotelSubtitle || '';
+
+    // Render hotel info section + rooms
+    let html = `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Hotel Name</div>
+            <input type="text" value="${hotelName}" id="edit-hotel-name" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Subtitle / Slogan</div>
+            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="e.g. Your home away from home" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
+          </div>
+          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Hotel Info</button>
+        </div>
+      </div>
+      <div id="editRoomsCards"></div>
+    `;
+    list.innerHTML = html;
+    renderEditRoomsCards();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
   }
 }
 
 function renderEditRooms() {
-  const list = document.getElementById('editRoomsList');
+  renderEditRoomsCards();
+}
+
+function renderEditRoomsCards() {
+  const list = document.getElementById('editRoomsCards') || document.getElementById('editRoomsList');
   if (!editRooms.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
     return;
   }
-  list.innerHTML = editRooms.map(r => `
-    <div class="booking-card" style="margin-bottom:12px;">
+  list.innerHTML = editRooms.map(r => {
+    const currentAmenities = (r.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
+    return `
+    <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
       <div style="position:relative;">
-        ${r.imageUrl ? `<img src="${r.imageUrl}" style="width:100%;height:140px;object-fit:cover;display:block;">` : `<div style="width:100%;height:100px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photo</div>`}
-        <label style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.6);color:white;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+        ${r.imageUrl ? `<img src="${r.imageUrl}" style="width:100%;height:200px;object-fit:cover;display:block;">` : `<div style="width:100%;height:160px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photo yet</div>`}
+        <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
           📷 Replace
           <input type="file" accept="image/*" style="display:none;" onchange="uploadEditImage(event,'${r.id}')">
         </label>
       </div>
-      <div style="padding:16px;">
-        <div contenteditable="true" style="font-size:18px;font-weight:700;padding:4px 6px;border-radius:6px;border:1.5px dashed transparent;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='transparent'; saveEditField('${r.id}','name',this.textContent)">${r.name}</div>
-        <div contenteditable="true" style="font-size:13px;color:var(--text-muted);padding:4px 6px;margin-top:6px;border-radius:6px;border:1.5px dashed transparent;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='transparent'; saveEditField('${r.id}','amenities',this.textContent)" data-placeholder="Tap to add amenities">${r.amenities || ''}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
-          <span style="font-size:12px;color:var(--text-muted);">Max ${r.maxOccupancy} guests • ${r.totalUnits} units</span>
-          <button onclick="deleteEditRoom('${r.id}')" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;" onmouseover="this.style.color='#E05252'" onmouseout="this.style.color='var(--text-muted)'">Delete</button>
+      <div style="padding:18px;">
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
+          <input type="text" value="${r.name}" id="edit-name-${r.id}" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Description</div>
+          <input type="text" value="${r.description || ''}" id="edit-desc-${r.id}" placeholder="e.g. A spacious room with king bed and city view" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Amenities</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="edit-amenity-pills-${r.id}">
+            ${currentAmenities.map(a => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--green-pale);color:var(--green);padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;">${getAmenityIcon(a)} ${a} <button onclick="removeAmenity('${r.id}','${a.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:14px;margin-left:2px;">×</button></span>`).join('')}
+          </div>
+          <button onclick="openAmenityPicker('${r.id}')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;font-family:inherit;">+ Add amenities</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Max Guests</div>
+            <input type="number" value="${r.maxOccupancy || 4}" min="1" max="20" id="edit-occ-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Total Units</div>
+            <input type="number" value="${r.totalUnits || 1}" min="1" max="200" id="edit-units-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Changes</button>
+          <button onclick="deleteEditRoom('${r.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-async function saveEditField(roomId, field, value) {
+function getAmenityIcon(amenity) {
+  const a = amenity.toLowerCase();
+  if (a.includes('wifi')) return '<i data-lucide="wifi" style="width:14px;height:14px;"></i>';
+  if (a.includes('tv') || a.includes('television')) return '<i data-lucide="tv" style="width:14px;height:14px;"></i>';
+  if (a.includes('fridge') || a.includes('refrigerator')) return '<i data-lucide="thermometer-snowflake" style="width:14px;height:14px;"></i>';
+  if (a.includes('parking')) return '<i data-lucide="car" style="width:14px;height:14px;"></i>';
+  if (a.includes('housekeeping') || a.includes('cleaning')) return '<i data-lucide="sparkles" style="width:14px;height:14px;"></i>';
+  if (a.includes('bath') || a.includes('shower')) return '<i data-lucide="bath" style="width:14px;height:14px;"></i>';
+  if (a.includes('work') || a.includes('desk')) return '<i data-lucide="laptop" style="width:14px;height:14px;"></i>';
+  if (a.includes('pet') || a.includes('dog')) return '<i data-lucide="paw-print" style="width:14px;height:14px;"></i>';
+  if (a.includes('pool')) return '<i data-lucide="waves" style="width:14px;height:14px;"></i>';
+  if (a.includes('kitchen') || a.includes('microwave')) return '<i data-lucide="cooking-pot" style="width:14px;height:14px;"></i>';
+  return '<i data-lucide="check" style="width:14px;height:14px;"></i>';
+}
+
+const AMENITY_PRESETS = [
+  { key: 'wifi', label: 'Free WiFi', icon: 'wifi' },
+  { key: 'tv', label: 'Smart TV', icon: 'tv' },
+  { key: 'fridge', label: 'Fridge', icon: 'thermometer-snowflake' },
+  { key: 'parking', label: 'Free Parking', icon: 'car' },
+  { key: 'housekeeping', label: 'Weekly Housekeeping', icon: 'sparkles' },
+  { key: 'bath', label: 'Bath', icon: 'bath' },
+  { key: 'workstation', label: 'Workstation', icon: 'laptop' },
+  { key: 'pet', label: 'Pet Friendly', icon: 'paw-print' },
+  { key: 'pool', label: 'Pool', icon: 'waves' },
+  { key: 'kitchen', label: 'Kitchenette', icon: 'cooking-pot' },
+  { key: 'ac', label: 'Air Conditioning', icon: 'wind' },
+  { key: 'laundry', label: 'Laundry', icon: 'shirt' },
+];
+
+let amenityPickerRoomId = null;
+
+function openAmenityPicker(roomId) {
+  amenityPickerRoomId = roomId;
+  const room = editRooms.find(r => r.id === roomId);
+  const current = (room?.amenities || '').split('•').map(a => a.trim().toLowerCase()).filter(Boolean);
+  
+  let modal = document.getElementById('amenityPickerModal');
+  if (!modal) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="amenityPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:white;border-radius:16px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+          <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Select Amenities</div>
+          <div id="amenityPickerGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+          <div style="margin-bottom:14px;">
+            <input type="text" id="amenityCustomInput" placeholder="Or type a custom one..." style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px;outline:none;">
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="confirmAmenityPicker()" style="flex:1;padding:11px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
+            <button onclick="closeAmenityPicker()" style="padding:11px 18px;border-radius:10px;border:1.5px solid #e5e7eb;background:none;font-family:inherit;font-size:14px;color:#6b7280;cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `);
+    document.getElementById('amenityPickerModal').addEventListener('click', closeAmenityPicker);
+    modal = document.getElementById('amenityPickerModal');
+  }
+
+  // Render preset pills
+  const grid = document.getElementById('amenityPickerGrid');
+  grid.innerHTML = AMENITY_PRESETS.map(p => {
+    const isSelected = current.some(c => c.includes(p.key));
+    return `<button onclick="toggleAmenityPreset(this,'${p.key}')" data-key="${p.key}" style="display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1.5px solid ${isSelected ? '#2E7D5B' : '#e5e7eb'};background:${isSelected ? '#E8F5EE' : 'white'};color:${isSelected ? '#2E7D5B' : '#1a1a2e'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;"><i data-lucide="${p.icon}" style="width:14px;height:14px;"></i> ${p.label}</button>`;
+  }).join('');
+  
+  document.getElementById('amenityCustomInput').value = '';
+  modal.style.display = 'flex';
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function toggleAmenityPreset(btn, key) {
+  const isActive = btn.style.borderColor === 'rgb(46, 125, 91)';
+  btn.style.borderColor = isActive ? '#e5e7eb' : '#2E7D5B';
+  btn.style.background = isActive ? 'white' : '#E8F5EE';
+  btn.style.color = isActive ? '#1a1a2e' : '#2E7D5B';
+}
+
+function closeAmenityPicker() {
+  document.getElementById('amenityPickerModal').style.display = 'none';
+  amenityPickerRoomId = null;
+}
+
+function confirmAmenityPicker() {
+  const room = editRooms.find(r => r.id === amenityPickerRoomId);
+  if (!room) { closeAmenityPicker(); return; }
+
+  const grid = document.getElementById('amenityPickerGrid');
+  const selected = [];
+  grid.querySelectorAll('button').forEach(btn => {
+    if (btn.style.background === 'rgb(232, 245, 238)') {
+      const preset = AMENITY_PRESETS.find(p => p.key === btn.dataset.key);
+      if (preset) selected.push(preset.label);
+    }
+  });
+
+  const custom = document.getElementById('amenityCustomInput').value.trim();
+  if (custom) selected.push(custom);
+
+  room.amenities = selected.join(' • ');
+  closeAmenityPicker();
+  renderEditRooms();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addAmenityPrompt(roomId) { openAmenityPicker(roomId); }
+
+function removeAmenity(roomId, amenity) {
   const room = editRooms.find(r => r.id === roomId);
   if (!room) return;
-  const body = { id: roomId, name: room.name, amenities: room.amenities, maxOccupancy: room.maxOccupancy, totalUnits: room.totalUnits };
-  body[field] = value.trim();
+  const current = (room.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
+  room.amenities = current.filter(a => a !== amenity).join(' • ');
+  renderEditRooms();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function saveHotelInfo() {
+  const name = document.getElementById('edit-hotel-name')?.value.trim();
+  const subtitle = document.getElementById('edit-hotel-subtitle')?.value.trim();
+  try {
+    await api('POST', '/api/crm/hotel-info', { name, subtitle });
+    toast('Hotel info saved!', 'success');
+  } catch (e) {
+    toast('Failed to save', 'error');
+  }
+}
+
+async function saveEditRoom(roomId) {
+  const room = editRooms.find(r => r.id === roomId);
+  if (!room) return;
+  const name = document.getElementById('edit-name-' + roomId).value.trim();
+  const description = document.getElementById('edit-desc-' + roomId).value.trim();
+  const maxOccupancy = parseInt(document.getElementById('edit-occ-' + roomId).value) || 4;
+  const totalUnits = parseInt(document.getElementById('edit-units-' + roomId).value) || 1;
+  const body = { id: roomId, name: name || room.name, description: description || null, amenities: room.amenities, maxOccupancy, totalUnits };
   try {
     await api('POST', '/api/crm/rooms', body);
-    room[field] = value.trim();
-    toast('Saved', 'success');
+    room.name = body.name;
+    room.description = body.description;
+    room.maxOccupancy = maxOccupancy;
+    room.totalUnits = totalUnits;
+    toast('Room saved!', 'success');
   } catch (e) {
     toast('Failed to save', 'error');
   }
