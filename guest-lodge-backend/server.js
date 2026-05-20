@@ -265,10 +265,23 @@ async function getDbHotelConfig(hotelId) {
     const cached = hotelConfigCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-    const row = await withRetry(() => prisma.hotelConfig.findUnique({
+    let row = await withRetry(() => prisma.hotelConfig.findUnique({
         where: { id: key },
         include: { domains: true },
     }));
+
+    // Fallback: resolve by domain if direct ID lookup fails
+    // e.g. "john-s-inn" → look up "john-s-inn.bookmarketel.com" in HotelDomain
+    if (!row && prisma.hotelDomain) {
+        const domainGuess = key + '.bookmarketel.com';
+        const domainRecord = await withRetry(() => prisma.hotelDomain.findUnique({ where: { domain: domainGuess } }));
+        if (domainRecord) {
+            row = await withRetry(() => prisma.hotelConfig.findUnique({
+                where: { id: domainRecord.hotelId },
+                include: { domains: true },
+            }));
+        }
+    }
 
     const config = row
         ? normalizeHotelConfig({
