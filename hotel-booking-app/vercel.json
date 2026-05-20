@@ -106,7 +106,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://*.clickinns.com https://*.onrender.com http://localhost:*"
+          "value": "frame-ancestors 'self' https://*.clickinns.com https://*.bookmarketel.com https://bookmarketel.com https://*.onrender.com http://localhost:*"
         },
         {
           "key": "X-XSS-Protection",

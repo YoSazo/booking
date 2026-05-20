@@ -67,11 +67,11 @@ export function getHotelId() {
     return domainMap[hostname];
   }
 
-  // Dynamic subdomains: {slug}.clickinns.com → use slug as hotelId
-  if (hostname.endsWith('.clickinns.com') && !domainMap[hostname]) {
-    const slug = hostname.replace('.clickinns.com', '');
+  // Dynamic subdomains: {slug}.clickinns.com or {slug}.bookmarketel.com → use slug as hotelId
+  if ((hostname.endsWith('.clickinns.com') || hostname.endsWith('.bookmarketel.com')) && !domainMap[hostname]) {
+    const slug = hostname.replace('.clickinns.com', '').replace('.bookmarketel.com', '');
     if (slug && !slug.includes('.')) {
-      return slug; // e.g. "sunset-inn" from "sunset-inn.clickinns.com"
+      return slug; // e.g. "sunset-inn" from "sunset-inn.bookmarketel.com"
     }
   }
 
