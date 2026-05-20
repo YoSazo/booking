@@ -1,8 +1,98 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import RoomCard from './RoomCard.jsx';
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
+import getHotelId from './utils/getHotelId';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
+  typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3001'
+    : ''
+);
+
+function OwnerPencilButton() {
+  const [showModal, setShowModal] = useState(false);
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Detect if we're inside the setup wizard iframe
+  const isInSetup = new URLSearchParams(window.location.search).has('setup') || 
+    (window !== window.parent);
+
+  const handleVerify = async () => {
+    if (!pin.trim()) { setError('Enter your PIN'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      const hotelId = getHotelId();
+      const res = await fetch(`${API_BASE_URL}/api/crm/verify?hotelId=${encodeURIComponent(hotelId)}`, {
+        headers: { 'x-crm-token': pin.trim() }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        // Store PIN so CRM auto-logs in
+        try { localStorage.setItem('crmToken', pin.trim()); } catch(e) {}
+        window.location.href = '/frontdesk';
+      } else {
+        setError(json.message || 'Incorrect PIN');
+      }
+    } catch (e) {
+      setError('Connection failed. Try again.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <>
+      <button
+        className="owner-pencil-btn"
+        onClick={() => { setShowModal(true); setError(''); setPin(''); }}
+        aria-label="Owner access"
+        title="Owner access"
+      >
+        ✏️
+      </button>
+
+      {showModal && (
+        <div className="owner-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="owner-modal" onClick={e => e.stopPropagation()}>
+            <button className="owner-modal-close" onClick={() => setShowModal(false)}>×</button>
+            {isInSetup ? (
+              <>
+                <h3>You're almost there!</h3>
+                <p>Your front desk is on the next page of the setup wizard. Hit "Next" to see it.</p>
+                <button className="owner-modal-btn" onClick={() => setShowModal(false)}>Got it</button>
+              </>
+            ) : (
+              <>
+                <h3>Are you the owner?</h3>
+                <p>Enter your Front Desk PIN to manage your property.</p>
+                <input
+                  type="text"
+                  className="owner-modal-input"
+                  placeholder="Enter PIN"
+                  value={pin}
+                  onChange={e => setPin(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleVerify()}
+                  autoFocus
+                />
+                {error && <p className="owner-modal-error">{error}</p>}
+                <button
+                  className="owner-modal-btn"
+                  onClick={handleVerify}
+                  disabled={loading}
+                >
+                  {loading ? 'Verifying...' : 'Go →'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function BookingPage({ 
   hotel,
@@ -42,7 +132,9 @@ function BookingPage({
       {/* Marquee banner removed - taking up valuable above-fold space */}
 
       <div className="container">
-        <header className="header">
+        <header className="header" style={{ position: 'relative' }}>
+          {/* Owner pencil button - subtle, top right of header */}
+          <OwnerPencilButton />
           <p className="header-address">{hotel.address}</p>
           <h1>{hotel.name}</h1>
           <p>{hotel.subtitle}</p>
