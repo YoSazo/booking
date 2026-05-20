@@ -4571,8 +4571,12 @@ app.get('/analytics', (req, res) => {
 // Verify PIN only (no DB) - helps debug auth vs DB issues
 app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
     try {
-        const hotelId = requireScopedHotelId(req, res);
-        if (!hotelId) return;
+        // Allow fallback to the PIN's first authorized hotel (for pencil-button flow
+        // where the domain may not resolve on the backend side)
+        const hotelId = resolveScopedHotelId(req, { allowFallback: true });
+        if (!hotelId) {
+            return res.status(403).json({ success: false, message: 'Missing authorized hotel context.' });
+        }
         const config = await resolveHotelConfig(hotelId);
         const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true } });
         res.json({
