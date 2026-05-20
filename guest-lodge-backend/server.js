@@ -4316,7 +4316,7 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{
-                price: 'price_1TYsfHBFnVCGiXweQNHOMDfX',
+                price: 'price_1TZ0hrBFnVCGiXweZZjP0NfZ',
                 quantity: 1,
             }],
             customer_email: hotel.ownerEmail || undefined,
