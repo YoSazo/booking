@@ -1270,7 +1270,7 @@
     }
     }
 
-    .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
+    .revenue-view { margin-top: 8px; display: flex; flex-direction: column; gap: 16px; }
     .revenue-wrap { display: flex; flex-direction: column; gap: 12px; }
     .revenue-period-bar {
       display: flex;
@@ -2191,7 +2191,7 @@ function ensureAvailabilityUi() {
   }
 
   // Add Edit tab if not present
-  if (tabs && !document.querySelector('[data-nav-filter="edit"]')) {
+  if (tabs && !tabs.querySelector('[data-nav-filter="edit"]')) {
     const editBtn = document.createElement('button');
     editBtn.className = 'tab';
     editBtn.setAttribute('type', 'button');
@@ -2199,7 +2199,7 @@ function ensureAvailabilityUi() {
     editBtn.dataset.navFilter = 'edit';
     editBtn.onclick = function () { setFilter('edit', editBtn); };
     // Insert before availability
-    const availBtn = document.querySelector('[data-nav-filter="availability"]');
+    const availBtn = tabs.querySelector('[data-nav-filter="availability"]');
     if (availBtn) tabs.insertBefore(editBtn, availBtn);
     else tabs.appendChild(editBtn);
   }
