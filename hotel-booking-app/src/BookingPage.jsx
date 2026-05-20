@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import RoomCard from './RoomCard.jsx';
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
-import getHotelId from './utils/getHotelId';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -25,8 +24,7 @@ function OwnerPencilButton() {
     setError('');
     setLoading(true);
     try {
-      const hotelId = getHotelId();
-      const res = await fetch(`${API_BASE_URL}/api/crm/verify?hotelId=${encodeURIComponent(hotelId)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/crm/verify`, {
         headers: { 'x-crm-token': pin.trim() }
       });
       const json = await res.json().catch(() => ({}));
@@ -225,7 +223,22 @@ function BookingPage({
               })}
             </div>
           ) : (
-            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
+            <div style={{
+              textAlign: 'center',
+              padding: '48px 24px',
+              background: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              border: '1px solid #e5e7eb'
+            }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>✏️</div>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px' }}>
+                Set up your hotel
+              </h3>
+              <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.5', maxWidth: '280px', margin: '0 auto' }}>
+                Tap the pencil in the top right to manage your rooms, rates, and bookings.
+              </p>
+            </div>
           )}
         </main>
       </div>

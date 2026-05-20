@@ -18,7 +18,7 @@ const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 const hotelId = getHotelId();
 const staticHotel = hotelData[hotelId] || null;
 const fallbackHotel = {
-  name: `Click Inns (${hotelId})`,
+  name: 'Your Hotel',
   url: '',
   subtitle: '',
   phone: '',
