@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marketel — Set Up Your Hotel</title>
+<title>Marketel &mdash; Set Up Your Hotel</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -106,7 +106,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="setup-container">
   <div class="setup-header">
     <img src="/marketellogo.svg" alt="Marketel" class="setup-logo">
-    <div class="setup-title">Set up your booking site</div>
+    <div class="setup-title">Set up your booking engine</div>
   </div>
 
   <div class="progress-bar">
@@ -133,7 +133,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Address</label>
         <input type="text" id="hotelAddress" placeholder="123 Main St, City, State ZIP">
       </div>
-      <button class="btn btn-primary" onclick="saveStep1()">Next →</button>
+      <button class="btn btn-primary" onclick="saveStep1()">Next &rarr;</button>
     </div>
   </div>
 
@@ -147,8 +147,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
       <button class="btn btn-primary" onclick="addRoom()">+ Add Room</button>
-      <button class="btn btn-primary" onclick="goToStep(3)" id="roomNextBtn" style="margin-top:8px; opacity:0.4; pointer-events:none;">Next →</button>
-      <button class="btn btn-back" onclick="goToStep(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goToStep(3)" id="roomNextBtn" style="margin-top:8px; opacity:0.4; pointer-events:none;">Next &rarr;</button>
+      <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
     </div>
   </div>
 
@@ -161,16 +161,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <input type="number" id="rateNightly" placeholder="69" value="69">
       </div>
       <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">Weekly and monthly rates are auto-calculated. You can adjust later.</p>
-      <button class="btn btn-primary" onclick="saveStep3()">See My Booking Site →</button>
-      <button class="btn btn-back" onclick="goToStep(2)">← Back</button>
+      <button class="btn btn-primary" onclick="saveStep3()">See My Booking Engine &rarr;</button>
+      <button class="btn btn-back" onclick="goToStep(2)">&larr; Back</button>
     </div>
   </div>
 
-  <!-- STEP 4: Preview booking site -->
+  <!-- STEP 4: Preview booking engine -->
   <div class="step" id="step-4">
     <div class="form-card" style="padding:16px;">
-      <h2 style="margin-bottom:4px;">This is your booking site</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">This is what your guests see.</p>
+      <h2 style="margin-bottom:4px;">This is your booking engine</h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">Guests can book this directly from your link.</p>
     </div>
 
     <div id="previewContainer" style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); position:relative;">
@@ -178,15 +178,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <iframe id="previewFrame" style="width:100%; height:750px; border:none; display:block;" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
     </div>
 
-    <button class="btn btn-primary" onclick="goToStep(5)">Next — See Your Front Desk →</button>
-    <button class="btn btn-back" onclick="goToStep(3)">← Back</button>
+    <button class="btn btn-primary" onclick="goToStep(5)">Next &mdash; See Your Front Desk &rarr;</button>
+    <button class="btn btn-back" onclick="goToStep(3)">&larr; Back</button>
   </div>
 
   <!-- STEP 5: Front desk demo + pay -->
   <div class="step" id="step-5">
     <div class="form-card" style="padding:16px;">
       <h2 style="margin-bottom:4px;">Your front desk</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">When guests book, everything lands here. Tap around.</p>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">Every direct booking lands here instantly. Tap around.</p>
     </div>
 
     <div style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); position:relative;">
@@ -195,15 +195,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
 
     <div class="live-card" style="margin-top:16px;">
-      <h2>Ready to go live?</h2>
-      <p>One payment and your booking site is active. We'll get your custom domain set up within minutes.</p>
-      <p style="opacity:0.8; font-size:13px; margin-bottom:16px;">$299/month. Cancel anytime. No commission.</p>
+      <h2>Start taking direct bookings.</h2>
+      <p>Your booking engine and front desk are ready. Activate now and stop sending direct guests back to OTAs.</p>
+      <p style="opacity:0.8; font-size:13px; margin-bottom:16px;">$299/month. No commission. Cancel anytime.</p>
       <button class="btn btn-primary" onclick="payAndGoLive()" style="background:white; color:var(--green-dark); font-size:16px;">
-        Start for $299/mo →
+        Go Live for $299/mo &rarr;
       </button>
-      <p style="opacity:0.5; font-size:11px; margin-top:10px;">🔒 Stripe. Cancel anytime, no questions asked.</p>
+      <p style="opacity:0.5; font-size:11px; margin-top:10px;">Stripe checkout. Custom domain included.</p>
     </div>
-    <button class="btn btn-back" onclick="goToStep(4)" style="margin-top:12px;">← Back</button>
+    <button class="btn btn-back" onclick="goToStep(4)" style="margin-top:12px;">&larr; Back</button>
   </div>
 </div>
 

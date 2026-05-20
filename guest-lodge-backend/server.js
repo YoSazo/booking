@@ -109,6 +109,8 @@ const corsOptions = {
         if (origin.endsWith('.vercel.app')) return callback(null, true);
         // Allow any clickinns.com subdomain (customer booking sites)
         if (origin.endsWith('.clickinns.com')) return callback(null, true);
+        // Allow bookmarketel.com and all subdomains
+        if (origin === 'https://bookmarketel.com' || origin.endsWith('.bookmarketel.com')) return callback(null, true);
         callback(new Error('Not allowed by CORS'));
     }
 };
@@ -4099,6 +4101,11 @@ app.get('/landing', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
 });
 
+// Root serves landing page too (for bookmarketel.com)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'landing.html'));
+});
+
 // ── SELF-SERVE SETUP ──────────────────────────────────────────
 
 // Start free setup — create hotel and redirect to wizard (no payment needed)
@@ -4391,7 +4398,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
         // If subdomain, create the domain record
         if (domainPref === 'subdomain') {
             const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            const domain = slug + '.marketel.com'; // Replace with your actual domain
+            const domain = slug + '.bookmarketel.com';
             try {
                 await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
             } catch (e) { /* might exist */ }
