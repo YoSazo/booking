@@ -222,6 +222,8 @@ function BookingPage({
                 );
               })}
             </div>
+          ) : hotel.rooms && hotel.rooms.length > 0 ? (
+            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
           ) : (
             <div style={{
               textAlign: 'center',

@@ -1831,7 +1831,10 @@ function buildHotelContextUrl() {
   const overrideHotelId = getContextParam('hotelId');
   const overrideDomain = getContextParam('domain');
   if (overrideHotelId) url.searchParams.set('hotelId', overrideHotelId);
-  if (overrideDomain) url.searchParams.set('domain', overrideDomain);
+  // Always pass the current hostname so the backend can resolve the hotel
+  // even if x-forwarded-host is not set by the proxy
+  const domain = overrideDomain || getDetectedHostname();
+  if (domain) url.searchParams.set('domain', domain);
   return url.toString();
 }
 

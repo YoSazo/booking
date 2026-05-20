@@ -204,20 +204,6 @@ const handleAddressPaste = (e) => {
     });
 };
 
-// Now, find your address input inside the <Autocomplete> component
-// and add the onPaste handler to it.
-
-<input
-    type="text"
-    name="address"
-    value={formData.address}
-    onChange={handleChange}
-    onPaste={handleAddressPaste} // <-- ADD THIS LINE
-    placeholder="Start typing or paste your address..."
-    autoComplete="street-address"
-    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-/>
-
 
     useEffect(() => { latestFormData.current = formData; }, [formData]);
 
