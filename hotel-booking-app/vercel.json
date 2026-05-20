@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/frontdesk", "destination": "https://guest-lodge-backend.onrender.com/frontdesk" },
+    { "source": "/api/(.*)", "destination": "https://guest-lodge-backend.onrender.com/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
