@@ -55,7 +55,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     }
 
     // Split by bullet separator and map each to an icon
-    const items = amenitiesText.split('•').map(a => a.trim()).filter(Boolean);
+    const items = amenitiesText.split(/\s*[\u2022\u2023\u25E6•]\s*|â€¢/).map(a => a.trim()).filter(Boolean);
     return items.slice(0, 7).map(item => {
       const lower = item.toLowerCase();
       // Find matching icon

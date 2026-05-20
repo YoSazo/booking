@@ -84,6 +84,7 @@ const allowedOrigins = [
     'https://homeplacesuites.clickinns.com',
     'https://www.homeplacesuites.clickinns.com',
     'https://hp.clickinns.com',
+    'https://test.clickinns.com',
     'https://myhomeplacesuites.com',
     'https://www.myhomeplacesuites.com',
     'https://guestlodgeminot.clickinns.com',
@@ -106,6 +107,8 @@ const corsOptions = {
         if (origin.endsWith('.onrender.com')) return callback(null, true);
         // Allow Vercel preview/production domains used by frontend deployments
         if (origin.endsWith('.vercel.app')) return callback(null, true);
+        // Allow any clickinns.com subdomain (customer booking sites)
+        if (origin.endsWith('.clickinns.com')) return callback(null, true);
         callback(new Error('Not allowed by CORS'));
     }
 };
