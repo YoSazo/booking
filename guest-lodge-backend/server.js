@@ -4387,24 +4387,45 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             data: { ownerPhone: phone || hotel.ownerPhone },
         });
 
+        // Auto-create subdomain on Vercel
+        let assignedDomain = '';
+        if (domainPref === 'subdomain') {
+            const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            assignedDomain = slug + '.bookmarketel.com';
+            
+            // Add to Vercel via API
+            const vercelToken = process.env.VERCEL_TOKEN;
+            const vercelProjectId = process.env.VERCEL_PROJECT_ID;
+            if (vercelToken && vercelProjectId) {
+                try {
+                    const vercelRes = await axios.post(
+                        `https://api.vercel.com/v10/projects/${vercelProjectId}/domains`,
+                        { name: assignedDomain },
+                        { headers: { Authorization: `Bearer ${vercelToken}`, 'Content-Type': 'application/json' } }
+                    );
+                    console.log(`✅ Vercel domain added: ${assignedDomain}`, vercelRes.data?.name || '');
+                } catch (vercelErr) {
+                    const errMsg = vercelErr.response?.data?.error?.message || vercelErr.message;
+                    console.error(`⚠️ Vercel domain add failed for ${assignedDomain}: ${errMsg}`);
+                    // Don't fail the whole request — domain can be added manually
+                }
+            }
+
+            // Save domain record in DB
+            try {
+                await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
+            } catch (e) { /* might exist */ }
+        }
+
         // Log for you to action manually
         console.log(`\n🔔 NEW CUSTOMER PAID — ACTION NEEDED`);
         console.log(`   Hotel: ${hotel.name} (${hotel.id})`);
         console.log(`   Email: ${hotel.ownerEmail}`);
         console.log(`   Phone: ${phone}`);
-        console.log(`   Domain: ${domainPref === 'custom' ? customDomain : 'subdomain (auto)'}`);
+        console.log(`   Domain: ${domainPref === 'custom' ? customDomain : assignedDomain}`);
         console.log(`   Setup token: ${req.params.token}\n`);
 
-        // If subdomain, create the domain record
-        if (domainPref === 'subdomain') {
-            const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            const domain = slug + '.bookmarketel.com';
-            try {
-                await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
-            } catch (e) { /* might exist */ }
-        }
-
-        res.json({ success: true });
+        res.json({ success: true, domain: assignedDomain });
     } catch (e) {
         console.error('Finalize error:', e.message);
         res.status(500).json({ error: 'Failed' });
