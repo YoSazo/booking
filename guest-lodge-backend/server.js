@@ -13,6 +13,44 @@ const https = require('https');
 const webpush = require('web-push');
 const nodemailer = require('nodemailer');
 
+// Marketel CAPI (separate pixel for the onboarding funnel)
+const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
+const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
+
+async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency } = {}) {
+    if (!MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
+    try {
+        const userData = {};
+        if (email) userData.em = [crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex')];
+        if (phone) {
+            const digits = String(phone).replace(/\D/g, '');
+            if (digits) userData.ph = [crypto.createHash('sha256').update(digits).digest('hex')];
+        }
+        if (ip) userData.client_ip_address = ip;
+        if (userAgent) userData.client_user_agent = userAgent;
+        if (fbp) userData.fbp = fbp;
+        if (fbc) userData.fbc = fbc;
+
+        const eventPayload = {
+            event_name: eventName,
+            event_time: Math.floor(Date.now() / 1000),
+            event_id: `${eventName.toLowerCase()}.${Date.now()}`,
+            action_source: 'website',
+            user_data: userData,
+        };
+        if (sourceUrl) eventPayload.event_source_url = sourceUrl;
+        if (value) eventPayload.custom_data = { value: parseFloat(value), currency: currency || 'USD' };
+
+        await axios.post(
+            `https://graph.facebook.com/v18.0/${MARKETEL_PIXEL_ID}/events`,
+            { data: [eventPayload], access_token: MARKETEL_ACCESS_TOKEN }
+        );
+        console.log(`✅ Marketel CAPI: ${eventName} sent`);
+    } catch (e) {
+        console.error(`❌ Marketel CAPI ${eventName} failed:`, e.response?.data?.error?.message || e.message);
+    }
+}
+
 // Email transporter (Brevo SMTP)
 const emailTransporter = (process.env.BREVO_SMTP_HOST && (process.env.BREVO_SMTP_KEY || process.env.BREVO_SMTP))
     ? nodemailer.createTransport({
@@ -4232,6 +4270,13 @@ app.post('/api/setup/start', async (req, res) => {
         });
 
         console.log(`✅ Free setup started: ${hotelSlug}, token: ${setupToken}, email: ${email}`);
+        // Meta CAPI: Lead event
+        sendMarketelCAPI('Lead', {
+            email,
+            userAgent: req.headers['user-agent'],
+            ip: req.ip || req.socket?.remoteAddress,
+            sourceUrl: req.headers.referer || req.headers.origin || '',
+        });
         res.json({ success: true, setupUrl: '/setup/' + setupToken, token: setupToken });
     } catch (e) {
         console.error('Start setup error:', e.message);
@@ -4421,6 +4466,16 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
 
+        // Meta CAPI: CustomizeProduct (they clicked Go Live)
+        sendMarketelCAPI('CustomizeProduct', {
+            email: hotel.ownerEmail,
+            userAgent: req.headers['user-agent'],
+            ip: req.ip || req.socket?.remoteAddress,
+            sourceUrl: req.headers.referer || '',
+            fbp: req.body?.fbp || '',
+            fbc: req.body?.fbc || '',
+        });
+
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
 
         const session = await marketelStripe.checkout.sessions.create({
@@ -4456,6 +4511,16 @@ app.get('/setup/:token/success', async (req, res) => {
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
             data: { setupComplete: true, active: true },
+        });
+
+        // Meta CAPI: Subscribe (payment confirmed)
+        sendMarketelCAPI('Subscribe', {
+            email: hotel.ownerEmail,
+            userAgent: req.headers['user-agent'],
+            ip: req.ip || req.socket?.remoteAddress,
+            sourceUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+            value: 299,
+            currency: 'USD',
         });
 
         // Create default CRM PIN
