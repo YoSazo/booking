@@ -147,6 +147,7 @@ model HotelConfig {
   subtitle      String?
   checkInTime   String?   @default("15:00")
   checkOutTime  String?   @default("11:00")
+  cancellationPolicy String?
 
   domains       HotelDomain[]
   crmPins       CrmPin[]

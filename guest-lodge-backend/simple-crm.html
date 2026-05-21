@@ -3179,16 +3179,22 @@ function openAvailabilityDayPopover(event, dayIso) {
 
   if (backdrop) backdrop.classList.add('open');
 
-  // Position: on mobile center it, on desktop position near cell
+  // Position: on mobile center above the cell, on desktop position near cell
   const isMobile = window.innerWidth < 600;
+  const rect = event.currentTarget.getBoundingClientRect();
   if (isMobile) {
+    const popWidth = 220;
+    let left = rect.left + (rect.width / 2) - (popWidth / 2);
+    if (left < 10) left = 10;
+    if (left + popWidth > window.innerWidth - 10) left = window.innerWidth - popWidth - 10;
+    let top = rect.top - 140;
+    if (top < 10) top = rect.bottom + 8;
     pop.style.position = 'fixed';
-    pop.style.left = '50%';
-    pop.style.top = '50%';
-    pop.style.transform = 'translate(-50%, -50%)';
-    pop.style.width = '240px';
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    pop.style.transform = '';
+    pop.style.width = popWidth + 'px';
   } else {
-    const rect = event.currentTarget.getBoundingClientRect();
     let top = rect.bottom + 8;
     let left = rect.left;
     if (left + 250 > window.innerWidth) left = window.innerWidth - 260;
@@ -3614,6 +3620,11 @@ async function loadEditRooms() {
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Phone</div>
             <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
           </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Booking Page Banner</div>
+            <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. ✅ Free Cancellation up to 7 days before arrival. 📞 Questions? Call us!" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
+            <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">Shown to guests during checkout. Leave blank for default.</p>
+          </div>
           <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save</button>
         </div>
       </div>
@@ -3716,7 +3727,7 @@ function renderEditRoomsCards() {
         </div>
         <div style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Description</div>
-          <input type="text" value="${r.description || ''}" id="edit-desc-${r.id}" placeholder="e.g. A spacious room with king bed and city view" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
+          <input type="text" value="${(r.description || '').replace(/"/g, '&quot;')}" id="edit-desc-${r.id}" placeholder="e.g. A spacious room with king bed and city view" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
         </div>
         <div style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Amenities</div>
@@ -3864,8 +3875,9 @@ async function saveHotelInfo() {
   const subtitle = document.getElementById('edit-hotel-subtitle')?.value.trim();
   const address = document.getElementById('edit-hotel-address')?.value.trim();
   const phone = document.getElementById('edit-hotel-phone')?.value.trim();
+  const cancellationPolicy = document.getElementById('edit-hotel-policy')?.value.trim();
   try {
-    await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone });
+    await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone, cancellationPolicy });
     toast('Hotel info saved!', 'success');
   } catch (e) {
     toast('Failed to save', 'error');
@@ -3967,6 +3979,13 @@ async function saveEditRoom(roomId) {
 async function uploadEditImage(event, roomId) {
   const file = event.target.files[0];
   if (!file) return;
+  // Show loading on the room card
+  const card = document.getElementById('edit-card-' + roomId);
+  const imgContainer = card?.querySelector('div:first-child');
+  if (imgContainer) {
+    imgContainer.style.position = 'relative';
+    imgContainer.insertAdjacentHTML('beforeend', '<div id="upload-spinner-' + roomId + '" style="position:absolute;inset:0;background:rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;z-index:5;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;"></div></div>');
+  }
   const fd = new FormData();
   fd.append('image', file);
   try {
@@ -3977,7 +3996,6 @@ async function uploadEditImage(event, roomId) {
     });
     const data = await res.json();
     if (data.success && data.image) {
-      // Add image to local state and re-render just the rooms cards (not the whole page)
       const room = editRooms.find(r => r.id === roomId);
       if (room) {
         if (!room.images) room.images = [];
@@ -3992,6 +4010,9 @@ async function uploadEditImage(event, roomId) {
   } catch (e) {
     toast('Upload failed', 'error');
   }
+  // Remove spinner
+  const spinner = document.getElementById('upload-spinner-' + roomId);
+  if (spinner) spinner.remove();
 }
 
 async function deleteEditImage(roomId, imageId) {

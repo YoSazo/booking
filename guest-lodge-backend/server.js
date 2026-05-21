@@ -1550,6 +1550,19 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     }
                 });
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
+                // Send guest confirmation email
+                const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true } }).catch(() => null);
+                sendGuestConfirmationEmail({
+                    guestEmail: guestInfo.email,
+                    guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
+                    hotelName: hotelForEmail?.name || 'Your Hotel',
+                    roomName: bookingDetails.name || bookingDetails.roomName,
+                    checkin: bookingDetails.checkin,
+                    checkout: bookingDetails.checkout,
+                    nights: bookingDetails.nights,
+                    total: bookingDetails.total,
+                    reservationCode: pmsResponse.reservationID || bookingDetails.reservationCode,
+                });
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -4573,7 +4586,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Don't send welcome email here — wait until they submit their contact info via /finalize
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:299,currency:'USD'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:299,currency:'USD'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');
@@ -4740,6 +4753,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             pms: hotel.pms,
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
+            cancellationPolicy: hotel.cancellationPolicy || '',
             rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
             rooms: hotel.rooms.map((r, i) => ({
                 id: i + 1,
@@ -4773,7 +4787,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Missing authorized hotel context.' });
         }
         const config = await resolveHotelConfig(hotelId);
-        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true } });
+        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true } });
         const primaryDomain = await prisma.hotelDomain.findFirst({ where: { hotelId, isPrimary: true }, select: { domain: true } });
         res.json({
             success: true,
@@ -4786,6 +4800,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             hotelSubtitle: dbHotel?.subtitle || '',
             hotelAddress: dbHotel?.address || '',
             hotelPhone: dbHotel?.phone || '',
+            cancellationPolicy: dbHotel?.cancellationPolicy || '',
         });
     } catch (e) {
         console.error('crm:verify failed:', e.message);
@@ -4793,17 +4808,18 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
     }
 });
 
-// Update hotel name/subtitle/address/phone
+// Update hotel name/subtitle/address/phone/cancellationPolicy
 app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const { name, subtitle, address, phone } = req.body;
+        const { name, subtitle, address, phone, cancellationPolicy } = req.body;
         const data = {};
         if (name !== undefined) data.name = name || undefined;
         if (subtitle !== undefined) data.subtitle = subtitle;
         if (address !== undefined) data.address = address;
         if (phone !== undefined) data.phone = phone;
+        if (cancellationPolicy !== undefined) data.cancellationPolicy = cancellationPolicy;
         await prisma.hotelConfig.update({
             where: { id: hotelId },
             data,

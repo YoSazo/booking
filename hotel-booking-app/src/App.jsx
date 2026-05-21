@@ -120,6 +120,7 @@ function App() {
           pms: data.pms || 'manual',
           rates: data.rates || fallbackHotel.rates,
           rooms: data.rooms || [],
+          cancellationPolicy: data.cancellationPolicy || '',
           reviews: [],
         });
       } catch (e) {

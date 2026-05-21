@@ -67,7 +67,7 @@ function OwnerPencilButton() {
 
       {showTourGuide && (
         <div className="pencil-tour-guide" onClick={() => setShowTourGuide(false)}>
-          <div className="pencil-tour-arrow">↗</div>
+          <div className="pencil-tour-arrow">→</div>
           <div className="pencil-tour-text">Tap here to manage your hotel</div>
         </div>
       )}
@@ -243,7 +243,25 @@ function BookingPage({
               })}
             </div>
           ) : hotel.rooms && hotel.rooms.length > 0 ? (
-            <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}><strong>No rooms available for the selected dates.</strong><br/>Please try another search.</p>
+            <div style={{textAlign: 'center', padding: '40px 20px'}}>
+              <p style={{fontSize: '1.1em', marginBottom: '16px'}}><strong>No rooms available for the selected dates.</strong></p>
+              <button
+                onClick={onCalendarOpen}
+                style={{
+                  padding: '12px 24px',
+                  background: '#2E7D5B',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit'
+                }}
+              >
+                Try different dates
+              </button>
+            </div>
           ) : (
             <div style={{
               textAlign: 'center',

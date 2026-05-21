@@ -130,7 +130,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
       )}
 
       <div className="static-banner" style={{ marginTop: '16px' }}>
-        ✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotelPhone} — we're happy to help!
+        {hotel?.cancellationPolicy || <>✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotelPhone} — we're happy to help!</>}
       </div>
 
       <div className="confirmation-container">

@@ -5619,9 +5619,11 @@ padding: 6px 16px;
 .pencil-tour-arrow {
   font-size: 14px;
   animation: tourBounce 1s ease-in-out infinite;
+  order: 2;
 }
 .pencil-tour-text {
   line-height: 1;
+  order: 1;
 }
 @keyframes tourPulse {
   0%, 100% { opacity: 1; }
