@@ -3652,6 +3652,19 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
         </div>
       </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+          <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
+          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+        </div>
+        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
+          <div style="margin-bottom:12px;">
+            <textarea id="supportMessage" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
+          </div>
+          <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
+        </div>
+      </div>
       <div id="editRoomsCards"></div>
     `;
     list.innerHTML = html;
@@ -3674,15 +3687,17 @@ function renderEditRoomsCards() {
   }
   list.innerHTML = editRooms.map(r => {
     const currentAmenities = (r.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
+    const images = r.images || [];
     return `
     <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
       <div style="position:relative;">
-        ${r.imageUrl ? `<img src="${r.imageUrl}" style="width:100%;height:200px;object-fit:cover;display:block;">` : `<div style="width:100%;height:160px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photo yet</div>`}
+        ${images.length ? `<img src="${images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
         <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          📷 Replace
+          📷 + Add Photo
           <input type="file" accept="image/*" style="display:none;" onchange="uploadEditImage(event,'${r.id}')">
         </label>
       </div>
+      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       <div style="padding:18px;">
         <div style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
@@ -3906,6 +3921,18 @@ async function openBillingPortal() {
   }
 }
 
+async function sendSupportMessage() {
+  const msg = document.getElementById('supportMessage')?.value.trim();
+  if (!msg) { toast('Please enter a message', 'error'); return; }
+  try {
+    await api('POST', '/api/crm/support', { message: msg });
+    document.getElementById('supportMessage').value = '';
+    toast('Message sent! We\'ll reply to your email.', 'success');
+  } catch (e) {
+    toast('Failed to send. Email support@bookmarketel.com directly.', 'error');
+  }
+}
+
 async function saveEditRoom(roomId) {
   const room = editRooms.find(r => r.id === roomId);
   if (!room) return;
@@ -3939,13 +3966,24 @@ async function uploadEditImage(event, roomId) {
     });
     const data = await res.json();
     if (data.success) {
-      toast('Photo updated', 'success');
+      toast('Photo added', 'success');
       loadEditRooms();
     } else {
       toast('Upload failed', 'error');
     }
   } catch (e) {
     toast('Upload failed', 'error');
+  }
+}
+
+async function deleteEditImage(roomId, imageId) {
+  if (!confirm('Delete this photo?')) return;
+  try {
+    await api('DELETE', `/api/crm/rooms/${roomId}/images/${imageId}`);
+    toast('Photo deleted', 'success');
+    loadEditRooms();
+  } catch (e) {
+    toast('Failed to delete', 'error');
   }
 }
 

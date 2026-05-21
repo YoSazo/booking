@@ -14,10 +14,23 @@ function OwnerPencilButton() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showTourGuide, setShowTourGuide] = useState(false);
 
   // Detect if we're inside the setup wizard iframe
   const isInSetup = new URLSearchParams(window.location.search).has('setup') || 
     (window !== window.parent);
+
+  // Show tour guide on first visit (welcome=1 param from success page)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('welcome')) {
+      setShowTourGuide(true);
+      // Remove the param from URL without reload
+      const url = new URL(window.location);
+      url.searchParams.delete('welcome');
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
 
   const handleVerify = async () => {
     if (!pin.trim()) { setError('Enter your PIN'); return; }
@@ -45,12 +58,19 @@ function OwnerPencilButton() {
     <>
       <button
         className="owner-pencil-btn"
-        onClick={() => { setShowModal(true); setError(''); setPin(''); }}
+        onClick={() => { setShowTourGuide(false); setShowModal(true); setError(''); setPin(''); }}
         aria-label="Owner access"
         title="Owner access"
       >
         ✏️
       </button>
+
+      {showTourGuide && (
+        <div className="pencil-tour-guide" onClick={() => setShowTourGuide(false)}>
+          <div className="pencil-tour-arrow">↗</div>
+          <div className="pencil-tour-text">Tap here to manage your hotel</div>
+        </div>
+      )}
 
       {showModal && (
         <div className="owner-modal-overlay" onClick={() => setShowModal(false)}>

@@ -531,9 +531,15 @@ const handleConfirmBooking = async (bookingDetails) => {
     setLightboxData(null);
   };
 
-  // Show nothing while loading dynamic hotel
+  // Show loading spinner while loading dynamic hotel
   if (hotelLoading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui' }}>Loading...</div>;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui', gap: '16px' }}>
+        <div style={{ width: '32px', height: '32px', border: '3px solid #e5e7eb', borderTopColor: '#2E7D5B', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <p style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Getting your engine ready...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
   }
 
   return (

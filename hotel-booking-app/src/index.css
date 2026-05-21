@@ -5586,3 +5586,48 @@ padding: 6px 16px;
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* --- Pencil Tour Guide (first visit) --- */
+.pencil-tour-guide {
+  position: absolute;
+  top: 6px;
+  right: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1a1a2e;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 60;
+  animation: tourPulse 2s ease-in-out infinite;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  white-space: nowrap;
+}
+.pencil-tour-guide::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: #1a1a2e;
+}
+.pencil-tour-arrow {
+  font-size: 14px;
+  animation: tourBounce 1s ease-in-out infinite;
+}
+.pencil-tour-text {
+  line-height: 1;
+}
+@keyframes tourPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+@keyframes tourBounce {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
