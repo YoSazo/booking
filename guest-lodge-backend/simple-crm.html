@@ -1642,6 +1642,14 @@
       onkeydown="if(event.key==='Enter') doLogin()">
     <button class="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-error" id="loginError"></div>
+    <div id="forgotPinSection" style="margin-top:14px;text-align:center;">
+      <a href="#" onclick="showForgotPin(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Forgot PIN?</a>
+      <div id="forgotPinForm" style="display:none;margin-top:12px;">
+        <input class="login-input" type="email" id="forgotPinEmail" placeholder="Owner email address" style="margin-bottom:10px;">
+        <button class="login-btn" onclick="submitForgotPin()" style="background:#555;">Reset PIN</button>
+        <div id="forgotPinMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2429,6 +2437,27 @@ async function doLogin() {
   } catch (e) {
     err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : (e.message || 'Connection failed');
   }
+}
+
+function showForgotPin(e) {
+  e.preventDefault();
+  document.getElementById('forgotPinForm').style.display = 'block';
+  e.target.style.display = 'none';
+}
+
+async function submitForgotPin() {
+  const email = document.getElementById('forgotPinEmail').value.trim();
+  const msg = document.getElementById('forgotPinMsg');
+  if (!email) { msg.textContent = 'Please enter your email'; return; }
+  msg.textContent = 'Sending…';
+  try {
+    await fetch('/api/forgot-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  } catch (e) { /* ignore */ }
+  msg.textContent = "If that email is on file, we've sent a new PIN.";
 }
 
 // ── API ────────────────────────────────────────────────
@@ -3535,7 +3564,23 @@ async function loadEditRooms() {
     if (res.rates) rates = res.rates;
 
     // Render hotel info section + rates + PIN + rooms
+    const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
+    const bookingUrl = 'https://' + bookingDomain;
+    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
+          <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
+            <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
+            <button onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
+          </div>
+          <div style="text-align:center;margin-bottom:10px;">
+            <img src="${qrUrl}" alt="QR Code" style="width:160px;height:160px;border-radius:8px;border:1px solid var(--border);">
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this link to your Google Business profile, website, or text it to guests.</p>
+        </div>
+      </div>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Hotel Info</div>
@@ -3586,6 +3631,13 @@ async function loadEditRooms() {
           </div>
           <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
+        </div>
+      </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Subscription</div>
+          <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
         </div>
       </div>
       <div id="editRoomsCards"></div>
@@ -3806,6 +3858,27 @@ async function changePin() {
     document.getElementById('edit-new-pin').value = '';
   } catch (e) {
     toast('Failed to change PIN', 'error');
+  }
+}
+
+function copyBookingLink(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    toast('Booking link copied!', 'success');
+  }).catch(() => {
+    toast('Failed to copy', 'error');
+  });
+}
+
+async function openBillingPortal() {
+  try {
+    const res = await api('GET', '/api/crm/billing-portal');
+    if (res.success && res.url) {
+      window.location.href = res.url;
+    } else {
+      toast(res.message || 'Contact support@bookmarketel.com to manage your subscription.', 'error');
+    }
+  } catch (e) {
+    toast('Contact support@bookmarketel.com to manage your subscription.', 'error');
   }
 }
 

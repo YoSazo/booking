@@ -14,14 +14,14 @@ const webpush = require('web-push');
 const nodemailer = require('nodemailer');
 
 // Email transporter (Brevo SMTP)
-const emailTransporter = (process.env.BREVO_SMTP_HOST && process.env.BREVO_SMTP_KEY)
+const emailTransporter = ((process.env.BREVO_SMTP_HOST || process.env.SMTP_SERVER) && (process.env.BREVO_SMTP_KEY || process.env.BREVO_SMPTP))
     ? nodemailer.createTransport({
-        host: process.env.BREVO_SMTP_HOST,
-        port: parseInt(process.env.BREVO_SMTP_PORT) || 587,
+        host: process.env.BREVO_SMTP_HOST || process.env.SMTP_SERVER,
+        port: parseInt(process.env.BREVO_SMTP_PORT || process.env.BREVO_PORT) || 587,
         secure: false,
         auth: {
-            user: process.env.BREVO_SMTP_LOGIN,
-            pass: process.env.BREVO_SMTP_KEY,
+            user: process.env.BREVO_SMTP_LOGIN || process.env.BREVO_LOGIN,
+            pass: process.env.BREVO_SMTP_KEY || process.env.BREVO_SMPTP,
         },
     })
     : null;
@@ -158,8 +158,10 @@ app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
 app.use('/uploads', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
-});
+}, express.static(path.join(__dirname, 'public', 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
@@ -4658,9 +4660,11 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
         }
         const config = await resolveHotelConfig(hotelId);
         const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true } });
+        const primaryDomain = await prisma.hotelDomain.findFirst({ where: { hotelId, isPrimary: true }, select: { domain: true } });
         res.json({
             success: true,
             hotelId,
+            domain: primaryDomain?.domain || '',
             allowedHotels: req.crmAllowedHotels || [],
             pms: config.pms,
             isManualPms: config.pms === 'manual',
@@ -4697,6 +4701,39 @@ app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
     }
 });
 
+// Forgot PIN — email a new PIN to the owner (no auth required)
+app.post('/api/forgot-pin', async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (email) {
+            const hotel = await prisma.hotelConfig.findFirst({ where: { ownerEmail: email } });
+            if (hotel) {
+                // Generate new 4-digit PIN
+                const newPin = String(Math.floor(1000 + Math.random() * 9000));
+                const pinHash = hashCrmPin(newPin);
+                // Deactivate old PINs
+                await prisma.crmPin.updateMany({ where: { hotelId: hotel.id }, data: { active: false } });
+                // Create new PIN
+                await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Reset PIN', active: true } });
+                // Send email
+                if (emailTransporter) {
+                    await emailTransporter.sendMail({
+                        from: '"Marketel" <support@bookmarketel.com>',
+                        to: email,
+                        subject: 'Your new Front Desk PIN',
+                        text: `Hi,\n\nYour Front Desk PIN has been reset.\n\nYour new PIN: ${newPin}\n\nUse this PIN to log in at your Front Desk dashboard.\n\n— Marketel`,
+                    });
+                }
+            }
+        }
+        // Always return success (don't reveal if email exists)
+        res.json({ success: true });
+    } catch (e) {
+        console.error('forgot-pin error:', e.message);
+        res.json({ success: true });
+    }
+});
+
 // Change PIN (CRM-authenticated — owner can change their own PIN)
 app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
     try {
@@ -4719,6 +4756,35 @@ app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('crm:change-pin failed:', e.message);
         res.status(500).json({ success: false, message: 'Failed to change PIN' });
+    }
+});
+
+// Billing portal — redirect to Stripe customer portal
+app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
+    try {
+        if (!marketelStripe) {
+            return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
+        }
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { ownerEmail: true } });
+        if (!hotel?.ownerEmail) {
+            return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
+        }
+        // Find customer by email
+        const customers = await marketelStripe.customers.list({ email: hotel.ownerEmail, limit: 1 });
+        if (!customers.data.length) {
+            return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
+        }
+        const customerId = customers.data[0].id;
+        const session = await marketelStripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: req.headers.referer || '/',
+        });
+        res.json({ success: true, url: session.url });
+    } catch (e) {
+        console.error('crm:billing-portal error:', e.message);
+        res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
     }
 });
 
