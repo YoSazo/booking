@@ -17,7 +17,7 @@ const nodemailer = require('nodemailer');
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
 
-async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency } = {}) {
+async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId } = {}) {
     if (!MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
     try {
         const userData = {};
@@ -34,7 +34,7 @@ async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, source
         const eventPayload = {
             event_name: eventName,
             event_time: Math.floor(Date.now() / 1000),
-            event_id: `${eventName.toLowerCase()}.${Date.now()}`,
+            event_id: eventId || `${eventName.toLowerCase()}.${Date.now()}`,
             action_source: 'website',
             user_data: userData,
         };
@@ -49,6 +49,14 @@ async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, source
     } catch (e) {
         console.error(`❌ Marketel CAPI ${eventName} failed:`, e.response?.data?.error?.message || e.message);
     }
+}
+
+// Helper to extract fbp/fbc from request cookies
+function getMetaCookies(req) {
+    const cookieHeader = req.headers.cookie || '';
+    const fbp = (cookieHeader.match(/(?:^|;\s*)_fbp=([^;]+)/) || [])[1] || '';
+    const fbc = (cookieHeader.match(/(?:^|;\s*)_fbc=([^;]+)/) || [])[1] || '';
+    return { fbp, fbc };
 }
 
 // Email transporter (Brevo SMTP)
@@ -4271,11 +4279,13 @@ app.post('/api/setup/start', async (req, res) => {
 
         console.log(`✅ Free setup started: ${hotelSlug}, token: ${setupToken}, email: ${email}`);
         // Meta CAPI: Lead event
+        const { fbp, fbc } = getMetaCookies(req);
         sendMarketelCAPI('Lead', {
             email,
             userAgent: req.headers['user-agent'],
             ip: req.ip || req.socket?.remoteAddress,
             sourceUrl: req.headers.referer || req.headers.origin || '',
+            fbp, fbc,
         });
         res.json({ success: true, setupUrl: '/setup/' + setupToken, token: setupToken });
     } catch (e) {
@@ -4467,13 +4477,14 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
 
         // Meta CAPI: CustomizeProduct (they clicked Go Live)
+        const { fbp: cpFbp, fbc: cpFbc } = getMetaCookies(req);
         sendMarketelCAPI('CustomizeProduct', {
             email: hotel.ownerEmail,
             userAgent: req.headers['user-agent'],
             ip: req.ip || req.socket?.remoteAddress,
             sourceUrl: req.headers.referer || '',
-            fbp: req.body?.fbp || '',
-            fbc: req.body?.fbc || '',
+            fbp: req.body?.fbp || cpFbp,
+            fbc: req.body?.fbc || cpFbc,
         });
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
@@ -4514,11 +4525,15 @@ app.get('/setup/:token/success', async (req, res) => {
         });
 
         // Meta CAPI: Subscribe (payment confirmed)
+        const { fbp: subFbp, fbc: subFbc } = getMetaCookies(req);
         sendMarketelCAPI('Subscribe', {
             email: hotel.ownerEmail,
+            phone: hotel.ownerPhone,
             userAgent: req.headers['user-agent'],
             ip: req.ip || req.socket?.remoteAddress,
             sourceUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+            fbp: subFbp,
+            fbc: subFbc,
             value: 299,
             currency: 'USD',
         });
@@ -4558,7 +4573,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Don't send welcome email here — wait until they submit their contact info via /finalize
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:299,currency:'USD'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');

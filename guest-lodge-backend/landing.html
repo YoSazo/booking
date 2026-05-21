@@ -171,7 +171,10 @@ function startFreeSetup() {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   }).then(r => r.json()).then(data => {
-    if (data.setupUrl) { window.location.href = API + data.setupUrl; }
+    if (data.setupUrl) {
+      if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'setup_start' });
+      window.location.href = API + data.setupUrl;
+    }
     else { throw new Error(); }
   }).catch(() => {
     alert('Something went wrong. Try again.');
