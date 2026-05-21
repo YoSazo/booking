@@ -20,12 +20,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .header-logo { height: 26px; }
 .header-name { font-size: 14px; font-weight: 700; }
 
-.container { max-width: 600px; margin: 0 auto; padding: 16px; }
+.container { max-width: 600px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
 
 /* Tour overlay */
 .tour-bar {
   background: var(--text); color: white; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  position: sticky; top: 48px; z-index: 90;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
 }
 .tour-text { font-size: 13px; font-weight: 500; line-height: 1.4; }
 .tour-next {
@@ -126,14 +126,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <!-- Tour bar -->
-<div class="tour-bar" id="tourBar">
-  <div>
-    <div class="tour-text" id="tourText">These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.</div>
-    <div class="tour-step" id="tourStepLabel">Step 1 of 3</div>
-  </div>
-  <button class="tour-next" id="tourNextBtn" onclick="nextTourStep()">Next →</button>
-</div>
-
 <div class="tabs" id="tabBar">
   <button class="tab active" onclick="switchTab('bookings')">Bookings</button>
   <button class="tab" onclick="switchTab('edit')">Edit</button>
@@ -242,6 +234,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <button class="popover-done" onclick="closePop()">Done</button>
 </div>
 
+<div class="tour-bar" id="tourBar">
+  <div>
+    <div class="tour-text" id="tourText">These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.</div>
+    <div class="tour-step" id="tourStepLabel">Step 1 of 4</div>
+  </div>
+  <button class="tour-next" id="tourNextBtn" onclick="nextTourStep()">Next →</button>
+</div>
+
 <script>
 const params = new URLSearchParams(window.location.search);
 const hotelName = params.get('name');
@@ -255,6 +255,17 @@ const tourSteps = [
   { view: 'availability', text: 'Control what\'s available on your booking engine. Tap any date to open or close rooms — your site updates instantly.', label: 'Step 3 of 4' },
   { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\'re saving vs. OTA commissions.', label: 'Step 4 of 4', btnText: 'Got it ✓' },
 ];
+
+const noTour = new URLSearchParams(window.location.search).has('notour');
+if (noTour) {
+  document.getElementById('tourBar').style.display = 'none';
+  // Listen for parent to drive tab switching
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'switchTab') {
+      switchTab(e.data.view);
+    }
+  });
+}
 
 function showTourStep() {
   const step = tourSteps[tourStep];
@@ -271,19 +282,37 @@ function showTourStep() {
 function nextTourStep() {
   tourStep++;
   if (tourStep >= tourSteps.length) {
-    // Tour done — hide bar, let them explore freely
-    document.getElementById('tourBar').style.display = 'none';
+    // Tour done — show CTA inside the bar
+    var bar = document.getElementById('tourBar');
+    bar.style.background = 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)';
+    bar.style.flexDirection = 'column';
+    bar.style.textAlign = 'center';
+    bar.style.padding = '20px 16px';
+    bar.innerHTML = '<div style="font-size:17px;font-weight:700;margin-bottom:6px;">Start taking direct bookings.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:10px;">Your booking engine and front desk are ready.<br>$299/month. No commission. Cancel anytime.</div><button onclick="window.parent.postMessage({type:\'payNow\'},\'*\')" style="background:white;color:#1a5c3f;border:none;padding:12px 24px;border-radius:10px;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div>';
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'tourComplete' }, '*');
+    }
     return;
   }
   showTourStep();
 }
-showTourStep();
+if (!noTour) showTourStep();
+if (noTour) switchTab('bookings');
 
 function switchTab(name) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('view-' + name).classList.add('active');
-  event.target.classList.add('active');
+  var views = document.querySelectorAll('.view');
+  var tabs = document.querySelectorAll('.tab');
+  var targetView = document.getElementById('view-' + name);
+  if (!targetView) return;
+  views.forEach(function(v) { v.classList.remove('active'); });
+  tabs.forEach(function(t) { t.classList.remove('active'); });
+  targetView.classList.add('active');
+  // Highlight matching tab by checking onclick attribute text
+  tabs.forEach(function(t) {
+    if (t.textContent.toLowerCase().replace(/\s/g,'') === name.toLowerCase().replace(/\s/g,'')) {
+      t.classList.add('active');
+    }
+  });
   if (name === 'availability') { renderCal(); setTimeout(showPointer, 500); }
 }
 

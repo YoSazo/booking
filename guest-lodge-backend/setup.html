@@ -15,6 +15,7 @@
 }
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 .setup-container { max-width: 500px; margin: 0 auto; padding: 32px 20px 100px; }
+.setup-container.compact { padding-bottom: 8px; }
 .setup-header { text-align: center; margin-bottom: 24px; }
 .setup-logo { height: 36px; margin-bottom: 12px; }
 .setup-title { font-size: 20px; font-weight: 700; }
@@ -92,6 +93,104 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .toast.show { display: block; }
 .toast.error { background: var(--red); }
 
+/* Full-page iframe steps (mobile only) */
+.step-fullpage {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: none;
+  flex-direction: column;
+}
+.step-fullpage.active {
+  display: flex !important;
+}
+.fullpage-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fullpage-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.fullpage-back {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--green);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+.fullpage-iframe-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.fullpage-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+.fullpage-loading {
+  position: absolute;
+  inset: 0;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.fullpage-bottombar {
+  padding: 12px 16px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fullpage-bottombar .btn {
+  width: 100%;
+}
+
+/* Desktop: revert to inline iframe layout */
+@media (min-width: 769px) {
+  .step-fullpage {
+    position: static;
+    z-index: auto;
+    background: none;
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+  }
+  .step-fullpage.active {
+    display: block !important;
+  }
+  .fullpage-topbar {
+    display: none;
+  }
+  .fullpage-iframe-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+    height: 80vh;
+    flex: none;
+  }
+  .fullpage-bottombar {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 16px 0;
+  }
+}
+
 .loading-overlay {
   display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8);
   z-index: 250; align-items: center; justify-content: center;
@@ -166,45 +265,38 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 4: Preview booking engine -->
-  <div class="step" id="step-4">
-    <div class="form-card" style="padding:16px;">
-      <h2 style="margin-bottom:4px;">This is your booking engine</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">Guests can book this directly from your link.</p>
-    </div>
+</div>
 
-    <div id="previewContainer" style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); position:relative;">
-      <div id="previewLoading" style="position:absolute;inset:0;background:var(--card);display:flex;align-items:center;justify-content:center;z-index:2;"><div class="spinner"></div></div>
-      <iframe id="previewFrame" style="width:100%; height:750px; border:none; display:block;" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
-    </div>
-
-    <button class="btn btn-primary" onclick="goToStep(5)">Next &mdash; See Your Front Desk &rarr;</button>
-    <button class="btn btn-back" onclick="goToStep(3)">&larr; Back</button>
+<!-- Full-page iframe steps (outside container) -->
+<!-- STEP 4: Preview booking engine (full-page iframe) -->
+<div class="step step-fullpage" id="step-4">
+  <div class="fullpage-topbar">
+    <button class="fullpage-back" onclick="goToStep(3)">&larr;</button>
+    <div class="fullpage-title">Your booking engine</div>
+    <div style="width:32px;"></div>
   </div>
-
-  <!-- STEP 5: Front desk demo + pay -->
-  <div class="step" id="step-5">
-    <div class="form-card" style="padding:16px;">
-      <h2 style="margin-bottom:4px;">Your front desk</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:0;">Every direct booking lands here instantly. Tap around.</p>
-    </div>
-
-    <div style="margin:12px 0; border-radius:16px; overflow:hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.12); border:1px solid var(--border); position:relative;">
-      <div id="frontdeskLoading" style="position:absolute;inset:0;background:var(--card);display:flex;align-items:center;justify-content:center;z-index:2;"><div class="spinner"></div></div>
-      <iframe id="frontdeskDemoFrame" style="width:100%; height:700px; border:none; display:block;" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
-    </div>
-
-    <div class="live-card" style="margin-top:16px;">
-      <h2>Start taking direct bookings.</h2>
-      <p>Your booking engine and front desk are ready. Activate now and stop sending direct guests back to OTAs.</p>
-      <p style="opacity:0.8; font-size:13px; margin-bottom:16px;">$299/month. No commission. Cancel anytime.</p>
-      <button class="btn btn-primary" onclick="payAndGoLive()" style="background:white; color:var(--green-dark); font-size:16px;">
-        Go Live for $299/mo &rarr;
-      </button>
-      <p style="opacity:0.5; font-size:11px; margin-top:10px;">Stripe checkout. Custom domain included.</p>
-    </div>
-    <button class="btn btn-back" onclick="goToStep(4)" style="margin-top:12px;">&larr; Back</button>
+  <div class="fullpage-iframe-wrap">
+    <div id="previewLoading" class="fullpage-loading"><div class="spinner"></div></div>
+    <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
   </div>
+  <div class="fullpage-bottombar">
+    <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Guests can book directly from your link.</p>
+    <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">Next &rarr;</button>
+  </div>
+</div>
+
+<!-- STEP 5: Front desk demo (full-page iframe) -->
+<div class="step step-fullpage" id="step-5">
+  <div class="fullpage-topbar">
+    <button class="fullpage-back" onclick="goToStep(4)">&larr;</button>
+    <div class="fullpage-title">Your front desk</div>
+    <div style="width:32px;"></div>
+  </div>
+  <div class="fullpage-iframe-wrap">
+    <div id="frontdeskLoading" class="fullpage-loading"><div class="spinner"></div></div>
+    <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
+  </div>
+  <div class="fullpage-bottombar" id="step5Bottom"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -231,6 +323,21 @@ function goToStep(n) {
   document.querySelectorAll('.progress-step').forEach((s, i) => {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
+  const container = document.querySelector('.setup-container');
+  const isMobile = window.innerWidth < 769;
+  if ((n === 4 || n === 5) && isMobile) {
+    container.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+  } else {
+    container.style.display = 'block';
+    document.body.style.overflow = '';
+  }
+  // On desktop, reduce container padding so iframe sits tight below progress bar
+  if (n === 4 || n === 5) {
+    container.classList.add('compact');
+  } else {
+    container.classList.remove('compact');
+  }
   if (n === 4) loadPreview();
   if (n === 5) loadFrontdeskDemo();
   window.scrollTo(0, 0);
@@ -246,8 +353,66 @@ function loadPreview() {
 function loadFrontdeskDemo() {
   const base = window.location.origin;
   const name = encodeURIComponent(hotelData.name || 'Your Hotel');
-  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name;
+  const isMobile = window.innerWidth < 769;
+  // Mobile: hide iframe tour, drive it from bottom bar. Desktop: keep tour inside iframe.
+  const notour = isMobile ? '&notour=1' : '';
+  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name + notour;
+  // Reset tour state (for mobile bottom bar)
+  setupTourStep = 0;
+  if (isMobile) {
+    renderSetupTour();
+  } else {
+    // Desktop: hide the bottom bar entirely, tour lives inside iframe
+    document.getElementById('step5Bottom').style.display = 'none';
+  }
 }
+
+const setupTourSteps = [
+  { view: 'bookings', text: 'These are bookings from your booking engine. Guest name, phone, room, dates \u2014 everything you need to confirm their stay.' },
+  { view: 'edit', text: 'Edit your rooms, photos, rates, and amenities. Tap any field to change it \u2014 updates your booking site instantly.' },
+  { view: 'availability', text: 'Control what\u2019s available on your booking engine. Tap any date to open or close rooms.' },
+  { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\u2019re saving vs. OTA commissions.' },
+];
+let setupTourStep = 0;
+
+function renderSetupTour() {
+  const bottom = document.getElementById('step5Bottom');
+  const step = setupTourSteps[setupTourStep];
+  const label = 'Step ' + (setupTourStep + 1) + ' of ' + setupTourSteps.length;
+  const isLast = setupTourStep === setupTourSteps.length - 1;
+  bottom.innerHTML = '<div style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;"><div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px;">' + step.text + '</div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;"><span style="font-size:11px;opacity:0.5;">' + label + '</span><button onclick="advanceSetupTour()" style="background:var(--green);color:white;border:none;padding:8px 16px;border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">' + (isLast ? 'Got it \u2713' : 'Next \u2192') + '</button></div></div>';
+  // Tell iframe to switch tab
+  var iframe = document.getElementById('frontdeskDemoFrame');
+  if (iframe && iframe.contentWindow) {
+    iframe.contentWindow.postMessage({ type: 'switchTab', view: step.view }, '*');
+  }
+}
+
+function advanceSetupTour() {
+  setupTourStep++;
+  if (setupTourStep >= setupTourSteps.length) {
+    // Tour done — show CTA
+    showStep5Cta();
+    return;
+  }
+  renderSetupTour();
+}
+
+function showStep5Cta() {
+  var bottom = document.getElementById('step5Bottom');
+  bottom.style.display = '';
+  bottom.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">Start taking direct bookings.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine and front desk are ready. Activate now and stop sending direct guests back to OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:0;background:white;color:var(--green-dark);font-size:16px;font-weight:700;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div></div>';
+}
+
+// Listen for tour complete from iframe (desktop)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'tourComplete') {
+    // Desktop: CTA is shown inside iframe, no need to show external one
+  }
+  if (e.data && e.data.type === 'payNow') {
+    payAndGoLive();
+  }
+});
 
 // Load existing data
 async function loadSetup() {
