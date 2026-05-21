@@ -2572,6 +2572,8 @@ async function loadBookings() {
 
 async function refreshCurrentView() {
   if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
+  // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
+  if (currentFilter === 'edit') return;
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -3177,18 +3179,27 @@ function openAvailabilityDayPopover(event, dayIso) {
 
   if (backdrop) backdrop.classList.add('open');
 
-  // Position next to the clicked cell
-  const rect = event.currentTarget.getBoundingClientRect();
-  let top = rect.bottom + 8;
-  let left = rect.left;
-  if (left + 250 > window.innerWidth) left = window.innerWidth - 260;
-  if (top + 140 > window.innerHeight) top = rect.top - 150;
-  if (top < 10) top = 10;
-
-  pop.style.position = 'fixed';
-  pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
-  pop.style.width = '200px';
+  // Position: on mobile center it, on desktop position near cell
+  const isMobile = window.innerWidth < 600;
+  if (isMobile) {
+    pop.style.position = 'fixed';
+    pop.style.left = '50%';
+    pop.style.top = '50%';
+    pop.style.transform = 'translate(-50%, -50%)';
+    pop.style.width = '240px';
+  } else {
+    const rect = event.currentTarget.getBoundingClientRect();
+    let top = rect.bottom + 8;
+    let left = rect.left;
+    if (left + 250 > window.innerWidth) left = window.innerWidth - 260;
+    if (top + 140 > window.innerHeight) top = rect.top - 150;
+    if (top < 10) top = 10;
+    pop.style.position = 'fixed';
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    pop.style.transform = '';
+    pop.style.width = '200px';
+  }
   pop.style.display = 'block';
   pop.style.zIndex = '262';
   pop.style.background = 'var(--white)';
@@ -3965,9 +3976,16 @@ async function uploadEditImage(event, roomId) {
       body: fd,
     });
     const data = await res.json();
-    if (data.success) {
+    if (data.success && data.image) {
+      // Add image to local state and re-render just the rooms cards (not the whole page)
+      const room = editRooms.find(r => r.id === roomId);
+      if (room) {
+        if (!room.images) room.images = [];
+        room.images.push(data.image);
+        if (!room.imageUrl) room.imageUrl = data.image.url;
+      }
+      renderEditRoomsCards();
       toast('Photo added', 'success');
-      loadEditRooms();
     } else {
       toast('Upload failed', 'error');
     }
@@ -3980,8 +3998,14 @@ async function deleteEditImage(roomId, imageId) {
   if (!confirm('Delete this photo?')) return;
   try {
     await api('DELETE', `/api/crm/rooms/${roomId}/images/${imageId}`);
+    // Remove from local state
+    const room = editRooms.find(r => r.id === roomId);
+    if (room && room.images) {
+      room.images = room.images.filter(i => i.id !== imageId);
+      room.imageUrl = room.images[0]?.url || null;
+    }
+    renderEditRoomsCards();
     toast('Photo deleted', 'success');
-    loadEditRooms();
   } catch (e) {
     toast('Failed to delete', 'error');
   }
