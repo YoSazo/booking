@@ -11,6 +11,42 @@ const xml2js = require('xml2js');
 const http = require('http');
 const https = require('https');
 const webpush = require('web-push');
+const nodemailer = require('nodemailer');
+
+// Email transporter (Brevo SMTP)
+const emailTransporter = (process.env.BREVO_SMTP_HOST && process.env.BREVO_SMTP_KEY)
+    ? nodemailer.createTransport({
+        host: process.env.BREVO_SMTP_HOST,
+        port: parseInt(process.env.BREVO_SMTP_PORT) || 587,
+        secure: false,
+        auth: {
+            user: process.env.BREVO_SMTP_LOGIN,
+            pass: process.env.BREVO_SMTP_KEY,
+        },
+    })
+    : null;
+
+async function sendWelcomeEmail(toEmail, hotelName, pin, domain) {
+    if (!emailTransporter) {
+        console.log('⚠️ Email not configured — skipping welcome email');
+        return;
+    }
+    try {
+        let html = require('fs').readFileSync(path.join(__dirname, 'email-templates', 'welcome.html'), 'utf8');
+        html = html.replace(/\{\{DOMAIN\}\}/g, domain);
+        html = html.replace(/\{\{PIN\}\}/g, pin);
+
+        await emailTransporter.sendMail({
+            from: '"Marketel" <support@bookmarketel.com>',
+            to: toEmail,
+            subject: 'Your booking engine is live',
+            html,
+        });
+        console.log(`✅ Welcome email sent to ${toEmail}`);
+    } catch (e) {
+        console.error('❌ Welcome email failed:', e.message);
+    }
+}
 
 // Web Push configuration
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
@@ -4419,7 +4455,9 @@ app.get('/setup/:token/success', async (req, res) => {
             await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
         } catch (e) { /* might exist */ }
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}#phoneSection{transition:all 0.3s}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><div id="phoneSection"><div class="field"><label>Your phone number (so we can reach you)</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><button class="btn" onclick="submitFinal()">Done \u2192</button></div><p class="note">You can change your PIN later in your front desk settings.</p></div><script>function submitFinal(){var phone=document.getElementById('ownerPhone').value.trim();if(!phone){alert('Please enter your phone number');return;}var btn=document.querySelector('#phoneSection .btn');btn.textContent='Saving...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('phoneSection').innerHTML='<a class=\"btn\" href=\"https://${assignedDomain}\">Visit Your Site \u2192</a>';}).catch(function(){document.getElementById('phoneSection').innerHTML='<a class=\"btn\" href=\"https://${assignedDomain}\">Visit Your Site \u2192</a>';});}</script></body></html>`);
+        // Don't send welcome email here — wait until they submit their contact info via /finalize
+
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');
@@ -4431,12 +4469,25 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
-        const { phone, domainPref, customDomain } = req.body;
+        const { email, phone, domainPref, customDomain } = req.body;
 
+        // Save email and phone
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
-            data: { ownerPhone: phone || hotel.ownerPhone },
+            data: {
+                ownerEmail: email || hotel.ownerEmail,
+                ownerPhone: phone || hotel.ownerPhone,
+            },
         });
+
+        // Send welcome email with PIN
+        const finalEmail = email || hotel.ownerEmail;
+        if (finalEmail) {
+            const slug = (hotel.name || 'hotel').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const domain = slug + '.bookmarketel.com';
+            const pin = String(req.body.pin || '').trim();
+            sendWelcomeEmail(finalEmail, hotel.name || 'Your Hotel', pin || 'See your setup page', domain);
+        }
 
         // Auto-create subdomain on Vercel
         let assignedDomain = '';
