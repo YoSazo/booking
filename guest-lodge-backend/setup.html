@@ -314,6 +314,8 @@ function showToast(msg, isError) {
 function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
 
 function goToStep(n) {
+  // Track step completion
+  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Step' + n + 'Reached' }) }).catch(() => {});
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step-' + n).classList.add('active');
   document.querySelectorAll('.progress-step').forEach((s, i) => {
@@ -526,6 +528,7 @@ async function saveStep3() {
 
 // Step 4: Pay
 async function payAndGoLive() {
+  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'PaymentCTAClicked' }) }).catch(() => {});
   showLoading(true);
   try {
     const res = await fetch(API + '/api/setup/' + TOKEN + '/checkout', { method: 'POST' });

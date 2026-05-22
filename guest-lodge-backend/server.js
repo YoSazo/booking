@@ -3965,20 +3965,40 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     }
 });
 
+// Onboarding funnel tracking (landing page + setup wizard)
+app.post('/api/funnel/onboarding', async (req, res) => {
+    try {
+        const { eventName, email, userAgent, ip, referrer } = req.body;
+        if (!eventName) return res.status(400).json({ success: false });
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId: 'marketel-onboarding',
+                eventName,
+                guestEmail: email || null,
+                userAgent: userAgent || req.headers['user-agent'] || null,
+                ipAddress: ip || req.ip || req.socket?.remoteAddress || null,
+                contentName: referrer || null,
+            },
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Onboarding funnel event error:', e.message);
+        res.json({ success: true }); // Don't fail silently
+    }
+});
+
 // Funnel dashboard API (no auth required)
 app.get('/api/funnel', async (req, res) => {
     try {
         let since, until;
 
         if (req.query.from && req.query.to) {
-            // Explicit date range
             since = new Date(req.query.from + 'T00:00:00.000Z');
             until = new Date(req.query.to + 'T23:59:59.999Z');
             if (isNaN(since) || isNaN(until)) {
                 return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
             }
         } else {
-            // Fallback: days param
             const daysBack = parseInt(req.query.days) || 7;
             until = new Date();
             since = new Date();
@@ -3986,17 +4006,21 @@ app.get('/api/funnel', async (req, res) => {
             since.setHours(0, 0, 0, 0);
         }
 
+        // Filter by source: 'onboarding' shows marketel funnel, default shows booking engine
+        const source = req.query.source || 'all';
+        const where = { createdAt: { gte: since, lte: until } };
+        if (source === 'onboarding') where.hotelId = 'marketel-onboarding';
+        else if (source === 'bookings') where.hotelId = { not: 'marketel-onboarding' };
+
         const events = await withRetry(() => prisma.funnelEvent.findMany({
-            where: { createdAt: { gte: since, lte: until } },
+            where,
             orderBy: { createdAt: 'desc' },
             take: 500,
         }));
 
-        // Build counts
-        const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
-        events.forEach(e => { if (counts[e.eventName] !== undefined) counts[e.eventName]++; });
+        const counts = {};
+        events.forEach(e => { counts[e.eventName] = (counts[e.eventName] || 0) + 1; });
 
-        // Recent events with full detail
         const recent = events.map(e => ({
             event_name: e.eventName,
             timestamp: e.createdAt.getTime(),
@@ -4018,11 +4042,7 @@ app.get('/api/funnel', async (req, res) => {
         res.json({ counts, recent });
     } catch (e) {
         console.error('Funnel API error:', e.message);
-        // Fallback to in-memory if DB fails
-        const counts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
-        funnelStore.forEach(e => { if (counts[e.event_name] !== undefined) counts[e.event_name]++; });
-        const recent = funnelStore.slice(0, 50);
-        res.json({ counts, recent });
+        res.json({ counts: {}, recent: [] });
     }
 });
 
@@ -4567,6 +4587,9 @@ app.get('/setup/:token/success', async (req, res) => {
             value: 299,
             currency: 'USD',
         });
+
+        // Track payment success in funnel DB
+        prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotel.ownerEmail || null } }).catch(() => {});
 
         // Create default CRM PIN
         const defaultPin = String(Math.floor(1000 + Math.random() * 9000));

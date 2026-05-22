@@ -169,6 +169,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </section>
 
 <script>
+// Track landing page view
+fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'LandingPageView' }) }).catch(() => {});
+
 function startFreeSetup() {
   const email = document.getElementById('setupEmail').value.trim();
   if (!email || !email.includes('@')) {
@@ -188,6 +191,7 @@ function startFreeSetup() {
   }).then(r => r.json()).then(data => {
     if (data.setupUrl) {
       if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'setup_start' });
+      fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'SetupStarted', email }) }).catch(() => {});
       window.location.href = API + data.setupUrl;
     }
     else { throw new Error(); }

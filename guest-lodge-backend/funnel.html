@@ -596,29 +596,29 @@
       <div class="stat-label">Revenue</div>
     </div>
     <div class="stat-card">
+      <div class="stat-icon">👁</div>
+      <div class="stat-value" id="stat-landing">0</div>
+      <div class="stat-label">Landing Views</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📧</div>
+      <div class="stat-value" id="stat-started">0</div>
+      <div class="stat-label">Setup Started</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏨</div>
+      <div class="stat-value" id="stat-step4">0</div>
+      <div class="stat-label">Saw Engine</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🖱</div>
+      <div class="stat-value" id="stat-cta">0</div>
+      <div class="stat-label">Clicked Pay</div>
+    </div>
+    <div class="stat-card">
       <div class="stat-icon">✅</div>
-      <div class="stat-value" id="stat-purchases">0</div>
-      <div class="stat-label">Purchases</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">💳</div>
-      <div class="stat-value" id="stat-infos">0</div>
-      <div class="stat-label">Info Entered</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">📋</div>
-      <div class="stat-value" id="stat-checkouts">0</div>
-      <div class="stat-label">Checkouts</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">🛒</div>
-      <div class="stat-value" id="stat-carts">0</div>
-      <div class="stat-label">Add to Cart</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">🔍</div>
-      <div class="stat-value" id="stat-searches">0</div>
-      <div class="stat-label">Searches</div>
+      <div class="stat-value" id="stat-paid">0</div>
+      <div class="stat-label">Paid</div>
     </div>
   </div>
 </div>
@@ -627,11 +627,12 @@
 <div id="activityView" style="display:none">
 <div class="filters">
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
-  <button class="filter-btn" data-filter="AddPaymentInfo" onclick="setFilter('AddPaymentInfo')">Info Entered</button>
-  <button class="filter-btn" data-filter="ConfirmBookingClick" onclick="setFilter('ConfirmBookingClick')">Confirm Click</button>
-  <button class="filter-btn" data-filter="Purchase" onclick="setFilter('Purchase')">Purchased</button>
-  <button class="filter-btn" data-filter="AddToCart" onclick="setFilter('AddToCart')">Add to Cart</button>
-  <button class="filter-btn" data-filter="Search" onclick="setFilter('Search')">Search</button>
+  <button class="filter-btn" data-filter="LandingPageView" onclick="setFilter('LandingPageView')">Landing</button>
+  <button class="filter-btn" data-filter="SetupStarted" onclick="setFilter('SetupStarted')">Started</button>
+  <button class="filter-btn" data-filter="Step4Reached" onclick="setFilter('Step4Reached')">Saw Engine</button>
+  <button class="filter-btn" data-filter="Step5Reached" onclick="setFilter('Step5Reached')">Saw Desk</button>
+  <button class="filter-btn" data-filter="PaymentCTAClicked" onclick="setFilter('PaymentCTAClicked')">Clicked Pay</button>
+  <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
 </div>
 
 <div class="events-list" id="eventsList">
@@ -896,31 +897,27 @@ function closeDetail(e) {
 }
 
 const ICONS = {
-  PageView: '👁',
-  Search: '🔍',
-  AddToCart: '🛒',
-  InitiateCheckout: '📋',
-  AddPaymentInfo: '💳',
-  CardModalAcknowledged: '✅',
-  ConfirmBookingClick: '🖱',
-  Purchase: '✅',
-  CallModalDismissed: '📞',
-  TapToCallFirst: '📱',
-  CardDeclineModalShown: '⚠️',
+  LandingPageView: '👁',
+  SetupStarted: '📧',
+  Step1Reached: '1️⃣',
+  Step2Reached: '2️⃣',
+  Step3Reached: '3️⃣',
+  Step4Reached: '4️⃣',
+  Step5Reached: '5️⃣',
+  PaymentCTAClicked: '🖱',
+  PaymentSucceeded: '✅',
 };
 
 const TYPE_LABELS = {
-  PageView: 'Page View',
-  Search: 'Search',
-  AddToCart: 'Add to Cart',
-  InitiateCheckout: 'Checkout Started',
-  AddPaymentInfo: 'Info Entered',
-  CardModalAcknowledged: 'Card Modal OK',
-  ConfirmBookingClick: 'Confirm Click',
-  Purchase: 'Purchase',
-  CallModalDismissed: 'Call Modal',
-  TapToCallFirst: 'Tap to Call',
-  CardDeclineModalShown: 'Card Declined',
+  LandingPageView: 'Landing Page',
+  SetupStarted: 'Setup Started',
+  Step1Reached: 'Step 1 (Name)',
+  Step2Reached: 'Step 2 (Rooms)',
+  Step3Reached: 'Step 3 (Rate)',
+  Step4Reached: 'Step 4 (Engine)',
+  Step5Reached: 'Step 5 (Desk)',
+  PaymentCTAClicked: 'Clicked Pay',
+  PaymentSucceeded: 'Paid $299',
 };
 
 function formatTime(ts) {
@@ -948,13 +945,13 @@ function renderEvents() {
   document.getElementById('totalCount').textContent = filtered.length + ' event' + (filtered.length !== 1 ? 's' : '');
 
   // Update overview stats
-  const revenue = allEvents.filter(e => e.event_name === 'Purchase').reduce((sum, e) => sum + (e.value || 0), 0);
-  document.getElementById('stat-revenue').textContent = '$' + revenue.toFixed(0);
-  document.getElementById('stat-purchases').textContent = allCounts.Purchase || 0;
-  document.getElementById('stat-infos').textContent = allCounts.AddPaymentInfo || 0;
-  document.getElementById('stat-checkouts').textContent = allCounts.InitiateCheckout || 0;
-  document.getElementById('stat-carts').textContent = allCounts.AddToCart || 0;
-  document.getElementById('stat-searches').textContent = allCounts.Search || 0;
+  const paid = allCounts.PaymentSucceeded || 0;
+  document.getElementById('stat-revenue').textContent = '$' + (paid * 299);
+  document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
+  document.getElementById('stat-started').textContent = allCounts.SetupStarted || 0;
+  document.getElementById('stat-step4').textContent = allCounts.Step4Reached || 0;
+  document.getElementById('stat-cta').textContent = allCounts.PaymentCTAClicked || 0;
+  document.getElementById('stat-paid').textContent = paid;
 
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty-state"><p>No events found for this filter.</p></div>';
@@ -1022,7 +1019,7 @@ async function loadEvents() {
   const from = fmtDate(calStart);
   const to = fmtDate(calEnd);
   try {
-    const res = await fetch('/api/funnel?from=' + from + '&to=' + to);
+    const res = await fetch('/api/funnel?from=' + from + '&to=' + to + '&source=onboarding');
     if (!res.ok) throw new Error('Failed to load');
     const data = await res.json();
     allEvents = data.recent || [];
