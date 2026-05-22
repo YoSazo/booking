@@ -1137,7 +1137,8 @@
       bottom: 0;
       z-index: 261;
       max-width: 430px;
-      max-height: 92vh;
+      height: auto;
+      max-height: 50vh;
       margin: 0 auto;
       overflow-y: auto;
       background: var(--white);
@@ -3179,21 +3180,16 @@ function openAvailabilityDayPopover(event, dayIso) {
 
   if (backdrop) backdrop.classList.add('open');
 
-  // Position: on mobile center above the cell, on desktop position near cell
+  // Position: on mobile use bottom sheet, on desktop position near cell
   const isMobile = window.innerWidth < 600;
   const rect = event.currentTarget.getBoundingClientRect();
   if (isMobile) {
-    const popWidth = 220;
-    let left = rect.left + (rect.width / 2) - (popWidth / 2);
-    if (left < 10) left = 10;
-    if (left + popWidth > window.innerWidth - 10) left = window.innerWidth - popWidth - 10;
-    let top = rect.top - 140;
-    if (top < 10) top = rect.bottom + 8;
-    pop.style.position = 'fixed';
-    pop.style.left = left + 'px';
-    pop.style.top = top + 'px';
+    // Let the CSS bottom-sheet handle positioning
+    pop.style.position = '';
+    pop.style.left = '';
+    pop.style.top = '';
     pop.style.transform = '';
-    pop.style.width = popWidth + 'px';
+    pop.style.width = '';
   } else {
     let top = rect.bottom + 8;
     let left = rect.left;
