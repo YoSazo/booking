@@ -4269,6 +4269,14 @@ app.get('/landing', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
 });
 
+// Privacy & Terms
+app.get('/privacy', (req, res) => {
+    res.sendFile(path.join(__dirname, 'privacy.html'));
+});
+app.get('/terms', (req, res) => {
+    res.sendFile(path.join(__dirname, 'terms.html'));
+});
+
 // Root serves landing page too (for bookmarketel.com)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
