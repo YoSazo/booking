@@ -40,6 +40,7 @@ const ELEMENT_OPTIONS = {
 // This is the main component that controls the multi-step flow.
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     // Add this at the very top of your component, before any other code
+    const isPreviewMode = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('preview') || window !== window.parent);
     const [cardBrand, setCardBrand] = useState('');
     const [cardComplete, setCardComplete] = useState({
         cardNumber: false,
@@ -2242,9 +2243,9 @@ const handlePayLaterBooking = async (e) => {
         form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
         className="btn btn-confirm btn-wider"
         onClick={(e) => handlePayLaterBooking(e)}
-        disabled={isProcessing || !clientSecret || !stripe || !elements}
+        disabled={isPreviewMode || isProcessing || !clientSecret || !stripe || !elements}
       >
-        {isProcessing ? "Processing..." : getPaymentButtonText()}
+        {isPreviewMode ? "Reserve for $0 (Preview)" : isProcessing ? "Processing..." : getPaymentButtonText()}
       </button>
       
       {/* Pay Later reassurance text - below button */}
@@ -2268,12 +2269,8 @@ const handlePayLaterBooking = async (e) => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    const [elementsOptions] = useState({
-        fonts: [
-            {
-                cssSrc: '/fonts/inter.css',
-            },
-        ],
+    const elementsOptions = {
+        fonts: [{ cssSrc: '/fonts/inter.css' }],
         appearance: {
             theme: 'stripe',
             variables: {
@@ -2285,7 +2282,7 @@ function GuestInfoPageWrapper(props) {
                 borderRadius: '8px',
             },
         },
-    });
+    };
 
     return (
         <Elements stripe={stripePromise} options={elementsOptions}>

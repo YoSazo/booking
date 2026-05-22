@@ -141,9 +141,6 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           ))}
         </div>
 
-        {/* Description - only show if different from subtitle */}
-        {room.description && room.description.length > 60 && <p className="room-description">{room.description}</p>}
-
         {/* Selected Dates Display */}
         {nights > 0 && checkinDate && checkoutDate && (
           <div className="selected-dates-display">

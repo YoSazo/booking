@@ -220,21 +220,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-5"></div>
   </div>
 
-  <!-- STEP 1: Hotel Info (3 fields) -->
+  <!-- STEP 1: Hotel Name only -->
   <div class="step active" id="step-1">
     <div class="form-card">
       <h2>Your hotel</h2>
       <div class="field">
         <label>Hotel Name</label>
         <input type="text" id="hotelName" placeholder="e.g. Sunset Inn">
-      </div>
-      <div class="field">
-        <label>Phone Number</label>
-        <input type="tel" id="hotelPhone" placeholder="(555) 123-4567">
-      </div>
-      <div class="field">
-        <label>Address</label>
-        <input type="text" id="hotelAddress" placeholder="123 Main St, City, State ZIP">
       </div>
       <button class="btn btn-primary" onclick="saveStep1()">Next &rarr;</button>
     </div>
@@ -284,8 +276,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
   </div>
   <div class="fullpage-bottombar">
-    <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Guests can book directly from your link.</p>
-    <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">Next &rarr;</button>
+    <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Try booking yourself — pick dates, select a room, and see exactly what your guests experience.</p>
+    <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">See How to Edit It &rarr;</button>
   </div>
 </div>
 
@@ -351,7 +343,7 @@ function loadPreview() {
   const frontendBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5173'
     : 'https://suitestay.clickinns.com';
-  document.getElementById('previewFrame').src = frontendBase + '?hotelId=' + (hotelData.id || '');
+  document.getElementById('previewFrame').src = frontendBase + '?hotelId=' + (hotelData.id || '') + '&preview=1';
 }
 
 function loadFrontdeskDemo() {
@@ -372,8 +364,8 @@ function loadFrontdeskDemo() {
 }
 
 const setupTourSteps = [
-  { view: 'bookings', text: 'These are bookings from your booking engine. Guest name, phone, room, dates \u2014 everything you need to confirm their stay.' },
-  { view: 'edit', text: 'Edit your rooms, photos, rates, and amenities. Tap any field to change it \u2014 updates your booking site instantly.' },
+  { view: 'edit', text: 'Edit your rooms, photos, rates, and hotel info. Tap any field to change it \u2014 updates your booking site instantly.' },
+  { view: 'bookings', text: 'Every direct booking lands here. Guest name, phone, room, dates \u2014 everything you need to confirm their stay.' },
   { view: 'availability', text: 'Control what\u2019s available on your booking engine. Tap any date to open or close rooms.' },
   { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\u2019re saving vs. OTA commissions.' },
 ];
@@ -438,17 +430,15 @@ async function loadSetup() {
 // Step 1: Save hotel info
 async function saveStep1() {
   const name = document.getElementById('hotelName').value.trim();
-  const phone = document.getElementById('hotelPhone').value.trim();
-  const address = document.getElementById('hotelAddress').value.trim();
   if (!name) { showToast('Enter your hotel name', true); return; }
 
   showLoading(true);
   try {
     await fetch(API + '/api/setup/' + TOKEN + '/hotel', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone, address }),
+      body: JSON.stringify({ name }),
     });
-    hotelData = { ...hotelData, name, phone, address };
+    hotelData = { ...hotelData, name };
     goToStep(2);
   } catch (e) { showToast('Failed to save', true); }
   showLoading(false);

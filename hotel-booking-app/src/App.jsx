@@ -357,6 +357,9 @@ const handleConfirmBooking = async (bookingDetails) => {
     return;
   }
 
+  const searchParams = window.location.search;
+  const isPreview = new URLSearchParams(searchParams).has('preview');
+
   setIsProcessingBooking(true);
 
   const nights = checkinDate && checkoutDate
@@ -406,7 +409,8 @@ const handleConfirmBooking = async (bookingDetails) => {
         amount: newBooking.total / 2,
         bookingDetails: stripeMetadata,
         guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
-        hotelId: hotelId
+        hotelId: hotelId,
+        preview: isPreview || undefined
       }),
     });
     

@@ -1332,7 +1332,8 @@ const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { wi
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 25 });
 
 app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
-    const { amount, bookingDetails, guestInfo, hotelId } = req.body;
+    const { amount, bookingDetails, guestInfo, hotelId, preview } = req.body;
+    console.log('💳 create-payment-intent called. hotelId:', hotelId, 'preview:', preview);
     const amountInCents = Math.round(amount * 100);
 
     if (typeof amount !== 'number' || amount <= 0) {
@@ -1340,9 +1341,14 @@ app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req,
     }
 
     try {
-        const hotelValidation = await getActiveHotelValidation(hotelId);
-        if (!hotelValidation.ok) {
-            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        // Skip hotel active check in preview mode (setup wizard)
+        let resolvedHotelId = hotelId;
+        if (!preview) {
+            const hotelValidation = await getActiveHotelValidation(hotelId);
+            if (!hotelValidation.ok) {
+                return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+            }
+            resolvedHotelId = hotelValidation.hotelId;
         }
 
         const paymentIntent = await stripe.paymentIntents.create({
@@ -1354,7 +1360,7 @@ app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req,
             metadata: buildStripeIntentMetadata({
                 bookingDetails,
                 guestInfo,
-                hotelId: hotelValidation.hotelId,
+                hotelId: resolvedHotelId,
             }),
         });
         res.send({ clientSecret: paymentIntent.client_secret });

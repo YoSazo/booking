@@ -127,15 +127,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <!-- Tour bar -->
 <div class="tabs" id="tabBar">
-  <button class="tab active" onclick="switchTab('bookings')">Bookings</button>
-  <button class="tab" onclick="switchTab('edit')">Edit</button>
+  <button class="tab active" onclick="switchTab('edit')">Edit</button>
+  <button class="tab" onclick="switchTab('bookings')">Bookings</button>
   <button class="tab" onclick="switchTab('availability')">Availability</button>
   <button class="tab" onclick="switchTab('revenue')">Revenue</button>
 </div>
 
 <div class="container">
   <!-- BOOKINGS -->
-  <div class="view active" id="view-bookings">
+  <div class="view" id="view-bookings">
     <div class="booking-card"><div class="card-accent"></div><div class="card-inner">
       <div class="card-top"><div><div class="guest-name">Sarah Johnson</div><div class="guest-time">2 hours ago</div></div><div class="card-amount">$483</div></div>
       <div class="card-meta"><span class="meta-chip">King Suite</span><span class="meta-chip">7 nights</span></div>
@@ -168,40 +168,71 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
 
   <!-- EDIT VIEW -->
-  <div class="view" id="view-edit">
+  <div class="view active" id="view-edit">
     <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Tap any field to edit. Changes update your booking site instantly.</div>
-    
-    <div class="booking-card" style="cursor:pointer;">
+
+    <!-- Rooms -->
+    <div class="booking-card" style="cursor:pointer; margin-bottom:12px;">
       <div style="position:relative;">
+        <div style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;">📷 Change photo</div>
         <img src="https://suitestay.clickinns.com/kingbedsuitestay.webp" style="width:100%; height:140px; object-fit:cover; display:block;">
-        <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;">📷 Replace photo</div>
       </div>
       <div class="card-inner" style="padding:14px;">
         <div style="font-size:16px; font-weight:700; margin-bottom:4px; padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border);">King Suite</div>
         <div style="font-size:12px; color:var(--text-muted); padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-top:6px;">Free WiFi • TV • Fridge • Parking • Housekeeping</div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-          <span style="font-size:12px; color:var(--text-muted);">Max 4 guests • 8 units</span>
-          <span style="font-size:16px; font-weight:700; color:var(--green);">$69/night</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span style="font-size:12px; color:var(--text-muted); padding:4px 8px; border-radius:6px; border:1.5px dashed var(--border);">Max 4 guests • 8 units</span>
         </div>
       </div>
     </div>
 
-    <div class="booking-card" style="cursor:pointer;">
+    <div class="booking-card" style="cursor:pointer; margin-bottom:12px;">
       <div style="position:relative;">
+        <div style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;">📷 Change photo</div>
         <img src="https://suitestay.clickinns.com/doublesuitestay.webp" style="width:100%; height:140px; object-fit:cover; display:block;">
-        <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600;">📷 Replace photo</div>
       </div>
       <div class="card-inner" style="padding:14px;">
         <div style="font-size:16px; font-weight:700; margin-bottom:4px; padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border);">Queen Room</div>
         <div style="font-size:12px; color:var(--text-muted); padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-top:6px;">Free WiFi • TV • Fridge • Parking • Housekeeping</div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-          <span style="font-size:12px; color:var(--text-muted);">Max 4 guests • 6 units</span>
-          <span style="font-size:16px; font-weight:700; color:var(--green);">$69/night</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span style="font-size:12px; color:var(--text-muted); padding:4px 8px; border-radius:6px; border:1.5px dashed var(--border);">Max 4 guests • 6 units</span>
         </div>
       </div>
     </div>
 
-    <button style="width:100%; padding:12px; border-radius:10px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px;">+ Add another room type</button>
+    <button style="width:100%; padding:12px; border-radius:10px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-bottom:12px;">+ Add another room type</button>
+
+    <!-- Hotel Info -->
+    <div class="booking-card" style="margin-bottom:12px;">
+      <div class="card-inner" style="padding:14px;">
+        <div style="font-size:12px; font-weight:700; margin-bottom:10px; color:var(--text);">Hotel Info</div>
+        <div style="padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-bottom:6px; font-size:16px; font-weight:700;">Your Hotel Name</div>
+        <div style="padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-bottom:6px; font-size:13px; color:var(--text-muted);">Your subtitle or slogan</div>
+        <div style="padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); margin-bottom:6px; font-size:13px; color:var(--text-muted);">123 Main St, City, State</div>
+        <div style="padding:6px 8px; border-radius:6px; border:1.5px dashed var(--border); font-size:13px; color:var(--text-muted);">(555) 123-4567</div>
+      </div>
+    </div>
+
+    <!-- Rates -->
+    <div class="booking-card" style="margin-bottom:12px;">
+      <div class="card-inner" style="padding:14px;">
+        <div style="font-size:12px; font-weight:700; margin-bottom:10px; color:var(--text);">Rates</div>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1.5px dashed var(--border);">
+            <div style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Nightly</div>
+            <div style="font-size:18px; font-weight:700; color:var(--green);">$69</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1.5px dashed var(--border);">
+            <div style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Weekly</div>
+            <div style="font-size:18px; font-weight:700; color:var(--green);">$345</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1.5px dashed var(--border);">
+            <div style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Monthly</div>
+            <div style="font-size:18px; font-weight:700; color:var(--green);">$1,380</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- REVENUE -->
@@ -250,8 +281,8 @@ if (hotelName) document.getElementById('demoHotelName').textContent = decodeURIC
 // Tour
 let tourStep = 0;
 const tourSteps = [
-  { view: 'bookings', text: 'These are bookings from your booking engine. Guest name, phone, room, dates — everything you need to confirm their stay.', label: 'Step 1 of 4' },
-  { view: 'edit', text: 'Edit your rooms, photos, rates, and amenities. Tap any field to change it — updates your booking site instantly.', label: 'Step 2 of 4' },
+  { view: 'edit', text: 'Edit your rooms, photos, rates, and hotel info. Tap any field to change it — updates your booking site instantly.', label: 'Step 1 of 4' },
+  { view: 'bookings', text: 'Every direct booking lands here. Guest name, phone, room, dates — everything you need to confirm their stay.', label: 'Step 2 of 4' },
   { view: 'availability', text: 'Control what\'s available on your booking engine. Tap any date to open or close rooms — your site updates instantly.', label: 'Step 3 of 4' },
   { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\'re saving vs. OTA commissions.', label: 'Step 4 of 4', btnText: 'Got it ✓' },
 ];
@@ -297,7 +328,7 @@ function nextTourStep() {
   showTourStep();
 }
 if (!noTour) showTourStep();
-if (noTour) switchTab('bookings');
+if (noTour) switchTab('edit');
 
 function switchTab(name) {
   var views = document.querySelectorAll('.view');
