@@ -188,7 +188,7 @@ function startFreeSetup() {
   const API = '';
   fetch(API + '/api/setup/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, fbp: document.cookie.match(/(?:^|;\s*)_fbp=([^;]+)/)?.[1] || '', fbc: document.cookie.match(/(?:^|;\s*)_fbc=([^;]+)/)?.[1] || '' }),
   }).then(r => r.json()).then(data => {
     if (data.setupUrl) {
       if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'setup_start' });

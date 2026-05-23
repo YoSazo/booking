@@ -4329,13 +4329,14 @@ app.post('/api/setup/start', async (req, res) => {
 
         console.log(`✅ Free setup started: ${hotelSlug}, token: ${setupToken}, email: ${email}`);
         // Meta CAPI: Lead event
-        const { fbp, fbc } = getMetaCookies(req);
+        const { fbp: cookieFbp, fbc: cookieFbc } = getMetaCookies(req);
         sendMarketelCAPI('Lead', {
             email,
             userAgent: req.headers['user-agent'],
             ip: req.ip || req.socket?.remoteAddress,
             sourceUrl: req.headers.referer || req.headers.origin || '',
-            fbp, fbc,
+            fbp: req.body.fbp || cookieFbp,
+            fbc: req.body.fbc || cookieFbc,
         });
         res.json({ success: true, setupUrl: '/setup/' + setupToken, token: setupToken });
     } catch (e) {
