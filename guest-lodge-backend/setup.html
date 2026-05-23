@@ -315,8 +315,8 @@ function showToast(msg, isError) {
 function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
 
 function goToStep(n) {
-  // Track step completion
-  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Step' + n + 'Reached' }) }).catch(() => {});
+  // Track step completion with hotel ID for identification
+  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Step' + n + 'Reached', email: hotelData.id || TOKEN }) }).catch(() => {});
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step-' + n).classList.add('active');
   document.querySelectorAll('.progress-step').forEach((s, i) => {
