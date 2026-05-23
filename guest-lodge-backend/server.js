@@ -3967,6 +3967,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
 
 // Onboarding funnel tracking (landing page + setup wizard)
 app.post('/api/funnel/onboarding', async (req, res) => {
+    if (!funnelTrackingEnabled) return res.json({ success: true });
     try {
         const { eventName, email, userAgent, ip, referrer } = req.body;
         if (!eventName) return res.status(400).json({ success: false });

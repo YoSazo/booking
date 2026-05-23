@@ -452,12 +452,19 @@ async function saveStep1() {
 function renderRooms() {
   const list = document.getElementById('roomList');
   const nextBtn = document.getElementById('roomNextBtn');
+  const addBtn = document.querySelector('#step-2 .btn-primary[onclick="addRoom()"]');
+  const rmField = document.getElementById('rmName')?.parentElement;
   if (!rooms.length) {
     list.innerHTML = '';
     nextBtn.style.opacity = '0.4'; nextBtn.style.pointerEvents = 'none';
+    if (addBtn) addBtn.style.display = '';
+    if (rmField) rmField.style.display = '';
     return;
   }
   nextBtn.style.opacity = '1'; nextBtn.style.pointerEvents = 'auto';
+  // Hide the add room input and button after first room is added
+  if (addBtn) addBtn.style.display = 'none';
+  if (rmField) rmField.style.display = 'none';
   list.innerHTML = rooms.map(r => {
     return `<div class="room-item">
       <div class="room-item-info"><div class="room-item-name">${r.name}</div></div>
