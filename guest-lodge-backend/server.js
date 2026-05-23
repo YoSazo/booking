@@ -1867,7 +1867,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 await prisma.hotelConfig.create({
                     data: {
                         id: hotelSlug,
-                        name: 'My Hotel',
+                        name: '',
                         pms: 'manual',
                         active: false,
                         setupToken,
@@ -4319,7 +4319,7 @@ app.post('/api/setup/start', async (req, res) => {
         await prisma.hotelConfig.create({
             data: {
                 id: hotelSlug,
-                name: 'My Hotel',
+                name: '',
                 pms: 'manual',
                 active: false,
                 setupToken,
