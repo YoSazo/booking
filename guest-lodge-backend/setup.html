@@ -218,7 +218,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-2"></div>
     <div class="progress-step" id="prog-3"></div>
     <div class="progress-step" id="prog-4"></div>
-    <div class="progress-step" id="prog-5"></div>
   </div>
 
   <!-- STEP 1: Hotel Name only -->
@@ -237,14 +236,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="step" id="step-2">
     <div class="form-card">
       <h2>Add your first room</h2>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:14px;">Just one is enough to see your booking engine. You can add more later.</p>
-      <div id="roomList"></div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:14px;">You can add more rooms later from your front desk.</p>
       <div class="field">
         <label>Room Name</label>
         <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
-      <button class="btn btn-primary" onclick="addRoom()">+ Add Room</button>
-      <button class="btn btn-primary" onclick="goToStep(3)" id="roomNextBtn" style="margin-top:8px; opacity:0.4; pointer-events:none;">Next &rarr;</button>
+      <button class="btn btn-primary" onclick="addRoomAndNext()">See My Booking Engine &rarr;</button>
       <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
     </div>
   </div>
@@ -269,7 +266,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <!-- STEP 4: Preview booking engine (full-page iframe) -->
 <div class="step step-fullpage" id="step-4">
   <div class="fullpage-topbar">
-    <button class="fullpage-back" onclick="goToStep(3)">&larr;</button>
+    <button class="fullpage-back" onclick="goToStep(2)">&larr;</button>
     <div class="fullpage-title">Your booking engine</div>
     <div style="width:32px;"></div>
   </div>
@@ -401,7 +398,7 @@ function advanceSetupTour() {
 function showStep5Cta() {
   var bottom = document.getElementById('step5Bottom');
   bottom.style.display = '';
-  bottom.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">Start taking direct bookings.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine and front desk are ready. Activate now and stop sending direct guests back to OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:0;background:white;color:var(--green-dark);font-size:16px;font-weight:700;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div><div style="text-align:left;margin-top:14px;font-size:11px;line-height:1.5;opacity:0.8;"><strong>This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div></div>';
+  bottom.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">Start taking direct bookings.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine and front desk are ready. Activate now and stop sending direct guests back to OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:0;background:white;color:var(--green-dark);font-size:16px;font-weight:700;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div><div style="text-align:left;margin-top:16px;font-size:12px;line-height:1.6;opacity:1;background:rgba(255,255,255,0.12);border-radius:8px;padding:12px;"><strong>\u2705 This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>\u274c Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div></div>';
 }
 
 // Listen for tour complete from iframe (desktop)
@@ -449,6 +446,24 @@ async function saveStep1() {
 }
 
 // Step 2: Rooms
+async function addRoomAndNext() {
+  const name = document.getElementById('rmName').value.trim();
+  if (!name) { showToast('Enter a room name', true); return; }
+
+  showLoading(true);
+  try {
+    const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, maxOccupancy: 4, totalUnits: 5 }),
+    });
+    if (!res.ok) throw new Error('Server error');
+    const data = await res.json();
+    rooms.push({ id: data.room.id, name: data.room.name });
+    goToStep(4);
+  } catch (e) { showToast('Failed to save room', true); }
+  showLoading(false);
+}
+
 function renderRooms() {
   const list = document.getElementById('roomList');
   const nextBtn = document.getElementById('roomNextBtn');
