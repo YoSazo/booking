@@ -110,6 +110,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
   background: var(--card);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -149,10 +150,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   z-index: 2;
 }
 .fullpage-bottombar {
-  padding: 12px 16px;
-  background: var(--card);
-  border-top: 1px solid var(--border);
+  padding: 14px 16px 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  background: #f0fdf4;
+  border-top: 1.5px solid #bbf7d0;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  -webkit-transform: translateZ(0);
 }
 .fullpage-bottombar .btn {
   width: 100%;
@@ -397,7 +402,7 @@ function advanceSetupTour() {
 function showStep5Cta() {
   var bottom = document.getElementById('step5Bottom');
   bottom.style.display = '';
-  bottom.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">Start taking direct bookings.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine and front desk are ready. Activate now and stop sending direct guests back to OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:0;background:white;color:var(--green-dark);font-size:16px;font-weight:700;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div><div style="text-align:left;margin-top:14px;font-size:11px;line-height:1.5;opacity:0.8;"><strong>This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div></div>';
+  bottom.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">' + (hotelData.name || 'Your hotel') + ' is ready to go live.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine is built. Activate now and start taking direct bookings tonight \u2014 no commission, no OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:0;background:white;color:var(--green-dark);font-size:16px;font-weight:700;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div><div style="text-align:left;margin-top:14px;font-size:11px;line-height:1.5;opacity:0.8;"><strong>This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div></div>';
 }
 
 // Listen for tour complete from iframe (desktop)
