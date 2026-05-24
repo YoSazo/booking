@@ -319,8 +319,13 @@ function fixIosViewport() {
   var vp = document.querySelector('meta[name="viewport"]');
   if (!vp) return;
   var original = vp.getAttribute('content');
-  vp.setAttribute('content', original + ', maximum-scale=1.01');
-  setTimeout(function() { vp.setAttribute('content', original); }, 50);
+  // Run multiple times with delays to ensure it catches
+  [0, 100, 300, 600].forEach(function(delay) {
+    setTimeout(function() {
+      vp.setAttribute('content', original + ', maximum-scale=1.01');
+      setTimeout(function() { vp.setAttribute('content', original); }, 50);
+    }, delay);
+  });
 }
 
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
