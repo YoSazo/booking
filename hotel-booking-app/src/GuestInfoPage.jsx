@@ -1331,6 +1331,18 @@ const handlePayLaterBooking = async (e) => {
 
     return (
         <>
+            {/* Freemium gate: overlay + sticky banner when not subscribed */}
+            {!isPreviewMode && hotel && hotel.subscribed === false && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.3)', zIndex: 9998, pointerEvents: 'all' }} />
+                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
+                  <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>Go live to accept bookings</div>
+                  <button onClick={() => { window.location.href = '/frontdesk'; }} style={{ width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Activate — $299/mo →</button>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', marginTop: '6px' }}>No commission. Cancel anytime.</div>
+                </div>
+              </>
+            )}
+
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
 
             {/* Why We Need Your Card - Centered Floating Modal */}
@@ -2269,23 +2281,6 @@ const handlePayLaterBooking = async (e) => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    // Freemium gate: if hotel isn't subscribed, show Go Live screen
-    const isPreview = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('preview') || window !== window.parent);
-    if (!isPreview && props.hotel && props.hotel.subscribed === false) {
-        return (
-            <div style={{ minHeight: '100vh', background: '#f4f7f9', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                <div style={{ background: 'white', borderRadius: '20px', padding: '36px', maxWidth: '420px', width: '100%', textAlign: 'center', boxShadow: '0 12px 40px rgba(0,0,0,0.1)' }}>
-                    <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
-                    <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px' }}>Almost there!</h2>
-                    <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.5', marginBottom: '20px' }}>Your booking engine is built and ready. Activate it to start accepting real bookings from guests.</p>
-                    <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>$299/month. No commission. Cancel anytime.</p>
-                    <button onClick={() => { window.location.href = '/frontdesk'; }} style={{ width: '100%', padding: '14px', background: '#2E7D5B', color: 'white', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}>Go Live →</button>
-                    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '12px' }}>Log into your front desk to activate.</p>
-                </div>
-            </div>
-        );
-    }
-
     const elementsOptions = {
         fonts: [{ cssSrc: '/fonts/inter.css' }],
         appearance: {
