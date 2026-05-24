@@ -351,13 +351,17 @@ async function addRoomAndFinish() {
     document.getElementById('successPin').textContent = completeData.crmPin || '----';
     document.getElementById('successLink').href = domain + '?welcome=1';
 
-    // Enable the Visit Site button after a delay (SSL cert provisioning)
-    setTimeout(function() {
-      var link = document.getElementById('successLink');
-      link.textContent = 'Visit Your Site \u2192';
-      link.style.opacity = '1';
-      link.style.pointerEvents = 'auto';
-    }, 5000);
+    // Poll until the site is actually reachable (SSL provisioned)
+    (function checkSiteReady() {
+      fetch(domain, { mode: 'no-cors' }).then(function() {
+        var link = document.getElementById('successLink');
+        link.textContent = 'Visit Your Site \u2192';
+        link.style.opacity = '1';
+        link.style.pointerEvents = 'auto';
+      }).catch(function() {
+        setTimeout(checkSiteReady, 3000);
+      });
+    })();
 
     // Send welcome email
     fetch(API + '/api/setup/' + TOKEN + '/finalize', {
