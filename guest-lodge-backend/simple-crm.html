@@ -1656,6 +1656,10 @@
 
 <!-- APP -->
 <div id="app" style="display:none">
+  <!-- Go Live banner (shown when not subscribed) -->
+  <div id="goLiveBanner" style="display:none; background:linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%); color:white; padding:12px 16px; text-align:center; font-size:13px; font-weight:500;">
+    Your booking engine is in preview mode. <button onclick="goLive()" style="background:white; color:#1a5c3f; border:none; padding:6px 14px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; margin-left:8px;">Go Live — $299/mo</button>
+  </div>
   <header class="header">
     <div class="header-logo">
       <img src="/marketellogo.svg" alt="" class="header-logo-icon">
@@ -2401,6 +2405,12 @@ async function startCrmApp(verification) {
   document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+
+  // Show/hide Go Live banner based on subscription status
+  const banner = document.getElementById('goLiveBanner');
+  if (banner) {
+    banner.style.display = (verification && verification.subscribed) ? 'none' : 'block';
+  }
 
   const realignActiveTab = () => {
     const activeTab = document.querySelector('.tab.active');
@@ -3923,6 +3933,19 @@ function toggleSection(header) {
   } else {
     body.style.display = 'none';
     if (arrow) arrow.style.transform = 'rotate(0deg)';
+  }
+}
+
+async function goLive() {
+  try {
+    const res = await api('POST', '/api/crm/go-live');
+    if (res.success && res.url) {
+      window.location.href = res.url;
+    } else {
+      toast(res.message || 'Failed to start checkout', 'error');
+    }
+  } catch (e) {
+    toast('Failed to start checkout. Try again.', 'error');
   }
 }
 

@@ -121,6 +121,7 @@ function App() {
           rates: data.rates || fallbackHotel.rates,
           rooms: data.rooms || [],
           cancellationPolicy: data.cancellationPolicy || '',
+          subscribed: data.subscribed || false,
           reviews: [],
         });
       } catch (e) {
@@ -354,6 +355,12 @@ function App() {
 const handleConfirmBooking = async (bookingDetails) => {
   if (!selectedRoom) {
     alert("Please select a room first.");
+    return;
+  }
+
+  // Block booking if hotel isn't subscribed (freemium gate)
+  if (!currentHotel.subscribed) {
+    alert("This booking engine is in preview mode. The hotel owner needs to activate it to accept bookings.");
     return;
   }
 

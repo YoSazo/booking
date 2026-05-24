@@ -221,11 +221,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="progress-bar">
     <div class="progress-step done" id="prog-1"></div>
     <div class="progress-step" id="prog-2"></div>
-    <div class="progress-step" id="prog-3"></div>
-    <div class="progress-step" id="prog-4"></div>
   </div>
 
-  <!-- STEP 1: Hotel Name only -->
+  <!-- STEP 1: Hotel Name -->
   <div class="step active" id="step-1">
     <div class="form-card">
       <h2>Your hotel</h2>
@@ -245,94 +243,33 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Room Name</label>
         <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
-      <button class="btn btn-primary" onclick="addRoomAndNext()">See My Booking Engine &rarr;</button>
+      <button class="btn btn-primary" onclick="addRoomAndFinish()">Build My Engine &rarr;</button>
       <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
     </div>
   </div>
 
-  <!-- STEP 3: Rate (1 field) -->
+  <!-- STEP 3: Success - give them everything -->
   <div class="step" id="step-3">
-    <div class="form-card">
-      <h2>Set your nightly rate</h2>
-      <div class="field">
-        <label>Price per night ($)</label>
-        <input type="number" id="rateNightly" placeholder="69" value="69">
+    <div class="form-card" style="text-align:center;">
+      <h2>🎉 You're in!</h2>
+      <p style="font-size:14px; color:var(--muted); margin-bottom:16px;">Your booking engine and front desk are ready.</p>
+      <div style="background:#e8f5ee; border-radius:12px; padding:14px; font-family:monospace; font-size:14px; color:#2E7D5B; font-weight:600; margin-bottom:14px; word-break:break-all;" id="successDomain"></div>
+      <div style="background:#f0f4ff; border:1.5px solid #c7d2fe; border-radius:12px; padding:14px; margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Front Desk PIN</div>
+        <div style="font-family:monospace; font-size:24px; font-weight:700; letter-spacing:3px;" id="successPin"></div>
       </div>
-      <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">Weekly and monthly rates are auto-calculated. You can adjust later.</p>
-      <button class="btn btn-primary" onclick="saveStep3()">See My Booking Engine &rarr;</button>
-      <button class="btn btn-back" onclick="goToStep(2)">&larr; Back</button>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Tap the ✏️ pencil on your booking site to manage rooms, photos, rates, and availability.</p>
+      <a class="btn btn-primary" id="successLink" href="#" target="_blank" style="text-decoration:none; text-align:center;">Visit Your Site &rarr;</a>
+      <p style="font-size:11px; color:var(--muted); margin-top:20px;">We've emailed this to you. Your engine is in preview mode — go live anytime from your front desk.</p>
     </div>
   </div>
 
-</div>
-
-<!-- Full-page iframe steps (outside container) -->
-<!-- STEP 4: Preview booking engine (full-page iframe) -->
-<div class="step step-fullpage" id="step-4">
-  <div class="fullpage-topbar">
-    <button class="fullpage-back" onclick="goToStep(2)">&larr;</button>
-    <div class="fullpage-title">Your booking engine</div>
-    <div style="width:32px;"></div>
-  </div>
-  <div class="fullpage-iframe-wrap">
-    <div id="previewLoading" class="fullpage-loading"><div class="spinner"></div></div>
-    <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
-  </div>
-  <div class="fullpage-bottombar">
-    <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Try booking yourself — pick dates, select a room, and see exactly what your guests experience.</p>
-    <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">See How to Edit It &rarr;</button>
-  </div>
-</div>
-
-<!-- STEP 5: Front desk demo (full-page iframe) -->
-<div class="step step-fullpage" id="step-5">
-  <div class="fullpage-topbar">
-    <button class="fullpage-back" onclick="goToStep(4)">&larr;</button>
-    <div class="fullpage-title">Your front desk</div>
-    <div style="width:32px;"></div>
-  </div>
-  <div class="fullpage-iframe-wrap">
-    <div id="frontdeskLoading" class="fullpage-loading"><div class="spinner"></div></div>
-    <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
-  </div>
-  <div class="fullpage-bottombar" id="step5Bottom">
-    <div id="step5Tour">
-      <div id="step5TourText" style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
-        <div id="step5TourMsg" style="font-size:13px;font-weight:500;line-height:1.4;"></div>
-        <div id="step5TourLabel" style="font-size:11px;opacity:0.5;margin-top:6px;"></div>
-      </div>
-      <button class="btn btn-primary" id="step5TourBtn" onclick="advanceSetupTour()" style="margin:0;">Next →</button>
-    </div>
-    <div id="step5CTA" style="display:none;"></div>
-  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
-// Fix iOS Safari iframe viewport offset bug (tab bar at top causes touch misalignment)
-var iosFixInterval = null;
-function fixIosViewport() {
-  var vp = document.querySelector('meta[name="viewport"]');
-  if (!vp) return;
-  var original = vp.getAttribute('content');
-  vp.setAttribute('content', original + ', maximum-scale=1.01');
-  setTimeout(function() { vp.setAttribute('content', original); }, 50);
-}
-function startIosFix() {
-  fixIosViewport();
-  if (!iosFixInterval) {
-    iosFixInterval = setInterval(fixIosViewport, 2000);
-  }
-}
-function stopIosFix() {
-  if (iosFixInterval) {
-    clearInterval(iosFixInterval);
-    iosFixInterval = null;
-  }
-}
-
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
 const API = '';
 let hotelData = {};
@@ -348,115 +285,14 @@ function showToast(msg, isError) {
 function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
 
 function goToStep(n) {
-  // Track step completion with hotel ID for identification
   fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Step' + n + 'Reached', email: hotelData.id || TOKEN }) }).catch(() => {});
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step-' + n).classList.add('active');
   document.querySelectorAll('.progress-step').forEach((s, i) => {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
-  const container = document.querySelector('.setup-container');
-  const isMobile = window.innerWidth < 769;
-  if ((n === 4 || n === 5) && isMobile) {
-    container.style.display = 'none';
-    document.body.style.overflow = 'hidden';
-  } else {
-    container.style.display = 'block';
-    document.body.style.overflow = '';
-  }
-  // On desktop, reduce container padding so iframe sits tight below progress bar
-  if (n === 4 || n === 5) {
-    container.classList.add('compact');
-  } else {
-    container.classList.remove('compact');
-  }
-  if (n === 4) loadPreview();
-  if (n === 5) loadFrontdeskDemo();
   window.scrollTo(0, 0);
-  // iOS Safari fix: force viewport recalculation by scrolling
-  if (n === 4 || n === 5) {
-    setTimeout(function() { window.scrollTo(0, 1); }, 50);
-    setTimeout(function() { window.scrollTo(0, 0); }, 100);
-  }
 }
-
-function loadPreview() {
-  const frontendBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5173'
-    : 'https://suitestay.clickinns.com';
-  document.getElementById('previewFrame').src = frontendBase + '?hotelId=' + (hotelData.id || '') + '&preview=1';
-}
-
-function loadFrontdeskDemo() {
-  const base = window.location.origin;
-  const name = encodeURIComponent(hotelData.name || 'Your Hotel');
-  const isMobile = window.innerWidth < 769;
-  const notour = isMobile ? '&notour=1' : '';
-  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name + notour;
-  setupTourStep = 0;
-  if (isMobile) {
-    document.getElementById('step5Bottom').style.display = '';
-    renderSetupTour();
-  } else {
-    document.getElementById('step5Bottom').style.display = 'none';
-  }
-}
-
-const setupTourSteps = [
-  { view: 'edit', text: 'Edit your rooms, photos, rates, and hotel info. Tap any field to change it \u2014 updates your booking site instantly.' },
-  { view: 'bookings', text: 'Every direct booking lands here. Guest name, phone, room, dates \u2014 everything you need to confirm their stay.' },
-  { view: 'availability', text: 'Control what\u2019s available on your booking engine. Tap any date to open or close rooms.' },
-  { view: 'revenue', text: 'Track your direct revenue and see exactly how much you\u2019re saving vs. OTA commissions.' },
-];
-let setupTourStep = 0;
-
-function renderSetupTour() {
-  const step = setupTourSteps[setupTourStep];
-  const label = 'Step ' + (setupTourStep + 1) + ' of ' + setupTourSteps.length;
-  const isLast = setupTourStep === setupTourSteps.length - 1;
-  document.getElementById('step5TourMsg').textContent = step.text;
-  document.getElementById('step5TourLabel').textContent = label;
-  document.getElementById('step5TourBtn').textContent = isLast ? 'Got it \u2713' : 'Next \u2192';
-  document.getElementById('step5Tour').style.display = '';
-  document.getElementById('step5CTA').style.display = 'none';
-  // Tell iframe to switch tab
-  var iframe = document.getElementById('frontdeskDemoFrame');
-  if (iframe && iframe.contentWindow) {
-    iframe.contentWindow.postMessage({ type: 'switchTab', view: step.view }, '*');
-  }
-}
-
-function advanceSetupTour() {
-  setupTourStep++;
-  if (setupTourStep >= setupTourSteps.length) {
-    // Tour done — show CTA
-    showStep5Cta();
-    return;
-  }
-  renderSetupTour();
-}
-
-function showStep5Cta() {
-  var bottom = document.getElementById('step5Bottom');
-  bottom.style.display = '';
-  document.getElementById('step5Tour').style.display = 'none';
-  var cta = document.getElementById('step5CTA');
-  cta.style.display = '';
-  cta.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">' + (hotelData.name || 'Your hotel') + ' is ready to go live.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine is built. Activate now and start taking direct bookings tonight \u2014 no commission, no OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div></div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:10px 0 0;background:var(--green);font-size:16px;">Go Live for $299/mo \u2192</button><div style="text-align:left;margin-top:14px;font-size:11px;line-height:1.5;color:var(--muted);"><strong>This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div>';
-}
-
-// Listen for tour complete from iframe (desktop)
-window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'tourComplete') {
-    // Desktop: CTA is shown inside iframe, no need to show external one
-  }
-  if (e.data && e.data.type === 'payNow') {
-    payAndGoLive();
-  }
-  if (e.data && e.data.type === 'nextStep') {
-    goToStep(5);
-  }
-});
 
 // Load existing data
 async function loadSetup() {
@@ -468,10 +304,6 @@ async function loadSetup() {
     hotelData = data.hotel || {};
     rooms = data.rooms || [];
     if (hotelData.name) document.getElementById('hotelName').value = hotelData.name;
-    if (hotelData.phone) document.getElementById('hotelPhone').value = hotelData.phone;
-    if (hotelData.address) document.getElementById('hotelAddress').value = hotelData.address;
-    if (data.rates) document.getElementById('rateNightly').value = data.rates.nightly || 69;
-    renderRooms();
   } catch (e) {}
 }
 
@@ -493,120 +325,41 @@ async function saveStep1() {
 }
 
 // Step 2: Rooms
-async function addRoomAndNext() {
+async function addRoomAndFinish() {
   const name = document.getElementById('rmName').value.trim();
   if (!name) { showToast('Enter a room name', true); return; }
 
   showLoading(true);
   try {
+    // Save room
     const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, maxOccupancy: 4, totalUnits: 5 }),
     });
     if (!res.ok) throw new Error('Server error');
-    const data = await res.json();
-    rooms.push({ id: data.room.id, name: data.room.name });
-    goToStep(4);
-  } catch (e) { showToast('Failed to save room', true); }
-  showLoading(false);
-}
 
-function renderRooms() {
-  const list = document.getElementById('roomList');
-  const nextBtn = document.getElementById('roomNextBtn');
-  const addBtn = document.querySelector('#step-2 .btn-primary[onclick="addRoom()"]');
-  const rmField = document.getElementById('rmName')?.parentElement;
-  if (!rooms.length) {
-    list.innerHTML = '';
-    nextBtn.style.opacity = '0.4'; nextBtn.style.pointerEvents = 'none';
-    if (addBtn) addBtn.style.display = '';
-    if (rmField) rmField.style.display = '';
-    return;
-  }
-  nextBtn.style.opacity = '1'; nextBtn.style.pointerEvents = 'auto';
-  // Hide the add room input and button after first room is added
-  if (addBtn) addBtn.style.display = 'none';
-  if (rmField) rmField.style.display = 'none';
-  list.innerHTML = rooms.map(r => {
-    return `<div class="room-item">
-      <div class="room-item-info"><div class="room-item-name">${r.name}</div></div>
-      <div class="room-item-actions"><button class="room-item-btn" onclick="deleteRoom('${r.id}')">✕</button></div>
-    </div>`;
-  }).join('');
-}
-
-async function addRoom() {
-  const name = document.getElementById('rmName').value.trim();
-  if (!name) { showToast('Enter a room name', true); return; }
-
-  showLoading(true);
-  try {
-    const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
+    // Complete setup — get domain + PIN
+    const completeRes = await fetch(API + '/api/setup/' + TOKEN + '/complete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, maxOccupancy: 4, totalUnits: 5 }),
     });
-    if (!res.ok) throw new Error('Server error');
-    const data = await res.json();
-    const roomId = data.room?.id;
+    const completeData = await completeRes.json();
 
-    // Upload photo if selected
-    if (pendingFile && roomId) {
-      const fd = new FormData();
-      fd.append('image', pendingFile);
-      await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + roomId + '/images', { method: 'POST', body: fd });
-    }
+    // Show success
+    console.log('Complete response:', completeData);
+    const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.bookmarketel.com';
+    document.getElementById('successDomain').textContent = domain.replace('https://', '');
+    document.getElementById('successPin').textContent = completeData.crmPin || '----';
+    document.getElementById('successLink').href = domain + '?welcome=1';
 
-    // Reload
-    const setupRes = await fetch(API + '/api/setup/' + TOKEN);
-    const setupData = await setupRes.json();
-    rooms = setupData.rooms || [];
-    renderRooms();
-
-    // Reset fields
-    document.getElementById('rmName').value = '';
-    pendingFile = null;
-    showToast('Room added!');
-  } catch (e) { showToast('Failed to add room', true); }
-  showLoading(false);
-}
-
-async function deleteRoom(id) {
-  showLoading(true);
-  try {
-    await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + id, { method: 'DELETE' });
-    rooms = rooms.filter(r => r.id !== id);
-    renderRooms();
-  } catch (e) { showToast('Failed to delete', true); }
-  showLoading(false);
-}
-
-// Step 3: Rate
-async function saveStep3() {
-  const nightly = parseFloat(document.getElementById('rateNightly').value) || 69;
-  const weekly = Math.round(nightly * 5);
-  const monthly = Math.round(nightly * 20);
-
-  showLoading(true);
-  try {
-    await fetch(API + '/api/setup/' + TOKEN + '/rates', {
+    // Send welcome email
+    fetch(API + '/api/setup/' + TOKEN + '/finalize', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nightly, weekly, monthly, taxRate: 0.10 }),
-    });
-    goToStep(4);
-  } catch (e) { showToast('Failed to save', true); }
-  showLoading(false);
-}
+      body: JSON.stringify({ email: '', phone: '', pin: completeData.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
+    }).catch(() => {});
 
-// Step 4: Pay
-async function payAndGoLive() {
-  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'PaymentCTAClicked' }) }).catch(() => {});
-  showLoading(true);
-  try {
-    const res = await fetch(API + '/api/setup/' + TOKEN + '/checkout', { method: 'POST' });
-    const data = await res.json();
-    if (data.url) { window.location.href = data.url; }
-    else { throw new Error(); }
-  } catch (e) { showToast('Failed to start payment', true); showLoading(false); }
+    goToStep(3);
+  } catch (e) { showToast('Something went wrong. Try again.', true); }
+  showLoading(false);
 }
 
 loadSetup();

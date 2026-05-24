@@ -137,6 +137,7 @@ model HotelConfig {
   // Onboarding
   setupToken      String?   @unique
   setupComplete   Boolean   @default(false)
+  subscribed      Boolean   @default(false)
   stripeAccountId String?
   ownerEmail      String?
   ownerPhone      String?

@@ -4728,19 +4728,30 @@ app.post('/api/setup/:token/complete', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        console.log('Complete called for:', hotel.id, hotel.name);
 
         // Generate slug from hotel name
         const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const domain = slug + '.clickinns.com';
+        const assignedDomain = slug + '.bookmarketel.com';
 
         // Create domain record (ignore if exists)
         try {
-            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain, isPrimary: true } });
-        } catch (e) {
-            // Domain might already exist — that's fine
+            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
+        } catch (e) { /* Domain might already exist */ }
+
+        // Add to Vercel
+        const vercelToken = process.env.VERCEL_TOKEN;
+        const vercelProjectId = process.env.VERCEL_PROJECT_ID;
+        if (vercelToken && vercelProjectId) {
+            try {
+                await axios.post(`https://api.vercel.com/v10/projects/${vercelProjectId}/domains`, { name: assignedDomain }, { headers: { Authorization: `Bearer ${vercelToken}`, 'Content-Type': 'application/json' } });
+                console.log(`✅ Vercel domain added: ${assignedDomain}`);
+            } catch (vercelErr) {
+                console.error(`⚠️ Vercel domain add failed: ${vercelErr.response?.data?.error?.message || vercelErr.message}`);
+            }
         }
 
-        // Mark setup complete and activate
+        // Mark setup complete, activate (subscribed defaults to false)
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
             data: { setupComplete: true, active: true },
@@ -4753,10 +4764,19 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore duplicate */ }
 
-        res.json({ success: true, bookingUrl: 'https://' + domain, frontdeskUrl: 'https://' + domain + '/frontdesk', crmPin: defaultPin });
+        // Send welcome email
+        if (hotel.ownerEmail) {
+            sendWelcomeEmail(hotel.ownerEmail, hotel.name || 'Your Hotel', defaultPin, assignedDomain);
+        }
+
+        // Track funnel event
+        prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'SetupCompleted', guestEmail: hotel.ownerEmail || null } }).catch(() => {});
+
+        console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
+        res.json({ success: true, bookingUrl: 'https://' + assignedDomain, frontdeskUrl: 'https://' + assignedDomain + '/frontdesk', crmPin: defaultPin });
     } catch (e) {
-        console.error('Setup complete error:', e.message);
-        res.status(500).json({ error: 'Failed to complete setup' });
+        console.error('Setup complete error:', e.message, e.stack);
+        res.status(500).json({ error: 'Failed to complete setup', detail: e.message });
     }
 });
 
@@ -4796,6 +4816,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
+            subscribed: false,
             rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
             rooms: hotel.rooms.map((r, i) => ({
                 id: i + 1,
@@ -4843,6 +4864,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             hotelAddress: dbHotel?.address || '',
             hotelPhone: dbHotel?.phone || '',
             cancellationPolicy: dbHotel?.cancellationPolicy || '',
+            subscribed: false,
         });
     } catch (e) {
         console.error('crm:verify failed:', e.message);
@@ -4928,6 +4950,49 @@ app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('crm:change-pin failed:', e.message);
         res.status(500).json({ success: false, message: 'Failed to change PIN' });
+    }
+});
+
+// Go Live — create Stripe checkout for subscription (from front desk)
+app.post('/api/crm/go-live', crmAuth, async (req, res) => {
+    try {
+        if (!marketelStripe) return res.json({ success: false, message: 'Payment not configured' });
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { ownerEmail: true, name: true, setupToken: true } });
+
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+        const session = await marketelStripe.checkout.sessions.create({
+            mode: 'subscription',
+            line_items: [{ price: 'price_1TYsfHBFnVCGiXweQNHOMDfX', quantity: 1 }],
+            customer_email: hotel?.ownerEmail || undefined,
+            metadata: { product: 'hotel-go-live', hotelId },
+            success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&token=${encodeURIComponent(req.crmToken || '')}`,
+            cancel_url: req.headers.referer || baseUrl + '/frontdesk',
+        });
+        res.json({ success: true, url: session.url });
+    } catch (e) {
+        console.error('crm:go-live error:', e.message);
+        res.json({ success: false, message: 'Failed to create checkout' });
+    }
+});
+
+// Go Live success — mark hotel as subscribed
+app.get('/api/crm/go-live-success', async (req, res) => {
+    try {
+        const hotelId = String(req.query.hotelId || '').trim();
+        if (hotelId) {
+            await prisma.hotelConfig.update({ where: { id: hotelId }, data: { setupComplete: true } });
+            console.log(`✅ Hotel subscribed: ${hotelId}`);
+            // Track
+            prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotelId } }).catch(() => {});
+            sendMarketelCAPI('Subscribe', { ip: req.ip, userAgent: req.headers['user-agent'], sourceUrl: req.headers.referer || '', value: 299, currency: 'USD' });
+        }
+        // Redirect back to front desk
+        res.redirect('/frontdesk');
+    } catch (e) {
+        console.error('go-live-success error:', e.message);
+        res.redirect('/frontdesk');
     }
 });
 
