@@ -1331,8 +1331,8 @@ const handlePayLaterBooking = async (e) => {
 
     return (
         <>
-            {/* Freemium gate: overlay + sticky banner when not subscribed */}
-            {!isPreviewMode && hotel && hotel.subscribed === false && (
+            {/* Freemium gate: overlay + sticky banner when not subscribed AND on payment step */}
+            {!isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4 && (
               <>
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.3)', zIndex: 9998, pointerEvents: 'all' }} />
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>

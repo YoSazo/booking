@@ -3588,6 +3588,7 @@ async function loadEditRooms() {
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
+      <div id="editRoomsCards"></div>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
@@ -3690,7 +3691,6 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
         </div>
       </div>
-      <div id="editRoomsCards"></div>
     `;
     list.innerHTML = html;
     renderEditRoomsCards();
