@@ -95,23 +95,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 /* Full-page iframe steps (mobile only) */
 .step-fullpage {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 100%;
-  height: 100dvh;
   z-index: 200;
   background: var(--bg);
   display: none;
   flex-direction: column;
-  /* iOS 26 Safari fix: force GPU layer to fix touch offset */
-  -webkit-transform: translate3d(0,0,0);
-  transform: translate3d(0,0,0);
+  padding: 0;
 }
 .step-fullpage.active {
-  display: flex !important;
+  display: block !important;
 }
 .fullpage-topbar {
   display: flex;
@@ -138,11 +129,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   font-weight: 600;
 }
 .fullpage-iframe-wrap {
-  flex: 1;
   position: relative;
   overflow: hidden;
-  z-index: 1;
-  -webkit-overflow-scrolling: touch;
+  height: 72vh;
+  border-radius: 12px;
+  margin: 0 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
 .fullpage-iframe {
   width: 100%;
@@ -161,14 +154,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   z-index: 2;
 }
 .fullpage-bottombar {
-  padding: 14px 16px 24px;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  padding: 14px 16px;
   background: #f0fdf4;
   border-top: 1.5px solid #bbf7d0;
   flex-shrink: 0;
-  position: relative;
+  position: sticky;
+  bottom: 0;
   z-index: 10;
-  -webkit-transform: translateZ(0);
 }
 .fullpage-bottombar .btn {
   width: 100%;
@@ -287,9 +279,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
   <div class="fullpage-iframe-wrap">
     <div id="previewLoading" class="fullpage-loading"><div class="spinner"></div></div>
-    <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none';fixIosViewport()"></iframe>
+    <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
   </div>
-  <div class="fullpage-bottombar" ontouchstart="document.getElementById('previewFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('previewFrame').style.pointerEvents=''},300)">
+  <div class="fullpage-bottombar">
     <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Try booking yourself — pick dates, select a room, and see exactly what your guests experience.</p>
     <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">See How to Edit It &rarr;</button>
   </div>
@@ -304,9 +296,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
   <div class="fullpage-iframe-wrap">
     <div id="frontdeskLoading" class="fullpage-loading"><div class="spinner"></div></div>
-    <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none';fixIosViewport()"></iframe>
+    <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
   </div>
-  <div class="fullpage-bottombar" id="step5Bottom" style="position:relative;z-index:100;" ontouchstart="document.getElementById('frontdeskDemoFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('frontdeskDemoFrame').style.pointerEvents=''},300)">
+  <div class="fullpage-bottombar" id="step5Bottom">
     <div id="step5Tour">
       <div id="step5TourText" style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
         <div id="step5TourMsg" style="font-size:13px;font-weight:500;line-height:1.4;"></div>
@@ -323,17 +315,25 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 <script>
 // Fix iOS Safari iframe viewport offset bug (tab bar at top causes touch misalignment)
+var iosFixInterval = null;
 function fixIosViewport() {
   var vp = document.querySelector('meta[name="viewport"]');
   if (!vp) return;
   var original = vp.getAttribute('content');
-  // Run multiple times with delays to ensure it catches
-  [0, 100, 300, 600].forEach(function(delay) {
-    setTimeout(function() {
-      vp.setAttribute('content', original + ', maximum-scale=1.01');
-      setTimeout(function() { vp.setAttribute('content', original); }, 50);
-    }, delay);
-  });
+  vp.setAttribute('content', original + ', maximum-scale=1.01');
+  setTimeout(function() { vp.setAttribute('content', original); }, 50);
+}
+function startIosFix() {
+  fixIosViewport();
+  if (!iosFixInterval) {
+    iosFixInterval = setInterval(fixIosViewport, 2000);
+  }
+}
+function stopIosFix() {
+  if (iosFixInterval) {
+    clearInterval(iosFixInterval);
+    iosFixInterval = null;
+  }
 }
 
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
