@@ -3668,7 +3668,7 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
         </div>
       </div>
-      <div class="booking-card" style="margin-bottom:14px;">
+      ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
@@ -3677,7 +3677,7 @@ async function loadEditRooms() {
           <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
         </div>
-      </div>
+      </div>` : ''}
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
