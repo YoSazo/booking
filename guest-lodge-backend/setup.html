@@ -295,7 +295,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div id="frontdeskLoading" class="fullpage-loading"><div class="spinner"></div></div>
     <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
   </div>
-  <div class="fullpage-bottombar" id="step5Bottom"></div>
+  <div class="fullpage-bottombar" id="step5Bottom">
+    <div id="step5Tour">
+      <div id="step5TourText" style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+        <div id="step5TourMsg" style="font-size:13px;font-weight:500;line-height:1.4;"></div>
+        <div id="step5TourLabel" style="font-size:11px;opacity:0.5;margin-top:6px;"></div>
+      </div>
+      <button class="btn btn-primary" id="step5TourBtn" onclick="advanceSetupTour()" style="margin:0;">Next →</button>
+    </div>
+    <div id="step5CTA" style="display:none;"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -377,11 +386,14 @@ const setupTourSteps = [
 let setupTourStep = 0;
 
 function renderSetupTour() {
-  const bottom = document.getElementById('step5Bottom');
   const step = setupTourSteps[setupTourStep];
   const label = 'Step ' + (setupTourStep + 1) + ' of ' + setupTourSteps.length;
   const isLast = setupTourStep === setupTourSteps.length - 1;
-  bottom.innerHTML = '<div style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;"><div style="font-size:13px;font-weight:500;line-height:1.4;">' + step.text + '</div><div style="font-size:11px;opacity:0.5;margin-top:6px;">' + label + '</div></div><button class="btn btn-primary" onclick="advanceSetupTour()" style="margin:0;">' + (isLast ? 'Got it \u2713' : 'Next \u2192') + '</button>';
+  document.getElementById('step5TourMsg').textContent = step.text;
+  document.getElementById('step5TourLabel').textContent = label;
+  document.getElementById('step5TourBtn').textContent = isLast ? 'Got it \u2713' : 'Next \u2192';
+  document.getElementById('step5Tour').style.display = '';
+  document.getElementById('step5CTA').style.display = 'none';
   // Tell iframe to switch tab
   var iframe = document.getElementById('frontdeskDemoFrame');
   if (iframe && iframe.contentWindow) {
@@ -402,7 +414,10 @@ function advanceSetupTour() {
 function showStep5Cta() {
   var bottom = document.getElementById('step5Bottom');
   bottom.style.display = '';
-  bottom.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">' + (hotelData.name || 'Your hotel') + ' is ready to go live.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine is built. Activate now and start taking direct bookings tonight \u2014 no commission, no OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:0;background:white;color:var(--green-dark);font-size:16px;font-weight:700;">Go Live for $299/mo \u2192</button><div style="font-size:11px;opacity:0.5;margin-top:8px;">Stripe checkout. Custom domain included.</div><div style="text-align:left;margin-top:14px;font-size:11px;line-height:1.5;opacity:0.8;"><strong>This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div></div>';
+  document.getElementById('step5Tour').style.display = 'none';
+  var cta = document.getElementById('step5CTA');
+  cta.style.display = '';
+  cta.innerHTML = '<div style="background:linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);border-radius:12px;padding:20px;color:white;text-align:center;"><div style="font-size:17px;font-weight:700;margin-bottom:6px;">' + (hotelData.name || 'Your hotel') + ' is ready to go live.</div><div style="font-size:13px;opacity:0.85;line-height:1.4;margin-bottom:14px;">Your booking engine is built. Activate now and start taking direct bookings tonight \u2014 no commission, no OTAs.</div><div style="font-size:12px;opacity:0.7;margin-bottom:12px;">$299/month. No commission. Cancel anytime.</div></div><button class="btn btn-primary" onclick="payAndGoLive()" style="margin:10px 0 0;background:var(--green);font-size:16px;">Go Live for $299/mo \u2192</button><div style="text-align:left;margin-top:14px;font-size:11px;line-height:1.5;color:var(--muted);"><strong>This is for you if:</strong> guests already find you \u2014 Google, Maps, word-of-mouth \u2014 and you\u2019re tired of losing 15\u201325% to Expedia on bookings you could\u2019ve taken direct.<br><br><strong>Not for you if:</strong> you have zero traffic and expect software to magically fill rooms. We\u2019re a booking engine, not an ad agency.</div>';
 }
 
 // Listen for tour complete from iframe (desktop)
