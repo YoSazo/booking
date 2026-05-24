@@ -25,6 +25,8 @@ function OwnerPencilButton() {
     const params = new URLSearchParams(window.location.search);
     if (params.has('welcome')) {
       setShowTourGuide(true);
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => setShowTourGuide(false), 5000);
       // Remove the param from URL without reload
       const url = new URL(window.location);
       url.searchParams.delete('welcome');
