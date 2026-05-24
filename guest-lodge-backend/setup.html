@@ -259,7 +259,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <div style="font-family:monospace; font-size:24px; font-weight:700; letter-spacing:3px;" id="successPin"></div>
       </div>
       <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Tap the ✏️ pencil on your booking site to manage rooms, photos, rates, and availability.</p>
-      <a class="btn btn-primary" id="successLink" href="#" target="_blank" style="text-decoration:none; text-align:center;">Visit Your Site &rarr;</a>
+      <a class="btn btn-primary" id="successLink" href="#" target="_blank" style="text-decoration:none; text-align:center; opacity:0.5; pointer-events:none;">Setting up your site...</a>
       <p style="font-size:11px; color:var(--muted); margin-top:20px;">We've emailed this to you. Your engine is in preview mode — go live anytime from your front desk.</p>
     </div>
   </div>
@@ -350,6 +350,14 @@ async function addRoomAndFinish() {
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     document.getElementById('successPin').textContent = completeData.crmPin || '----';
     document.getElementById('successLink').href = domain + '?welcome=1';
+
+    // Enable the Visit Site button after a delay (SSL cert provisioning)
+    setTimeout(function() {
+      var link = document.getElementById('successLink');
+      link.textContent = 'Visit Your Site \u2192';
+      link.style.opacity = '1';
+      link.style.pointerEvents = 'auto';
+    }, 5000);
 
     // Send welcome email
     fetch(API + '/api/setup/' + TOKEN + '/finalize', {
