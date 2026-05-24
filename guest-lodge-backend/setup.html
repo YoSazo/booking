@@ -279,9 +279,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
   <div class="fullpage-iframe-wrap">
     <div id="previewLoading" class="fullpage-loading"><div class="spinner"></div></div>
-    <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
+    <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none';fixIosViewport()"></iframe>
   </div>
-  <div class="fullpage-bottombar" style="display:none;" ontouchstart="document.getElementById('previewFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('previewFrame').style.pointerEvents=''},300)">
+  <div class="fullpage-bottombar" ontouchstart="document.getElementById('previewFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('previewFrame').style.pointerEvents=''},300)">
     <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Try booking yourself — pick dates, select a room, and see exactly what your guests experience.</p>
     <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">See How to Edit It &rarr;</button>
   </div>
@@ -296,7 +296,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
   <div class="fullpage-iframe-wrap">
     <div id="frontdeskLoading" class="fullpage-loading"><div class="spinner"></div></div>
-    <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
+    <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none';fixIosViewport()"></iframe>
   </div>
   <div class="fullpage-bottombar" id="step5Bottom" style="position:relative;z-index:100;" ontouchstart="document.getElementById('frontdeskDemoFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('frontdeskDemoFrame').style.pointerEvents=''},300)">
     <div id="step5Tour">
@@ -314,6 +314,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
 
 <script>
+// Fix iOS Safari iframe viewport offset bug (tab bar at top causes touch misalignment)
+function fixIosViewport() {
+  var vp = document.querySelector('meta[name="viewport"]');
+  if (!vp) return;
+  var original = vp.getAttribute('content');
+  vp.setAttribute('content', original + ', maximum-scale=1.01');
+  setTimeout(function() { vp.setAttribute('content', original); }, 50);
+}
+
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
 const API = '';
 let hotelData = {};
@@ -366,10 +375,16 @@ function loadPreview() {
 function loadFrontdeskDemo() {
   const base = window.location.origin;
   const name = encodeURIComponent(hotelData.name || 'Your Hotel');
-  // Always use the iframe's built-in tour (works universally, no iOS touch issues)
-  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name;
-  // Hide the external bottom bar — tour + CTA live inside the iframe
-  document.getElementById('step5Bottom').style.display = 'none';
+  const isMobile = window.innerWidth < 769;
+  const notour = isMobile ? '&notour=1' : '';
+  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name + notour;
+  setupTourStep = 0;
+  if (isMobile) {
+    document.getElementById('step5Bottom').style.display = '';
+    renderSetupTour();
+  } else {
+    document.getElementById('step5Bottom').style.display = 'none';
+  }
 }
 
 const setupTourSteps = [

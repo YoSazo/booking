@@ -149,7 +149,7 @@ function BookingPage({
     <>
       {/* Marquee banner removed - taking up valuable above-fold space */}
 
-      <div className="container" style={new URLSearchParams(window.location.search).has('preview') ? { paddingBottom: '100px' } : undefined}>
+      <div className="container">
         <header className="header" style={{ position: 'relative' }}>
           {/* Owner pencil button - subtle, top right of header */}
           <OwnerPencilButton />
@@ -282,41 +282,6 @@ function BookingPage({
           )}
         </main>
       </div>
-
-      {/* Preview mode: fixed bottom bar with CTA to advance to next step */}
-      {new URLSearchParams(window.location.search).has('preview') && (
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: '#f0fdf4',
-          borderTop: '1.5px solid #bbf7d0',
-          padding: '12px 16px 20px',
-          paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
-          zIndex: 9999,
-          textAlign: 'center'
-        }}>
-          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>This is your booking engine. Try booking yourself to see what guests experience.</p>
-          <button
-            onClick={() => window.parent.postMessage({ type: 'nextStep' }, '*')}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: '#2E7D5B',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontFamily: 'inherit',
-              fontSize: '15px',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
-          >
-            See How to Edit It →
-          </button>
-        </div>
-      )}
     </>
   );
 }
