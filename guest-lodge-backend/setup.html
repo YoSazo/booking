@@ -281,7 +281,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div id="previewLoading" class="fullpage-loading"><div class="spinner"></div></div>
     <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
   </div>
-  <div class="fullpage-bottombar" ontouchstart="document.getElementById('previewFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('previewFrame').style.pointerEvents=''},300)">
+  <div class="fullpage-bottombar" style="display:none;" ontouchstart="document.getElementById('previewFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('previewFrame').style.pointerEvents=''},300)">
     <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Try booking yourself — pick dates, select a room, and see exactly what your guests experience.</p>
     <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">See How to Edit It &rarr;</button>
   </div>
@@ -366,18 +366,10 @@ function loadPreview() {
 function loadFrontdeskDemo() {
   const base = window.location.origin;
   const name = encodeURIComponent(hotelData.name || 'Your Hotel');
-  const isMobile = window.innerWidth < 769;
-  // Mobile: hide iframe tour, drive it from bottom bar. Desktop: keep tour inside iframe.
-  const notour = isMobile ? '&notour=1' : '';
-  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name + notour;
-  // Reset tour state (for mobile bottom bar)
-  setupTourStep = 0;
-  if (isMobile) {
-    renderSetupTour();
-  } else {
-    // Desktop: hide the bottom bar entirely, tour lives inside iframe
-    document.getElementById('step5Bottom').style.display = 'none';
-  }
+  // Always use the iframe's built-in tour (works universally, no iOS touch issues)
+  document.getElementById('frontdeskDemoFrame').src = base + '/frontdesk-demo?name=' + name;
+  // Hide the external bottom bar — tour + CTA live inside the iframe
+  document.getElementById('step5Bottom').style.display = 'none';
 }
 
 const setupTourSteps = [
@@ -430,6 +422,9 @@ window.addEventListener('message', function(e) {
   }
   if (e.data && e.data.type === 'payNow') {
     payAndGoLive();
+  }
+  if (e.data && e.data.type === 'nextStep') {
+    goToStep(5);
   }
 });
 
