@@ -4764,10 +4764,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore duplicate */ }
 
-        // Send welcome email
-        if (hotel.ownerEmail) {
-            sendWelcomeEmail(hotel.ownerEmail, hotel.name || 'Your Hotel', defaultPin, assignedDomain);
-        }
+        // Welcome email sent via /finalize call from the client
 
         // Track funnel event
         prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'SetupCompleted', guestEmail: hotel.ownerEmail || null } }).catch(() => {});
