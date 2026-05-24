@@ -95,14 +95,18 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 /* Full-page iframe steps (mobile only) */
 .step-fullpage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 200;
   background: var(--bg);
   display: none;
   flex-direction: column;
-  padding: 0;
 }
 .step-fullpage.active {
-  display: block !important;
+  display: flex !important;
 }
 .fullpage-topbar {
   display: flex;
@@ -129,20 +133,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   font-weight: 600;
 }
 .fullpage-iframe-wrap {
+  flex: 1;
   position: relative;
   overflow: hidden;
-  height: 72vh;
-  border-radius: 12px;
-  margin: 0 8px;
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
 .fullpage-iframe {
   width: 100%;
   height: 100%;
   border: none;
   display: block;
-  pointer-events: auto;
 }
 .fullpage-loading {
   position: absolute;
@@ -155,12 +154,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .fullpage-bottombar {
   padding: 14px 16px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   background: #f0fdf4;
   border-top: 1.5px solid #bbf7d0;
   flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
 }
 .fullpage-bottombar .btn {
   width: 100%;
@@ -376,6 +373,11 @@ function goToStep(n) {
   if (n === 4) loadPreview();
   if (n === 5) loadFrontdeskDemo();
   window.scrollTo(0, 0);
+  // iOS Safari fix: force viewport recalculation by scrolling
+  if (n === 4 || n === 5) {
+    setTimeout(function() { window.scrollTo(0, 1); }, 50);
+    setTimeout(function() { window.scrollTo(0, 0); }, 100);
+  }
 }
 
 function loadPreview() {
