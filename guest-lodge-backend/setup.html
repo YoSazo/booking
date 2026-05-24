@@ -281,7 +281,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div id="previewLoading" class="fullpage-loading"><div class="spinner"></div></div>
     <iframe id="previewFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('previewLoading').style.display='none'"></iframe>
   </div>
-  <div class="fullpage-bottombar">
+  <div class="fullpage-bottombar" ontouchstart="document.getElementById('previewFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('previewFrame').style.pointerEvents=''},300)">
     <p style="font-size:13px; color:var(--muted); text-align:center; margin-bottom:8px;">This is your booking engine. Try booking yourself — pick dates, select a room, and see exactly what your guests experience.</p>
     <button class="btn btn-primary" onclick="goToStep(5)" style="margin:0;">See How to Edit It &rarr;</button>
   </div>
@@ -298,7 +298,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div id="frontdeskLoading" class="fullpage-loading"><div class="spinner"></div></div>
     <iframe id="frontdeskDemoFrame" class="fullpage-iframe" src="about:blank" onload="document.getElementById('frontdeskLoading').style.display='none'"></iframe>
   </div>
-  <div class="fullpage-bottombar" id="step5Bottom" style="position:relative;z-index:100;">
+  <div class="fullpage-bottombar" id="step5Bottom" style="position:relative;z-index:100;" ontouchstart="document.getElementById('frontdeskDemoFrame').style.pointerEvents='none'" ontouchend="setTimeout(function(){document.getElementById('frontdeskDemoFrame').style.pointerEvents=''},300)">
     <div id="step5Tour">
       <div id="step5TourText" style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
         <div id="step5TourMsg" style="font-size:13px;font-weight:500;line-height:1.4;"></div>
