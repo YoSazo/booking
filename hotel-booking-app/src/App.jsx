@@ -358,12 +358,6 @@ const handleConfirmBooking = async (bookingDetails) => {
     return;
   }
 
-  // Block booking if hotel isn't subscribed (freemium gate)
-  if (!currentHotel.subscribed) {
-    alert("This booking engine is in preview mode. The hotel owner needs to activate it to accept bookings.");
-    return;
-  }
-
   const searchParams = window.location.search;
   const isPreview = new URLSearchParams(searchParams).has('preview');
 

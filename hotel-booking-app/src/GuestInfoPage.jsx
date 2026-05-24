@@ -2269,6 +2269,23 @@ const handlePayLaterBooking = async (e) => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
+    // Freemium gate: if hotel isn't subscribed, show Go Live screen
+    const isPreview = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('preview') || window !== window.parent);
+    if (!isPreview && props.hotel && props.hotel.subscribed === false) {
+        return (
+            <div style={{ minHeight: '100vh', background: '#f4f7f9', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                <div style={{ background: 'white', borderRadius: '20px', padding: '36px', maxWidth: '420px', width: '100%', textAlign: 'center', boxShadow: '0 12px 40px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                    <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px' }}>Almost there!</h2>
+                    <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.5', marginBottom: '20px' }}>Your booking engine is built and ready. Activate it to start accepting real bookings from guests.</p>
+                    <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>$299/month. No commission. Cancel anytime.</p>
+                    <button onClick={() => { window.location.href = '/frontdesk'; }} style={{ width: '100%', padding: '14px', background: '#2E7D5B', color: 'white', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}>Go Live →</button>
+                    <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '12px' }}>Log into your front desk to activate.</p>
+                </div>
+            </div>
+        );
+    }
+
     const elementsOptions = {
         fonts: [{ cssSrc: '/fonts/inter.css' }],
         appearance: {
