@@ -381,7 +381,7 @@ function renderSetupTour() {
   const step = setupTourSteps[setupTourStep];
   const label = 'Step ' + (setupTourStep + 1) + ' of ' + setupTourSteps.length;
   const isLast = setupTourStep === setupTourSteps.length - 1;
-  bottom.innerHTML = '<div style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;"><div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px;">' + step.text + '</div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;"><span style="font-size:11px;opacity:0.5;">' + label + '</span><button onclick="advanceSetupTour()" style="background:var(--green);color:white;border:none;padding:8px 16px;border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">' + (isLast ? 'Got it \u2713' : 'Next \u2192') + '</button></div></div>';
+  bottom.innerHTML = '<div style="background:var(--text);color:white;border-radius:12px;padding:14px 16px;margin-bottom:10px;"><div style="font-size:13px;font-weight:500;line-height:1.4;">' + step.text + '</div><div style="font-size:11px;opacity:0.5;margin-top:6px;">' + label + '</div></div><button class="btn btn-primary" onclick="advanceSetupTour()" style="margin:0;">' + (isLast ? 'Got it \u2713' : 'Next \u2192') + '</button>';
   // Tell iframe to switch tab
   var iframe = document.getElementById('frontdeskDemoFrame');
   if (iframe && iframe.contentWindow) {
