@@ -1342,7 +1342,7 @@ const handlePayLaterBooking = async (e) => {
                       .then(r => r.json())
                       .then(data => { if (data.success && data.url) window.location.href = data.url; else window.location.href = '/frontdesk'; })
                       .catch(() => { window.location.href = '/frontdesk'; });
-                  }} style={{ width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Activate — $299/mo →</button>
+                  }} style={{ width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Activate — $99/mo →</button>
                   <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', marginTop: '6px' }}>No commission. Cancel anytime.</div>
                 </div>
               </>

@@ -4562,7 +4562,7 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
     }
 });
 
-// Create Stripe Checkout session for $997 (pay to go live)
+// Create Stripe Checkout session for $149/mo (pay to go live)
 // Uses separate Marketel Stripe account (not the hotel booking account)
 const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY)
@@ -4590,7 +4590,7 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{
-                price: 'price_1TYsfHBFnVCGiXweQNHOMDfX',
+                price: 'price_1Tb5IdBFnVCGiXwe7YUvVN60',
                 quantity: 1,
             }],
             customer_email: hotel.ownerEmail || undefined,
@@ -5008,7 +5008,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
-            line_items: [{ price: 'price_1TYsfHBFnVCGiXweQNHOMDfX', quantity: 1 }],
+            line_items: [{ price: 'price_1Tb5IdBFnVCGiXwe7YUvVN60', quantity: 1 }],
             customer_email: hotel?.ownerEmail || undefined,
             metadata: { product: 'hotel-go-live', hotelId },
             success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&token=${encodeURIComponent(req.crmToken || '')}`,

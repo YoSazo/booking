@@ -915,7 +915,7 @@ const TYPE_LABELS = {
   SetupCompleted: 'Setup Completed',
   PaymentCTAClicked: 'Hit Gate',
   GoLiveClicked: 'Go Live Clicked',
-  PaymentSucceeded: 'Paid $299',
+  PaymentSucceeded: 'Paid $149',
 };
 
 function formatTime(ts) {
@@ -944,7 +944,7 @@ function renderEvents() {
 
   // Update overview stats
   const paid = allCounts.PaymentSucceeded || 0;
-  document.getElementById('stat-revenue').textContent = '$' + (paid * 299);
+  document.getElementById('stat-revenue').textContent = '$' + (paid * 149);
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
   document.getElementById('stat-started').textContent = allCounts.SetupStarted || 0;
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
