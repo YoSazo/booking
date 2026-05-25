@@ -25,13 +25,18 @@ function OwnerPencilButton() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const hasCrmToken = localStorage.getItem('crmToken');
-    if (params.has('welcome') || hasCrmToken) {
+    // Auto-store PIN from URL (first visit from success page)
+    const pinParam = params.get('pin');
+    if (pinParam) {
+      try { localStorage.setItem('crmToken', pinParam); } catch(e) {}
+    }
+    if (params.has('welcome') || hasCrmToken || pinParam) {
       setShowTourGuide(true);
       if (params.has('welcome')) {
-        // Store that this is the owner's device
         try { localStorage.setItem('isOwner', '1'); } catch(e) {}
         const url = new URL(window.location);
         url.searchParams.delete('welcome');
+        url.searchParams.delete('pin');
         window.history.replaceState({}, '', url);
       }
     } else if (localStorage.getItem('isOwner')) {
@@ -74,12 +79,24 @@ function OwnerPencilButton() {
 
       {showTourGuide && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-          background: '#1a1a2e', color: 'white', padding: '10px 16px',
-          textAlign: 'center', cursor: 'pointer'
-        }} onClick={() => { setShowTourGuide(false); setShowModal(true); setError(''); setPin(''); }}>
-          <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>✏️ Add photos and customize your engine → Tap here</div>
-          <div style={{ fontSize: '11px', opacity: 0.6 }}>Only you see this — your guests don't.</div>
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#1a1a2e', color: 'white', padding: '12px 16px',
+          paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'
+        }}>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Change photos & customize</div>
+            <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
+          </div>
+          <button onClick={() => { 
+            // If owner (first visit or has token), go straight to frontdesk
+            const token = localStorage.getItem('crmToken');
+            if (token) {
+              window.location.href = '/frontdesk';
+            } else {
+              setShowTourGuide(false); setShowModal(true); setError(''); setPin('');
+            }
+          }} style={{ background: '#2E7D5B', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Edit →</button>
         </div>
       )}
 
@@ -160,7 +177,7 @@ function BookingPage({
     <>
       {/* Marquee banner removed - taking up valuable above-fold space */}
 
-      <div className="container">
+      <div className="container" style={localStorage.getItem('isOwner') || localStorage.getItem('crmToken') ? { paddingBottom: '80px' } : undefined}>
         <header className="header" style={{ position: 'relative' }}>
           {/* Owner pencil button - subtle, top right of header */}
           <OwnerPencilButton />

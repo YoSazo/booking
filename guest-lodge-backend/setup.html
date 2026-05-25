@@ -349,7 +349,7 @@ async function addRoomAndFinish() {
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.bookmarketel.com';
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     document.getElementById('successPin').textContent = completeData.crmPin || '----';
-    document.getElementById('successLink').href = domain + '?welcome=1';
+    document.getElementById('successLink').href = domain + '?welcome=1&pin=' + encodeURIComponent(completeData.crmPin || '');
 
     // Enable after 8 seconds (Vercel SSL provisioning time)
     setTimeout(function() {
