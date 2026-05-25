@@ -1338,10 +1338,12 @@ const handlePayLaterBooking = async (e) => {
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
                   <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>Go live to accept bookings</div>
                   <button onClick={() => { 
-                    fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': localStorage.getItem('crmToken') || '' } })
+                    const token = localStorage.getItem('crmToken') || '';
+                    if (!token) { window.location.href = '/frontdesk?action=go-live'; return; }
+                    fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': token } })
                       .then(r => r.json())
-                      .then(data => { if (data.success && data.url) window.location.href = data.url; else window.location.href = '/frontdesk'; })
-                      .catch(() => { window.location.href = '/frontdesk'; });
+                      .then(data => { if (data.success && data.url) window.location.href = data.url; else window.location.href = '/frontdesk?action=go-live'; })
+                      .catch(() => { window.location.href = '/frontdesk?action=go-live'; });
                   }} style={{ width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Activate — $99/mo →</button>
                   <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', marginTop: '6px' }}>No commission. Cancel anytime.</div>
                 </div>

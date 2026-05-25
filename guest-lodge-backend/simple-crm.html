@@ -2438,6 +2438,14 @@ async function startCrmApp(verification) {
   refreshMobileBottomNavIcons();
   requestAnimationFrame(refreshMobileBottomNavIcons);
   setTimeout(refreshMobileBottomNavIcons, 80);
+
+  // If redirected here with ?action=go-live, trigger Stripe checkout immediately
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('action') === 'go-live') {
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    goLive();
+  }
 }
 
 async function doLogin() {
