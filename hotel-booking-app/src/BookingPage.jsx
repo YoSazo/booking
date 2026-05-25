@@ -21,16 +21,21 @@ function OwnerPencilButton() {
     (window !== window.parent);
 
   // Show tour guide on first visit (welcome=1 param from success page)
+  // Show owner banner persistently if they have a PIN stored or first visit
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has('welcome')) {
+    const hasCrmToken = localStorage.getItem('crmToken');
+    if (params.has('welcome') || hasCrmToken) {
       setShowTourGuide(true);
-      // Auto-dismiss after 5 seconds
-      setTimeout(() => setShowTourGuide(false), 5000);
-      // Remove the param from URL without reload
-      const url = new URL(window.location);
-      url.searchParams.delete('welcome');
-      window.history.replaceState({}, '', url);
+      if (params.has('welcome')) {
+        // Store that this is the owner's device
+        try { localStorage.setItem('isOwner', '1'); } catch(e) {}
+        const url = new URL(window.location);
+        url.searchParams.delete('welcome');
+        window.history.replaceState({}, '', url);
+      }
+    } else if (localStorage.getItem('isOwner')) {
+      setShowTourGuide(true);
     }
   }, []);
 
@@ -68,9 +73,13 @@ function OwnerPencilButton() {
       </button>
 
       {showTourGuide && (
-        <div className="pencil-tour-guide" onClick={() => setShowTourGuide(false)}>
-          <div className="pencil-tour-arrow">→</div>
-          <div className="pencil-tour-text">Tap here to manage your hotel</div>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#1a1a2e', color: 'white', padding: '10px 16px',
+          textAlign: 'center', cursor: 'pointer'
+        }} onClick={() => { setShowTourGuide(false); setShowModal(true); setError(''); setPin(''); }}>
+          <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>✏️ Add photos and customize your engine → Tap here</div>
+          <div style={{ fontSize: '11px', opacity: 0.6 }}>Only you see this — your guests don't.</div>
         </div>
       )}
 
