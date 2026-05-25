@@ -1478,7 +1478,7 @@ const handlePayLaterBooking = async (e) => {
                 </div>
             </div>
             
-            <div className="guest-info-container" style={{ paddingBottom: '120px', paddingTop: '0' }}>
+            <div className="guest-info-container" style={{ paddingBottom: (!isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4) ? '220px' : '120px', paddingTop: '0' }}>
                 <div className="checkout-progress-bar">
                     <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Review Cart</span>
