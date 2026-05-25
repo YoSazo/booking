@@ -3589,7 +3589,46 @@ async function loadEditRooms() {
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
+          <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
+            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+          </div>
+          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
+        </div>
+      </div>
       <div id="editRoomsCards"></div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
+          <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+              <span style="color:var(--text-muted);font-size:14px;">‹</span>
+              <span style="font-size:13px;font-weight:600;color:var(--text);">Guest Information</span>
+            </div>
+            <div style="background:#e8f5ee;border-bottom:1px solid #bbf7d0;padding:10px 14px;">
+              <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="✅ Free Cancellation up to 7 days before arrival. 📞 Questions? Call us!" style="width:100%;font-size:12px;color:#166534;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
+            </div>
+            <div style="padding:12px 16px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:18px;height:18px;border-radius:50%;background:var(--green);"></div><span style="font-size:11px;color:var(--text-muted);">Review Cart</span></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);"></div><span style="font-size:11px;color:var(--text-muted);">Info</span></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);"></div><span style="font-size:11px;color:var(--text-muted);">Payment</span></div>
+              </div>
+              <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
+                <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
+                <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
+          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
+        </div>
+      </div>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
@@ -3601,25 +3640,6 @@ async function loadEditRooms() {
             <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
           </div>
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
-        </div>
-      </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
-          <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
-            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-          </div>
-          <div style="margin-top:10px;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Checkout Banner Preview</div>
-            <div style="background:#e8f5ee;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;">
-              <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="✅ Free Cancellation up to 7 days before arrival. 📞 Questions? Call us!" style="width:100%;font-size:13px;color:#166534;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
-            </div>
-            <p style="font-size:10px;color:var(--text-muted);margin-top:4px;text-align:center;">Shown to guests during checkout. Leave blank for default.</p>
-          </div>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
         </div>
       </div>
       <div class="booking-card" style="margin-bottom:14px;">
