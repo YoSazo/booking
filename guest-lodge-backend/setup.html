@@ -351,20 +351,13 @@ async function addRoomAndFinish() {
     document.getElementById('successPin').textContent = completeData.crmPin || '----';
     document.getElementById('successLink').href = domain + '?welcome=1';
 
-    // Poll until the site is actually reachable (SSL provisioned)
-    (function checkSiteReady() {
-      var img = new Image();
-      img.onload = function() {
-        var link = document.getElementById('successLink');
-        link.textContent = 'Visit Your Site \u2192';
-        link.style.opacity = '1';
-        link.style.pointerEvents = 'auto';
-      };
-      img.onerror = function() {
-        setTimeout(checkSiteReady, 3000);
-      };
-      img.src = domain + '/favicon.ico?' + Date.now();
-    })();
+    // Enable after 8 seconds (Vercel SSL provisioning time)
+    setTimeout(function() {
+      var link = document.getElementById('successLink');
+      link.textContent = 'Visit Your Site \u2192';
+      link.style.opacity = '1';
+      link.style.pointerEvents = 'auto';
+    }, 8000);
 
     // Send welcome email
     fetch(API + '/api/setup/' + TOKEN + '/finalize', {
