@@ -21,6 +21,13 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+    /* Prevent iOS zoom on input focus (exclude WYSIWYG preview inputs) */
+    input, textarea, select { font-size: 16px !important; }
+    #edit-hotel-name { font-size: 24px !important; }
+    #edit-hotel-subtitle { font-size: 14px !important; }
+    #edit-hotel-address { font-size: 13px !important; }
+    #edit-hotel-phone { font-size: 13px !important; }
+    #edit-hotel-policy { font-size: 11px !important; }
 
     /* ── LOGIN ── */
     .login-screen {
@@ -3751,13 +3758,13 @@ function renderEditRoomsCards() {
     return `
     <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
       <div style="position:relative;">
-        ${images.length ? `<img src="${images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
+        ${images.length ? `<img src="${images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
         <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          📷 + Add Photo
-          <input type="file" accept="image/*" style="display:none;" onchange="uploadEditImage(event,'${r.id}')">
+          📷 + Add Photos
+          <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
         </label>
       </div>
-      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
+      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       <div style="padding:18px;">
         <div style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
@@ -4027,43 +4034,46 @@ async function saveEditRoom(roomId) {
   }
 }
 
-async function uploadEditImage(event, roomId) {
-  const file = event.target.files[0];
-  if (!file) return;
+async function uploadEditImages(event, roomId) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
   // Show loading on the room card
   const card = document.getElementById('edit-card-' + roomId);
   const imgContainer = card?.querySelector('div:first-child');
   if (imgContainer) {
     imgContainer.style.position = 'relative';
-    imgContainer.insertAdjacentHTML('beforeend', '<div id="upload-spinner-' + roomId + '" style="position:absolute;inset:0;background:rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;z-index:5;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;"></div></div>');
+    imgContainer.insertAdjacentHTML('beforeend', '<div id="upload-spinner-' + roomId + '" style="position:absolute;inset:0;background:rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;z-index:5;flex-direction:column;gap:6px;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;"></div><div id="upload-progress-' + roomId + '" style="font-size:12px;color:var(--text-muted);font-weight:600;">0 / ' + files.length + '</div></div>');
   }
-  const fd = new FormData();
-  fd.append('image', file);
-  try {
-    const res = await fetch(`/api/crm/rooms/${roomId}/images`, {
-      method: 'POST',
-      headers: { 'x-crm-token': token },
-      body: fd,
-    });
-    const data = await res.json();
-    if (data.success && data.image) {
-      const room = editRooms.find(r => r.id === roomId);
-      if (room) {
-        if (!room.images) room.images = [];
-        room.images.push(data.image);
-        if (!room.imageUrl) room.imageUrl = data.image.url;
+  let uploaded = 0;
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      const res = await fetch(`/api/crm/rooms/${roomId}/images`, {
+        method: 'POST',
+        headers: { 'x-crm-token': token },
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.success && data.image) {
+        const room = editRooms.find(r => r.id === roomId);
+        if (room) {
+          if (!room.images) room.images = [];
+          room.images.push(data.image);
+          if (!room.imageUrl) room.imageUrl = data.image.url;
+        }
+        uploaded++;
       }
-      renderEditRoomsCards();
-      toast('Photo added', 'success');
-    } else {
-      toast('Upload failed', 'error');
-    }
-  } catch (e) {
-    toast('Upload failed', 'error');
+    } catch (e) { /* skip failed */ }
+    // Update progress
+    const prog = document.getElementById('upload-progress-' + roomId);
+    if (prog) prog.textContent = uploaded + ' / ' + files.length;
   }
   // Remove spinner
   const spinner = document.getElementById('upload-spinner-' + roomId);
   if (spinner) spinner.remove();
+  renderEditRoomsCards();
+  toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added', 'success');
 }
 
 async function deleteEditImage(roomId, imageId) {

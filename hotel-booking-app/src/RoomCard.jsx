@@ -79,6 +79,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
         className="room-gallery-image"
         loading="lazy"
         decoding="async"
+        onError={(e) => { e.target.onerror = null; e.target.src = 'https://suitestay.clickinns.com/kingbedsuitestay.webp'; }}
       />
       
       {/* Navigation Arrows - Only show if multiple images */}

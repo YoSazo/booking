@@ -4468,6 +4468,31 @@ app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
 // Upload room image
 const multer = require('multer');
 const fs = require('fs');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+
+// Cloudflare R2 setup
+const r2 = new S3Client({
+    region: 'auto',
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+});
+const R2_BUCKET = process.env.R2_BUCKET || 'marketel-uploads';
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // e.g. https://pub-xxx.r2.dev or custom domain
+
+// Use memory storage (upload to R2, not disk)
+const uploadMemory = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        cb(null, allowed.includes(file.mimetype));
+    },
+});
+
+// Also keep disk storage as fallback if R2 not configured
 const uploadStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
@@ -4479,10 +4504,24 @@ const uploadStorage = multer.diskStorage({
         cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
     },
 });
-const upload = multer({ storage: uploadStorage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+const uploadDisk = multer({ storage: uploadStorage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];
     cb(null, allowed.includes(file.mimetype));
 }});
+
+// Choose upload middleware based on R2 config
+const upload = R2_PUBLIC_URL ? uploadMemory : uploadDisk;
+
+// Helper: upload buffer to R2
+async function uploadToR2(buffer, key, contentType) {
+    await r2.send(new PutObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+    }));
+    return `${R2_PUBLIC_URL}/${key}`;
+}
 
 app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
     try {
@@ -4494,7 +4533,14 @@ app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
 }, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-        const url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        let url;
+        if (R2_PUBLIC_URL) {
+            const ext = path.extname(req.file.originalname) || '.jpg';
+            const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+        } else {
+            url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        }
         const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
         const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
         res.json({ success: true, image: { id: image.id, url: image.url } });
@@ -4801,6 +4847,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
 
         // Build absolute image URLs
         const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const resolveImgUrl = (url) => url.startsWith('http') ? url : baseUrl + url;
 
         // Allow preview for unpaid hotels (setupComplete=false) — they just can't have a public domain yet
         res.json({
@@ -4821,8 +4868,8 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
                 description: r.description,
                 amenities: r.amenities,
                 maxOccupancy: r.maxOccupancy,
-                imageUrl: r.images[0]?.url ? baseUrl + r.images[0].url : 'https://suitestay.clickinns.com/kingbedsuitestay.webp',
-                imageUrls: r.images.length ? r.images.map(img => baseUrl + img.url) : ['https://suitestay.clickinns.com/kingbedsuitestay.webp'],
+                imageUrl: r.images[0]?.url ? resolveImgUrl(r.images[0].url) : 'https://suitestay.clickinns.com/kingbedsuitestay.webp',
+                imageUrls: r.images.length ? r.images.map(img => resolveImgUrl(img.url)) : ['https://suitestay.clickinns.com/kingbedsuitestay.webp'],
             })),
         });
     } catch (e) {
@@ -5301,6 +5348,7 @@ app.get('/api/crm/rooms', crmAuth, async (req, res) => {
         }));
         const rates = await withRetry(() => prisma.hotelRates.findUnique({ where: { hotelId } }));
         const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const resolveImgUrl = (url) => url.startsWith('http') ? url : baseUrl + url;
         res.json({
             success: true,
             rooms: rooms.map(r => ({
@@ -5310,8 +5358,8 @@ app.get('/api/crm/rooms', crmAuth, async (req, res) => {
                 amenities: r.amenities,
                 maxOccupancy: r.maxOccupancy,
                 totalUnits: r.totalUnits,
-                imageUrl: r.images[0]?.url ? baseUrl + r.images[0].url : null,
-                images: r.images.map(i => ({ id: i.id, url: baseUrl + i.url })),
+                imageUrl: r.images[0]?.url ? resolveImgUrl(r.images[0].url) : null,
+                images: r.images.map(i => ({ id: i.id, url: resolveImgUrl(i.url) })),
             })),
             rates: rates ? { nightly: rates.nightly, weekly: rates.weekly, monthly: rates.monthly, taxRate: rates.taxRate } : null,
         });
@@ -5376,11 +5424,19 @@ app.post('/api/crm/rooms/:roomId/images', crmAuth, (req, res, next) => {
 }, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ success: false, message: 'No image' });
-        const url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        let url;
+        if (R2_PUBLIC_URL) {
+            const ext = path.extname(req.file.originalname) || '.jpg';
+            const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+        } else {
+            url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        }
         const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
         const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        res.json({ success: true, image: { id: image.id, url: baseUrl + image.url } });
+        // If R2, url is already absolute; if disk, prepend host
+        const returnUrl = R2_PUBLIC_URL ? image.url : `${req.protocol}://${req.get('host')}${image.url}`;
+        res.json({ success: true, image: { id: image.id, url: returnUrl } });
     } catch (e) {
         console.error('CRM image upload error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to upload' });
