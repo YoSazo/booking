@@ -353,14 +353,17 @@ async function addRoomAndFinish() {
 
     // Poll until the site is actually reachable (SSL provisioned)
     (function checkSiteReady() {
-      fetch(domain, { mode: 'no-cors' }).then(function() {
+      var img = new Image();
+      img.onload = function() {
         var link = document.getElementById('successLink');
         link.textContent = 'Visit Your Site \u2192';
         link.style.opacity = '1';
         link.style.pointerEvents = 'auto';
-      }).catch(function() {
+      };
+      img.onerror = function() {
         setTimeout(checkSiteReady, 3000);
-      });
+      };
+      img.src = domain + '/favicon.ico?' + Date.now();
     })();
 
     // Send welcome email
