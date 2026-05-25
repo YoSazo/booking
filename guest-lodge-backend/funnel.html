@@ -608,12 +608,12 @@
     <div class="stat-card">
       <div class="stat-icon">🏨</div>
       <div class="stat-value" id="stat-step4">0</div>
-      <div class="stat-label">Saw Engine</div>
+      <div class="stat-label">Setup Done</div>
     </div>
     <div class="stat-card">
       <div class="stat-icon">🖱</div>
       <div class="stat-value" id="stat-cta">0</div>
-      <div class="stat-label">Clicked Pay</div>
+      <div class="stat-label">Hit Gate</div>
     </div>
     <div class="stat-card">
       <div class="stat-icon">✅</div>
@@ -629,9 +629,7 @@
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
   <button class="filter-btn" data-filter="LandingPageView" onclick="setFilter('LandingPageView')">Landing</button>
   <button class="filter-btn" data-filter="SetupStarted" onclick="setFilter('SetupStarted')">Started</button>
-  <button class="filter-btn" data-filter="Step4Reached" onclick="setFilter('Step4Reached')">Saw Engine</button>
-  <button class="filter-btn" data-filter="Step5Reached" onclick="setFilter('Step5Reached')">Saw Desk</button>
-  <button class="filter-btn" data-filter="PaymentCTAClicked" onclick="setFilter('PaymentCTAClicked')">Clicked Pay</button>
+  <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
   <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
 </div>
 
@@ -902,21 +900,21 @@ const ICONS = {
   Step1Reached: '1️⃣',
   Step2Reached: '2️⃣',
   Step3Reached: '3️⃣',
-  Step4Reached: '4️⃣',
-  Step5Reached: '5️⃣',
+  SetupCompleted: '🏨',
   PaymentCTAClicked: '🖱',
+  GoLiveClicked: '🖱',
   PaymentSucceeded: '✅',
 };
 
 const TYPE_LABELS = {
   LandingPageView: 'Landing Page',
   SetupStarted: 'Setup Started',
-  Step1Reached: 'Step 1 (Name)',
-  Step2Reached: 'Step 2 (Rooms)',
-  Step3Reached: 'Step 3 (Rate)',
-  Step4Reached: 'Step 4 (Engine)',
-  Step5Reached: 'Step 5 (Desk)',
-  PaymentCTAClicked: 'Clicked Pay',
+  Step1Reached: 'Step 1',
+  Step2Reached: 'Step 2',
+  Step3Reached: 'Setup Done',
+  SetupCompleted: 'Setup Completed',
+  PaymentCTAClicked: 'Hit Gate',
+  GoLiveClicked: 'Go Live Clicked',
   PaymentSucceeded: 'Paid $299',
 };
 
@@ -949,8 +947,8 @@ function renderEvents() {
   document.getElementById('stat-revenue').textContent = '$' + (paid * 299);
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
   document.getElementById('stat-started').textContent = allCounts.SetupStarted || 0;
-  document.getElementById('stat-step4').textContent = allCounts.Step4Reached || 0;
-  document.getElementById('stat-cta').textContent = allCounts.PaymentCTAClicked || 0;
+  document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
+  document.getElementById('stat-cta').textContent = (allCounts.PaymentCTAClicked || 0) + (allCounts.GoLiveClicked || 0);
   document.getElementById('stat-paid').textContent = paid;
 
   if (filtered.length === 0) {
