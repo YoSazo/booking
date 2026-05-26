@@ -572,6 +572,7 @@ const handleConfirmBooking = async (bookingDetails) => {
                 onOpenLightbox={handleOpenLightbox}
                 isProcessingBooking={isProcessingBooking}
                 setIsProcessingBooking={setIsProcessingBooking}
+                onHotelUpdate={(updates) => setCurrentHotel(prev => ({ ...prev, ...updates }))}
               />
           } />
 

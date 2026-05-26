@@ -4864,6 +4864,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
             rooms: hotel.rooms.map((r, i) => ({
                 id: i + 1,
+                roomId: r.id,
                 name: r.name,
                 description: r.description,
                 amenities: r.amenities,

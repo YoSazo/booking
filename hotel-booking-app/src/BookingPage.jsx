@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import RoomCard from './RoomCard.jsx';
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
@@ -9,38 +9,108 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     : ''
 );
 
-function OwnerPencilButton() {
+// ── Inline Editable Field ──────────────────────────────────────
+function EditableField({ value, onChange, tag: Tag = 'p', className, style, placeholder }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef(null);
+
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  if (!editing) {
+    return (
+      <Tag
+        className={className}
+        style={{ ...style, cursor: 'pointer', borderBottom: '1.5px dashed #2E7D5B', paddingBottom: '2px' }}
+        onClick={() => setEditing(true)}
+        title="Tap to edit"
+      >
+        {value || <span style={{ opacity: 0.4 }}>{placeholder}</span>}
+      </Tag>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => { setEditing(false); if (draft !== value) onChange(draft); }}
+      onKeyDown={e => { if (e.key === 'Enter') { setEditing(false); if (draft !== value) onChange(draft); } }}
+      placeholder={placeholder}
+      style={{
+        width: '100%', border: 'none', borderBottom: '2px solid #2E7D5B', outline: 'none',
+        background: 'transparent', fontFamily: 'inherit', textAlign: 'center',
+        ...(style || {}),
+        padding: '4px 0', fontSize: style?.fontSize || 'inherit', fontWeight: style?.fontWeight || 'inherit',
+        color: style?.color || 'inherit',
+      }}
+    />
+  );
+}
+
+// ── Owner Edit Banner (replaces old tour guide) ────────────────
+function OwnerEditBanner({ isEditMode, onToggleEdit, onGoToFrontDesk }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+      background: isEditMode ? '#2E7D5B' : '#1a1a2e', color: 'white', padding: '10px 16px',
+      paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+      transition: 'background 0.2s',
+    }}>
+      <div>
+        <div style={{ fontSize: '13px', fontWeight: '600' }}>
+          {isEditMode ? '✏️ Editing — tap any field' : '✏️ Change photos & customize'}
+        </div>
+        <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
+      </div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={onToggleEdit} style={{
+          background: isEditMode ? 'white' : '#2E7D5B', color: isEditMode ? '#2E7D5B' : 'white',
+          border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
+          fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
+        }}>{isEditMode ? 'Done' : 'Edit'}</button>
+        {!isEditMode && (
+          <button onClick={onGoToFrontDesk} style={{
+            background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)',
+            padding: '8px 12px', borderRadius: '8px', fontFamily: 'inherit',
+            fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap'
+          }}>Front Desk</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Owner Pencil Button (for non-owners / PIN entry) ───────────
+function OwnerPencilButton({ isOwner }) {
   const [showModal, setShowModal] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showTourGuide, setShowTourGuide] = useState(false);
 
-  // Detect if we're inside the setup wizard iframe
   const isInSetup = new URLSearchParams(window.location.search).has('setup') || 
     (window !== window.parent);
 
-  // Show tour guide on first visit (welcome=1 param from success page)
-  // Show owner banner persistently if they have a PIN stored or first visit
+  // Auto-store PIN from URL param on first visit
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const hasCrmToken = localStorage.getItem('crmToken');
-    // Auto-store PIN from URL (first visit from success page)
     const pinParam = params.get('pin');
     if (pinParam) {
-      try { localStorage.setItem('crmToken', pinParam); } catch(e) {}
+      try { localStorage.setItem('crmToken', pinParam); localStorage.setItem('isOwner', '1'); } catch(e) {}
+      const url = new URL(window.location);
+      url.searchParams.delete('pin');
+      url.searchParams.delete('welcome');
+      window.history.replaceState({}, '', url);
     }
-    if (params.has('welcome') || hasCrmToken || pinParam) {
-      setShowTourGuide(true);
-      if (params.has('welcome')) {
-        try { localStorage.setItem('isOwner', '1'); } catch(e) {}
-        const url = new URL(window.location);
-        url.searchParams.delete('welcome');
-        url.searchParams.delete('pin');
-        window.history.replaceState({}, '', url);
-      }
-    } else if (localStorage.getItem('isOwner')) {
-      setShowTourGuide(true);
+    if (params.has('welcome')) {
+      try { localStorage.setItem('isOwner', '1'); } catch(e) {}
+      const url = new URL(window.location);
+      url.searchParams.delete('welcome');
+      window.history.replaceState({}, '', url);
     }
   }, []);
 
@@ -54,9 +124,8 @@ function OwnerPencilButton() {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success) {
-        // Store PIN so CRM auto-logs in
-        try { localStorage.setItem('crmToken', pin.trim()); } catch(e) {}
-        window.location.href = '/frontdesk';
+        try { localStorage.setItem('crmToken', pin.trim()); localStorage.setItem('isOwner', '1'); } catch(e) {}
+        window.location.reload();
       } else {
         setError(json.message || 'Incorrect PIN');
       }
@@ -66,39 +135,19 @@ function OwnerPencilButton() {
     setLoading(false);
   };
 
+  // If owner, don't show pencil (they get the edit banner instead)
+  if (isOwner) return null;
+
   return (
     <>
       <button
         className="owner-pencil-btn"
-        onClick={() => { setShowTourGuide(false); setShowModal(true); setError(''); setPin(''); }}
+        onClick={() => { setShowModal(true); setError(''); setPin(''); }}
         aria-label="Owner access"
         title="Owner access"
       >
         ✏️
       </button>
-
-      {showTourGuide && (
-        <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-          background: '#1a1a2e', color: 'white', padding: '12px 16px',
-          paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'
-        }}>
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Change photos & customize</div>
-            <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
-          </div>
-          <button onClick={() => { 
-            // If owner (first visit or has token), go straight to frontdesk
-            const token = localStorage.getItem('crmToken');
-            if (token) {
-              window.location.href = '/frontdesk';
-            } else {
-              setShowTourGuide(false); setShowModal(true); setError(''); setPin('');
-            }
-          }} style={{ background: '#2E7D5B', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Edit →</button>
-        </div>
-      )}
 
       {showModal && (
         <div className="owner-modal-overlay" onClick={() => setShowModal(false)}>
@@ -140,6 +189,68 @@ function OwnerPencilButton() {
   );
 }
 
+// ── Photo Upload Overlay (on room images) ──────────────────────
+function PhotoUploadOverlay({ roomId, onPhotosAdded }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setUploading(true);
+    const token = localStorage.getItem('crmToken') || '';
+    const uploaded = [];
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('image', file);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/crm/rooms/${roomId}/images`, {
+          method: 'POST', headers: { 'x-crm-token': token }, body: fd,
+        });
+        const data = await res.json();
+        if (data.success && data.image) uploaded.push(data.image);
+      } catch (err) { /* skip */ }
+    }
+    setUploading(false);
+    if (uploaded.length) onPhotosAdded(roomId, uploaded);
+    // Reset input
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return (
+    <label style={{
+      position: 'absolute', bottom: '10px', right: '10px', zIndex: 5,
+      background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 14px',
+      borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', gap: '6px',
+      opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto',
+    }}>
+      {uploading ? '⏳ Uploading...' : '📷 + Photos'}
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
+    </label>
+  );
+}
+
+// ── Floating Save Bar ──────────────────────────────────────────
+function SaveBar({ saving, onSave }) {
+  return (
+    <div style={{
+      position: 'fixed', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 10000,
+      background: '#2E7D5B', color: 'white', padding: '10px 20px', borderRadius: '12px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '10px',
+      fontSize: '14px', fontWeight: '600', fontFamily: 'inherit',
+      animation: 'slideDown 0.2s ease',
+    }}>
+      <span>Unsaved changes</span>
+      <button onClick={onSave} disabled={saving} style={{
+        background: 'white', color: '#2E7D5B', border: 'none', padding: '6px 14px',
+        borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+      }}>{saving ? 'Saving...' : 'Save'}</button>
+    </div>
+  );
+}
+
+// ── Main BookingPage ───────────────────────────────────────────
 function BookingPage({ 
   hotel,
   onOpenLightbox,
@@ -158,63 +269,93 @@ function BookingPage({
   onDatesChange,
   isLoading,
   isProcessingBooking,
-  setIsProcessingBooking
+  setIsProcessingBooking,
+  onHotelUpdate,
 }) {
-  console.log('isProcessingBooking in BookingPage:', isProcessingBooking);
+  useEffect(() => { trackPageView(); }, []);
+  useEffect(() => { setIsProcessingBooking(false); }, []);
+
+  // Owner detection
+  const isOwner = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Editable hotel fields
+  const [editName, setEditName] = useState(hotel.name);
+  const [editSubtitle, setEditSubtitle] = useState(hotel.subtitle);
+  const [editAddress, setEditAddress] = useState(hotel.address);
+
+  // Sync when hotel prop changes
   useEffect(() => {
-    // This will run once when the application sstarts
-    trackPageView(); 
-  }, []);
-  useEffect(() => {
-    setIsProcessingBooking(false);
-  }, []);
+    setEditName(hotel.name);
+    setEditSubtitle(hotel.subtitle);
+    setEditAddress(hotel.address);
+  }, [hotel.name, hotel.subtitle, hotel.address]);
+
+  const markDirty = (setter) => (val) => { setter(val); setDirty(true); };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const token = localStorage.getItem('crmToken') || '';
+    try {
+      await fetch(`${API_BASE_URL}/api/crm/hotel-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+        body: JSON.stringify({ name: editName, subtitle: editSubtitle, address: editAddress }),
+      });
+      setDirty(false);
+      // Update parent state if callback provided
+      if (onHotelUpdate) onHotelUpdate({ name: editName, subtitle: editSubtitle, address: editAddress });
+    } catch (e) { /* silent */ }
+    setSaving(false);
+  };
+
+  const handlePhotosAdded = (roomId, newImages) => {
+    // Force a page reload to pick up new images from the API
+    window.location.reload();
+  };
 
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-
-  // Calculate nights here to pass to the RoomCard for display
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+
   return (
     <>
-      {/* Marquee banner removed - taking up valuable above-fold space */}
+      {/* Floating save bar */}
+      {dirty && <SaveBar saving={saving} onSave={handleSave} />}
 
-      <div className="container" style={localStorage.getItem('isOwner') || localStorage.getItem('crmToken') ? { paddingBottom: '80px' } : undefined}>
+      <div className="container" style={isOwner ? { paddingBottom: '80px' } : undefined}>
         <header className="header" style={{ position: 'relative' }}>
-          {/* Owner pencil button - subtle, top right of header */}
-          <OwnerPencilButton />
-          <p className="header-address">{hotel.address}</p>
-          <h1>{hotel.name}</h1>
-          <p>{hotel.subtitle}</p>
-        </header>
-        
-        {/* Reviews section removed - blocking calendar/rooms visibility
-            Trust is already established through ad creative and Kenneth video */}
+          {/* Pencil for non-owners */}
+          <OwnerPencilButton isOwner={isOwner} />
 
-        {/* Calendar widget removed - redundant, calendar opens when user clicks "Book Now" on room */}
+          {isEditMode ? (
+            <>
+              <EditableField value={editAddress} onChange={markDirty(setEditAddress)} tag="p" className="header-address" placeholder="Add address" style={{ fontSize: '13px', color: '#6b7280' }} />
+              <EditableField value={editName} onChange={markDirty(setEditName)} tag="h1" placeholder="Hotel name" style={{ fontSize: '24px', fontWeight: '700' }} />
+              <EditableField value={editSubtitle} onChange={markDirty(setEditSubtitle)} tag="p" placeholder="Add a subtitle or slogan" style={{ fontSize: '14px', color: '#555' }} />
+            </>
+          ) : (
+            <>
+              <p className="header-address">{editAddress || hotel.address}</p>
+              <h1>{editName || hotel.name}</h1>
+              <p>{editSubtitle || hotel.subtitle}</p>
+            </>
+          )}
+        </header>
 
         {/* Location banner - St. Croix only */}
         {window.location.hostname.includes('stcroix') && (
           <div className="location-banner" style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            backgroundColor: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            borderRadius: '8px',
-            marginBottom: '16px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#166534'
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '10px 16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0',
+            borderRadius: '8px', marginBottom: '16px', fontSize: '14px', fontWeight: '500', color: '#166534'
           }}>
-            <span>📍</span>
-            <span>50 min away from Minneapolis</span>
+            <span>📍</span><span>50 min away from Minneapolis</span>
           </div>
         )}
 
         <main className="rooms-list">
-          
-          {/* Conditional rendering based on loading and availability */}
           {isLoading ? (
             <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}>
               <strong>Checking for available rooms...</strong>
@@ -229,19 +370,15 @@ function BookingPage({
                   : 0;
 
                 let grandTotal, payToday, balanceDue;
-
                 if (room.totalRate !== undefined && room.totalRate !== null) {
-                  // Cloudbeds API returned a rate - use it directly
                   grandTotal = room.totalRate;
-                  payToday = 0; // Reserve for $0 today
-                  balanceDue = grandTotal; // Full amount due at arrival
+                  payToday = 0;
+                  balanceDue = grandTotal;
                 } else {
-                  // Fallback to local calculation if API didn't return rates
                   const subtotalBeforeTax = calculateTieredPrice(nights, rates);
-                  const taxAmount = 0;
-                  grandTotal = subtotalBeforeTax + taxAmount;
-                  payToday = 0; // Reserve for $0 today
-                  balanceDue = grandTotal; // Full amount due at arrival
+                  grandTotal = subtotalBeforeTax;
+                  payToday = 0;
+                  balanceDue = grandTotal;
                 }
 
                 return (
@@ -266,6 +403,8 @@ function BookingPage({
                     roomsAvailable={currentRoomData.roomsAvailable}
                     checkinDate={checkinDate}
                     checkoutDate={checkoutDate}
+                    isEditMode={isEditMode}
+                    onPhotosAdded={handlePhotosAdded}
                   />
                 );
               })}
@@ -273,36 +412,18 @@ function BookingPage({
           ) : hotel.rooms && hotel.rooms.length > 0 ? (
             <div style={{textAlign: 'center', padding: '40px 20px'}}>
               <p style={{fontSize: '1.1em', marginBottom: '16px'}}><strong>No rooms available for the selected dates.</strong></p>
-              <button
-                onClick={onCalendarOpen}
-                style={{
-                  padding: '12px 24px',
-                  background: '#2E7D5B',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit'
-                }}
-              >
-                Try different dates
-              </button>
+              <button onClick={onCalendarOpen} style={{
+                padding: '12px 24px', background: '#2E7D5B', color: 'white', border: 'none',
+                borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit'
+              }}>Try different dates</button>
             </div>
           ) : (
             <div style={{
-              textAlign: 'center',
-              padding: '48px 24px',
-              background: 'white',
-              borderRadius: '16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              border: '1px solid #e5e7eb'
+              textAlign: 'center', padding: '48px 24px', background: 'white',
+              borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e5e7eb'
             }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>✏️</div>
-              <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px' }}>
-                Set up your hotel
-              </h3>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px' }}>Set up your hotel</h3>
               <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.5', maxWidth: '280px', margin: '0 auto' }}>
                 Tap the pencil in the top right to manage your rooms, rates, and bookings.
               </p>
@@ -310,6 +431,15 @@ function BookingPage({
           )}
         </main>
       </div>
+
+      {/* Owner bottom banner */}
+      {isOwner && (
+        <OwnerEditBanner
+          isEditMode={isEditMode}
+          onToggleEdit={() => { setIsEditMode(!isEditMode); if (isEditMode && dirty) handleSave(); }}
+          onGoToFrontDesk={() => { window.location.href = '/frontdesk'; }}
+        />
+      )}
     </>
   );
 }

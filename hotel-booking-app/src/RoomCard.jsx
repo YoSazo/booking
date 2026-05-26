@@ -1,7 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Wifi, Tv, Refrigerator, Briefcase, Bath, Car, Sparkles, Users, PawPrint, ChevronLeft, ChevronRight } from 'lucide-react';
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate  }) {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
+  typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3001'
+    : ''
+);
+
+function PhotoUploadButton({ roomId, onPhotosAdded }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setUploading(true);
+    const token = localStorage.getItem('crmToken') || '';
+    const uploaded = [];
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('image', file);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/crm/rooms/${roomId}/images`, {
+          method: 'POST', headers: { 'x-crm-token': token }, body: fd,
+        });
+        const data = await res.json();
+        if (data.success && data.image) uploaded.push(data.image);
+      } catch (err) { /* skip */ }
+    }
+    setUploading(false);
+    if (uploaded.length && onPhotosAdded) onPhotosAdded(roomId, uploaded);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return (
+    <label style={{
+      position: 'absolute', bottom: '10px', right: '10px', zIndex: 5,
+      background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 14px',
+      borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', gap: '6px',
+      opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto',
+    }}>
+      {uploading ? '⏳ Uploading...' : '📷 + Photos'}
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
+    </label>
+  );
+}
+
+function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
@@ -117,6 +163,9 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           {roomsAvailable} room{roomsAvailable > 1 ? 's' : ''} left!
         </div>
       )}
+
+      {/* Edit mode: photo upload button */}
+      {isEditMode && <PhotoUploadButton roomId={room.roomId || room.id} onPhotosAdded={onPhotosAdded} />}
     </div>
 
 
