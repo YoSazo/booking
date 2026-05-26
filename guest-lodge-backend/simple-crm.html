@@ -2063,8 +2063,9 @@ function syncRevenueUi() {
                 <div id="revenueRoomList"></div>
               </div>
             </div>
-            <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
-              <p style="font-size:12px;color:var(--text-muted);text-align:center;margin:0;line-height:1.5;">💡 We verify your guest's card at booking ($0 charge). You collect payment at check-in — cash, card, Venmo, however you prefer.</p>
+            <div style="margin-top:14px;padding:14px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;">
+              <div style="font-size:13px;font-weight:600;color:#166534;margin-bottom:6px;">🔒 How payments work</div>
+              <p style="font-size:12px;color:#15803d;margin:0;line-height:1.6;">Guests are <strong>never charged</strong> when they book. We securely verify their card to prevent no-shows — then <strong>you collect payment at check-in</strong> however you prefer (cash, card, Venmo, etc).</p>
             </div>
           </div>
         </div>
@@ -2614,9 +2615,9 @@ function renderBookings(list) {
   if (list.length === 0) {
     el.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">✅</div>
-        <div class="empty-text">All caught up!</div>
-        <div class="empty-sub">No bookings need a call right now.</div>
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">No bookings yet</div>
+        <div class="empty-sub">Share your booking link to start getting reservations.</div>
       </div>`;
     return;
   }
