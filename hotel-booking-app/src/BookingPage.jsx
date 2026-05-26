@@ -77,15 +77,15 @@ function OwnerEditBanner({ onGoToFrontDesk, dirty, saving, onSave, onExitEditMod
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
       }}>
         <div>
-          <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Tap any field to edit</div>
-          <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
+          <div style={{ fontSize: '13px', fontWeight: '600' }}>👋 This is your booking page</div>
+          <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this bar</div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button onClick={() => { window.open('/frontdesk', '_blank'); }} style={{
             background: '#2E7D5B', color: 'white',
             border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
             fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
-          }}>Manage Bookings →</button>
+          }}>Edit & Manage →</button>
           <button onClick={onExitEditMode} style={{
             background: 'none', color: 'rgba(255,255,255,0.7)',
             border: '1px solid rgba(255,255,255,0.3)', padding: '8px 12px', borderRadius: '8px', fontFamily: 'inherit',
@@ -107,22 +107,21 @@ function OwnerPencilButton({ isOwner, onReenterEditMode }) {
   const isInSetup = new URLSearchParams(window.location.search).has('setup') || 
     (window !== window.parent);
 
-  // Auto-store PIN from URL param on first visit
+  // Auto-store PIN from URL param on first visit (backup — parent handles this too)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pinParam = params.get('pin');
-    if (pinParam) {
-      try { localStorage.setItem('crmToken', pinParam); localStorage.setItem('isOwner', '1'); } catch(e) {}
-      const url = new URL(window.location);
-      url.searchParams.delete('pin');
-      url.searchParams.delete('welcome');
-      window.history.replaceState({}, '', url);
-    }
-    if (params.has('welcome')) {
-      try { localStorage.setItem('isOwner', '1'); } catch(e) {}
-      const url = new URL(window.location);
-      url.searchParams.delete('welcome');
-      window.history.replaceState({}, '', url);
+    if (pinParam || params.has('welcome')) {
+      // Parent BookingPage already handles this and sets isOwner state
+      // Just ensure localStorage is set as backup
+      if (pinParam) {
+        try { localStorage.setItem('crmToken', pinParam); localStorage.setItem('isOwner', '1'); } catch(e) {}
+      }
+      if (params.has('welcome')) {
+        try { localStorage.setItem('isOwner', '1'); } catch(e) {}
+      }
+      // Trigger re-enter edit mode in case parent missed it
+      if (onReenterEditMode) onReenterEditMode();
     }
   }, []);
 
@@ -347,6 +346,29 @@ function BookingPage({
   // Owner detection — use state so we can toggle edit mode off
   const [isOwner, setIsOwner] = useState(!!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner')));
   const [showPencilTooltip, setShowPencilTooltip] = useState(false);
+
+  // Process ?welcome and ?pin URL params on first load to activate edit mode
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pinParam = params.get('pin');
+    let shouldActivate = false;
+    if (pinParam) {
+      try { localStorage.setItem('crmToken', pinParam); localStorage.setItem('isOwner', '1'); } catch(e) {}
+      shouldActivate = true;
+    }
+    if (params.has('welcome')) {
+      try { localStorage.setItem('isOwner', '1'); } catch(e) {}
+      shouldActivate = true;
+    }
+    if (shouldActivate) {
+      setIsOwner(true);
+      const url = new URL(window.location);
+      url.searchParams.delete('pin');
+      url.searchParams.delete('welcome');
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
+
   // Owners are always in edit mode — no toggle needed
   const isEditMode = isOwner;
   const [dirty, setDirty] = useState(false);

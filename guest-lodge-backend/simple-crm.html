@@ -1774,6 +1774,18 @@ const CRM_HOTEL_LABELS = {
 };
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
+// Auto-login from ?pin= URL param (coming from setup wizard)
+try {
+  const _urlPin = new URLSearchParams(window.location.search).get('pin');
+  if (_urlPin) {
+    token = _urlPin;
+    localStorage.setItem('crmToken', token);
+    const _cleanUrl = new URL(window.location);
+    _cleanUrl.searchParams.delete('pin');
+    window.history.replaceState({}, '', _cleanUrl);
+  }
+} catch(e) {}
+
 function getContextParam(name) {
   try {
     const params = new URLSearchParams(window.location.search || '');

@@ -252,14 +252,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="step" id="step-3">
     <div class="form-card" style="text-align:center;">
       <h2>🎉 You're in!</h2>
-      <p style="font-size:14px; color:var(--muted); margin-bottom:16px;">Your booking engine and front desk are ready.</p>
+      <p style="font-size:14px; color:var(--muted); margin-bottom:16px;">Your booking engine is live.</p>
       <div style="background:#e8f5ee; border-radius:12px; padding:14px; font-family:monospace; font-size:14px; color:#2E7D5B; font-weight:600; margin-bottom:14px; word-break:break-all;" id="successDomain"></div>
       <div style="background:#f0f4ff; border:1.5px solid #c7d2fe; border-radius:12px; padding:14px; margin-bottom:14px;">
         <div style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Front Desk PIN</div>
         <div style="font-family:monospace; font-size:24px; font-weight:700; letter-spacing:3px;" id="successPin"></div>
       </div>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Tap the ✏️ pencil on your booking site to manage rooms, photos, rates, and availability.</p>
-      <a class="btn btn-primary" id="successLink" href="#" target="_blank" style="text-decoration:none; text-align:center; opacity:0.5; pointer-events:none;">Setting up your site...</a>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Add photos, set rates, and manage bookings from your dashboard.</p>
+      <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; opacity:0.5; pointer-events:none;">Setting up your site...</a>
+      <a id="previewSiteLink" href="#" style="display:block; margin-top:12px; font-size:13px; color:#2E7D5B; font-weight:600; text-decoration:none; opacity:0.5; pointer-events:none;">Preview your booking page →</a>
       <p style="font-size:11px; color:var(--muted); margin-top:20px;">We've emailed your PIN to you.</p>
     </div>
   </div>
@@ -347,16 +348,27 @@ async function addRoomAndFinish() {
     // Show success
     console.log('Complete response:', completeData);
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.bookmarketel.com';
+    
+    // Use localhost URLs when running locally
+    var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    var baseUrl = isLocal ? window.location.origin : domain;
+    
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     document.getElementById('successPin').textContent = completeData.crmPin || '----';
-    document.getElementById('successLink').href = domain + '?welcome=1&pin=' + encodeURIComponent(completeData.crmPin || '');
+    // Primary CTA: go to front desk (their dashboard)
+    var frontdeskUrl = baseUrl + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '');
+    document.getElementById('successLink').href = frontdeskUrl;
+    // Secondary: preview booking site link
+    document.getElementById('previewSiteLink').href = (isLocal ? 'http://localhost:5173' : domain) + '?welcome=1&pin=' + encodeURIComponent(completeData.crmPin || '');
 
     // Enable after 8 seconds (Vercel SSL provisioning time)
     setTimeout(function() {
       var link = document.getElementById('successLink');
-      link.textContent = 'Visit Your Site \u2192';
+      link.textContent = 'Go to Your Dashboard \u2192';
       link.style.opacity = '1';
       link.style.pointerEvents = 'auto';
+      document.getElementById('previewSiteLink').style.opacity = '1';
+      document.getElementById('previewSiteLink').style.pointerEvents = 'auto';
     }, 8000);
 
     // Send welcome email
