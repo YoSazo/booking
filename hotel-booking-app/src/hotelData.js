@@ -1,4 +1,4 @@
-﻿export const hotelData = {
+export const hotelData = {
   // --- Second Hotel (Example with different data) ---
   'home-place-suites': {
     name: 'Home Place Suites',
@@ -28,7 +28,7 @@
       },
     ],
     rooms: [
-      { id: 1, name: 'Single King Room', roomTypeID: '117057244229790', amenities: 'Free WiFi â€¢ 30" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 4, imageUrls: [
+      { id: 1, name: 'Single King Room', roomTypeID: '117057244229790', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 4, imageUrls: [
             'kingbedbart.jpg',
             'Bed-high.jpg',
             'IMG_4300.jpg',
@@ -44,7 +44,7 @@
             'Lobby.jpg',
             'bathroomamen.jpg',
         ] },
-      { id: 2, name: 'Double Queen Room', roomTypeID: '116355544711397', amenities: 'Free WiFi â€¢ 30" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
+      { id: 2, name: 'Double Queen Room', roomTypeID: '116355544711397', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'twoqueenbart.jpg',
             'IMG_4300.jpg',
             'TV.jpg',
@@ -60,7 +60,7 @@
             'bathroomamen.jpg',
         ] },
 
-      { id: 3, name: 'Double Queen Suite With Kitchenette', roomTypeID: '117068633694351', amenities: 'Free WiFi â€¢ 30" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two queen beds and a Kitchenette, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
+      { id: 3, name: 'Double Queen Suite With Kitchenette', roomTypeID: '117068633694351', amenities: 'Free WiFi • 30" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two queen beds and a Kitchenette, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 7, imageUrls: [
             'double-kitchen.jpeg',
             'Kitchen-front-view.jpg',
             'kitchen.jpeg',
@@ -112,7 +112,7 @@
           weekly: '',
           monthly: '', // Using weekly rate for monthly bookings (pay at check-in)
         },
-        amenities: 'Free WiFi â€¢ 60" TV â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping',
+        amenities: 'Free WiFi • 60" TV • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.',
         maxOccupancy: 3,
         imageUrl: '/stcroix/singgle.webp',
@@ -130,7 +130,7 @@
           weekly: '',
           monthly: '', // Using weekly rate for monthly bookings (pay at check-in)
         },
-        amenities: 'Free WiFi â€¢ 60" TV â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping',
+        amenities: 'Free WiFi • 60" TV • Workstation • Bath • Free Parking • Weekly Housekeeping',
         description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.',
         maxOccupancy: 4,
         imageUrl: '/stcroix/IMG_5449.webp',
@@ -170,7 +170,7 @@
       },
     ],
     rooms: [
-      { id: 1, name: 'King Room', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
+      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
             'kingbedsuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',
@@ -181,7 +181,7 @@
             'suitestayoutside.webp',
             'suitestayreception.webp',
         ] },
-      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi â€¢ 60" TV â€¢ Fridge â€¢ Workstation â€¢ Bath â€¢ Free Parking â€¢ Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
+      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
             'doublesuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',

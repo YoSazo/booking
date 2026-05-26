@@ -112,6 +112,7 @@ function App() {
         const data = await res.json();
         if (cancelled) return;
         setCurrentHotel({
+          id: data.id || hotelId,
           name: data.name || fallbackHotel.name,
           url: '',
           subtitle: data.subtitle || fallbackHotel.subtitle,
@@ -573,7 +574,7 @@ const handleConfirmBooking = async (bookingDetails) => {
                 isProcessingBooking={isProcessingBooking}
                 setIsProcessingBooking={setIsProcessingBooking}
                 onHotelUpdate={(updates) => setCurrentHotel(prev => ({ ...prev, ...updates }))}
-                hotelId={hotelId}              />
+                hotelId={currentHotel.id || hotelId}              />
           } />
 
           <Route path="/guest-info" element={
