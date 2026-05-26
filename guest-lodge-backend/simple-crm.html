@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Marketel · Front Desk</title>
+  <title>Marketel Â· Front Desk</title>
   <link rel="manifest" href="/manifest-simple-crm.json">
   <meta name="theme-color" content="#EEF2EF">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,15 +21,10 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
-    /* Prevent iOS zoom on input focus (exclude WYSIWYG preview inputs) */
+    /* Prevent iOS zoom on input focus */
     input, textarea, select { font-size: 16px !important; }
-    #edit-hotel-name { font-size: 24px !important; }
-    #edit-hotel-subtitle { font-size: 14px !important; }
-    #edit-hotel-address { font-size: 13px !important; }
-    #edit-hotel-phone { font-size: 13px !important; }
-    #edit-hotel-policy { font-size: 11px !important; }
 
-    /* ── LOGIN ── */
+    /* â”€â”€ LOGIN â”€â”€ */
     .login-screen {
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
       background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
@@ -79,7 +74,7 @@
     .login-btn:hover { background: #245f46; }
     .login-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
 
-    /* ── HEADER ── */
+    /* â”€â”€ HEADER â”€â”€ */
     .header {
       background: var(--white); border-bottom: 1.5px solid var(--border);
       padding: 8px 16px; min-height: 58px; display: flex; align-items: center;
@@ -118,7 +113,7 @@
       color: var(--green);
     }
 
-    /* ── LAYOUT ── */
+    /* â”€â”€ LAYOUT â”€â”€ */
     .container { max-width: 860px; margin: 0 auto; padding: 24px 20px; }
 
     /* TABS */
@@ -231,7 +226,7 @@
       padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
     }
 
-    /* ── BOOKING CARD ── */
+    /* â”€â”€ BOOKING CARD â”€â”€ */
     .booking-card {
       background: var(--white); border: 2px solid var(--border);
       border-radius: 20px; overflow: hidden;
@@ -324,7 +319,7 @@
       background: var(--bg);
     }
 
-    /* ── STATES ── */
+    /* â”€â”€ STATES â”€â”€ */
     .empty-state {
       text-align: center; padding: 64px 20px;
       background: var(--white); border: 1.5px solid var(--border);
@@ -345,7 +340,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── TOAST ── */
+    /* â”€â”€ TOAST â”€â”€ */
     /* Notes Section */
     .card-notes {
       margin-top: 12px;
@@ -833,7 +828,7 @@
       cursor: pointer;
     }
 
-    /* Desktop-only × on day popover (hidden on mobile sheet) */
+    /* Desktop-only Ã— on day popover (hidden on mobile sheet) */
     #availabilityDayPopover .avail-desktop-popover-x {
       display: none;
     }
@@ -1066,7 +1061,7 @@
       }
     }
 
-    /* ── RESPONSIVE ── */
+    /* â”€â”€ RESPONSIVE â”€â”€ */
     /* Granny-proof mobile availability */
     @media (max-width: 600px) {
     .availability-view {
@@ -1646,8 +1641,8 @@
       <img src="/marketellogo.svg" alt="" class="login-logo-icon">
       <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
     </div>
-    <p>Front Desk — Enter your PIN to continue</p>
-    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
+    <p>Front Desk â€” Enter your PIN to continue</p>
+    <input class="login-input" type="password" id="pinInput" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢" maxlength="20"
       onkeydown="if(event.key==='Enter') doLogin()">
     <button class="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-error" id="loginError"></div>
@@ -1673,9 +1668,9 @@
       <span class="header-logo-suffix">Front Desk</span>
     </div>
     <div class="header-right">
-      <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
+      <div id="statNew" class="stat-pill">ðŸ“¥ <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
-      <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="refreshCurrentView()">â†» Refresh</button>
     </div>
   </header>
 
@@ -1687,16 +1682,12 @@
       </button>
     </div>
     <div id="bookingsList">
-      <div class="loading"><div class="spinner"></div> Loading bookings…</div>
+      <div class="loading"><div class="spinner"></div> Loading bookingsâ€¦</div>
     </div>
   </div>
 
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
-    <button type="button" class="mobile-nav-item active" data-nav-filter="edit" aria-current="page">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="pencil"></i></span>
-      <span class="mobile-nav-label">Edit</span>
-    </button>
-    <button type="button" class="mobile-nav-item" data-nav-filter="bookings">
+    <button type="button" class="mobile-nav-item active" data-nav-filter="bookings" aria-current="page">
       <span class="mobile-nav-icon-wrap"><i data-lucide="inbox"></i></span>
       <span class="mobile-nav-label">Bookings</span>
     </button>
@@ -1708,6 +1699,10 @@
       <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
       <span class="mobile-nav-label">Revenue</span>
     </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="settings">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
+      <span class="mobile-nav-label">Settings</span>
+    </button>
   </nav>
 </div>
 
@@ -1718,7 +1713,7 @@
   <div class="notes-modal" onclick="event.stopPropagation()">
     <div class="notes-modal-header">
       <div class="notes-modal-title">Add Note</div>
-      <button class="notes-modal-close" onclick="closeNotesModal()">×</button>
+      <button class="notes-modal-close" onclick="closeNotesModal()">Ã—</button>
     </div>
     <div class="notes-modal-body">
       <label class="notes-input-label">Note</label>
@@ -1734,7 +1729,7 @@
 <script>
 let token = '';
 let bookings = [];
-let currentFilter = 'edit';
+let currentFilter = 'bookings';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
@@ -1858,16 +1853,16 @@ function buildHotelContextUrl() {
 }
 
 function updateHotelChrome() {
-  const label = activeHotelName ? `Front Desk · ${activeHotelName}` : 'Front Desk';
+  const label = activeHotelName ? `Front Desk Â· ${activeHotelName}` : 'Front Desk';
   const headerSuffix = document.querySelector('.header-logo-suffix');
   if (headerSuffix) headerSuffix.textContent = label;
   const loginCopy = document.querySelector('#loginScreen p');
   if (loginCopy) {
     loginCopy.textContent = activeHotelName
-      ? `${activeHotelName} — Enter your PIN to continue`
-      : 'Front Desk — Enter your PIN to continue';
+      ? `${activeHotelName} â€” Enter your PIN to continue`
+      : 'Front Desk â€” Enter your PIN to continue';
   }
-  document.title = activeHotelName ? `Marketel · ${activeHotelName} Front Desk` : 'Marketel · Front Desk';
+  document.title = activeHotelName ? `Marketel Â· ${activeHotelName} Front Desk` : 'Marketel Â· Front Desk';
 }
 
 function showBootState({ title, message, debug = '', showRetry = false } = {}) {
@@ -2040,7 +2035,7 @@ function syncRevenueUi() {
             <button type="button" class="revenue-period-btn active" data-period="30d">30 days</button>
             <button type="button" class="revenue-period-btn" data-period="all">All time</button>
           </div>
-          <div class="revenue-subhint" id="revenueSubhint">Last 30 days · stay dates</div>
+          <div class="revenue-subhint" id="revenueSubhint">Last 30 days Â· stay dates</div>
           <div id="revenueStatus"></div>
           <div id="revenueContent" style="display:none">
             <div class="revenue-savings-pill">
@@ -2064,7 +2059,7 @@ function syncRevenueUi() {
               </div>
             </div>
             <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
-              <p style="font-size:12px;color:var(--text-muted);text-align:center;margin:0;line-height:1.5;">💡 We verify your guest's card at booking ($0 charge). You collect payment at check-in — cash, card, Venmo, however you prefer.</p>
+              <p style="font-size:12px;color:var(--text-muted);text-align:center;margin:0;line-height:1.5;">ðŸ’¡ We verify your guest's card at booking ($0 charge). You collect payment at check-in â€” cash, card, Venmo, however you prefer.</p>
             </div>
           </div>
         </div>
@@ -2133,7 +2128,7 @@ function renderRevenueView() {
   const subhintEl = document.getElementById('revenueSubhint');
   const periodButtons = document.querySelectorAll('.revenue-period-btn');
   const currentPeriodLabel = revenuePeriodLabel(revenuePeriod);
-  if (subhintEl) subhintEl.textContent = `${currentPeriodLabel} · stay dates`;
+  if (subhintEl) subhintEl.textContent = `${currentPeriodLabel} Â· stay dates`;
   periodButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.period === revenuePeriod);
   });
@@ -2213,27 +2208,24 @@ function ensureAvailabilityUi() {
     tabs.appendChild(btn);
   }
 
-  // Add Edit tab if not present
-  if (tabs && !tabs.querySelector('[data-nav-filter="edit"]')) {
-    const editBtn = document.createElement('button');
-    editBtn.className = 'tab';
-    editBtn.setAttribute('type', 'button');
-    editBtn.innerHTML = 'Edit';
-    editBtn.dataset.navFilter = 'edit';
-    editBtn.onclick = function () { setFilter('edit', editBtn); };
-    // Insert before availability
-    const availBtn = tabs.querySelector('[data-nav-filter="availability"]');
-    if (availBtn) tabs.insertBefore(editBtn, availBtn);
-    else tabs.appendChild(editBtn);
+  // Add Settings tab if not present
+  if (tabs && !tabs.querySelector('[data-nav-filter="settings"]')) {
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'tab';
+    settingsBtn.setAttribute('type', 'button');
+    settingsBtn.innerHTML = 'Settings';
+    settingsBtn.dataset.navFilter = 'settings';
+    settingsBtn.onclick = function () { setFilter('settings', settingsBtn); };
+    tabs.appendChild(settingsBtn);
   }
 
   const container = document.querySelector('.container');
 
-  // Add Edit view if not present
-  if (container && !document.getElementById('editView')) {
+  // Add Settings view if not present
+  if (container && !document.getElementById('settingsView')) {
     container.insertAdjacentHTML('beforeend', `
-      <div id="editView" style="display:none; margin-top:8px;">
-        <div id="editRoomsList"></div>
+      <div id="settingsView" style="display:none; margin-top:8px;">
+        <div id="settingsList"></div>
       </div>
     `);
   }
@@ -2252,8 +2244,8 @@ function ensureAvailabilityUi() {
               <div class="cal-header">
                 <div id="availabilityMonthLabel" class="cal-month-label"></div>
                 <div class="cal-nav">
-                  <button class="cal-nav-btn" type="button" id="availabilityPrevMonthBtn">‹</button>
-                  <button class="cal-nav-btn" type="button" id="availabilityNextMonthBtn">›</button>
+                  <button class="cal-nav-btn" type="button" id="availabilityPrevMonthBtn">â€¹</button>
+                  <button class="cal-nav-btn" type="button" id="availabilityNextMonthBtn">â€º</button>
                 </div>
               </div>
               <div id="availabilityCalendarGrid" class="cal-grid"></div>
@@ -2264,8 +2256,8 @@ function ensureAvailabilityUi() {
                 <div class="legend-item"><div class="legend-dot" style="background:#f2f4f3;border:1px solid #d0d7d3"></div>Closed</div>
               </div>
               <div id="roomMobileActions" class="room-mobile-actions" style="display:none">
-                <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">✎ Edit room</button>
-                <button id="roomMobileDeleteBtn" class="room-mobile-action-btn danger" type="button">🗑 Delete room</button>
+                <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">âœŽ Edit room</button>
+                <button id="roomMobileDeleteBtn" class="room-mobile-action-btn danger" type="button">ðŸ—‘ Delete room</button>
               </div>
             </div>
           </div>
@@ -2312,13 +2304,13 @@ function ensureAvailabilityUi() {
 
       <div id="availabilitySheetBackdrop" class="availability-sheet-backdrop"></div>
       <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true" style="display:none;">
-        <button type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:15px;color:var(--text-muted);cursor:pointer;" onclick="closeAvailabilityDayPopover()">×</button>
+        <button type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:15px;color:var(--text-muted);cursor:pointer;" onclick="closeAvailabilityDayPopover()">Ã—</button>
         <div style="padding:14px 16px;">
           <div id="availabilityDayPopoverTitle" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;"></div>
           <div id="availabilitySheetDate" style="display:none;"></div>
           <div id="availabilityActiveRoomLabel" style="display:none;"></div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <button id="availabilityStepDownBtn" type="button" onclick="stepAvailabilityDay(-1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">−</button>
+            <button id="availabilityStepDownBtn" type="button" onclick="stepAvailabilityDay(-1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">âˆ’</button>
             <div id="availabilityDayCount" style="font-size:22px;font-family:'DM Mono',monospace;font-weight:500;flex:1;text-align:center;">0</div>
             <button id="availabilityStepUpBtn" type="button" onclick="stepAvailabilityDay(1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">+</button>
           </div>
@@ -2384,11 +2376,11 @@ function bindAvailabilityUiEvents() {
   const cancelDayBtn = document.getElementById('availabilityDayCancelBtn');
   const closedToggle = document.getElementById('availabilityClosedToggle');
   const sheetBackdrop = document.getElementById('availabilitySheetBackdrop');
-  // Event listeners now handled via inline onclick — no need to bind here
+  // Event listeners now handled via inline onclick â€” no need to bind here
   if (sheetBackdrop) sheetBackdrop.addEventListener('click', closeAvailabilityDayPopover);
 }
 
-// ── LOGIN ──────────────────────────────────────────────
+// â”€â”€ LOGIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function verifyCrmToken(pin) {
   if (!activeHotelId) throw new Error('Hotel context is not ready yet.');
   const res = await fetch(`/api/crm/verify?hotelId=${encodeURIComponent(activeHotelId)}`, {
@@ -2476,7 +2468,7 @@ async function submitForgotPin() {
   const email = document.getElementById('forgotPinEmail').value.trim();
   const msg = document.getElementById('forgotPinMsg');
   if (!email) { msg.textContent = 'Please enter your email'; return; }
-  msg.textContent = 'Sending…';
+  msg.textContent = 'Sendingâ€¦';
   try {
     await fetch('/api/forgot-pin', {
       method: 'POST',
@@ -2487,7 +2479,7 @@ async function submitForgotPin() {
   msg.textContent = "If that email is on file, we've sent a new PIN.";
 }
 
-// ── API ────────────────────────────────────────────────
+// â”€â”€ API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function api(method, path, body) {
   if (!activeHotelId) throw new Error('Hotel context is not loaded.');
   const url = new URL(path, window.location.origin);
@@ -2571,7 +2563,7 @@ async function bootCrmApp() {
   }
 }
 
-// ── LOAD ───────────────────────────────────────────────
+// â”€â”€ LOAD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadBookings() {
   try {
     const data = await api('GET', '/api/crm/bookings');
@@ -2590,7 +2582,7 @@ async function loadBookings() {
     if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">⚠️</div>
+        <div class="empty-icon">âš ï¸</div>
       <div class="empty-text">Could not load bookings</div>
       <div class="empty-sub">${esc(e.message)}</div>
       </div>`;
@@ -2600,7 +2592,7 @@ async function loadBookings() {
 async function refreshCurrentView() {
   if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
   // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
-  if (currentFilter === 'edit') return;
+  if (currentFilter === 'settings') return;
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -2611,14 +2603,14 @@ async function refreshCurrentView() {
   await Promise.allSettled(tasks);
 }
 
-// ── RENDER ─────────────────────────────────────────────
+// â”€â”€ RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderBookings(list) {
   const el = document.getElementById('bookingsList');
 
   if (list.length === 0) {
     el.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">✅</div>
+        <div class="empty-icon">âœ…</div>
         <div class="empty-text">All caught up!</div>
         <div class="empty-sub">No bookings need a call right now.</div>
       </div>`;
@@ -2627,8 +2619,8 @@ function renderBookings(list) {
 
   el.innerHTML = list.map(b => {
     const isDeclined = b.notes && b.notes.includes('PAYMENT DECLINED');
-    const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-    const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'â€”';
+    const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'â€”';
     const ago = timeAgo(b.createdAt);
     const rawPhoneDigits = String(b.guestPhone || '').replace(/\D/g, '');
     let localPhoneDigits = rawPhoneDigits;
@@ -2653,9 +2645,9 @@ function renderBookings(list) {
         </div>
 
         <div class="card-meta">
-          <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
-          <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
-          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : '<div class="pay-chip">💳 Pay at check-in</div>'}
+          <div class="meta-chip">ðŸ› ${esc(b.roomName || 'Room')}</div>
+          <div class="meta-chip">ðŸŒ™ ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
+          ${isDeclined ? '<div class="declined-chip">âš ï¸ Card declined</div>' : '<div class="pay-chip">ðŸ’³ Pay at check-in</div>'}
         </div>
 
         <div class="card-dates">
@@ -2690,15 +2682,15 @@ function renderBookings(list) {
         ` : ''}
 
         <div class="card-footer">
-          ${phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`}
-          <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
+          ${phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">ðŸ“ž Call Now</a>` : `<button class="btn btn-confirm" disabled>ðŸ“ž No Phone</button>`}
+          <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">ðŸ“ ${b.notes ? 'Edit' : 'Add'} Note</button>
         </div>
       </div>
     </div>`;
   }).join('');
 }
 
-// ── FILTER TABS ────────────────────────────────────────
+// â”€â”€ FILTER TABS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function refreshMobileBottomNavIcons() {
   if (typeof lucide === 'undefined' || typeof lucide.createIcons !== 'function') return;
   const root = document.getElementById('mobileBottomNav');
@@ -2833,15 +2825,15 @@ function applyFilter() {
   const bookingsEl = document.getElementById('bookingsList');
   const availabilityEl = document.getElementById('availabilityView');
   const revenueEl = document.getElementById('revenueView');
-  const editEl = document.getElementById('editView');
+  const settingsEl = document.getElementById('settingsView');
 
-  if (currentFilter === 'edit') {
+  if (currentFilter === 'settings') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'none';
-    if (editEl) editEl.style.display = 'block';
+    if (settingsEl) settingsEl.style.display = 'block';
     closeAvailabilityDayPopover();
-    loadEditRooms();
+    loadSettings();
     return;
   }
 
@@ -2849,7 +2841,7 @@ function applyFilter() {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'flex';
     if (revenueEl) revenueEl.style.display = 'none';
-    if (editEl) editEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
     renderAvailabilityView();
     return;
   }
@@ -2858,7 +2850,7 @@ function applyFilter() {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'flex';
-    if (editEl) editEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
     closeAvailabilityDayPopover();
     renderRevenueView();
     return;
@@ -2867,7 +2859,7 @@ function applyFilter() {
   if (bookingsEl) bookingsEl.style.display = '';
   if (availabilityEl) availabilityEl.style.display = 'none';
   if (revenueEl) revenueEl.style.display = 'none';
-  if (editEl) editEl.style.display = 'none';
+  if (settingsEl) settingsEl.style.display = 'none';
   closeAvailabilityDayPopover();
   renderBookings(bookings);
 }
@@ -2932,7 +2924,7 @@ function renderRoomPills() {
     editBtn.className = 'room-pill-action';
     editBtn.title = `Edit ${room.name}`;
     editBtn.setAttribute('aria-label', `Edit ${room.name}`);
-    editBtn.textContent = '✎';
+    editBtn.textContent = 'âœŽ';
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       openRoomsEditModal(room.name);
@@ -2943,7 +2935,7 @@ function renderRoomPills() {
     delBtn.className = 'room-pill-action danger';
     delBtn.title = `Delete ${room.name}`;
     delBtn.setAttribute('aria-label', `Delete ${room.name}`);
-    delBtn.textContent = '🗑';
+    delBtn.textContent = 'ðŸ—‘';
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       deleteRoomType(room.name);
@@ -3410,7 +3402,7 @@ async function confirmDeleteRoomType() {
   }
 }
 
-// ── ACTIONS ────────────────────────────────────────────
+// â”€â”€ ACTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function markConfirmed(id) {
   try {
     await api('POST', `/api/crm/bookings/${id}/confirm`);
@@ -3426,7 +3418,7 @@ async function markConfirmed(id) {
   } catch(e) { toast('Failed to update', 'error'); }
 }
 
-// ── NOTES MODAL ────────────────────────────────────────
+// â”€â”€ NOTES MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let currentNoteBookingId = null;
 
 function addNote(id, existingNote = '') {
@@ -3497,7 +3489,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ── ADD DUMMY BOOKINGS ─────────────────────────────────
+// â”€â”€ ADD DUMMY BOOKINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function addDummyBookings() {
   if (!confirm('Add 4 test bookings (1 with payment declined)?')) return;
   try {
@@ -3514,7 +3506,7 @@ async function addDummyBookings() {
   }
 }
 
-// ── NOTIFICATIONS ──────────────────────────────────────
+// â”€â”€ NOTIFICATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -3556,7 +3548,7 @@ async function enableNotifications() {
   }
 }
 
-// ── HELPERS ────────────────────────────────────────────
+// â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -3572,434 +3564,141 @@ function toast(msg, type = '') {
   const c = document.getElementById('toasts');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.textContent = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'} ${msg}`;
+  el.textContent = `${type === 'success' ? 'âœ“' : type === 'error' ? 'âœ•' : 'â„¹'} ${msg}`;
   c.appendChild(el);
   setTimeout(() => el.remove(), 3100);
 }
 
-// ── EDIT TAB ───────────────────────────────────────────────
+// â”€â”€ SETTINGS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-let editRooms = [];
-
-async function loadEditRooms() {
-  const list = document.getElementById('editRoomsList');
+async function loadSettings() {
+  const list = document.getElementById('settingsList');
   if (!list) return;
-  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loadingâ€¦</div>';
   try {
-    const res = await api('GET', '/api/crm/rooms');
-    if (!res.rooms) throw new Error('No data');
-    editRooms = res.rooms;
-
-    // Fetch hotel info for name/subtitle/address/phone editing
     const hotelRes = await api('GET', '/api/crm/verify');
-    const hotelName = hotelRes?.hotelName || '';
-    const hotelSubtitle = hotelRes?.hotelSubtitle || '';
-    const hotelAddress = hotelRes?.hotelAddress || '';
-    const hotelPhone = hotelRes?.hotelPhone || '';
-
-    // Fetch rates
-    let rates = { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 };
-    if (res.rates) rates = res.rates;
-
-    // Render hotel info section + rates + PIN + rooms
     const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
-    let html = `
+
+    let html = '';
+
+    // Booking Link + QR
+    html += `
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
-          <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
-            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Your Booking Link</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <input type="text" value="${bookingUrl}" readonly style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:13px;color:var(--text);background:var(--bg);" id="settings-booking-url">
+            <button onclick="copyBookingLink()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Copy</button>
           </div>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
-        </div>
-      </div>
-      <div id="editRoomsCards"></div>
-      <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:12px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add room type</button>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
-          <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
-            <!-- Back button pill (matches .back-button-pill) -->
-            <div style="padding:12px 16px 0;">
-              <span style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:600;box-shadow:0 2px 6px rgba(16,185,129,0.2);">‹ Back to Booking</span>
-            </div>
-            <!-- Cancellation policy banner (matches .static-banner — white pill with shadow) -->
-            <div style="padding:10px 16px;display:flex;justify-content:center;">
-              <div style="background:white;border-radius:20px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px dashed #10b981;width:fit-content;max-width:100%;position:relative;">
-                <div style="position:absolute;top:-8px;right:8px;background:#10b981;color:white;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;">Editable</div>
-                <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;font-size:11px;color:#111827;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
-              </div>
-            </div>
-            <!-- Progress bar (matches .checkout-progress-bar with pill step-circles) -->
-            <div style="padding:8px 16px 14px;position:relative;">
-              <div style="display:flex;justify-content:space-between;align-items:center;position:relative;">
-                <!-- Connecting line -->
-                <div style="position:absolute;top:11px;left:15%;right:15%;height:2px;background:#ddd;z-index:0;"></div>
-                <!-- Step 1: Review Cart (active/completed) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:#28a745;border:2px solid #28a745;"></div>
-                  <span style="font-size:10px;color:#000;font-weight:600;">Review Cart</span>
-                </div>
-                <!-- Step 2: Info (inactive) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
-                  <span style="font-size:10px;color:#888;">Info</span>
-                </div>
-                <!-- Step 3: Payment (inactive) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
-                  <span style="font-size:10px;color:#888;">Payment</span>
-                </div>
-              </div>
-            </div>
-            <!-- Placeholder content -->
-            <div style="padding:0 16px 14px;">
-              <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
-                <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
-                <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
-              </div>
-            </div>
-          </div>
-          <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
-        </div>
-      </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
-          <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
-            <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
-            <button onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
-          </div>
-          <div style="text-align:center;margin-bottom:10px;">
-            <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
-          </div>
-          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
-        </div>
-      </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
-              <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
-              <input type="number" value="${rates.weekly}" id="edit-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
-              <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-            </div>
-          </div>
-          <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
-        </div>
-      </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Change PIN</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
-          </div>
-          <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
-        </div>
-      </div>
-      ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
-        </div>
-      </div>` : ''}
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="margin-bottom:12px;">
-            <textarea id="supportMessage" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
-          </div>
-          <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
+          <div style="text-align:center;"><img src="${qrUrl}" style="width:140px;height:140px;border-radius:10px;border:1.5px solid var(--border);" alt="QR Code"></div>
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px;">Share this link or QR code with guests</p>
         </div>
       </div>
     `;
-    list.innerHTML = html;
-    renderEditRoomsCards();
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-  } catch (e) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
-  }
-}
 
-function renderEditRooms() {
-  renderEditRoomsCards();
-}
-
-function renderEditRoomsCards() {
-  const list = document.getElementById('editRoomsCards') || document.getElementById('editRoomsList');
-  if (!editRooms.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
-    return;
-  }
-  list.innerHTML = editRooms.map(r => {
-    const currentAmenities = (r.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
-    const images = r.images || [];
-    return `
-    <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
-      <div style="position:relative;">
-        ${images.length ? `<img src="${images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
-        <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          📷 + Add Photos
-          <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
-        </label>
-      </div>
-      ${images.length >= 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
-      <div style="padding:18px;">
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
-          <input type="text" value="${r.name}" id="edit-name-${r.id}" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
-        </div>
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Description</div>
-          <input type="text" value="${(r.description || '').replace(/"/g, '&quot;')}" id="edit-desc-${r.id}" placeholder="e.g. A spacious room with king bed and city view" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
-        </div>
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Amenities</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="edit-amenity-pills-${r.id}">
-            ${currentAmenities.map(a => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--green-pale);color:var(--green);padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;">${getAmenityIcon(a)} ${a} <button onclick="removeAmenity('${r.id}','${a.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:14px;margin-left:2px;">×</button></span>`).join('')}
+    // Rates
+    const ratesRes = await api('GET', '/api/crm/rooms');
+    let rates = { nightly: 69, weekly: 299, monthly: 999 };
+    if (ratesRes?.rates) rates = ratesRes.rates;
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Rates</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
+              <input type="number" value="${rates.nightly}" id="settings-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
+              <input type="number" value="${rates.weekly}" id="settings-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
+              <input type="number" value="${rates.monthly}" id="settings-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
           </div>
-          <button onclick="openAmenityPicker('${r.id}')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;font-family:inherit;">+ Add amenities</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Max Guests</div>
-            <input type="number" value="${r.maxOccupancy || 4}" min="1" max="20" id="edit-occ-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Total Units</div>
-            <input type="number" value="${r.totalUnits || 1}" min="1" max="200" id="edit-units-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Changes</button>
-          <button onclick="deleteEditRoom('${r.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
+          <button onclick="saveSettingsRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
         </div>
       </div>
-    </div>`;
-  }).join('');
-}
+    `;
 
-function getAmenityIcon(amenity) {
-  const a = amenity.toLowerCase();
-  if (a.includes('wifi')) return '<i data-lucide="wifi" style="width:14px;height:14px;"></i>';
-  if (a.includes('tv') || a.includes('television')) return '<i data-lucide="tv" style="width:14px;height:14px;"></i>';
-  if (a.includes('fridge') || a.includes('refrigerator')) return '<i data-lucide="thermometer-snowflake" style="width:14px;height:14px;"></i>';
-  if (a.includes('parking')) return '<i data-lucide="car" style="width:14px;height:14px;"></i>';
-  if (a.includes('housekeeping') || a.includes('cleaning')) return '<i data-lucide="sparkles" style="width:14px;height:14px;"></i>';
-  if (a.includes('bath') || a.includes('shower')) return '<i data-lucide="bath" style="width:14px;height:14px;"></i>';
-  if (a.includes('work') || a.includes('desk')) return '<i data-lucide="laptop" style="width:14px;height:14px;"></i>';
-  if (a.includes('pet') || a.includes('dog')) return '<i data-lucide="paw-print" style="width:14px;height:14px;"></i>';
-  if (a.includes('pool')) return '<i data-lucide="waves" style="width:14px;height:14px;"></i>';
-  if (a.includes('kitchen') || a.includes('microwave')) return '<i data-lucide="cooking-pot" style="width:14px;height:14px;"></i>';
-  return '<i data-lucide="check" style="width:14px;height:14px;"></i>';
-}
-
-const AMENITY_PRESETS = [
-  { key: 'wifi', label: 'Free WiFi', icon: 'wifi' },
-  { key: 'tv', label: 'Smart TV', icon: 'tv' },
-  { key: 'fridge', label: 'Fridge', icon: 'thermometer-snowflake' },
-  { key: 'parking', label: 'Free Parking', icon: 'car' },
-  { key: 'housekeeping', label: 'Weekly Housekeeping', icon: 'sparkles' },
-  { key: 'bath', label: 'Bath', icon: 'bath' },
-  { key: 'workstation', label: 'Workstation', icon: 'laptop' },
-  { key: 'pet', label: 'Pet Friendly', icon: 'paw-print' },
-  { key: 'pool', label: 'Pool', icon: 'waves' },
-  { key: 'kitchen', label: 'Kitchenette', icon: 'cooking-pot' },
-  { key: 'ac', label: 'Air Conditioning', icon: 'wind' },
-  { key: 'laundry', label: 'Laundry', icon: 'shirt' },
-];
-
-let amenityPickerRoomId = null;
-
-function openAmenityPicker(roomId) {
-  amenityPickerRoomId = roomId;
-  const room = editRooms.find(r => r.id === roomId);
-  const current = (room?.amenities || '').split('•').map(a => a.trim().toLowerCase()).filter(Boolean);
-  
-  let modal = document.getElementById('amenityPickerModal');
-  if (!modal) {
-    document.body.insertAdjacentHTML('beforeend', `
-      <div id="amenityPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;align-items:center;justify-content:center;padding:20px;">
-        <div style="background:white;border-radius:16px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
-          <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Select Amenities</div>
-          <div id="amenityPickerGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
-          <div style="margin-bottom:14px;">
-            <input type="text" id="amenityCustomInput" placeholder="Or type a custom one..." style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px;outline:none;">
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button onclick="confirmAmenityPicker()" style="flex:1;padding:11px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
-            <button onclick="closeAmenityPicker()" style="padding:11px 18px;border-radius:10px;border:1.5px solid #e5e7eb;background:none;font-family:inherit;font-size:14px;color:#6b7280;cursor:pointer;">Cancel</button>
-          </div>
+    // Change PIN
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Change PIN</div>
+          <input type="text" id="settings-new-pin" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;margin-bottom:10px;">
+          <button onclick="settingsChangePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
         </div>
       </div>
-    `);
-    document.getElementById('amenityPickerModal').addEventListener('click', closeAmenityPicker);
-    modal = document.getElementById('amenityPickerModal');
-  }
+    `;
 
-  // Render preset pills
-  const grid = document.getElementById('amenityPickerGrid');
-  grid.innerHTML = AMENITY_PRESETS.map(p => {
-    const isSelected = current.some(c => c.includes(p.key));
-    return `<button onclick="toggleAmenityPreset(this,'${p.key}')" data-key="${p.key}" style="display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1.5px solid ${isSelected ? '#2E7D5B' : '#e5e7eb'};background:${isSelected ? '#E8F5EE' : 'white'};color:${isSelected ? '#2E7D5B' : '#1a1a2e'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;"><i data-lucide="${p.icon}" style="width:14px;height:14px;"></i> ${p.label}</button>`;
-  }).join('');
-  
-  document.getElementById('amenityCustomInput').value = '';
-  modal.style.display = 'flex';
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function toggleAmenityPreset(btn, key) {
-  const isActive = btn.style.borderColor === 'rgb(46, 125, 91)';
-  btn.style.borderColor = isActive ? '#e5e7eb' : '#2E7D5B';
-  btn.style.background = isActive ? 'white' : '#E8F5EE';
-  btn.style.color = isActive ? '#1a1a2e' : '#2E7D5B';
-}
-
-function closeAmenityPicker() {
-  document.getElementById('amenityPickerModal').style.display = 'none';
-  amenityPickerRoomId = null;
-}
-
-function confirmAmenityPicker() {
-  const room = editRooms.find(r => r.id === amenityPickerRoomId);
-  if (!room) { closeAmenityPicker(); return; }
-
-  const grid = document.getElementById('amenityPickerGrid');
-  const selected = [];
-  grid.querySelectorAll('button').forEach(btn => {
-    if (btn.style.background === 'rgb(232, 245, 238)') {
-      const preset = AMENITY_PRESETS.find(p => p.key === btn.dataset.key);
-      if (preset) selected.push(preset.label);
+    // Subscription (only if subscribed)
+    if (hotelRes?.subscribed) {
+      html += `
+        <div class="booking-card" style="margin-bottom:14px;">
+          <div style="padding:18px;">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Subscription</div>
+            <button onclick="openBillingPortal()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
+          </div>
+        </div>
+      `;
     }
-  });
 
-  const custom = document.getElementById('amenityCustomInput').value.trim();
-  if (custom) selected.push(custom);
+    // Support
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Need Help?</div>
+          <textarea id="settings-support-msg" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
+          <button onclick="settingsSendSupport()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email within 24 hours.</p>
+        </div>
+      </div>
+    `;
 
-  room.amenities = selected.join(' • ');
-  closeAmenityPicker();
-  renderEditRooms();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function addAmenityPrompt(roomId) { openAmenityPicker(roomId); }
-
-function removeAmenity(roomId, amenity) {
-  const room = editRooms.find(r => r.id === roomId);
-  if (!room) return;
-  const current = (room.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
-  room.amenities = current.filter(a => a !== amenity).join(' • ');
-  renderEditRooms();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-async function saveHotelInfo() {
-  const name = document.getElementById('edit-hotel-name')?.value.trim();
-  const subtitle = document.getElementById('edit-hotel-subtitle')?.value.trim();
-  const address = document.getElementById('edit-hotel-address')?.value.trim();
-  const phone = document.getElementById('edit-hotel-phone')?.value.trim();
-  const cancellationPolicy = document.getElementById('edit-hotel-policy')?.value.trim();
-  try {
-    await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone, cancellationPolicy });
-    toast('Hotel info saved!', 'success');
+    list.innerHTML = html;
   } catch (e) {
-    toast('Failed to save', 'error');
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">âš ï¸</div><div class="empty-text">Failed to load settings</div></div>';
   }
 }
 
-async function saveRates() {
-  const nightly = parseFloat(document.getElementById('edit-rate-nightly')?.value) || 69;
-  const weekly = parseFloat(document.getElementById('edit-rate-weekly')?.value) || 299;
-  const monthly = parseFloat(document.getElementById('edit-rate-monthly')?.value) || 999;
+function copyBookingLink() {
+  const input = document.getElementById('settings-booking-url');
+  if (input) {
+    navigator.clipboard.writeText(input.value).then(() => toast('Link copied!', 'success')).catch(() => toast('Copy failed', 'error'));
+  }
+}
+
+async function saveSettingsRates() {
+  const nightly = parseFloat(document.getElementById('settings-rate-nightly')?.value) || 69;
+  const weekly = parseFloat(document.getElementById('settings-rate-weekly')?.value) || 299;
+  const monthly = parseFloat(document.getElementById('settings-rate-monthly')?.value) || 999;
   try {
     await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
-    toast('Rates saved!', 'success');
-  } catch (e) {
-    toast('Failed to save rates', 'error');
-  }
+    toast('Rates saved', 'success');
+  } catch (e) { toast('Failed to save rates', 'error'); }
 }
 
-async function changePin() {
-  const newPin = document.getElementById('edit-new-pin')?.value.trim();
-  if (!newPin || newPin.length < 4) {
-    toast('PIN must be at least 4 characters', 'error');
-    return;
-  }
+async function settingsChangePin() {
+  const newPin = document.getElementById('settings-new-pin')?.value.trim();
+  if (!newPin || newPin.length < 4) { toast('PIN must be at least 4 characters', 'error'); return; }
   try {
     await api('POST', '/api/crm/change-pin', { newPin });
-    toast('PIN updated! Use your new PIN next time.', 'success');
-    document.getElementById('edit-new-pin').value = '';
-  } catch (e) {
-    toast('Failed to change PIN', 'error');
-  }
-}
-
-function copyBookingLink(url) {
-  navigator.clipboard.writeText(url).then(() => {
-    toast('Booking link copied!', 'success');
-  }).catch(() => {
-    toast('Failed to copy', 'error');
-  });
-}
-
-function toggleSection(header) {
-  const body = header.nextElementSibling;
-  const arrow = header.querySelector('.accordion-arrow');
-  if (body.style.display === 'none') {
-    body.style.display = 'block';
-    if (arrow) arrow.style.transform = 'rotate(90deg)';
-  } else {
-    body.style.display = 'none';
-    if (arrow) arrow.style.transform = 'rotate(0deg)';
-  }
-}
-
-async function goLive() {
-  try {
-    const res = await api('POST', '/api/crm/go-live');
-    if (res.success && res.url) {
-      window.location.href = res.url;
-    } else {
-      toast(res.message || 'Failed to start checkout', 'error');
-    }
-  } catch (e) {
-    toast('Failed to start checkout. Try again.', 'error');
-  }
+    token = newPin;
+    try { localStorage.setItem('crmToken', token); } catch(e) {}
+    toast('PIN updated!', 'success');
+    document.getElementById('settings-new-pin').value = '';
+  } catch (e) { toast('Failed to change PIN', 'error'); }
 }
 
 async function openBillingPortal() {
   try {
-    const res = await api('GET', '/api/crm/billing-portal');
+    const res = await api('POST', '/api/crm/billing-portal');
     if (res.success && res.url) {
       window.location.href = res.url;
     } else {
@@ -4010,135 +3709,30 @@ async function openBillingPortal() {
   }
 }
 
-async function sendSupportMessage() {
-  const msg = document.getElementById('supportMessage')?.value.trim();
+async function settingsSendSupport() {
+  const msg = document.getElementById('settings-support-msg')?.value.trim();
   if (!msg) { toast('Please enter a message', 'error'); return; }
   try {
     await api('POST', '/api/crm/support', { message: msg });
-    document.getElementById('supportMessage').value = '';
-    toast('Message sent! We\'ll reply to your email.', 'success');
-  } catch (e) {
-    toast('Failed to send. Email support@bookmarketel.com directly.', 'error');
-  }
+    toast('Message sent! We\'ll reply soon.', 'success');
+    document.getElementById('settings-support-msg').value = '';
+  } catch (e) { toast('Failed to send', 'error'); }
 }
 
-async function saveEditRoom(roomId) {
-  const room = editRooms.find(r => r.id === roomId);
-  if (!room) return;
-  const name = document.getElementById('edit-name-' + roomId).value.trim();
-  const description = document.getElementById('edit-desc-' + roomId).value.trim();
-  const maxOccupancy = parseInt(document.getElementById('edit-occ-' + roomId).value) || 4;
-  const totalUnits = parseInt(document.getElementById('edit-units-' + roomId).value) || 1;
-  const body = { id: roomId, name: name || room.name, description: description || null, amenities: room.amenities, maxOccupancy, totalUnits };
+async function goLive() {
   try {
-    await api('POST', '/api/crm/rooms', body);
-    room.name = body.name;
-    room.description = body.description;
-    room.maxOccupancy = maxOccupancy;
-    room.totalUnits = totalUnits;
-    toast('Room saved!', 'success');
-  } catch (e) {
-    toast('Failed to save', 'error');
-  }
-}
-
-async function uploadEditImages(event, roomId) {
-  const files = Array.from(event.target.files);
-  if (!files.length) return;
-  // Show loading on the room card
-  const card = document.getElementById('edit-card-' + roomId);
-  const imgContainer = card?.querySelector('div:first-child');
-  if (imgContainer) {
-    imgContainer.style.position = 'relative';
-    imgContainer.insertAdjacentHTML('beforeend', '<div id="upload-spinner-' + roomId + '" style="position:absolute;inset:0;background:rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;z-index:5;flex-direction:column;gap:6px;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;"></div><div id="upload-progress-' + roomId + '" style="font-size:12px;color:var(--text-muted);font-weight:600;">0 / ' + files.length + '</div></div>');
-  }
-  let uploaded = 0;
-  for (const file of files) {
-    const fd = new FormData();
-    fd.append('image', file);
-    try {
-      const res = await fetch(`/api/crm/rooms/${roomId}/images`, {
-        method: 'POST',
-        headers: { 'x-crm-token': token },
-        body: fd,
-      });
-      const data = await res.json();
-      if (data.success && data.image) {
-        const room = editRooms.find(r => r.id === roomId);
-        if (room) {
-          if (!room.images) room.images = [];
-          room.images.push(data.image);
-          if (!room.imageUrl) room.imageUrl = data.image.url;
-        }
-        uploaded++;
-      }
-    } catch (e) { /* skip failed */ }
-    // Update progress
-    const prog = document.getElementById('upload-progress-' + roomId);
-    if (prog) prog.textContent = uploaded + ' / ' + files.length;
-  }
-  // Remove spinner
-  const spinner = document.getElementById('upload-spinner-' + roomId);
-  if (spinner) spinner.remove();
-  renderEditRoomsCards();
-  toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added', 'success');
-}
-
-async function deleteEditImage(roomId, imageId) {
-  if (!confirm('Delete this photo?')) return;
-  try {
-    await api('DELETE', `/api/crm/rooms/${roomId}/images/${imageId}`);
-    // Remove from local state
-    const room = editRooms.find(r => r.id === roomId);
-    if (room && room.images) {
-      room.images = room.images.filter(i => i.id !== imageId);
-      room.imageUrl = room.images[0]?.url || null;
+    const res = await api('POST', '/api/crm/go-live');
+    if (res.success && res.url) {
+      window.location.href = res.url;
+    } else {
+      toast(res.message || 'Contact support@bookmarketel.com', 'error');
     }
-    renderEditRoomsCards();
-    toast('Photo deleted', 'success');
   } catch (e) {
-    toast('Failed to delete', 'error');
+    toast('Contact support@bookmarketel.com', 'error');
   }
 }
 
-async function deleteEditRoom(roomId) {
-  if (!confirm('Delete this room type?')) return;
-  try {
-    await api('DELETE', `/api/crm/rooms/${roomId}`);
-    toast('Room deleted', 'success');
-    loadEditRooms();
-  } catch (e) {
-    toast('Failed to delete', 'error');
-  }
-}
-
-function openEditAddRoom() {
-  const list = document.getElementById('editRoomsList');
-  // Check if add form already exists
-  if (document.getElementById('editAddForm')) return;
-  list.insertAdjacentHTML('beforeend', `
-    <div id="editAddForm" class="booking-card" style="margin-bottom:12px; border-color:var(--green);">
-      <div style="padding:16px;">
-        <input type="text" id="editNewRoomName" placeholder="Room type name (e.g. King Suite)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:16px;outline:none;margin-bottom:10px;">
-        <div style="display:flex;gap:8px;">
-          <button onclick="confirmEditAddRoom()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Add</button>
-          <button onclick="document.getElementById('editAddForm').remove()" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--text-muted);">Cancel</button>
-        </div>
-      </div>
-    </div>
-  `);
-  document.getElementById('editNewRoomName').focus();
-}
-
-function confirmEditAddRoom() {
-  const name = document.getElementById('editNewRoomName').value.trim();
-  if (!name) return;
-  api('POST', '/api/crm/rooms', { name, maxOccupancy: 4, totalUnits: 5 })
-    .then(() => { toast('Room added', 'success'); loadEditRooms(); })
-    .catch(() => toast('Failed to add', 'error'));
-}
-
-// ── INIT ───────────────────────────────────────────────
+// â”€â”€ INIT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 bootCrmApp();
@@ -4146,3 +3740,4 @@ setInterval(refreshCurrentView, 30000);
 </script>
 </body>
 </html>
+

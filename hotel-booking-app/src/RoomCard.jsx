@@ -41,13 +41,83 @@ function PhotoUploadButton({ roomId, onPhotosAdded }) {
       display: 'flex', alignItems: 'center', gap: '6px',
       opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto',
     }}>
-      {uploading ? '⏳ Uploading...' : '📷 + Photos'}
+      {uploading ? '⏳ Uploading...' : '📷 Change photos'}
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
     </label>
   );
 }
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded  }) {
+function RoomEditFields({ room, onRoomUpdate, onRoomDelete }) {
+  const [name, setName] = useState(room.name || '');
+  const [description, setDescription] = useState(room.description || '');
+  const [amenities, setAmenities] = useState(room.amenities || '');
+  const [maxOccupancy, setMaxOccupancy] = useState(room.maxOccupancy || 4);
+  const [totalUnits, setTotalUnits] = useState(room.totalUnits || 1);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const token = localStorage.getItem('crmToken') || '';
+    const roomId = room.roomId || room.id;
+    try {
+      await fetch(`${API_BASE_URL}/api/crm/rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+        body: JSON.stringify({ id: roomId, name, description, amenities, maxOccupancy: Number(maxOccupancy), totalUnits: Number(totalUnits) }),
+      });
+      if (onRoomUpdate) onRoomUpdate();
+    } catch (e) { /* silent */ }
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this room type?')) return;
+    const token = localStorage.getItem('crmToken') || '';
+    const roomId = room.roomId || room.id;
+    try {
+      await fetch(`${API_BASE_URL}/api/crm/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: { 'x-crm-token': token },
+      });
+      if (onRoomDelete) onRoomDelete();
+    } catch (e) { /* silent */ }
+  };
+
+  const fieldStyle = {
+    width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1.5px solid #D8E4DC',
+    fontFamily: 'inherit', fontSize: '14px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box',
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Room name" style={{ ...fieldStyle, fontSize: '16px', fontWeight: '700' }} />
+      <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (e.g. Spacious room with king bed)" style={fieldStyle} />
+      <input type="text" value={amenities} onChange={e => setAmenities(e.target.value)} placeholder="Amenities (e.g. Free WiFi • TV • Parking)" style={fieldStyle} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: '#6B7D72', marginBottom: '3px' }}>Max Guests</div>
+          <input type="number" value={maxOccupancy} onChange={e => setMaxOccupancy(e.target.value)} min="1" max="20" style={{ ...fieldStyle, marginBottom: 0 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: '#6B7D72', marginBottom: '3px' }}>Total Units</div>
+          <input type="number" value={totalUnits} onChange={e => setTotalUnits(e.target.value)} min="1" max="200" style={{ ...fieldStyle, marginBottom: 0 }} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={handleSave} disabled={saving} style={{
+          flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#2E7D5B',
+          color: 'white', fontFamily: 'inherit', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+        }}>{saving ? 'Saving...' : 'Save Room'}</button>
+        <button onClick={handleDelete} style={{
+          padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #D8E4DC', background: 'none',
+          color: '#6B7D72', fontFamily: 'inherit', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+        }}>Delete</button>
+      </div>
+    </div>
+  );
+}
+
+function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded, onRoomUpdate, onRoomDelete  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   console.log('isProcessing in RoomCard:', isProcessing);
@@ -173,13 +243,20 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
       <div className="room-details">
         {/* Header */}
         <div className="room-header">
-          <div>
-            <h3>{room.name}</h3>
-            <p className="room-subtitle">{room.description || 'Spacious • Fully Furnished'}</p>
+          <div style={{ width: '100%' }}>
+            {isEditMode ? (
+              <RoomEditFields room={room} onRoomUpdate={onRoomUpdate} onRoomDelete={onRoomDelete} />
+            ) : (
+              <>
+                <h3>{room.name}</h3>
+                <p className="room-subtitle">{room.description || 'Spacious • Fully Furnished'}</p>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Amenities Grid */}
+        {/* Amenities Grid - hide in edit mode (editable in RoomEditFields) */}
+        {!isEditMode && (
         <div className="amenities-grid">
           {amenityList.map((amenity, idx) => (
             <div key={idx} className="amenity-item">
@@ -190,6 +267,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             </div>
           ))}
         </div>
+        )}
 
         {/* Selected Dates Display */}
         {nights > 0 && checkinDate && checkoutDate && (

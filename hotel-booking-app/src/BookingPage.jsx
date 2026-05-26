@@ -52,35 +52,23 @@ function EditableField({ value, onChange, tag: Tag = 'p', className, style, plac
 }
 
 // ── Owner Edit Banner (replaces old tour guide) ────────────────
-function OwnerEditBanner({ isEditMode, onToggleEdit, onGoToFrontDesk }) {
+function OwnerEditBanner({ onGoToFrontDesk }) {
   return (
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-      background: isEditMode ? '#2E7D5B' : '#1a1a2e', color: 'white', padding: '10px 16px',
+      background: '#1a1a2e', color: 'white', padding: '10px 16px',
       paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-      transition: 'background 0.2s',
     }}>
       <div>
-        <div style={{ fontSize: '13px', fontWeight: '600' }}>
-          {isEditMode ? '✏️ Editing — tap any field' : '✏️ Change photos & customize'}
-        </div>
+        <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Tap any field to edit</div>
         <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
       </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button onClick={onToggleEdit} style={{
-          background: isEditMode ? 'white' : '#2E7D5B', color: isEditMode ? '#2E7D5B' : 'white',
-          border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
-          fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
-        }}>{isEditMode ? 'Done' : 'Edit'}</button>
-        {!isEditMode && (
-          <button onClick={onGoToFrontDesk} style={{
-            background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.3)',
-            padding: '8px 12px', borderRadius: '8px', fontFamily: 'inherit',
-            fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap'
-          }}>Front Desk</button>
-        )}
-      </div>
+      <button onClick={onGoToFrontDesk} style={{
+        background: '#2E7D5B', color: 'white',
+        border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
+        fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
+      }}>Bookings & Calendar →</button>
     </div>
   );
 }
@@ -250,6 +238,61 @@ function SaveBar({ saving, onSave }) {
   );
 }
 
+// ── Add Room Button ────────────────────────────────────────────
+function AddRoomButton() {
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const handleAdd = async () => {
+    if (!name.trim()) return;
+    setAdding(true);
+    const token = localStorage.getItem('crmToken') || '';
+    try {
+      await fetch(`${API_BASE_URL}/api/crm/rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+        body: JSON.stringify({ name: name.trim(), maxOccupancy: 4, totalUnits: 5 }),
+      });
+      window.location.reload();
+    } catch (e) { /* silent */ }
+    setAdding(false);
+  };
+
+  if (!showForm) {
+    return (
+      <button onClick={() => setShowForm(true)} style={{
+        width: '100%', padding: '16px', borderRadius: '14px', border: '2px dashed #D8E4DC',
+        background: 'none', fontFamily: 'inherit', fontSize: '14px', fontWeight: '600',
+        color: '#6B7D72', cursor: 'pointer', marginTop: '12px',
+      }}>+ Add room type</button>
+    );
+  }
+
+  return (
+    <div style={{
+      width: '100%', padding: '16px', borderRadius: '14px', border: '2px solid #D8E4DC',
+      background: 'white', marginTop: '12px',
+    }}>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Room name (e.g. King Suite)"
+        onKeyDown={e => e.key === 'Enter' && handleAdd()}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #D8E4DC', fontFamily: 'inherit', fontSize: '15px', outline: 'none', marginBottom: '10px', boxSizing: 'border-box' }}
+        autoFocus
+      />
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button onClick={handleAdd} disabled={adding} style={{
+          flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#2E7D5B',
+          color: 'white', fontFamily: 'inherit', fontSize: '14px', fontWeight: '700', cursor: 'pointer',
+        }}>{adding ? 'Adding...' : 'Add'}</button>
+        <button onClick={() => setShowForm(false)} style={{
+          padding: '10px 16px', borderRadius: '8px', border: '1.5px solid #D8E4DC', background: 'none',
+          fontFamily: 'inherit', fontSize: '14px', color: '#6B7D72', cursor: 'pointer',
+        }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main BookingPage ───────────────────────────────────────────
 function BookingPage({ 
   hotel,
@@ -277,7 +320,8 @@ function BookingPage({
 
   // Owner detection
   const isOwner = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Owners are always in edit mode — no toggle needed
+  const isEditMode = isOwner;
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -405,9 +449,13 @@ function BookingPage({
                     checkoutDate={checkoutDate}
                     isEditMode={isEditMode}
                     onPhotosAdded={handlePhotosAdded}
+                    onRoomUpdate={() => window.location.reload()}
+                    onRoomDelete={() => window.location.reload()}
                   />
                 );
               })}
+              {/* Add Room button in edit mode */}
+              {isEditMode && <AddRoomButton />}
             </div>
           ) : hotel.rooms && hotel.rooms.length > 0 ? (
             <div style={{textAlign: 'center', padding: '40px 20px'}}>
@@ -435,8 +483,6 @@ function BookingPage({
       {/* Owner bottom banner */}
       {isOwner && (
         <OwnerEditBanner
-          isEditMode={isEditMode}
-          onToggleEdit={() => { setIsEditMode(!isEditMode); if (isEditMode && dirty) handleSave(); }}
           onGoToFrontDesk={() => { window.location.href = '/frontdesk'; }}
         />
       )}

@@ -38,6 +38,53 @@ const ELEMENT_OPTIONS = {
 };
 
 // This is the main component that controls the multi-step flow.
+
+// Editable banner for owners
+function EditableBanner({ hotel, apiBaseUrl }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(hotel.cancellationPolicy || '');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const token = localStorage.getItem('crmToken') || '';
+    const base = apiBaseUrl || '';
+    try {
+      await fetch(`${base}/api/crm/hotel-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+        body: JSON.stringify({ cancellationPolicy: value }),
+      });
+    } catch (e) { /* silent */ }
+    setSaving(false);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <span onClick={() => setEditing(true)} style={{ cursor: 'pointer', borderBottom: '1.5px dashed #10b981', paddingBottom: '1px' }} title="Tap to edit banner">
+        {value || 'Tap to set your cancellation policy / banner text'}
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+      <input ref={inputRef} type="text" value={value} onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+        placeholder="e.g. Free cancellation up to 7 days before arrival"
+        style={{ flex: 1, border: 'none', borderBottom: '2px solid #10b981', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', padding: '2px 0' }}
+      />
+      <button onClick={handleSave} disabled={saving} style={{ background: '#10b981', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
+        {saving ? '...' : '✓'}
+      </button>
+    </span>
+  );
+}
+
 function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, clientSecret }) {
     // Add this at the very top of your component, before any other code
     const isPreviewMode = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('preview') || window !== window.parent);
@@ -1476,7 +1523,13 @@ const handlePayLaterBooking = async (e) => {
                 </button>
                 
                 <div className="static-banner">
-                    {hotel.cancellationPolicy || <>✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!</>}
+                    {(() => {
+                      const isOwner = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
+                      if (isOwner) {
+                        return <EditableBanner hotel={hotel} apiBaseUrl={apiBaseUrl} />;
+                      }
+                      return hotel.cancellationPolicy || <>✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!</>;
+                    })()}
                 </div>
             </div>
             
