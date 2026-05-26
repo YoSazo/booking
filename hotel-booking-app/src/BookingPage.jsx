@@ -52,7 +52,7 @@ function EditableField({ value, onChange, onDirty, tag: Tag = 'p', className, st
 }
 
 // ── Owner Edit Banner ────────────────────────────────────────
-function OwnerEditBanner({ onGoToFrontDesk, dirty, saving, onSave }) {
+function OwnerEditBanner({ onGoToFrontDesk, dirty, saving, onSave, onExitEditMode }) {
   return (
     <>
       {/* Save bar — fixed above the banner */}
@@ -80,18 +80,25 @@ function OwnerEditBanner({ onGoToFrontDesk, dirty, saving, onSave }) {
           <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Tap any field to edit</div>
           <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
         </div>
-        <button onClick={() => { window.open('/frontdesk', '_blank'); }} style={{
-          background: '#2E7D5B', color: 'white',
-          border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
-          fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
-        }}>Manage Bookings →</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={() => { window.open('/frontdesk', '_blank'); }} style={{
+            background: '#2E7D5B', color: 'white',
+            border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
+            fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
+          }}>Manage Bookings →</button>
+          <button onClick={onExitEditMode} style={{
+            background: 'none', color: 'rgba(255,255,255,0.7)',
+            border: '1px solid rgba(255,255,255,0.3)', padding: '8px 12px', borderRadius: '8px', fontFamily: 'inherit',
+            fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap'
+          }}>Exit</button>
+        </div>
       </div>
     </>
   );
 }
 
 // ── Owner Pencil Button (for non-owners / PIN entry) ───────────
-function OwnerPencilButton({ isOwner }) {
+function OwnerPencilButton({ isOwner, onReenterEditMode }) {
   const [showModal, setShowModal] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -140,14 +147,23 @@ function OwnerPencilButton({ isOwner }) {
     setLoading(false);
   };
 
-  // If owner, don't show pencil (they get the edit banner instead)
+  // If owner is in edit mode, don't show pencil (they get the edit banner instead)
   if (isOwner) return null;
+
+  // If owner exited edit mode but still has token, clicking pencil re-enters edit mode
+  const hasToken = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
 
   return (
     <>
       <button
         className="owner-pencil-btn"
-        onClick={() => { setShowModal(true); setError(''); setPin(''); }}
+        onClick={() => {
+          if (hasToken && onReenterEditMode) {
+            onReenterEditMode();
+          } else {
+            setShowModal(true); setError(''); setPin('');
+          }
+        }}
         aria-label="Owner access"
         title="Owner access"
       >
@@ -271,7 +287,8 @@ function AddRoomButton({ hotelId }) {
       <button onClick={() => setShowForm(true)} style={{
         width: '100%', padding: '16px', borderRadius: '14px', border: '2px dashed #D8E4DC',
         background: 'none', fontFamily: 'inherit', fontSize: '14px', fontWeight: '600',
-        color: '#6B7D72', cursor: 'pointer', marginTop: '12px', boxSizing: 'border-box',
+        color: '#6B7D72', cursor: 'pointer', marginTop: '12px', marginBottom: '24px', boxSizing: 'border-box',
+        gridColumn: '1 / -1',
       }}>+ Add room type</button>
     );
   }
@@ -279,7 +296,8 @@ function AddRoomButton({ hotelId }) {
   return (
     <div style={{
       width: '100%', padding: '16px', borderRadius: '14px', border: '2px solid #D8E4DC',
-      background: 'white', marginTop: '12px', boxSizing: 'border-box',
+      background: 'white', marginTop: '12px', marginBottom: '24px', boxSizing: 'border-box',
+      gridColumn: '1 / -1',
     }}>
       <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Room name (e.g. King Suite)"
         onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -326,12 +344,19 @@ function BookingPage({
   useEffect(() => { trackPageView(); }, []);
   useEffect(() => { setIsProcessingBooking(false); }, []);
 
-  // Owner detection
-  const isOwner = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
+  // Owner detection — use state so we can toggle edit mode off
+  const [isOwner, setIsOwner] = useState(!!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner')));
+  const [showPencilTooltip, setShowPencilTooltip] = useState(false);
   // Owners are always in edit mode — no toggle needed
   const isEditMode = isOwner;
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Exit edit mode: hide owner UI, show pencil tooltip
+  const handleExitEditMode = () => {
+    setIsOwner(false);
+    setShowPencilTooltip(true);
+  };
 
   // Editable hotel fields
   const [editName, setEditName] = useState(hotel.name);
@@ -384,7 +409,7 @@ function BookingPage({
       <div className="container" style={isOwner ? { paddingBottom: '80px' } : undefined}>
         <header className="header" style={{ position: 'relative' }}>
           {/* Pencil for non-owners */}
-          <OwnerPencilButton isOwner={isOwner} />
+          <OwnerPencilButton isOwner={isOwner} onReenterEditMode={() => setIsOwner(true)} />
 
           {isEditMode ? (
             <>
@@ -502,7 +527,34 @@ function BookingPage({
           saving={saving}
           onSave={handleUniversalSave}
           onGoToFrontDesk={() => { window.location.href = '/frontdesk'; }}
+          onExitEditMode={handleExitEditMode}
         />
+      )}
+
+      {/* Pencil tooltip modal — shown after exiting edit mode */}
+      {showPencilTooltip && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+        }} onClick={() => setShowPencilTooltip(false)}>
+          <div style={{
+            background: 'white', borderRadius: '16px', padding: '24px', maxWidth: '280px',
+            width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>✏️</div>
+            <p style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e', marginBottom: '6px' }}>
+              Tap the pencil anytime to edit
+            </p>
+            <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '16px', lineHeight: '1.4' }}>
+              It's in the top-right corner of your booking page.
+            </p>
+            <button onClick={() => setShowPencilTooltip(false)} style={{
+              width: '100%', padding: '12px', borderRadius: '10px', border: 'none',
+              background: '#1a1a2e', color: 'white', fontFamily: 'inherit',
+              fontSize: '14px', fontWeight: '700', cursor: 'pointer',
+            }}>Got it</button>
+          </div>
+        </div>
       )}
     </>
   );
