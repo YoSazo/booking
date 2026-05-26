@@ -80,7 +80,7 @@ function OwnerEditBanner({ onGoToFrontDesk, dirty, saving, onSave }) {
           <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Tap any field to edit</div>
           <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
         </div>
-        <button onClick={onGoToFrontDesk} style={{
+        <button onClick={() => { window.open('/frontdesk', '_blank'); }} style={{
           background: '#2E7D5B', color: 'white',
           border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
           fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
