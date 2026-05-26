@@ -495,8 +495,8 @@ function BookingPage({
         </main>
       </div>
 
-      {/* Owner bottom banner */}
-      {isOwner && (
+      {/* Owner bottom banner — hide when calendar is open */}
+      {isOwner && !isCalendarOpen && (
         <OwnerEditBanner
           dirty={dirty}
           saving={saving}
