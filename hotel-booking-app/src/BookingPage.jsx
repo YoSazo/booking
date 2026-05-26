@@ -347,6 +347,29 @@ function BookingPage({
   // Owner detection — use state so we can toggle edit mode off
   const [isOwner, setIsOwner] = useState(!!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner')));
   const [showPencilTooltip, setShowPencilTooltip] = useState(false);
+
+  // Process ?welcome and ?pin URL params to activate edit mode on first visit
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pinParam = params.get('pin');
+    let shouldActivate = false;
+    if (pinParam) {
+      try { localStorage.setItem('crmToken', pinParam); localStorage.setItem('isOwner', '1'); } catch(e) {}
+      shouldActivate = true;
+    }
+    if (params.has('welcome')) {
+      try { localStorage.setItem('isOwner', '1'); } catch(e) {}
+      shouldActivate = true;
+    }
+    if (shouldActivate) {
+      setIsOwner(true);
+      const url = new URL(window.location);
+      url.searchParams.delete('pin');
+      url.searchParams.delete('welcome');
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
+
   // Owners are always in edit mode — no toggle needed
   const isEditMode = isOwner;
   const [dirty, setDirty] = useState(false);
