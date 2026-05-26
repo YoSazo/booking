@@ -573,7 +573,7 @@ const handleConfirmBooking = async (bookingDetails) => {
                 isProcessingBooking={isProcessingBooking}
                 setIsProcessingBooking={setIsProcessingBooking}
                 onHotelUpdate={(updates) => setCurrentHotel(prev => ({ ...prev, ...updates }))}
-              />
+                hotelId={hotelId}              />
           } />
 
           <Route path="/guest-info" element={

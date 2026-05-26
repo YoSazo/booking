@@ -56,7 +56,7 @@ function EditableBanner({ hotel, apiBaseUrl }) {
       await fetch(`${base}/api/crm/hotel-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
-        body: JSON.stringify({ cancellationPolicy: value }),
+        body: JSON.stringify({ cancellationPolicy: value, hotelId }),
       });
     } catch (e) { /* silent */ }
     setSaving(false);

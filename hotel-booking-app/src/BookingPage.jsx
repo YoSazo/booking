@@ -10,7 +10,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
 );
 
 // ── Inline Editable Field ──────────────────────────────────────
-function EditableField({ value, onChange, tag: Tag = 'p', className, style, placeholder }) {
+function EditableField({ value, onChange, onDirty, tag: Tag = 'p', className, style, placeholder }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef(null);
@@ -36,7 +36,7 @@ function EditableField({ value, onChange, tag: Tag = 'p', className, style, plac
       ref={inputRef}
       type="text"
       value={draft}
-      onChange={e => setDraft(e.target.value)}
+      onChange={e => { setDraft(e.target.value); if (onDirty) onDirty(); }}
       onBlur={() => { setEditing(false); if (draft !== value) onChange(draft); }}
       onKeyDown={e => { if (e.key === 'Enter') { setEditing(false); if (draft !== value) onChange(draft); } }}
       placeholder={placeholder}
@@ -51,25 +51,42 @@ function EditableField({ value, onChange, tag: Tag = 'p', className, style, plac
   );
 }
 
-// ── Owner Edit Banner (replaces old tour guide) ────────────────
-function OwnerEditBanner({ onGoToFrontDesk }) {
+// ── Owner Edit Banner ────────────────────────────────────────
+function OwnerEditBanner({ onGoToFrontDesk, dirty, saving, onSave }) {
   return (
-    <div style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-      background: '#1a1a2e', color: 'white', padding: '10px 16px',
-      paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-    }}>
-      <div>
-        <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Tap any field to edit</div>
-        <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
+    <>
+      {/* Save bar — fixed above the banner */}
+      <div style={{
+        position: 'fixed', bottom: 'calc(54px + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, zIndex: 9999,
+        background: dirty ? '#2E7D5B' : '#22543d', padding: '10px 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background 0.2s',
+      }}>
+        <button onClick={onSave} disabled={!dirty || saving} style={{
+          background: dirty ? 'white' : 'rgba(255,255,255,0.3)', color: dirty ? '#2E7D5B' : 'rgba(255,255,255,0.5)',
+          border: 'none', padding: '12px 24px', borderRadius: '10px', fontFamily: 'inherit',
+          fontSize: '15px', fontWeight: '700', cursor: dirty ? 'pointer' : 'default', whiteSpace: 'nowrap',
+          width: '100%', maxWidth: '320px', transition: 'all 0.2s',
+        }}>{saving ? 'Saving...' : dirty ? 'Save Changes' : 'All saved ✓'}</button>
       </div>
-      <button onClick={onGoToFrontDesk} style={{
-        background: '#2E7D5B', color: 'white',
-        border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
-        fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
-      }}>Bookings & Calendar →</button>
-    </div>
+      {/* Bottom banner */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+        background: '#1a1a2e', color: 'white', padding: '10px 16px',
+        paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+      }}>
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: '600' }}>✏️ Tap any field to edit</div>
+          <div style={{ fontSize: '10px', opacity: 0.6 }}>Only you see this</div>
+        </div>
+        <button onClick={onGoToFrontDesk} style={{
+          background: '#2E7D5B', color: 'white',
+          border: 'none', padding: '8px 14px', borderRadius: '8px', fontFamily: 'inherit',
+          fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap'
+        }}>Manage Bookings →</button>
+      </div>
+    </>
   );
 }
 
@@ -219,27 +236,9 @@ function PhotoUploadOverlay({ roomId, onPhotosAdded }) {
   );
 }
 
-// ── Floating Save Bar ──────────────────────────────────────────
-function SaveBar({ saving, onSave }) {
-  return (
-    <div style={{
-      position: 'fixed', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 10000,
-      background: '#2E7D5B', color: 'white', padding: '10px 20px', borderRadius: '12px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '10px',
-      fontSize: '14px', fontWeight: '600', fontFamily: 'inherit',
-      animation: 'slideDown 0.2s ease',
-    }}>
-      <span>Unsaved changes</span>
-      <button onClick={onSave} disabled={saving} style={{
-        background: 'white', color: '#2E7D5B', border: 'none', padding: '6px 14px',
-        borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-      }}>{saving ? 'Saving...' : 'Save'}</button>
-    </div>
-  );
-}
 
 // ── Add Room Button ────────────────────────────────────────────
-function AddRoomButton() {
+function AddRoomButton({ hotelId }) {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [adding, setAdding] = useState(false);
@@ -249,14 +248,22 @@ function AddRoomButton() {
     setAdding(true);
     const token = localStorage.getItem('crmToken') || '';
     try {
-      await fetch(`${API_BASE_URL}/api/crm/rooms`, {
+      const res = await fetch(`${API_BASE_URL}/api/crm/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
-        body: JSON.stringify({ name: name.trim(), maxOccupancy: 4, totalUnits: 5 }),
+        body: JSON.stringify({ name: name.trim(), maxOccupancy: 4, totalUnits: 1, hotelId }),
       });
-      window.location.reload();
-    } catch (e) { /* silent */ }
-    setAdding(false);
+      const data = await res.json();
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert(data.message || 'Failed to add room. Name might already exist.');
+        setAdding(false);
+      }
+    } catch (e) { 
+      alert('Failed to add room');
+      setAdding(false);
+    }
   };
 
   if (!showForm) {
@@ -264,7 +271,7 @@ function AddRoomButton() {
       <button onClick={() => setShowForm(true)} style={{
         width: '100%', padding: '16px', borderRadius: '14px', border: '2px dashed #D8E4DC',
         background: 'none', fontFamily: 'inherit', fontSize: '14px', fontWeight: '600',
-        color: '#6B7D72', cursor: 'pointer', marginTop: '12px',
+        color: '#6B7D72', cursor: 'pointer', marginTop: '12px', boxSizing: 'border-box',
       }}>+ Add room type</button>
     );
   }
@@ -272,7 +279,7 @@ function AddRoomButton() {
   return (
     <div style={{
       width: '100%', padding: '16px', borderRadius: '14px', border: '2px solid #D8E4DC',
-      background: 'white', marginTop: '12px',
+      background: 'white', marginTop: '12px', boxSizing: 'border-box',
     }}>
       <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Room name (e.g. King Suite)"
         onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -314,6 +321,7 @@ function BookingPage({
   isProcessingBooking,
   setIsProcessingBooking,
   onHotelUpdate,
+  hotelId,
 }) {
   useEffect(() => { trackPageView(); }, []);
   useEffect(() => { setIsProcessingBooking(false); }, []);
@@ -337,22 +345,30 @@ function BookingPage({
     setEditAddress(hotel.address);
   }, [hotel.name, hotel.subtitle, hotel.address]);
 
-  const markDirty = (setter) => (val) => { setter(val); setDirty(true); };
+  // Auto-save hotel info on field change (marks dirty, actual save on button)
+  const saveHotelField = (updates) => {
+    setDirty(true);
+  };
 
-  const handleSave = async () => {
+  // Universal save — saves hotel info + all room data
+  const handleUniversalSave = async () => {
     setSaving(true);
     const token = localStorage.getItem('crmToken') || '';
     try {
+      // Save hotel info
       await fetch(`${API_BASE_URL}/api/crm/hotel-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
-        body: JSON.stringify({ name: editName, subtitle: editSubtitle, address: editAddress }),
+        body: JSON.stringify({ name: editName, subtitle: editSubtitle, address: editAddress, hotelId }),
       });
-      setDirty(false);
-      // Update parent state if callback provided
       if (onHotelUpdate) onHotelUpdate({ name: editName, subtitle: editSubtitle, address: editAddress });
     } catch (e) { /* silent */ }
+    // Trigger room saves via event
+    window.dispatchEvent(new CustomEvent('saveAllRooms'));
+    // Small delay to let room saves complete
+    await new Promise(r => setTimeout(r, 500));
     setSaving(false);
+    setDirty(false);
   };
 
   const handlePhotosAdded = (roomId, newImages) => {
@@ -365,9 +381,6 @@ function BookingPage({
 
   return (
     <>
-      {/* Floating save bar */}
-      {dirty && <SaveBar saving={saving} onSave={handleSave} />}
-
       <div className="container" style={isOwner ? { paddingBottom: '80px' } : undefined}>
         <header className="header" style={{ position: 'relative' }}>
           {/* Pencil for non-owners */}
@@ -375,9 +388,9 @@ function BookingPage({
 
           {isEditMode ? (
             <>
-              <EditableField value={editAddress} onChange={markDirty(setEditAddress)} tag="p" className="header-address" placeholder="Add address" style={{ fontSize: '13px', color: '#6b7280' }} />
-              <EditableField value={editName} onChange={markDirty(setEditName)} tag="h1" placeholder="Hotel name" style={{ fontSize: '24px', fontWeight: '700' }} />
-              <EditableField value={editSubtitle} onChange={markDirty(setEditSubtitle)} tag="p" placeholder="Add a subtitle or slogan" style={{ fontSize: '14px', color: '#555' }} />
+              <EditableField value={editAddress} onChange={(val) => { setEditAddress(val); setDirty(true); }} onDirty={() => setDirty(true)} tag="p" className="header-address" placeholder="Add address" style={{ fontSize: '13px', color: '#6b7280' }} />
+              <EditableField value={editName} onChange={(val) => { setEditName(val); setDirty(true); }} onDirty={() => setDirty(true)} tag="h1" placeholder="Hotel name" style={{ fontSize: '24px', fontWeight: '700' }} />
+              <EditableField value={editSubtitle} onChange={(val) => { setEditSubtitle(val); setDirty(true); }} onDirty={() => setDirty(true)} tag="p" placeholder="Add a subtitle or slogan" style={{ fontSize: '14px', color: '#555' }} />
             </>
           ) : (
             <>
@@ -451,11 +464,13 @@ function BookingPage({
                     onPhotosAdded={handlePhotosAdded}
                     onRoomUpdate={() => window.location.reload()}
                     onRoomDelete={() => window.location.reload()}
+                    hotelId={hotelId}
+                    onDirty={() => setDirty(true)}
                   />
                 );
               })}
               {/* Add Room button in edit mode */}
-              {isEditMode && <AddRoomButton />}
+              {isEditMode && <AddRoomButton hotelId={hotelId} />}
             </div>
           ) : hotel.rooms && hotel.rooms.length > 0 ? (
             <div style={{textAlign: 'center', padding: '40px 20px'}}>
@@ -483,6 +498,9 @@ function BookingPage({
       {/* Owner bottom banner */}
       {isOwner && (
         <OwnerEditBanner
+          dirty={dirty}
+          saving={saving}
+          onSave={handleUniversalSave}
           onGoToFrontDesk={() => { window.location.href = '/frontdesk'; }}
         />
       )}

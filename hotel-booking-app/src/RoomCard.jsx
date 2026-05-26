@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Wifi, Tv, Refrigerator, Briefcase, Bath, Car, Sparkles, Users, PawPrint, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Wifi, Tv, Refrigerator, Briefcase, Bath, Car, Sparkles, Users, PawPrint, ChevronLeft, ChevronRight, Waves, Wind, Shirt, CookingPot, Laptop } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -7,7 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     : ''
 );
 
-function PhotoUploadButton({ roomId, onPhotosAdded }) {
+function PhotoUploadButton({ roomId, onPhotosAdded, hotelId }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -21,7 +21,10 @@ function PhotoUploadButton({ roomId, onPhotosAdded }) {
       const fd = new FormData();
       fd.append('image', file);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/crm/rooms/${roomId}/images`, {
+        const url = hotelId 
+          ? `${API_BASE_URL}/api/crm/rooms/${roomId}/images?hotelId=${encodeURIComponent(hotelId)}`
+          : `${API_BASE_URL}/api/crm/rooms/${roomId}/images`;
+        const res = await fetch(url, {
           method: 'POST', headers: { 'x-crm-token': token }, body: fd,
         });
         const data = await res.json();
@@ -47,35 +50,128 @@ function PhotoUploadButton({ roomId, onPhotosAdded }) {
   );
 }
 
-function RoomEditFields({ room, onRoomUpdate, onRoomDelete }) {
-  const [name, setName] = useState(room.name || '');
-  const [description, setDescription] = useState(room.description || '');
-  const [amenities, setAmenities] = useState(room.amenities || '');
-  const [maxOccupancy, setMaxOccupancy] = useState(room.maxOccupancy || 4);
-  const [totalUnits, setTotalUnits] = useState(room.totalUnits || 1);
+function AmenityPickerModal({ room, hotelId, onDone }) {
+  const currentAmenities = (room.amenities || '').split(/\s*[\u2022\u2023\u25E6•]\s*/).map(a => a.trim()).filter(Boolean);
+  const [selected, setSelected] = useState(currentAmenities);
+  const [customAmenity, setCustomAmenity] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
+  const PRESETS = [
+    { key: 'wifi', label: 'Free WiFi', icon: Wifi },
+    { key: 'tv', label: 'Smart TV', icon: Tv },
+    { key: 'fridge', label: 'Fridge', icon: Refrigerator },
+    { key: 'parking', label: 'Free Parking', icon: Car },
+    { key: 'housekeeping', label: 'Weekly Housekeeping', icon: Sparkles },
+    { key: 'bath', label: 'Bath', icon: Bath },
+    { key: 'workstation', label: 'Workstation', icon: Laptop },
+    { key: 'pet', label: 'Pet Friendly', icon: PawPrint },
+    { key: 'pool', label: 'Pool', icon: Waves },
+    { key: 'kitchen', label: 'Kitchenette', icon: CookingPot },
+    { key: 'ac', label: 'Air Conditioning', icon: Wind },
+    { key: 'laundry', label: 'Laundry', icon: Shirt },
+  ];
+
+  const isActive = (key) => selected.some(a => a.toLowerCase().includes(key));
+
+  const toggle = (label) => {
+    if (selected.some(a => a.toLowerCase() === label.toLowerCase())) {
+      setSelected(selected.filter(a => a.toLowerCase() !== label.toLowerCase()));
+    } else {
+      setSelected([...selected, label]);
+    }
+  };
+
+  const addCustom = () => {
+    if (!customAmenity.trim()) return;
+    setSelected([...selected, customAmenity.trim()]);
+    setCustomAmenity('');
+  };
+
+  const handleDone = async () => {
     setSaving(true);
     const token = localStorage.getItem('crmToken') || '';
     const roomId = room.roomId || room.id;
+    const newAmenities = selected.join(' • ');
     try {
       await fetch(`${API_BASE_URL}/api/crm/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
-        body: JSON.stringify({ id: roomId, name, description, amenities, maxOccupancy: Number(maxOccupancy), totalUnits: Number(totalUnits) }),
+        body: JSON.stringify({ id: roomId, name: room.name, amenities: newAmenities, hotelId }),
       });
-      if (onRoomUpdate) onRoomUpdate();
     } catch (e) { /* silent */ }
     setSaving(false);
+    onDone(newAmenities);
   };
 
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={handleDone}>
+      <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '360px', padding: '20px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '14px' }}>Add Amenities</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+          {PRESETS.map(p => (
+            <button key={p.key} type="button" onClick={() => toggle(p.label)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
+              border: `1.5px solid ${isActive(p.key) ? '#2E7D5B' : '#e5e7eb'}`,
+              background: isActive(p.key) ? '#E8F5EE' : 'white',
+              color: isActive(p.key) ? '#2E7D5B' : '#1a1a2e',
+            }}><p.icon size={14} /> {p.label}</button>
+          ))}
+        </div>
+        <div style={{ position: 'relative', marginBottom: '14px' }}>
+          <input type="text" value={customAmenity} onChange={e => setCustomAmenity(e.target.value)} placeholder="Type your own..." onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+            style={{ width: '100%', padding: '10px 60px 10px 12px', borderRadius: '8px', border: '1.5px solid #D8E4DC', fontFamily: 'inherit', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+          <button type="button" onClick={addCustom} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#2E7D5B', color: 'white', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>Add</button>
+        </div>
+        {/* Show current selected as pills */}
+        {selected.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+            {selected.map((a, i) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#E8F5EE', color: '#2E7D5B', padding: '5px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
+                {a}
+                <button type="button" onClick={() => setSelected(selected.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: '#2E7D5B', cursor: 'pointer', fontSize: '14px', padding: 0, lineHeight: 1 }}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={handleDone} disabled={saving} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#1a1a2e', color: 'white', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>{saving ? 'Saving...' : 'Done'}</button>
+      </div>
+    </div>
+  );
+}
+
+function RoomEditFields({ room, onRoomUpdate, onRoomDelete, hotelId, onDirty }) {
+  const [name, setName] = useState(room.name || '');
+  const [description, setDescription] = useState(room.description || '');
+  const [maxOccupancy, setMaxOccupancy] = useState(room.maxOccupancy || 4);
+  const [totalUnits, setTotalUnits] = useState(room.totalUnits || 1);
+
+  // Listen for universal save event
+  useEffect(() => {
+    const handleSaveAll = async () => {
+      const token = localStorage.getItem('crmToken') || '';
+      const roomId = room.roomId || room.id;
+      try {
+        await fetch(`${API_BASE_URL}/api/crm/rooms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+          body: JSON.stringify({ id: roomId, name, description, maxOccupancy: Number(maxOccupancy), totalUnits: Number(totalUnits), hotelId }),
+        });
+      } catch (e) { /* silent */ }
+    };
+    window.addEventListener('saveAllRooms', handleSaveAll);
+    return () => window.removeEventListener('saveAllRooms', handleSaveAll);
+  });
+
+  const markDirty = (setter) => (e) => { setter(e.target.value); if (onDirty) onDirty(); };
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const handleDelete = async () => {
-    if (!confirm('Delete this room type?')) return;
     const token = localStorage.getItem('crmToken') || '';
     const roomId = room.roomId || room.id;
     try {
-      await fetch(`${API_BASE_URL}/api/crm/rooms/${roomId}`, {
+      await fetch(`${API_BASE_URL}/api/crm/rooms/${roomId}?hotelId=${encodeURIComponent(hotelId || '')}`, {
         method: 'DELETE',
         headers: { 'x-crm-token': token },
       });
@@ -90,36 +186,45 @@ function RoomEditFields({ room, onRoomUpdate, onRoomDelete }) {
 
   return (
     <div style={{ width: '100%' }}>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Room name" style={{ ...fieldStyle, fontSize: '16px', fontWeight: '700' }} />
-      <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (e.g. Spacious room with king bed)" style={fieldStyle} />
-      <input type="text" value={amenities} onChange={e => setAmenities(e.target.value)} placeholder="Amenities (e.g. Free WiFi • TV • Parking)" style={fieldStyle} />
+      <input type="text" value={name} onChange={markDirty(setName)} placeholder="Room name" style={{ ...fieldStyle, fontSize: '16px', fontWeight: '700' }} />
+      <input type="text" value={description} onChange={markDirty(setDescription)} placeholder="Description (e.g. Spacious room with king bed)" style={fieldStyle} />
+      
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: '600', color: '#6B7D72', marginBottom: '3px' }}>Max Guests</div>
-          <input type="number" value={maxOccupancy} onChange={e => setMaxOccupancy(e.target.value)} min="1" max="20" style={{ ...fieldStyle, marginBottom: 0 }} />
+          <input type="number" value={maxOccupancy} onChange={markDirty(setMaxOccupancy)} min="1" max="20" style={{ ...fieldStyle, marginBottom: 0 }} />
         </div>
         <div>
           <div style={{ fontSize: '11px', fontWeight: '600', color: '#6B7D72', marginBottom: '3px' }}>Total Units</div>
-          <input type="number" value={totalUnits} onChange={e => setTotalUnits(e.target.value)} min="1" max="200" style={{ ...fieldStyle, marginBottom: 0 }} />
+          <input type="number" value={totalUnits} onChange={markDirty(setTotalUnits)} min="1" max="200" style={{ ...fieldStyle, marginBottom: 0 }} />
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button onClick={handleSave} disabled={saving} style={{
-          flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#2E7D5B',
-          color: 'white', fontFamily: 'inherit', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-        }}>{saving ? 'Saving...' : 'Save Room'}</button>
-        <button onClick={handleDelete} style={{
-          padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #D8E4DC', background: 'none',
-          color: '#6B7D72', fontFamily: 'inherit', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-        }}>Delete</button>
-      </div>
+      <button onClick={() => setShowDeleteConfirm(true)} style={{
+        width: '100%', padding: '10px', borderRadius: '8px', border: '1.5px solid #E05252', background: 'none',
+        color: '#E05252', fontFamily: 'inherit', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+      }}>Delete Room</button>
+
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowDeleteConfirm(false)}>
+          <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '300px', padding: '24px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '8px' }}>Delete {name}?</div>
+            <div style={{ fontSize: '13px', color: '#6B7D72', marginBottom: '16px' }}>This removes the room and its photos. Can't be undone.</div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1.5px solid #D8E4DC', background: 'none', fontFamily: 'inherit', fontSize: '14px', fontWeight: '600', cursor: 'pointer', color: '#6B7D72' }}>Cancel</button>
+              <button onClick={handleDelete} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#E05252', color: 'white', fontFamily: 'inherit', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded, onRoomUpdate, onRoomDelete  }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded, onRoomUpdate, onRoomDelete, hotelId, onDirty  }) {
   console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showAmenityPicker, setShowAmenityPicker] = useState(false);
+  const [localAmenities, setLocalAmenities] = useState(room.amenities || '');
   console.log('isProcessing in RoomCard:', isProcessing);
 
   const displayPayToday = payToday || 0;
@@ -159,9 +264,11 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
   // Extract amenities from room.amenities string
   const getAmenityList = () => {
-    const amenitiesText = (room.amenities || '');
+    const amenitiesText = (localAmenities || '');
     if (!amenitiesText.trim()) {
-      // No amenities at all — show defaults
+      // In edit mode, show nothing so owner can add their own
+      if (isEditMode) return [];
+      // For guests, show defaults
       return [
         { icon: Wifi, label: 'Free WiFi' },
         { icon: Tv, label: 'Smart TV' },
@@ -171,7 +278,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     }
 
     // Split by bullet separator and map each to an icon
-    const items = amenitiesText.split(/\s*[\u2022\u2023\u25E6•]\s*|â€¢/).map(a => a.trim()).filter(Boolean);
+    const items = amenitiesText.split(/\s*[\u2022\u2023\u25E6•]\s*/).map(a => a.trim()).filter(Boolean);
     return items.slice(0, 7).map(item => {
       const lower = item.toLowerCase();
       // Find matching icon
@@ -235,7 +342,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
       )}
 
       {/* Edit mode: photo upload button */}
-      {isEditMode && <PhotoUploadButton roomId={room.roomId || room.id} onPhotosAdded={onPhotosAdded} />}
+      {isEditMode && <PhotoUploadButton roomId={room.roomId || room.id} onPhotosAdded={onPhotosAdded} hotelId={hotelId} />}
     </div>
 
 
@@ -245,7 +352,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
         <div className="room-header">
           <div style={{ width: '100%' }}>
             {isEditMode ? (
-              <RoomEditFields room={room} onRoomUpdate={onRoomUpdate} onRoomDelete={onRoomDelete} />
+              <RoomEditFields room={room} onRoomUpdate={onRoomUpdate} onRoomDelete={onRoomDelete} hotelId={hotelId} onDirty={onDirty} />
             ) : (
               <>
                 <h3>{room.name}</h3>
@@ -255,19 +362,43 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           </div>
         </div>
 
-        {/* Amenities Grid - hide in edit mode (editable in RoomEditFields) */}
-        {!isEditMode && (
+        {/* Amenities Grid */}
         <div className="amenities-grid">
           {amenityList.map((amenity, idx) => (
-            <div key={idx} className="amenity-item">
+            <div key={idx} className="amenity-item" style={{ position: 'relative' }}>
               <div className="amenity-icon-box">
                 <amenity.icon size={18} className="amenity-icon" />
               </div>
               <span className="amenity-label">{amenity.label}</span>
+              {isEditMode && (
+                <button type="button" onClick={() => {
+                  const current = localAmenities.split(/\s*[\u2022\u2023\u25E6•]\s*/).map(a => a.trim()).filter(Boolean);
+                  const updated = current.filter(a => a !== amenity.label);
+                  const newAmenities = updated.join(' • ');
+                  setLocalAmenities(newAmenities);
+                  const token = localStorage.getItem('crmToken') || '';
+                  const roomId = room.roomId || room.id;
+                  fetch(`${API_BASE_URL}/api/crm/rooms`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-crm-token': token },
+                    body: JSON.stringify({ id: roomId, name: room.name, amenities: newAmenities, hotelId }),
+                  });
+                }} style={{ position: 'absolute', top: '-4px', right: '-4px', width: '16px', height: '16px', borderRadius: '50%', background: '#E05252', color: 'white', border: 'none', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+              )}
             </div>
           ))}
+          {isEditMode && (
+            <div className="amenity-item" style={{ cursor: 'pointer' }} onClick={() => setShowAmenityPicker(true)}>
+              <div className="amenity-icon-box" style={{ border: '1.5px dashed #D8E4DC' }}>
+                <span style={{ fontSize: '16px', color: '#6B7D72' }}>+</span>
+              </div>
+              <span className="amenity-label" style={{ color: '#6B7D72' }}>Add</span>
+            </div>
+          )}
         </div>
-        )}
+
+        {/* Amenity Picker Modal (edit mode) */}
+        {isEditMode && showAmenityPicker && <AmenityPickerModal room={{ ...room, amenities: localAmenities }} hotelId={hotelId} onDone={(newAmenities) => { setShowAmenityPicker(false); if (newAmenities !== undefined) setLocalAmenities(newAmenities); }} />}
 
         {/* Selected Dates Display */}
         {nights > 0 && checkinDate && checkoutDate && (

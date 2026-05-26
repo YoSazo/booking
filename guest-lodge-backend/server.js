@@ -802,6 +802,28 @@ async function getManualRooms(hotelId) {
     if (!prisma.manualRoom || !prisma.manualOverride) {
         throw new Error('Manual availability models are missing in Prisma client. Redeploy with prisma generate + prisma migrate deploy.');
     }
+    // Auto-sync: ensure ManualRoom matches Room table (source of truth)
+    try {
+        const realRooms = await prisma.room.findMany({ where: { hotelId }, select: { name: true, totalUnits: true } });
+        const manualRooms = await prisma.manualRoom.findMany({ where: { hotelId }, select: { name: true } });
+        const realNames = new Set(realRooms.map(r => r.name));
+        const manualNames = new Set(manualRooms.map(r => r.name));
+        // Delete ManualRooms that don't exist in Room
+        const toDelete = manualRooms.filter(m => !realNames.has(m.name));
+        if (toDelete.length) {
+            await prisma.manualRoom.deleteMany({ where: { hotelId, name: { in: toDelete.map(r => r.name) } } });
+        }
+        // Create ManualRooms for Rooms that don't have one
+        const toCreate = realRooms.filter(r => !manualNames.has(r.name));
+        for (const r of toCreate) {
+            await prisma.manualRoom.upsert({
+                where: { hotelId_name: { hotelId, name: r.name } },
+                create: { hotelId, name: r.name, totalUnits: r.totalUnits || 1 },
+                update: { totalUnits: r.totalUnits || 1 },
+            });
+        }
+    } catch (e) { /* sync failed silently — continue with what we have */ }
+
     return withRetry(() => prisma.manualRoom.findMany({
         where: { hotelId },
         include: { overrides: true },
@@ -835,6 +857,13 @@ async function getManualAvailability(hotelId, checkin, checkout) {
         },
     }));
     if (!rooms.length) return [];
+
+    // Look up real Room IDs and details by name for inline editing
+    const realRooms = await withRetry(() => prisma.room.findMany({
+        where: { hotelId },
+        select: { id: true, name: true, description: true, amenities: true, maxOccupancy: true, totalUnits: true },
+    }));
+    const roomDetailsByName = Object.fromEntries(realRooms.map(r => [r.name, r]));
 
     const overlapping = await withRetry(() => prisma.booking.findMany({
         where: {
@@ -894,8 +923,14 @@ async function getManualAvailability(hotelId, checkin, checkout) {
         if (availableRooms <= 0) continue;
 
         const slug = slugifyText(roomName) || 'room';
+        const details = roomDetailsByName[roomName] || {};
         out.push({
             roomName,
+            roomId: details.id || null,
+            description: details.description || null,
+            amenities: details.amenities || null,
+            maxOccupancy: details.maxOccupancy || 4,
+            totalUnits: details.totalUnits || room.totalUnits || 1,
             available: true,
             roomsAvailable: availableRooms,
             roomTypeID: `manual-${slug}`,
@@ -4869,6 +4904,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
                 description: r.description,
                 amenities: r.amenities,
                 maxOccupancy: r.maxOccupancy,
+                totalUnits: r.totalUnits,
                 imageUrl: r.images[0]?.url ? resolveImgUrl(r.images[0].url) : 'https://suitestay.clickinns.com/kingbedsuitestay.webp',
                 imageUrls: r.images.length ? r.images.map(img => resolveImgUrl(img.url)) : ['https://suitestay.clickinns.com/kingbedsuitestay.webp'],
             })),
@@ -5267,9 +5303,30 @@ app.delete('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
             prisma.manualRoom.delete({ where: { id: room.id } }),
         ]));
 
+        // Also delete the corresponding Room record (engine)
+        // Must use individual delete (not deleteMany) to trigger cascade on RoomImage
+        let roomDeleteCount = 0;
+        try {
+            const roomsToDelete = await prisma.room.findMany({ where: { hotelId, name: roomName }, select: { id: true } });
+            for (const r of roomsToDelete) {
+                await prisma.room.delete({ where: { id: r.id } });
+                roomDeleteCount++;
+            }
+        } catch (roomDelErr) {
+            // If cascade fails, manually delete images first then room
+            try {
+                const roomsToDelete = await prisma.room.findMany({ where: { hotelId, name: roomName }, select: { id: true } });
+                for (const r of roomsToDelete) {
+                    await prisma.roomImage.deleteMany({ where: { roomId: r.id } });
+                    await prisma.room.delete({ where: { id: r.id } });
+                    roomDeleteCount++;
+                }
+            } catch (e2) { /* give up */ }
+        }
+
         const rooms = await getManualRooms(hotelId);
         const payload = formatManualAvailabilityPayload(rooms);
-        res.json({ success: true, data: payload });
+        res.json({ success: true, data: payload, roomDeleteCount });
     } catch (e) {
         console.error('manual-availability:rooms delete failed:', e.message);
         res.status(500).json({ success: false, message: e.message });
@@ -5380,10 +5437,21 @@ app.post('/api/crm/rooms', crmAuth, async (req, res) => {
 
         let room;
         if (id) {
+            // Get old name before update (for ManualRoom rename sync)
+            const oldRoom = await prisma.room.findUnique({ where: { id }, select: { name: true } });
+            const data = { name };
+            if (description !== undefined) data.description = description || null;
+            if (amenities !== undefined) data.amenities = amenities || null;
+            if (maxOccupancy !== undefined) data.maxOccupancy = maxOccupancy || 4;
+            if (totalUnits !== undefined) data.totalUnits = totalUnits || 1;
             room = await withRetry(() => prisma.room.update({
                 where: { id },
-                data: { name, description: description || null, amenities: amenities || null, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 },
+                data,
             }));
+            // If name changed, delete old ManualRoom
+            if (oldRoom && oldRoom.name !== name) {
+                await prisma.manualRoom.deleteMany({ where: { hotelId, name: oldRoom.name } }).catch(() => {});
+            }
         } else {
             const count = await prisma.room.count({ where: { hotelId } });
             room = await withRetry(() => prisma.room.create({
@@ -5392,16 +5460,18 @@ app.post('/api/crm/rooms', crmAuth, async (req, res) => {
         }
 
         // Sync ManualRoom for availability
+        const syncUnits = totalUnits !== undefined ? (totalUnits || 1) : (room.totalUnits || 1);
         await prisma.manualRoom.upsert({
             where: { hotelId_name: { hotelId, name } },
-            create: { hotelId, name, totalUnits: totalUnits || 1 },
-            update: { totalUnits: totalUnits || 1 },
+            create: { hotelId, name, totalUnits: syncUnits },
+            update: { totalUnits: syncUnits },
         });
 
         res.json({ success: true, room: { id: room.id, name: room.name } });
     } catch (e) {
         console.error('CRM rooms POST error:', e.message);
-        res.status(500).json({ success: false, message: 'Failed to save room' });
+        const msg = e.message?.includes('Unique constraint') ? 'A room with that name already exists' : 'Failed to save room';
+        res.status(500).json({ success: false, message: msg });
     }
 });
 
@@ -5410,7 +5480,13 @@ app.delete('/api/crm/rooms/:roomId', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        // Get room name before deleting (needed to clean up ManualRoom)
+        const room = await prisma.room.findUnique({ where: { id: req.params.roomId }, select: { name: true } });
         await withRetry(() => prisma.room.delete({ where: { id: req.params.roomId } }));
+        // Also delete the corresponding ManualRoom (availability)
+        if (room?.name) {
+            await prisma.manualRoom.deleteMany({ where: { hotelId, name: room.name } }).catch(() => {});
+        }
         res.json({ success: true });
     } catch (e) {
         console.error('CRM rooms DELETE error:', e.message);

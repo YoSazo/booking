@@ -1692,11 +1692,7 @@
   </div>
 
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
-    <button type="button" class="mobile-nav-item active" data-nav-filter="edit" aria-current="page">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="pencil"></i></span>
-      <span class="mobile-nav-label">Edit</span>
-    </button>
-    <button type="button" class="mobile-nav-item" data-nav-filter="bookings">
+    <button type="button" class="mobile-nav-item active" data-nav-filter="bookings" aria-current="page">
       <span class="mobile-nav-icon-wrap"><i data-lucide="inbox"></i></span>
       <span class="mobile-nav-label">Bookings</span>
     </button>
@@ -1707,6 +1703,10 @@
     <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="revenue" id="mobileNavRevenueBtn">
       <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
       <span class="mobile-nav-label">Revenue</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="settings">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
+      <span class="mobile-nav-label">Settings</span>
     </button>
   </nav>
 </div>
@@ -1734,7 +1734,7 @@
 <script>
 let token = '';
 let bookings = [];
-let currentFilter = 'edit';
+let currentFilter = 'bookings';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
@@ -2213,27 +2213,24 @@ function ensureAvailabilityUi() {
     tabs.appendChild(btn);
   }
 
-  // Add Edit tab if not present
-  if (tabs && !tabs.querySelector('[data-nav-filter="edit"]')) {
-    const editBtn = document.createElement('button');
-    editBtn.className = 'tab';
-    editBtn.setAttribute('type', 'button');
-    editBtn.innerHTML = 'Edit';
-    editBtn.dataset.navFilter = 'edit';
-    editBtn.onclick = function () { setFilter('edit', editBtn); };
-    // Insert before availability
-    const availBtn = tabs.querySelector('[data-nav-filter="availability"]');
-    if (availBtn) tabs.insertBefore(editBtn, availBtn);
-    else tabs.appendChild(editBtn);
+  // Add Settings tab if not present
+  if (tabs && !tabs.querySelector('[data-nav-filter="settings"]')) {
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'tab';
+    settingsBtn.setAttribute('type', 'button');
+    settingsBtn.innerHTML = 'Settings';
+    settingsBtn.dataset.navFilter = 'settings';
+    settingsBtn.onclick = function () { setFilter('settings', settingsBtn); };
+    tabs.appendChild(settingsBtn);
   }
 
   const container = document.querySelector('.container');
 
-  // Add Edit view if not present
-  if (container && !document.getElementById('editView')) {
+  // Add Settings view if not present
+  if (container && !document.getElementById('settingsView')) {
     container.insertAdjacentHTML('beforeend', `
-      <div id="editView" style="display:none; margin-top:8px;">
-        <div id="editRoomsList"></div>
+      <div id="settingsView" style="display:none; margin-top:8px;">
+        <div id="settingsList"></div>
       </div>
     `);
   }
@@ -2438,6 +2435,13 @@ async function startCrmApp(verification) {
   refreshMobileBottomNavIcons();
   requestAnimationFrame(refreshMobileBottomNavIcons);
   setTimeout(refreshMobileBottomNavIcons, 80);
+
+  // If redirected here with ?action=go-live, trigger Stripe checkout immediately
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('action') === 'go-live') {
+    window.history.replaceState({}, '', window.location.pathname);
+    goLive();
+  }
 }
 
 async function doLogin() {
@@ -2592,7 +2596,7 @@ async function loadBookings() {
 async function refreshCurrentView() {
   if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
   // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
-  if (currentFilter === 'edit') return;
+  if (currentFilter === 'settings') return;
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -2825,15 +2829,15 @@ function applyFilter() {
   const bookingsEl = document.getElementById('bookingsList');
   const availabilityEl = document.getElementById('availabilityView');
   const revenueEl = document.getElementById('revenueView');
-  const editEl = document.getElementById('editView');
+  const settingsEl = document.getElementById('settingsView');
 
-  if (currentFilter === 'edit') {
+  if (currentFilter === 'settings') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'none';
-    if (editEl) editEl.style.display = 'block';
+    if (settingsEl) settingsEl.style.display = 'block';
     closeAvailabilityDayPopover();
-    loadEditRooms();
+    loadSettings();
     return;
   }
 
@@ -2841,7 +2845,7 @@ function applyFilter() {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'flex';
     if (revenueEl) revenueEl.style.display = 'none';
-    if (editEl) editEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
     renderAvailabilityView();
     return;
   }
@@ -2850,7 +2854,7 @@ function applyFilter() {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'flex';
-    if (editEl) editEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
     closeAvailabilityDayPopover();
     renderRevenueView();
     return;
@@ -2859,7 +2863,7 @@ function applyFilter() {
   if (bookingsEl) bookingsEl.style.display = '';
   if (availabilityEl) availabilityEl.style.display = 'none';
   if (revenueEl) revenueEl.style.display = 'none';
-  if (editEl) editEl.style.display = 'none';
+  if (settingsEl) settingsEl.style.display = 'none';
   closeAvailabilityDayPopover();
   renderBookings(bookings);
 }
@@ -3567,6 +3571,142 @@ function toast(msg, type = '') {
   el.textContent = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'} ${msg}`;
   c.appendChild(el);
   setTimeout(() => el.remove(), 3100);
+}
+
+// ── SETTINGS TAB ───────────────────────────────────────────────
+
+async function loadSettings() {
+  const list = document.getElementById('settingsList');
+  if (!list) return;
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+  try {
+    const hotelRes = await api('GET', '/api/crm/verify');
+    const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
+    const bookingUrl = 'https://' + bookingDomain;
+    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
+
+    const ratesRes = await api('GET', '/api/crm/rooms');
+    let rates = { nightly: 69, weekly: 299, monthly: 999 };
+    if (ratesRes?.rates) rates = ratesRes.rates;
+
+    let html = '';
+
+    // Booking Link + QR
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Your Booking Link</div>
+          <div style="margin-bottom:12px;">
+            <input type="text" value="${bookingUrl}" readonly style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text);background:var(--bg);box-sizing:border-box;" id="settings-booking-url">
+          </div>
+          <button onclick="settingsCopyLink()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Copy Link</button>
+          <div style="text-align:center;margin-top:20px;"><img src="${qrUrl}" style="width:140px;height:140px;border-radius:10px;border:1.5px solid var(--border);" alt="QR Code"></div>
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px;">Share this link or QR code with guests</p>
+        </div>
+      </div>
+    `;
+
+    // Rates
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Rates</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
+              <input type="number" value="${rates.nightly}" id="settings-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
+              <input type="number" value="${rates.weekly}" id="settings-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
+              <input type="number" value="${rates.monthly}" id="settings-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+          </div>
+          <button onclick="settingsSaveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
+        </div>
+      </div>
+    `;
+
+    // Change PIN
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Change PIN</div>
+          <input type="text" id="settings-new-pin" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;margin-bottom:10px;">
+          <button onclick="settingsChangePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
+        </div>
+      </div>
+    `;
+
+    // Subscription
+    if (hotelRes?.subscribed) {
+      html += `
+        <div class="booking-card" style="margin-bottom:14px;">
+          <div style="padding:18px;">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Subscription</div>
+            <button onclick="openBillingPortal()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // Support
+    html += `
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Need Help?</div>
+          <textarea id="settings-support-msg" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
+          <button onclick="settingsSendSupport()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email within 24 hours.</p>
+        </div>
+      </div>
+    `;
+
+    list.innerHTML = html;
+  } catch (e) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load settings</div></div>';
+  }
+}
+
+function settingsCopyLink() {
+  const input = document.getElementById('settings-booking-url');
+  if (input) navigator.clipboard.writeText(input.value).then(() => toast('Link copied!', 'success')).catch(() => toast('Copy failed', 'error'));
+}
+
+async function settingsSaveRates() {
+  const nightly = parseFloat(document.getElementById('settings-rate-nightly')?.value) || 69;
+  const weekly = parseFloat(document.getElementById('settings-rate-weekly')?.value) || 299;
+  const monthly = parseFloat(document.getElementById('settings-rate-monthly')?.value) || 999;
+  try {
+    await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
+    toast('Rates saved', 'success');
+  } catch (e) { toast('Failed to save rates', 'error'); }
+}
+
+async function settingsChangePin() {
+  const newPin = document.getElementById('settings-new-pin')?.value.trim();
+  if (!newPin || newPin.length < 4) { toast('PIN must be at least 4 characters', 'error'); return; }
+  try {
+    await api('POST', '/api/crm/change-pin', { newPin });
+    token = newPin;
+    try { localStorage.setItem('crmToken', token); } catch(e) {}
+    toast('PIN updated!', 'success');
+    document.getElementById('settings-new-pin').value = '';
+  } catch (e) { toast('Failed to change PIN', 'error'); }
+}
+
+async function settingsSendSupport() {
+  const msg = document.getElementById('settings-support-msg')?.value.trim();
+  if (!msg) { toast('Please enter a message', 'error'); return; }
+  try {
+    await api('POST', '/api/crm/support', { message: msg });
+    toast('Message sent!', 'success');
+    document.getElementById('settings-support-msg').value = '';
+  } catch (e) { toast('Failed to send', 'error'); }
 }
 
 // ── EDIT TAB ───────────────────────────────────────────────
