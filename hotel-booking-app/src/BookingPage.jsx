@@ -29,20 +29,11 @@ function BookingPage({
   useEffect(() => { trackPageView(); }, []);
   useEffect(() => { setIsProcessingBooking(false); }, []);
 
-  const isOwner = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
-
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
     <div className="container">
-      {/* Owner link to front desk */}
-      {isOwner && (
-        <div style={{ textAlign: 'right', padding: '8px 0 0' }}>
-          <a href="/frontdesk" style={{ fontSize: '12px', color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>Front Desk →</a>
-        </div>
-      )}
-
       <header className="header">
         <p className="header-address">{hotel.address}</p>
         <h1>{hotel.name}</h1>

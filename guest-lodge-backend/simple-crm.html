@@ -1682,10 +1682,10 @@
   <div class="container">
     <div class="tabs-container">
       <div class="tabs-slider" id="tabsSlider"></div>
-      <button type="button" class="tab" data-nav-filter="settings" onclick="setFilter('settings', this)">
+      <button type="button" class="tab active" data-nav-filter="settings" onclick="setFilter('settings', this)">
         Settings
       </button>
-      <button type="button" class="tab active" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
+      <button type="button" class="tab" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
         Bookings <span class="tab-badge" id="countNeedsCalled">0</span>
       </button>
     </div>
@@ -1698,11 +1698,11 @@
   <div id="previewSiteBar" style="display:none;"></div>
 
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
-    <button type="button" class="mobile-nav-item" data-nav-filter="settings">
+    <button type="button" class="mobile-nav-item active" data-nav-filter="settings">
       <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
       <span class="mobile-nav-label">Settings</span>
     </button>
-    <button type="button" class="mobile-nav-item active" data-nav-filter="bookings" aria-current="page">
+    <button type="button" class="mobile-nav-item" data-nav-filter="bookings">
       <span class="mobile-nav-icon-wrap"><i data-lucide="inbox"></i></span>
       <span class="mobile-nav-label">Bookings</span>
     </button>
@@ -1740,7 +1740,7 @@
 <script>
 let token = '';
 let bookings = [];
-let currentFilter = 'bookings';
+let currentFilter = 'settings';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
@@ -4028,9 +4028,10 @@ function advanceTourIfNeeded() {
   const hasRates = !!localStorage.getItem('ratesChanged');
   const hasLink = !!localStorage.getItem('linkCopied');
 
-  if (step === 0 && hasPhoto) localStorage.setItem('settingsTourStep', '1');
-  if (step === 1 && hasRates) localStorage.setItem('settingsTourStep', '2');
-  if (step === 2 && hasLink) { localStorage.setItem('settingsTourDone', '1'); localStorage.removeItem('settingsTourStep'); }
+  // Steps: 0=header info, 1=photo, 2=rates, 3=copy link
+  if (step === 1 && hasPhoto) localStorage.setItem('settingsTourStep', '2');
+  if (step === 2 && hasRates) localStorage.setItem('settingsTourStep', '3');
+  if (step === 3 && hasLink) { localStorage.setItem('settingsTourDone', '1'); localStorage.removeItem('settingsTourStep'); }
 
   // Remove active tour tooltip if it's now stale
   const tooltip = document.getElementById('tourTooltip');
@@ -4045,16 +4046,24 @@ function startSettingsTour() {
   let step = parseInt(localStorage.getItem('settingsTourStep') || '0');
   const steps = [
     {
+      target: '#edit-hotel-phone',
+      text: 'Tap any field here to edit your hotel info — name, address, phone.',
+      openAccordion: false
+    },
+    {
       target: '#editRoomsCards label',
-      text: 'Add a photo of your room — guests book more when they see one.'
+      text: 'Add a photo of your room — guests book more when they see one.',
+      openAccordion: false
     },
     {
       target: '#edit-rate-nightly',
-      text: 'Set your nightly rate here. Don\'t forget to hit Save when done.'
+      text: 'Set your nightly rate here. Don\'t forget to hit Save when done.',
+      openAccordion: true
     },
     {
       target: '#editRoomsList button[onclick*="copyBookingLink"]',
-      text: 'Tap here to copy your booking link — then text it to your next guest.'
+      text: 'Tap here to copy your booking link — then text it to your next guest.',
+      openAccordion: false
     }
   ];
 
@@ -4071,6 +4080,16 @@ function startSettingsTour() {
     const s = steps[step];
     const el = document.querySelector(s.target);
     if (!el) { step++; showStep(); return; }
+
+    // Open accordion if needed
+    if (s.openAccordion) {
+      const accordionBody = el.closest('.accordion-body');
+      if (accordionBody && accordionBody.style.display === 'none') {
+        accordionBody.style.display = 'block';
+        const arrow = accordionBody.previousElementSibling?.querySelector('.accordion-arrow');
+        if (arrow) arrow.style.transform = 'rotate(90deg)';
+      }
+    }
 
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
@@ -4097,7 +4116,7 @@ function startSettingsTour() {
         localStorage.setItem('settingsTourStep', String(step));
         showStep();
       };
-    }, 400);
+    }, 1000);
   }
 
   showStep();
