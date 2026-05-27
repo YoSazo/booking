@@ -1523,13 +1523,7 @@ const handlePayLaterBooking = async (e) => {
                 </button>
                 
                 <div className="static-banner">
-                    {(() => {
-                      const isOwner = !!(localStorage.getItem('crmToken') || localStorage.getItem('isOwner'));
-                      if (isOwner) {
-                        return <EditableBanner hotel={hotel} apiBaseUrl={apiBaseUrl} />;
-                      }
-                      return hotel.cancellationPolicy || <>✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!</>;
-                    })()}
+                    {hotel.cancellationPolicy || <>✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!</>}
                 </div>
             </div>
             

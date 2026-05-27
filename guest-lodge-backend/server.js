@@ -5009,6 +5009,93 @@ app.post('/api/forgot-pin', async (req, res) => {
     }
 });
 
+// ── MAGIC LINK AUTH ────────────────────────────────────────────
+const MAGIC_LINK_SECRET = process.env.MAGIC_LINK_SECRET || process.env.SESSION_SECRET || 'marketel-magic-link-fallback-secret';
+const MAGIC_LINK_EXPIRY_MS = 60 * 60 * 1000; // 60 minutes
+
+function generateMagicToken(email, hotelId) {
+    const payload = JSON.stringify({ email, hotelId, exp: Date.now() + MAGIC_LINK_EXPIRY_MS });
+    const encoded = Buffer.from(payload).toString('base64url');
+    const sig = crypto.createHmac('sha256', MAGIC_LINK_SECRET).update(encoded).digest('base64url');
+    return encoded + '.' + sig;
+}
+
+function verifyMagicToken(token) {
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+    const [encoded, sig] = parts;
+    const expectedSig = crypto.createHmac('sha256', MAGIC_LINK_SECRET).update(encoded).digest('base64url');
+    if (sig !== expectedSig) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (payload.exp < Date.now()) return null;
+        return payload;
+    } catch (e) { return null; }
+}
+
+// Send magic link email
+app.post('/api/auth/magic-link', async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (!email) return res.json({ success: true }); // Don't reveal if email missing
+
+        const hotel = await prisma.hotelConfig.findFirst({ where: { ownerEmail: email }, select: { id: true, name: true } });
+        if (!hotel) return res.json({ success: true }); // Don't reveal if not found
+
+        // Get the hotel's domain for the link
+        const domain = await prisma.hotelDomain.findFirst({ where: { hotelId: hotel.id, isPrimary: true }, select: { domain: true } });
+        const baseUrl = domain ? 'https://' + domain.domain : (req.protocol + '://' + req.get('host'));
+
+        const token = generateMagicToken(email, hotel.id);
+        const magicUrl = baseUrl + '/frontdesk?magic=' + encodeURIComponent(token);
+
+        if (emailTransporter) {
+            await emailTransporter.sendMail({
+                from: '"Marketel" <support@bookmarketel.com>',
+                to: email,
+                subject: 'Your login link — ' + (hotel.name || 'Front Desk'),
+                html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:400px;margin:0 auto;padding:40px 20px;">
+                    <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Log in to your Front Desk</h2>
+                    <p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0 0 24px;">Tap the button below to access your dashboard. This link expires in 60 minutes.</p>
+                    <a href="${magicUrl}" style="display:block;text-align:center;padding:14px 24px;background:#2E7D5B;color:white;text-decoration:none;border-radius:10px;font-size:15px;font-weight:700;">Open My Dashboard →</a>
+                    <p style="font-size:12px;color:#9ca3af;margin:24px 0 0;text-align:center;">If you didn't request this, you can ignore this email.</p>
+                </div>`,
+                text: `Log in to your Front Desk: ${magicUrl}\n\nThis link expires in 60 minutes.`,
+            });
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('magic-link error:', e.message);
+        res.json({ success: true });
+    }
+});
+
+// Verify magic link token — returns PIN for auto-login
+app.get('/api/auth/verify-magic', async (req, res) => {
+    try {
+        const token = String(req.query?.token || '').trim();
+        const payload = verifyMagicToken(token);
+        if (!payload) return res.status(401).json({ success: false, message: 'Link expired or invalid.' });
+
+        // Find an active PIN for this hotel
+        const pin = await prisma.crmPin.findFirst({ where: { hotelId: payload.hotelId, active: true }, select: { pinHash: true } });
+        if (!pin) return res.status(404).json({ success: false, message: 'No active PIN found.' });
+
+        // We can't reverse the hash, so generate a fresh temporary PIN
+        const tempPin = String(Math.floor(1000 + Math.random() * 9000));
+        const pinHash = hashCrmPin(tempPin);
+        // Deactivate old PINs and create new one
+        await prisma.crmPin.updateMany({ where: { hotelId: payload.hotelId }, data: { active: false } });
+        await prisma.crmPin.create({ data: { hotelId: payload.hotelId, pinHash, label: 'Magic link login', active: true } });
+
+        res.json({ success: true, pin: tempPin, hotelId: payload.hotelId });
+    } catch (e) {
+        console.error('verify-magic error:', e.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 // Change PIN (CRM-authenticated — owner can change their own PIN)
 app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
     try {

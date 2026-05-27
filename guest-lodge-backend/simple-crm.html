@@ -1652,11 +1652,11 @@
     <button class="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-error" id="loginError"></div>
     <div id="forgotPinSection" style="margin-top:14px;text-align:center;">
-      <a href="#" onclick="showForgotPin(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Forgot PIN?</a>
-      <div id="forgotPinForm" style="display:none;margin-top:12px;">
-        <input class="login-input" type="email" id="forgotPinEmail" placeholder="Owner email address" style="margin-bottom:10px;">
-        <button class="login-btn" onclick="submitForgotPin()" style="background:#555;">Reset PIN</button>
-        <div id="forgotPinMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
+      <a href="#" onclick="showMagicLinkForm(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Email me a login link</a>
+      <div id="magicLinkForm" style="display:none;margin-top:12px;">
+        <input class="login-input" type="email" id="magicLinkEmail" placeholder="Your email address" style="margin-bottom:10px;">
+        <button class="login-btn" onclick="sendMagicLink()" style="background:#2E7D5B;">Send Login Link</button>
+        <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
       </div>
     </div>
   </div>
@@ -1682,6 +1682,9 @@
   <div class="container">
     <div class="tabs-container">
       <div class="tabs-slider" id="tabsSlider"></div>
+      <button type="button" class="tab" data-nav-filter="settings" onclick="setFilter('settings', this)">
+        Settings
+      </button>
       <button type="button" class="tab active" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
         Bookings <span class="tab-badge" id="countNeedsCalled">0</span>
       </button>
@@ -1691,7 +1694,14 @@
     </div>
   </div>
 
+  <!-- Sticky Preview Site button above nav -->
+  <div id="previewSiteBar" style="display:none;"></div>
+
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
+    <button type="button" class="mobile-nav-item" data-nav-filter="settings">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
+      <span class="mobile-nav-label">Settings</span>
+    </button>
     <button type="button" class="mobile-nav-item active" data-nav-filter="bookings" aria-current="page">
       <span class="mobile-nav-icon-wrap"><i data-lucide="inbox"></i></span>
       <span class="mobile-nav-label">Bookings</span>
@@ -1703,10 +1713,6 @@
     <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="revenue" id="mobileNavRevenueBtn">
       <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
       <span class="mobile-nav-label">Revenue</span>
-    </button>
-    <button type="button" class="mobile-nav-item" data-nav-filter="settings">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
-      <span class="mobile-nav-label">Settings</span>
     </button>
   </nav>
 </div>
@@ -1773,6 +1779,48 @@ const CRM_HOTEL_LABELS = {
   'suite-stay': 'Suite Stay',
 };
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
+
+// Auto-login from ?pin= URL param (coming from setup wizard)
+try {
+  const _urlPin = new URLSearchParams(window.location.search).get('pin');
+  if (_urlPin) {
+    token = _urlPin;
+    localStorage.setItem('crmToken', token);
+    // Clean URL but keep hotelId if present
+    const _cleanUrl = new URL(window.location);
+    _cleanUrl.searchParams.delete('pin');
+    window.history.replaceState({}, '', _cleanUrl);
+  }
+} catch(e) {}
+
+// Auto-login from ?magic= token (magic link email)
+let _magicLoginPending = false;
+try {
+  const _magicToken = new URLSearchParams(window.location.search).get('magic');
+  if (_magicToken) {
+    _magicLoginPending = true;
+    fetch('/api/auth/verify-magic?token=' + encodeURIComponent(_magicToken))
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.pin) {
+          token = data.pin;
+          localStorage.setItem('crmToken', token);
+          const _cleanUrl = new URL(window.location);
+          _cleanUrl.searchParams.delete('magic');
+          window.history.replaceState({}, '', _cleanUrl);
+          // Reload to trigger normal boot with the new token
+          window.location.reload();
+        } else {
+          _magicLoginPending = false;
+          alert('Login link expired or invalid. Please request a new one.');
+          const _cleanUrl = new URL(window.location);
+          _cleanUrl.searchParams.delete('magic');
+          window.history.replaceState({}, '', _cleanUrl);
+        }
+      })
+      .catch(() => { _magicLoginPending = false; });
+  }
+} catch(e) {}
 
 function getContextParam(name) {
   try {
@@ -2236,6 +2284,15 @@ function ensureAvailabilityUi() {
     `);
   }
 
+  // Add Edit view (used by Settings tab for room/photo/amenity editing)
+  if (container && !document.getElementById('editView')) {
+    container.insertAdjacentHTML('beforeend', `
+      <div id="editView" style="display:none; margin-top:8px;">
+        <div id="editRoomsList"></div>
+      </div>
+    `);
+  }
+
   if (container && !document.getElementById('availabilityView')) {
     container.insertAdjacentHTML('beforeend', `
       <div id="availabilityView" class="availability-view" style="display:none">
@@ -2425,6 +2482,16 @@ async function startCrmApp(verification) {
   requestAnimationFrame(realignActiveTab);
   setTimeout(realignActiveTab, 120);
 
+  // If coming from setup (has welcome param) or returning from preview (has tab param), open Settings
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
+    currentFilter = 'settings';
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('welcome');
+    cleanUrl.searchParams.delete('tab');
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
   await Promise.allSettled([
     loadManualAvailability(),
     loadBookings(),
@@ -2438,7 +2505,6 @@ async function startCrmApp(verification) {
   setTimeout(refreshMobileBottomNavIcons, 80);
 
   // If redirected here with ?action=go-live, trigger Stripe checkout immediately
-  const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('action') === 'go-live') {
     window.history.replaceState({}, '', window.location.pathname);
     goLive();
@@ -2463,25 +2529,26 @@ async function doLogin() {
   }
 }
 
-function showForgotPin(e) {
+function showMagicLinkForm(e) {
   e.preventDefault();
-  document.getElementById('forgotPinForm').style.display = 'block';
+  document.getElementById('magicLinkForm').style.display = 'block';
   e.target.style.display = 'none';
 }
 
-async function submitForgotPin() {
-  const email = document.getElementById('forgotPinEmail').value.trim();
-  const msg = document.getElementById('forgotPinMsg');
+async function sendMagicLink() {
+  const email = document.getElementById('magicLinkEmail').value.trim();
+  const msg = document.getElementById('magicLinkMsg');
   if (!email) { msg.textContent = 'Please enter your email'; return; }
   msg.textContent = 'Sending…';
   try {
-    await fetch('/api/forgot-pin', {
+    await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
   } catch (e) { /* ignore */ }
-  msg.textContent = "If that email is on file, we've sent a new PIN.";
+  msg.textContent = "Check your email — we sent you a login link.";
+  msg.style.color = '#2E7D5B';
 }
 
 // ── API ────────────────────────────────────────────────
@@ -2613,12 +2680,68 @@ function renderBookings(list) {
   const el = document.getElementById('bookingsList');
 
   if (list.length === 0) {
-    el.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📋</div>
-        <div class="empty-text">No bookings yet</div>
-        <div class="empty-sub">Share your booking link to start getting reservations.</div>
-      </div>`;
+    // Check photo status from API (editRooms might not be loaded yet)
+    const hasPhoto = editRooms.length > 0 
+      ? editRooms.some(r => r.images && r.images.length > 0)
+      : false;
+    const hasSharedLink = !!localStorage.getItem('linkCopied');
+
+    // If editRooms not loaded yet, fetch to check photo status
+    if (editRooms.length === 0) {
+      api('GET', '/api/crm/rooms').then(res => {
+        if (res?.rooms) {
+          editRooms = res.rooms;
+          renderBookings(list); // Re-render with updated data
+        }
+      }).catch(() => {});
+    }
+
+    const checkIcon = (done) => done 
+      ? '<div style="width:24px;height:24px;border-radius:50%;background:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>'
+      : '<div style="width:24px;height:24px;border-radius:6px;border:2px solid #d0d7d3;flex-shrink:0;"></div>';
+
+    const allDone = hasPhoto && hasSharedLink && !!localStorage.getItem('ratesChanged');
+
+    if (allDone) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🚀</div>
+          <div class="empty-text">Your engine is live!</div>
+          <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting bookings.</div>
+          <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div style="padding:20px 0;">
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Launch Checklist</div>
+            <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">Complete these to start getting bookings</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button onclick="checklistGoTo('#editRoomsCards label', 'Tap here to add your photo')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${hasPhoto ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(hasPhoto)}
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Add a photo to your room</div>
+                <div style="font-size:12px;color:#6b7280;">Guests book more when they see photos</div>
+              </div>
+            </button>
+            <button onclick="checklistGoToRates()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${localStorage.getItem('ratesChanged') ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(!!localStorage.getItem('ratesChanged'))}
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Change your rates</div>
+                <div style="font-size:12px;color:#6b7280;">Set your nightly, weekly, and monthly pricing</div>
+              </div>
+            </button>
+            <button onclick="copyBookingLinkFromChecklist()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${hasSharedLink ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(hasSharedLink)}
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Share your booking link</div>
+                <div style="font-size:12px;color:#6b7280;">Text it to a guest or add to Google Business</div>
+              </div>
+            </button>
+          </div>
+        </div>`;
+    }
     return;
   }
 
@@ -2831,14 +2954,21 @@ function applyFilter() {
   const availabilityEl = document.getElementById('availabilityView');
   const revenueEl = document.getElementById('revenueView');
   const settingsEl = document.getElementById('settingsView');
+  updatePreviewSiteBar();
+  // Remove any checklist pointer when switching tabs
+  const ptr = document.getElementById('checklistPointer');
+  if (ptr) ptr.remove();
 
   if (currentFilter === 'settings') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'none';
-    if (settingsEl) settingsEl.style.display = 'block';
+    if (settingsEl) settingsEl.style.display = 'none';
+    // Show the full edit view (rooms, photos, amenities, header preview, etc.)
+    const editEl = document.getElementById('editView');
+    if (editEl) editEl.style.display = 'block';
     closeAvailabilityDayPopover();
-    loadSettings();
+    loadEditRooms();
     return;
   }
 
@@ -2847,6 +2977,8 @@ function applyFilter() {
     if (availabilityEl) availabilityEl.style.display = 'flex';
     if (revenueEl) revenueEl.style.display = 'none';
     if (settingsEl) settingsEl.style.display = 'none';
+    const editEl = document.getElementById('editView');
+    if (editEl) editEl.style.display = 'none';
     renderAvailabilityView();
     return;
   }
@@ -2856,6 +2988,8 @@ function applyFilter() {
     if (availabilityEl) availabilityEl.style.display = 'none';
     if (revenueEl) revenueEl.style.display = 'flex';
     if (settingsEl) settingsEl.style.display = 'none';
+    const editEl = document.getElementById('editView');
+    if (editEl) editEl.style.display = 'none';
     closeAvailabilityDayPopover();
     renderRevenueView();
     return;
@@ -2865,6 +2999,8 @@ function applyFilter() {
   if (availabilityEl) availabilityEl.style.display = 'none';
   if (revenueEl) revenueEl.style.display = 'none';
   if (settingsEl) settingsEl.style.display = 'none';
+  const editEl = document.getElementById('editView');
+  if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
   renderBookings(bookings);
 }
@@ -3589,8 +3725,40 @@ async function loadSettings() {
     const ratesRes = await api('GET', '/api/crm/rooms');
     let rates = { nightly: 69, weekly: 299, monthly: 999 };
     if (ratesRes?.rates) rates = ratesRes.rates;
+    const rooms = ratesRes?.rooms || [];
 
     let html = '';
+
+    // Room Cards with photo upload
+    if (rooms.length) {
+      rooms.forEach(r => {
+        const hasImage = r.images && r.images.length > 0;
+        html += `
+          <div class="booking-card" style="margin-bottom:14px;">
+            <div style="position:relative;">
+              ${hasImage ? `<img src="${r.images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;border-radius:14px 14px 0 0;">` : `<div style="width:100%;height:140px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-radius:14px 14px 0 0;">No photos yet</div>`}
+              <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                📷 ${hasImage ? 'Change Photo' : '+ Add Photo'}
+                <input type="file" accept="image/*" style="display:none;" onchange="settingsUploadPhoto(event,'${r.id}')">
+              </label>
+            </div>
+            <div style="padding:14px 18px;">
+              <div style="font-size:16px;font-weight:700;color:var(--text);">${r.name}</div>
+              ${r.description ? `<div style="font-size:13px;color:var(--text-muted);margin-top:4px;">${r.description}</div>` : ''}
+            </div>
+          </div>
+        `;
+      });
+    } else {
+      html += `
+        <div class="booking-card" style="margin-bottom:14px;">
+          <div style="padding:18px;text-align:center;">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;">No rooms yet</div>
+            <p style="font-size:13px;color:var(--text-muted);">Add a room type to get started.</p>
+          </div>
+        </div>
+      `;
+    }
 
     // Booking Link + QR
     html += `
@@ -3601,6 +3769,7 @@ async function loadSettings() {
             <input type="text" value="${bookingUrl}" readonly style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text);background:var(--bg);box-sizing:border-box;" id="settings-booking-url">
           </div>
           <button onclick="settingsCopyLink()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Copy Link</button>
+          <button onclick="window.open('${bookingUrl}?preview=1', '_blank')" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;">Preview Your Site →</button>
           <div style="text-align:center;margin-top:20px;"><img src="${qrUrl}" style="width:140px;height:140px;border-radius:10px;border:1.5px solid var(--border);" alt="QR Code"></div>
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px;">Share this link or QR code with guests</p>
         </div>
@@ -3675,7 +3844,135 @@ async function loadSettings() {
 
 function settingsCopyLink() {
   const input = document.getElementById('settings-booking-url');
-  if (input) navigator.clipboard.writeText(input.value).then(() => toast('Link copied!', 'success')).catch(() => toast('Copy failed', 'error'));
+  if (input) navigator.clipboard.writeText(input.value).then(() => { localStorage.setItem('linkCopied', '1'); advanceTourIfNeeded(); toast('Link copied!', 'success'); }).catch(() => toast('Copy failed', 'error'));
+}
+
+function checklistGoToRates() {
+  localStorage.setItem('settingsTourDone', '1');
+  const settingsBtn = document.querySelector('[data-nav-filter="settings"]');
+  setFilter('settings', settingsBtn);
+
+  // Poll for the rates accordion, open it, then scroll to the input
+  let attempts = 0;
+  const poll = setInterval(() => {
+    attempts++;
+    const rateInput = document.getElementById('edit-rate-nightly');
+    if (rateInput || attempts > 20) {
+      clearInterval(poll);
+      if (!rateInput) return;
+
+      // Open the accordion if it's closed
+      const accordionBody = rateInput.closest('.accordion-body');
+      if (accordionBody && accordionBody.style.display === 'none') {
+        accordionBody.style.display = 'block';
+        const arrow = accordionBody.previousElementSibling?.querySelector('.accordion-arrow');
+        if (arrow) arrow.style.transform = 'rotate(90deg)';
+      }
+
+      // Now scroll and show pointer
+      setTimeout(() => {
+        rateInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Fixed delay to let scroll finish
+        setTimeout(() => {
+          const prev = document.getElementById('checklistPointer');
+          if (prev) prev.remove();
+
+          const rect = rateInput.getBoundingClientRect();
+          const pointer = document.createElement('div');
+          pointer.id = 'checklistPointer';
+          pointer.style.cssText = `position:fixed;z-index:100000;left:50%;transform:translateX(-50%);top:${rect.bottom + 12}px;max-width:240px;width:calc(100% - 40px);`;
+          pointer.innerHTML = `
+            <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin:0 auto;"></div>
+            <div style="background:#1a1a2e;border-radius:10px;padding:10px 14px;color:white;font-size:13px;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <span>Set your nightly rate here</span>
+              <button onclick="document.getElementById('checklistPointer').remove()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:18px;cursor:pointer;padding:0;line-height:1;">×</button>
+            </div>
+          `;
+          document.body.appendChild(pointer);
+          setTimeout(() => { const p = document.getElementById('checklistPointer'); if (p) p.remove(); }, 6000);
+        }, 1000);
+      }, 100);
+    }
+  }, 200);
+}
+
+function copyBookingLinkFromChecklist() {
+  const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+  const url = 'https://' + domain;
+  navigator.clipboard.writeText(url).then(() => {
+    localStorage.setItem('linkCopied', '1');
+    advanceTourIfNeeded();
+    toast('Link copied!', 'success');
+    loadBookings();
+  }).catch(() => toast('Copy failed', 'error'));
+}
+
+function checklistGoTo(target, label) {
+  // Prevent tour from triggering when navigating from checklist
+  localStorage.setItem('settingsTourDone', '1');
+  // Switch to settings tab
+  const settingsBtn = document.querySelector('[data-nav-filter="settings"]');
+  setFilter('settings', settingsBtn);
+
+  // Poll for the target element (loadEditRooms is async)
+  let attempts = 0;
+  const poll = setInterval(() => {
+    attempts++;
+    const el = document.querySelector(target);
+    if (el || attempts > 20) {
+      clearInterval(poll);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Fixed delay to let scroll finish before positioning tooltip
+      setTimeout(() => {
+        const prev = document.getElementById('checklistPointer');
+        if (prev) prev.remove();
+
+        const rect = el.getBoundingClientRect();
+        const pointer = document.createElement('div');
+        pointer.id = 'checklistPointer';
+        pointer.style.cssText = `
+          position:fixed;z-index:100000;left:50%;transform:translateX(-50%);
+          top:${rect.bottom + 12}px;max-width:240px;width:calc(100% - 40px);
+        `;
+        pointer.innerHTML = `
+          <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin:0 auto;"></div>
+          <div style="background:#1a1a2e;border-radius:10px;padding:10px 14px;color:white;font-size:13px;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <span>${label}</span>
+            <button onclick="document.getElementById('checklistPointer').remove()" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:18px;cursor:pointer;padding:0;line-height:1;">×</button>
+          </div>
+        `;
+        document.body.appendChild(pointer);
+
+        setTimeout(() => { const p = document.getElementById('checklistPointer'); if (p) p.remove(); }, 6000);
+      }, 1000);
+    }
+  }, 200);
+}
+
+async function settingsUploadPhoto(event, roomId) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('image', file);
+  try {
+    const res = await fetch(`/api/crm/rooms/${roomId}/images?hotelId=${encodeURIComponent(activeHotelId)}`, {
+      method: 'POST',
+      headers: { 'x-crm-token': token },
+      body: fd,
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast('Photo uploaded!', 'success');
+      loadSettings();
+    } else {
+      toast(data.message || 'Upload failed', 'error');
+    }
+  } catch (e) {
+    toast('Upload failed', 'error');
+  }
 }
 
 async function settingsSaveRates() {
@@ -3710,6 +4007,102 @@ async function settingsSendSupport() {
   } catch (e) { toast('Failed to send', 'error'); }
 }
 
+function openPreviewSite() {
+  const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const url = isLocal ? 'http://localhost:5173/?hotelId=' + encodeURIComponent(activeHotelId) + '&preview=1' : 'https://' + domain + '?preview=1';
+  window.open(url, '_blank');
+}
+
+function updatePreviewSiteBar() {
+  const bar = document.getElementById('previewSiteBar');
+  if (!bar) return;
+  bar.style.display = (currentFilter === 'settings') ? 'block' : 'none';
+}
+
+// Single rule: when a checklist action completes, advance the tour past that step
+function advanceTourIfNeeded() {
+  if (localStorage.getItem('settingsTourDone')) return;
+  const step = parseInt(localStorage.getItem('settingsTourStep') || '0');
+  const hasPhoto = editRooms.some(r => r.images && r.images.length > 0);
+  const hasRates = !!localStorage.getItem('ratesChanged');
+  const hasLink = !!localStorage.getItem('linkCopied');
+
+  if (step === 0 && hasPhoto) localStorage.setItem('settingsTourStep', '1');
+  if (step === 1 && hasRates) localStorage.setItem('settingsTourStep', '2');
+  if (step === 2 && hasLink) { localStorage.setItem('settingsTourDone', '1'); localStorage.removeItem('settingsTourStep'); }
+
+  // Remove active tour tooltip if it's now stale
+  const tooltip = document.getElementById('tourTooltip');
+  if (tooltip) tooltip.remove();
+}
+
+// ── SETTINGS TOUR GUIDE ────────────────────────────────────────
+function startSettingsTour() {
+  // Only show once
+  if (localStorage.getItem('settingsTourDone')) return;
+
+  let step = parseInt(localStorage.getItem('settingsTourStep') || '0');
+  const steps = [
+    {
+      target: '#editRoomsCards label',
+      text: 'Add a photo of your room — guests book more when they see one.'
+    },
+    {
+      target: '#edit-rate-nightly',
+      text: 'Set your nightly rate here. Don\'t forget to hit Save when done.'
+    },
+    {
+      target: '#editRoomsList button[onclick*="copyBookingLink"]',
+      text: 'Tap here to copy your booking link — then text it to your next guest.'
+    }
+  ];
+
+  function showStep() {
+    const prev = document.getElementById('tourTooltip');
+    if (prev) prev.remove();
+
+    if (step >= steps.length) {
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+      return;
+    }
+
+    const s = steps[step];
+    const el = document.querySelector(s.target);
+    if (!el) { step++; showStep(); return; }
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    setTimeout(() => {
+      const rect = el.getBoundingClientRect();
+      const tooltip = document.createElement('div');
+      tooltip.id = 'tourTooltip';
+      tooltip.style.cssText = `
+        position:fixed;z-index:100000;left:50%;transform:translateX(-50%);
+        top:${rect.bottom + 12}px;max-width:260px;width:calc(100% - 40px);
+      `;
+      tooltip.innerHTML = `
+        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin:0 auto;"></div>
+        <div style="background:#1a1a2e;border-radius:10px;padding:12px 16px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
+          <p style="margin:0 0 10px;">${s.text}</p>
+          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next →' : 'Got it!'}</button>
+        </div>
+      `;
+      document.body.appendChild(tooltip);
+
+      document.getElementById('tourNextBtn').onclick = () => {
+        tooltip.remove();
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+      };
+    }, 400);
+  }
+
+  showStep();
+}
+
 // ── EDIT TAB ───────────────────────────────────────────────
 
 let editRooms = [];
@@ -3739,6 +4132,7 @@ async function loadEditRooms() {
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
+      <button onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
@@ -3878,6 +4272,8 @@ async function loadEditRooms() {
     list.innerHTML = html;
     renderEditRoomsCards();
     if (typeof lucide !== 'undefined') lucide.createIcons();
+    // Trigger tour guide on first visit (only if on settings tab)
+    setTimeout(() => { if (currentFilter === 'settings') startSettingsTour(); }, 300);
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
   }
@@ -4076,6 +4472,8 @@ async function saveRates() {
   const monthly = parseFloat(document.getElementById('edit-rate-monthly')?.value) || 999;
   try {
     await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
+    localStorage.setItem('ratesChanged', '1');
+    advanceTourIfNeeded();
     toast('Rates saved!', 'success');
   } catch (e) {
     toast('Failed to save rates', 'error');
@@ -4214,7 +4612,9 @@ async function uploadEditImages(event, roomId) {
   const spinner = document.getElementById('upload-spinner-' + roomId);
   if (spinner) spinner.remove();
   renderEditRoomsCards();
-  toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added', 'success');
+  // Advance tour if action was taken during it
+  advanceTourIfNeeded();
+  toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
 }
 
 async function deleteEditImage(roomId, imageId) {
