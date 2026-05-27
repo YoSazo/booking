@@ -27,6 +27,8 @@
     #edit-hotel-subtitle { font-size: 14px !important; }
     #edit-hotel-address { font-size: 13px !important; }
     #edit-hotel-phone { font-size: 13px !important; }
+    #edit-hotel-phone::placeholder { color: #999 !important; opacity: 1; }
+    #edit-hotel-name::placeholder, #edit-hotel-subtitle::placeholder, #edit-hotel-address::placeholder { color: #999 !important; opacity: 1; }
     #edit-hotel-policy { font-size: 11px !important; }
 
     /* ── LOGIN ── */
@@ -861,17 +863,20 @@
         display: block;
       }
 
-      /* Desktop: day editor = small popover near cell */
+      /* Desktop: day editor = centered floating modal */
       #availabilityDayPopover.availability-edit-sheet {
         position: fixed;
         z-index: 262;
-        width: 240px;
-        max-width: 240px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(1);
+        width: 260px;
+        max-width: calc(100vw - 32px);
         background: var(--white);
         border: 1.5px solid var(--border);
-        border-radius: 14px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
-        transition: opacity 0.12s ease;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        transition: opacity 0.15s ease, transform 0.15s ease;
         padding: 0;
         display: none;
         overflow: hidden;
@@ -1139,23 +1144,26 @@
     .availability-sheet-backdrop.open { display: block; }
     .availability-edit-sheet {
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      left: 50%;
+      top: 50%;
+      right: auto;
+      bottom: auto;
       z-index: 261;
-      max-width: 430px;
+      width: 260px;
+      max-width: calc(100vw - 32px);
       height: auto;
-      max-height: 50vh;
-      margin: 0 auto;
+      max-height: 80vh;
+      margin: 0;
       overflow-y: auto;
       background: var(--white);
-      border-radius: 28px 28px 0 0;
-      box-shadow: 0 16px 44px rgba(0,0,0,0.24);
-      transform: translateY(105%);
-      transition: transform .28s cubic-bezier(0.32,0.72,0,1);
-      padding-bottom: max(18px, env(safe-area-inset-bottom));
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      transform: translate(-50%, -50%) scale(0.9);
+      opacity: 0;
+      transition: transform .2s ease, opacity .2s ease;
+      padding-bottom: 0;
     }
-    .availability-edit-sheet.open { transform: translateY(0); }
+    .availability-edit-sheet.open { transform: translate(-50%, -50%) scale(1); opacity: 1; }
     .sheet-handle {
       width: 42px;
       height: 5px;
@@ -2111,7 +2119,7 @@ function syncRevenueUi() {
                 <div id="revenueRoomList"></div>
               </div>
             </div>
-            <div style="margin-top:14px;padding:14px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;">
+            <div style="margin-top:14px;padding:14px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;" id="paymentsExplainer">
               <div style="font-size:13px;font-weight:600;color:#166534;margin-bottom:6px;">🔒 How payments work</div>
               <p style="font-size:12px;color:#15803d;margin:0;line-height:1.6;">Guests are <strong>never charged</strong> when they book. We securely verify their card to prevent no-shows — then <strong>you collect payment at check-in</strong> however you prefer (cash, card, Venmo, etc).</p>
             </div>
@@ -2367,18 +2375,22 @@ function ensureAvailabilityUi() {
 
       <div id="availabilitySheetBackdrop" class="availability-sheet-backdrop"></div>
       <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true" style="display:none;">
-        <button type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:15px;color:var(--text-muted);cursor:pointer;" onclick="closeAvailabilityDayPopover()">×</button>
-        <div style="padding:14px 16px;">
-          <div id="availabilityDayPopoverTitle" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;"></div>
+        <button type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:18px;color:var(--text-muted);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;" onclick="closeAvailabilityDayPopover()" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">×</button>
+        <div style="padding:18px 18px 16px;">
+          <div id="availabilityDayPopoverTitle" style="font-size:13px;font-weight:700;color:#1a1a2e;text-align:center;margin-bottom:14px;"></div>
           <div id="availabilitySheetDate" style="display:none;"></div>
           <div id="availabilityActiveRoomLabel" style="display:none;"></div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <button id="availabilityStepDownBtn" type="button" onclick="stepAvailabilityDay(-1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">−</button>
-            <div id="availabilityDayCount" style="font-size:22px;font-family:'DM Mono',monospace;font-weight:500;flex:1;text-align:center;">0</div>
-            <button id="availabilityStepUpBtn" type="button" onclick="stepAvailabilityDay(1)" style="width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-size:16px;cursor:pointer;font-family:inherit;">+</button>
+          <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
+            <button id="availabilityStepDownBtn" type="button" onclick="stepAvailabilityDay(-1)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;color:#374151;">−</button>
+            <div id="availabilityDayCount" style="font-size:28px;font-family:'DM Mono',monospace;font-weight:700;min-width:40px;text-align:center;color:#1a1a2e;">0</div>
+            <button id="availabilityStepUpBtn" type="button" onclick="stepAvailabilityDay(1)" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;color:#374151;">+</button>
           </div>
           <input id="availabilityDayClosedInput" type="checkbox" hidden>
-          <button id="availabilityDaySaveBtn" type="button" onclick="saveAvailabilityDay()" style="width:100%;padding:9px;border-radius:9px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Done</button>
+          <button id="availabilityClosedToggleBtn" type="button" onclick="toggleAvailabilityDayClosed()" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);cursor:pointer;margin-bottom:14px;font-family:inherit;">
+            <span style="font-size:12px;font-weight:600;color:#374151;">Close for this day</span>
+            <div id="availabilityClosedToggleTrack" style="width:36px;height:20px;border-radius:10px;background:#D8E4DC;position:relative;transition:background 0.2s;"><div id="availabilityClosedToggleThumb" style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:left 0.2s;"></div></div>
+          </button>
+          <button id="availabilityDaySaveBtn" type="button" onclick="saveAvailabilityDay()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
         </div>
       </div>
       <button id="availabilityClosedToggle" style="display:none;"></button>
@@ -2508,6 +2520,11 @@ async function startCrmApp(verification) {
   if (urlParams.get('action') === 'go-live') {
     window.history.replaceState({}, '', window.location.pathname);
     goLive();
+  }
+
+  // Show onboarding questionnaire on first visit (before tour)
+  if (!localStorage.getItem('onboardingDone')) {
+    showOnboardingQuestions();
   }
 }
 
@@ -2968,7 +2985,8 @@ function applyFilter() {
     const editEl = document.getElementById('editView');
     if (editEl) editEl.style.display = 'block';
     closeAvailabilityDayPopover();
-    loadEditRooms();
+    // Only load if not already loaded (prevents wiping unsaved inputs)
+    if (!editRooms.length) loadEditRooms();
     return;
   }
 
@@ -3336,36 +3354,35 @@ function openAvailabilityDayPopover(event, dayIso) {
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   if (closedInput) closedInput.checked = result.status === 'closed';
 
+  // Sync toggle visual state
+  const isClosed = result.status === 'closed';
+  const track = document.getElementById('availabilityClosedToggleTrack');
+  const thumb = document.getElementById('availabilityClosedToggleThumb');
+  const stepDown = document.getElementById('availabilityStepDownBtn');
+  const stepUp = document.getElementById('availabilityStepUpBtn');
+  if (track) track.style.background = isClosed ? '#E05252' : '#D8E4DC';
+  if (thumb) thumb.style.left = isClosed ? '18px' : '2px';
+  if (countEl) countEl.style.opacity = isClosed ? '0.35' : '1';
+  if (stepDown) { stepDown.disabled = isClosed; stepDown.style.opacity = isClosed ? '0.35' : '1'; stepDown.style.pointerEvents = isClosed ? 'none' : ''; }
+  if (stepUp) { stepUp.disabled = isClosed; stepUp.style.opacity = isClosed ? '0.35' : '1'; stepUp.style.pointerEvents = isClosed ? 'none' : ''; }
+
   if (backdrop) backdrop.classList.add('open');
 
-  // Position: on mobile use bottom sheet, on desktop position near cell
-  const isMobile = window.innerWidth < 600;
-  const rect = event.currentTarget.getBoundingClientRect();
-  if (isMobile) {
-    // Let the CSS bottom-sheet handle positioning
-    pop.style.position = '';
-    pop.style.left = '';
-    pop.style.top = '';
-    pop.style.transform = '';
-    pop.style.width = '';
-  } else {
-    let top = rect.bottom + 8;
-    let left = rect.left;
-    if (left + 250 > window.innerWidth) left = window.innerWidth - 260;
-    if (top + 140 > window.innerHeight) top = rect.top - 150;
-    if (top < 10) top = 10;
-    pop.style.position = 'fixed';
-    pop.style.left = left + 'px';
-    pop.style.top = top + 'px';
-    pop.style.transform = '';
-    pop.style.width = '200px';
-  }
+  // Always center the popover as a floating modal
+  pop.style.position = 'fixed';
+  pop.style.left = '50%';
+  pop.style.top = '50%';
+  pop.style.transform = 'translate(-50%, -50%)';
+  pop.style.width = '260px';
+  pop.style.maxWidth = 'calc(100vw - 32px)';
+  pop.style.bottom = '';
+  pop.style.right = '';
   pop.style.display = 'block';
   pop.style.zIndex = '262';
   pop.style.background = 'var(--white)';
-  pop.style.borderRadius = '14px';
+  pop.style.borderRadius = '16px';
   pop.style.border = '1.5px solid var(--border)';
-  pop.style.boxShadow = '0 8px 32px rgba(0,0,0,0.14)';
+  pop.style.boxShadow = '0 20px 60px rgba(0,0,0,0.2)';
 
   pop.classList.add('open');
   pop.setAttribute('aria-hidden', 'false');
@@ -3405,28 +3422,24 @@ function stepAvailabilityDay(delta) {
 function toggleAvailabilityDayClosed() {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const countEl = document.getElementById('availabilityDayCount');
-  const stepButtons = document.querySelectorAll('.day-step-btn');
-  const closedToggle = document.getElementById('availabilityClosedToggle');
-  const stepper = document.querySelector('.sheet-stepper');
+  const stepDown = document.getElementById('availabilityStepDownBtn');
+  const stepUp = document.getElementById('availabilityStepUpBtn');
+  const track = document.getElementById('availabilityClosedToggleTrack');
+  const thumb = document.getElementById('availabilityClosedToggleThumb');
   if (!closedInput || !countEl) return;
-  const isClosed = !!closedInput.checked;
-  countEl.style.opacity = isClosed ? '0.35' : '1';
-  if (closedToggle) closedToggle.classList.toggle('active', isClosed);
-  if (stepper) {
-    stepper.style.opacity = isClosed ? '0.35' : '1';
-    stepper.style.pointerEvents = isClosed ? 'none' : '';
-  }
-  stepButtons.forEach((btn) => {
-    btn.disabled = isClosed;
-    btn.style.opacity = isClosed ? '0.35' : '1';
-  });
-}
 
-function toggleAvailabilityDayClosedButton() {
-  const closedInput = document.getElementById('availabilityDayClosedInput');
-  if (!closedInput) return;
+  // Toggle the checkbox
   closedInput.checked = !closedInput.checked;
-  toggleAvailabilityDayClosed();
+  const isClosed = closedInput.checked;
+
+  // Update visual state
+  countEl.style.opacity = isClosed ? '0.35' : '1';
+  if (stepDown) { stepDown.disabled = isClosed; stepDown.style.opacity = isClosed ? '0.35' : '1'; stepDown.style.pointerEvents = isClosed ? 'none' : ''; }
+  if (stepUp) { stepUp.disabled = isClosed; stepUp.style.opacity = isClosed ? '0.35' : '1'; stepUp.style.pointerEvents = isClosed ? 'none' : ''; }
+
+  // Update toggle track/thumb visual
+  if (track) track.style.background = isClosed ? '#E05252' : '#D8E4DC';
+  if (thumb) thumb.style.left = isClosed ? '18px' : '2px';
 }
 
 async function saveAvailabilityDay() {
@@ -4031,11 +4044,154 @@ function advanceTourIfNeeded() {
   // Steps: 0=header info, 1=photo, 2=rates, 3=copy link
   if (step === 1 && hasPhoto) localStorage.setItem('settingsTourStep', '2');
   if (step === 2 && hasRates) localStorage.setItem('settingsTourStep', '3');
-  if (step === 3 && hasLink) { localStorage.setItem('settingsTourDone', '1'); localStorage.removeItem('settingsTourStep'); }
+  if (step === 3 && hasLink) localStorage.setItem('settingsTourStep', '4');
 
-  // Remove active tour tooltip if it's now stale
+  // Remove active tour tooltip and overlay if stale
   const tooltip = document.getElementById('tourTooltip');
   if (tooltip) tooltip.remove();
+  const overlay = document.getElementById('tourBlurOverlay');
+  if (overlay) overlay.remove();
+  document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
+    el.style.position = '';
+    el.style.zIndex = '';
+    el.style.boxShadow = '';
+    el.removeAttribute('data-tour-highlighted');
+  });
+  document.body.style.overflow = '';
+}
+
+// ── ONBOARDING QUESTIONNAIRE ───────────────────────────────────
+function showOnboardingQuestions() {
+  let step = 0;
+  const answers = {};
+
+  const questions = [
+    {
+      title: 'Why do you want a booking engine?',
+      key: 'why',
+      type: 'text',
+      placeholder: 'e.g. I want guests to book directly instead of calling me...'
+    },
+    {
+      title: 'How do guests currently book with you?',
+      key: 'currentBooking',
+      type: 'choice',
+      options: [
+        { label: 'They call me or walk in', value: 'phone_walkin' },
+        { label: 'Through Booking.com / Expedia', value: 'ota' },
+        { label: 'I have a website but no booking system', value: 'website_no_booking' },
+        { label: 'I don\'t take bookings online yet', value: 'no_online' },
+      ]
+    },
+    {
+      title: 'How many rooms do you have?',
+      key: 'roomCount',
+      type: 'choice',
+      options: [
+        { label: '1–5 rooms', value: '1-5' },
+        { label: '6–15 rooms', value: '6-15' },
+        { label: '16–50 rooms', value: '16-50' },
+        { label: '50+ rooms', value: '50+' },
+      ]
+    },
+    {
+      title: 'What\'s most important to you?',
+      key: 'priority',
+      type: 'choice',
+      options: [
+        { label: 'Stop paying OTA commissions', value: 'no_commission' },
+        { label: 'Get more direct bookings', value: 'more_bookings' },
+        { label: 'Have a professional online presence', value: 'professional' },
+        { label: 'Make it easier for guests to book', value: 'easier_booking' },
+      ]
+    }
+  ];
+
+  function render() {
+    let existing = document.getElementById('onboardingOverlay');
+    if (existing) existing.remove();
+
+    if (step >= questions.length) {
+      // Done — save answers and show welcome modal
+      localStorage.setItem('onboardingDone', '1');
+      try {
+        api('POST', '/api/crm/onboarding-answers', answers).catch(() => {});
+      } catch(e) {}
+      showWelcomeModal();
+      return;
+    }
+
+    const q = questions[step];
+    const overlay = document.createElement('div');
+    overlay.id = 'onboardingOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;';
+
+    if (q.type === 'text') {
+      overlay.innerHTML = `
+        <div style="max-width:360px;width:100%;text-align:center;">
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;">Question ${step + 1} of ${questions.length}</div>
+          <h2 style="font-size:20px;font-weight:700;color:white;margin:0 0 24px;line-height:1.3;">${q.title}</h2>
+          <textarea id="onboardingTextInput" placeholder="${q.placeholder || ''}" style="width:100%;min-height:100px;padding:14px;border-radius:12px;border:none;font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;background:rgba(255,255,255,0.95);"></textarea>
+          <button id="onboardingTextSubmit" style="width:100%;margin-top:14px;padding:14px;border-radius:12px;border:none;background:white;color:#2E7D5B;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Next →</button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById('onboardingTextSubmit').onclick = () => {
+        const val = document.getElementById('onboardingTextInput').value.trim();
+        if (!val) return; // require an answer
+        answers[q.key] = val;
+        step++;
+        render();
+      };
+    } else {
+      overlay.innerHTML = `
+        <div style="max-width:360px;width:100%;text-align:center;">
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;">Question ${step + 1} of ${questions.length}</div>
+          <h2 style="font-size:20px;font-weight:700;color:white;margin:0 0 24px;line-height:1.3;">${q.title}</h2>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${q.options.map(opt => `
+              <button class="onboarding-opt" data-value="${opt.value}" style="width:100%;padding:14px 16px;border-radius:12px;border:none;background:rgba(255,255,255,0.95);font-family:inherit;font-size:14px;font-weight:500;color:#1a1a2e;cursor:pointer;text-align:left;transition:all 0.15s;">
+                ${opt.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.querySelectorAll('.onboarding-opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+          answers[q.key] = btn.dataset.value;
+          btn.style.background = '#1a1a2e';
+          btn.style.color = 'white';
+          btn.style.fontWeight = '600';
+          setTimeout(() => { step++; render(); }, 250);
+        });
+      });
+    }
+  }
+
+  render();
+}
+
+// ── WELCOME MODAL (after questionnaire) ────────────────────────
+function showWelcomeModal() {
+  const overlay = document.createElement('div');
+  overlay.id = 'welcomeModalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <div style="font-size:32px;margin-bottom:12px;">🏨</div>
+      <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
+      <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 20px;">This is where you:<br><strong>Customize</strong> your booking page<br><strong>See bookings</strong> that come in<br><strong>Track revenue</strong> your page generates</p>
+      <button id="welcomeModalGotIt" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Got it — show me around</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('welcomeModalGotIt').onclick = () => {
+    overlay.remove();
+    // Start tour after a short delay to let DOM settle
+    setTimeout(() => { startSettingsTour(); }, 200);
+  };
 }
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
@@ -4048,33 +4204,94 @@ function startSettingsTour() {
     {
       target: '#edit-hotel-phone',
       text: 'Tap any field here to edit your hotel info — name, address, phone.',
-      openAccordion: false
+      openAccordion: false,
+      tab: 'settings'
     },
     {
-      target: '#editRoomsCards label',
+      target: '#editRoomsCards .booking-card > div:first-child',
       text: 'Add a photo of your room — guests book more when they see one.',
-      openAccordion: false
+      openAccordion: false,
+      tab: 'settings'
     },
     {
       target: '#edit-rate-nightly',
-      text: 'Set your nightly rate here. Don\'t forget to hit Save when done.',
-      openAccordion: true
+      text: 'You can change your rates here — nightly, weekly, and monthly.',
+      openAccordion: true,
+      targetParent: true,
+      tab: 'settings'
     },
     {
-      target: '#editRoomsList button[onclick*="copyBookingLink"]',
-      text: 'Tap here to copy your booking link — then text it to your next guest.',
-      openAccordion: false
+      target: 'button[onclick*="copyBookingLink"]',
+      text: 'This is your booking URL — the link guests use to book with you directly.',
+      openAccordion: false,
+      tab: 'settings'
     },
     {
-      target: '#editRoomsList button[onclick*="openPreviewSite"]',
+      target: 'button[onclick*="openPreviewSite"]',
       text: 'Preview your booking engine to see exactly what your guests see.',
-      openAccordion: false
+      openAccordion: false,
+      tab: 'settings'
+    },
+    {
+      target: '#edit-new-pin',
+      text: 'This is your login PIN — you\'ll need it to access this dashboard next time. We emailed it to you, but you can change it here anytime.',
+      openAccordion: true,
+      tab: 'settings'
+    },
+    {
+      target: '#bookingsList',
+      text: '',
+      openAccordion: false,
+      tab: 'bookings',
+      customModal: true
+    },
+    {
+      target: '#availabilityCalendarWrap',
+      text: '',
+      openAccordion: false,
+      tab: 'availability',
+      customModal: 'availability'
+    },
+    {
+      target: '.revenue-savings-pill',
+      text: 'See how much revenue your booking page generates and how much you\'re saving vs OTA commissions.',
+      openAccordion: false,
+      tab: 'revenue',
+      waitForVisible: true
+    },
+    {
+      target: '#paymentsExplainer',
+      text: 'When guests book through your engine, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
+      openAccordion: false,
+      tab: 'revenue',
+      waitForVisible: true
+    },
+    {
+      target: '#bookingsList',
+      text: '',
+      openAccordion: false,
+      tab: 'bookings',
+      customModal: 'finale'
     }
   ];
 
-  function showStep() {
+  function cleanupTour() {
     const prev = document.getElementById('tourTooltip');
     if (prev) prev.remove();
+    const prevOverlay = document.getElementById('tourBlurOverlay');
+    if (prevOverlay) prevOverlay.remove();
+    // Remove any lingering highlight styles
+    document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
+      el.style.position = '';
+      el.style.zIndex = '';
+      el.style.boxShadow = '';
+      el.removeAttribute('data-tour-highlighted');
+    });
+    document.body.style.overflow = '';
+  }
+
+  function showStep() {
+    cleanupTour();
 
     if (step >= steps.length) {
       localStorage.setItem('settingsTourDone', '1');
@@ -4083,45 +4300,529 @@ function startSettingsTour() {
     }
 
     const s = steps[step];
-    const el = document.querySelector(s.target);
-    if (!el) { step++; showStep(); return; }
 
-    // Open accordion if needed
+    // Skip revenue steps if revenue isn't enabled for this hotel
+    if (s.tab === 'revenue' && !revenueEnabled) {
+      step++;
+      localStorage.setItem('settingsTourStep', String(step));
+      showStep();
+      return;
+    }
+
+    // Switch tab if this step requires a different tab
+    if (s.tab && s.tab !== currentFilter) {
+      const tabBtn = document.querySelector(`.tab[data-nav-filter="${s.tab}"]`) || document.querySelector(`.mobile-nav-item[data-nav-filter="${s.tab}"]`);
+      if (tabBtn) setFilter(s.tab, tabBtn);
+      // For custom modals, show immediately after tab switch (no need to wait for elements)
+      if (s.customModal) {
+        setTimeout(() => { showStepContent(s); }, 150);
+      } else {
+        // Wait longer for tab content to fully render (especially async tabs like availability/revenue)
+        setTimeout(() => { showStepContent(s); }, 800);
+      }
+      return;
+    }
+    // Small delay even on same tab to let DOM settle
+    setTimeout(() => { showStepContent(s); }, 100);
+  }
+
+  function showStepContent(s) {
+    // Custom modal for bookings tab — show a mock booking card example
+    if (s.customModal === true || s.customModal === 'bookings') {
+      showBookingsMockModal();
+      return;
+    }
+    // Custom modal for availability tab — multi-page walkthrough
+    if (s.customModal === 'availability') {
+      showAvailabilityMockModal();
+      return;
+    }
+    // Finale modal — tour complete, clear next action
+    if (s.customModal === 'finale') {
+      showFinaleMockModal();
+      return;
+    }
+
+    // If step needs to wait for element to become visible (e.g. async-loaded content)
+    if (s.waitForVisible) {
+      const targets = s.target.split(',').map(t => t.trim());
+      let attempts = 0;
+      const maxAttempts = 20; // 20 * 200ms = 4 seconds max wait
+      const pollForVisible = () => {
+        attempts++;
+        let el = null;
+        for (const t of targets) {
+          el = document.querySelector(t);
+          if (el && el.offsetParent !== null) break;
+          el = null;
+        }
+        if (el) {
+          showStepForElement(el, s);
+        } else if (attempts < maxAttempts) {
+          setTimeout(pollForVisible, 200);
+        } else {
+          // Give up, skip this step
+          step++;
+          localStorage.setItem('settingsTourStep', String(step));
+          showStep();
+        }
+      };
+      pollForVisible();
+      return;
+    }
+
+    // Try multiple selectors (comma-separated)
+    let el = null;
+    const targets = s.target.split(',').map(t => t.trim());
+    for (const t of targets) {
+      el = document.querySelector(t);
+      // Skip elements that are hidden/display:none — BUT allow if openAccordion will reveal it
+      if (el && !s.openAccordion && el.offsetParent === null && getComputedStyle(el).position !== 'fixed') {
+        el = null;
+        continue;
+      }
+      if (el) break;
+    }
+    if (!el) { step++; localStorage.setItem('settingsTourStep', String(step)); showStep(); return; }
+
+    showStepForElement(el, s);
+  }
+
+  function showStepForElement(el, s) {
+
+    // Open accordion if needed — find the accordion-body that contains this element
     if (s.openAccordion) {
-      const accordionBody = el.closest('.accordion-body');
-      if (accordionBody && accordionBody.style.display === 'none') {
-        accordionBody.style.display = 'block';
-        const arrow = accordionBody.previousElementSibling?.querySelector('.accordion-arrow');
+      const acc = el.closest('.accordion-body');
+      if (acc && acc.style.display === 'none') {
+        acc.style.display = 'block';
+        const arrow = acc.previousElementSibling?.querySelector('.accordion-arrow');
         if (arrow) arrow.style.transform = 'rotate(90deg)';
       }
     }
 
+    // If targetParent, highlight the parent card instead
+    if (s.targetParent) {
+      el = el.closest('.booking-card') || el.closest('.accordion-body') || el;
+    }
+
+    // Add dark overlay + lock scroll
+    const blurOverlay = document.createElement('div');
+    blurOverlay.id = 'tourBlurOverlay';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);';
+    document.body.appendChild(blurOverlay);
+    document.body.style.overflow = 'hidden';
+
+    // Highlight the target element
+    el.style.position = 'relative';
+    el.style.zIndex = '99999';
+    el.style.boxShadow = '0 0 0 4px #2E7D5B, 0 0 20px rgba(46,125,91,0.3)';
+    el.setAttribute('data-tour-highlighted', '1');
+
+    // Scroll element into view and wait for scroll to finish before positioning tooltip
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    setTimeout(() => {
-      const rect = el.getBoundingClientRect();
-      const tooltip = document.createElement('div');
-      tooltip.id = 'tourTooltip';
-      tooltip.style.cssText = `
-        position:fixed;z-index:100000;left:50%;transform:translateX(-50%);
-        top:${rect.bottom + 12}px;max-width:260px;width:calc(100% - 40px);
-      `;
+    // Use a longer delay to ensure scroll completes, then measure position
+    setTimeout(() => { positionTooltip(el, s); }, 500);
+  }
+
+  function positionTooltip(el, s) {
+    const rect = el.getBoundingClientRect();
+    const tooltip = document.createElement('div');
+    tooltip.id = 'tourTooltip';
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const tooltipMaxWidth = Math.min(280, window.innerWidth - 32);
+
+    // Calculate horizontal center aligned with the element
+    const elCenterX = rect.left + rect.width / 2;
+    const tooltipLeft = Math.max(16, Math.min(elCenterX - tooltipMaxWidth / 2, window.innerWidth - tooltipMaxWidth - 16));
+    // Arrow offset from left edge of tooltip to point at element center
+    const arrowLeft = Math.max(20, Math.min(elCenterX - tooltipLeft, tooltipMaxWidth - 20));
+
+    const skipHtml = `<div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>`;
+
+    if (spaceBelow > 130) {
+      // Position below the element
+      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${rect.bottom + 12}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
       tooltip.innerHTML = `
-        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin:0 auto;"></div>
-        <div style="background:#1a1a2e;border-radius:10px;padding:12px 16px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
-          <p style="margin:0 0 10px;">${s.text}</p>
-          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next →' : 'Got it!'}</button>
+        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
+        <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
+          <p style="margin:0 0 12px;">${s.text}</p>
+          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
+          ${skipHtml}
+        </div>`;
+    } else if (spaceAbove > 130) {
+      // Position above the element
+      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - rect.top + 12}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+      tooltip.innerHTML = `
+        <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
+          <p style="margin:0 0 12px;">${s.text}</p>
+          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
+          ${skipHtml}
         </div>
-      `;
-      document.body.appendChild(tooltip);
+        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
+    } else {
+      // Fallback: center on screen
+      tooltip.style.cssText = `position:fixed;z-index:100000;left:50%;top:50%;transform:translate(-50%,-50%);max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+      tooltip.innerHTML = `
+        <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
+          <p style="margin:0 0 12px;">${s.text}</p>
+          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
+          ${skipHtml}
+        </div>`;
+    }
+    document.body.appendChild(tooltip);
+
+    document.getElementById('tourNextBtn').onclick = () => {
+      cleanupTour();
+      step++;
+      localStorage.setItem('settingsTourStep', String(step));
+      showStep();
+    };
+
+    document.getElementById('tourSkipBtn').onclick = () => {
+      cleanupTour();
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+    };
+
+    // Also allow clicking the overlay to skip/dismiss
+    const overlay = document.getElementById('tourBlurOverlay');
+    if (overlay) {
+      overlay.onclick = () => {
+        cleanupTour();
+        localStorage.setItem('settingsTourDone', '1');
+        localStorage.removeItem('settingsTourStep');
+      };
+    }
+  }
+
+  function showFinaleMockModal() {
+    // Dark overlay
+    const blurOverlay = document.createElement('div');
+    blurOverlay.id = 'tourBlurOverlay';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);';
+    document.body.appendChild(blurOverlay);
+    document.body.style.overflow = 'hidden';
+
+    const modal = document.createElement('div');
+    modal.id = 'tourTooltip';
+    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
+        <div style="padding:24px 20px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:12px;">🚀</div>
+          <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">You're all set!</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking engine is live. Here's what to do next:</p>
+          <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:16px;">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:flex-start;gap:8px;">
+                <span style="font-size:14px;">1️⃣</span>
+                <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Share your booking link</strong> — add it to your Google Business Profile, your website, text it to guests, or run ads to it</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;">
+                <span style="font-size:14px;">2️⃣</span>
+                <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Wait for your first booking</strong> — you'll see it appear right here</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;">
+                <span style="font-size:14px;">3️⃣</span>
+                <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Call the guest</strong> to confirm and collect payment at check-in</span>
+              </div>
+            </div>
+          </div>
+          <div style="background:#fff7ed;border-radius:10px;padding:10px 12px;border:1px solid #fed7aa;margin-bottom:16px;">
+            <p style="font-size:12px;color:#9a3412;margin:0;line-height:1.5;">⚠️ We're not an ad agency — you won't get bookings unless you get your link in front of people.</p>
+          </div>
+          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Got it — let's go!</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    // Add slide-up animation
+    if (!document.getElementById('tourModalAnimStyle')) {
+      const animStyle = document.createElement('style');
+      animStyle.id = 'tourModalAnimStyle';
+      animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
+      document.head.appendChild(animStyle);
+    }
+
+    document.getElementById('tourNextBtn').onclick = () => {
+      cleanupTour();
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+      // Switch to bookings tab so they see where reservations will appear
+      const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
+      if (tabBtn) setFilter('bookings', tabBtn);
+    };
+
+    // Dismiss on overlay click
+    blurOverlay.onclick = () => {
+      cleanupTour();
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+    };
+  }
+
+  function showAvailabilityMockModal() {
+    // Dark overlay
+    const blurOverlay = document.createElement('div');
+    blurOverlay.id = 'tourBlurOverlay';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);';
+    document.body.appendChild(blurOverlay);
+    document.body.style.overflow = 'hidden';
+
+    let modalPage = 0;
+    const pages = [
+      // Page 1: The Calendar
+      `<div style="padding:20px 18px 0;">
+        <div style="text-align:center;margin-bottom:14px;">
+          <div style="font-size:15px;font-weight:700;color:#1a1a2e;">Your Availability Calendar</div>
+          <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">See room availability at a glance</p>
+        </div>
+      </div>
+      <div style="padding:0 14px 14px;">
+        <div style="background:#f8faf9;border-radius:14px;padding:14px;border:1px solid #D8E4DC;">
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px;">
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Sun</div>
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Mon</div>
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Tue</div>
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Wed</div>
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Thu</div>
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Fri</div>
+            <div style="text-align:center;font-size:10px;font-weight:600;color:#6b7280;padding:4px 0;">Sat</div>
+            <div style="background:#E8F5EE;border:1.5px solid #2E7D5B;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">8</div><div style="font-size:10px;color:#2E7D5B;font-weight:600;">4</div></div>
+            <div style="background:#E8F5EE;border:1.5px solid #2E7D5B;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">9</div><div style="font-size:10px;color:#2E7D5B;font-weight:600;">4</div></div>
+            <div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">10</div><div style="font-size:10px;color:#92400e;font-weight:600;">2</div></div>
+            <div style="background:#E8F5EE;border:1.5px solid #2E7D5B;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">11</div><div style="font-size:10px;color:#2E7D5B;font-weight:600;">4</div></div>
+            <div style="background:#FEE2E2;border:1.5px solid #E05252;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">12</div><div style="font-size:10px;color:#991b1b;font-weight:600;">0</div></div>
+            <div style="background:#E8F5EE;border:1.5px solid #2E7D5B;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">13</div><div style="font-size:10px;color:#2E7D5B;font-weight:600;">4</div></div>
+            <div style="background:#E8F5EE;border:1.5px solid #2E7D5B;border-radius:8px;padding:6px 2px;text-align:center;"><div style="font-size:11px;font-weight:700;color:#1a1a2e;">14</div><div style="font-size:10px;color:#2E7D5B;font-weight:600;">3</div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;padding:8px 12px;background:white;border-radius:8px;border:1px solid #D8E4DC;">
+            <div style="background:#E8F5EE;border:1.5px solid #2E7D5B;border-radius:6px;padding:4px 6px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#1a1a2e;">8</div><div style="font-size:9px;color:#2E7D5B;font-weight:600;">4</div></div>
+            <div style="font-size:11px;color:#374151;line-height:1.3;"><span style="font-weight:600;">8</span> = date &nbsp;·&nbsp; <span style="font-weight:600;">4</span> = rooms available</div>
+          </div>
+          <div style="display:flex;gap:12px;justify-content:center;">
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:50%;background:#E8F5EE;border:1.5px solid #2E7D5B;"></div><span style="font-size:11px;color:#374151;">Open</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:50%;background:#FEF3C7;border:1.5px solid #F59E0B;"></div><span style="font-size:11px;color:#374151;">Partial</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:50%;background:#FEE2E2;border:1.5px solid #E05252;"></div><span style="font-size:11px;color:#374151;">Full</span></div>
+          </div>
+        </div>
+      </div>`,
+
+      // Page 2: Tap a Day
+      `<div style="padding:20px 18px 0;">
+        <div style="text-align:center;margin-bottom:14px;">
+          <div style="font-size:15px;font-weight:700;color:#1a1a2e;">Tap Any Day to Adjust</div>
+          <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">Control exactly how many rooms are available</p>
+        </div>
+      </div>
+      <div style="padding:0 14px 14px;">
+        <div style="background:#f8faf9;border-radius:14px;padding:14px;border:1px solid #D8E4DC;">
+          <div style="display:flex;justify-content:center;margin-bottom:12px;">
+            <div style="background:#2E7D5B;border:2px solid #1a5c3f;border-radius:10px;padding:8px 12px;text-align:center;box-shadow:0 0 0 3px rgba(46,125,91,0.3);">
+              <div style="font-size:12px;font-weight:700;color:white;">10</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.8);font-weight:600;">4</div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-bottom:10px;">
+            <span style="font-size:11px;color:#6b7280;">↓ opens this</span>
+          </div>
+          <div style="background:white;border-radius:12px;padding:16px;border:1.5px solid #D8E4DC;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+            <div style="text-align:center;font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:12px;">Wed, Jun 10</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:14px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#374151;border:1.5px solid #D8E4DC;">−</div>
+              <div style="font-size:28px;font-weight:700;color:#1a1a2e;">3</div>
+              <div style="width:32px;height:32px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#374151;border:1.5px solid #D8E4DC;">+</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f8faf9;border-radius:8px;border:1px solid #D8E4DC;">
+              <span style="font-size:12px;font-weight:600;color:#374151;">Close for this day</span>
+              <div style="width:36px;height:20px;border-radius:10px;background:#D8E4DC;position:relative;"><div style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>`,
+
+      // Page 3: Summary
+      `<div style="padding:20px 18px 0;">
+        <div style="text-align:center;margin-bottom:14px;">
+          <div style="font-size:15px;font-weight:700;color:#1a1a2e;">That's It</div>
+        </div>
+      </div>
+      <div style="padding:0 14px 14px;">
+        <div style="background:#f0fdf4;border-radius:12px;padding:16px;border:1px solid #bbf7d0;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">✅</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;">Rooms default to <strong>open</strong> with all units available</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">🔒</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;">Toggle <strong>close</strong> on days you're fully booked</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">🔢</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;">Use +/− to reduce units when partially booked</span>
+            </div>
+          </div>
+        </div>
+      </div>`
+    ];
+
+    const modal = document.createElement('div');
+    modal.id = 'tourTooltip';
+    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+
+    function renderModalPage() {
+      const isLast = modalPage >= pages.length - 1;
+      const btnLabel = isLast ? 'Next \u2014 Revenue \u2192' : 'Next \u2192';
+      modal.innerHTML = `
+        <div style="background:white;border-radius:20px;max-width:340px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
+          ${pages[modalPage]}
+          <div style="padding:4px 18px 6px;text-align:center;">
+            <div style="display:flex;justify-content:center;gap:6px;margin-bottom:10px;">
+              ${pages.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === modalPage ? '#2E7D5B' : '#D8E4DC'};"></div>`).join('')}
+            </div>
+          </div>
+          <div style="padding:0 18px 20px;text-align:center;">
+            <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${btnLabel}</button>
+            <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(0,0,0,0.35);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
+          </div>
+        </div>`;
 
       document.getElementById('tourNextBtn').onclick = () => {
-        tooltip.remove();
-        step++;
-        localStorage.setItem('settingsTourStep', String(step));
-        showStep();
+        if (modalPage < pages.length - 1) {
+          modalPage++;
+          renderModalPage();
+        } else {
+          cleanupTour();
+          step++;
+          localStorage.setItem('settingsTourStep', String(step));
+          showStep();
+        }
       };
-    }, 1000);
+
+      document.getElementById('tourSkipBtn').onclick = () => {
+        cleanupTour();
+        localStorage.setItem('settingsTourDone', '1');
+        localStorage.removeItem('settingsTourStep');
+      };
+    }
+
+    document.body.appendChild(modal);
+    renderModalPage();
+
+    // Add slide-up animation
+    if (!document.getElementById('tourModalAnimStyle')) {
+      const animStyle = document.createElement('style');
+      animStyle.id = 'tourModalAnimStyle';
+      animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
+      document.head.appendChild(animStyle);
+    }
+
+    // Dismiss on overlay click
+    blurOverlay.onclick = () => {
+      cleanupTour();
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+    };
+  }
+
+  function showBookingsMockModal() {
+    // Dark overlay
+    const blurOverlay = document.createElement('div');
+    blurOverlay.id = 'tourBlurOverlay';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);';
+    document.body.appendChild(blurOverlay);
+    document.body.style.overflow = 'hidden';
+
+    const modal = document.createElement('div');
+    modal.id = 'tourTooltip';
+    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:20px;max-width:340px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
+        <div style="padding:20px 18px 0;">
+          <div style="text-align:center;margin-bottom:16px;">
+            <div style="font-size:15px;font-weight:700;color:#1a1a2e;">When a guest books, it looks like this</div>
+          </div>
+        </div>
+        <!-- Mock booking card -->
+        <div style="padding:0 14px 14px;">
+          <div style="background:white;border:2px solid #D8E4DC;border-radius:16px;overflow:hidden;">
+            <div style="height:5px;background:#2E7D5B;"></div>
+            <div style="padding:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+                <div>
+                  <div style="font-size:16px;font-weight:700;color:#1a1a2e;">Sarah Johnson</div>
+                  <div style="font-size:11px;color:#6b7280;margin-top:2px;">2 minutes ago</div>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#2E7D5B;">$284.00</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">🛏 King Room</span>
+                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">🌙 3 nights</span>
+                <span style="background:#eff6ff;color:#1e40af;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">💳 Pay at check-in</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px;background:#f8faf9;border-radius:10px;margin-bottom:14px;">
+                <div style="text-align:center;">
+                  <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;">Check-in</div>
+                  <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-top:2px;">Jun 15</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;">Check-out</div>
+                  <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-top:2px;">Jun 18</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;">Guests</div>
+                  <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-top:2px;">2</div>
+                </div>
+              </div>
+              <div style="margin-bottom:14px;">
+                <div style="font-size:12px;color:#6b7280;">(555) 867-5309</div>
+                <div style="font-size:12px;color:#6b7280;">sarah.j@email.com</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="padding:10px;border-radius:10px;background:#2E7D5B;color:white;font-size:13px;font-weight:700;text-align:center;">📞 Call Now</div>
+                <div style="padding:10px;border-radius:10px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:700;text-align:center;">📝 Add Note</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 18px 20px;text-align:center;">
+          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Next — Availability \u2192</button>
+          <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(0,0,0,0.35);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    // Add slide-up animation
+    if (!document.getElementById('tourModalAnimStyle')) {
+      const animStyle = document.createElement('style');
+      animStyle.id = 'tourModalAnimStyle';
+      animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
+      document.head.appendChild(animStyle);
+    }
+
+    document.getElementById('tourNextBtn').onclick = () => {
+      cleanupTour();
+      step++;
+      localStorage.setItem('settingsTourStep', String(step));
+      showStep();
+    };
+
+    document.getElementById('tourSkipBtn').onclick = () => {
+      cleanupTour();
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+    };
+
+    // Dismiss on overlay click
+    blurOverlay.onclick = () => {
+      cleanupTour();
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+    };
   }
 
   showStep();
@@ -4296,8 +4997,8 @@ async function loadEditRooms() {
     list.innerHTML = html;
     renderEditRoomsCards();
     if (typeof lucide !== 'undefined') lucide.createIcons();
-    // Trigger tour guide on first visit (only if on settings tab)
-    setTimeout(() => { if (currentFilter === 'settings') startSettingsTour(); }, 300);
+    // Trigger tour guide on first visit (only if on settings tab and onboarding is done)
+    setTimeout(() => { if (currentFilter === 'settings' && localStorage.getItem('onboardingDone') && !localStorage.getItem('settingsTourDone') && !document.getElementById('welcomeModalOverlay')) startSettingsTour(); }, 300);
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
   }
@@ -4579,12 +5280,12 @@ async function sendSupportMessage() {
 
 async function saveEditRoom(roomId) {
   const room = editRooms.find(r => r.id === roomId);
-  if (!room) return;
-  const name = document.getElementById('edit-name-' + roomId).value.trim();
-  const description = document.getElementById('edit-desc-' + roomId).value.trim();
-  const maxOccupancy = parseInt(document.getElementById('edit-occ-' + roomId).value) || 4;
-  const totalUnits = parseInt(document.getElementById('edit-units-' + roomId).value) || 1;
-  const body = { id: roomId, name: name || room.name, description: description || null, amenities: room.amenities, maxOccupancy, totalUnits };
+  if (!room) { toast('Room not found — try refreshing', 'error'); return; }
+  const name = document.getElementById('edit-name-' + roomId)?.value.trim();
+  const description = document.getElementById('edit-desc-' + roomId)?.value.trim();
+  const maxOccupancy = parseInt(document.getElementById('edit-occ-' + roomId)?.value) || 4;
+  const totalUnits = parseInt(document.getElementById('edit-units-' + roomId)?.value) || 1;
+  const body = { id: roomId, name: name || room.name, description: description || null, amenities: room.amenities || null, maxOccupancy, totalUnits };
   try {
     await api('POST', '/api/crm/rooms', body);
     room.name = body.name;
@@ -4593,7 +5294,7 @@ async function saveEditRoom(roomId) {
     room.totalUnits = totalUnits;
     toast('Room saved!', 'success');
   } catch (e) {
-    toast('Failed to save', 'error');
+    toast('Failed to save: ' + (e.message || ''), 'error');
   }
 }
 

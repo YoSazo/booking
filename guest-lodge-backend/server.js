@@ -5193,6 +5193,23 @@ app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
     }
 });
 
+// Store onboarding questionnaire answers
+app.post('/api/crm/onboarding-answers', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const { why, currentBooking, roomCount, priority } = req.body;
+        console.log(`📋 Onboarding answers for ${hotelId}: why="${why}", booking=${currentBooking}, rooms=${roomCount}, priority=${priority}`);
+        // Store as a funnel event for analytics
+        await prisma.funnelEvent.create({
+            data: { hotelId, eventName: 'OnboardingAnswers', contentName: JSON.stringify({ why, currentBooking, roomCount, priority }) }
+        }).catch(() => {});
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: true });
+    }
+});
+
 // Support contact — hotel owner sends a message, we get an email
 app.post('/api/crm/support', crmAuth, async (req, res) => {
     try {
