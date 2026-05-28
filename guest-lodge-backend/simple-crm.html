@@ -4235,7 +4235,7 @@ function startSettingsTour() {
     },
     {
       target: '#edit-new-pin',
-      text: 'This is your login PIN — you\'ll need it to access this dashboard next time. We emailed it to you, but you can change it here anytime.',
+      text: 'This is your login PIN — you\'ll need it to access this dashboard next time. You can change it here anytime.',
       openAccordion: true,
       tab: 'settings'
     },
@@ -4265,7 +4265,8 @@ function startSettingsTour() {
       text: 'When guests book through your engine, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
       openAccordion: false,
       tab: 'revenue',
-      waitForVisible: true
+      waitForVisible: true,
+      tooltipPosition: 'above'
     },
     {
       target: '#bookingsList',
@@ -4451,7 +4452,10 @@ function startSettingsTour() {
 
     const skipHtml = `<div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>`;
 
-    if (spaceBelow > 130) {
+    // Determine position: use override if specified, otherwise auto-detect
+    const position = s.tooltipPosition || (spaceBelow > 130 ? 'below' : spaceAbove > 130 ? 'above' : 'center');
+
+    if (position === 'below') {
       // Position below the element
       tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${rect.bottom + 12}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
       tooltip.innerHTML = `
@@ -4461,7 +4465,7 @@ function startSettingsTour() {
           <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
           ${skipHtml}
         </div>`;
-    } else if (spaceAbove > 130) {
+    } else if (position === 'above') {
       // Position above the element
       tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - rect.top + 12}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
       tooltip.innerHTML = `
@@ -4531,7 +4535,7 @@ function startSettingsTour() {
           <div style="background:#fff7ed;border-radius:10px;padding:10px 12px;border:1px solid #fed7aa;margin-bottom:16px;">
             <p style="font-size:12px;color:#9a3412;margin:0;line-height:1.5;">⚠️ We're not an ad agency — you won't get bookings unless you get your link in front of people.</p>
           </div>
-          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Got it — let's go!</button>
+          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy my link & let's go!</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -4545,12 +4549,18 @@ function startSettingsTour() {
     }
 
     document.getElementById('tourNextBtn').onclick = () => {
+      // Copy booking link to clipboard so they have it ready to share
+      const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+      const url = 'https://' + domain;
+      navigator.clipboard.writeText(url).catch(() => {});
       cleanupTour();
       localStorage.setItem('settingsTourDone', '1');
+      localStorage.setItem('linkCopied', '1');
       localStorage.removeItem('settingsTourStep');
       // Switch to bookings tab so they see where reservations will appear
       const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
       if (tabBtn) setFilter('bookings', tabBtn);
+      toast('Booking link copied!', 'success');
     };
   }
 
@@ -4936,7 +4946,7 @@ async function loadEditRooms() {
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
           <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+            <input type="text" id="edit-new-pin" value="${token}" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
           </div>
           <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
