@@ -93,6 +93,51 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .toast.show { display: block; }
 .toast.error { background: var(--red); }
 
+.logo-sprite-bounce {
+  width: 27px; height: 32px;
+  background: url('/Make-the-logo-bounce.png') no-repeat;
+  background-size: 162px 192px;
+  animation: spritePlay 3s steps(1) infinite;
+}
+@keyframes spritePlay {
+  0%    { background-position: 0 0; }
+  2.78% { background-position: -27px 0; }
+  5.56% { background-position: -54px 0; }
+  8.33% { background-position: -81px 0; }
+  11.11% { background-position: -108px 0; }
+  13.89% { background-position: -135px 0; }
+  16.67% { background-position: 0 -32px; }
+  19.44% { background-position: -27px -32px; }
+  22.22% { background-position: -54px -32px; }
+  25%    { background-position: -81px -32px; }
+  27.78% { background-position: -108px -32px; }
+  30.56% { background-position: -135px -32px; }
+  33.33% { background-position: 0 -64px; }
+  36.11% { background-position: -27px -64px; }
+  38.89% { background-position: -54px -64px; }
+  41.67% { background-position: -81px -64px; }
+  44.44% { background-position: -108px -64px; }
+  47.22% { background-position: -135px -64px; }
+  50%    { background-position: 0 -96px; }
+  52.78% { background-position: -27px -96px; }
+  55.56% { background-position: -54px -96px; }
+  58.33% { background-position: -81px -96px; }
+  61.11% { background-position: -108px -96px; }
+  63.89% { background-position: -135px -96px; }
+  66.67% { background-position: 0 -128px; }
+  69.44% { background-position: -27px -128px; }
+  72.22% { background-position: -54px -128px; }
+  75%    { background-position: -81px -128px; }
+  77.78% { background-position: -108px -128px; }
+  80.56% { background-position: -135px -128px; }
+  83.33% { background-position: 0 -160px; }
+  86.11% { background-position: -27px -160px; }
+  88.89% { background-position: -54px -160px; }
+  91.67% { background-position: -81px -160px; }
+  94.44% { background-position: -108px -160px; }
+  97.22% { background-position: -135px -160px; }
+}
+
 /* Full-page iframe steps (mobile only) */
 .step-fullpage {
   position: fixed;
@@ -250,19 +295,27 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
   <!-- STEP 3: Success - give them everything -->
   <div class="step" id="step-3">
-    <div class="form-card" style="text-align:center;">
-      <h2>🎉 You're in!</h2>
-      <p style="font-size:14px; color:var(--muted); margin-bottom:16px;">Your booking engine is live. Let's set it up.</p>
-      <div style="background:#e8f5ee; border-radius:12px; padding:14px; font-family:monospace; font-size:14px; color:#2E7D5B; font-weight:600; margin-bottom:14px; word-break:break-all;" id="successDomain"></div>
-      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Add photos, set rates, and manage bookings from your dashboard.</p>
-      <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; opacity:0.5; pointer-events:none;">Setting up your site...</a>
+    <div class="form-card" style="text-align:center; padding:32px 24px;">
+      <div style="margin-bottom:20px;">
+        <div class="logo-sprite-bounce" style="margin:0 auto;"></div>
+      </div>
+      <h2 style="font-size:22px; font-weight:800; margin-bottom:8px; color:var(--text);">Your engine is live 🚀</h2>
+      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.5;">We're setting up your site. This takes a few seconds.</p>
+      <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px; padding:14px; margin-bottom:20px;">
+        <div style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Your Booking Page</div>
+        <div style="font-family:monospace; font-size:15px; color:#2E7D5B; font-weight:700; word-break:break-all;" id="successDomain"></div>
+      </div>
+      <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; opacity:0.5; pointer-events:none; font-size:16px; padding:16px;">
+        <span id="successBtnText">Setting up your site...</span>
+      </a>
+      <p style="font-size:12px; color:var(--muted); margin-top:14px; line-height:1.5;">Next: Add photos, set rates, and start accepting bookings.</p>
     </div>
   </div>
 
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="logo-sprite-bounce"></div></div>
 
 <script>
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
@@ -355,6 +408,9 @@ async function addRoomAndFinish() {
       link.textContent = 'Go to Your Dashboard \u2192';
       link.style.opacity = '1';
       link.style.pointerEvents = 'auto';
+      // Stop the bouncing logo
+      var sprite = document.querySelector('#step-3 .logo-sprite-bounce');
+      if (sprite) sprite.style.animation = 'none';
     }, 8000);
 
     // Send welcome email

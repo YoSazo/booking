@@ -347,6 +347,51 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .logo-sprite-bounce {
+      width: 27px; height: 32px;
+      background: url('/Make-the-logo-bounce.png') no-repeat;
+      background-size: 162px 192px;
+      animation: spritePlay 3s steps(1) infinite;
+    }
+    @keyframes spritePlay {
+      0%    { background-position: 0 0; }
+      2.78% { background-position: -27px 0; }
+      5.56% { background-position: -54px 0; }
+      8.33% { background-position: -81px 0; }
+      11.11% { background-position: -108px 0; }
+      13.89% { background-position: -135px 0; }
+      16.67% { background-position: 0 -32px; }
+      19.44% { background-position: -27px -32px; }
+      22.22% { background-position: -54px -32px; }
+      25%    { background-position: -81px -32px; }
+      27.78% { background-position: -108px -32px; }
+      30.56% { background-position: -135px -32px; }
+      33.33% { background-position: 0 -64px; }
+      36.11% { background-position: -27px -64px; }
+      38.89% { background-position: -54px -64px; }
+      41.67% { background-position: -81px -64px; }
+      44.44% { background-position: -108px -64px; }
+      47.22% { background-position: -135px -64px; }
+      50%    { background-position: 0 -96px; }
+      52.78% { background-position: -27px -96px; }
+      55.56% { background-position: -54px -96px; }
+      58.33% { background-position: -81px -96px; }
+      61.11% { background-position: -108px -96px; }
+      63.89% { background-position: -135px -96px; }
+      66.67% { background-position: 0 -128px; }
+      69.44% { background-position: -27px -128px; }
+      72.22% { background-position: -54px -128px; }
+      75%    { background-position: -81px -128px; }
+      77.78% { background-position: -108px -128px; }
+      80.56% { background-position: -135px -128px; }
+      83.33% { background-position: 0 -160px; }
+      86.11% { background-position: -27px -160px; }
+      88.89% { background-position: -54px -160px; }
+      91.67% { background-position: -81px -160px; }
+      94.44% { background-position: -108px -160px; }
+      97.22% { background-position: -135px -160px; }
+    }
+
     /* ── TOAST ── */
     /* Notes Section */
     .card-notes {
@@ -1638,7 +1683,7 @@
     <div class="status-title" id="bootTitle">Connecting to hotel...</div>
     <p class="status-message" id="bootMessage">Checking this domain and loading front desk context.</p>
     <div class="status-spinner-wrap" id="bootSpinnerWrap">
-      <div class="spinner status-spinner"></div>
+      <div class="logo-sprite-bounce"></div>
     </div>
     <div class="status-debug" id="bootDebug"></div>
     <div class="status-actions">
@@ -1698,7 +1743,7 @@
       </button>
     </div>
     <div id="bookingsList">
-      <div class="loading"><div class="spinner"></div> Loading bookings…</div>
+      <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
     </div>
   </div>
 
@@ -2200,7 +2245,7 @@ function renderRevenueView() {
     if (contentEl) contentEl.style.display = 'none';
     if (statusEl) {
       if (revenueLoading) {
-        statusEl.innerHTML = '<div class="loading"><div class="spinner"></div> Loading revenue...</div>';
+        statusEl.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading revenue...</div>';
       } else if (revenueError) {
         statusEl.innerHTML = `
           <div class="empty-state">
@@ -2913,7 +2958,7 @@ function setFilter(filter, btn) {
     const calWrap = document.getElementById('availabilityCalendarWrap');
     const noRoom = document.getElementById('availabilityNoRoom');
     if (calWrap) calWrap.style.display = 'none';
-    if (noRoom) { noRoom.style.display = 'block'; noRoom.innerHTML = '<div class="loading"><div class="spinner"></div> Loading availability…</div>'; }
+    if (noRoom) { noRoom.style.display = 'block'; noRoom.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading availability…</div>'; }
     loadManualAvailability().then(() => { renderAvailabilityView(); }).catch(() => { renderAvailabilityView(); });
     return;
   }
@@ -3738,7 +3783,7 @@ function toast(msg, type = '') {
 async function loadSettings() {
   const list = document.getElementById('settingsList');
   if (!list) return;
-  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+  list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
   try {
     const hotelRes = await api('GET', '/api/crm/verify');
     const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
@@ -4827,7 +4872,7 @@ let editRooms = [];
 async function loadEditRooms() {
   const list = document.getElementById('editRoomsList');
   if (!list) return;
-  list.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+  list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
   try {
     const res = await api('GET', '/api/crm/rooms');
     if (!res.rooms) throw new Error('No data');
@@ -5399,3 +5444,4 @@ setInterval(refreshCurrentView, 30000);
 </script>
 </body>
 </html>
+
