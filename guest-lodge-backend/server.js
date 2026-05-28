@@ -4470,7 +4470,11 @@ app.post('/api/setup/:token/rooms', async (req, res) => {
             room = await prisma.room.update({ where: { id }, data: { name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 } });
         } else {
             const count = await prisma.room.count({ where: { hotelId: hotel.id } });
-            room = await prisma.room.create({ data: { hotelId: hotel.id, name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1, sortOrder: count } });
+            room = await prisma.room.upsert({
+                where: { hotelId_name: { hotelId: hotel.id, name } },
+                create: { hotelId: hotel.id, name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1, sortOrder: count },
+                update: { description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 },
+            });
         }
 
         // Also create/update ManualRoom for availability tracking

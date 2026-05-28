@@ -343,7 +343,6 @@ async function addRoomAndFinish() {
     console.log('Complete response:', completeData);
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.bookmarketel.com';
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
-    document.getElementById('successPin').textContent = completeData.crmPin || '----';
     
     // Link goes to front desk (their dashboard), not the booking engine
     var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
