@@ -266,6 +266,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="progress-bar">
     <div class="progress-step done" id="prog-1"></div>
     <div class="progress-step" id="prog-2"></div>
+    <div class="progress-step" id="prog-3"></div>
   </div>
 
   <!-- STEP 1: Hotel Name -->
@@ -293,22 +294,46 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 3: Success - give them everything -->
+  <!-- STEP 3: Video showcase - see your engine in action -->
   <div class="step" id="step-3">
-    <div class="form-card" style="text-align:center; padding:32px 24px;">
-      <div style="margin-bottom:20px;">
-        <div class="logo-sprite-bounce" style="margin:0 auto;"></div>
+    <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center;">
+      <div style="max-width:400px; width:100%;">
+        <h2 style="font-size:20px; font-weight:800; margin-bottom:6px; color:var(--text);">Here's what your guests see</h2>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.5;">This is your booking engine in action — takes guests under 60 seconds to book.</p>
+        
+        <!-- Video -->
+        <div style="border-radius:16px; overflow:hidden; border:2px solid var(--border); margin-bottom:24px; background:#000; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+          <video id="enginePreviewVideo" autoplay muted playsinline style="width:100%; display:block;"
+            poster="">
+            <source src="" id="engineVideoSrc" type="video/mp4">
+          </video>
+          <div id="videoPlaceholder" style="padding:60px 20px; text-align:center; display:none;">
+            <div class="logo-sprite-bounce" style="margin:0 auto 12px;"></div>
+            <p style="font-size:13px; color:#9ca3af; margin:0;">Loading preview...</p>
+          </div>
+        </div>
+
+        <button id="videoNextBtn" class="btn btn-primary" style="font-size:16px; padding:16px; opacity:0.4; pointer-events:none;" onclick="goToStep(4)">
+          Continue →
+        </button>
+        <p id="videoWaitText" style="font-size:11px; color:var(--muted); margin-top:10px;">Watch the video to continue</p>
       </div>
-      <h2 style="font-size:22px; font-weight:800; margin-bottom:8px; color:var(--text);">Your engine is live 🚀</h2>
-      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.5;">We're setting up your site. This takes a few seconds.</p>
+    </div>
+  </div>
+
+  <!-- STEP 4: Success - dashboard ready -->
+  <div class="step" id="step-4">
+    <div class="form-card" style="text-align:center; padding:32px 24px;">
+      <div style="font-size:36px; margin-bottom:12px;">🚀</div>
+      <h2 style="font-size:22px; font-weight:800; margin-bottom:8px; color:var(--text);">You're all set!</h2>
+      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.5;">Your booking engine is live and ready to accept guests.</p>
       <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px; padding:14px; margin-bottom:20px;">
         <div style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Your Booking Page</div>
         <div style="font-family:monospace; font-size:15px; color:#2E7D5B; font-weight:700; word-break:break-all;" id="successDomain"></div>
       </div>
-      <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; opacity:0.5; pointer-events:none; font-size:16px; padding:16px;">
-        <span id="successBtnText">Setting up your site...</span>
+      <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
+        Go to Your Dashboard →
       </a>
-      <p style="font-size:12px; color:var(--muted); margin-top:14px; line-height:1.5;">Next: Add photos, set rates, and start accepting bookings.</p>
     </div>
   </div>
 
@@ -402,16 +427,29 @@ async function addRoomAndFinish() {
     var dashboardUrl = (isLocal ? window.location.origin : domain) + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
     document.getElementById('successLink').href = dashboardUrl;
 
-    // Enable after 8 seconds (Vercel SSL provisioning time)
-    setTimeout(function() {
-      var link = document.getElementById('successLink');
-      link.textContent = 'Go to Your Dashboard \u2192';
-      link.style.opacity = '1';
-      link.style.pointerEvents = 'auto';
-      // Stop the bouncing logo
-      var sprite = document.querySelector('#step-3 .logo-sprite-bounce');
-      if (sprite) sprite.style.animation = 'none';
-    }, 8000);
+    // Site provisions during video step — link is ready by step 4
+
+    // Show video placeholder if no video source set
+    var videoEl = document.getElementById('enginePreviewVideo');
+    var videoSrc = document.getElementById('engineVideoSrc');
+    var placeholder = document.getElementById('videoPlaceholder');
+    if (!videoSrc || !videoSrc.getAttribute('src')) {
+      if (videoEl) videoEl.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'block';
+    }
+
+    // Enable "Continue" button after video ends or 10 seconds (whichever comes first)
+    var videoNextBtn = document.getElementById('videoNextBtn');
+    var videoWaitText = document.getElementById('videoWaitText');
+    function enableVideoNext() {
+      if (videoNextBtn) { videoNextBtn.style.opacity = '1'; videoNextBtn.style.pointerEvents = 'auto'; }
+      if (videoWaitText) videoWaitText.textContent = '';
+    }
+    if (videoEl && videoSrc && videoSrc.getAttribute('src')) {
+      videoEl.addEventListener('ended', enableVideoNext);
+    }
+    // Fallback: enable after 10 seconds regardless
+    setTimeout(enableVideoNext, 10000);
 
     // Send welcome email
     fetch(API + '/api/setup/' + TOKEN + '/finalize', {

@@ -148,7 +148,7 @@ export const hotelData = {
     subtitle: 'No Deposits. No Leases. No Credit Checks. Just Simple Extended Living.',
     phone: '256-207-8086',
     address: '65600 AL-77, Talladega, AL 35160',
-    pms: 'Cloudbeds',
+    pms: 'manual',
     propertyCode: 'Dont know yet',
     rates: {
       NIGHTLY: 69,
@@ -170,7 +170,7 @@ export const hotelData = {
       },
     ],
     rooms: [
-      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
+      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today.', maxOccupancy: 3, totalUnits: 5, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
             'kingbedsuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',
@@ -181,7 +181,7 @@ export const hotelData = {
             'suitestayoutside.webp',
             'suitestayreception.webp',
         ] },
-      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi • 60" TV • Fridge • Workstation', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
+      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi • 60" TV • Fridge • Workstation', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in.', maxOccupancy: 4, totalUnits: 5, imageUrl: 'doublesuitestay.webp', imageUrls: [
             'doublesuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',
