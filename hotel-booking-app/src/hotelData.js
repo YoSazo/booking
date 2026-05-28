@@ -170,7 +170,7 @@ export const hotelData = {
       },
     ],
     rooms: [
-      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today. Enjoy weekly housekeeping and free parking.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
+      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
             'kingbedsuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',
