@@ -5201,8 +5201,10 @@ async function changePin() {
   }
   try {
     await api('POST', '/api/crm/change-pin', { newPin });
-    toast('PIN updated! Use your new PIN next time.', 'success');
-    document.getElementById('edit-new-pin').value = '';
+    token = newPin;
+    try { localStorage.setItem('crmToken', token); } catch(e) {}
+    toast('PIN updated!', 'success');
+    // Keep the new PIN visible in the input
   } catch (e) {
     toast('Failed to change PIN', 'error');
   }
@@ -5275,7 +5277,8 @@ async function saveEditRoom(roomId) {
   const totalUnits = parseInt(document.getElementById('edit-units-' + roomId)?.value) || 1;
   const body = { id: roomId, name: name || room.name, description: description || null, amenities: room.amenities || null, maxOccupancy, totalUnits };
   try {
-    await api('POST', '/api/crm/rooms', body);
+    const res = await api('POST', '/api/crm/rooms', body);
+    if (res && res.success === false) { toast(res.message || 'Failed to save', 'error'); return; }
     room.name = body.name;
     room.description = body.description;
     room.maxOccupancy = maxOccupancy;
