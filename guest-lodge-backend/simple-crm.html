@@ -1740,8 +1740,8 @@
         Bookings <span class="tab-badge" id="countNeedsCalled">0</span>
       </button>
     </div>
+    <div id="goLiveBanner" style="display:none;"></div>
     <div id="bookingsList">
-      <div id="goLiveBanner" style="display:none;"></div>
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
     </div>
   </div>
@@ -1802,6 +1802,7 @@ let editingRoomName = '';
 let pendingDeleteRoomName = '';
 let currentHotelPms = '';
 let revenueEnabled = false;
+let hotelSubscribed = false;
 let revenuePeriod = '30d';
 let revenueCache = {};
 let revenueLoading = false;
@@ -2525,12 +2526,24 @@ async function startCrmApp(verification) {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
+  // Track subscription status globally for banner visibility
+  hotelSubscribed = !!(verification && verification.subscribed);
+
   // Show/hide Go Live banner based on subscription status
   const banner = document.getElementById('goLiveBanner');
   if (banner) {
     // Only show the go-live banner after the tour is done (or if returning user who already did tour)
     const tourDone = localStorage.getItem('settingsTourDone');
-    banner.style.display = (verification && verification.subscribed === false && tourDone) ? 'block' : 'none';
+    banner.style.display = (!hotelSubscribed && tourDone) ? 'block' : 'none';
+    if (banner.style.display === 'block') {
+      banner.innerHTML = `
+        <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
+          <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
+          <p style="font-size:12px;color:rgba(255,255,255,0.8);margin:0 0 14px;line-height:1.5;">Guests can see your booking page but can't complete a reservation yet.</p>
+          <button onclick="goLive()" style="width:100%;max-width:260px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
+          <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+        </div>`;
+    }
   }
 
   const realignActiveTab = () => {
@@ -2745,18 +2758,6 @@ async function refreshCurrentView() {
 // ── RENDER ─────────────────────────────────────────────
 function renderBookings(list) {
   const el = document.getElementById('bookingsList');
-
-  // Show go-live banner at top if not subscribed
-  const goLiveBanner = document.getElementById('goLiveBanner');
-  if (goLiveBanner && goLiveBanner.style.display !== 'none') {
-    goLiveBanner.innerHTML = `
-      <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
-        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
-        <p style="font-size:12px;color:rgba(255,255,255,0.8);margin:0 0 14px;line-height:1.5;">Guests can see your booking page but can't complete a reservation yet.</p>
-        <button onclick="goLive()" style="width:100%;max-width:260px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
-        <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
-      </div>`;
-  }
 
   if (list.length === 0) {
     // Check photo status from API (editRooms might not be loaded yet)
@@ -3039,10 +3040,27 @@ function applyFilter() {
   const availabilityEl = document.getElementById('availabilityView');
   const revenueEl = document.getElementById('revenueView');
   const settingsEl = document.getElementById('settingsView');
+  const goLiveBanner = document.getElementById('goLiveBanner');
   updatePreviewSiteBar();
   // Remove any checklist pointer when switching tabs
   const ptr = document.getElementById('checklistPointer');
   if (ptr) ptr.remove();
+
+  // Hide go-live banner on non-bookings tabs
+  if (goLiveBanner) {
+    const tourDone = localStorage.getItem('settingsTourDone');
+    const shouldShow = currentFilter === 'bookings' && !hotelSubscribed && tourDone;
+    goLiveBanner.style.display = shouldShow ? 'block' : 'none';
+    if (shouldShow && !goLiveBanner.innerHTML.trim()) {
+      goLiveBanner.innerHTML = `
+        <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
+          <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
+          <p style="font-size:12px;color:rgba(255,255,255,0.8);margin:0 0 14px;line-height:1.5;">Guests can see your booking page but can't complete a reservation yet.</p>
+          <button onclick="goLive()" style="width:100%;max-width:260px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
+          <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+        </div>`;
+    }
+  }
 
   if (currentFilter === 'settings') {
     if (bookingsEl) bookingsEl.style.display = 'none';
