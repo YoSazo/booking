@@ -160,7 +160,12 @@ async function withRetry(fn, retries = 3, delay = 1000) {
                 msg.includes("Can't reach database") ||
                 msg.includes('P1001') ||
                 msg.includes('P1017') ||
-                msg.includes('Engine is not yet connected');
+                msg.includes('P2024') ||
+                msg.includes('Engine is not yet connected') ||
+                msg.includes('timed out') ||
+                msg.includes('Connection refused') ||
+                msg.includes('ECONNRESET') ||
+                msg.includes('socket hang up');
             if (isConnErr && i < retries - 1) {
                 console.log(`DB connection failed, retrying in ${delay}ms... (${i + 1}/${retries})`);
                 await prisma.$disconnect();

@@ -5275,7 +5275,7 @@ async function saveEditRoom(roomId) {
   const description = document.getElementById('edit-desc-' + roomId)?.value.trim();
   const maxOccupancy = parseInt(document.getElementById('edit-occ-' + roomId)?.value) || 4;
   const totalUnits = parseInt(document.getElementById('edit-units-' + roomId)?.value) || 1;
-  const body = { id: roomId, name: name || room.name, description: description || null, amenities: room.amenities || null, maxOccupancy, totalUnits };
+  const body = { id: roomId, name: name || room.name, description: description || '', amenities: room.amenities || '', maxOccupancy, totalUnits };
   try {
     const res = await api('POST', '/api/crm/rooms', body);
     if (res && res.success === false) { toast(res.message || 'Failed to save', 'error'); return; }
