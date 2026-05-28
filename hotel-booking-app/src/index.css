@@ -13,12 +13,14 @@ html, body, #root {
     --border-color: #dee2e6;
     --success-color: #28a745;
     --card-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    --bg-color: #f4f7f9;
+    --accent-color: #0056b3;
 }
 
 body {
     font-family: 'Inter', sans-serif;
     margin: 0;
-    background-color: #f4f7f9;
+    background-color: var(--bg-color);
     color: var(--text-color);
     line-height: 1.6;
     /* Prevent viewport shifting on input focus */
@@ -1439,19 +1441,19 @@ body {
 
 /* Update the Book Now button style */
 .book-now-btn {
-  background-color: var(--primary-color);
+  background-color: #2E7D5B;
   color: #fff;
   border-radius: 999px; /* Pill shape */
   padding: 12px 24px !important; /* Force padding */
   font-weight: 700 !important;
   font-size: 1em !important;
   border: none;
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(46, 125, 91, 0.3);
   transition: all 0.2s ease;
 }
 
 .book-now-btn:hover {
-    background-color: #0056b3;
+    background-color: #245f46;
     transform: translateY(-1px);
 }
 

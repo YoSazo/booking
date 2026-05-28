@@ -4052,10 +4052,11 @@ function advanceTourIfNeeded() {
   const overlay = document.getElementById('tourBlurOverlay');
   if (overlay) overlay.remove();
   document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
-    el.style.position = '';
+    el.style.position = el.dataset.tourOrigPosition || '';
     el.style.zIndex = '';
     el.style.boxShadow = '';
     el.removeAttribute('data-tour-highlighted');
+    delete el.dataset.tourOrigPosition;
   });
   document.body.style.overflow = '';
 }
@@ -4280,14 +4281,21 @@ function startSettingsTour() {
     if (prev) prev.remove();
     const prevOverlay = document.getElementById('tourBlurOverlay');
     if (prevOverlay) prevOverlay.remove();
-    // Remove any lingering highlight styles
+    // Remove any lingering highlight styles — restore original position
     document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
-      el.style.position = '';
+      el.style.position = el.dataset.tourOrigPosition || '';
       el.style.zIndex = '';
       el.style.boxShadow = '';
       el.removeAttribute('data-tour-highlighted');
+      delete el.dataset.tourOrigPosition;
     });
     document.body.style.overflow = '';
+  }
+
+  function skipToFinale() {
+    cleanupTour();
+    // Jump straight to the finale modal — they must see the "share your link" reality check
+    showFinaleMockModal();
   }
 
   function showStep() {
@@ -4412,8 +4420,9 @@ function startSettingsTour() {
     document.body.appendChild(blurOverlay);
     document.body.style.overflow = 'hidden';
 
-    // Highlight the target element
-    el.style.position = 'relative';
+    // Highlight the target element — preserve original position
+    if (!el.dataset.tourOrigPosition) el.dataset.tourOrigPosition = el.style.position || '';
+    el.style.position = el.style.position || 'relative';
     el.style.zIndex = '99999';
     el.style.boxShadow = '0 0 0 4px #2E7D5B, 0 0 20px rgba(46,125,91,0.3)';
     el.setAttribute('data-tour-highlighted', '1');
@@ -4482,20 +4491,8 @@ function startSettingsTour() {
     };
 
     document.getElementById('tourSkipBtn').onclick = () => {
-      cleanupTour();
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.removeItem('settingsTourStep');
+      skipToFinale();
     };
-
-    // Also allow clicking the overlay to skip/dismiss
-    const overlay = document.getElementById('tourBlurOverlay');
-    if (overlay) {
-      overlay.onclick = () => {
-        cleanupTour();
-        localStorage.setItem('settingsTourDone', '1');
-        localStorage.removeItem('settingsTourStep');
-      };
-    }
   }
 
   function showFinaleMockModal() {
@@ -4554,13 +4551,6 @@ function startSettingsTour() {
       // Switch to bookings tab so they see where reservations will appear
       const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
       if (tabBtn) setFilter('bookings', tabBtn);
-    };
-
-    // Dismiss on overlay click
-    blurOverlay.onclick = () => {
-      cleanupTour();
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.removeItem('settingsTourStep');
     };
   }
 
@@ -4704,9 +4694,7 @@ function startSettingsTour() {
       };
 
       document.getElementById('tourSkipBtn').onclick = () => {
-        cleanupTour();
-        localStorage.setItem('settingsTourDone', '1');
-        localStorage.removeItem('settingsTourStep');
+        skipToFinale();
       };
     }
 
@@ -4720,13 +4708,6 @@ function startSettingsTour() {
       animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
       document.head.appendChild(animStyle);
     }
-
-    // Dismiss on overlay click
-    blurOverlay.onclick = () => {
-      cleanupTour();
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.removeItem('settingsTourStep');
-    };
   }
 
   function showBookingsMockModal() {
@@ -4812,16 +4793,7 @@ function startSettingsTour() {
     };
 
     document.getElementById('tourSkipBtn').onclick = () => {
-      cleanupTour();
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.removeItem('settingsTourStep');
-    };
-
-    // Dismiss on overlay click
-    blurOverlay.onclick = () => {
-      cleanupTour();
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.removeItem('settingsTourStep');
+      skipToFinale();
     };
   }
 

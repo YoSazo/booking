@@ -142,6 +142,7 @@ function App() {
       document.title = 'Book Now';
     }
   }, [currentHotel?.name]);
+
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
   const location = useLocation(); 

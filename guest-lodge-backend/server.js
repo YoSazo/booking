@@ -4892,6 +4892,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             address: hotel.address,
             subtitle: hotel.subtitle,
             pms: hotel.pms,
+            theme: hotel.theme || 'light',
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
@@ -4931,7 +4932,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Missing authorized hotel context.' });
         }
         const config = await resolveHotelConfig(hotelId);
-        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true } });
+        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true, theme: true, subscribed: true } });
         const primaryDomain = await prisma.hotelDomain.findFirst({ where: { hotelId, isPrimary: true }, select: { domain: true } });
         res.json({
             success: true,
@@ -4945,7 +4946,8 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             hotelAddress: dbHotel?.address || '',
             hotelPhone: dbHotel?.phone || '',
             cancellationPolicy: dbHotel?.cancellationPolicy || '',
-            subscribed: false,
+            theme: dbHotel?.theme || 'light',
+            subscribed: dbHotel?.subscribed || false,
         });
     } catch (e) {
         console.error('crm:verify failed:', e.message);
@@ -4958,13 +4960,14 @@ app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const { name, subtitle, address, phone, cancellationPolicy } = req.body;
+        const { name, subtitle, address, phone, cancellationPolicy, theme } = req.body;
         const data = {};
         if (name !== undefined) data.name = name || undefined;
         if (subtitle !== undefined) data.subtitle = subtitle;
         if (address !== undefined) data.address = address;
         if (phone !== undefined) data.phone = phone;
         if (cancellationPolicy !== undefined) data.cancellationPolicy = cancellationPolicy;
+        if (theme !== undefined) data.theme = theme;
         await prisma.hotelConfig.update({
             where: { id: hotelId },
             data,

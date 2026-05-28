@@ -146,6 +146,7 @@ model HotelConfig {
   phone         String?
   address       String?
   subtitle      String?
+  theme         String?   @default("light")
   checkInTime   String?   @default("15:00")
   checkOutTime  String?   @default("11:00")
   cancellationPolicy String?
