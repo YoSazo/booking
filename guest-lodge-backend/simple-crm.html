@@ -2523,8 +2523,12 @@ async function startCrmApp(verification) {
   }
 
   // Show onboarding questionnaire on first visit (before tour)
-  if (!localStorage.getItem('onboardingDone')) {
+  // Only show if coming from setup (welcome param was present) AND not already done
+  if (!localStorage.getItem('onboardingDone') && urlParams.has('welcome')) {
     showOnboardingQuestions();
+  } else {
+    // Returning user — mark onboarding as done so it never shows again
+    localStorage.setItem('onboardingDone', '1');
   }
 }
 
