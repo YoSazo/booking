@@ -2904,7 +2904,13 @@ function setFilter(filter, btn) {
   }
   syncMobileNavActive(filter);
   if (filter === 'availability') {
-    loadManualAvailability().then(applyFilter).catch(() => applyFilter());
+    // Show the tab immediately with a loading state
+    applyFilter();
+    const calWrap = document.getElementById('availabilityCalendarWrap');
+    const noRoom = document.getElementById('availabilityNoRoom');
+    if (calWrap) calWrap.style.display = 'none';
+    if (noRoom) { noRoom.style.display = 'block'; noRoom.innerHTML = '<div class="loading"><div class="spinner"></div> Loading availability…</div>'; }
+    loadManualAvailability().then(() => { renderAvailabilityView(); }).catch(() => { renderAvailabilityView(); });
     return;
   }
   if (filter === 'revenue') {
