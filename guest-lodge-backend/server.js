@@ -276,7 +276,7 @@ const BOOKINGCENTER_TEST_RECEIPT_TYPE = process.env.BOOKINGCENTER_TEST_RECEIPT_T
 // Multi-hotel configuration
 const hotelConfig = {
     'suite-stay': {
-        pms: 'cloudbeds',
+        pms: 'manual',
         propertyId: '100080519237760',
         roomIDMapping: {
             'King Room': {
