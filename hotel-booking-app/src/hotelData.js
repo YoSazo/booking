@@ -170,7 +170,7 @@ export const hotelData = {
       },
     ],
     rooms: [
-      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
+      { id: 1, name: 'King Room', amenities: 'Free WiFi • 60" TV • Fridge • Workstation', description: 'A spacious, fully furnished room with a king-sized bed, no utility fees, and everything you need to move in today.', maxOccupancy: 3, imageUrl: 'kingbedsuitestay.webp', imageUrls: [
             'kingbedsuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',
@@ -181,7 +181,7 @@ export const hotelData = {
             'suitestayoutside.webp',
             'suitestayreception.webp',
         ] },
-      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi • 60" TV • Fridge • Workstation • Bath • Free Parking • Weekly Housekeeping', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in. Includes a workstation, Wi-Fi, and weekly housekeeping.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
+      { id: 2, name: 'Double Full Bed', amenities: 'Free WiFi • 60" TV • Fridge • Workstation', description: 'Fully furnished with two full-size beds, no utility fees, and ready to move in.', maxOccupancy: 4, imageUrl: 'doublesuitestay.webp', imageUrls: [
             'doublesuitestay.webp',
             'doublesuitestay2.webp',
             'doublesuitestay3.webp',

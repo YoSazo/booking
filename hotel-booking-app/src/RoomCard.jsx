@@ -356,7 +356,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             ) : (
               <>
                 <h3>{room.name}</h3>
-                <p className="room-subtitle">{room.description || 'Spacious • Fully Furnished'}</p>
+                <p className="room-subtitle">Spacious • Fully Furnished</p>
               </>
             )}
           </div>
@@ -396,6 +396,11 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             </div>
           )}
         </div>
+
+        {/* Room Description */}
+        {room.description && !isEditMode && (
+          <p className="room-description">{room.description}</p>
+        )}
 
         {/* Amenity Picker Modal (edit mode) */}
         {isEditMode && showAmenityPicker && <AmenityPickerModal room={{ ...room, amenities: localAmenities }} hotelId={hotelId} onDone={(newAmenities) => { setShowAmenityPicker(false); if (newAmenities !== undefined) setLocalAmenities(newAmenities); }} />}
