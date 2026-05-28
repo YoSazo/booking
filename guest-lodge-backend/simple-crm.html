@@ -1717,8 +1717,6 @@
 
 <!-- APP -->
 <div id="app" style="display:none">
-  <!-- Go Live banner (hidden - payment gate is on booking engine) -->
-  <div id="goLiveBanner" style="display:none;"></div>
   <header class="header">
     <div class="header-logo">
       <img src="/marketellogo.svg" alt="" class="header-logo-icon">
@@ -1743,6 +1741,7 @@
       </button>
     </div>
     <div id="bookingsList">
+      <div id="goLiveBanner" style="display:none;"></div>
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
     </div>
   </div>
@@ -2529,7 +2528,9 @@ async function startCrmApp(verification) {
   // Show/hide Go Live banner based on subscription status
   const banner = document.getElementById('goLiveBanner');
   if (banner) {
-    banner.style.display = (verification && verification.subscribed) ? 'none' : 'block';
+    // Only show the go-live banner after the tour is done (or if returning user who already did tour)
+    const tourDone = localStorage.getItem('settingsTourDone');
+    banner.style.display = (verification && verification.subscribed === false && tourDone) ? 'block' : 'none';
   }
 
   const realignActiveTab = () => {
@@ -2744,6 +2745,18 @@ async function refreshCurrentView() {
 // ── RENDER ─────────────────────────────────────────────
 function renderBookings(list) {
   const el = document.getElementById('bookingsList');
+
+  // Show go-live banner at top if not subscribed
+  const goLiveBanner = document.getElementById('goLiveBanner');
+  if (goLiveBanner && goLiveBanner.style.display !== 'none') {
+    goLiveBanner.innerHTML = `
+      <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
+        <p style="font-size:12px;color:rgba(255,255,255,0.8);margin:0 0 14px;line-height:1.5;">Guests can see your booking page but can't complete a reservation yet.</p>
+        <button onclick="goLive()" style="width:100%;max-width:260px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
+        <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+      </div>`;
+  }
 
   if (list.length === 0) {
     // Check photo status from API (editRooms might not be loaded yet)
@@ -4625,24 +4638,35 @@ function startSettingsTour() {
     overlay.innerHTML = `
       <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
         <div style="padding:28px 22px;text-align:center;">
-          <div style="font-size:36px;margin-bottom:12px;">🏨</div>
-          <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">One last thing</div>
-          <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 20px;">See what your guests see — walk through your booking page like a guest would. Takes 60 seconds.</p>
-          <div style="background:#f8faf9;border-radius:10px;padding:12px;margin-bottom:20px;border:1px solid #D8E4DC;">
-            <p style="font-size:12px;color:#374151;margin:0;line-height:1.5;">This is exactly what happens when someone clicks your link. Your card won't be charged — we just verify it.</p>
+          <div style="font-size:36px;margin-bottom:12px;">🚀</div>
+          <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Go live and start accepting bookings</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your engine is built. Your link is copied. Activate to let guests book.</p>
+          <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:20px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Your booking page goes live</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Card verification prevents no-shows</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Get notified when bookings come in</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">No commission — ever</span></div>
+            </div>
           </div>
-          <button id="testDriveBtn" style="width:100%;padding:16px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Preview as a Guest →</button>
-          <button id="testDriveSkip" style="background:none;border:none;color:#6b7280;font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;">I'll do this later</button>
+          <button id="activateNowBtn" style="width:100%;padding:16px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">$99/mo — Go Live Now</button>
+          <p style="font-size:11px;color:#6b7280;margin:0 0 16px;">Cancel anytime · No contracts</p>
+          <button id="activateLaterBtn" style="background:none;border:none;color:#9ca3af;font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;">Not ready yet — keep my page inactive</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
 
-    document.getElementById('testDriveBtn').onclick = () => {
+    document.getElementById('activateNowBtn').onclick = () => {
       overlay.remove();
-      window.open(bookingUrl + '?preview=1', '_blank');
+      // Trigger Stripe checkout via go-live endpoint
+      const goLiveToken = token;
+      fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': goLiveToken }, body: JSON.stringify({ hotelId: activeHotelId }) })
+        .then(r => r.json())
+        .then(data => { if (data.success && data.url) window.location.href = data.url; else toast('Something went wrong. Try again.', 'error'); })
+        .catch(() => toast('Something went wrong. Try again.', 'error'));
     };
 
-    document.getElementById('testDriveSkip').onclick = () => {
+    document.getElementById('activateLaterBtn').onclick = () => {
       overlay.remove();
       // Switch to bookings tab
       const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
