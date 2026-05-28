@@ -5052,7 +5052,7 @@ app.post('/api/auth/magic-link', async (req, res) => {
         if (!email) return res.json({ success: true }); // Don't reveal if email missing
 
         const hotel = await prisma.hotelConfig.findFirst({ where: { ownerEmail: email }, select: { id: true, name: true } });
-        if (!hotel) return res.json({ success: true }); // Don't reveal if not found
+        if (!hotel) return res.status(404).json({ success: false, message: 'No account found with that email.' });
 
         // Get the hotel's domain for the link
         const domain = await prisma.hotelDomain.findFirst({ where: { hotelId: hotel.id, isPrimary: true }, select: { domain: true } });

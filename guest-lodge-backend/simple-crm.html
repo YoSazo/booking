@@ -2582,13 +2582,14 @@ async function startCrmApp(verification) {
     goLive();
   }
 
-  // Show onboarding questionnaire on first visit (before tour)
-  // Only show if coming from setup (welcome param was present) AND not already done
+  // Show welcome modal on first visit (skip questionnaire, go straight to tour)
   if (!localStorage.getItem('onboardingDone') && urlParams.has('welcome')) {
-    showOnboardingQuestions();
-  } else {
-    // Returning user — mark onboarding as done so it never shows again
     localStorage.setItem('onboardingDone', '1');
+    showWelcomeModal();
+  } else {
+    // Returning user — mark onboarding and tour as done so they never fire
+    localStorage.setItem('onboardingDone', '1');
+    localStorage.setItem('settingsTourDone', '1');
   }
 }
 
@@ -2622,12 +2623,22 @@ async function sendMagicLink() {
   if (!email) { msg.textContent = 'Please enter your email'; return; }
   msg.textContent = 'Sending…';
   try {
-    await fetch('/api/auth/magic-link', {
+    const res = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-  } catch (e) { /* ignore */ }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      msg.textContent = data.message || 'No account found with that email.';
+      msg.style.color = '#E05252';
+      return;
+    }
+  } catch (e) {
+    msg.textContent = 'Something went wrong. Try again.';
+    msg.style.color = '#E05252';
+    return;
+  }
   msg.textContent = "Check your email — we sent you a login link.";
   msg.style.color = '#2E7D5B';
 }
