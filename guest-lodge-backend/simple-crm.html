@@ -2532,10 +2532,11 @@ async function startCrmApp(verification) {
   // Show/hide Go Live banner based on subscription status
   const banner = document.getElementById('goLiveBanner');
   if (banner) {
-    // Only show the go-live banner after the tour is done (or if returning user who already did tour)
+    // Only show on bookings tab, after tour is done, when not subscribed
     const tourDone = localStorage.getItem('settingsTourDone');
-    banner.style.display = (!hotelSubscribed && tourDone) ? 'block' : 'none';
-    if (banner.style.display === 'block') {
+    const showBanner = !hotelSubscribed && tourDone && currentFilter === 'bookings';
+    banner.style.display = showBanner ? 'block' : 'none';
+    if (showBanner) {
       banner.innerHTML = `
         <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
           <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
