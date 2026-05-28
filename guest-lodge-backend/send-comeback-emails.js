@@ -23,14 +23,14 @@ function generateMagicToken(email, hotelId) {
 }
 
 async function main() {
-  // Setup email transporter
+  // Setup email transporter (Brevo SMTP)
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
+    host: process.env.BREVO_SMTP_HOST,
+    port: parseInt(process.env.BREVO_SMTP_PORT || '587'),
+    secure: false,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: process.env.BREVO_SMTP_LOGIN,
+      pass: process.env.BREVO_SMTP,
     },
   });
 

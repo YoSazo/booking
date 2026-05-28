@@ -4009,7 +4009,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
 app.post('/api/funnel/onboarding', async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true });
     try {
-        const { eventName, email, userAgent, ip, referrer } = req.body;
+        const { eventName, email, userAgent, ip, referrer, contentName } = req.body;
         if (!eventName) return res.status(400).json({ success: false });
         await prisma.funnelEvent.create({
             data: {
@@ -4018,9 +4018,21 @@ app.post('/api/funnel/onboarding', async (req, res) => {
                 guestEmail: email || null,
                 userAgent: userAgent || req.headers['user-agent'] || null,
                 ipAddress: ip || req.ip || req.socket?.remoteAddress || null,
-                contentName: referrer || null,
+                contentName: contentName || referrer || null,
             },
         });
+        // Fire CAPI for Qualead events
+        if (eventName === 'Qualead') {
+            const { fbp: qFbp, fbc: qFbc } = getMetaCookies(req);
+            sendMarketelCAPI('Qualead', {
+                email: email || '',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                sourceUrl: req.headers.referer || '',
+                fbp: qFbp,
+                fbc: qFbc,
+            });
+        }
         res.json({ success: true });
     } catch (e) {
         console.error('Onboarding funnel event error:', e.message);

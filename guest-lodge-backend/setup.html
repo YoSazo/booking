@@ -268,6 +268,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-2"></div>
     <div class="progress-step" id="prog-3"></div>
     <div class="progress-step" id="prog-4"></div>
+    <div class="progress-step" id="prog-5"></div>
   </div>
 
   <!-- STEP 1: Hotel Name -->
@@ -295,8 +296,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 3: Video showcase - see your engine in action -->
+  <!-- STEP 3: Quality question -->
   <div class="step" id="step-3">
+    <div class="form-card" style="text-align:center;">
+      <h2 style="font-size:18px; margin-bottom:16px;">Why do you want a booking engine?</h2>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_commissions')">I'm tired of paying OTA commissions</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('direct_bookings')">I want guests to book directly from my website / Google listing</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('professional')">I want to look more professional online</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('other')">Other</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4: Video showcase - see your engine in action -->
+  <div class="step" id="step-4">
     <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center;">
       <div style="max-width:400px; width:100%;">
         <h2 style="font-size:20px; font-weight:800; margin-bottom:6px; color:var(--text);">This is your booking engine</h2>
@@ -311,15 +325,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
           </video>
         </div>
 
-        <button id="videoNextBtn" class="btn btn-primary" style="font-size:16px; padding:16px;" onclick="goToStep(4)">
+        <button id="videoNextBtn" class="btn btn-primary" style="font-size:16px; padding:16px;" onclick="goToStep(5)">
           Continue →
         </button>
       </div>
     </div>
   </div>
 
-  <!-- STEP 4: Success - dashboard ready -->
-  <div class="step" id="step-4">
+  <!-- STEP 5: Success - dashboard ready -->
+  <div class="step" id="step-5">
     <div class="form-card" style="text-align:center; padding:32px 24px;">
       <div style="font-size:36px; margin-bottom:12px;">🚀</div>
       <h2 style="font-size:22px; font-weight:800; margin-bottom:8px; color:var(--text);">You're all set!</h2>
@@ -362,6 +376,18 @@ function goToStep(n) {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
   window.scrollTo(0, 0);
+}
+
+function answerQualityQ(answer) {
+  // Fire Qualead event for gold answers (browser-side)
+  if (answer === 'ota_commissions' || answer === 'direct_bookings') {
+    if (typeof fbq !== 'undefined') fbq('trackCustom', 'Qualead', { answer: answer });
+    // CAPI (server-side)
+    fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Qualead', email: hotelData.id || TOKEN, contentName: answer }) }).catch(() => {});
+  }
+  // Track all answers
+  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'QualityAnswer', email: hotelData.id || TOKEN, contentName: answer }) }).catch(() => {});
+  goToStep(4);
 }
 
 // Load existing data
