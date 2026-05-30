@@ -1727,6 +1727,7 @@
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');location.href='/frontdesk?pin='+encodeURIComponent(token)+'&hotelId='+encodeURIComponent(activeHotelId)+'&welcome=1';">🔄 Redo Tour</button>
     </div>
   </header>
 
