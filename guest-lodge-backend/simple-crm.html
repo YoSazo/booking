@@ -340,6 +340,22 @@
       display: flex; align-items: center; justify-content: center;
       height: 200px; font-size: 14px; color: var(--text-muted); gap: 10px;
     }
+    .availability-day-saving-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.94);
+      border-radius: inherit;
+    }
+    .availability-day-saving-overlay[hidden] { display: none; }
+    .availability-day-saving-inner {
+      height: auto;
+      flex-direction: column;
+      gap: 12px;
+    }
     .spinner {
       width: 18px; height: 18px; border: 2px solid var(--border);
       border-top-color: var(--green); border-radius: 50%;
@@ -1799,6 +1815,7 @@ let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
 let availabilityMonth = new Date().getMonth();
 let availabilityEditingDay = '';
+let availabilityDaySaving = false;
 let editingRoomName = '';
 let pendingDeleteRoomName = '';
 let currentHotelPms = '';
@@ -2421,7 +2438,10 @@ function ensureAvailabilityUi() {
 
       <div id="availabilitySheetBackdrop" class="availability-sheet-backdrop"></div>
       <div id="availabilityDayPopover" class="availability-edit-sheet" aria-hidden="true" style="display:none;">
-        <button type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:18px;color:var(--text-muted);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;" onclick="closeAvailabilityDayPopover()" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">×</button>
+        <div id="availabilityDaySavingOverlay" class="availability-day-saving-overlay" hidden aria-hidden="true">
+          <div class="loading availability-day-saving-inner"><div class="logo-sprite-bounce"></div> Saving…</div>
+        </div>
+        <button id="availabilityDayCloseBtn" type="button" style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:18px;color:var(--text-muted);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;" onclick="closeAvailabilityDayPopover()" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">×</button>
         <div style="padding:18px 18px 16px;">
           <div id="availabilityDayPopoverTitle" style="font-size:13px;font-weight:700;color:#1a1a2e;text-align:center;margin-bottom:14px;"></div>
           <div id="availabilitySheetDate" style="display:none;"></div>
@@ -3483,13 +3503,52 @@ function openAvailabilityDayPopover(event, dayIso) {
   pop.style.border = '1.5px solid var(--border)';
   pop.style.boxShadow = '0 20px 60px rgba(0,0,0,0.2)';
 
+  setAvailabilityDaySaving(false);
+
   pop.classList.add('open');
   pop.setAttribute('aria-hidden', 'false');
   if (event) event.stopPropagation();
 }
 
+function setAvailabilityDaySaving(saving) {
+  availabilityDaySaving = !!saving;
+  const overlay = document.getElementById('availabilityDaySavingOverlay');
+  const saveBtn = document.getElementById('availabilityDaySaveBtn');
+  const closeBtn = document.getElementById('availabilityDayCloseBtn');
+  const stepDown = document.getElementById('availabilityStepDownBtn');
+  const stepUp = document.getElementById('availabilityStepUpBtn');
+  const closedToggle = document.getElementById('availabilityClosedToggleBtn');
+  if (overlay) {
+    overlay.hidden = !saving;
+    overlay.setAttribute('aria-hidden', saving ? 'false' : 'true');
+  }
+  [saveBtn, closeBtn, stepDown, stepUp, closedToggle].forEach((el) => {
+    if (!el) return;
+    el.disabled = saving;
+    el.style.pointerEvents = saving ? 'none' : '';
+    el.style.opacity = saving ? '0.45' : '';
+  });
+  if (!saving) {
+    const closedInput = document.getElementById('availabilityDayClosedInput');
+    const isClosed = !!(closedInput && closedInput.checked);
+    if (stepDown) {
+      stepDown.style.opacity = isClosed ? '0.35' : '';
+      stepDown.style.pointerEvents = isClosed ? 'none' : '';
+    }
+    if (stepUp) {
+      stepUp.style.opacity = isClosed ? '0.35' : '';
+      stepUp.style.pointerEvents = isClosed ? 'none' : '';
+    }
+    if (closedToggle) closedToggle.style.opacity = '';
+    if (saveBtn) saveBtn.style.opacity = '';
+    if (closeBtn) closeBtn.style.opacity = '';
+  }
+}
+
 function closeAvailabilityDayPopover() {
+  if (availabilityDaySaving) return;
   availabilityEditingDay = '';
+  setAvailabilityDaySaving(false);
   const backdrop = document.getElementById('availabilitySheetBackdrop');
   const pop = document.getElementById('availabilityDayPopover');
   if (backdrop) backdrop.classList.remove('open');
@@ -3542,7 +3601,7 @@ function toggleAvailabilityDayClosed() {
 }
 
 async function saveAvailabilityDay() {
-  if (!availabilityEditingDay || !manualSelectedRoom) return;
+  if (availabilityDaySaving || !availabilityEditingDay || !manualSelectedRoom) return;
   const closedInput = document.getElementById('availabilityDayClosedInput');
   const countEl = document.getElementById('availabilityDayCount');
   if (!closedInput || !countEl) return;
@@ -3557,14 +3616,17 @@ async function saveAvailabilityDay() {
     payload.availableUnits = Math.max(0, parseInt(countEl.textContent, 10) || 0);
   }
 
+  setAvailabilityDaySaving(true);
   try {
     const data = await api('POST', '/api/crm/manual-availability/range', payload);
     if (!data.success) throw new Error(data.message || 'Failed to save day');
     manualAvailability = data.data || manualAvailability;
+    availabilityDaySaving = false;
     closeAvailabilityDayPopover();
     renderAvailabilityCalendar();
     toast('Day updated', 'success');
   } catch (e) {
+    setAvailabilityDaySaving(false);
     toast('Failed to update availability', 'error');
   }
 }
