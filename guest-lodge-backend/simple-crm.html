@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Marketel · Front Desk</title>
   <link rel="manifest" href="/manifest-simple-crm.json">
   <meta name="theme-color" content="#EEF2EF">
@@ -4515,7 +4515,7 @@ function startSettingsTour() {
     // Add dark overlay + lock scroll
     const blurOverlay = document.createElement('div');
     blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);pointer-events:none;';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);';
     document.body.appendChild(blurOverlay);
     document.body.style.overflow = 'hidden';
 
@@ -4523,7 +4523,7 @@ function startSettingsTour() {
     if (!el.dataset.tourOrigPosition) el.dataset.tourOrigPosition = el.style.position || '';
     el.style.position = el.style.position || 'relative';
     el.style.zIndex = '99999';
-    el.style.pointerEvents = 'auto';
+    el.style.isolation = 'isolate';
     el.style.boxShadow = '0 0 0 4px #2E7D5B, 0 0 20px rgba(46,125,91,0.3)';
     el.setAttribute('data-tour-highlighted', '1');
 
