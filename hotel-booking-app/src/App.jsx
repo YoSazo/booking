@@ -111,7 +111,7 @@ function App() {
         if (!res.ok) throw new Error('Not found');
         const data = await res.json();
         if (cancelled) return;
-        setCurrentHotel({
+        const hotelConfig = {
           id: data.id || hotelId,
           name: data.name || fallbackHotel.name,
           url: '',
@@ -125,10 +125,15 @@ function App() {
           subscribed: data.subscribed || false,
           appIconUrl: data.appIconUrl || '',
           reviews: [],
-        });
+        };
+        setCurrentHotel(hotelConfig);
+        setAvailableRooms(hotelConfig.rooms || []);
       } catch (e) {
         // Hotel not found in API — use fallback
-        if (!cancelled) setCurrentHotel(fallbackHotel);
+        if (!cancelled) {
+          setCurrentHotel(fallbackHotel);
+          setAvailableRooms(fallbackHotel.rooms || []);
+        }
       }
       if (!cancelled) setHotelLoading(false);
     })();
@@ -198,7 +203,7 @@ function App() {
   const [checkoutDate, setCheckoutDate] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [availableRooms, setAvailableRooms] = useState([]);
+  const [availableRooms, setAvailableRooms] = useState(() => (staticHotel || fallbackHotel).rooms || []);
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
 
