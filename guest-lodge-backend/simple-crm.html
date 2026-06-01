@@ -4692,11 +4692,13 @@ function startSettingsTour() {
     const initial = hName.trim().charAt(0).toUpperCase();
     const shortName = hName.length > 10 ? hName.slice(0, 10) : hName;
 
-    // Build a uniform 4×2 home-screen grid. Every cell has the same square
-    // icon + a reserved label line so all tiles align perfectly. The hotel's
-    // tile is the only one that's highlighted and labeled.
-    const ghostTile = '<div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="width:100%;aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,0.22);"></div><div style="height:8px;"></div></div>';
-    const hotelTile = `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="width:100%;aspect-ratio:1;border-radius:10px;background:#fff;color:#2E7D5B;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(255,255,255,0.95),0 6px 14px rgba(0,0,0,0.35);">${initial}</div><div style="font-size:7.5px;color:#fff;font-weight:700;line-height:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortName}</div></div>`;
+    // Build a uniform 4x2 home-screen grid. Every icon uses the same fixed
+    // visual box; the hotel tile is highlighted by color only, not by size.
+    const tileWrapStyle = 'width:32px;display:flex;flex-direction:column;align-items:center;gap:5px;';
+    const iconBaseStyle = 'width:32px;height:32px;border-radius:9px;box-sizing:border-box;';
+    const labelBaseStyle = 'height:8px;max-width:46px;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    const ghostTile = `<div style="${tileWrapStyle}"><div style="${iconBaseStyle}background:rgba(255,255,255,0.22);"></div><div style="${labelBaseStyle}"></div></div>`;
+    const hotelTile = `<div style="${tileWrapStyle}"><div style="${iconBaseStyle}background:#fff;color:#2E7D5B;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.95);box-shadow:0 6px 14px rgba(0,0,0,0.28);">${initial}</div><div style="${labelBaseStyle}font-size:7.5px;color:#fff;font-weight:700;">${shortName}</div></div>`;
     const homeTiles = [ghostTile, ghostTile, ghostTile, ghostTile, hotelTile, ghostTile, ghostTile, ghostTile].join('');
 
     const modal = document.createElement('div');
@@ -4706,8 +4708,8 @@ function startSettingsTour() {
       <div style="background:white;border-radius:22px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;overflow:hidden;">
         <div style="background:linear-gradient(160deg,#2E7D5B 0%,#1f5c43 100%);padding:22px 20px 18px;text-align:center;">
           <!-- Mini phone home-screen mockup -->
-          <div style="width:172px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:24px;padding:16px 14px;border:1px solid rgba(255,255,255,0.18);">
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:13px 11px;">
+          <div style="width:172px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:24px;padding:16px 14px;border:1px solid rgba(255,255,255,0.18);box-sizing:border-box;">
+            <div style="display:grid;grid-template-columns:repeat(4,32px);justify-content:center;gap:13px 8px;">
               ${homeTiles}
             </div>
           </div>
