@@ -4383,6 +4383,13 @@ function startSettingsTour() {
       tab: 'settings'
     },
     {
+      target: '#appIconPreview',
+      text: 'Upload your own app icon here — this is what guests see on their home screen when they install your booking page. Make it yours.',
+      openAccordion: false,
+      targetParent: true,
+      tab: 'settings'
+    },
+    {
       target: '#edit-rate-nightly',
       text: 'You can change your rates here — nightly, weekly, and monthly.',
       openAccordion: true,
@@ -4685,27 +4692,23 @@ function startSettingsTour() {
     const initial = hName.trim().charAt(0).toUpperCase();
     const shortName = hName.length > 10 ? hName.slice(0, 10) : hName;
 
+    // Build a uniform 4×2 home-screen grid. Every cell has the same square
+    // icon + a reserved label line so all tiles align perfectly. The hotel's
+    // tile is the only one that's highlighted and labeled.
+    const ghostTile = '<div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="width:100%;aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,0.22);"></div><div style="height:8px;"></div></div>';
+    const hotelTile = `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="width:100%;aspect-ratio:1;border-radius:10px;background:#fff;color:#2E7D5B;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(255,255,255,0.95),0 6px 14px rgba(0,0,0,0.35);">${initial}</div><div style="font-size:7.5px;color:#fff;font-weight:700;line-height:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortName}</div></div>`;
+    const homeTiles = [ghostTile, ghostTile, ghostTile, ghostTile, hotelTile, ghostTile, ghostTile, ghostTile].join('');
+
     const modal = document.createElement('div');
     modal.id = 'tourTooltip';
     modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:20px 16px;';
     modal.innerHTML = `
       <div style="background:white;border-radius:22px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;overflow:hidden;">
-        <div style="background:linear-gradient(160deg,#2E7D5B 0%,#1f5c43 100%);padding:22px 20px 14px;text-align:center;">
+        <div style="background:linear-gradient(160deg,#2E7D5B 0%,#1f5c43 100%);padding:22px 20px 18px;text-align:center;">
           <!-- Mini phone home-screen mockup -->
-          <div style="width:150px;margin:0 auto;background:rgba(255,255,255,0.12);border-radius:22px;padding:14px 12px 16px;border:1px solid rgba(255,255,255,0.2);">
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;">
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
-              <!-- The hotel's app tile, glowing -->
-              <div style="grid-column:span 1;display:flex;flex-direction:column;align-items:center;gap:3px;">
-                <div style="aspect-ratio:1;width:100%;border-radius:9px;background:#fff;color:#2E7D5B;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 4px 12px rgba(0,0,0,0.3);">${initial}</div>
-                <div style="font-size:7px;color:white;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortName}</div>
-              </div>
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
-              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+          <div style="width:172px;margin:0 auto;background:rgba(255,255,255,0.1);border-radius:24px;padding:16px 14px;border:1px solid rgba(255,255,255,0.18);">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:13px 11px;">
+              ${homeTiles}
             </div>
           </div>
         </div>
@@ -5107,6 +5110,9 @@ async function loadEditRooms() {
     // Fetch hotel info for name/subtitle/address/phone editing
     const hotelRes = await api('GET', '/api/crm/verify');
     const hotelName = hotelRes?.hotelName || '';
+    // Keep the global name in sync — context API can fall back to the hotel id,
+    // but verify returns the real name (used by the tour's home-screen modal).
+    if (hotelName) activeHotelName = hotelName;
     const hotelSubtitle = hotelRes?.hotelSubtitle || '';
     const hotelAddress = hotelRes?.hotelAddress || '';
     const hotelPhone = hotelRes?.hotelPhone || '';
