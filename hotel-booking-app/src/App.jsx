@@ -589,9 +589,8 @@ const handleConfirmBooking = async (bookingDetails) => {
   // Show loading spinner while loading dynamic hotel
   if (hotelLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ width: '32px', height: '32px', border: '3px solid #e5e7eb', borderTopColor: '#2E7D5B', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="app-boot-loader" aria-label="Loading booking page">
+        <div className="app-boot-loader__mark"></div>
       </div>
     );
   }

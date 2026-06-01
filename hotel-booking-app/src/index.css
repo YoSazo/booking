@@ -3,6 +3,7 @@ html, body, #root {
   /* This prevents the "rubber band" scrolling bounce effect on mobile,
      especially on iOS, and stops the grey background from appearing. */
   overscroll-behavior-y: contain;
+  min-height: 100%;
 }
 
 /* --- Basic Styles & Fonts --- */
@@ -26,6 +27,34 @@ body {
     /* Prevent viewport shifting on input focus */
     width: 100%;
     overflow-x: hidden;
+}
+
+.app-boot-loader {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #ffffff 0%, #f3f8f5 100%);
+}
+
+.app-boot-loader__mark {
+  width: 46px;
+  height: 48px;
+  background: url('/marketellogo.svg') center / contain no-repeat;
+  animation: appBootBounce 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  filter: drop-shadow(0 10px 18px rgba(46, 125, 91, 0.16));
+}
+
+@keyframes appBootBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-10px) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-boot-loader__mark {
+    animation: none;
+  }
 }
 
 /* --- Main Container --- */
