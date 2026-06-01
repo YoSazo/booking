@@ -29,3 +29,6 @@ hotel-booking-app/0518.mp4
 
 # Ignore temp files
 .memla_patch_exec_tmp/
+
+# Ignore internal notes
+Conversation about marketel.md
