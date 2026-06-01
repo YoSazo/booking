@@ -4364,6 +4364,13 @@ function startSettingsTour() {
   let step = parseInt(localStorage.getItem('settingsTourStep') || '0');
   const steps = [
     {
+      target: '',
+      text: '',
+      openAccordion: false,
+      tab: 'settings',
+      customModal: 'homescreen'
+    },
+    {
       target: '#edit-hotel-phone',
       text: 'Tap any field here to edit your hotel info — name, address, phone.',
       openAccordion: false,
@@ -4497,6 +4504,11 @@ function startSettingsTour() {
   }
 
   function showStepContent(s) {
+    // Home-screen install pitch — shown first so they immediately get the value
+    if (s.customModal === 'homescreen') {
+      showHomescreenMockModal();
+      return;
+    }
     // Custom modal for bookings tab — show a mock booking card example
     if (s.customModal === true || s.customModal === 'bookings') {
       showBookingsMockModal();
@@ -4659,6 +4671,71 @@ function startSettingsTour() {
     document.getElementById('tourSkipBtn').onclick = () => {
       skipToFinale();
     };
+  }
+
+  function showHomescreenMockModal() {
+    // Dark overlay
+    const blurOverlay = document.createElement('div');
+    blurOverlay.id = 'tourBlurOverlay';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);';
+    document.body.appendChild(blurOverlay);
+    document.body.style.overflow = 'hidden';
+
+    const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+    const initial = hName.trim().charAt(0).toUpperCase();
+    const shortName = hName.length > 10 ? hName.slice(0, 10) : hName;
+
+    const modal = document.createElement('div');
+    modal.id = 'tourTooltip';
+    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:20px 16px;';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:22px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;overflow:hidden;">
+        <div style="background:linear-gradient(160deg,#2E7D5B 0%,#1f5c43 100%);padding:22px 20px 14px;text-align:center;">
+          <!-- Mini phone home-screen mockup -->
+          <div style="width:150px;margin:0 auto;background:rgba(255,255,255,0.12);border-radius:22px;padding:14px 12px 16px;border:1px solid rgba(255,255,255,0.2);">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;">
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+              <!-- The hotel's app tile, glowing -->
+              <div style="grid-column:span 1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                <div style="aspect-ratio:1;width:100%;border-radius:9px;background:#fff;color:#2E7D5B;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 4px 12px rgba(0,0,0,0.3);">${initial}</div>
+                <div style="font-size:7px;color:white;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortName}</div>
+              </div>
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+              <div style="aspect-ratio:1;border-radius:9px;background:rgba(255,255,255,0.25);"></div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:20px 22px 22px;text-align:center;">
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You're on their home screen</div>
+          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">Guests can install <strong>${hName}</strong> as an app — right next to their other apps. No Safari, no searching <span style="text-decoration:line-through;color:#9ca3af;">Booking.com</span> or <span style="text-decoration:line-through;color:#9ca3af;">Airbnb</span>.</p>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
+            <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
+          </div>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Your guests get a "Tap to Install" button on your booking page. You can set your own custom app icon in Settings.</p>
+          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
+          <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    if (!document.getElementById('tourModalAnimStyle')) {
+      const animStyle = document.createElement('style');
+      animStyle.id = 'tourModalAnimStyle';
+      animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
+      document.head.appendChild(animStyle);
+    }
+
+    document.getElementById('tourNextBtn').onclick = () => {
+      cleanupTour();
+      step++;
+      localStorage.setItem('settingsTourStep', String(step));
+      showStep();
+    };
+    document.getElementById('tourSkipBtn').onclick = () => { skipToFinale(); };
   }
 
   function showFinaleMockModal() {
@@ -5033,6 +5110,7 @@ async function loadEditRooms() {
     const hotelSubtitle = hotelRes?.hotelSubtitle || '';
     const hotelAddress = hotelRes?.hotelAddress || '';
     const hotelPhone = hotelRes?.hotelPhone || '';
+    const hotelAppIcon = hotelRes?.appIconUrl || '';
 
     // Fetch rates
     let rates = { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 };
@@ -5118,6 +5196,22 @@ async function loadEditRooms() {
             <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
           </div>
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
+        </div>
+      </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Your App Icon</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">When a guest taps <strong>Install</strong> on your booking page, your hotel lands on their home screen. This is the icon they'll see — make it yours.</p>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <div id="appIconPreview" style="width:68px;height:68px;border-radius:16px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:30px;font-weight:800;">
+              ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;">` : (hotelName ? hotelName.trim().charAt(0).toUpperCase() : '🏨')}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <input type="file" id="appIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
+              <button onclick="document.getElementById('appIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
+              <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0;line-height:1.4;">Square image works best (512×512). PNG or JPG.</p>
+            </div>
+          </div>
         </div>
       </div>
       <div class="booking-card" style="margin-bottom:14px;">
@@ -5529,6 +5623,39 @@ async function uploadEditImages(event, roomId) {
   // Advance tour if action was taken during it
   advanceTourIfNeeded();
   toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
+}
+
+async function uploadAppIcon(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const preview = document.getElementById('appIconPreview');
+  if (preview) {
+    preview.innerHTML = '<div style="width:24px;height:24px;border:3px solid rgba(255,255,255,0.5);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></div>';
+  }
+  const fd = new FormData();
+  fd.append('icon', file);
+  try {
+    const res = await fetch('/api/crm/hotel-app-icon', {
+      method: 'POST',
+      headers: { 'x-crm-token': token },
+      body: fd,
+    });
+    const data = await res.json();
+    if (data.success && data.appIconUrl) {
+      if (preview) {
+        preview.style.background = '#fff';
+        preview.innerHTML = '<img src="' + data.appIconUrl + '" alt="App icon" style="width:100%;height:100%;object-fit:cover;">';
+      }
+      toast('App icon updated! Guests who install your page will see it.', 'success');
+    } else {
+      toast(data.message || 'Failed to upload icon', 'error');
+      if (preview) preview.innerHTML = '🏨';
+    }
+  } catch (e) {
+    toast('Failed to upload icon', 'error');
+    if (preview) preview.innerHTML = '🏨';
+  }
+  input.value = '';
 }
 
 async function deleteEditImage(roomId, imageId) {

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import RoomCard from './RoomCard.jsx';
+import InstallAppBanner from './InstallAppBanner.jsx';
 import { trackPageView } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 
@@ -126,6 +127,14 @@ function BookingPage({
           </div>
         )}
       </main>
+
+      {roomData && roomData.length > 0 && (
+        <InstallAppBanner
+          hotelName={hotel.name}
+          appIconUrl={hotel.appIconUrl}
+          hotelId={hotelId}
+        />
+      )}
     </div>
   );
 }

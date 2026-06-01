@@ -4879,6 +4879,66 @@ app.post('/api/setup/:token/complete', async (req, res) => {
     }
 });
 
+// Dynamic per-hotel PWA manifest — lets each hotel be installed to the home
+// screen as "their" app (their name + their icon). Served same-origin via the
+// booking engine's /api proxy so install prompts work.
+app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
+    try {
+        let hotel = await prisma.hotelConfig.findUnique({
+            where: { id: req.params.hotelId },
+            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
+        });
+        if (!hotel) {
+            const domainGuess = req.params.hotelId + '.bookmarketel.com';
+            const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+            if (domainRecord) {
+                hotel = await prisma.hotelConfig.findUnique({
+                    where: { id: domainRecord.hotelId },
+                    include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
+                });
+            }
+        }
+
+        const name = (hotel && hotel.name) || 'Book Now';
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
+
+        // Icon priority: custom uploaded icon → first room photo → default
+        let iconUrl = hotel && hotel.appIconUrl ? hotel.appIconUrl : '';
+        if (!iconUrl) {
+            const firstImg = hotel && hotel.rooms && hotel.rooms[0] && hotel.rooms[0].images && hotel.rooms[0].images[0];
+            iconUrl = firstImg ? resolveImgUrl(firstImg.url) : 'https://suitestay.clickinns.com/kingbedsuitestay.webp';
+        }
+        const ext = (iconUrl.split('?')[0].split('.').pop() || '').toLowerCase();
+        const iconType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
+
+        const manifest = {
+            name,
+            short_name: name.length > 12 ? name.slice(0, 12) : name,
+            description: `Book directly with ${name}`,
+            start_url: '/?homescreen=1',
+            scope: '/',
+            display: 'standalone',
+            background_color: '#ffffff',
+            theme_color: '#2E7D5B',
+            orientation: 'portrait',
+            icons: [
+                { src: iconUrl, sizes: '192x192', type: iconType, purpose: 'any' },
+                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'any' },
+                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'maskable' },
+            ],
+        };
+
+        res.set('Content-Type', 'application/manifest+json');
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cache-Control', 'public, max-age=300');
+        res.json(manifest);
+    } catch (e) {
+        console.error('Manifest error:', e.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // Public hotel config API (for dynamic frontend loading)
 app.get('/api/hotel/:hotelId/public', async (req, res) => {
     try {
@@ -4914,6 +4974,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             subtitle: hotel.subtitle,
             pms: hotel.pms,
             theme: hotel.theme || 'light',
+            appIconUrl: hotel.appIconUrl || '',
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
@@ -4953,7 +5014,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Missing authorized hotel context.' });
         }
         const config = await resolveHotelConfig(hotelId);
-        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true, theme: true, subscribed: true } });
+        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true, theme: true, appIconUrl: true, subscribed: true } });
         const primaryDomain = await prisma.hotelDomain.findFirst({ where: { hotelId, isPrimary: true }, select: { domain: true } });
         res.json({
             success: true,
@@ -4968,6 +5029,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             hotelPhone: dbHotel?.phone || '',
             cancellationPolicy: dbHotel?.cancellationPolicy || '',
             theme: dbHotel?.theme || 'light',
+            appIconUrl: dbHotel?.appIconUrl || '',
             subscribed: dbHotel?.subscribed || false,
         });
     } catch (e) {
@@ -5655,6 +5717,32 @@ app.delete('/api/crm/rooms/:roomId/images/:imageId', crmAuth, async (req, res) =
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: 'Failed to delete image' });
+    }
+});
+
+// Upload custom PWA app icon for the booking engine (home-screen icon)
+app.post('/api/crm/hotel-app-icon', crmAuth, (req, res, next) => {
+    req.hotelId = req.crmDefaultHotelId || req.crmResolvedHotelId || 'unknown';
+    next();
+}, upload.single('icon'), async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        if (!req.file) return res.status(400).json({ success: false, message: 'No icon' });
+        let url;
+        if (R2_PUBLIC_URL) {
+            const ext = path.extname(req.file.originalname) || '.png';
+            const key = `${req.hotelId}/appicon-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+        } else {
+            url = `/uploads/${req.hotelId}/${req.file.filename}`;
+        }
+        await withRetry(() => prisma.hotelConfig.update({ where: { id: hotelId }, data: { appIconUrl: url } }));
+        const returnUrl = R2_PUBLIC_URL ? url : `${req.protocol}://${req.get('host')}${url}`;
+        res.json({ success: true, appIconUrl: returnUrl });
+    } catch (e) {
+        console.error('CRM app icon upload error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to upload icon' });
     }
 });
 

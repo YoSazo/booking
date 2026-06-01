@@ -123,6 +123,7 @@ function App() {
           rooms: data.rooms || [],
           cancellationPolicy: data.cancellationPolicy || '',
           subscribed: data.subscribed || false,
+          appIconUrl: data.appIconUrl || '',
           reviews: [],
         });
       } catch (e) {
@@ -142,6 +143,52 @@ function App() {
       document.title = 'Book Now';
     }
   }, [currentHotel?.name]);
+
+  // Make this property installable as its own home-screen app (PWA).
+  // Point the manifest at the per-hotel backend endpoint and set the
+  // iOS apple-touch-icon, then register a lightweight service worker.
+  useEffect(() => {
+    if (staticHotel || !hotelId) return; // only for dynamic (real) properties
+
+    const manifestHref = `${API_BASE_URL}/api/hotel/${hotelId}/manifest.webmanifest`;
+    let link = document.querySelector('link[rel="manifest"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'manifest';
+      document.head.appendChild(link);
+    }
+    link.href = manifestHref;
+
+    document.querySelector('meta[name="theme-color"]')?.remove();
+    const themeMeta = document.createElement('meta');
+    themeMeta.name = 'theme-color';
+    themeMeta.content = '#2E7D5B';
+    document.head.appendChild(themeMeta);
+
+    const iosMeta = document.createElement('meta');
+    iosMeta.name = 'apple-mobile-web-app-capable';
+    iosMeta.content = 'yes';
+    document.head.appendChild(iosMeta);
+
+    const iosTitle = document.createElement('meta');
+    iosTitle.name = 'apple-mobile-web-app-title';
+    iosTitle.content = currentHotel?.name || 'Book Now';
+    document.head.appendChild(iosTitle);
+
+    if (currentHotel?.appIconUrl) {
+      let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+      if (!appleIcon) {
+        appleIcon = document.createElement('link');
+        appleIcon.rel = 'apple-touch-icon';
+        document.head.appendChild(appleIcon);
+      }
+      appleIcon.href = currentHotel.appIconUrl;
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/engine-sw.js').catch(() => {});
+    }
+  }, [hotelId, currentHotel?.appIconUrl, currentHotel?.name]);
 
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
