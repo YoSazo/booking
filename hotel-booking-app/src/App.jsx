@@ -140,6 +140,33 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
+  // When the user returns to the app (e.g. after the owner activates in an
+  // external browser tab from within the installed PWA), re-check subscription
+  // status so the payment paywall clears automatically — no manual restart.
+  useEffect(() => {
+    if (staticHotel) return;
+    if (currentHotel?.subscribed) return; // already live, nothing to recheck
+
+    const recheck = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/hotel/${hotelId}/public`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.subscribed) {
+          setCurrentHotel(prev => ({ ...prev, subscribed: true }));
+        }
+      } catch (e) { /* ignore */ }
+    };
+
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+    return () => {
+      document.removeEventListener('visibilitychange', recheck);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [hotelId, currentHotel?.subscribed]);
+
   // Set page title per hotel (single deployment serving multiple properties)
   useEffect(() => {
     if (currentHotel?.name) {

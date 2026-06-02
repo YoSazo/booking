@@ -1385,6 +1385,15 @@ const handlePayLaterBooking = async (e) => {
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
                   <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>Go live to accept bookings</div>
                   <button onClick={() => { 
+                    // If this is running as an installed PWA (home-screen app), the
+                    // front desk + Stripe flow must open in a real browser tab.
+                    // Navigating in-place would replace the booking engine inside
+                    // the installed app and trap the owner on the front desk.
+                    const isStandalone = (typeof window !== 'undefined') && (
+                      window.matchMedia?.('(display-mode: standalone)').matches ||
+                      window.navigator.standalone === true
+                    );
+                    if (isStandalone) { window.open('/frontdesk?action=go-live', '_blank', 'noopener'); return; }
                     const token = localStorage.getItem('crmToken') || '';
                     if (!token) { window.location.href = '/frontdesk?action=go-live'; return; }
                     fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': token } })
