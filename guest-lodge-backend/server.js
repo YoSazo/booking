@@ -5177,6 +5177,10 @@ app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
             where: { id: hotelId },
             data,
         });
+        // Invalidate caches so the new name/info shows immediately everywhere
+        // (and isn't served stale until the cache TTL expires or a deploy clears it).
+        hotelConfigCache.delete(hotelId);
+        clearHotelDomainCache();
         res.json({ success: true });
     } catch (e) {
         console.error('crm:hotel-info failed:', e.message);

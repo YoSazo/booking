@@ -66,6 +66,23 @@ self.addEventListener('notificationclick', function(event) {
     );
 });
 
+// Fetch handler — required for the app to be installable as a PWA.
+// Network-first with no aggressive caching so the live dashboard always shows
+// fresh data; only navigations get a cache fallback when offline.
+self.addEventListener('fetch', function(event) {
+    if (event.request.method !== 'GET') return;
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request).catch(function() {
+                return caches.match(event.request).then(function(r) {
+                    return r || Response.error();
+                });
+            })
+        );
+    }
+    // Non-navigation requests fall through to default network handling.
+});
+
 // Install event
 self.addEventListener('install', function(event) {
     console.log('[Service Worker] Installing...');
