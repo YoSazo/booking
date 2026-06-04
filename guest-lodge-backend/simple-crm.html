@@ -7,7 +7,10 @@
   <link rel="manifest" href="/manifest-simple-crm.json">
   <meta name="theme-color" content="#EEF2EF">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Front Desk">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -1829,6 +1832,7 @@ const ALLOWED_REVENUE_PERIODS = new Set(['today', '7d', '30d', 'all']);
 const OTA_COMMISSION_RATE = 0.25;
 let activeHotelId = '';
 let activeHotelName = '';
+let activeHotelAppIcon = '';
 let activeHotelDomain = '';
 let activeHotelContext = null;
 let bootInFlight = false;
@@ -1880,12 +1884,33 @@ function pushSupported() {
 }
 
 // Point the page's manifest at this hotel's dynamic Front Desk manifest so the
-// installed app is branded as their hotel (name + icon).
+// installed app is branded as their hotel (name + icon). Also refresh the
+// iOS-specific tags (apple-touch-icon + title) because iOS reads THOSE from the
+// DOM at "Add to Home Screen" time and largely ignores manifest icons — and it
+// only accepts PNG, never SVG, so a custom uploaded icon (photo/PNG) or our
+// PNG fallback is what makes the home-screen icon render instead of blank.
 function updateFrontdeskManifestLink() {
   if (!activeHotelId) return;
   const link = document.querySelector('link[rel="manifest"]');
-  if (!link) return;
-  link.href = '/api/hotel/' + encodeURIComponent(activeHotelId) + '/frontdesk-manifest.webmanifest';
+  if (link) {
+    link.href = '/api/hotel/' + encodeURIComponent(activeHotelId) + '/frontdesk-manifest.webmanifest';
+  }
+  try {
+    // Custom uploaded icon wins, but only if it's a raster format iOS can use.
+    let touchIcon = '/apple-touch-icon.png';
+    if (activeHotelAppIcon && /\.(png|jpe?g|webp)(\?|$)/i.test(activeHotelAppIcon)) {
+      touchIcon = activeHotelAppIcon;
+    }
+    let appleLink = document.querySelector('link[rel="apple-touch-icon"]');
+    if (!appleLink) {
+      appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      document.head.appendChild(appleLink);
+    }
+    appleLink.href = touchIcon;
+    const titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    if (titleMeta) titleMeta.content = activeHotelName ? (activeHotelName + ' Front Desk') : 'Front Desk';
+  } catch (_) {}
 }
 try { token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
@@ -2096,6 +2121,7 @@ async function loadHotelContext() {
 
   activeHotelId = String(data.hotelId || '').trim();
   activeHotelName = String(config.name || data.hotelId || '').trim();
+  activeHotelAppIcon = String(config.appIconUrl || '').trim();
   activeHotelDomain = String(data.domain || getDetectedHostname() || '').trim();
   activeHotelContext = data;
   updateHotelChrome();
@@ -2662,6 +2688,9 @@ async function startCrmApp(verification) {
     localStorage.setItem('onboardingDone', '1');
     localStorage.setItem('settingsTourDone', '1');
   }
+
+  // First time opening the INSTALLED app → offer to turn on booking alerts.
+  maybePromptInstalledNotifications();
 }
 
 async function doLogin() {
@@ -4523,6 +4552,46 @@ async function toggleAppNotifications() {
   refreshFrontdeskInstallCard();
 }
 
+// First-launch nudge inside the INSTALLED app. Installing a PWA never asks for
+// notifications on its own — permission is a separate, gesture-driven step (iOS
+// flat-out ignores requestPermission unless it comes from a tap). So the first
+// time they open the installed Front Desk we surface a one-time card whose
+// "Enable" button supplies that gesture. Shown once per device.
+function maybePromptInstalledNotifications() {
+  try {
+    if (!isStandaloneApp()) return;                 // only inside the installed app
+    if (!pushSupported()) return;                   // device can't do web push
+    if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
+    if (localStorage.getItem('notifPromptShown') === '1') return;
+    // Don't stack on top of the welcome / payment-success modals.
+    if (document.getElementById('welcomeModalOverlay') || document.getElementById('activatedModalOverlay')) return;
+    localStorage.setItem('notifPromptShown', '1');
+    setTimeout(showNotifPromptModal, 700);
+  } catch (_) {}
+}
+
+function showNotifPromptModal() {
+  if (document.getElementById('notifPromptOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'notifPromptOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="font-size:34px;margin-bottom:10px;">🔔</div>
+      <h2 style="font-size:19px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">Turn on booking alerts?</h2>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 20px;">Get a notification the moment a guest books — even when the app is closed.</p>
+      <button id="notifPromptEnable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Enable notifications</button>
+      <button id="notifPromptLater" style="width:100%;padding:12px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Not now</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('notifPromptEnable').onclick = async () => {
+    overlay.remove();
+    await enableNotifications();   // runs inside this tap → gesture requirement satisfied
+    refreshFrontdeskInstallCard();
+  };
+  document.getElementById('notifPromptLater').onclick = () => overlay.remove();
+}
+
 // Reusable themed iOS "Add to Home Screen" instruction sheet.
 function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
   const existing = document.getElementById('iosInstallSheet');
@@ -5328,6 +5397,9 @@ async function loadEditRooms() {
     const hotelAddress = hotelRes?.hotelAddress || '';
     const hotelPhone = hotelRes?.hotelPhone || '';
     const hotelAppIcon = hotelRes?.appIconUrl || '';
+    // Sync the home-screen icon/title with the freshest values from verify.
+    activeHotelAppIcon = hotelAppIcon;
+    updateFrontdeskManifestLink();
 
     // Fetch rates
     let rates = { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 };

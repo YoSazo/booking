@@ -4961,13 +4961,22 @@ app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
 
-        // Icon priority: custom uploaded icon → Marketel logo
-        let iconUrl = hotel && hotel.appIconUrl ? hotel.appIconUrl : '';
-        if (!iconUrl) {
-            iconUrl = `${baseUrl}/marketellogo.svg`;
-        }
-        const ext = (iconUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-        const iconType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
+        // Icon priority: custom raster icon → Marketel PNG. Never fall back to
+        // SVG: iOS ignores SVG home-screen icons (renders blank), so the default
+        // must be a real PNG served at the standard sizes.
+        const customExt = (hotel && hotel.appIconUrl ? hotel.appIconUrl.split('?')[0].split('.').pop() : '').toLowerCase();
+        const customIsRaster = hotel && hotel.appIconUrl && ['png', 'jpg', 'jpeg', 'webp'].includes(customExt);
+        const icons = customIsRaster
+            ? [
+                { src: hotel.appIconUrl, sizes: '192x192', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
+                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
+                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'maskable' },
+            ]
+            : [
+                { src: `${baseUrl}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            ];
 
         const manifest = {
             name,
@@ -4979,11 +4988,7 @@ app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
             background_color: '#ffffff',
             theme_color: '#2E7D5B',
             orientation: 'portrait',
-            icons: [
-                { src: iconUrl, sizes: '192x192', type: iconType, purpose: 'any' },
-                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'any' },
-                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'maskable' },
-            ],
+            icons,
         };
 
         res.set('Content-Type', 'application/manifest+json');
@@ -5024,13 +5029,22 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
 
-        // Icon priority: custom uploaded icon → Marketel logo
-        let iconUrl = hotel && hotel.appIconUrl ? hotel.appIconUrl : '';
-        if (!iconUrl) {
-            iconUrl = `${baseUrl}/marketellogo.svg`;
-        }
-        const ext = (iconUrl.split('?')[0].split('.').pop() || '').toLowerCase();
-        const iconType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
+        // Icon priority: custom raster icon → Marketel PNG. Never fall back to
+        // SVG: iOS ignores SVG home-screen icons (renders blank), so the default
+        // must be a real PNG served at the standard sizes.
+        const customExt = (hotel && hotel.appIconUrl ? hotel.appIconUrl.split('?')[0].split('.').pop() : '').toLowerCase();
+        const customIsRaster = hotel && hotel.appIconUrl && ['png', 'jpg', 'jpeg', 'webp'].includes(customExt);
+        const icons = customIsRaster
+            ? [
+                { src: hotel.appIconUrl, sizes: '192x192', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
+                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
+                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'maskable' },
+            ]
+            : [
+                { src: `${baseUrl}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            ];
 
         const startUrl = `/frontdesk?hotelId=${encodeURIComponent(hotelId)}&homescreen=1`;
         const manifest = {
@@ -5044,11 +5058,7 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
             background_color: '#EEF2EF',
             theme_color: '#2E7D5B',
             orientation: 'portrait',
-            icons: [
-                { src: iconUrl, sizes: '192x192', type: iconType, purpose: 'any' },
-                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'any' },
-                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'maskable' },
-            ],
+            icons,
         };
 
         res.set('Content-Type', 'application/manifest+json');
