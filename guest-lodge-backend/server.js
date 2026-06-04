@@ -3614,6 +3614,34 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
     }
 });
 
+// PWA push: send a test notification to this hotel's subscribed devices
+app.post('/api/push/test', crmAuth, async (req, res) => {
+    try {
+        if (!VAPID_PRIVATE) return res.status(503).json({ success: false, message: 'Push not configured' });
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+        if (!subs.length) return res.json({ success: false, message: 'No subscribed devices yet' });
+        const payload = JSON.stringify({
+            title: 'Notifications are on ✅',
+            body: "This is how you'll be alerted when a guest books.",
+            url: '/frontdesk',
+            icon: '/marketellogo.svg',
+        });
+        await Promise.allSettled(subs.map((s) =>
+            webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload,
+                { TTL: 60 }
+            )
+        ));
+        res.json({ success: true });
+    } catch (e) {
+        console.error('push/test error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
 async function notifyNewBooking(hotelId, guestName, roomName, grandTotal) {
     if (!VAPID_PRIVATE || !hotelId) return;
@@ -4965,6 +4993,72 @@ app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
         res.json(manifest);
     } catch (e) {
         console.error('Manifest error:', e.message);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Dynamic per-hotel FRONT DESK manifest — lets the owner install their back
+// office as its own home-screen app (their name + icon), separate from the
+// guest booking engine. Distinct start_url/scope/id so the two installs never
+// collide on the same hotel domain. Installing this is also what unlocks web
+// push on iOS (requires a standalone PWA).
+app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) => {
+    try {
+        let hotel = await prisma.hotelConfig.findUnique({
+            where: { id: req.params.hotelId },
+            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
+        });
+        if (!hotel) {
+            const domainGuess = req.params.hotelId + '.bookmarketel.com';
+            const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+            if (domainRecord) {
+                hotel = await prisma.hotelConfig.findUnique({
+                    where: { id: domainRecord.hotelId },
+                    include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
+                });
+            }
+        }
+
+        const hotelId = (hotel && hotel.id) || req.params.hotelId;
+        const hotelName = (hotel && hotel.name) || 'Front Desk';
+        const name = `${hotelName} Front Desk`;
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
+
+        // Icon priority: custom uploaded icon → first room photo → Marketel logo
+        let iconUrl = hotel && hotel.appIconUrl ? hotel.appIconUrl : '';
+        if (!iconUrl) {
+            const firstImg = hotel && hotel.rooms && hotel.rooms[0] && hotel.rooms[0].images && hotel.rooms[0].images[0];
+            iconUrl = firstImg ? resolveImgUrl(firstImg.url) : `${baseUrl}/marketellogo.svg`;
+        }
+        const ext = (iconUrl.split('?')[0].split('.').pop() || '').toLowerCase();
+        const iconType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
+
+        const startUrl = `/frontdesk?hotelId=${encodeURIComponent(hotelId)}&homescreen=1`;
+        const manifest = {
+            id: `/frontdesk?hotelId=${encodeURIComponent(hotelId)}`,
+            name,
+            short_name: hotelName.length > 12 ? 'Front Desk' : hotelName,
+            description: `Manage bookings for ${hotelName}`,
+            start_url: startUrl,
+            scope: '/frontdesk',
+            display: 'standalone',
+            background_color: '#EEF2EF',
+            theme_color: '#2E7D5B',
+            orientation: 'portrait',
+            icons: [
+                { src: iconUrl, sizes: '192x192', type: iconType, purpose: 'any' },
+                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'any' },
+                { src: iconUrl, sizes: '512x512', type: iconType, purpose: 'maskable' },
+            ],
+        };
+
+        res.set('Content-Type', 'application/manifest+json');
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cache-Control', 'public, max-age=300');
+        res.json(manifest);
+    } catch (e) {
+        console.error('Front desk manifest error:', e.message);
         res.status(500).json({ error: 'Server error' });
     }
 });
