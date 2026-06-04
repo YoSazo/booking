@@ -1756,16 +1756,10 @@
       <button type="button" class="tab" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
         Bookings <span class="tab-badge" id="countNeedsCalled">0</span>
       </button>
-      <button type="button" class="tab" data-nav-filter="app" onclick="setFilter('app', this)">
-        App
-      </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
     <div id="bookingsList">
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
-    </div>
-    <div id="appView" style="display:none; margin-top:8px;">
-      <div id="appList"></div>
     </div>
   </div>
 
@@ -1788,10 +1782,6 @@
     <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="revenue" id="mobileNavRevenueBtn">
       <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
       <span class="mobile-nav-label">Revenue</span>
-    </button>
-    <button type="button" class="mobile-nav-item" data-nav-filter="app">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="smartphone"></i></span>
-      <span class="mobile-nav-label">App</span>
     </button>
   </nav>
 </div>
@@ -1868,16 +1858,12 @@ let frontdeskInstalled = false;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  if (typeof currentFilter !== 'undefined' && currentFilter === 'app') {
-    try { renderAppPage(); } catch (_) {}
-  }
+  try { refreshFrontdeskInstallCard(); } catch (_) {}
 });
 window.addEventListener('appinstalled', () => {
   frontdeskInstalled = true;
   deferredInstallPrompt = null;
-  if (typeof currentFilter !== 'undefined' && currentFilter === 'app') {
-    try { renderAppPage(); } catch (_) {}
-  }
+  try { refreshFrontdeskInstallCard(); } catch (_) {}
 });
 
 function isIosDevice() {
@@ -2842,8 +2828,6 @@ async function refreshCurrentView() {
   if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
   // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
   if (currentFilter === 'settings') return;
-  // The App page is static content — skip refresh so it never flashes a reload
-  if (currentFilter === 'app') return;
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -3159,23 +3143,6 @@ function applyFilter() {
           <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
         </div>`;
     }
-  }
-
-  // Always hide the App page unless it's the active tab (handled below)
-  const appEl = document.getElementById('appView');
-  if (appEl) appEl.style.display = 'none';
-
-  if (currentFilter === 'app') {
-    if (bookingsEl) bookingsEl.style.display = 'none';
-    if (availabilityEl) availabilityEl.style.display = 'none';
-    if (revenueEl) revenueEl.style.display = 'none';
-    if (settingsEl) settingsEl.style.display = 'none';
-    const editEl = document.getElementById('editView');
-    if (editEl) editEl.style.display = 'none';
-    if (appEl) appEl.style.display = 'block';
-    closeAvailabilityDayPopover();
-    renderAppPage();
-    return;
   }
 
   if (currentFilter === 'settings') {
@@ -4481,65 +4448,43 @@ function showActivatedModal() {
   };
 }
 
-// ── "YOUR APP" PAGE ────────────────────────────────────────────
-// Two simple, unambiguous cards:
-//   1. Want notifications? Install the Front Desk app.
-//   2. Your guests can install your booking engine — open your booking page.
-// Kept synchronous (no fetch) so it never flashes a loading state on refresh.
-function renderAppPage() {
-  const list = document.getElementById('appList');
-  if (!list) return;
-
-  const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
-  const bookingUrl = bookingDomain ? 'https://' + bookingDomain : '';
+// ── DOWNLOAD FRONT DESK (Settings card) ────────────────────────
+// Owner-facing: install THIS front desk to the home screen to receive booking
+// notifications. Deliberately framed around alerts + "Front Desk" so it never
+// reads as the guest booking engine (which is installed from the booking page).
+function frontdeskInstallCardHtml() {
   const installed = isStandaloneApp() || frontdeskInstalled;
   const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
-
-  // ── Card 1: notifications via the Front Desk app ──
-  let notifyCard;
+  let inner;
   if (installed && pushSupported()) {
-    notifyCard = `
-      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
-        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
-        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">${granted
-          ? "You're all set — you'll get an alert on this phone every time a guest books."
-          : "You're in the app. Turn on alerts to get a notification the moment a guest books — even when it's closed."}</p>
-        <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:${granted ? '1.5px solid var(--green)' : 'none'};background:${granted ? 'none' : 'var(--green)'};color:${granted ? 'var(--green)' : '#fff'};font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${granted ? 'Send a test notification' : 'Turn on notifications'}</button>
-      </div></div>`;
+    inner = granted
+      ? `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">You're all set — you'll get an alert on this phone every time a guest books.</p>
+         <button onclick="toggleAppNotifications()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Send a test notification</button>`
+      : `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">You're in the app. Turn on alerts to get a notification the moment a guest books — even when it's closed.</p>
+         <button onclick="toggleAppNotifications()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Turn on notifications</button>`;
   } else if (installed && !pushSupported()) {
-    notifyCard = `
-      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
-        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
-        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">This device can't show push notifications, but the app is installed for quick one-tap access.</p>
-      </div></div>`;
+    inner = `<p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">Front Desk is installed for quick one-tap access. (This device can't show push notifications.)</p>`;
   } else {
-    notifyCard = `
-      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
-        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Want booking notifications?</div>
-        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Install the Front Desk app on your phone, then turn on alerts. You'll get a buzz the moment a guest books — even when the app is closed.</p>
-        <button onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Install the app</button>
-      </div></div>`;
+    inner = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Add <strong>Front Desk</strong> to your home screen to get a buzz the second a guest books — even when it's closed. Takes 3 seconds.</p>
+       <button onclick="handleInstallFrontdesk()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Add Front Desk to home screen</button>`;
   }
-
-  // ── Card 2: the guest booking engine ──
-  const engineCard = `
-    <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
-      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">📲 Your guest booking app</div>
-      <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Your booking page can be installed like an app — guests book direct in one tap, no OTA fees. Open your booking page to install it yourself, or send guests the link so they can.</p>
-      ${bookingUrl
-        ? `<a href="${bookingUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;">Open my booking page →</a>
-           <p style="font-size:12px;color:var(--text-muted);margin:10px 0 0;text-align:center;word-break:break-all;">${bookingDomain}</p>`
-        : `<p style="font-size:12px;color:var(--text-muted);margin:0;">Your booking page link will appear here once your domain is set.</p>`}
+  return `<div class="booking-card" id="frontdeskInstallCard" style="margin-bottom:14px;"><div style="padding:18px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">🔔 Get booking alerts on your phone</div>
+      ${inner}
     </div></div>`;
+}
 
-  list.innerHTML = notifyCard + engineCard;
+function refreshFrontdeskInstallCard() {
+  const el = document.getElementById('frontdeskInstallCard');
+  if (!el) return;
+  el.outerHTML = frontdeskInstallCardHtml();
 }
 
 function handleInstallFrontdesk() {
   if (isIosDevice()) {
     showIosInstallSheet({
       title: (activeHotelName ? activeHotelName + ' ' : '') + 'Front Desk',
-      subtitle: 'Add it to your home screen — takes 5 seconds.',
+      subtitle: 'Add it to your home screen — takes 3 seconds.',
     });
     return;
   }
@@ -4548,7 +4493,7 @@ function handleInstallFrontdesk() {
     deferredInstallPrompt.userChoice.then((choice) => {
       if (choice && choice.outcome === 'accepted') { frontdeskInstalled = true; }
       deferredInstallPrompt = null;
-      renderAppPage();
+      refreshFrontdeskInstallCard();
     }).catch(() => {});
   } else {
     toast('Use your browser menu → "Install app" / "Add to Home screen".', 'info');
@@ -4568,7 +4513,7 @@ async function toggleAppNotifications() {
     return;
   }
   await enableNotifications();
-  renderAppPage();
+  refreshFrontdeskInstallCard();
 }
 
 // Reusable themed iOS "Add to Home Screen" instruction sheet.
@@ -4590,13 +4535,14 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
       </div>
       ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;margin-bottom:16px;padding:12px;border-radius:11px;border:1.5px solid #2E7D5B;background:none;color:#2E7D5B;font-size:14px;font-weight:700;">Open booking page →</a>` : ''}
       <div style="display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span><div style="font-size:14px;color:#374151;line-height:1.4;">Tap the <strong>Share</strong> button <span style="color:#007aff;">⬆️</span> in Safari's bar</div></div>
-        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span><div style="font-size:14px;color:#374151;line-height:1.4;">Scroll down and tap <strong>Add to Home Screen</strong> ➕</div></div>
+        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span><div style="font-size:14px;color:#374151;line-height:1.4;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">Tap the <strong>Share</strong> button <i data-lucide="share" style="width:18px;height:18px;color:#007aff;vertical-align:middle;"></i> in Safari's bar</div></div>
+        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span><div style="font-size:14px;color:#374151;line-height:1.4;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">Scroll down and tap <strong>Add to Home Screen</strong> <i data-lucide="square-plus" style="width:18px;height:18px;color:#2E7D5B;vertical-align:middle;"></i></div></div>
         <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span><div style="font-size:14px;color:#374151;line-height:1.4;">Tap <strong>Add</strong> — done! It's on your home screen.</div></div>
       </div>
       <button id="iosInstallSheetDone" style="width:100%;margin-top:22px;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Got it</button>
     </div>`;
   document.body.appendChild(overlay);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
   const close = () => overlay.remove();
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   const card = document.getElementById('iosInstallSheetCard');
@@ -4629,6 +4575,13 @@ function startSettingsTour() {
       target: '#editRoomsCards .booking-card > div:first-child',
       text: 'Add a photo of your room — guests book more when they see one.',
       openAccordion: false,
+      tab: 'settings'
+    },
+    {
+      target: '#frontdeskInstallCard',
+      text: 'Want a buzz the second a guest books? Add Front Desk to your home screen and turn on notifications — takes 3 seconds.',
+      openAccordion: false,
+      targetParent: true,
       tab: 'settings'
     },
     {
@@ -5455,6 +5408,7 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
         </div>
       </div>
+      ${frontdeskInstallCardHtml()}
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Your App Icon</div>
