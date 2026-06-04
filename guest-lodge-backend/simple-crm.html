@@ -2603,6 +2603,17 @@ async function startCrmApp(verification) {
     goLive();
   }
 
+  // Just came back from a successful payment — reassure them about what happens next
+  if (urlParams.get('activated') === '1') {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('activated');
+    window.history.replaceState({}, '', cleanUrl);
+    hotelSubscribed = true;
+    const _goLiveBanner = document.getElementById('goLiveBanner');
+    if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
+    showActivatedModal();
+  }
+
   // Show welcome modal on first visit (skip questionnaire, go straight to tour)
   if (!localStorage.getItem('onboardingDone') && urlParams.has('welcome')) {
     localStorage.setItem('onboardingDone', '1');
@@ -4353,6 +4364,48 @@ function showWelcomeModal() {
     overlay.remove();
     // Start tour after a short delay to let DOM settle
     setTimeout(() => { startSettingsTour(); }, 200);
+  };
+}
+
+// Shown when the owner returns from a successful Go Live payment — removes all
+// ambiguity about what just happened and what's now true for their hotel.
+function showActivatedModal() {
+  if (document.getElementById('activatedModalOverlay')) return;
+  const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
+  const overlay = document.createElement('div');
+  overlay.id = 'activatedModalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:28px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#2E7D5B 0%,#1a5c3f 100%);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">🎉</div>
+      <h2 style="font-size:21px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">You're live — payment received</h2>
+      <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 18px;">Thank you! Your subscription is active and your booking page is now switched on.</p>
+      <div style="text-align:left;background:#f0f7f3;border:1px solid #d6e9df;border-radius:14px;padding:16px 18px;margin-bottom:18px;">
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
+          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>Guests can now book.</strong> The paywall is gone — reservations go through on your page immediately.</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
+          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>New bookings appear right here</strong> in your Bookings tab, and you'll get a notification for each one.</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
+          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>You're billed monthly.</strong> Cancel anytime from <strong>Settings → Manage Subscription</strong> — no contracts.</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>A receipt is on its way</strong> to your email from Stripe.</span>
+        </div>
+      </div>
+      ${bookingDomain ? `<p style="font-size:12px;color:#6b7280;margin:0 0 16px;">Your booking page: <strong style="color:#2E7D5B;">${bookingDomain}</strong></p>` : ''}
+      <button id="activatedModalDone" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Got it — take me to my bookings</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('activatedModalDone').onclick = () => {
+    overlay.remove();
+    try { setFilter('bookings'); } catch (e) { /* ignore */ }
   };
 }
 

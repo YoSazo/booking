@@ -5270,18 +5270,21 @@ app.get('/api/crm/go-live-success', async (req, res) => {
     // Resolve where to send the owner back to: their own hotel domain, never the
     // backend host (which would default the front desk to Guest Lodge Minot).
     async function buildFrontdeskRedirect() {
-        if (!hotelId) return '/frontdesk';
+        if (!hotelId) return '/frontdesk?activated=1';
         try {
             const primaryDomain = await prisma.hotelDomain.findFirst({
                 where: { hotelId, isPrimary: true },
                 select: { domain: true },
             });
             const domain = primaryDomain?.domain;
-            const query = pin ? `?pin=${encodeURIComponent(pin)}` : '';
-            if (domain) return `https://${domain}/frontdesk${query}`;
+            if (domain) {
+                const query = new URLSearchParams({ activated: '1' });
+                if (pin) query.set('pin', pin);
+                return `https://${domain}/frontdesk?${query.toString()}`;
+            }
         } catch (_) { /* fall through to relative redirect */ }
         // Fallback: stay on the backend host but force the correct hotel context
-        const params = new URLSearchParams({ hotelId });
+        const params = new URLSearchParams({ hotelId, activated: '1' });
         if (pin) params.set('pin', pin);
         return `/frontdesk?${params.toString()}`;
     }
