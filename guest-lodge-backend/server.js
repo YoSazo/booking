@@ -4618,11 +4618,36 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
     }
 });
 
-// Create Stripe Checkout session for $149/mo (pay to go live)
-// Uses separate Marketel Stripe account (not the hotel booking account)
+// Marketel subscription (CRM go-live + setup checkout) — separate Stripe account from guest bookings
 const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY)
     : null;
+const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_UduliUOPjkESCJ';
+
+async function getMarketelSubscriptionPrice() {
+    if (!marketelStripe) throw new Error('Payment not configured');
+    if (process.env.STRIPE_MARKETEL_PRICE_ID) {
+        const price = await marketelStripe.prices.retrieve(process.env.STRIPE_MARKETEL_PRICE_ID);
+        return { id: price.id, amountUsd: (price.unit_amount || 0) / 100 };
+    }
+    const product = await marketelStripe.products.retrieve(MARKETEL_SUBSCRIPTION_PRODUCT_ID, {
+        expand: ['default_price'],
+    });
+    let price = product.default_price;
+    if (!price) {
+        const prices = await marketelStripe.prices.list({
+            product: MARKETEL_SUBSCRIPTION_PRODUCT_ID,
+            active: true,
+            type: 'recurring',
+            limit: 1,
+        });
+        if (!prices.data.length) throw new Error('No active subscription price for Marketel product');
+        price = prices.data[0];
+    } else if (typeof price === 'string') {
+        price = await marketelStripe.prices.retrieve(price);
+    }
+    return { id: price.id, amountUsd: (price.unit_amount || 0) / 100 };
+}
 
 app.post('/api/setup/:token/checkout', async (req, res) => {
     try {
@@ -4642,11 +4667,12 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         });
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+        const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
 
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{
-                price: 'price_1Tb5IdBFnVCGiXwe7YUvVN60',
+                price: subscriptionPriceId,
                 quantity: 1,
             }],
             customer_email: hotel.ownerEmail || undefined,
@@ -4680,6 +4706,10 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Meta CAPI: Subscribe (payment confirmed)
         const { fbp: subFbp, fbc: subFbc } = getMetaCookies(req);
+        let subscriptionAmountUsd = 99;
+        try {
+            subscriptionAmountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
+        } catch (_) { /* use fallback */ }
         sendMarketelCAPI('Subscribe', {
             email: hotel.ownerEmail,
             phone: hotel.ownerPhone,
@@ -4688,7 +4718,7 @@ app.get('/setup/:token/success', async (req, res) => {
             sourceUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
             fbp: subFbp,
             fbc: subFbc,
-            value: 299,
+            value: subscriptionAmountUsd,
             currency: 'USD',
         });
 
@@ -4730,7 +4760,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Don't send welcome email here — wait until they submit their contact info via /finalize
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:299,currency:'USD'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:${subscriptionAmountUsd},currency:'USD'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');
@@ -5216,9 +5246,10 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { ownerEmail: true, name: true, setupToken: true } });
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+        const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
-            line_items: [{ price: 'price_1Tb5IdBFnVCGiXwe7YUvVN60', quantity: 1 }],
+            line_items: [{ price: subscriptionPriceId, quantity: 1 }],
             customer_email: hotel?.ownerEmail || undefined,
             metadata: { product: 'hotel-go-live', hotelId },
             success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&token=${encodeURIComponent(req.crmToken || '')}`,
@@ -5240,7 +5271,11 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             console.log(`✅ Hotel subscribed: ${hotelId}`);
             // Track
             prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotelId } }).catch(() => {});
-            sendMarketelCAPI('Subscribe', { ip: req.ip, userAgent: req.headers['user-agent'], sourceUrl: req.headers.referer || '', value: 299, currency: 'USD' });
+            let subscriptionAmountUsd = 99;
+            try {
+                subscriptionAmountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
+            } catch (_) { /* use fallback */ }
+            sendMarketelCAPI('Subscribe', { ip: req.ip, userAgent: req.headers['user-agent'], sourceUrl: req.headers.referer || '', value: subscriptionAmountUsd, currency: 'USD' });
         }
         // Redirect back to front desk
         res.redirect('/frontdesk');
