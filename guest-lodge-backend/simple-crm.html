@@ -2842,6 +2842,8 @@ async function refreshCurrentView() {
   if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
   // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
   if (currentFilter === 'settings') return;
+  // The App page is static content — skip refresh so it never flashes a reload
+  if (currentFilter === 'app') return;
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -4480,119 +4482,64 @@ function showActivatedModal() {
 }
 
 // ── "YOUR APP" PAGE ────────────────────────────────────────────
-// One place for the owner to: install the Front Desk as a home-screen app,
-// turn on booking notifications, set their app icon, and share/install their
-// guest booking engine.
-async function renderAppPage() {
+// Two simple, unambiguous cards:
+//   1. Want notifications? Install the Front Desk app.
+//   2. Your guests can install your booking engine — open your booking page.
+// Kept synchronous (no fetch) so it never flashes a loading state on refresh.
+function renderAppPage() {
   const list = document.getElementById('appList');
   if (!list) return;
-  list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
 
-  let info = {};
-  try { info = await api('GET', '/api/crm/verify'); } catch (e) { /* best effort */ }
-
-  const hotelName = info.hotelName || activeHotelName || 'your hotel';
-  const appIcon = info.appIconUrl || '';
-  const bookingDomain = info.domain || activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
+  const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
   const bookingUrl = bookingDomain ? 'https://' + bookingDomain : '';
   const installed = isStandaloneApp() || frontdeskInstalled;
-  const ios = isIosDevice();
+  const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
 
-  const iconTile = (size) => appIcon
-    ? `<img src="${appIcon}" alt="" style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.22)}px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.12);">`
-    : `<div style="width:${size}px;height:${size}px;border-radius:${Math.round(size*0.22)}px;flex-shrink:0;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.42)}px;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,0.12);">${hotelName.trim().charAt(0).toUpperCase()}</div>`;
-
-  // ── Front Desk install card ──
-  let installCard;
-  if (installed) {
-    installCard = `
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;display:flex;align-items:center;gap:14px;">
-          ${iconTile(56)}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:700;color:var(--text);">Front Desk app installed ✓</div>
-            <p style="font-size:12px;color:var(--text-muted);margin:4px 0 0;line-height:1.45;">You're running the installed app. Turn on notifications below to get pinged the moment a booking comes in.</p>
-          </div>
-        </div>
-      </div>`;
-  } else {
-    installCard = `
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-            ${iconTile(56)}
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:15px;font-weight:700;color:var(--text);">Install your Front Desk app</div>
-              <p style="font-size:12px;color:var(--text-muted);margin:4px 0 0;line-height:1.45;">Add it to your home screen for one-tap access — and to receive booking alerts${ios ? ' on your iPhone' : ''}.</p>
-            </div>
-          </div>
-          <button onclick="handleInstallFrontdesk()" style="width:100%;padding:13px;border-radius:11px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Add to home screen</button>
-        </div>
-      </div>`;
-  }
-
-  // ── Notifications card ──
+  // ── Card 1: notifications via the Front Desk app ──
   let notifyCard;
-  if (!pushSupported()) {
+  if (installed && pushSupported()) {
     notifyCard = `
-      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:18px;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">This browser doesn't support push notifications. Try Chrome on Android/desktop, or install the app${ios ? ' (iOS 16.4+)' : ''}.</p>
+      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">${granted
+          ? "You're all set — you'll get an alert on this phone every time a guest books."
+          : "You're in the app. Turn on alerts to get a notification the moment a guest books — even when it's closed."}</p>
+        <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:${granted ? '1.5px solid var(--green)' : 'none'};background:${granted ? 'none' : 'var(--green)'};color:${granted ? 'var(--green)' : '#fff'};font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${granted ? 'Send a test notification' : 'Turn on notifications'}</button>
       </div></div>`;
-  } else if (ios && !installed) {
+  } else if (installed && !pushSupported()) {
     notifyCard = `
-      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:18px;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">On iPhone, notifications only work once the app is installed. Tap <strong>Add to home screen</strong> above first, then open the installed app and come back here to turn them on.</p>
+      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">This device can't show push notifications, but the app is installed for quick one-tap access.</p>
       </div></div>`;
   } else {
-    const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
     notifyCard = `
-      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:18px;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Booking notifications</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Get an instant alert on this device every time a guest books — even when the app is closed.</p>
-        <button id="appNotifyBtn" onclick="toggleAppNotifications()" style="width:100%;padding:13px;border-radius:11px;border:${granted ? '1.5px solid var(--green)' : 'none'};background:${granted ? 'none' : 'var(--green)'};color:${granted ? 'var(--green)' : '#fff'};font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${granted ? 'Notifications on ✓ — send test' : 'Turn on booking alerts'}</button>
+      <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">🔔 Want booking notifications?</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Install the Front Desk app on your phone, then turn on alerts. You'll get a buzz the moment a guest books — even when the app is closed.</p>
+        <button onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Install the app</button>
       </div></div>`;
   }
 
-  // ── App icon card ──
-  const iconCard = `
-    <div class="booking-card" style="margin-bottom:14px;"><div style="padding:18px;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Your app icon</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Shown on the home screen for both your Front Desk app and your guests' booking app. Make it yours.</p>
-      <div style="display:flex;align-items:center;gap:16px;">
-        <div id="appIconPreviewApp" style="width:68px;height:68px;border-radius:16px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:${appIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:30px;font-weight:800;">
-          ${appIcon ? `<img src="${appIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;">` : (hotelName ? hotelName.trim().charAt(0).toUpperCase() : '🏨')}
-        </div>
-        <div style="flex:1;min-width:0;">
-          <input type="file" id="appIconInputApp" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIconApp(this)">
-          <button onclick="document.getElementById('appIconInputApp').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${appIcon ? 'Change icon' : 'Upload icon'}</button>
-          <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0;line-height:1.4;">Square image works best (512×512). PNG or JPG.</p>
-        </div>
-      </div>
+  // ── Card 2: the guest booking engine ──
+  const engineCard = `
+    <div class="booking-card" style="margin-bottom:14px;"><div style="padding:20px;">
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">📲 Your guest booking app</div>
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Your booking page can be installed like an app — guests book direct in one tap, no OTA fees. Open your booking page to install it yourself, or send guests the link so they can.</p>
+      ${bookingUrl
+        ? `<a href="${bookingUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;">Open my booking page →</a>
+           <p style="font-size:12px;color:var(--text-muted);margin:10px 0 0;text-align:center;word-break:break-all;">${bookingDomain}</p>`
+        : `<p style="font-size:12px;color:var(--text-muted);margin:0;">Your booking page link will appear here once your domain is set.</p>`}
     </div></div>`;
 
-  // ── Guest booking app (share + install) card ──
-  const qrUrl = bookingUrl ? 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl) : '';
-  const guestCard = `
-    <div class="booking-card" style="margin-bottom:14px;"><div style="padding:18px;">
-      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Your guest booking app</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Guests can install your booking page like an app — they book direct in one tap, no OTA fees. Share it or install it yourself to see what they see.</p>
-      ${qrUrl ? `<div style="text-align:center;margin-bottom:12px;"><img src="${qrUrl}" alt="QR code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);"></div>` : ''}
-      ${bookingUrl ? `<div style="display:flex;align-items:center;gap:8px;background:var(--bg,#f5f5f5);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;"><span style="flex:1;min-width:0;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${bookingDomain}</span><button onclick="copyAppBookingLink('${bookingUrl}')" style="flex-shrink:0;padding:7px 12px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Copy</button></div>` : ''}
-      ${bookingUrl ? `<button onclick="installGuestApp('${bookingUrl}')" style="width:100%;padding:12px;border-radius:11px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Install on this device</button>` : ''}
-    </div></div>`;
-
-  list.innerHTML = installCard + notifyCard + iconCard + guestCard;
+  list.innerHTML = notifyCard + engineCard;
 }
 
 function handleInstallFrontdesk() {
   if (isIosDevice()) {
-    const icon = document.querySelector('#appIconPreviewApp img');
     showIosInstallSheet({
       title: (activeHotelName ? activeHotelName + ' ' : '') + 'Front Desk',
       subtitle: 'Add it to your home screen — takes 5 seconds.',
-      iconUrl: icon ? icon.src : '',
     });
     return;
   }
@@ -4622,60 +4569,6 @@ async function toggleAppNotifications() {
   }
   await enableNotifications();
   renderAppPage();
-}
-
-async function uploadAppIconApp(input) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  const preview = document.getElementById('appIconPreviewApp');
-  if (preview) {
-    preview.innerHTML = '<div style="width:24px;height:24px;border:3px solid rgba(255,255,255,0.5);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></div>';
-  }
-  const fd = new FormData();
-  fd.append('icon', file);
-  try {
-    const res = await fetch('/api/crm/hotel-app-icon', { method: 'POST', headers: { 'x-crm-token': token }, body: fd });
-    const data = await res.json();
-    if (data.success && data.appIconUrl) {
-      toast('App icon updated! It will show on installed apps.', 'success');
-      // Refresh the per-hotel manifest reference so a fresh install picks it up.
-      updateFrontdeskManifestLink();
-      renderAppPage();
-    } else {
-      toast(data.message || 'Failed to upload icon', 'error');
-      renderAppPage();
-    }
-  } catch (e) {
-    toast('Failed to upload icon', 'error');
-    renderAppPage();
-  }
-  input.value = '';
-}
-
-function copyAppBookingLink(url) {
-  if (!url) return;
-  try {
-    navigator.clipboard.writeText(url);
-    toast('Booking link copied', 'success');
-  } catch (e) {
-    toast('Copy failed — long-press to copy', 'error');
-  }
-}
-
-function installGuestApp(url) {
-  if (isIosDevice()) {
-    const icon = document.querySelector('#appIconPreviewApp img');
-    showIosInstallSheet({
-      title: (activeHotelName || 'Your hotel') + ' — Booking app',
-      subtitle: 'Open your booking page in Safari, then add it to your home screen.',
-      iconUrl: icon ? icon.src : '',
-      openUrl: url,
-    });
-    return;
-  }
-  // Android/desktop: open the booking page where its own install prompt appears.
-  window.open(url + (url.includes('?') ? '&' : '?') + 'homescreen=1', '_blank');
-  toast('Tap "Install" on your booking page to add it.', 'info');
 }
 
 // Reusable themed iOS "Add to Home Screen" instruction sheet.
