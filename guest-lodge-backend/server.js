@@ -5008,7 +5008,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
-            subscribed: false,
+            subscribed: hotel.subscribed || false,
             rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
             rooms: hotel.rooms.map((r, i) => ({
                 id: i + 1,
@@ -5264,10 +5264,34 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
 
 // Go Live success — mark hotel as subscribed
 app.get('/api/crm/go-live-success', async (req, res) => {
+    const hotelId = String(req.query.hotelId || '').trim();
+    const pin = String(req.query.token || '').trim();
+
+    // Resolve where to send the owner back to: their own hotel domain, never the
+    // backend host (which would default the front desk to Guest Lodge Minot).
+    async function buildFrontdeskRedirect() {
+        if (!hotelId) return '/frontdesk';
+        try {
+            const primaryDomain = await prisma.hotelDomain.findFirst({
+                where: { hotelId, isPrimary: true },
+                select: { domain: true },
+            });
+            const domain = primaryDomain?.domain;
+            const query = pin ? `?pin=${encodeURIComponent(pin)}` : '';
+            if (domain) return `https://${domain}/frontdesk${query}`;
+        } catch (_) { /* fall through to relative redirect */ }
+        // Fallback: stay on the backend host but force the correct hotel context
+        const params = new URLSearchParams({ hotelId });
+        if (pin) params.set('pin', pin);
+        return `/frontdesk?${params.toString()}`;
+    }
+
     try {
-        const hotelId = String(req.query.hotelId || '').trim();
         if (hotelId) {
-            await prisma.hotelConfig.update({ where: { id: hotelId }, data: { setupComplete: true } });
+            await prisma.hotelConfig.update({
+                where: { id: hotelId },
+                data: { setupComplete: true, subscribed: true, active: true },
+            });
             console.log(`✅ Hotel subscribed: ${hotelId}`);
             // Track
             prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotelId } }).catch(() => {});
@@ -5277,11 +5301,10 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             } catch (_) { /* use fallback */ }
             sendMarketelCAPI('Subscribe', { ip: req.ip, userAgent: req.headers['user-agent'], sourceUrl: req.headers.referer || '', value: subscriptionAmountUsd, currency: 'USD' });
         }
-        // Redirect back to front desk
-        res.redirect('/frontdesk');
+        res.redirect(await buildFrontdeskRedirect());
     } catch (e) {
         console.error('go-live-success error:', e.message);
-        res.redirect('/frontdesk');
+        res.redirect(await buildFrontdeskRedirect());
     }
 });
 
