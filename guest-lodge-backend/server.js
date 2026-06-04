@@ -4961,11 +4961,10 @@ app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
 
-        // Icon priority: custom uploaded icon → first room photo → default
+        // Icon priority: custom uploaded icon → Marketel logo
         let iconUrl = hotel && hotel.appIconUrl ? hotel.appIconUrl : '';
         if (!iconUrl) {
-            const firstImg = hotel && hotel.rooms && hotel.rooms[0] && hotel.rooms[0].images && hotel.rooms[0].images[0];
-            iconUrl = firstImg ? resolveImgUrl(firstImg.url) : 'https://suitestay.clickinns.com/kingbedsuitestay.webp';
+            iconUrl = `${baseUrl}/marketellogo.svg`;
         }
         const ext = (iconUrl.split('?')[0].split('.').pop() || '').toLowerCase();
         const iconType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
@@ -5025,11 +5024,10 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
 
-        // Icon priority: custom uploaded icon → first room photo → Marketel logo
+        // Icon priority: custom uploaded icon → Marketel logo
         let iconUrl = hotel && hotel.appIconUrl ? hotel.appIconUrl : '';
         if (!iconUrl) {
-            const firstImg = hotel && hotel.rooms && hotel.rooms[0] && hotel.rooms[0].images && hotel.rooms[0].images[0];
-            iconUrl = firstImg ? resolveImgUrl(firstImg.url) : `${baseUrl}/marketellogo.svg`;
+            iconUrl = `${baseUrl}/marketellogo.svg`;
         }
         const ext = (iconUrl.split('?')[0].split('.').pop() || '').toLowerCase();
         const iconType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
