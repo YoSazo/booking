@@ -3626,16 +3626,18 @@ app.post('/api/push/test', crmAuth, async (req, res) => {
             title: 'Notifications are on ✅',
             body: "This is how you'll be alerted when a guest books.",
             url: '/frontdesk',
-            icon: '/marketellogo.svg',
+            icon: '/icon-192.png',
         });
-        await Promise.allSettled(subs.map((s) =>
+        const results = await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
                 { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
                 payload,
                 { TTL: 60 }
             )
         ));
-        res.json({ success: true });
+        await cleanupPushResults(subs, results, 'push/test');
+        const sent = results.filter((r) => r.status === 'fulfilled').length;
+        res.json({ success: sent > 0, sent, failed: results.length - sent });
     } catch (e) {
         console.error('push/test error:', e.message);
         res.status(500).json({ success: false, message: e.message });
@@ -3644,9 +3646,11 @@ app.post('/api/push/test', crmAuth, async (req, res) => {
 
 // Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
 async function notifyNewBooking(hotelId, guestName, roomName, grandTotal) {
-    if (!VAPID_PRIVATE || !hotelId) return;
+    if (!VAPID_PRIVATE) { console.log(`🔕 [push] skipped — VAPID not configured (hotel=${hotelId})`); return; }
+    if (!hotelId) { console.log('🔕 [push] skipped — no hotelId'); return; }
     try {
         const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+        console.log(`🔔 [push] new booking for hotel=${hotelId}: ${subs.length} subscription(s)`);
         if (subs.length === 0) return;
         
         let bodyText = '';
@@ -3661,18 +3665,40 @@ async function notifyNewBooking(hotelId, guestName, roomName, grandTotal) {
         const payload = JSON.stringify({
             title: 'New Booking!',
             body: bodyText,
-            url: '/simple-crm',
-            icon: '/marketellogo.svg'
+            url: '/frontdesk',
+            icon: '/icon-192.png'
         });
-        await Promise.allSettled(subs.map((s) =>
+        const results = await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
                 { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
                 payload,
                 { TTL: 60 }
             )
         ));
+        await cleanupPushResults(subs, results, 'notifyNewBooking');
     } catch (e) {
         console.error('notifyNewBooking:', e.message);
+    }
+}
+
+// Inspect the outcome of a batch of webpush sends: log success/failure counts and
+// delete subscriptions the push service reports as gone (404/410), so the table
+// self-heals after key rotations or when a user uninstalls the app.
+async function cleanupPushResults(subs, results, label) {
+    let sent = 0;
+    const deadIds = [];
+    results.forEach((r, i) => {
+        if (r.status === 'fulfilled') { sent++; return; }
+        const code = r.reason && r.reason.statusCode;
+        if (code === 404 || code === 410) {
+            deadIds.push(subs[i].id);
+        } else {
+            console.error(`⚠️ [push] ${label} send failed (status=${code || '?'}):`, r.reason && r.reason.body ? r.reason.body : (r.reason && r.reason.message));
+        }
+    });
+    console.log(`📨 [push] ${label}: ${sent} sent, ${results.length - sent} failed, ${deadIds.length} stale removed`);
+    if (deadIds.length) {
+        await prisma.pushSubscription.deleteMany({ where: { id: { in: deadIds } } }).catch((e) => console.error('push cleanup:', e.message));
     }
 }
 
