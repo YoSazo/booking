@@ -3936,7 +3936,7 @@ async function enableNotifications() {
     const keyData = await keyRes.json().catch(() => ({}));
     mark('hasKey=' + !!keyData.publicKey);
     if (!keyData.publicKey) { alert('Notif stopped: ' + steps.join(' → ')); toast('Push not configured', 'error'); return; }
-    try { await navigator.serviceWorker.register('/sw.js'); mark('registered'); } catch (e) { mark('regErr=' + (e && e.message)); }
+    try { await navigator.serviceWorker.register('/frontdesk-sw.js'); mark('registered'); } catch (e) { mark('regErr=' + (e && e.message)); }
     const reg = await Promise.race([
       navigator.serviceWorker.ready,
       new Promise((_, rej) => setTimeout(() => rej(new Error('ready-timeout-8s')), 8000)),
@@ -6062,7 +6062,7 @@ function confirmEditAddRoom() {
 }
 
 // ── INIT ───────────────────────────────────────────────
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/frontdesk-sw.js').catch(() => {});
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 bootCrmApp();
 setInterval(refreshCurrentView, 30000);
