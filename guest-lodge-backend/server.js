@@ -5050,7 +5050,9 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
         const manifest = {
             id: `/frontdesk?hotelId=${encodeURIComponent(hotelId)}`,
             name,
-            short_name: hotelName.length > 12 ? 'Front Desk' : hotelName,
+            // Home-screen label = just the hotel name (kept short). The longer
+            // "<Hotel> Front Desk" lives in `name`/`description` for the install UI.
+            short_name: hotelName.length > 12 ? hotelName.slice(0, 12) : hotelName,
             description: `Manage bookings for ${hotelName}`,
             start_url: startUrl,
             scope: '/frontdesk',
