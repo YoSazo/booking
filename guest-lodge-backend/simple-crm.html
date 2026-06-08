@@ -3911,41 +3911,59 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function enableNotifications() {
-  if (!token) { toast('Sign in first', 'error'); return; }
+  // TEMP DIAGNOSTICS: iOS has no visible console, so we trace each step and show
+  // a blocking alert at the end / on failure so we can see exactly where it dies.
+  const steps = [];
+  const mark = (s) => steps.push(s);
+  if (!token) { alert('Notif: not signed in (no token)'); toast('Sign in first', 'error'); return; }
+  if (typeof Notification === 'undefined') { alert('Notif: Notification API missing'); return; }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('Notif: push unsupported (sw=' + ('serviceWorker' in navigator) + ', push=' + ('PushManager' in window) + ', standalone=' + isStandaloneApp() + ')');
+    return;
+  }
   try {
+    mark('start standalone=' + isStandaloneApp());
     const perm = await Notification.requestPermission();
+    mark('perm=' + perm);
     if (perm !== 'granted') {
       setNotificationButtonState(false);
+      alert('Notif stopped: ' + steps.join(' → '));
       toast('Notifications blocked', 'error');
       return;
     }
     const keyRes = await fetch('/api/push/vapid-public');
+    mark('vapidHTTP=' + keyRes.status);
     const keyData = await keyRes.json().catch(() => ({}));
-    if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
-    // Make sure the service worker is actually registered + ready. On some hosts
-    // /sw.js can fail to load, in which case navigator.serviceWorker.ready hangs
-    // forever — so we register explicitly and race `ready` against a timeout to
-    // surface a real error instead of silently never subscribing.
-    try { await navigator.serviceWorker.register('/sw.js'); } catch (_) {}
+    mark('hasKey=' + !!keyData.publicKey);
+    if (!keyData.publicKey) { alert('Notif stopped: ' + steps.join(' → ')); toast('Push not configured', 'error'); return; }
+    try { await navigator.serviceWorker.register('/sw.js'); mark('registered'); } catch (e) { mark('regErr=' + (e && e.message)); }
     const reg = await Promise.race([
       navigator.serviceWorker.ready,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('Service worker unavailable')), 8000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('ready-timeout-8s')), 8000)),
     ]);
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
-    });
+    mark('ready scope=' + (reg && reg.scope));
+    const sub = await Promise.race([
+      reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('subscribe-timeout-15s')), 15000)),
+    ]);
+    mark('subscribed');
     const bufToB64 = buf => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
-    await api('POST', '/api/push/subscribe', {
+    const postRes = await api('POST', '/api/push/subscribe', {
       endpoint: sub.endpoint,
       p256dh: sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '',
       auth: sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : '',
       source: 'simple-crm'
     });
+    mark('posted=' + JSON.stringify(postRes));
+    alert('Notif OK: ' + steps.join(' → '));
     toast('Notifications enabled', 'success');
     setNotificationButtonState(true);
   } catch(e) {
     setNotificationButtonState(false);
+    alert('Notif FAILED: ' + steps.join(' → ') + ' → ERROR=' + (e && e.message ? e.message : e));
     toast('Failed: ' + (e.message || e), 'error');
   }
 }
