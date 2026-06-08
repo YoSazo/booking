@@ -1896,18 +1896,16 @@ function updateFrontdeskManifestLink() {
     link.href = '/api/hotel/' + encodeURIComponent(activeHotelId) + '/frontdesk-manifest.webmanifest';
   }
   try {
-    // Custom uploaded icon wins, but only if it's a raster format iOS can use.
-    let touchIcon = '/apple-touch-icon.png';
-    if (activeHotelAppIcon && /\.(png|jpe?g|webp)(\?|$)/i.test(activeHotelAppIcon)) {
-      touchIcon = activeHotelAppIcon;
-    }
+    // The Front Desk ALWAYS uses the Marketel logo — it's the owner's back-office
+    // app and must look distinct from the hotel's guest booking engine (which uses
+    // the custom uploaded icon). So we never swap in activeHotelAppIcon here.
     let appleLink = document.querySelector('link[rel="apple-touch-icon"]');
     if (!appleLink) {
       appleLink = document.createElement('link');
       appleLink.rel = 'apple-touch-icon';
       document.head.appendChild(appleLink);
     }
-    appleLink.href = touchIcon;
+    appleLink.href = '/apple-touch-icon.png';
     // Home-screen label should be short — just the hotel name (iOS shows the
     // app full-screen so "Front Desk" context is obvious once it's open).
     const titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');

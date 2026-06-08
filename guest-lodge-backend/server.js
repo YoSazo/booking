@@ -5029,24 +5029,19 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
 
-        // Icon priority: custom raster icon → Marketel PNG. Never fall back to
-        // SVG: iOS ignores SVG home-screen icons (renders blank), so the default
-        // must be a real PNG served at the standard sizes.
-        const customExt = (hotel && hotel.appIconUrl ? hotel.appIconUrl.split('?')[0].split('.').pop() : '').toLowerCase();
-        const customIsRaster = hotel && hotel.appIconUrl && ['png', 'jpg', 'jpeg', 'webp'].includes(customExt);
-        const icons = customIsRaster
-            ? [
-                { src: hotel.appIconUrl, sizes: '192x192', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
-                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
-                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'maskable' },
-            ]
-            : [
-                { src: `${baseUrl}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-            ];
+        // The Front Desk ALWAYS uses the Marketel logo (PNG) — it's the owner's
+        // back-office app and must look distinct from the hotel's guest booking
+        // engine (which uses the custom uploaded icon). Never SVG: iOS renders
+        // SVG home-screen icons blank.
+        const icons = [
+            { src: `${baseUrl}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ];
 
-        const startUrl = `/frontdesk?hotelId=${encodeURIComponent(hotelId)}&homescreen=1`;
+        // Root scope + simple start_url mirrors the guest booking engine, which
+        // reliably installs as a standalone PWA on iOS. A narrow "/frontdesk"
+        // scope was causing iOS to open it in Safari instead of standalone.
         const manifest = {
             id: `/frontdesk?hotelId=${encodeURIComponent(hotelId)}`,
             name,
@@ -5054,8 +5049,8 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
             // "<Hotel> Front Desk" lives in `name`/`description` for the install UI.
             short_name: hotelName.length > 12 ? hotelName.slice(0, 12) : hotelName,
             description: `Manage bookings for ${hotelName}`,
-            start_url: startUrl,
-            scope: '/frontdesk',
+            start_url: '/frontdesk?homescreen=1',
+            scope: '/',
             display: 'standalone',
             background_color: '#EEF2EF',
             theme_color: '#2E7D5B',
