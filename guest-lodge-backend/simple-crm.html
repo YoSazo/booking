@@ -3922,7 +3922,15 @@ async function enableNotifications() {
     const keyRes = await fetch('/api/push/vapid-public');
     const keyData = await keyRes.json().catch(() => ({}));
     if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
-    const reg = await navigator.serviceWorker.ready;
+    // Make sure the service worker is actually registered + ready. On some hosts
+    // /sw.js can fail to load, in which case navigator.serviceWorker.ready hangs
+    // forever — so we register explicitly and race `ready` against a timeout to
+    // surface a real error instead of silently never subscribing.
+    try { await navigator.serviceWorker.register('/sw.js'); } catch (_) {}
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Service worker unavailable')), 8000)),
+    ]);
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
