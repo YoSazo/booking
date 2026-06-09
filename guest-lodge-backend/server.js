@@ -94,7 +94,24 @@ async function sendWelcomeEmail(toEmail, hotelName, pin, domain) {
     }
 }
 
-async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, checkout, nights, total, reservationCode }) {
+// Build a durable link back to the guest's reservation page (survives closing
+// the app). Prefers the hotel's own domain; falls back to the request origin.
+async function buildGuestBookingUrl(hotelId, code, req) {
+    if (!code) return '';
+    let base = '';
+    try {
+        const d = await prisma.hotelDomain.findFirst({ where: { hotelId }, orderBy: { isPrimary: 'desc' } });
+        if (d?.domain) base = `https://${d.domain}`;
+    } catch (_) {}
+    if (!base && req) {
+        const ref = req.headers?.referer || req.headers?.origin || '';
+        try { const u = new URL(ref); base = `${u.protocol}//${u.host}`; } catch (_) {}
+    }
+    if (!base) return '';
+    return `${base}/booking/${encodeURIComponent(code)}`;
+}
+
+async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, checkout, nights, total, reservationCode, bookingUrl }) {
     if (!emailTransporter || !guestEmail) return;
     try {
         const checkinStr = new Date(checkin).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -102,7 +119,7 @@ async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, ho
         const totalStr = total ? `$${Number(total).toFixed(2)}` : '';
         const phoneStr = hotelPhone ? ` — ${hotelPhone}` : '.';
 
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Reservation Confirmed ✓</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.5;">Your reservation at <strong>${hotelName}</strong> is confirmed. Here are your details:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;"><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Room</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${roomName}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-in</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkinStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-out</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkoutStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Nights</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${nights}</div></td></tr>${totalStr ? `<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Total</div><div style="font-size:15px;font-weight:600;color:#2E7D5B;">${totalStr}</div></td></tr>` : ''}<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Confirmation #</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${reservationCode}</div></td></tr></table><p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">If you have any questions, contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Reservation Confirmed ✓</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.5;">Your reservation at <strong>${hotelName}</strong> is confirmed. Here are your details:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;"><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Room</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${roomName}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-in</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkinStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-out</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkoutStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Nights</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${nights}</div></td></tr>${totalStr ? `<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Total</div><div style="font-size:15px;font-weight:600;color:#2E7D5B;">${totalStr}</div></td></tr>` : ''}<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Confirmation #</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${reservationCode}</div></td></tr></table>${bookingUrl ? `<div style="text-align:center;margin:0 0 20px;"><a href="${bookingUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 26px;border-radius:10px;">View my reservation</a><div style="font-size:11px;color:#9ca3af;margin-top:8px;">Message the front desk, add to your calendar, or book again anytime.</div></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">If you have any questions, contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
 
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
@@ -1599,6 +1616,8 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
                 // Send guest confirmation email
                 const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true, phone: true } }).catch(() => null);
+                const emailCode = pmsResponse.reservationID || bookingDetails.reservationCode;
+                const bookingUrl = await buildGuestBookingUrl(hotelValidation.hotelId, emailCode, req);
                 sendGuestConfirmationEmail({
                     guestEmail: guestInfo.email,
                     guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
@@ -1609,7 +1628,8 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     checkout: bookingDetails.checkout,
                     nights: bookingDetails.nights,
                     total: bookingDetails.total,
-                    reservationCode: pmsResponse.reservationID || bookingDetails.reservationCode,
+                    reservationCode: emailCode,
+                    bookingUrl,
                 });
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
@@ -1831,6 +1851,10 @@ app.post('/api/guest-message', async (req, res) => {
         const requestList = Array.isArray(requests)
             ? requests.map((r) => String(r || '').trim()).filter(Boolean).slice(0, 10)
             : [];
+        // Client-supplied contact fallback (used only when we can't match a booking).
+        const fbName = String(req.body?.guestName || '').trim().slice(0, 120);
+        const fbEmail = String(req.body?.guestEmail || '').trim().slice(0, 200);
+        const fbPhone = String(req.body?.guestPhone || '').trim().slice(0, 40);
 
         if (!cleanBody && requestList.length === 0) {
             return res.status(400).json({ success: false, message: 'Message is empty.' });
@@ -1838,12 +1862,15 @@ app.post('/api/guest-message', async (req, res) => {
 
         const validation = await getActiveHotelValidation(hotelId);
         if (!validation.ok) {
+            console.log(`💬 [guest-message] hotel invalid: ${hotelId} → ${validation.message}`);
             return res.status(validation.status || 400).json({ success: false, message: validation.message });
         }
         const resolvedHotelId = validation.hotelId;
 
-        // Tie the message to a real booking when we can (don't hard-fail if the
-        // code is missing — confirmation always has one, but be forgiving).
+        // Try to tie the message to a real booking — but DON'T hard-fail if we can't
+        // (preview/test bookings aren't persisted, and PMS codes can differ). The
+        // hotel itself is validated, so this is effectively an authenticated contact
+        // form; a missing match just means no linked booking.
         let booking = null;
         if (cleanCode) {
             booking = await prisma.booking.findFirst({
@@ -1857,13 +1884,13 @@ app.post('/api/guest-message', async (req, res) => {
                 },
             });
             if (!booking) {
-                return res.status(404).json({ success: false, message: 'Reservation not found.' });
+                console.log(`💬 [guest-message] no booking match for hotel=${resolvedHotelId} code=${cleanCode} — accepting as contact`);
             }
         }
 
         const guestName = booking
-            ? [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim() || 'Guest'
-            : 'Guest';
+            ? ([booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim() || 'Guest')
+            : (fbName || 'Guest');
 
         await prisma.guestMessage.create({
             data: {
@@ -1871,13 +1898,14 @@ app.post('/api/guest-message', async (req, res) => {
                 bookingId: booking?.id || null,
                 reservationCode: cleanCode || null,
                 guestName,
-                guestEmail: booking?.guestEmail || null,
-                guestPhone: booking?.guestPhone || null,
+                guestEmail: booking?.guestEmail || fbEmail || null,
+                guestPhone: booking?.guestPhone || fbPhone || null,
                 roomName: booking?.roomName || null,
                 body: cleanBody || null,
                 requests: requestList.length ? JSON.stringify(requestList) : null,
             },
         });
+        console.log(`💬 [guest-message] saved for hotel=${resolvedHotelId} (booking=${booking?.id || 'none'})`);
 
         // Notify the owner. Lead with the request chips since they're scannable.
         const preview = [requestList.join(', '), cleanBody].filter(Boolean).join(' — ').slice(0, 140);
@@ -1887,6 +1915,58 @@ app.post('/api/guest-message', async (req, res) => {
     } catch (e) {
         console.error('guest-message error:', e.message);
         res.status(500).json({ success: false, message: 'Could not send message.' });
+    }
+});
+
+// PUBLIC: look up a reservation so the guest can return to it after closing the
+// app. The confirmation code is the secret (long & random); the optional email
+// adds a second factor for the manual "find my reservation" form.
+app.get('/api/booking/lookup', async (req, res) => {
+    try {
+        const hotelId = req.query.hotelId;
+        const code = String(req.query.code || '').trim();
+        const email = String(req.query.email || '').trim();
+        if (!code) return res.status(400).json({ success: false, message: 'Confirmation code required.' });
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status || 400).json({ success: false, message: validation.message });
+        }
+        const resolvedHotelId = validation.hotelId;
+
+        const booking = await prisma.booking.findFirst({
+            where: {
+                hotelId: resolvedHotelId,
+                OR: [{ ourReservationCode: code }, { pmsConfirmationCode: code }],
+            },
+        });
+        // Same generic response whether the code or the email is wrong, to avoid
+        // leaking which reservations exist.
+        const notFound = () => res.status(404).json({ success: false, message: 'We couldn’t find that reservation. Check your confirmation code and email.' });
+        if (!booking) return notFound();
+        if (email && String(booking.guestEmail || '').toLowerCase() !== email.toLowerCase()) return notFound();
+
+        res.json({
+            success: true,
+            booking: {
+                reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
+                guestFirstName: booking.guestFirstName,
+                guestLastName: booking.guestLastName,
+                guestEmail: booking.guestEmail,
+                guestPhone: booking.guestPhone,
+                roomName: booking.roomName,
+                checkin: booking.checkinDate,
+                checkout: booking.checkoutDate,
+                nights: booking.nights,
+                total: booking.grandTotal,
+                status: booking.status,
+                bookingType: booking.bookingType,
+                createdAt: booking.createdAt,
+            },
+        });
+    } catch (e) {
+        console.error('booking lookup error:', e.message);
+        res.status(500).json({ success: false, message: 'Lookup failed. Please try again.' });
     }
 });
 
@@ -2830,6 +2910,8 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
                 // Send guest confirmation email
                 const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true, phone: true } }).catch(() => null);
+                const emailCode = pmsResponse.reservationID || bookingDetails.reservationCode;
+                const bookingUrl = await buildGuestBookingUrl(hotelValidation.hotelId, emailCode, req);
                 sendGuestConfirmationEmail({
                     guestEmail: guestInfo.email,
                     guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
@@ -2840,7 +2922,8 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                     checkout: bookingDetails.checkout,
                     nights: bookingDetails.nights,
                     total: bookingDetails.total,
-                    reservationCode: pmsResponse.reservationID || bookingDetails.reservationCode,
+                    reservationCode: emailCode,
+                    bookingUrl,
                 });
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);

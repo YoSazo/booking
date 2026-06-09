@@ -11,6 +11,7 @@ import getHotelId from './utils/getHotelId';
 // GuestInfoPage pulls in Stripe + Google Maps — biggest win.
 const GuestInfoPageWrapper = lazy(() => import('./GuestInfoPage.jsx'));
 const ConfirmationPage = lazy(() => import('./ConfirmationPage.jsx'));
+const MyBookingPage = lazy(() => import('./MyBookingPage.jsx'));
 const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper.jsx'));
 const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 
@@ -683,6 +684,18 @@ const handleConfirmBooking = async (bookingDetails) => {
           <Route path="/confirmation" element={
             <Suspense fallback={null}>
               <CheckoutReturnPageWrapper onComplete={handleCompleteBooking} />
+            </Suspense>
+          } />
+
+          {/* Persistent guest reservation page (magic link + manual lookup) */}
+          <Route path="/booking" element={
+            <Suspense fallback={null}>
+              <MyBookingPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
+            </Suspense>
+          } />
+          <Route path="/booking/:code" element={
+            <Suspense fallback={null}>
+              <MyBookingPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
             </Suspense>
           } />
 
