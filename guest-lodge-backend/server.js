@@ -1554,7 +1554,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1596,7 +1596,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
                 // Send guest confirmation email
                 const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true, phone: true } }).catch(() => null);
                 sendGuestConfirmationEmail({
@@ -1702,7 +1702,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         }
                     });
                     dbSaveSuccess = true;
-                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
+                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -1817,6 +1817,76 @@ app.post('/api/release-hold', requireCrmAuthDeferred, async (req, res) => {
             success: false, 
             message: error.message || 'Failed to release hold.' 
         });
+    }
+});
+
+// PUBLIC: guest sends a message / special request from the booking-confirmation
+// screen. We verify a matching booking exists (so randoms can't spam a hotel),
+// persist it, and ping the owner's Front Desk in real time.
+app.post('/api/guest-message', async (req, res) => {
+    try {
+        const { hotelId, reservationCode, body, requests } = req.body || {};
+        const cleanCode = String(reservationCode || '').trim();
+        const cleanBody = String(body || '').trim().slice(0, 2000);
+        const requestList = Array.isArray(requests)
+            ? requests.map((r) => String(r || '').trim()).filter(Boolean).slice(0, 10)
+            : [];
+
+        if (!cleanBody && requestList.length === 0) {
+            return res.status(400).json({ success: false, message: 'Message is empty.' });
+        }
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status || 400).json({ success: false, message: validation.message });
+        }
+        const resolvedHotelId = validation.hotelId;
+
+        // Tie the message to a real booking when we can (don't hard-fail if the
+        // code is missing — confirmation always has one, but be forgiving).
+        let booking = null;
+        if (cleanCode) {
+            booking = await prisma.booking.findFirst({
+                where: {
+                    hotelId: resolvedHotelId,
+                    OR: [{ ourReservationCode: cleanCode }, { pmsConfirmationCode: cleanCode }],
+                },
+                select: {
+                    id: true, guestFirstName: true, guestLastName: true,
+                    guestEmail: true, guestPhone: true, roomName: true,
+                },
+            });
+            if (!booking) {
+                return res.status(404).json({ success: false, message: 'Reservation not found.' });
+            }
+        }
+
+        const guestName = booking
+            ? [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim() || 'Guest'
+            : 'Guest';
+
+        await prisma.guestMessage.create({
+            data: {
+                hotelId: resolvedHotelId,
+                bookingId: booking?.id || null,
+                reservationCode: cleanCode || null,
+                guestName,
+                guestEmail: booking?.guestEmail || null,
+                guestPhone: booking?.guestPhone || null,
+                roomName: booking?.roomName || null,
+                body: cleanBody || null,
+                requests: requestList.length ? JSON.stringify(requestList) : null,
+            },
+        });
+
+        // Notify the owner. Lead with the request chips since they're scannable.
+        const preview = [requestList.join(', '), cleanBody].filter(Boolean).join(' — ').slice(0, 140);
+        notifyGuestMessage(resolvedHotelId, guestName, preview, cleanCode).catch(() => {});
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('guest-message error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not send message.' });
     }
 });
 
@@ -2757,7 +2827,7 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                         grandTotal: bookingDetails.total
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
                 // Send guest confirmation email
                 const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true, phone: true } }).catch(() => null);
                 sendGuestConfirmationEmail({
@@ -3644,38 +3714,100 @@ app.post('/api/push/test', crmAuth, async (req, res) => {
     }
 });
 
-// Notify all subscribed clients (CRM + Funnel) of a new booking (fire-and-forget)
-async function notifyNewBooking(hotelId, guestName, roomName, grandTotal) {
-    if (!VAPID_PRIVATE) { console.log(`🔕 [push] skipped — VAPID not configured (hotel=${hotelId})`); return; }
-    if (!hotelId) { console.log('🔕 [push] skipped — no hotelId'); return; }
+const BIG_BOOKING_USD = Number(process.env.BIG_BOOKING_USD || 250);
+
+function isCancelledStatus(s) {
+    const v = String(s || '').toLowerCase();
+    return v === 'cancelled' || v === 'canceled';
+}
+
+// Generic push sender for one hotel: loads subs, sends, self-heals dead ones,
+// and returns how many were delivered. All owner notifications funnel through this.
+async function sendPushToHotel(hotelId, payloadObj, opts = {}, label = 'push') {
+    if (!VAPID_PRIVATE) { console.log(`🔕 [push] ${label} skipped — VAPID not configured (hotel=${hotelId})`); return 0; }
+    if (!hotelId) { console.log(`🔕 [push] ${label} skipped — no hotelId`); return 0; }
+    const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+    if (subs.length === 0) { console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 subscriptions`); return 0; }
+    const payload = JSON.stringify(payloadObj);
+    const results = await Promise.allSettled(subs.map((s) =>
+        webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            payload,
+            Object.assign({ TTL: 600 }, opts)
+        )
+    ));
+    await cleanupPushResults(subs, results, label);
+    return results.filter((r) => r.status === 'fulfilled').length;
+}
+
+const MONTHLY_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+
+// Notify the owner of a new booking. The copy adapts to context so the alert is
+// genuinely useful at a glance: first sale of the day, a big-ticket booking, a
+// returning guest, or a same-day arrival each get their own framing. Also fires a
+// separate 🏆 milestone alert when the hotel crosses a monthly bookings threshold.
+async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '') {
+    if (!VAPID_PRIVATE || !hotelId) { console.log(`🔕 [push] new booking skipped (vapid=${!!VAPID_PRIVATE}, hotel=${hotelId})`); return; }
     try {
-        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
-        console.log(`🔔 [push] new booking for hotel=${hotelId}: ${subs.length} subscription(s)`);
-        if (subs.length === 0) return;
-        
+        const amount = (grandTotal !== undefined && grandTotal !== null) ? Number(grandTotal) : null;
+        const todayIso = getReportingTodayIso();
+        const monthPrefix = todayIso.slice(0, 7); // YYYY-MM
+
+        // Pull this month's bookings once and derive both "first today" and the
+        // running monthly count (this booking is already saved).
+        let isFirstToday = false;
+        let monthCount = null;
+        try {
+            const monthStart = new Date(Date.now() - 32 * 24 * 60 * 60 * 1000);
+            const monthly = await prisma.booking.findMany({
+                where: { hotelId, createdAt: { gte: monthStart } },
+                select: { createdAt: true, status: true },
+            });
+            const active = monthly.filter((b) => !isCancelledStatus(b.status));
+            isFirstToday = active.filter((b) => normalizeIsoDate(b.createdAt) === todayIso).length <= 1;
+            monthCount = active.filter((b) => normalizeIsoDate(b.createdAt).startsWith(monthPrefix)).length;
+        } catch (_) {}
+
+        // Returning guest? Match prior bookings for this hotel by email.
+        let isReturning = false;
+        if (guestEmail) {
+            try {
+                const priorSame = await prisma.booking.count({
+                    where: { hotelId, guestEmail: { equals: guestEmail, mode: 'insensitive' } },
+                });
+                isReturning = priorSame >= 2; // includes the one just created
+            } catch (_) {}
+        }
+
+        const arrivesToday = checkinIso && normalizeIsoDate(checkinIso) === todayIso;
+        const isBig = amount !== null && amount >= BIG_BOOKING_USD;
+
+        let title = '🛎️ New booking';
+        if (isFirstToday) title = '🎉 First booking today!';
+        else if (isBig) title = '💰 Big booking!';
+
         let bodyText = '';
         if (guestName) bodyText += guestName;
-        if (roomName) bodyText += (bodyText ? ` - ${roomName}` : roomName);
-        if (grandTotal !== undefined && grandTotal !== null) {
-            bodyText += ` - $${Number(grandTotal).toFixed(2)}`;
-        }
-        
+        if (roomName) bodyText += (bodyText ? ` · ${roomName}` : roomName);
+        if (amount !== null) bodyText += ` · $${amount.toFixed(2)}`;
+        if (isReturning) bodyText += ' · returning guest 🔁';
+        if (arrivesToday) bodyText += ' · arrives today ⚡';
         if (!bodyText) bodyText = 'A new booking just came in.';
 
-        const payload = JSON.stringify({
-            title: 'New Booking!',
-            body: bodyText,
-            url: '/frontdesk',
-            icon: '/icon-192.png'
-        });
-        const results = await Promise.allSettled(subs.map((s) =>
-            webpush.sendNotification(
-                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                payload,
-                { TTL: 60 }
-            )
-        ));
-        await cleanupPushResults(subs, results, 'notifyNewBooking');
+        const sent = await sendPushToHotel(hotelId, {
+            title, body: bodyText, url: '/frontdesk', icon: '/icon-192.png',
+        }, { TTL: 60 }, 'notifyNewBooking');
+        console.log(`🔔 [push] new booking hotel=${hotelId} sent=${sent} "${title}"`);
+
+        // Monthly milestone — fires once, exactly when the count lands on a threshold.
+        if (monthCount !== null && MONTHLY_MILESTONES.includes(monthCount)) {
+            await sendPushToHotel(hotelId, {
+                title: '🏆 Milestone reached!',
+                body: `${monthCount} bookings this month — keep it going!`,
+                url: '/frontdesk',
+                icon: '/icon-192.png',
+            }, { TTL: 6 * 60 * 60 }, 'milestone');
+        }
     } catch (e) {
         console.error('notifyNewBooking:', e.message);
     }
@@ -3812,10 +3944,174 @@ async function maybeNotifyRoomSoldOutToday(hotelId, roomName, referenceIso = '')
     }
 }
 
-function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, checkinIso = '') {
-    notifyNewBooking(hotelId, guestName, roomName, grandTotal).catch(() => {});
+function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '') {
+    notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso, guestEmail).catch(() => {});
     maybeNotifyRoomSoldOutToday(hotelId, roomName, checkinIso).catch(() => {});
 }
+
+// Notify the owner that a guest messaged them from the confirmation screen.
+async function notifyGuestMessage(hotelId, guestName, preview, reservationCode = '') {
+    if (!VAPID_PRIVATE || !hotelId) return;
+    try {
+        const tag = reservationCode ? ` · #${reservationCode}` : '';
+        const sent = await sendPushToHotel(hotelId, {
+            title: `💬 Message from ${guestName || 'a guest'}`,
+            body: (preview || 'Tap to read').slice(0, 160) + tag,
+            url: '/frontdesk?tab=bookings',
+            icon: '/icon-192.png',
+        }, { TTL: 60 * 60 }, 'guestMessage');
+        console.log(`💬 [push] guest message hotel=${hotelId} sent=${sent}`);
+    } catch (e) {
+        console.error('notifyGuestMessage:', e.message);
+    }
+}
+
+// ── DAILY MORNING DIGEST ───────────────────────────────────────────────
+// Once a day, owners get a "good morning" summary: who's arriving today plus how
+// yesterday performed. Gives the app a reason to be useful beyond live alerts.
+const DIGEST_HOUR = Number(process.env.DIGEST_HOUR || 8);  // morning digest, local hour
+const RECAP_HOUR = Number(process.env.RECAP_HOUR || 20);   // evening recap, local hour
+const QUIET_NUDGE_DAYS = Number(process.env.QUIET_NUDGE_DAYS || 4); // streak + cooldown
+
+function getReportingHour() {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: REPORT_TIME_ZONE, hour: '2-digit', hour12: false }).formatToParts(new Date());
+    const hourPart = parts.find((p) => p.type === 'hour');
+    return (parseInt(hourPart && hourPart.value, 10) || 0) % 24;
+}
+
+function getReportingIsoOffset(dayOffset) {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: REPORT_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+        .formatToParts(new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000));
+    const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+    return `${m.year}-${m.month}-${m.day}`;
+}
+function getReportingYesterdayIso() { return getReportingIsoOffset(-1); }
+function getReportingTomorrowIso() { return getReportingIsoOffset(1); }
+
+// Per-hotel cooldown so the "quiet" nudge never fires more than once every few days.
+const lastQuietNudge = new Map();
+
+async function sendHotelDigest(hotelId) {
+    const todayIso = getReportingTodayIso();
+    const yesterdayIso = getReportingYesterdayIso();
+    const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const bookings = await prisma.booking.findMany({
+        where: { hotelId, OR: [{ checkinDate: { gte: since } }, { createdAt: { gte: since } }] },
+        select: { checkinDate: true, createdAt: true, grandTotal: true, status: true, guestFirstName: true, guestLastName: true },
+    });
+    const active = bookings.filter((b) => !isCancelledStatus(b.status));
+    const arrivals = active.filter((b) => normalizeIsoDate(b.checkinDate) === todayIso);
+    const yesterdayBookings = active.filter((b) => normalizeIsoDate(b.createdAt) === yesterdayIso);
+    // Nothing to report → instead of going silent, consider a gentle re-engagement
+    // nudge if it's been a genuinely quiet stretch (with a cooldown so it's rare).
+    if (arrivals.length === 0 && yesterdayBookings.length === 0) {
+        await maybeSendQuietNudge(hotelId, active);
+        return 0;
+    }
+
+    const yRevenue = yesterdayBookings.reduce((s, b) => s + (Number(b.grandTotal) || 0), 0);
+    const lines = [];
+    if (arrivals.length) {
+        const names = arrivals
+            .map((a) => [a.guestFirstName, a.guestLastName].filter(Boolean).join(' ').trim() || 'Guest')
+            .slice(0, 3);
+        lines.push(`🛎️ ${arrivals.length} arriving today: ${names.join(', ')}${arrivals.length > names.length ? '…' : ''}`);
+    } else {
+        lines.push('🛎️ No check-ins today');
+    }
+    if (yesterdayBookings.length) {
+        lines.push(`📈 Yesterday: ${yesterdayBookings.length} booking${yesterdayBookings.length > 1 ? 's' : ''} · $${yRevenue.toFixed(0)}`);
+    }
+
+    return sendPushToHotel(hotelId, {
+        title: '☀️ Good morning',
+        body: lines.join('\n'),
+        url: '/frontdesk',
+        icon: '/icon-192.png',
+    }, { TTL: 6 * 60 * 60 }, 'dailyDigest');
+}
+
+// 😴 Quiet nudge: only when the hotel has had ZERO bookings for QUIET_NUDGE_DAYS,
+// and at most once per cooldown window, so it encourages action without nagging.
+async function maybeSendQuietNudge(hotelId, recentActiveBookings) {
+    const todayIso = getReportingTodayIso();
+    const cutoffIso = getReportingIsoOffset(-QUIET_NUDGE_DAYS);
+    const hadRecent = (recentActiveBookings || []).some((b) => {
+        const created = normalizeIsoDate(b.createdAt);
+        return created && created > cutoffIso;
+    });
+    if (hadRecent) return 0; // not actually quiet
+    const last = lastQuietNudge.get(hotelId);
+    if (last && last > cutoffIso) return 0; // already nudged recently
+    lastQuietNudge.set(hotelId, todayIso);
+    return sendPushToHotel(hotelId, {
+        title: '😴 Quiet stretch',
+        body: 'No bookings in a few days. Share your booking link to fill rooms →',
+        url: '/frontdesk?tab=settings',
+        icon: '/icon-192.png',
+    }, { TTL: 6 * 60 * 60 }, 'quietNudge');
+}
+
+// 🌙 Evening recap: end-of-day wrap with today's performance + tomorrow's arrivals.
+async function sendHotelRecap(hotelId) {
+    const todayIso = getReportingTodayIso();
+    const tomorrowIso = getReportingTomorrowIso();
+    const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const until = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const bookings = await prisma.booking.findMany({
+        where: { hotelId, OR: [{ checkinDate: { gte: since, lte: until } }, { createdAt: { gte: since } }] },
+        select: { checkinDate: true, createdAt: true, grandTotal: true, status: true },
+    });
+    const active = bookings.filter((b) => !isCancelledStatus(b.status));
+    const todayBookings = active.filter((b) => normalizeIsoDate(b.createdAt) === todayIso);
+    const tomorrowArrivals = active.filter((b) => normalizeIsoDate(b.checkinDate) === tomorrowIso);
+    // Only recap days where something actually happened.
+    if (todayBookings.length === 0) return 0;
+
+    const revenue = todayBookings.reduce((s, b) => s + (Number(b.grandTotal) || 0), 0);
+    const lines = [`📊 Today: ${todayBookings.length} booking${todayBookings.length > 1 ? 's' : ''} · $${revenue.toFixed(0)}`];
+    if (tomorrowArrivals.length) {
+        lines.push(`🛎️ ${tomorrowArrivals.length} arriving tomorrow`);
+    }
+    return sendPushToHotel(hotelId, {
+        title: '🌙 Today’s recap',
+        body: lines.join('\n'),
+        url: '/frontdesk',
+        icon: '/icon-192.png',
+    }, { TTL: 6 * 60 * 60 }, 'eveningRecap');
+}
+
+// Run a per-hotel job across every hotel that has at least one subscriber.
+async function forEachSubscribedHotel(label, fn) {
+    if (!VAPID_PRIVATE) return;
+    const subs = await prisma.pushSubscription.findMany({ select: { hotelId: true } });
+    const hotelIds = [...new Set(subs.map((s) => s.hotelId).filter(Boolean))];
+    if (!hotelIds.length) return;
+    console.log(`⏰ [push] running ${label} for ${hotelIds.length} hotel(s)`);
+    for (const hotelId of hotelIds) {
+        try { await fn(hotelId); } catch (e) { console.error(`${label}`, hotelId, e.message); }
+    }
+}
+
+const sendDailyDigests = () => forEachSubscribedHotel('morning digest', sendHotelDigest);
+const sendEveningRecaps = () => forEachSubscribedHotel('evening recap', sendHotelRecap);
+
+let lastDigestDate = '';
+let lastRecapDate = '';
+setInterval(() => {
+    try {
+        const hour = getReportingHour();
+        const today = getReportingTodayIso();
+        if (hour === DIGEST_HOUR && lastDigestDate !== today) {
+            lastDigestDate = today;
+            sendDailyDigests().catch((e) => console.error('morning digest:', e.message));
+        }
+        if (hour === RECAP_HOUR && lastRecapDate !== today) {
+            lastRecapDate = today;
+            sendEveningRecaps().catch((e) => console.error('evening recap:', e.message));
+        }
+    } catch (_) {}
+}, 5 * 60 * 1000);
 
 // Support for old notifyPurchase is removed to prevent double notifications
 
@@ -3843,13 +4139,13 @@ async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMe
         const payload = JSON.stringify({
             title: '🔴 URGENT: Payment Declined',
             body: `${guestName} • ${phone}\n${roomName} • ${total}\n${declineReason} - CALL NOW!`,
-            icon: '/marketellogo.svg',
-            badge: '/marketellogo.svg',
+            icon: '/icon-192.png',
+            badge: '/icon-192.png',
             tag: 'payment-declined',
             requireInteraction: true, // Keeps notification visible until dismissed
             vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern
             data: {
-                url: '/simple-crm',
+                url: '/frontdesk',
                 type: 'payment_declined',
                 urgent: true,
                 guestName: guestName,
@@ -6137,6 +6433,74 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
 });
 
 // Delete a booking
+// List guest messages for the Front Desk (recent first) + unread count.
+app.get('/api/crm/messages', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const rows = await withRetry(() => prisma.guestMessage.findMany({
+            where: { hotelId, createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) } },
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+        }));
+        const messages = rows.map((m) => {
+            let requests = [];
+            try { requests = m.requests ? JSON.parse(m.requests) : []; } catch (_) { requests = []; }
+            return {
+                id: m.id,
+                createdAt: m.createdAt,
+                bookingId: m.bookingId,
+                reservationCode: m.reservationCode,
+                guestName: m.guestName,
+                guestEmail: m.guestEmail,
+                guestPhone: m.guestPhone,
+                roomName: m.roomName,
+                body: m.body,
+                requests,
+                read: !!m.readAt,
+            };
+        });
+        const unread = messages.filter((m) => !m.read).length;
+        res.json({ success: true, messages, unread });
+    } catch (e) {
+        console.error('CRM messages list error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to load messages' });
+    }
+});
+
+// Mark a single message read (scoped to the authenticated hotel).
+app.post('/api/crm/messages/:id/read', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const result = await withRetry(() => prisma.guestMessage.updateMany({
+            where: { id: req.params.id, hotelId },
+            data: { readAt: new Date() },
+        }));
+        if (!result.count) return res.status(404).json({ success: false, message: 'Message not found.' });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CRM message read error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to update message' });
+    }
+});
+
+// Mark every message read for this hotel.
+app.post('/api/crm/messages/read-all', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        await withRetry(() => prisma.guestMessage.updateMany({
+            where: { hotelId, readAt: null },
+            data: { readAt: new Date() },
+        }));
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CRM messages read-all error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to update messages' });
+    }
+});
+
 app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;

@@ -1,6 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { PhoneCall, CheckCircle2, Smartphone, DollarSign } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { PhoneCall, CheckCircle2, Smartphone, DollarSign, MessageSquare, Send, CalendarPlus, CalendarClock } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
+import InstallAppBanner from './InstallAppBanner.jsx';
+
+const QUICK_REQUESTS = [
+  'Early check-in',
+  'Late check-in',
+  'Late arrival (after 9pm)',
+  'Ground floor room',
+  'Quiet room',
+  'Extra towels',
+];
+
+// Build & download an .ics calendar file for the stay so the guest can add it
+// to Apple/Google Calendar in one tap.
+function downloadStayIcs({ hotel, bookingDetails, reservationCode }) {
+  const toIcsDate = (d) => {
+    const dt = new Date(d);
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dt.getUTCDate()).padStart(2, '0');
+    return `${y}${m}${day}`;
+  };
+  const esc = (s) => String(s || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+  const name = hotel?.name || 'Your stay';
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Marketel//Booking//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${reservationCode || Date.now()}@marketel`,
+    `DTSTAMP:${toIcsDate(new Date())}T000000Z`,
+    `DTSTART;VALUE=DATE:${toIcsDate(bookingDetails.checkin)}`,
+    `DTEND;VALUE=DATE:${toIcsDate(bookingDetails.checkout)}`,
+    `SUMMARY:${esc(`Stay at ${name}`)}`,
+    `DESCRIPTION:${esc(`Confirmation #${reservationCode || ''}${hotel?.phone ? `\nQuestions? Call ${hotel.phone}` : ''}`)}`,
+    hotel?.address ? `LOCATION:${esc(hotel.address)}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean);
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-stay.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 const formatDateWithSuffix = (date) => {
   const d = new Date(date);
@@ -14,12 +65,56 @@ const formatDateWithSuffix = (date) => {
   return `${monthYear} ${day}${suffix}`;
 };
 
-function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel }) {
+function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, apiBaseUrl = '', hotelId }) {
+  const navigate = useNavigate();
   const [showCallModal, setShowCallModal] = useState(false);
   const [callModalDismissed, setCallModalDismissed] = useState(false);
 
+  // Guest → owner messaging state
+  const [selectedRequests, setSelectedRequests] = useState([]);
+  const [messageText, setMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSent, setMessageSent] = useState(false);
+  const [messageError, setMessageError] = useState('');
+
   const CONFIRMATION_CALL_MODAL_DELAY_MS = 800; // Brief pause so page is visible before modal
   const hotelPhone = hotel?.phone || '(701) 289-5992';
+  const resolvedHotelId = hotelId || hotel?.id;
+
+  const toggleRequest = (label) => {
+    setSelectedRequests((prev) =>
+      prev.includes(label) ? prev.filter((r) => r !== label) : [...prev, label]
+    );
+  };
+
+  const handleSendMessage = async () => {
+    const body = messageText.trim();
+    if (!body && selectedRequests.length === 0) return;
+    if (!resolvedHotelId) { setMessageError('Messaging is unavailable for this booking.'); return; }
+    setSendingMessage(true);
+    setMessageError('');
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/guest-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotelId: resolvedHotelId,
+          reservationCode,
+          body,
+          requests: selectedRequests,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setMessageSent(true);
+      } else {
+        setMessageError(data.message || 'Could not send. Please call us instead.');
+      }
+    } catch (e) {
+      setMessageError('Could not send. Please call us instead.');
+    }
+    setSendingMessage(false);
+  };
 
   useEffect(() => {
     if (!bookingDetails) return;
@@ -277,6 +372,115 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel })
               </>
             )}
           </div>
+
+          {/* Quick actions: add to calendar + book again / extend */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => downloadStayIcs({ hotel, bookingDetails, reservationCode })}
+              style={{
+                flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '8px', padding: '13px 14px', borderRadius: '12px', cursor: 'pointer',
+                border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',
+                fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
+              }}
+            >
+              <CalendarPlus size={17} /> Add to Calendar
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              style={{
+                flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '8px', padding: '13px 14px', borderRadius: '12px', cursor: 'pointer',
+                border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',
+                fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
+              }}
+            >
+              <CalendarClock size={17} /> Extend / Book again
+            </button>
+          </div>
+
+          {/* Message the front desk */}
+          <div className="stay-details-card" style={{ marginTop: '20px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px', fontWeight: '700', marginBottom: '6px', color: '#1a1a1a' }}>
+              <MessageSquare size={18} /> Message the front desk
+            </h3>
+            {messageSent ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 12px', background: '#e8f7ee', borderRadius: '10px', marginTop: '10px' }}>
+                <CheckCircle2 size={20} style={{ color: '#28a745', flexShrink: 0 }} />
+                <div style={{ fontSize: '14px', color: '#1a1a1a', lineHeight: 1.5 }}>
+                  <strong>Sent!</strong> The front desk got your message and will follow up. You can also call {hotelPhone}.
+                </div>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', lineHeight: 1.5 }}>
+                  Have a request or question? Send it straight to the property — they'll see it instantly.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                  {QUICK_REQUESTS.map((label) => {
+                    const active = selectedRequests.includes(label);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => toggleRequest(label)}
+                        style={{
+                          padding: '8px 12px', borderRadius: '999px', cursor: 'pointer',
+                          fontSize: '13px', fontWeight: 600, fontFamily: 'inherit',
+                          border: active ? '1px solid #2E7D5B' : '1px solid #d7dde3',
+                          background: active ? '#2E7D5B' : '#fff',
+                          color: active ? '#fff' : '#374151',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {active ? '✓ ' : ''}{label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <textarea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Add a note (optional) — e.g. arriving around 11pm, traveling with a pet…"
+                  rows={3}
+                  maxLength={2000}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '12px',
+                    borderRadius: '10px', border: '1px solid #d7dde3', fontSize: '14px',
+                    fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, color: '#1a1a1a',
+                  }}
+                />
+                {messageError && (
+                  <p style={{ fontSize: '13px', color: '#c0392b', margin: '8px 0 0' }}>{messageError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSendMessage}
+                  disabled={sendingMessage || (!messageText.trim() && selectedRequests.length === 0)}
+                  style={{
+                    width: '100%', marginTop: '12px', padding: '14px', borderRadius: '12px',
+                    border: 'none', fontSize: '15px', fontWeight: 700, fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    cursor: sendingMessage ? 'wait' : 'pointer',
+                    background: (!messageText.trim() && selectedRequests.length === 0) ? '#b8c4bd' : '#2E7D5B',
+                    color: '#fff',
+                    opacity: sendingMessage ? 0.7 : 1,
+                  }}
+                >
+                  <Send size={16} /> {sendingMessage ? 'Sending…' : 'Send to front desk'}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Save this property to the home screen */}
+          <InstallAppBanner
+            hotelName={hotel?.name}
+            appIconUrl={hotel?.appIconUrl}
+            hotelId={resolvedHotelId}
+          />
         </div>
       </div>
     </>

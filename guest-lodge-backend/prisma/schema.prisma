@@ -157,6 +157,28 @@ model HotelConfig {
   pushSubscriptions PushSubscription[]
   rooms         Room[]
   rates         HotelRates?
+  guestMessages GuestMessage[]
+}
+
+// Messages a guest sends to the property from the booking-confirmation screen.
+// Surfaces on the Front Desk so owners can act on requests (early check-in,
+// late arrival, questions, etc.) without a phone call.
+model GuestMessage {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  hotel           HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId         String
+  bookingId       String?
+  reservationCode String?
+  guestName       String?
+  guestEmail      String?
+  guestPhone      String?
+  roomName        String?
+  body            String?
+  requests        String?     // JSON array of quick-request chip labels
+  readAt          DateTime?
+
+  @@index([hotelId, createdAt])
 }
 
 model Room {

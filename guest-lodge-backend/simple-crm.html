@@ -1757,10 +1757,11 @@
         Settings
       </button>
       <button type="button" class="tab" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
-        Bookings <span class="tab-badge" id="countNeedsCalled">0</span>
+        Bookings <span class="tab-badge" id="countNeedsCalled">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
+    <div id="messagesPanel" style="display:none;"></div>
     <div id="bookingsList">
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
     </div>
@@ -1775,7 +1776,7 @@
       <span class="mobile-nav-label">Settings</span>
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="bookings">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="inbox"></i></span>
+      <span class="mobile-nav-icon-wrap" style="position:relative;"><i data-lucide="inbox"></i><span id="msgUnreadDot" style="display:none;position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e0245e;border:2px solid #fff;"></span></span>
       <span class="mobile-nav-label">Bookings</span>
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="availability">
@@ -1812,6 +1813,7 @@
 <script>
 let token = '';
 let bookings = [];
+let guestMessages = [];
 let currentFilter = 'settings';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
@@ -2648,6 +2650,12 @@ async function startCrmApp(verification) {
     cleanUrl.searchParams.delete('welcome');
     cleanUrl.searchParams.delete('tab');
     window.history.replaceState({}, '', cleanUrl);
+  } else if (urlParams.get('tab') === 'bookings') {
+    // Deep link from a guest-message push notification.
+    currentFilter = 'bookings';
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('tab');
+    window.history.replaceState({}, '', cleanUrl);
   }
 
   await Promise.allSettled([
@@ -2661,6 +2669,11 @@ async function startCrmApp(verification) {
   refreshMobileBottomNavIcons();
   requestAnimationFrame(refreshMobileBottomNavIcons);
   setTimeout(refreshMobileBottomNavIcons, 80);
+
+  // Sync tab chrome if we deep-linked straight to Bookings (e.g. from a push).
+  if (currentFilter === 'bookings') {
+    setFilter('bookings', document.querySelector('.tab[data-nav-filter="bookings"]'));
+  }
 
   // If redirected here with ?action=go-live, trigger Stripe checkout immediately
   if (urlParams.get('action') === 'go-live') {
@@ -2842,6 +2855,7 @@ async function loadBookings() {
     
     // Render based on current filter
     applyFilter();
+    loadMessages();
   } catch(e) {
     if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
@@ -2851,6 +2865,112 @@ async function loadBookings() {
       <div class="empty-sub">${esc(e.message)}</div>
       </div>`;
   }
+}
+
+// ── GUEST MESSAGES ─────────────────────────────────────
+async function loadMessages() {
+  try {
+    const data = await api('GET', '/api/crm/messages');
+    if (!data.success) return;
+    guestMessages = data.messages || [];
+    updateMessageBadges();
+    if (currentFilter === 'bookings') renderMessages();
+  } catch (e) { /* non-fatal */ }
+}
+
+function updateMessageBadges() {
+  const unread = guestMessages.filter(m => !m.read).length;
+  const badge = document.getElementById('msgUnreadBadge');
+  if (badge) {
+    badge.textContent = unread;
+    badge.style.display = unread > 0 ? '' : 'none';
+  }
+  const dot = document.getElementById('msgUnreadDot');
+  if (dot) dot.style.display = unread > 0 ? '' : 'none';
+}
+
+function timeAgo(iso) {
+  const then = new Date(iso).getTime();
+  if (!then) return '';
+  const diff = Math.max(0, Date.now() - then);
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function renderMessages() {
+  const panel = document.getElementById('messagesPanel');
+  if (!panel) return;
+  // Show unread first, then the few most recent read ones for context.
+  const unread = guestMessages.filter(m => !m.read);
+  const read = guestMessages.filter(m => m.read).slice(0, 3);
+  const visible = [...unread, ...read];
+  if (visible.length === 0) { panel.innerHTML = ''; return; }
+
+  const unreadCount = unread.length;
+  const cards = visible.map(m => {
+    const chips = (m.requests || []).map(r =>
+      `<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:600;margin:0 6px 6px 0;">${esc(r)}</span>`
+    ).join('');
+    const phone = (m.guestPhone || '').trim();
+    const email = (m.guestEmail || '').trim();
+    const contactBtns = [
+      phone ? `<a href="tel:${esc(phone)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#2E7D5B;color:#fff;font-size:12px;font-weight:700;">📞 Call</a>` : '',
+      phone ? `<a href="sms:${esc(phone)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:700;">💬 Text</a>` : '',
+      email ? `<a href="mailto:${esc(email)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:700;">✉️ Email</a>` : '',
+    ].filter(Boolean).join('');
+    return `
+      <div style="border:1px solid ${m.read ? '#e6e9e7' : '#bfe0cd'};background:${m.read ? '#fbfcfb' : '#f4fbf6'};border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <div style="font-weight:800;color:#1a1a1a;font-size:14px;display:flex;align-items:center;gap:8px;">
+            ${m.read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#e0245e;display:inline-block;"></span>'}
+            ${esc(m.guestName || 'Guest')}
+            ${m.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;">· ${esc(m.roomName)}</span>` : ''}
+          </div>
+          <div style="font-size:11px;color:#9ca3af;white-space:nowrap;">${esc(timeAgo(m.createdAt))}</div>
+        </div>
+        ${m.reservationCode ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">#${esc(m.reservationCode)}</div>` : ''}
+        ${chips ? `<div style="margin-bottom:8px;">${chips}</div>` : ''}
+        ${m.body ? `<div style="font-size:14px;color:#374151;line-height:1.5;margin-bottom:10px;white-space:pre-wrap;">${esc(m.body)}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${contactBtns}
+          ${m.read ? '' : `<button onclick="markMessageRead('${esc(m.id)}')" style="margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">✓ Mark read</button>`}
+        </div>
+      </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;padding:16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:15px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:8px;">
+          💬 Guest messages ${unreadCount > 0 ? `<span style="background:#e0245e;color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:2px 8px;">${unreadCount} new</span>` : ''}
+        </div>
+        ${unreadCount > 0 ? `<button onclick="markAllMessagesRead()" style="padding:6px 10px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Mark all read</button>` : ''}
+      </div>
+      ${cards}
+    </div>`;
+}
+
+async function markMessageRead(id) {
+  const msg = guestMessages.find(m => m.id === id);
+  if (msg) msg.read = true;
+  updateMessageBadges();
+  renderMessages();
+  try { await api('POST', `/api/crm/messages/${encodeURIComponent(id)}/read`); }
+  catch (e) { /* optimistic; ignore */ }
+}
+
+async function markAllMessagesRead() {
+  guestMessages.forEach(m => { m.read = true; });
+  updateMessageBadges();
+  renderMessages();
+  try { await api('POST', '/api/crm/messages/read-all'); }
+  catch (e) { /* optimistic; ignore */ }
 }
 
 async function refreshCurrentView() {
@@ -3153,6 +3273,8 @@ function applyFilter() {
   const revenueEl = document.getElementById('revenueView');
   const settingsEl = document.getElementById('settingsView');
   const goLiveBanner = document.getElementById('goLiveBanner');
+  const msgPanel = document.getElementById('messagesPanel');
+  if (msgPanel) msgPanel.style.display = 'none';
   updatePreviewSiteBar();
   // Remove any checklist pointer when switching tabs
   const ptr = document.getElementById('checklistPointer');
@@ -3218,6 +3340,8 @@ function applyFilter() {
   const editEl = document.getElementById('editView');
   if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
+  if (msgPanel) msgPanel.style.display = '';
+  renderMessages();
   renderBookings(bookings);
 }
 
@@ -3911,59 +4035,46 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function enableNotifications() {
-  // TEMP DIAGNOSTICS: iOS has no visible console, so we trace each step and show
-  // a blocking alert at the end / on failure so we can see exactly where it dies.
-  const steps = [];
-  const mark = (s) => steps.push(s);
-  if (!token) { alert('Notif: not signed in (no token)'); toast('Sign in first', 'error'); return; }
-  if (typeof Notification === 'undefined') { alert('Notif: Notification API missing'); return; }
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    alert('Notif: push unsupported (sw=' + ('serviceWorker' in navigator) + ', push=' + ('PushManager' in window) + ', standalone=' + isStandaloneApp() + ')');
+  if (!token) { toast('Sign in first', 'error'); return; }
+  if (typeof Notification === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    toast('Notifications not supported on this device', 'error');
     return;
   }
   try {
-    mark('start standalone=' + isStandaloneApp());
     const perm = await Notification.requestPermission();
-    mark('perm=' + perm);
     if (perm !== 'granted') {
       setNotificationButtonState(false);
-      alert('Notif stopped: ' + steps.join(' → '));
       toast('Notifications blocked', 'error');
       return;
     }
     const keyRes = await fetch('/api/push/vapid-public');
-    mark('vapidHTTP=' + keyRes.status);
     const keyData = await keyRes.json().catch(() => ({}));
-    mark('hasKey=' + !!keyData.publicKey);
-    if (!keyData.publicKey) { alert('Notif stopped: ' + steps.join(' → ')); toast('Push not configured', 'error'); return; }
-    try { await navigator.serviceWorker.register('/frontdesk-sw.js'); mark('registered'); } catch (e) { mark('regErr=' + (e && e.message)); }
+    if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
+    // Register from /frontdesk-sw.js (a dedicated path) and race `ready` against a
+    // timeout so a failed SW load surfaces an error instead of hanging forever.
+    try { await navigator.serviceWorker.register('/frontdesk-sw.js'); } catch (_) {}
     const reg = await Promise.race([
       navigator.serviceWorker.ready,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('ready-timeout-8s')), 8000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Service worker unavailable')), 8000)),
     ]);
-    mark('ready scope=' + (reg && reg.scope));
     const sub = await Promise.race([
       reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('subscribe-timeout-15s')), 15000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Subscription timed out')), 15000)),
     ]);
-    mark('subscribed');
     const bufToB64 = buf => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
-    const postRes = await api('POST', '/api/push/subscribe', {
+    await api('POST', '/api/push/subscribe', {
       endpoint: sub.endpoint,
       p256dh: sub.getKey('p256dh') ? bufToB64(sub.getKey('p256dh')) : '',
       auth: sub.getKey('auth') ? bufToB64(sub.getKey('auth')) : '',
       source: 'simple-crm'
     });
-    mark('posted=' + JSON.stringify(postRes));
-    alert('Notif OK: ' + steps.join(' → '));
     toast('Notifications enabled', 'success');
     setNotificationButtonState(true);
   } catch(e) {
     setNotificationButtonState(false);
-    alert('Notif FAILED: ' + steps.join(' → ') + ' → ERROR=' + (e && e.message ? e.message : e));
     toast('Failed: ' + (e.message || e), 'error');
   }
 }

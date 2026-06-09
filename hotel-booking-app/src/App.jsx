@@ -694,6 +694,8 @@ const handleConfirmBooking = async (bookingDetails) => {
               guestInfo={guestInfo}
               reservationCode={reservationCode}
               hotel={currentHotel}
+              apiBaseUrl={API_BASE_URL}
+              hotelId={currentHotel.id || hotelId}
             />
           </Suspense>
           } />
