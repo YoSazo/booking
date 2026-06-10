@@ -6,6 +6,8 @@ import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './tracking
 import { hotelData } from './hotelData.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 import getHotelId from './utils/getHotelId';
+import { GuestProvider } from './GuestProvider.jsx';
+import GuestLayout from './GuestLayout.jsx';
 
 // Lazy-load heavy pages so they don't bloat the initial landing page bundle.
 // GuestInfoPage pulls in Stripe + Google Maps — biggest win.
@@ -14,6 +16,8 @@ const ConfirmationPage = lazy(() => import('./ConfirmationPage.jsx'));
 const MyBookingPage = lazy(() => import('./MyBookingPage.jsx'));
 const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper.jsx'));
 const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
+const GuestHomePage = lazy(() => import('./GuestHomePage.jsx'));
+const GuestMessagesPage = lazy(() => import('./GuestMessagesPage.jsx'));
 
 
 const hotelId = getHotelId();
@@ -228,26 +232,20 @@ function App() {
   const location = useLocation(); 
 
   // PWA "Remember Me" Logic: If they land on the home screen and have an active stay,
-  // redirect them straight to their dashboard.
+  // redirect them straight to the Guest Home dashboard.
   useEffect(() => {
     if (location.pathname === '/') {
       const storedStay = localStorage.getItem('marketel_guest_stay');
       if (storedStay) {
         try {
           const stay = JSON.parse(storedStay);
-          if (stay.code && stay.checkout) {
-            // Check if checkout is in the future or today
-            const checkoutDate = new Date(stay.checkout);
+          if (stay.code && (stay.checkout || stay.checkoutDate)) {
+            const checkoutDate = new Date(stay.checkout || stay.checkoutDate);
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Start of today
-            
+            today.setHours(0, 0, 0, 0);
             if (checkoutDate >= today) {
-              // Active stay — redirect!
-              // Include the email in state or search params so the lookup succeeds easily if needed,
-              // or just let MyBookingPage handle it. MyBookingPage fetches based on code.
-              navigate(`/booking/${stay.code}?email=${encodeURIComponent(stay.email || '')}`, { replace: true });
+              navigate('/guest/home', { replace: true });
             } else {
-              // Stay has passed, clear memory
               localStorage.removeItem('marketel_guest_stay');
             }
           }
@@ -660,6 +658,8 @@ const handleConfirmBooking = async (bookingDetails) => {
   }
 
   return (
+    <GuestProvider apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId}>
+    <GuestLayout>
     <>
     <ScrollToTop />
       <PageTransition>
@@ -686,6 +686,18 @@ const handleConfirmBooking = async (bookingDetails) => {
                 setIsProcessingBooking={setIsProcessingBooking}
                 onHotelUpdate={(updates) => setCurrentHotel(prev => ({ ...prev, ...updates }))}
                 hotelId={currentHotel.id || hotelId}              />
+          } />
+
+          {/* Guest Dashboard routes */}
+          <Route path="/guest/home" element={
+            <Suspense fallback={null}>
+              <GuestHomePage hotel={currentHotel} />
+            </Suspense>
+          } />
+          <Route path="/guest/messages" element={
+            <Suspense fallback={null}>
+              <GuestMessagesPage hotel={currentHotel} />
+            </Suspense>
           } />
 
           <Route path="/guest-info" element={
@@ -767,6 +779,8 @@ const handleConfirmBooking = async (bookingDetails) => {
       />
       
     </>
+    </GuestLayout>
+    </GuestProvider>
   );
 }
 

@@ -2879,7 +2879,7 @@ async function loadMessages() {
 }
 
 function updateMessageBadges() {
-  const unread = guestMessages.filter(m => !m.read).length;
+  const unread = guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length;
   const badge = document.getElementById('msgUnreadBadge');
   if (badge) {
     badge.textContent = unread;
@@ -2906,41 +2906,77 @@ function timeAgo(iso) {
 function renderMessages() {
   const panel = document.getElementById('messagesPanel');
   if (!panel) return;
-  // Show unread first, then the few most recent read ones for context.
-  const unread = guestMessages.filter(m => !m.read);
-  const read = guestMessages.filter(m => m.read).slice(0, 3);
-  const visible = [...unread, ...read];
-  if (visible.length === 0) { panel.innerHTML = ''; return; }
 
-  const unreadCount = unread.length;
-  const cards = visible.map(m => {
-    const chips = (m.requests || []).map(r =>
-      `<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:600;margin:0 6px 6px 0;">${esc(r)}</span>`
-    ).join('');
-    const phone = (m.guestPhone || '').trim();
-    const email = (m.guestEmail || '').trim();
+  // Group messages into conversations by reservationCode
+  const threads = {};
+  guestMessages.forEach(m => {
+    const key = m.reservationCode || m.id;
+    if (!threads[key]) threads[key] = { code: m.reservationCode, guestName: m.guestName, roomName: m.roomName, guestPhone: m.guestPhone, guestEmail: m.guestEmail, msgs: [] };
+    threads[key].msgs.push(m);
+  });
+
+  // Sort threads: unread first, then by latest message
+  const threadList = Object.values(threads).sort((a, b) => {
+    const aUnread = a.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
+    const bUnread = b.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
+    if (aUnread && !bUnread) return -1;
+    if (!aUnread && bUnread) return 1;
+    const aLatest = new Date(a.msgs[a.msgs.length - 1].createdAt);
+    const bLatest = new Date(b.msgs[b.msgs.length - 1].createdAt);
+    return bLatest - aLatest;
+  });
+
+  if (threadList.length === 0) { panel.innerHTML = ''; return; }
+
+  const unreadCount = guestMessages.filter(m => !m.read && (m.sender || 'guest') === 'guest').length;
+
+  const threadCards = threadList.map(thread => {
+    const hasUnread = thread.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
+    const phone = (thread.guestPhone || '').trim();
+    const email = (thread.guestEmail || '').trim();
     const contactBtns = [
       phone ? `<a href="tel:${esc(phone)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#2E7D5B;color:#fff;font-size:12px;font-weight:700;">📞 Call</a>` : '',
       phone ? `<a href="sms:${esc(phone)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:700;">💬 Text</a>` : '',
       email ? `<a href="mailto:${esc(email)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:700;">✉️ Email</a>` : '',
     ].filter(Boolean).join('');
+
+    // Render individual messages in the thread
+    const msgBubbles = thread.msgs.map(m => {
+      const isHotel = (m.sender || 'guest') === 'hotel';
+      const chips = (m.requests || []).map(r =>
+        `<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:600;margin:0 6px 6px 0;">${esc(r)}</span>`
+      ).join('');
+      return `
+        <div style="display:flex;flex-direction:column;align-items:${isHotel ? 'flex-end' : 'flex-start'};margin-bottom:8px;">
+          <div style="font-size:10px;font-weight:700;color:${isHotel ? '#2E7D5B' : '#6b7280'};margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">${isHotel ? 'You' : esc(thread.guestName || 'Guest')} · ${esc(timeAgo(m.createdAt))}</div>
+          ${chips ? `<div style="margin-bottom:4px;">${chips}</div>` : ''}
+          ${m.body ? `<div style="background:${isHotel ? '#2E7D5B' : '#f3f4f6'};color:${isHotel ? '#fff' : '#1a1a2e'};padding:10px 14px;border-radius:14px;${isHotel ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;'}font-size:14px;line-height:1.5;max-width:85%;white-space:pre-wrap;">${esc(m.body)}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const replyInputId = `reply-${esc(thread.code || 'none')}`;
     return `
-      <div style="border:1px solid ${m.read ? '#e6e9e7' : '#bfe0cd'};background:${m.read ? '#fbfcfb' : '#f4fbf6'};border-radius:12px;padding:14px;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+      <div style="border:1px solid ${hasUnread ? '#bfe0cd' : '#e6e9e7'};background:${hasUnread ? '#f4fbf6' : '#fbfcfb'};border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
           <div style="font-weight:800;color:#1a1a1a;font-size:14px;display:flex;align-items:center;gap:8px;">
-            ${m.read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#e0245e;display:inline-block;"></span>'}
-            ${esc(m.guestName || 'Guest')}
-            ${m.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;">· ${esc(m.roomName)}</span>` : ''}
+            ${hasUnread ? '<span style="width:8px;height:8px;border-radius:50%;background:#e0245e;display:inline-block;"></span>' : ''}
+            ${esc(thread.guestName || 'Guest')}
+            ${thread.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;">· ${esc(thread.roomName)}</span>` : ''}
           </div>
-          <div style="font-size:11px;color:#9ca3af;white-space:nowrap;">${esc(timeAgo(m.createdAt))}</div>
+          ${thread.code ? `<div style="font-size:11px;color:#9ca3af;">#${esc(thread.code)}</div>` : ''}
         </div>
-        ${m.reservationCode ? `<div style="font-size:11px;color:#9ca3af;margin-bottom:8px;">#${esc(m.reservationCode)}</div>` : ''}
-        ${chips ? `<div style="margin-bottom:8px;">${chips}</div>` : ''}
-        ${m.body ? `<div style="font-size:14px;color:#374151;line-height:1.5;margin-bottom:10px;white-space:pre-wrap;">${esc(m.body)}</div>` : ''}
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="margin-bottom:10px;">${msgBubbles}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
           ${contactBtns}
-          ${m.read ? '' : `<button onclick="markMessageRead('${esc(m.id)}')" style="margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">✓ Mark read</button>`}
+          ${hasUnread ? thread.msgs.filter(m => !m.read && (m.sender||'guest')==='guest').map(m => `<button onclick="markMessageRead('${esc(m.id)}')" style="margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">✓ Mark read</button>`).join('') : ''}
         </div>
+        ${thread.code ? `
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}..." maxlength="2000" style="flex:1;padding:10px 14px;border-radius:24px;border:1.5px solid #d1d5db;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#2E7D5B'" onblur="this.style.borderColor='#d1d5db'" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
+          <button onclick="replyToThread('${esc(thread.code)}','${replyInputId}')" style="width:40px;height:40px;border-radius:50%;border:none;background:#2E7D5B;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s;" onmousedown="this.style.transform='scale(0.92)'" onmouseup="this.style.transform='scale(1)'">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>` : ''}
       </div>`;
   }).join('');
 
@@ -2952,7 +2988,7 @@ function renderMessages() {
         </div>
         ${unreadCount > 0 ? `<button onclick="markAllMessagesRead()" style="padding:6px 10px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Mark all read</button>` : ''}
       </div>
-      ${cards}
+      ${threadCards}
     </div>`;
 }
 
@@ -2971,6 +3007,35 @@ async function markAllMessagesRead() {
   renderMessages();
   try { await api('POST', '/api/crm/messages/read-all'); }
   catch (e) { /* optimistic; ignore */ }
+}
+
+async function replyToThread(reservationCode, inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const body = input.value.trim();
+  if (!body) return;
+  input.disabled = true;
+  try {
+    const data = await api('POST', `/api/crm/messages/${encodeURIComponent(reservationCode)}/reply`, { body });
+    if (data.success && data.message) {
+      // Add the reply to our local messages array so it renders immediately
+      guestMessages.push({
+        id: data.message.id,
+        reservationCode,
+        guestName: guestMessages.find(m => m.reservationCode === reservationCode)?.guestName || 'Guest',
+        body: data.message.body,
+        sender: 'hotel',
+        createdAt: data.message.createdAt,
+        read: true,
+        requests: [],
+      });
+      input.value = '';
+      renderMessages();
+    }
+  } catch (e) {
+    console.error('Reply failed:', e);
+  }
+  input.disabled = false;
 }
 
 async function refreshCurrentView() {

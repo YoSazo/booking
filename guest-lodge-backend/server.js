@@ -1904,6 +1904,7 @@ app.post('/api/guest-message', async (req, res) => {
                 roomName: booking?.roomName || null,
                 body: cleanBody || null,
                 requests: requestList.length ? JSON.stringify(requestList) : null,
+                sender: 'guest',
             },
         });
         console.log(`💬 [guest-message] saved for hotel=${resolvedHotelId} (booking=${booking?.id || 'none'})`);
@@ -1916,6 +1917,53 @@ app.post('/api/guest-message', async (req, res) => {
     } catch (e) {
         console.error('guest-message error:', e.message);
         res.status(500).json({ success: false, message: 'Could not send message.' });
+    }
+});
+
+// PUBLIC: guest fetches their conversation thread for a reservation.
+app.get('/api/guest-messages', async (req, res) => {
+    try {
+        const { hotelId, code, email } = req.query;
+        if (!hotelId || !code) return res.status(400).json({ success: false, message: 'Missing hotelId or code.' });
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) return res.status(validation.status || 404).json({ success: false, message: 'Property not found.' });
+        const resolvedHotelId = validation.hotelId;
+
+        const booking = await prisma.booking.findFirst({
+            where: {
+                hotelId: resolvedHotelId,
+                OR: [
+                    { ourReservationCode: String(code).trim() },
+                    { pmsConfirmationCode: String(code).trim() }
+                ]
+            }
+        });
+        if (!booking) return res.json({ success: true, messages: [] });
+        if (email && String(booking.guestEmail || '').toLowerCase() !== String(email).toLowerCase()) {
+            return res.json({ success: true, messages: [] });
+        }
+
+        const messages = await prisma.guestMessage.findMany({
+            where: { hotelId: resolvedHotelId, reservationCode: booking.ourReservationCode },
+            orderBy: { createdAt: 'asc' },
+            take: 200
+        });
+
+        res.json({
+            success: true,
+            messages: messages.map(m => ({
+                id: m.id,
+                body: m.body,
+                sender: m.sender || 'guest',
+                createdAt: m.createdAt,
+                requests: m.requests ? JSON.parse(m.requests) : [],
+                readAt: m.readAt
+            }))
+        });
+    } catch (err) {
+        console.error('GET /api/guest-messages error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
 
@@ -6541,6 +6589,7 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
                 roomName: m.roomName,
                 body: m.body,
                 requests,
+                sender: m.sender || 'guest',
                 read: !!m.readAt,
             };
         });
@@ -6582,6 +6631,43 @@ app.post('/api/crm/messages/read-all', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('CRM messages read-all error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to update messages' });
+    }
+});
+
+app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const { reservationCode } = req.params;
+        const { body } = req.body;
+
+        if (!body || !body.trim()) return res.status(400).json({ success: false, message: 'Reply cannot be empty.' });
+        if (body.length > 2000) return res.status(400).json({ success: false, message: 'Reply too long.' });
+
+        const latestMsg = await withRetry(() => prisma.guestMessage.findFirst({
+            where: { hotelId, reservationCode },
+            orderBy: { createdAt: 'desc' }
+        }));
+
+        const reply = await withRetry(() => prisma.guestMessage.create({
+            data: {
+                hotelId,
+                reservationCode,
+                bookingId: latestMsg?.bookingId || null,
+                guestName: latestMsg?.guestName || null,
+                guestEmail: latestMsg?.guestEmail || null,
+                guestPhone: latestMsg?.guestPhone || null,
+                roomName: latestMsg?.roomName || null,
+                body: body.trim(),
+                sender: 'hotel',
+                readAt: new Date(),
+            }
+        }));
+
+        res.json({ success: true, message: { id: reply.id, body: reply.body, sender: 'hotel', createdAt: reply.createdAt } });
+    } catch (e) {
+        console.error('POST /api/crm/messages/:reservationCode/reply error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to send reply.' });
     }
 });
 
