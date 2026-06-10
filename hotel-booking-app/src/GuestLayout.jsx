@@ -26,54 +26,38 @@ export default function GuestLayout({ children, hotelName }) {
     backgroundColor: 'var(--bg)',
     minHeight: '100vh',
     fontFamily: '"DM Sans", sans-serif',
-    paddingBottom: '80px', // Space for bottom nav
+    position: 'relative'
   };
 
   const navItems = [
     { label: 'My Stay', path: '/guest/dashboard', icon: Home },
     { label: 'Book', path: '/guest/book', icon: CalendarSearch },
-    { label: 'Profile', path: '/guest/profile', icon: User },
   ];
 
   return (
     <div style={guestThemeVars} className="guest-layout-wrapper">
-      {/* Optional: A simple top header like the Front Desk */}
-      <div style={{
-        background: '#fff',
-        padding: '16px 20px',
-        borderBottom: '1px solid var(--border)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 1px 8px rgba(46,125,91,0.05)'
-      }}>
-        <h1 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-          {hotelName || 'Guest Portal'}
-        </h1>
-      </div>
-
-      {/* Main Content Area */}
-      <div style={{ padding: '20px', maxWidth: '860px', margin: '0 auto' }}>
+      {/* Main Content Area (Full screen, no constraints) */}
+      <div style={{ width: '100%', minHeight: '100vh', paddingBottom: '100px' }}>
         {children}
       </div>
 
-      {/* Bottom Navigation Bar */}
+      {/* Floating Bottom Navigation Pill */}
       <div style={{
         position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: '#fff',
-        borderTop: '1px solid var(--border)',
+        bottom: 'max(24px, env(safe-area-inset-bottom))',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.4)',
         display: 'flex',
-        justifyContent: 'space-around',
-        padding: '10px 0',
-        paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
-        boxShadow: '0 -4px 12px rgba(46,125,91,0.05)',
-        zIndex: 100
+        justifyContent: 'center',
+        padding: '6px 6px',
+        borderRadius: '100px',
+        boxShadow: '0 8px 32px rgba(46,125,91,0.15)',
+        zIndex: 100,
+        gap: '4px'
       }}>
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || (item.path === '/guest/dashboard' && location.pathname.startsWith('/booking/'));
@@ -83,21 +67,22 @@ export default function GuestLayout({ children, hotelName }) {
               key={item.path}
               onClick={() => navigate(item.path)}
               style={{
-                background: 'none',
+                background: isActive ? 'var(--green)' : 'transparent',
                 border: 'none',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '4px',
-                color: isActive ? 'var(--green)' : 'var(--text-muted)',
+                gap: '8px',
+                color: isActive ? '#fff' : 'var(--text-muted)',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
-                width: '33%',
-                padding: '4px'
+                padding: '10px 20px',
+                borderRadius: '100px',
+                transition: 'all 0.2s ease',
+                outline: 'none'
               }}
             >
-              <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-              <span style={{ fontSize: '11px', fontWeight: isActive ? 700 : 500 }}>
+              <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+              <span style={{ fontSize: '14px', fontWeight: isActive ? 700 : 500 }}>
                 {item.label}
               </span>
             </button>

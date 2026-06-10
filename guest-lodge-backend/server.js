@@ -4959,6 +4959,7 @@ app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
 const multer = require('multer');
 const fs = require('fs');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const sharp = require('sharp');
 
 // Cloudflare R2 setup
 const r2 = new S3Client({
@@ -4972,8 +4973,8 @@ const r2 = new S3Client({
 const R2_BUCKET = process.env.R2_BUCKET || 'marketel-uploads';
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // e.g. https://pub-xxx.r2.dev or custom domain
 
-// Use memory storage (upload to R2, not disk)
-const uploadMemory = multer({
+// Use memory storage for ALL uploads so we can process them with Sharp first
+const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
@@ -4981,26 +4982,6 @@ const uploadMemory = multer({
         cb(null, allowed.includes(file.mimetype));
     },
 });
-
-// Also keep disk storage as fallback if R2 not configured
-const uploadStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname) || '.jpg';
-        cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
-    },
-});
-const uploadDisk = multer({ storage: uploadStorage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
-}});
-
-// Choose upload middleware based on R2 config
-const upload = R2_PUBLIC_URL ? uploadMemory : uploadDisk;
 
 // Helper: upload buffer to R2
 async function uploadToR2(buffer, key, contentType) {
@@ -5023,13 +5004,21 @@ app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
 }, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+        
+        // Convert the image to highly-compressed WebP format
+        const webpBuffer = await sharp(req.file.buffer).webp({ quality: 80 }).toBuffer();
+        
         let url;
+        const keyBase = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+        
         if (R2_PUBLIC_URL) {
-            const ext = path.extname(req.file.originalname) || '.jpg';
-            const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
-            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+            const key = `${req.hotelId}/${keyBase}.webp`;
+            url = await uploadToR2(webpBuffer, key, 'image/webp');
         } else {
-            url = `/uploads/${req.hotelId}/${req.file.filename}`;
+            const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, `${keyBase}.webp`), webpBuffer);
+            url = `/uploads/${req.hotelId}/${keyBase}.webp`;
         }
         const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
         const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
@@ -6261,13 +6250,21 @@ app.post('/api/crm/rooms/:roomId/images', crmAuth, (req, res, next) => {
 }, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ success: false, message: 'No image' });
+        
+        // Convert the image to highly-compressed WebP format
+        const webpBuffer = await sharp(req.file.buffer).webp({ quality: 80 }).toBuffer();
+        
         let url;
+        const keyBase = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+        
         if (R2_PUBLIC_URL) {
-            const ext = path.extname(req.file.originalname) || '.jpg';
-            const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
-            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+            const key = `${req.hotelId}/${keyBase}.webp`;
+            url = await uploadToR2(webpBuffer, key, 'image/webp');
         } else {
-            url = `/uploads/${req.hotelId}/${req.file.filename}`;
+            const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, `${keyBase}.webp`), webpBuffer);
+            url = `/uploads/${req.hotelId}/${keyBase}.webp`;
         }
         const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
         const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
@@ -6305,7 +6302,12 @@ app.post('/api/crm/hotel-app-icon', crmAuth, (req, res, next) => {
             const key = `${req.hotelId}/appicon-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
             url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
         } else {
-            url = `/uploads/${req.hotelId}/${req.file.filename}`;
+            const ext = path.extname(req.file.originalname) || '.png';
+            const fileName = `appicon-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+            const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, fileName), req.file.buffer);
+            url = `/uploads/${req.hotelId}/${fileName}`;
         }
         await withRetry(() => prisma.hotelConfig.update({ where: { id: hotelId }, data: { appIconUrl: url } }));
         const returnUrl = R2_PUBLIC_URL ? url : `${req.protocol}://${req.get('host')}${url}`;
