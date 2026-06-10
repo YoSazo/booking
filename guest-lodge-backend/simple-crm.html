@@ -6342,39 +6342,158 @@ function confirmEditAddRoom() {
 // ── APPS PAGE ─────────────────────────────────────────
 
 const APPS_SHOWCASE = {
-  homeScreen: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123562/home_screen_with_front_desk_and_booking_engine_w3w8bg.png',
-  guestBook: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123568/Book_page_booking_engine_juu9y4.png',
-  guestHome: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123564/Home_page_booking_engine_uks92o.png',
-  guestMessages: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123561/Messages_page_booking_engine_jfcztr.png',
-  frontdeskMessages: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123567/Bookings_guest_messages_front_desk_fir5nj.png',
-  bookingNotifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
-  guestMessageNotifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_23-43-50_1_z22p4m.mp4',
+  homeScreen:          'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123562/home_screen_with_front_desk_and_booking_engine_w3w8bg.png',
+  guestBook:           'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123568/Book_page_booking_engine_juu9y4.png',
+  guestHome:           'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123564/Home_page_booking_engine_uks92o.png',
+  guestMessages:       'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123561/Messages_page_booking_engine_jfcztr.png',
+  frontdeskMessages:   'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123567/Bookings_guest_messages_front_desk_fir5nj.png',
+  // Videos — live recordings
+  bookingNotifVideo:        'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
+  guestMessageNotifVideo:   'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_23-43-50_1_z22p4m.mp4',
+  guestInstallVideo:        'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_00-03-19_1_lgdf59.mp4',
+  frontdeskInstallVideo:    'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_00-05-07_1_lymlpv.mp4',
 };
 
-// Mobile-friendly Cloudinary delivery — full PNGs are ~1.5MB and often fail on cellular.
+// Cloudinary URL helpers
 function appsCloudinaryImg(url, width) {
   return url.replace('/image/upload/', '/image/upload/f_auto,q_auto,w_' + (width || 400) + '/');
 }
-
-function appsShowcaseImg(src, alt, caption, eager) {
-  const sm = appsCloudinaryImg(src, 360);
-  const md = appsCloudinaryImg(src, 520);
-  const cap = caption ? `<figcaption style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.45;max-width:280px;margin-left:auto;margin-right:auto;">${caption}</figcaption>` : '';
-  const loadAttr = eager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
-  return `<figure style="margin:0;text-align:center;flex:1;min-width:0;">
-    <img src="${sm}" srcset="${sm} 360w, ${md} 520w" sizes="(max-width:768px) 72vw, 280px" alt="${alt}" ${loadAttr} decoding="async" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;" onerror="this.onerror=null;this.src='${md}'">
-    ${cap}
-  </figure>`;
+// Full-res for lightbox (device pixel aware, max 1600px)
+function appsCloudinaryFull(url) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(Math.min(window.screen.width * dpr, 1600));
+  return url.replace('/image/upload/', `/image/upload/f_auto,q_auto:best,w_${w}/`);
 }
 
-function appsNotifVideo(videoSrc, caption, posterSrc) {
-  const poster = appsCloudinaryImg(posterSrc || APPS_SHOWCASE.homeScreen, 360);
-  const cap = caption ? `<p style="font-size:11px;color:var(--text-muted);text-align:center;margin:10px 0 0;line-height:1.45;">${caption}</p>` : '';
-  return `<div style="display:flex;flex-direction:column;align-items:center;max-width:280px;margin:0 auto;">
-    <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:280px;height:auto;display:block;" poster="${poster}">
-      <source src="${videoSrc}" type="video/mp4">
-    </video>
-    ${cap}
+// ── LIGHTBOX ──────────────────────────────────────────
+// Single global lightbox for the Apps page.
+// items: array of { type: 'image'|'video', src, alt, caption }
+let _appsLbItems = [];
+let _appsLbIdx   = 0;
+
+function appsOpenLightbox(items, startIdx) {
+  _appsLbItems = items;
+  _appsLbIdx   = startIdx || 0;
+  let lb = document.getElementById('appsLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'appsLightbox';
+    lb.style.cssText = [
+      'position:fixed;inset:0;z-index:102000;background:rgba(0,0,0,0.96);',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;',
+      'overscroll-behavior:contain;touch-action:pan-y;',
+    ].join('');
+    document.body.appendChild(lb);
+    document.body.style.overflow = 'hidden';
+    // Keyboard
+    lb._keyHandler = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') appsLbNav(1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') appsLbNav(-1);
+      else if (e.key === 'Escape') appsCloseLightbox();
+    };
+    document.addEventListener('keydown', lb._keyHandler);
+    // Swipe support
+    let touchStartX = 0;
+    lb.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, { passive: true });
+    lb.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 50) appsLbNav(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  }
+  document.body.style.overflow = 'hidden';
+  appsLbRender();
+}
+
+function appsCloseLightbox() {
+  const lb = document.getElementById('appsLightbox');
+  if (!lb) return;
+  document.removeEventListener('keydown', lb._keyHandler);
+  lb.remove();
+  document.body.style.overflow = '';
+}
+
+function appsLbNav(dir) {
+  const total = _appsLbItems.length;
+  if (total <= 1) return;
+  _appsLbIdx = (_appsLbIdx + dir + total) % total;
+  appsLbRender();
+}
+
+function appsLbRender() {
+  const lb = document.getElementById('appsLightbox');
+  if (!lb) return;
+  const item    = _appsLbItems[_appsLbIdx];
+  const total   = _appsLbItems.length;
+  const isImg   = item.type !== 'video';
+  const counter = total > 1 ? `${_appsLbIdx + 1} / ${total}` : '';
+
+  const mediaHtml = isImg
+    ? `<img src="${appsCloudinaryFull(item.src)}" alt="${item.alt || ''}"
+          style="max-width:100%;max-height:calc(100dvh - 130px);width:auto;height:auto;display:block;object-fit:contain;border-radius:8px;"
+          loading="eager" decoding="async">`
+    : `<video autoplay loop muted playsinline webkit-playsinline
+          style="max-width:100%;max-height:calc(100dvh - 130px);width:auto;height:auto;display:block;border-radius:8px;">
+          <source src="${item.src}" type="video/mp4">
+       </video>`;
+
+  const prevBtn = total > 1
+    ? `<button onclick="appsLbNav(-1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">‹</button>` : '';
+  const nextBtn = total > 1
+    ? `<button onclick="appsLbNav(1)"  style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">›</button>` : '';
+
+  const dotNav = total > 1 ? `<div style="display:flex;gap:7px;justify-content:center;margin-top:12px;">
+    ${Array.from({length: total}, (_, i) =>
+      `<div onclick="appsOpenLightbox(_appsLbItems,${i})" style="width:7px;height:7px;border-radius:50%;background:${i===_appsLbIdx ? '#fff' : 'rgba(255,255,255,0.35)'};cursor:pointer;transition:background 0.2s;"></div>`
+    ).join('')}
+  </div>` : '';
+
+  lb.innerHTML = `
+    <!-- top bar -->
+    <div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;z-index:1;">
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);font-weight:600;">${counter}</div>
+      <button onclick="appsCloseLightbox()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">✕</button>
+    </div>
+    <!-- media -->
+    <div style="position:relative;width:100%;flex:1;display:flex;align-items:center;justify-content:center;padding:54px 56px 0;">
+      ${mediaHtml}
+      ${prevBtn}${nextBtn}
+    </div>
+    <!-- caption + dots -->
+    <div style="padding:10px 20px 20px;text-align:center;width:100%;">
+      ${item.caption ? `<div style="font-size:12px;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:8px;">${item.caption}</div>` : ''}
+      ${dotNav}
+    </div>`;
+}
+
+// ── Thumbnail tile — tap to open lightbox ──────────────
+// items = array, startIdx = which one this tile opens
+function appsThumbnailTile(items, startIdx, opts) {
+  const item = items[startIdx];
+  const o    = opts || {};
+  const thumbUrl = item.type === 'video'
+    ? '' // video = no thumb, use play icon
+    : appsCloudinaryImg(item.src, 400);
+  const isVideo = item.type === 'video';
+  const label   = o.label || item.caption || '';
+  const w       = o.width || '100%';
+
+  if (isVideo) {
+    return `<div onclick="appsOpenLightbox(${JSON.stringify(items).replace(/"/g,'&quot;')},${startIdx})"
+         style="cursor:pointer;border-radius:14px;overflow:hidden;background:#111;aspect-ratio:9/16;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:1.5px solid rgba(255,255,255,0.08);width:${w};">
+      <div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:24px;">▶</div>
+      ${label ? `<div style="font-size:11px;color:rgba(255,255,255,0.55);padding:0 14px;text-align:center;line-height:1.4;">${label}</div>` : ''}
+    </div>`;
+  }
+
+  return `<div onclick="appsOpenLightbox(${JSON.stringify(items).replace(/"/g,'&quot;')},${startIdx})"
+       style="cursor:pointer;position:relative;border-radius:14px;overflow:hidden;background:#111;width:${w};">
+    <img src="${thumbUrl}" alt="${item.alt || ''}" loading="lazy" decoding="async"
+         style="width:100%;height:auto;display:block;transition:transform 0.2s;"
+         onerror="this.onerror=null;this.src='${appsCloudinaryImg(item.src, 520)}'">
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;background:rgba(0,0,0,0.25);">
+      <div style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:18px;">🔍</div>
+    </div>
+    ${label ? `<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.7));padding:20px 10px 8px;font-size:11px;color:#fff;font-weight:600;">${label}</div>` : ''}
   </div>`;
 }
 
@@ -6389,14 +6508,15 @@ function renderAppsView() {
   const el = document.getElementById('appsView');
   if (!el) return;
 
-  const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+  const hName       = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
   const hotelAppIcon = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
   const hotelInitial = hName.trim().charAt(0).toUpperCase() || '🏨';
-  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
-  const bookingUrl = domain ? 'https://' + domain : '#';
+  const domain      = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  const bookingUrl  = domain ? 'https://' + domain : '#';
 
+  // Front Desk CTA — state-aware
   const fdInstalled = isStandaloneApp() || frontdeskInstalled;
-  const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  const fdGranted   = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   let fdCtaHtml;
   if (fdInstalled && fdGranted) {
     fdCtaHtml = `<div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
@@ -6409,88 +6529,156 @@ function renderAppsView() {
     fdCtaHtml = `<button onclick="handleInstallFrontdesk()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Add Front Desk to my home screen →</button>`;
   }
 
+  // ── Define lightbox item sets ──────────────────────────
+  // Hero: home screen photo
+  const heroItems = [
+    { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Home screen showing Front Desk and guest hotel app', caption: 'Front Desk (yours) and your hotel app (theirs) — both on the home screen. No App Store.' },
+  ];
+
+  // Guest experience: 3 screens + install walkthrough video
+  const guestItems = [
+    { type: 'image', src: APPS_SHOWCASE.guestHome,     alt: 'Guest home page', caption: 'Home — their stay at a glance' },
+    { type: 'image', src: APPS_SHOWCASE.guestBook,     alt: 'Guest book page', caption: 'Book — reserve direct, no OTA' },
+    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest messages',  caption: 'Messages — chat with Front Desk' },
+    { type: 'video', src: APPS_SHOWCASE.guestInstallVideo, alt: 'Guest install walkthrough', caption: 'Watch: how a guest adds your hotel to their home screen' },
+  ];
+
+  // Front Desk: messages screen + install video + booking notification video
+  const frontdeskItems = [
+    { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Front Desk guest messages', caption: 'Reply to guests from the Bookings tab — they get a push notification' },
+    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, alt: 'Front Desk install walkthrough', caption: 'Watch: how to add Front Desk to your home screen' },
+    { type: 'video', src: APPS_SHOWCASE.bookingNotifVideo, alt: 'New booking notification', caption: 'Watch: what happens on your phone the moment someone books' },
+  ];
+
+  // Messages: both sides + notification video
+  const messageItems = [
+    { type: 'image', src: APPS_SHOWCASE.guestMessages,     alt: 'Guest messages',         caption: 'Guest side — they message you from your hotel app' },
+    { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Front Desk reply',        caption: 'You reply from Front Desk — they get a push notification' },
+    { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, alt: 'Message notification video', caption: 'Watch: guest asks a question → you reply → their phone buzzes' },
+  ];
+
+  // JSON-encode for inline onclick (must escape quotes for HTML attr)
+  function enc(arr) { return JSON.stringify(arr).replace(/"/g, '&quot;'); }
+
   el.innerHTML = `
   <style>
     .apps-section { background:var(--white);border:1.5px solid var(--border);border-radius:20px;padding:22px 20px;margin-bottom:14px;box-shadow:var(--shadow); }
     .apps-section-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--green);margin-bottom:6px; }
     .apps-section-headline { font-size:18px;font-weight:800;color:var(--text);line-height:1.3;margin-bottom:8px; }
-    .apps-section-body { font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:18px; }
+    .apps-section-body { font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:16px; }
     .apps-callout { background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:16px; }
     .apps-callout p { font-size:13px;color:#166534;margin:0;line-height:1.55; }
     .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:10px;line-height:1.5; }
-    .apps-scroll-row { display:flex;gap:14px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory; }
-    .apps-scroll-row > figure { scroll-snap-align:center;flex:0 0 min(72vw,260px); }
-    .apps-two-col { display:flex;gap:12px;align-items:flex-start;justify-content:center;flex-wrap:wrap; }
-    .apps-icon-legend { display:flex;gap:16px;justify-content:center;margin-top:12px;flex-wrap:wrap; }
-    .apps-icon-legend span { font-size:11px;font-weight:700;color:var(--text-muted); }
+    .apps-thumb-grid { display:grid;gap:10px;margin-bottom:16px; }
+    .apps-thumb-row  { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px; }
+    .apps-thumb-row2 { display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px; }
+    /* Hover lift on thumb tiles */
+    .apps-thumb-grid > div:hover img, .apps-thumb-row > div:hover img, .apps-thumb-row2 > div:hover img { transform:scale(1.03); }
+    .apps-thumb-grid > div:hover > div:last-child, .apps-thumb-row > div:hover > div:nth-child(2), .apps-thumb-row2 > div:hover > div:nth-child(2) { opacity:1 !important; }
   </style>
 
   <div style="padding:4px 0 20px;">
 
+    <!-- ── SECTION 1: THE BIG PICTURE ───────────────── -->
     <div class="apps-section" id="apps-section-hero">
       <div class="apps-section-label">The big picture</div>
       <div class="apps-section-headline">Two apps on one home screen</div>
       <div class="apps-section-body">Guests install <strong>your hotel</strong> to book and message you. You install <strong>Front Desk</strong> to get buzzed the second they book. No App Store — tap Add, done.</div>
-      ${appsShowcaseImg(APPS_SHOWCASE.homeScreen, 'Home screen with Front Desk and guest hotel apps', '', true)}
-      <div class="apps-icon-legend">
-        <span>← Front Desk (you)</span>
-        <span>${hName} (guests) →</span>
+      <!-- Hero photo — tap to full screen -->
+      <div class="apps-thumb-grid">
+        ${appsThumbnailTile(heroItems, 0, { label: 'Tap to see full screen' })}
       </div>
-      <div style="margin-top:22px;">
-        ${appsNotifVideo(APPS_SHOWCASE.bookingNotifVideo, 'This is what happens on your phone the moment someone books.', APPS_SHOWCASE.homeScreen)}
+      <div style="display:flex;gap:8px;justify-content:center;font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:18px;">
+        <span>← Front Desk (you)</span>
+        <span>·</span>
+        <span>${hName} (guests) →</span>
       </div>
     </div>
 
+    <!-- ── SECTION 2: GUEST EXPERIENCE ──────────────── -->
     <div class="apps-section" id="apps-section-guest">
       <div class="apps-section-label">Guest Experience</div>
       <div class="apps-section-headline">What guests see after they install</div>
       <div class="apps-section-body">Home, book, and message you — all from your icon on their phone. Like a chain hotel app, but it's <em>your</em> property.</div>
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;padding:14px;background:var(--bg);border-radius:14px;border:1px solid var(--border);">
-        <div id="appsAppIconPreview" style="width:68px;height:68px;border-radius:16px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:30px;font-weight:800;">
+      <!-- App icon inline upload -->
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px;background:var(--bg);border-radius:14px;border:1px solid var(--border);">
+        <div id="appsAppIconPreview" style="width:60px;height:60px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:26px;font-weight:800;">
           ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;">` : hotelInitial}
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Your app icon</div>
-          <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;line-height:1.45;">This is what guests see on their home screen when they install.</p>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;">Your app icon</div>
+          <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;line-height:1.4;">This is what guests see when they install.</p>
           <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-          <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
+          <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
         </div>
       </div>
-      <div class="apps-scroll-row" style="margin-bottom:18px;">
-        ${appsShowcaseImg(APPS_SHOWCASE.guestHome, 'Guest home screen', 'Home — their stay at a glance')}
-        ${appsShowcaseImg(APPS_SHOWCASE.guestBook, 'Guest book page', 'Book — reserve direct, no OTA')}
-        ${appsShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest messages', 'Messages — chat with the front desk')}
+      <!-- 3 screen shots + install video — tap any to open gallery -->
+      <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;font-weight:600;">Tap any screenshot to view full screen</p>
+      <div class="apps-thumb-row" style="margin-bottom:10px;">
+        ${appsThumbnailTile(guestItems, 0, {})}
+        ${appsThumbnailTile(guestItems, 1, {})}
+        ${appsThumbnailTile(guestItems, 2, {})}
+      </div>
+      <!-- Install video tile -->
+      <div class="apps-thumb-row2" style="margin-bottom:16px;">
+        <div onclick="appsOpenLightbox(${enc(guestItems)},3)"
+             style="cursor:pointer;border-radius:14px;overflow:hidden;background:#0d0d0d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px 12px;border:1.5px solid rgba(255,255,255,0.06);">
+          <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;">▶</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.6);text-align:center;line-height:1.4;">Watch: guest installs your hotel app</div>
+        </div>
+        <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;">
+          <div style="font-size:13px;font-weight:700;color:var(--text);">No App Store</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.45;">They tap Add on your booking page. Done. It's on their home screen.</p>
+        </div>
       </div>
       <div class="apps-callout">
-        <p>Upload your icon above — guests who install see <strong>${hName}</strong>, not a demo.</p>
+        <p>Upload your icon above — guests who install see <strong>${hName}</strong>, not a demo placeholder.</p>
       </div>
-      ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Preview guest booking page ↗</button>` : ''}
+      ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;">Preview guest booking page ↗</button>` : ''}
       <p class="apps-footnote">Works on iPhone and Android — no app store needed.</p>
     </div>
 
+    <!-- ── SECTION 3: FRONT DESK ─────────────────────── -->
     <div class="apps-section" id="apps-section-frontdesk">
       <div class="apps-section-label">For You</div>
-      <div class="apps-section-headline">Reply from your phone. Get buzzed when they book.</div>
-      <div class="apps-section-body">Front Desk on your home screen = bookings, guest messages, and instant alerts — all in one place.</div>
-      <div style="margin-bottom:18px;">
-        ${appsShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk guest messages', 'Reply to guests from Bookings — they get a notification on their phone.')}
-      </div>
-      <div style="margin-bottom:18px;">
-        ${appsNotifVideo(APPS_SHOWCASE.bookingNotifVideo, 'New booking — before email, before Airbnb.', APPS_SHOWCASE.frontdeskMessages)}
+      <div class="apps-section-headline">Your phone buzzes. Before email.</div>
+      <div class="apps-section-body">Add Front Desk to your home screen. Bookings, guest messages, and instant alerts — all one tap away.</div>
+      <!-- Screenshots + install video -->
+      <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;font-weight:600;">Tap to view full screen</p>
+      <div class="apps-thumb-row2" style="margin-bottom:16px;">
+        ${appsThumbnailTile(frontdeskItems, 0, {})}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <!-- Install video -->
+          <div onclick="appsOpenLightbox(${enc(frontdeskItems)},1)"
+               style="cursor:pointer;border-radius:12px;overflow:hidden;background:#0d0d0d;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 10px;border:1.5px solid rgba(255,255,255,0.06);">
+            <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:16px;">▶</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.6);text-align:center;line-height:1.3;">Watch: add Front Desk to home screen</div>
+          </div>
+          <!-- Booking notif video -->
+          <div onclick="appsOpenLightbox(${enc(frontdeskItems)},2)"
+               style="cursor:pointer;border-radius:12px;overflow:hidden;background:#0d0d0d;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 10px;border:1.5px solid rgba(255,255,255,0.06);">
+            <div style="width:36px;height:36px;border-radius:50%;background:rgba(46,125,91,0.25);display:flex;align-items:center;justify-content:center;font-size:16px;">🔔</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.6);text-align:center;line-height:1.3;">Watch: booking notification live</div>
+          </div>
+        </div>
       </div>
       ${fdCtaHtml}
     </div>
 
+    <!-- ── SECTION 4: MESSAGING ──────────────────────── -->
     <div class="apps-section" id="apps-section-messages">
       <div class="apps-section-label">Messaging</div>
       <div class="apps-section-headline">They message you. You reply. They get a buzz.</div>
-      <div class="apps-section-body">No SMS. No third-party app. Guest installs your hotel → messages you → you reply in Front Desk → they get a push.</div>
-      <div class="apps-two-col" style="margin-bottom:16px;">
-        ${appsShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest side messages', 'Guest')}
-        ${appsShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk reply', 'You')}
-      </div>
-      <div style="margin-bottom:16px;">
-        ${appsNotifVideo(APPS_SHOWCASE.guestMessageNotifVideo, 'Guest asks a question → you reply → their phone buzzes.', APPS_SHOWCASE.guestMessages)}
+      <div class="apps-section-body">No SMS. No third-party app. Guest installs your hotel → messages you → you reply in Front Desk → their phone buzzes.</div>
+      <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;font-weight:600;">Tap to view full screen</p>
+      <div class="apps-thumb-row" style="margin-bottom:10px;">
+        ${appsThumbnailTile(messageItems, 0, { label: 'Guest' })}
+        ${appsThumbnailTile(messageItems, 1, { label: 'You' })}
+        <div onclick="appsOpenLightbox(${enc(messageItems)},2)"
+             style="cursor:pointer;border-radius:14px;overflow:hidden;background:#0d0d0d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 8px;border:1.5px solid rgba(255,255,255,0.06);">
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">▶</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.55);text-align:center;line-height:1.3;">Watch live</div>
+        </div>
       </div>
       <div class="apps-callout">
         <p>Guests who install your app become <strong>your guests</strong> — reachable forever, no OTA in the way.</p>
