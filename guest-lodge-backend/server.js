@@ -12,6 +12,7 @@ const http = require('http');
 const https = require('https');
 const webpush = require('web-push');
 const nodemailer = require('nodemailer');
+const telemetry = require('./marketel-signal-extractor');
 
 // Marketel CAPI (separate pixel for the onboarding funnel)
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
@@ -6603,6 +6604,9 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
         res.status(e.code === 'P2025' ? 404 : 500).json({ success: false, message: msg });
     }
 });
+
+// Mount telemetry routes (LLM-optimized session intelligence)
+telemetry.setupRoutes(app);
 
 app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);

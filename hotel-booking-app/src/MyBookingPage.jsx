@@ -103,7 +103,10 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
 
             <p style={{ textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 18 }}>
               Need a new stay?{' '}
-              <button type="button" onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: '#2E7D5B', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>
+              <button type="button" onClick={() => {
+                localStorage.removeItem('marketel_guest_stay');
+                navigate('/');
+              }} style={{ background: 'none', border: 'none', color: '#2E7D5B', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>
                 Book now →
               </button>
             </p>
@@ -146,7 +149,10 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => {
+                  localStorage.removeItem('marketel_guest_stay');
+                  navigate('/');
+                }}
                 style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', borderRadius: 12, cursor: 'pointer', border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}
               >
                 <CalendarClock size={17} /> Extend / Book again

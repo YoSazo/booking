@@ -48,6 +48,17 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
     };
   }, [bookingDetails, callModalDismissed]);
 
+  // Save the stay to localStorage so the PWA "remembers" the user
+  useEffect(() => {
+    if (reservationCode && bookingDetails?.checkout && guestInfo?.email) {
+      localStorage.setItem('marketel_guest_stay', JSON.stringify({
+        code: reservationCode,
+        email: guestInfo.email,
+        checkout: bookingDetails.checkout
+      }));
+    }
+  }, [reservationCode, bookingDetails, guestInfo]);
+
   const handleDismissCallModal = () => {
     setShowCallModal(false);
     setCallModalDismissed(true);

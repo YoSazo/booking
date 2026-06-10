@@ -226,6 +226,37 @@ function App() {
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
   const location = useLocation(); 
+
+  // PWA "Remember Me" Logic: If they land on the home screen and have an active stay,
+  // redirect them straight to their dashboard.
+  useEffect(() => {
+    if (location.pathname === '/') {
+      const storedStay = localStorage.getItem('marketel_guest_stay');
+      if (storedStay) {
+        try {
+          const stay = JSON.parse(storedStay);
+          if (stay.code && stay.checkout) {
+            // Check if checkout is in the future or today
+            const checkoutDate = new Date(stay.checkout);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Start of today
+            
+            if (checkoutDate >= today) {
+              // Active stay — redirect!
+              // Include the email in state or search params so the lookup succeeds easily if needed,
+              // or just let MyBookingPage handle it. MyBookingPage fetches based on code.
+              navigate(`/booking/${stay.code}?email=${encodeURIComponent(stay.email || '')}`, { replace: true });
+            } else {
+              // Stay has passed, clear memory
+              localStorage.removeItem('marketel_guest_stay');
+            }
+          }
+        } catch (e) {
+          localStorage.removeItem('marketel_guest_stay');
+        }
+      }
+    }
+  }, [location.pathname, navigate]);
   
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
