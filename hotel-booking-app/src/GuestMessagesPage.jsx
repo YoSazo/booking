@@ -4,6 +4,15 @@ import { useGuest } from './GuestProvider.jsx';
 
 const QUICK_CHIPS = ['Early check-in', 'Late check-out', 'Extra towels', 'Quiet room'];
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
+  return output;
+}
+
 function formatRelativeTime(dateStr) {
   const now = new Date();
   const d = new Date(dateStr);
@@ -80,6 +89,55 @@ export default function GuestMessagesPage() {
     } catch (e) { /* ignore */ }
     if (isInitial) setLoading(false);
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
+
+  // Register for push notifications (once per stay, when permission allows).
+  useEffect(() => {
+    if (!guestStay?.code || !hotelId || !apiBaseUrl) return;
+    const flagKey = `guest_push_${hotelId}_${guestStay.code}`;
+    if (localStorage.getItem(flagKey)) return;
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    (async () => {
+      try {
+        let perm = Notification.permission;
+        if (perm === 'default') {
+          perm = await Notification.requestPermission();
+        }
+        if (perm !== 'granted') return;
+
+        const keyRes = await fetch(`${apiBaseUrl}/api/push/vapid-public`);
+        const keyData = await keyRes.json().catch(() => ({}));
+        if (!keyData.publicKey) return;
+
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+          });
+        }
+
+        const bufToB64 = (buf) => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+        await fetch(`${apiBaseUrl}/api/guest-push-subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            hotelId,
+            reservationCode: guestStay.code,
+            subscription: {
+              endpoint: sub.endpoint,
+              keys: {
+                p256dh: bufToB64(sub.getKey('p256dh')),
+                auth: bufToB64(sub.getKey('auth')),
+              },
+            },
+          }),
+        });
+        localStorage.setItem(flagKey, '1');
+      } catch (e) { /* ignore — messaging still works without push */ }
+    })();
+  }, [guestStay?.code, hotelId, apiBaseUrl]);
 
   // Initial load
   useEffect(() => {

@@ -84,16 +84,19 @@ model HitPayment {
 }
 
 model PushSubscription {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  endpoint  String      @unique
-  hotel     HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  hotelId   String
-  p256dh    String
-  auth      String
-  source    String?     // 'funnel' | 'crm'
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  endpoint        String      @unique
+  hotel           HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId         String
+  p256dh          String
+  auth            String
+  source          String?     // 'funnel' | 'crm' | 'guest'
+  reservationCode String?
 
   @@index([hotelId])
+  @@index([hotelId, source])
+  @@index([hotelId, reservationCode])
 }
 
 model ManualRoom {

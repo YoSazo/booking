@@ -2972,7 +2972,7 @@ function renderMessages() {
         </div>
         ${thread.code ? `
         <div style="display:flex;gap:8px;align-items:center;">
-          <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}..." maxlength="2000" style="flex:1;padding:10px 14px;border-radius:24px;border:1.5px solid #d1d5db;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#2E7D5B'" onblur="this.style.borderColor='#d1d5db'" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
+          <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}..." maxlength="2000" style="flex:1;padding:10px 14px;border-radius:24px;border:1.5px solid #d1d5db;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.2s;" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onfocus="event.stopPropagation();this.style.borderColor='#2E7D5B'" onblur="this.style.borderColor='#d1d5db'" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
           <button onclick="replyToThread('${esc(thread.code)}','${replyInputId}')" style="width:40px;height:40px;border-radius:50%;border:none;background:#2E7D5B;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s;" onmousedown="this.style.transform='scale(0.92)'" onmouseup="this.style.transform='scale(1)'">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
@@ -4144,6 +4144,38 @@ async function enableNotifications() {
   }
 }
 
+async function sendGuestBroadcast() {
+  const titleEl = document.getElementById('guest-broadcast-title');
+  const bodyEl = document.getElementById('guest-broadcast-body');
+  const resultEl = document.getElementById('guest-broadcast-result');
+  const title = titleEl?.value.trim();
+  const body = bodyEl?.value.trim();
+  if (!title || !body) {
+    toast('Enter a title and message', 'error');
+    return;
+  }
+  const btn = document.getElementById('guest-broadcast-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (resultEl) resultEl.textContent = '';
+  try {
+    const data = await api('POST', '/api/crm/guest-broadcast', { title, body });
+    if (data.success) {
+      const msg = data.sent > 0
+        ? `Sent to ${data.sent} guest${data.sent === 1 ? '' : 's'}`
+        : 'No subscribed guests yet';
+      if (resultEl) resultEl.textContent = msg;
+      toast(msg, data.sent > 0 ? 'success' : '');
+      if (bodyEl) bodyEl.value = '';
+    } else {
+      toast(data.message || 'Broadcast failed', 'error');
+    }
+  } catch (e) {
+    toast('Broadcast failed', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send to All Guests'; }
+  }
+}
+
 // ── HELPERS ────────────────────────────────────────────
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -4860,6 +4892,12 @@ function startSettingsTour() {
       text: 'Want a buzz the second a guest books? Add Front Desk to your home screen and turn on notifications — takes 3 seconds.',
       openAccordion: false,
       targetParent: true,
+      tab: 'settings'
+    },
+    {
+      target: '#guestBroadcastCard',
+      text: 'Send push notifications to your guests — great for promotions, events, or just saying hello.',
+      openAccordion: false,
       tab: 'settings'
     },
     {
@@ -5690,6 +5728,22 @@ async function loadEditRooms() {
         </div>
       </div>
       ${frontdeskInstallCardHtml()}
+      <div class="booking-card" id="guestBroadcastCard" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Guest Notifications</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Send a push notification to all guests who subscribed on the Messages tab — great for promotions, events, or check-in reminders.</p>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Title</div>
+            <input type="text" id="guest-broadcast-title" value="${(hotelName || '').replace(/"/g, '&quot;')}" maxlength="120" placeholder="Notification title" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Message</div>
+            <textarea id="guest-broadcast-body" maxlength="500" placeholder="Your message to guests…" style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+          </div>
+          <button id="guest-broadcast-btn" onclick="sendGuestBroadcast()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send to All Guests</button>
+          <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:10px 0 0;text-align:center;font-weight:600;"></p>
+        </div>
+      </div>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Your App Icon</div>

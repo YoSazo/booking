@@ -40,13 +40,18 @@ self.addEventListener('push', function (event) {
 
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  const urlToOpen = (event.notification.data && event.notification.data.url) || '/frontdesk';
+  const urlToOpen = (event.notification.data && event.notification.data.url) || '/guest/messages';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
       for (let i = 0; i < clientList.length; i++) {
-        if (clientList[i].url.includes(urlToOpen) && 'focus' in clientList[i]) return clientList[i].focus();
+        const client = clientList[i];
+        if (client.url.includes(urlToOpen) && 'focus' in client) return client.focus();
       }
-      if (clients.openWindow) return clients.openWindow(urlToOpen);
+      if (clients.openWindow) {
+        const base = self.location.origin;
+        const path = urlToOpen.startsWith('/') ? urlToOpen : '/' + urlToOpen;
+        return clients.openWindow(base + path);
+      }
     })
   );
 });

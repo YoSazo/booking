@@ -3816,13 +3816,71 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
     }
 });
 
+// Guest PWA: register for message notifications (public, no auth).
+app.post('/api/guest-push-subscribe', async (req, res) => {
+    try {
+        const { hotelId, reservationCode, subscription } = req.body || {};
+        const sub = subscription || req.body || {};
+        const endpoint = sub.endpoint || req.body?.endpoint;
+        const p256dh = sub.keys?.p256dh || req.body?.p256dh;
+        const auth = sub.keys?.auth || req.body?.auth;
+
+        if (!endpoint || !p256dh || !auth) {
+            return res.status(400).json({ success: false, message: 'Missing subscription data' });
+        }
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status || 400).json({ success: false, message: validation.message });
+        }
+
+        await saveGuestPushSubscription({
+            endpoint,
+            p256dh,
+            auth,
+            hotelId: validation.hotelId,
+            reservationCode,
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('guest-push-subscribe error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to save subscription' });
+    }
+});
+
+// CRM: broadcast a push notification to all subscribed guests for this hotel.
+app.post('/api/crm/guest-broadcast', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const title = String(req.body?.title || '').trim();
+        const body = String(req.body?.body || '').trim();
+        if (!title) return res.status(400).json({ success: false, message: 'Title is required.' });
+        if (!body) return res.status(400).json({ success: false, message: 'Message body is required.' });
+        if (title.length > 120) return res.status(400).json({ success: false, message: 'Title too long.' });
+        if (body.length > 500) return res.status(400).json({ success: false, message: 'Message too long.' });
+
+        const result = await sendPushToGuests(hotelId, {
+            title,
+            body,
+            url: '/guest/messages',
+            icon: '/icon-192.png',
+        }, { TTL: 60 * 60 }, 'guestBroadcast');
+
+        res.json({ success: true, sent: result.sent, failed: result.failed, cleaned: result.cleaned });
+    } catch (e) {
+        console.error('guest-broadcast error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to send broadcast' });
+    }
+});
+
 // PWA push: send a test notification to this hotel's subscribed devices
 app.post('/api/push/test', crmAuth, async (req, res) => {
     try {
         if (!VAPID_PRIVATE) return res.status(503).json({ success: false, message: 'Push not configured' });
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
         if (!subs.length) return res.json({ success: false, message: 'No subscribed devices yet' });
         const payload = JSON.stringify({
             title: 'Notifications are on ✅',
@@ -3853,12 +3911,61 @@ function isCancelledStatus(s) {
     return v === 'cancelled' || v === 'canceled';
 }
 
+// Owner-facing alerts only — guest PWA subscriptions use source='guest'.
+function ownerPushWhere(hotelId) {
+    return { hotelId, NOT: { source: 'guest' } };
+}
+
+async function saveGuestPushSubscription({ endpoint, p256dh, auth, hotelId, reservationCode }) {
+    const cleanEndpoint = String(endpoint || '').trim();
+    const cleanHotelId = String(hotelId || '').trim();
+    const cleanCode = String(reservationCode || '').trim() || null;
+    if (!cleanEndpoint || !p256dh || !auth || !cleanHotelId) {
+        throw new Error('Missing subscription data');
+    }
+    const data = {
+        endpoint: cleanEndpoint,
+        p256dh,
+        auth,
+        source: 'guest',
+        hotelId: cleanHotelId,
+        reservationCode: cleanCode,
+    };
+    const existing = await prisma.pushSubscription.findFirst({ where: { endpoint: cleanEndpoint } });
+    if (existing) {
+        await prisma.pushSubscription.update({ where: { id: existing.id }, data });
+    } else {
+        await prisma.pushSubscription.create({ data });
+    }
+}
+
+// Send push to guest subscriptions (optionally scoped to one reservation thread).
+async function sendPushToGuests(hotelId, payloadObj, opts = {}, label = 'guestPush', reservationCode = '') {
+    if (!VAPID_PRIVATE) { console.log(`🔕 [push] ${label} skipped — VAPID not configured (hotel=${hotelId})`); return { sent: 0, failed: 0, cleaned: 0 }; }
+    if (!hotelId) { console.log(`🔕 [push] ${label} skipped — no hotelId`); return { sent: 0, failed: 0, cleaned: 0 }; }
+    const where = { hotelId, source: 'guest' };
+    if (reservationCode) where.reservationCode = String(reservationCode).trim();
+    const subs = await prisma.pushSubscription.findMany({ where });
+    if (subs.length === 0) { console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 guest subscriptions`); return { sent: 0, failed: 0, cleaned: 0 }; }
+    const payload = JSON.stringify(payloadObj);
+    const results = await Promise.allSettled(subs.map((s) =>
+        webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            payload,
+            Object.assign({ TTL: 600 }, opts)
+        )
+    ));
+    const cleaned = await cleanupPushResults(subs, results, label);
+    const sent = results.filter((r) => r.status === 'fulfilled').length;
+    return { sent, failed: results.length - sent, cleaned };
+}
+
 // Generic push sender for one hotel: loads subs, sends, self-heals dead ones,
 // and returns how many were delivered. All owner notifications funnel through this.
 async function sendPushToHotel(hotelId, payloadObj, opts = {}, label = 'push') {
     if (!VAPID_PRIVATE) { console.log(`🔕 [push] ${label} skipped — VAPID not configured (hotel=${hotelId})`); return 0; }
     if (!hotelId) { console.log(`🔕 [push] ${label} skipped — no hotelId`); return 0; }
-    const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+    const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
     if (subs.length === 0) { console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 subscriptions`); return 0; }
     const payload = JSON.stringify(payloadObj);
     const results = await Promise.allSettled(subs.map((s) =>
@@ -3964,6 +4071,7 @@ async function cleanupPushResults(subs, results, label) {
     if (deadIds.length) {
         await prisma.pushSubscription.deleteMany({ where: { id: { in: deadIds } } }).catch((e) => console.error('push cleanup:', e.message));
     }
+    return deadIds.length;
 }
 
 const soldOutTodayNotificationState = new Map();
@@ -4028,7 +4136,7 @@ async function getManualRoomTodayAvailability(hotelId, roomName, referenceIso = 
 async function notifyRoomSoldOutToday(hotelId, roomName) {
     if (!VAPID_PRIVATE || !hotelId || !roomName) return;
     try {
-        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
         if (subs.length === 0) return;
 
         const payload = JSON.stringify({
@@ -4252,7 +4360,7 @@ setInterval(() => {
 async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMessage) {
     if (!VAPID_PRIVATE || !hotelId) return;
     try {
-        const subs = await prisma.pushSubscription.findMany({ where: { hotelId } });
+        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
         if (subs.length === 0) return;
 
         const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || 'Guest';
@@ -6663,6 +6771,16 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
                 readAt: new Date(),
             }
         }));
+
+        // Notify the guest on their device if they subscribed for this thread.
+        sendPushToGuests(hotelId, {
+            title: 'New message from Front Desk',
+            body: body.trim().slice(0, 160),
+            url: '/guest/messages',
+            icon: '/icon-192.png',
+        }, { TTL: 60 * 60 }, 'guestReply', reservationCode).catch((e) => {
+            console.error('guest reply push error:', e.message);
+        });
 
         res.json({ success: true, message: { id: reply.id, body: reply.body, sender: 'hotel', createdAt: reply.createdAt } });
     } catch (e) {
