@@ -185,7 +185,7 @@ export default function GuestMessagesPage() {
       <div ref={scrollContainerRef} style={styles.messagesArea}>
         {loading ? (
           <div style={styles.emptyContainer}>
-            <div style={styles.spinner} />
+            <div style={styles.logoSpriteBounce} />
           </div>
         ) : messages.length === 0 ? (
           <div style={styles.emptyContainer}>
@@ -247,7 +247,7 @@ export default function GuestMessagesPage() {
         )}
       </div>
 
-      {/* Compose bar */}
+      {/* Floating compose bar */}
       <div style={styles.composeBar}>
         {/* Quick chips */}
         <div style={styles.chipsScroll}>
@@ -260,9 +260,9 @@ export default function GuestMessagesPage() {
                 onClick={() => toggleChip(chip)}
                 style={{
                   ...styles.chip,
-                  background: active ? '#2E7D5B' : '#fff',
+                  background: active ? '#2E7D5B' : 'rgba(255,255,255,0.85)',
                   color: active ? '#fff' : '#2E7D5B',
-                  borderColor: '#2E7D5B',
+                  borderColor: active ? '#2E7D5B' : 'rgba(46,125,91,0.3)',
                 }}
               >
                 {active ? '✓ ' : ''}
@@ -303,19 +303,54 @@ export default function GuestMessagesPage() {
   );
 }
 
-const spinnerKeyframes = `
-@keyframes guestMsgSpinner {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* ── Inject sprite animation keyframes ── */
+const spriteKeyframes = `
+@keyframes spritePlay {
+  0%    { background-position: 0 0; }
+  2.78% { background-position: -27px 0; }
+  5.56% { background-position: -54px 0; }
+  8.33% { background-position: -81px 0; }
+  11.11% { background-position: -108px 0; }
+  13.89% { background-position: -135px 0; }
+  16.67% { background-position: 0 -32px; }
+  19.44% { background-position: -27px -32px; }
+  22.22% { background-position: -54px -32px; }
+  25%    { background-position: -81px -32px; }
+  27.78% { background-position: -108px -32px; }
+  30.56% { background-position: -135px -32px; }
+  33.33% { background-position: 0 -64px; }
+  36.11% { background-position: -27px -64px; }
+  38.89% { background-position: -54px -64px; }
+  41.67% { background-position: -81px -64px; }
+  44.44% { background-position: -108px -64px; }
+  47.22% { background-position: -135px -64px; }
+  50%    { background-position: 0 -96px; }
+  52.78% { background-position: -27px -96px; }
+  55.56% { background-position: -54px -96px; }
+  58.33% { background-position: -81px -96px; }
+  61.11% { background-position: -108px -96px; }
+  63.89% { background-position: -135px -96px; }
+  66.67% { background-position: 0 -128px; }
+  69.44% { background-position: -27px -128px; }
+  72.22% { background-position: -54px -128px; }
+  75%    { background-position: -81px -128px; }
+  77.78% { background-position: -108px -128px; }
+  80.56% { background-position: -135px -128px; }
+  83.33% { background-position: 0 -160px; }
+  86.11% { background-position: -27px -160px; }
+  88.89% { background-position: -54px -160px; }
+  91.67% { background-position: -81px -160px; }
+  94.44% { background-position: -108px -160px; }
+  97.22% { background-position: -135px -160px; }
 }
 `;
 
 if (typeof document !== 'undefined') {
-  const id = 'guest-msg-spinner-style';
+  const id = 'guest-msg-sprite-style';
   if (!document.getElementById(id)) {
     const styleEl = document.createElement('style');
     styleEl.id = id;
-    styleEl.textContent = spinnerKeyframes;
+    styleEl.textContent = spriteKeyframes;
     document.head.appendChild(styleEl);
   }
 }
@@ -351,11 +386,11 @@ const styles = {
     fontWeight: 500,
   },
 
-  // Messages area
+  // Messages area — tight bottom padding to sit just above compose bar
   messagesArea: {
     flex: 1,
     overflowY: 'auto',
-    padding: '0 16px 200px',
+    padding: '0 16px 140px',
     WebkitOverflowScrolling: 'touch',
   },
   messagesList: {
@@ -466,24 +501,24 @@ const styles = {
     maxWidth: 260,
     lineHeight: 1.5,
   },
-  spinner: {
-    width: 30,
-    height: 30,
-    border: '3px solid #e5e7eb',
-    borderTopColor: '#2E7D5B',
-    borderRadius: '50%',
-    animation: 'guestMsgSpinner 0.8s linear infinite',
+
+  // Marketel logo sprite bounce (replaces spinner)
+  logoSpriteBounce: {
+    width: 27,
+    height: 32,
+    backgroundImage: 'url(/marketel-sprite.png)',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: '162px 192px',
+    animation: 'spritePlay 3s steps(1) infinite',
   },
 
-  // Compose bar
+  // Floating compose bar — no background box, transparent & floating
   composeBar: {
     position: 'fixed',
-    bottom: 110,
+    bottom: 120,
     left: 0,
     right: 0,
-    background: '#fff',
-    borderTop: '1px solid #e5e7eb',
-    padding: '10px 12px',
+    padding: '0 12px',
     zIndex: 99,
     maxWidth: 540,
     margin: '0 auto',
@@ -492,7 +527,7 @@ const styles = {
     display: 'flex',
     gap: 6,
     overflowX: 'auto',
-    marginBottom: 10,
+    marginBottom: 8,
     paddingBottom: 2,
     WebkitOverflowScrolling: 'touch',
     msOverflowStyle: 'none',
@@ -509,6 +544,8 @@ const styles = {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
     whiteSpace: 'nowrap',
     transition: 'all 0.15s ease',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
   },
   inputRow: {
     display: 'flex',
@@ -518,13 +555,16 @@ const styles = {
   textInput: {
     flex: 1,
     borderRadius: 24,
-    border: '1.5px solid #d1d5db',
+    border: '1.5px solid rgba(0,0,0,0.08)',
     padding: '12px 16px',
     fontSize: 15,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
     outline: 'none',
     color: '#1a1a2e',
-    background: '#fff',
+    background: 'rgba(255,255,255,0.92)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
   },
   sendButton: {
     width: 44,
@@ -538,5 +578,6 @@ const styles = {
     justifyContent: 'center',
     flexShrink: 0,
     transition: 'opacity 0.15s ease',
+    boxShadow: '0 4px 16px rgba(46,125,91,0.3)',
   },
 };
