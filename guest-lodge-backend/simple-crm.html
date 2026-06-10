@@ -6323,12 +6323,22 @@ function confirmEditAddRoom() {
 
 // ── APPS PAGE ─────────────────────────────────────────
 
+// Hotel domains proxy /frontdesk to Render but not /apps-showcase — use backend origin for assets.
+function appsShowcaseUrl(file) {
+  const path = '/apps-showcase/' + file;
+  const host = location.hostname;
+  if (host.endsWith('.onrender.com') || host === 'localhost' || host === '127.0.0.1') {
+    return path;
+  }
+  return 'https://guest-lodge-backend.onrender.com' + path;
+}
+
 const APPS_SHOWCASE = {
-  homeScreen: '/apps-showcase/home-screen.png',
-  guestBook: '/apps-showcase/guest-book.png',
-  guestHome: '/apps-showcase/guest-home.png',
-  guestMessages: '/apps-showcase/guest-messages.png',
-  frontdeskMessages: '/apps-showcase/frontdesk-messages.png',
+  homeScreen: appsShowcaseUrl('home-screen.png'),
+  guestBook: appsShowcaseUrl('guest-book.png'),
+  guestHome: appsShowcaseUrl('guest-home.png'),
+  guestMessages: appsShowcaseUrl('guest-messages.png'),
+  frontdeskMessages: appsShowcaseUrl('frontdesk-messages.png'),
   notifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
 };
 
