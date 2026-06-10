@@ -6323,152 +6323,48 @@ function confirmEditAddRoom() {
 
 // ── APPS PAGE ─────────────────────────────────────────
 
+const APPS_SHOWCASE = {
+  homeScreen: '/apps-showcase/home-screen.png',
+  guestBook: '/apps-showcase/guest-book.png',
+  guestHome: '/apps-showcase/guest-home.png',
+  guestMessages: '/apps-showcase/guest-messages.png',
+  frontdeskMessages: '/apps-showcase/frontdesk-messages.png',
+  notifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
+};
+
+function appsShowcaseImg(src, alt, caption) {
+  const cap = caption ? `<figcaption style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.45;max-width:280px;margin-left:auto;margin-right:auto;">${caption}</figcaption>` : '';
+  return `<figure style="margin:0;text-align:center;flex:1;min-width:0;">
+    <img src="${src}" alt="${alt}" loading="lazy" decoding="async" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;">
+    ${cap}
+  </figure>`;
+}
+
+function appsNotifVideo(caption) {
+  const cap = caption ? `<p style="font-size:11px;color:var(--text-muted);text-align:center;margin:10px 0 0;line-height:1.45;">${caption}</p>` : '';
+  return `<div style="display:flex;flex-direction:column;align-items:center;max-width:280px;margin:0 auto;">
+    <video autoplay loop muted playsinline preload="auto" style="width:100%;height:auto;display:block;border-radius:0;" poster="${APPS_SHOWCASE.homeScreen}">
+      <source src="${APPS_SHOWCASE.notifVideo}" type="video/mp4">
+    </video>
+    ${cap}
+  </div>`;
+}
+
 function detectAppPlatform() {
   const ua = navigator.userAgent || '';
   if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return 'ios';
   if (/android/i.test(ua)) return 'android';
-  return 'ios'; // Desktop default: show iPhone frame
+  return 'ios';
 }
 
 function renderAppsView() {
   const el = document.getElementById('appsView');
   if (!el) return;
 
-  // Init platform on first call
-  if (!appsViewPlatform) appsViewPlatform = detectAppPlatform();
-
   const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
-  const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
-  const initial = hName.trim().charAt(0).toUpperCase();
-  const iconUrl = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
   const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
   const bookingUrl = domain ? 'https://' + domain : '#';
-  const isDesktop = !/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-  const isIos = appsViewPlatform === 'ios';
 
-  // ── Phone frame builder ──────────────────────────────
-  // Icon tile: uses uploaded icon if available, else colored initial
-  function iconTile(isHotel, size, label) {
-    const sz = size || 44;
-    const lbl = label || '';
-    const br = isIos ? `${Math.round(sz * 0.225)}px` : `${Math.round(sz * 0.35)}px`; // iOS squircle vs Android squircle
-    const iconInner = isHotel
-      ? (iconUrl
-          ? `<img src="${iconUrl}" alt="${hName}" style="width:100%;height:100%;object-fit:cover;border-radius:${br};">`
-          : `<div style="width:${sz}px;height:${sz}px;border-radius:${br};background:linear-gradient(135deg,#2E7D5B,#1a5c3f);color:#fff;font-weight:800;font-size:${Math.round(sz*0.4)}px;display:flex;align-items:center;justify-content:center;">${initial}</div>`)
-      : `<div style="width:${sz}px;height:${sz}px;border-radius:${br};background:rgba(255,255,255,0.18);"></div>`;
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-      <div style="width:${sz}px;height:${sz}px;border-radius:${br};overflow:hidden;${isHotel ? 'box-shadow:0 4px 12px rgba(0,0,0,0.22);' : ''}">${iconInner}</div>
-      <div style="font-size:9px;color:rgba(255,255,255,${isHotel ? '1' : '0.5'});font-weight:${isHotel ? '700' : '400'};max-width:${sz+12}px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isHotel ? shortName : lbl}</div>
-    </div>`;
-  }
-
-  // Ghost grid icons (realistic app names)
-  const ghostLabels = ['Messages', 'Maps', 'Photos', 'Camera', 'Mail', 'Safari', 'Clock', 'Settings'];
-  function ghostGrid(iconSz) {
-    const br = isIos ? `${Math.round(iconSz * 0.225)}px` : `${Math.round(iconSz * 0.35)}px`;
-    const colors = ['#3478f6','#35c759','#ff9f0a','#ff3b30','#1c8ef9','#0a84ff','#ff9500','#8e8e93'];
-    return ghostLabels.map((lbl, i) =>
-      `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-        <div style="width:${iconSz}px;height:${iconSz}px;border-radius:${br};background:${colors[i % colors.length]};opacity:0.7;"></div>
-        <div style="font-size:9px;color:rgba(255,255,255,0.45);max-width:${iconSz+8}px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lbl}</div>
-      </div>`
-    ).join('');
-  }
-
-  // Build phone frame HTML
-  function phoneFrame(contentHtml, notifHtml) {
-    const frameW = 200;
-    const frameH = 430;
-    const topDecor = isIos
-      ? `<div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);width:80px;height:24px;border-radius:14px;background:#0a0a0a;z-index:3;"></div>` // Dynamic Island
-      : `<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;background:#0a0a0a;z-index:3;"></div>`; // Pill camera
-    const bottomDecor = isIos
-      ? `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:90px;height:4px;border-radius:2px;background:rgba(255,255,255,0.5);"></div>`
-      : `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:110px;height:3px;border-radius:2px;background:rgba(255,255,255,0.3);"></div>`;
-    const statusBar = `<div style="display:flex;justify-content:space-between;align-items:center;padding:${isIos ? '44px' : '32px'} 16px 8px;font-size:10px;color:rgba(255,255,255,0.9);font-weight:600;">
-      <span>9:41</span>
-      <span style="display:flex;align-items:center;gap:4px;">
-        <span>▋▋▋</span>
-        <span>WiFi</span>
-        <span>🔋</span>
-      </span>
-    </div>`;
-    return `<div id="apps-phone-frame" style="position:relative;width:${frameW}px;height:${frameH}px;border-radius:36px;background:linear-gradient(160deg,#1a1a2e 0%,#16213e 100%);box-shadow:0 30px 80px rgba(0,0,0,0.45),inset 0 0 0 1.5px rgba(255,255,255,0.1);overflow:hidden;flex-shrink:0;">
-      ${topDecor}
-      ${statusBar}
-      <div style="position:relative;padding:0 10px;box-sizing:border-box;">${contentHtml}</div>
-      ${notifHtml || ''}
-      ${bottomDecor}
-    </div>`;
-  }
-
-  // Guest home screen content
-  const iconSz = 44;
-  const homeGrid = `<div style="display:grid;grid-template-columns:repeat(4,${iconSz}px);gap:14px 10px;justify-content:center;margin-bottom:10px;">
-    ${ghostGrid(iconSz)}
-  </div>
-  <div style="display:flex;justify-content:center;">
-    ${iconTile(true, iconSz, shortName)}
-  </div>`;
-
-  // Notification HTML (animated, for front desk section)
-  const notifBg = isIos ? '#f2f2f7' : '#e8eaf6';
-  const notifRadius = isIos ? '14px' : '12px';
-  const ownerNotifHtml = `<div id="apps-notif-anim" style="position:absolute;top:-80px;left:10px;right:10px;z-index:10;transition:top 0.5s cubic-bezier(0.34,1.56,0.64,1);opacity:0;transition:top 0.5s ease,opacity 0.4s ease;">
-    <div style="background:${notifBg};border-radius:${notifRadius};padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,0.28);">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-        <div style="width:22px;height:22px;border-radius:6px;background:#2E7D5B;display:flex;align-items:center;justify-content:center;font-size:11px;">🔔</div>
-        <div style="font-size:10px;font-weight:700;color:#1a1a2e;">Front Desk</div>
-        <div style="font-size:9px;color:#8e8e93;margin-left:auto;">now</div>
-      </div>
-      <div style="font-size:10px;color:#1a1a2e;font-weight:600;">New booking — James C. · 2 nights</div>
-      <div style="font-size:9px;color:#6b7280;margin-top:2px;">Check-in June 15 · ${hName}</div>
-    </div>
-  </div>`;
-
-  // Front Desk home screen with notification
-  const fdGrid = `<div style="display:grid;grid-template-columns:repeat(4,${iconSz}px);gap:14px 10px;justify-content:center;margin-bottom:10px;">
-    ${ghostLabels.slice(0,8).map((lbl, i) => {
-      const br = isIos ? `${Math.round(iconSz * 0.225)}px` : `${Math.round(iconSz * 0.35)}px`;
-      const colors = ['#3478f6','#35c759','#ff9f0a','#ff3b30','#1c8ef9','#0a84ff','#ff9500','#8e8e93'];
-      if (i === 0) {
-        // Front Desk icon in position 0
-        return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-          <div style="width:${iconSz}px;height:${iconSz}px;border-radius:${isIos ? `${Math.round(iconSz*0.225)}px` : `${Math.round(iconSz*0.35)}px`};background:#fff;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;">
-            <img src="/marketellogo.svg" alt="Front Desk" style="width:100%;height:100%;object-fit:contain;">
-          </div>
-          <div style="font-size:9px;color:#fff;font-weight:700;max-width:52px;text-align:center;">Front Desk</div>
-        </div>`;
-      }
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-        <div style="width:${iconSz}px;height:${iconSz}px;border-radius:${br};background:${colors[i % colors.length]};opacity:0.6;"></div>
-        <div style="font-size:9px;color:rgba(255,255,255,0.4);max-width:52px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lbl}</div>
-      </div>`;
-    }).join('')}
-  </div>`;
-
-  const guestNotifBg = isIos ? '#f2f2f7' : '#e8f5e9';
-  const guestNotifHtml = `<div style="position:absolute;top:-60px;left:10px;right:10px;z-index:10;transition:top 0.5s ease,opacity 0.4s ease;opacity:0;" id="apps-guest-notif">
-    <div style="background:${guestNotifBg};border-radius:${notifRadius};padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,0.28);">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-        <div style="width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#2E7D5B,#1a5c3f);display:flex;align-items:center;justify-content:center;font-size:11px;">✓</div>
-        <div style="font-size:10px;font-weight:700;color:#1a1a2e;">${shortName}</div>
-        <div style="font-size:9px;color:#8e8e93;margin-left:auto;">now</div>
-      </div>
-      <div style="font-size:10px;color:#1a1a2e;font-weight:600;">You're booked! 🎉</div>
-      <div style="font-size:9px;color:#6b7280;margin-top:2px;">June 15–17 · Confirmation sent to email</div>
-    </div>
-  </div>`;
-
-  // Platform toggle HTML (shown on desktop or when user overrides)
-  const toggleHtml = isDesktop ? `
-    <div style="display:flex;align-items:center;justify-content:center;gap:0;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:3px;margin:0 auto 20px;width:fit-content;">
-      <button onclick="appsViewPlatform='ios';renderAppsView();" style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;${isIos ? 'background:#fff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,0.1);' : 'background:none;color:var(--text-muted);'}">iPhone</button>
-      <button onclick="appsViewPlatform='android';renderAppsView();" style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;${!isIos ? 'background:#fff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,0.1);' : 'background:none;color:var(--text-muted);'}">Android</button>
-    </div>` : '';
-
-  // Front Desk install CTA (state-aware)
   const fdInstalled = isStandaloneApp() || frontdeskInstalled;
   const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   let fdCtaHtml;
@@ -6483,34 +6379,8 @@ function renderAppsView() {
     fdCtaHtml = `<button onclick="handleInstallFrontdesk()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Add Front Desk to my home screen →</button>`;
   }
 
-  // Message thread mock
-  const msgThread = `
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <div style="align-self:flex-start;background:rgba(255,255,255,0.15);border-radius:14px 14px 14px 3px;padding:8px 12px;max-width:75%;">
-        <div style="font-size:10px;color:rgba(255,255,255,0.9);">Hi, can we check in early?</div>
-      </div>
-      <div style="align-self:flex-end;background:#2E7D5B;border-radius:14px 14px 3px 14px;padding:8px 12px;max-width:75%;">
-        <div style="font-size:10px;color:#fff;">Of course! Come at 2pm 👍</div>
-      </div>
-      <div style="align-self:flex-start;background:rgba(255,255,255,0.12);border-radius:14px 14px 14px 3px;padding:8px 12px;max-width:75%;">
-        <div style="font-size:10px;color:rgba(255,255,255,0.9);">Perfect, thank you!</div>
-      </div>
-    </div>
-    <div style="position:absolute;bottom:18px;left:10px;right:10px;z-index:5;">
-      <div style="background:#f2f2f7;border-radius:12px;padding:9px 12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-        <div style="font-size:9px;color:#6b7280;font-weight:600;margin-bottom:3px;">📲 ${shortName}</div>
-        <div style="font-size:10px;color:#1a1a2e;font-weight:600;">New message from your guest</div>
-      </div>
-    </div>`;
-
-  // ── FULL PAGE HTML ───────────────────────────────────
   el.innerHTML = `
   <style>
-    @keyframes appsPhoneFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-    @keyframes appsNotifSlide { 0%{top:-80px;opacity:0} 20%{top:${isIos ? '52px' : '40px'};opacity:1} 80%{top:${isIos ? '52px' : '40px'};opacity:1} 100%{top:-80px;opacity:0} }
-    @keyframes appsGuestNotifSlide { 0%{top:-60px;opacity:0} 20%{top:${isIos ? '52px' : '40px'};opacity:1} 80%{top:${isIos ? '52px' : '40px'};opacity:1} 100%{top:-60px;opacity:0} }
-    @keyframes appsIconPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
-    @keyframes appsSplitSlide { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
     .apps-section { background:var(--white);border:1.5px solid var(--border);border-radius:20px;padding:22px 20px;margin-bottom:14px;box-shadow:var(--shadow); }
     .apps-section-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--green);margin-bottom:6px; }
     .apps-section-headline { font-size:18px;font-weight:800;color:var(--text);line-height:1.3;margin-bottom:8px; }
@@ -6518,139 +6388,69 @@ function renderAppsView() {
     .apps-callout { background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:16px; }
     .apps-callout p { font-size:13px;color:#166534;margin:0;line-height:1.55; }
     .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:10px;line-height:1.5; }
+    .apps-scroll-row { display:flex;gap:14px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory; }
+    .apps-scroll-row > figure { scroll-snap-align:center;flex:0 0 min(72vw,260px); }
+    .apps-two-col { display:flex;gap:12px;align-items:flex-start;justify-content:center;flex-wrap:wrap; }
+    .apps-icon-legend { display:flex;gap:16px;justify-content:center;margin-top:12px;flex-wrap:wrap; }
+    .apps-icon-legend span { font-size:11px;font-weight:700;color:var(--text-muted); }
   </style>
 
   <div style="padding:4px 0 20px;">
 
-    <!-- ── SECTION 1: GUEST APP ─────────────────────── -->
+    <div class="apps-section" id="apps-section-hero">
+      <div class="apps-section-label">The big picture</div>
+      <div class="apps-section-headline">Two apps on one home screen</div>
+      <div class="apps-section-body">Guests install <strong>your hotel</strong> to book and message you. You install <strong>Front Desk</strong> to get buzzed the second they book. No App Store — tap Add, done.</div>
+      ${appsShowcaseImg(APPS_SHOWCASE.homeScreen, 'Home screen with Front Desk and guest hotel apps', '')}
+      <div class="apps-icon-legend">
+        <span>← Front Desk (you)</span>
+        <span>${hName} (guests) →</span>
+      </div>
+      <div style="margin-top:22px;">
+        ${appsNotifVideo('This is what happens on your phone the moment someone books.')}
+      </div>
+    </div>
+
     <div class="apps-section" id="apps-section-guest">
       <div class="apps-section-label">Guest Experience</div>
-      <div class="apps-section-headline">Your hotel, on their home screen</div>
-      <div class="apps-section-body">Like Marriott — but it's <em>yours</em>. When a guest visits your booking page, they're offered one tap to install your hotel as an app. Their phone. Your icon. Forever.</div>
-
-      ${toggleHtml}
-
-      <div style="display:flex;justify-content:center;margin-bottom:20px;">
-        <div style="animation:appsPhoneFloat 3.5s ease-in-out infinite;">
-          ${phoneFrame(homeGrid, '')}
-        </div>
+      <div class="apps-section-headline">What guests see after they install</div>
+      <div class="apps-section-body">Home, book, and message you — all from your icon on their phone. Like a chain hotel app, but it's <em>your</em> property.</div>
+      <div class="apps-scroll-row" style="margin-bottom:18px;">
+        ${appsShowcaseImg(APPS_SHOWCASE.guestHome, 'Guest home screen', 'Home — their stay at a glance')}
+        ${appsShowcaseImg(APPS_SHOWCASE.guestBook, 'Guest book page', 'Book — reserve direct, no OTA')}
+        ${appsShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest messages', 'Messages — chat with the front desk')}
       </div>
-
       <div class="apps-callout">
-        <p>They tap your icon every trip. Not Booking.com. Not Airbnb. <strong>You.</strong> No OTA commission, ever.</p>
+        <p>Swap the demo name for <strong>your</strong> hotel — upload your icon and guests see your brand on their home screen.</p>
       </div>
-
       <div style="display:flex;flex-direction:column;gap:10px;">
         <button onclick="setFilter('settings', document.querySelector('.tab[data-nav-filter=settings]'));setTimeout(()=>{const ic=document.getElementById('appIconPreview');if(ic)ic.scrollIntoView({behavior:'smooth',block:'center'});},400);" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Upload your icon →</button>
-        ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Preview guest flow ↗</button>` : ''}
+        ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Preview guest booking page ↗</button>` : ''}
       </div>
       <p class="apps-footnote">Works on iPhone and Android — no app store needed.</p>
     </div>
 
-    <!-- ── SECTION 2: FRONT DESK ────────────────────── -->
     <div class="apps-section" id="apps-section-frontdesk">
       <div class="apps-section-label">For You</div>
-      <div class="apps-section-headline">Your phone buzzes the second they book</div>
-      <div class="apps-section-body">Add Front Desk to your home screen. The moment a guest books, a notification slides down — before you check email, before anything.</div>
-
-      <div style="display:flex;justify-content:center;margin-bottom:20px;">
-        ${phoneFrame(fdGrid, ownerNotifHtml)}
+      <div class="apps-section-headline">Reply from your phone. Get buzzed when they book.</div>
+      <div class="apps-section-body">Front Desk on your home screen = bookings, guest messages, and instant alerts — all in one place.</div>
+      <div style="margin-bottom:18px;">
+        ${appsShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk guest messages', 'Reply to guests from Bookings — they get a notification on their phone.')}
       </div>
-
+      <div style="margin-bottom:18px;">
+        ${appsNotifVideo('New booking notification — before email, before Airbnb.')}
+      </div>
       ${fdCtaHtml}
     </div>
 
-    <!-- ── SECTION 3: NOTIFICATIONS ─────────────────── -->
-    <div class="apps-section" id="apps-section-notif">
-      <div class="apps-section-label">The Loop</div>
-      <div class="apps-section-headline">They book. You find out. Before anyone else.</div>
-      <div class="apps-section-body">Before your email. Before Airbnb updates its calendar. The guest gets their confirmation — and your phone buzzes simultaneously.</div>
-
-      <div style="display:flex;gap:12px;justify-content:center;align-items:flex-start;margin-bottom:20px;animation:appsSplitSlide 0.5s ease;">
-        <!-- Guest phone -->
-        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0;">
-          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;">Guest</div>
-          <div style="position:relative;width:152px;height:320px;border-radius:30px;background:linear-gradient(160deg,#1a1a2e 0%,#16213e 100%);box-shadow:0 20px 50px rgba(0,0,0,0.4),inset 0 0 0 1.5px rgba(255,255,255,0.1);overflow:hidden;flex-shrink:0;">
-            ${isIos ? `<div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);width:60px;height:18px;border-radius:10px;background:#0a0a0a;z-index:3;"></div>` : `<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#0a0a0a;z-index:3;"></div>`}
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:${isIos ? '44px' : '32px'} 14px 8px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;">
-              <span>9:41</span><span>▋▋ 🔋</span>
-            </div>
-            <div style="padding:8px 12px;">
-              <div style="background:rgba(255,255,255,0.06);border-radius:14px;padding:14px 12px;text-align:center;">
-                <div style="font-size:22px;margin-bottom:8px;">🎉</div>
-                <div style="font-size:11px;font-weight:800;color:#fff;margin-bottom:4px;">You're booked!</div>
-                <div style="font-size:9px;color:rgba(255,255,255,0.7);">June 15–17</div>
-                <div style="font-size:9px;color:rgba(255,255,255,0.5);margin-top:2px;">${shortName}</div>
-              </div>
-            </div>
-            <div id="apps-split-guest-notif" style="position:absolute;top:${isIos ? '-70px' : '-60px'};left:8px;right:8px;z-index:10;opacity:0;transition:top 0.5s ease,opacity 0.4s ease;">
-              <div style="background:${guestNotifBg};border-radius:${notifRadius};padding:8px 10px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">
-                <div style="font-size:9px;font-weight:700;color:#1a1a2e;margin-bottom:2px;">${shortName}</div>
-                <div style="font-size:9px;color:#374151;">You're booked! June 15–17 ✓</div>
-              </div>
-            </div>
-            ${isIos ? `<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:65px;height:3px;border-radius:2px;background:rgba(255,255,255,0.4);"></div>` : `<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:80px;height:2px;border-radius:2px;background:rgba(255,255,255,0.25);"></div>`}
-          </div>
-        </div>
-
-        <!-- Arrow -->
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:60px;flex-shrink:0;">
-          <div style="font-size:22px;color:var(--green);font-weight:800;">→</div>
-        </div>
-
-        <!-- Owner phone -->
-        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0;">
-          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;">You</div>
-          <div style="position:relative;width:152px;height:320px;border-radius:30px;background:linear-gradient(160deg,#1a1a2e 0%,#16213e 100%);box-shadow:0 20px 50px rgba(0,0,0,0.4),inset 0 0 0 1.5px rgba(255,255,255,0.1);overflow:hidden;flex-shrink:0;">
-            ${isIos ? `<div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);width:60px;height:18px;border-radius:10px;background:#0a0a0a;z-index:3;"></div>` : `<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#0a0a0a;z-index:3;"></div>`}
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:${isIos ? '44px' : '32px'} 14px 8px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;">
-              <span>9:41</span><span>▋▋ 🔋</span>
-            </div>
-            <!-- Lock screen -->
-            <div style="padding:6px 14px;text-align:center;">
-              <div style="font-size:9px;color:rgba(255,255,255,0.5);margin-bottom:2px;">Tuesday, June 15</div>
-              <div style="font-size:28px;font-weight:200;color:#fff;">9:41</div>
-            </div>
-            <div id="apps-split-owner-notif" style="position:absolute;top:${isIos ? '-70px' : '-60px'};left:8px;right:8px;z-index:10;opacity:0;transition:top 0.5s ease,opacity 0.4s ease;">
-              <div style="background:${notifBg};border-radius:${notifRadius};padding:9px 11px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                  <div style="width:18px;height:18px;border-radius:5px;background:#2E7D5B;display:flex;align-items:center;justify-content:center;font-size:9px;">🔔</div>
-                  <div style="font-size:9px;font-weight:700;color:#1a1a2e;">Front Desk</div>
-                  <div style="font-size:8px;color:#8e8e93;margin-left:auto;">now</div>
-                </div>
-                <div style="font-size:9px;color:#1a1a2e;font-weight:600;">New booking — James C.</div>
-                <div style="font-size:8px;color:#6b7280;">2 nights · ${shortName}</div>
-              </div>
-            </div>
-            ${isIos ? `<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:65px;height:3px;border-radius:2px;background:rgba(255,255,255,0.4);"></div>` : `<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:80px;height:2px;border-radius:2px;background:rgba(255,255,255,0.25);"></div>`}
-          </div>
-        </div>
-      </div>
-
-      <div style="background:#1a2b22;border-radius:12px;padding:14px 16px;text-align:center;">
-        <p style="font-size:13px;color:#fff;margin:0;line-height:1.5;font-weight:600;">"Before your email. Before Airbnb updates its calendar. You find out first."</p>
-      </div>
-    </div>
-
-    <!-- ── SECTION 4: MESSAGES ──────────────────────── -->
     <div class="apps-section" id="apps-section-messages">
       <div class="apps-section-label">Messaging</div>
-      <div class="apps-section-headline">Guests message you. You reply. They get a buzz.</div>
-      <div class="apps-section-body">Guests who install your app can message you directly. You reply from Front Desk. They get a push notification — no SMS needed, no third-party app.</div>
-
-      <div style="display:flex;justify-content:center;margin-bottom:20px;">
-        <div style="position:relative;width:200px;height:340px;border-radius:36px;background:linear-gradient(160deg,#1a1a2e 0%,#16213e 100%);box-shadow:0 30px 80px rgba(0,0,0,0.45),inset 0 0 0 1.5px rgba(255,255,255,0.1);overflow:hidden;flex-shrink:0;">
-          ${isIos ? `<div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);width:80px;height:24px;border-radius:14px;background:#0a0a0a;z-index:3;"></div>` : `<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;background:#0a0a0a;z-index:3;"></div>`}
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:${isIos ? '44px' : '32px'} 16px 8px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;">
-            <span>9:41</span><span>▋▋ 🔋</span>
-          </div>
-          <div style="padding:0 12px;box-sizing:border-box;position:relative;height:220px;">
-            ${msgThread}
-          </div>
-          ${isIos ? `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:90px;height:4px;border-radius:2px;background:rgba(255,255,255,0.5);"></div>` : `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:110px;height:3px;border-radius:2px;background:rgba(255,255,255,0.3);"></div>`}
-        </div>
+      <div class="apps-section-headline">They message you. You reply. They get a buzz.</div>
+      <div class="apps-section-body">No SMS. No third-party app. Guest installs your hotel → messages you → you reply in Front Desk → they get a push.</div>
+      <div class="apps-two-col" style="margin-bottom:16px;">
+        ${appsShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest side messages', 'Guest')}
+        ${appsShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk reply', 'You')}
       </div>
-
       <div class="apps-callout">
         <p>Guests who install your app become <strong>your guests</strong> — reachable forever, no OTA in the way.</p>
       </div>
@@ -6658,62 +6458,6 @@ function renderAppsView() {
 
   </div>`;
 
-  // Animate the owner notification in section 2 (loop)
-  function animateOwnerNotif() {
-    const notif = document.getElementById('apps-notif-anim');
-    if (!notif) return;
-    const topIn = isIos ? '52px' : '40px';
-    let cycle = 0;
-    function runCycle() {
-      if (!document.getElementById('apps-notif-anim')) return;
-      notif.style.top = '-80px';
-      notif.style.opacity = '0';
-      setTimeout(() => {
-        if (!document.getElementById('apps-notif-anim')) return;
-        notif.style.top = topIn;
-        notif.style.opacity = '1';
-        setTimeout(() => {
-          if (!document.getElementById('apps-notif-anim')) return;
-          notif.style.top = '-80px';
-          notif.style.opacity = '0';
-          cycle++;
-          if (cycle < 999) setTimeout(runCycle, 2000);
-        }, 2500);
-      }, 300);
-    }
-    setTimeout(runCycle, 800);
-  }
-
-  // Animate split-screen notifications (section 3)
-  function animateSplitNotifs() {
-    const gn = document.getElementById('apps-split-guest-notif');
-    const on = document.getElementById('apps-split-owner-notif');
-    if (!gn || !on) return;
-    const topIn = isIos ? '54px' : '42px';
-    function runSplitCycle() {
-      if (!document.getElementById('apps-split-guest-notif')) return;
-      [gn, on].forEach(n => { n.style.top = n === gn ? '-70px' : '-70px'; n.style.opacity = '0'; });
-      setTimeout(() => {
-        if (!document.getElementById('apps-split-guest-notif')) return;
-        gn.style.top = topIn; gn.style.opacity = '1';
-        setTimeout(() => {
-          if (!document.getElementById('apps-split-owner-notif')) return;
-          on.style.top = topIn; on.style.opacity = '1';
-          setTimeout(() => {
-            if (!document.getElementById('apps-split-guest-notif')) return;
-            [gn, on].forEach(n => { n.style.top = '-70px'; n.style.opacity = '0'; });
-            setTimeout(runSplitCycle, 2000);
-          }, 2800);
-        }, 600);
-      }, 300);
-    }
-    setTimeout(runSplitCycle, 1200);
-  }
-
-  animateOwnerNotif();
-  animateSplitNotifs();
-
-  // Re-init lucide icons for smartphone icon in nav if needed
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -6726,7 +6470,6 @@ function startAppsTour() {
   const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
   const initial = hName.trim().charAt(0).toUpperCase();
   const iconUrl = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
-  const isIos = appsViewPlatform === 'ios';
 
   let tourStep = 0;
   const totalSteps = 4;
@@ -6778,140 +6521,56 @@ function startAppsTour() {
     document.getElementById('appsTourSkipBtn').onclick = () => { finish(); };
   }
 
-  function phoneFrameMini(contentHtml) {
-    const topDecor = isIos
-      ? `<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);width:60px;height:18px;border-radius:10px;background:#0a0a0a;z-index:3;"></div>`
-      : `<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:#0a0a0a;z-index:3;"></div>`;
-    const bottomBar = isIos
-      ? `<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:70px;height:3px;border-radius:2px;background:rgba(255,255,255,0.45);"></div>`
-      : `<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:85px;height:2px;border-radius:2px;background:rgba(255,255,255,0.25);"></div>`;
-    const statusBar = `<div style="display:flex;justify-content:space-between;padding:${isIos ? '34px' : '26px'} 14px 6px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;"><span>9:41</span><span>▋▋ 🔋</span></div>`;
-    return `<div style="position:relative;width:168px;height:360px;border-radius:32px;background:linear-gradient(160deg,#1a1a2e 0%,#16213e 100%);box-shadow:0 24px 60px rgba(0,0,0,0.5),inset 0 0 0 1.5px rgba(255,255,255,0.1);overflow:hidden;margin:0 auto;">
-      ${topDecor}${statusBar}
-      <div style="padding:0 10px;box-sizing:border-box;">${contentHtml}</div>
-      ${bottomBar}
-    </div>`;
-  }
-
-  function iconTileMini(isHotel) {
-    const sz = 40;
-    const br = isIos ? `${Math.round(sz * 0.225)}px` : `${Math.round(sz * 0.35)}px`;
-    const inner = isHotel
-      ? (iconUrl
-          ? `<img src="${iconUrl}" alt="${hName}" style="width:100%;height:100%;object-fit:cover;">`
-          : `<div style="width:${sz}px;height:${sz}px;background:linear-gradient(135deg,#2E7D5B,#1a5c3f);color:#fff;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;border-radius:${br};">${initial}</div>`)
-      : `<div style="width:${sz}px;height:${sz}px;background:rgba(255,255,255,0.18);border-radius:${br};"></div>`;
-    const pulseCss = isHotel ? 'animation:appsIconPulse 1.5s ease-in-out infinite;' : '';
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;${pulseCss}">
-      <div style="width:${sz}px;height:${sz}px;border-radius:${br};overflow:hidden;${isHotel ? 'box-shadow:0 4px 14px rgba(46,125,91,0.5);' : ''}">${inner}</div>
-      <div style="font-size:8px;color:rgba(255,255,255,${isHotel ? '1' : '0.35'});font-weight:${isHotel ? '700' : '400'};max-width:48px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isHotel ? shortName : ''}</div>
-    </div>`;
+  function tourShowcaseImg(src, alt) {
+    return `<img src="${src}" alt="${alt}" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;">`;
   }
 
   function showTourStep() {
-    // Step 1: Guest home screen
     if (tourStep === 0) {
-      const colors = ['#3478f6','#35c759','#ff9f0a','#ff3b30','#1c8ef9','#0a84ff','#ff9500','#8e8e93'];
-      const sz = 40;
-      const br = isIos ? `${Math.round(sz * 0.225)}px` : `${Math.round(sz * 0.35)}px`;
-      const ghostTiles = colors.slice(0, 7).map(c =>
-        `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
-          <div style="width:${sz}px;height:${sz}px;border-radius:${br};background:${c};opacity:0.6;"></div>
-          <div style="height:6px;"></div>
-        </div>`
-      ).join('');
-      const homeContent = `
-        <div style="display:grid;grid-template-columns:repeat(4,${sz}px);gap:10px 8px;justify-content:center;margin-bottom:10px;">
-          ${ghostTiles}
-          ${iconTileMini(true)}
-        </div>`;
       buildModal(`
-        <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:28px 20px 22px;">
-          ${phoneFrameMini(homeContent)}
+        <div style="background:#0a0a0a;padding:20px 16px 16px;">
+          ${tourShowcaseImg(APPS_SHOWCASE.homeScreen, 'Home screen with Front Desk and guest hotel apps')}
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">See this icon?</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's <strong>${hName}</strong> on a guest's home screen. Not Booking.com. Not Airbnb. <strong>Yours.</strong> They tap it every trip, forever.</p>
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Two icons. One home screen.</div>
+          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;"><strong>Front Desk</strong> is yours — you get buzzed when they book. <strong>${hName}</strong> is theirs — they book and message you direct. No App Store.</p>
         </div>`, 'Got it — what else? →');
     }
-    // Step 2: Notification sliding down
     else if (tourStep === 1) {
-      const notifBg = isIos ? '#f2f2f7' : '#e8eaf6';
-      const notifR = isIos ? '13px' : '11px';
-      const notifContent = `
-        <div style="position:relative;">
-          <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:16px;text-align:center;">
-            <div style="font-size:30px;margin-bottom:6px;">🔒</div>
-            <div style="font-size:28px;font-weight:200;color:#fff;margin-bottom:4px;">9:41</div>
-            <div style="font-size:9px;color:rgba(255,255,255,0.5);">Tuesday, June 15</div>
-          </div>
-          <div style="margin-top:8px;background:${notifBg};border-radius:${notifR};padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,0.3);animation:appsPhoneFloat 2s ease-in-out infinite;">
-            <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">
-              <div style="width:20px;height:20px;border-radius:6px;background:#2E7D5B;display:flex;align-items:center;justify-content:center;font-size:10px;">🔔</div>
-              <div style="font-size:9px;font-weight:700;color:#1a1a2e;">Front Desk</div>
-              <div style="font-size:8px;color:#8e8e93;margin-left:auto;">now</div>
-            </div>
-            <div style="font-size:9px;color:#1a1a2e;font-weight:600;">New booking — James C. · 2 nights</div>
-            <div style="font-size:8px;color:#6b7280;margin-top:1px;">${shortName}</div>
-          </div>
-        </div>`;
       buildModal(`
-        <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:28px 20px 22px;">
-          ${phoneFrameMini(notifContent)}
+        <div style="background:#0a0a0a;padding:20px 16px 16px;">
+          <video autoplay loop muted playsinline style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;" poster="${APPS_SHOWCASE.homeScreen}">
+            <source src="${APPS_SHOWCASE.notifVideo}" type="video/mp4">
+          </video>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
           <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">See this buzz?</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's you finding out the second they book — <strong>before you check email.</strong> Add Front Desk to your home screen once, and this is automatic.</p>
+          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's you finding out the second they book — <strong>before you check email.</strong> Add Front Desk to your home screen once.</p>
         </div>`, 'Makes sense →');
     }
-    // Step 3: Split screen guest ↔ owner
     else if (tourStep === 2) {
-      const notifBg2 = isIos ? '#f2f2f7' : '#e8eaf6';
-      const notifR2 = isIos ? '12px' : '10px';
       buildModal(`
-        <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:24px 16px 20px;">
-          <div style="display:flex;gap:10px;justify-content:center;align-items:flex-start;">
-            <!-- Guest mini phone -->
-            <div style="flex:1;">
-              <div style="font-size:9px;color:rgba(255,255,255,0.6);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Guest</div>
-              <div style="position:relative;border-radius:24px;background:linear-gradient(160deg,#1a1a2e,#16213e);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.1);overflow:hidden;padding:${isIos ? '20px' : '16px'} 8px 16px;min-height:120px;">
-                ${isIos ? `<div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:44px;height:12px;border-radius:8px;background:#0a0a0a;"></div>` : `<div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#0a0a0a;"></div>`}
-                <div style="text-align:center;margin-top:4px;">
-                  <div style="font-size:18px;">🎉</div>
-                  <div style="font-size:9px;color:#fff;font-weight:700;margin-top:4px;">You're booked!</div>
-                  <div style="font-size:8px;color:rgba(255,255,255,0.5);margin-top:2px;">June 15–17</div>
-                </div>
-              </div>
+        <div style="background:#0a0a0a;padding:16px 12px 12px;">
+          <div style="display:flex;gap:8px;align-items:flex-start;justify-content:center;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:9px;color:rgba(255,255,255,0.55);text-align:center;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Guest</div>
+              ${tourShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest messages')}
             </div>
-            <!-- Arrow -->
-            <div style="display:flex;align-items:center;justify-content:center;padding-top:44px;font-size:16px;color:rgba(255,255,255,0.7);flex-shrink:0;">→</div>
-            <!-- Owner mini phone -->
-            <div style="flex:1;">
-              <div style="font-size:9px;color:rgba(255,255,255,0.6);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">You</div>
-              <div style="position:relative;border-radius:24px;background:linear-gradient(160deg,#1a1a2e,#16213e);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.1);overflow:hidden;padding:${isIos ? '20px' : '16px'} 8px 16px;min-height:120px;">
-                ${isIos ? `<div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:44px;height:12px;border-radius:8px;background:#0a0a0a;"></div>` : `<div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#0a0a0a;"></div>`}
-                <div style="margin-top:6px;background:${notifBg2};border-radius:${notifR2};padding:7px 8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
-                  <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
-                    <div style="width:14px;height:14px;border-radius:4px;background:#2E7D5B;display:flex;align-items:center;justify-content:center;font-size:7px;">🔔</div>
-                    <div style="font-size:8px;font-weight:700;color:#1a1a2e;">Front Desk</div>
-                  </div>
-                  <div style="font-size:8px;color:#1a1a2e;font-weight:600;">New booking!</div>
-                  <div style="font-size:7px;color:#6b7280;">James C. · 2 nights</div>
-                </div>
-              </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:9px;color:rgba(255,255,255,0.55);text-align:center;font-weight:700;text-transform:uppercase;margin-bottom:6px;">You</div>
+              ${tourShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk reply')}
             </div>
           </div>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">They install once. You own the relationship.</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Next trip, they open your icon. No searching Airbnb. No OTA cut. Just a direct, repeat guest — on your terms.</p>
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">They message. You reply. They get a buzz.</div>
+          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">No SMS. No third-party app. You own the conversation — forever.</p>
         </div>`, 'One more thing →');
     }
-    // Step 4: CTA / action
     else if (tourStep === 3) {
       const iconEl = iconUrl
-        ? `<img src="${iconUrl}" alt="${hName}" style="width:64px;height:64px;border-radius:${isIos ? '14px' : '22px'};object-fit:cover;box-shadow:0 8px 24px rgba(46,125,91,0.4);">`
-        : `<div style="width:64px;height:64px;border-radius:${isIos ? '14px' : '22px'};background:linear-gradient(135deg,#2E7D5B,#1a5c3f);color:#fff;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(46,125,91,0.4);">${initial}</div>`;
+        ? `<img src="${iconUrl}" alt="${hName}" style="width:64px;height:64px;border-radius:14px;object-fit:cover;box-shadow:0 8px 24px rgba(46,125,91,0.4);">`
+        : `<div style="width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,#2E7D5B,#1a5c3f);color:#fff;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(46,125,91,0.4);">${initial}</div>`;
       buildModal(`
         <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:28px 20px 22px;text-align:center;">
           <div style="display:flex;justify-content:center;margin-bottom:16px;">${iconEl}</div>
@@ -6932,17 +6591,6 @@ function startAppsTour() {
       const appsEl = document.getElementById('appsView');
       if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }
-
-  // Inject pulse animation if not present
-  if (!document.getElementById('appsTourAnimStyle')) {
-    const s = document.createElement('style');
-    s.id = 'appsTourAnimStyle';
-    s.textContent = `
-      @keyframes appsPhoneFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-      @keyframes appsIconPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-    `;
-    document.head.appendChild(s);
   }
 
   showTourStep();
