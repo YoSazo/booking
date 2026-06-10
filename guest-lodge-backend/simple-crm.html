@@ -6229,13 +6229,29 @@ function squareCropImage(file, size = 512) {
   });
 }
 
+function setAppIconPreviewLoading() {
+  const spinner = '<div style="width:24px;height:24px;border:3px solid rgba(255,255,255,0.5);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></div>';
+  ['appIconPreview', 'appsAppIconPreview'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = spinner;
+  });
+}
+
+function setAppIconPreviewImage(url) {
+  const html = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:cover;">';
+  ['appIconPreview', 'appsAppIconPreview'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.background = '#fff';
+      el.innerHTML = html;
+    }
+  });
+}
+
 async function uploadAppIcon(input) {
   const file = input.files && input.files[0];
   if (!file) return;
-  const preview = document.getElementById('appIconPreview');
-  if (preview) {
-    preview.innerHTML = '<div style="width:24px;height:24px;border:3px solid rgba(255,255,255,0.5);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></div>';
-  }
+  setAppIconPreviewLoading();
   const fd = new FormData();
   try {
     const squared = await squareCropImage(file, 512);
@@ -6251,18 +6267,20 @@ async function uploadAppIcon(input) {
     });
     const data = await res.json();
     if (data.success && data.appIconUrl) {
-      if (preview) {
-        preview.style.background = '#fff';
-        preview.innerHTML = '<img src="' + data.appIconUrl + '" alt="App icon" style="width:100%;height:100%;object-fit:cover;">';
-      }
+      activeHotelAppIcon = data.appIconUrl;
+      setAppIconPreviewImage(data.appIconUrl);
+      if (typeof updateFrontdeskManifestLink === 'function') updateFrontdeskManifestLink();
       toast('App icon updated! Guests who install your page will see it.', 'success');
     } else {
       toast(data.message || 'Failed to upload icon', 'error');
-      if (preview) preview.innerHTML = '🏨';
+      const initial = ((typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'H').trim().charAt(0).toUpperCase() || '🏨';
+      ['appIconPreview', 'appsAppIconPreview'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) { el.style.background = 'var(--green)'; el.innerHTML = initial; }
+      });
     }
   } catch (e) {
     toast('Failed to upload icon', 'error');
-    if (preview) preview.innerHTML = '🏨';
   }
   input.value = '';
 }
@@ -6329,22 +6347,32 @@ const APPS_SHOWCASE = {
   guestHome: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123564/Home_page_booking_engine_uks92o.png',
   guestMessages: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123561/Messages_page_booking_engine_jfcztr.png',
   frontdeskMessages: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123567/Bookings_guest_messages_front_desk_fir5nj.png',
-  notifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
+  bookingNotifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
+  guestMessageNotifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_23-43-50_1_z22p4m.mp4',
 };
 
-function appsShowcaseImg(src, alt, caption) {
+// Mobile-friendly Cloudinary delivery — full PNGs are ~1.5MB and often fail on cellular.
+function appsCloudinaryImg(url, width) {
+  return url.replace('/image/upload/', '/image/upload/f_auto,q_auto,w_' + (width || 400) + '/');
+}
+
+function appsShowcaseImg(src, alt, caption, eager) {
+  const sm = appsCloudinaryImg(src, 360);
+  const md = appsCloudinaryImg(src, 520);
   const cap = caption ? `<figcaption style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.45;max-width:280px;margin-left:auto;margin-right:auto;">${caption}</figcaption>` : '';
+  const loadAttr = eager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
   return `<figure style="margin:0;text-align:center;flex:1;min-width:0;">
-    <img src="${src}" alt="${alt}" loading="lazy" decoding="async" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;">
+    <img src="${sm}" srcset="${sm} 360w, ${md} 520w" sizes="(max-width:768px) 72vw, 280px" alt="${alt}" ${loadAttr} decoding="async" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;" onerror="this.onerror=null;this.src='${md}'">
     ${cap}
   </figure>`;
 }
 
-function appsNotifVideo(caption) {
+function appsNotifVideo(videoSrc, caption, posterSrc) {
+  const poster = appsCloudinaryImg(posterSrc || APPS_SHOWCASE.homeScreen, 360);
   const cap = caption ? `<p style="font-size:11px;color:var(--text-muted);text-align:center;margin:10px 0 0;line-height:1.45;">${caption}</p>` : '';
   return `<div style="display:flex;flex-direction:column;align-items:center;max-width:280px;margin:0 auto;">
-    <video autoplay loop muted playsinline preload="auto" style="width:100%;height:auto;display:block;border-radius:0;" poster="${APPS_SHOWCASE.homeScreen}">
-      <source src="${APPS_SHOWCASE.notifVideo}" type="video/mp4">
+    <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:280px;height:auto;display:block;" poster="${poster}">
+      <source src="${videoSrc}" type="video/mp4">
     </video>
     ${cap}
   </div>`;
@@ -6362,6 +6390,8 @@ function renderAppsView() {
   if (!el) return;
 
   const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+  const hotelAppIcon = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
+  const hotelInitial = hName.trim().charAt(0).toUpperCase() || '🏨';
   const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
   const bookingUrl = domain ? 'https://' + domain : '#';
 
@@ -6401,13 +6431,13 @@ function renderAppsView() {
       <div class="apps-section-label">The big picture</div>
       <div class="apps-section-headline">Two apps on one home screen</div>
       <div class="apps-section-body">Guests install <strong>your hotel</strong> to book and message you. You install <strong>Front Desk</strong> to get buzzed the second they book. No App Store — tap Add, done.</div>
-      ${appsShowcaseImg(APPS_SHOWCASE.homeScreen, 'Home screen with Front Desk and guest hotel apps', '')}
+      ${appsShowcaseImg(APPS_SHOWCASE.homeScreen, 'Home screen with Front Desk and guest hotel apps', '', true)}
       <div class="apps-icon-legend">
         <span>← Front Desk (you)</span>
         <span>${hName} (guests) →</span>
       </div>
       <div style="margin-top:22px;">
-        ${appsNotifVideo('This is what happens on your phone the moment someone books.')}
+        ${appsNotifVideo(APPS_SHOWCASE.bookingNotifVideo, 'This is what happens on your phone the moment someone books.', APPS_SHOWCASE.homeScreen)}
       </div>
     </div>
 
@@ -6415,18 +6445,26 @@ function renderAppsView() {
       <div class="apps-section-label">Guest Experience</div>
       <div class="apps-section-headline">What guests see after they install</div>
       <div class="apps-section-body">Home, book, and message you — all from your icon on their phone. Like a chain hotel app, but it's <em>your</em> property.</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;padding:14px;background:var(--bg);border-radius:14px;border:1px solid var(--border);">
+        <div id="appsAppIconPreview" style="width:68px;height:68px;border-radius:16px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:30px;font-weight:800;">
+          ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;">` : hotelInitial}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Your app icon</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;line-height:1.45;">This is what guests see on their home screen when they install.</p>
+          <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
+          <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
+        </div>
+      </div>
       <div class="apps-scroll-row" style="margin-bottom:18px;">
         ${appsShowcaseImg(APPS_SHOWCASE.guestHome, 'Guest home screen', 'Home — their stay at a glance')}
         ${appsShowcaseImg(APPS_SHOWCASE.guestBook, 'Guest book page', 'Book — reserve direct, no OTA')}
         ${appsShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest messages', 'Messages — chat with the front desk')}
       </div>
       <div class="apps-callout">
-        <p>Swap the demo name for <strong>your</strong> hotel — upload your icon and guests see your brand on their home screen.</p>
+        <p>Upload your icon above — guests who install see <strong>${hName}</strong>, not a demo.</p>
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <button onclick="setFilter('settings', document.querySelector('.tab[data-nav-filter=settings]'));setTimeout(()=>{const ic=document.getElementById('appIconPreview');if(ic)ic.scrollIntoView({behavior:'smooth',block:'center'});},400);" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Upload your icon →</button>
-        ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Preview guest booking page ↗</button>` : ''}
-      </div>
+      ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Preview guest booking page ↗</button>` : ''}
       <p class="apps-footnote">Works on iPhone and Android — no app store needed.</p>
     </div>
 
@@ -6438,7 +6476,7 @@ function renderAppsView() {
         ${appsShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk guest messages', 'Reply to guests from Bookings — they get a notification on their phone.')}
       </div>
       <div style="margin-bottom:18px;">
-        ${appsNotifVideo('New booking notification — before email, before Airbnb.')}
+        ${appsNotifVideo(APPS_SHOWCASE.bookingNotifVideo, 'New booking — before email, before Airbnb.', APPS_SHOWCASE.frontdeskMessages)}
       </div>
       ${fdCtaHtml}
     </div>
@@ -6450,6 +6488,9 @@ function renderAppsView() {
       <div class="apps-two-col" style="margin-bottom:16px;">
         ${appsShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest side messages', 'Guest')}
         ${appsShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk reply', 'You')}
+      </div>
+      <div style="margin-bottom:16px;">
+        ${appsNotifVideo(APPS_SHOWCASE.guestMessageNotifVideo, 'Guest asks a question → you reply → their phone buzzes.', APPS_SHOWCASE.guestMessages)}
       </div>
       <div class="apps-callout">
         <p>Guests who install your app become <strong>your guests</strong> — reachable forever, no OTA in the way.</p>
@@ -6522,7 +6563,8 @@ function startAppsTour() {
   }
 
   function tourShowcaseImg(src, alt) {
-    return `<img src="${src}" alt="${alt}" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;">`;
+    const sm = appsCloudinaryImg(src, 320);
+    return `<img src="${sm}" alt="${alt}" loading="eager" decoding="async" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;">`;
   }
 
   function showTourStep() {
@@ -6537,15 +6579,16 @@ function startAppsTour() {
         </div>`, 'Got it — what else? →');
     }
     else if (tourStep === 1) {
+      const poster = appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 320);
       buildModal(`
         <div style="background:#0a0a0a;padding:20px 16px 16px;">
-          <video autoplay loop muted playsinline style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;" poster="${APPS_SHOWCASE.homeScreen}">
-            <source src="${APPS_SHOWCASE.notifVideo}" type="video/mp4">
+          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;" poster="${poster}">
+            <source src="${APPS_SHOWCASE.guestMessageNotifVideo}" type="video/mp4">
           </video>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
           <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">See this buzz?</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's you finding out the second they book — <strong>before you check email.</strong> Add Front Desk to your home screen once.</p>
+          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Guest asks "How do I connect to WiFi?" — you reply — their phone buzzes. <strong>No SMS needed.</strong></p>
         </div>`, 'Makes sense →');
     }
     else if (tourStep === 2) {
@@ -6579,7 +6622,7 @@ function startAppsTour() {
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
           <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Make it yours</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Upload your own icon so guests see your brand — not a letter. Takes 5 seconds in Settings.</p>
+          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Upload your own icon on the Apps tab so guests see your brand — not a demo. Takes 5 seconds.</p>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
             <p style="font-size:12px;color:#166534;margin:0;line-height:1.5;"><strong>Your hotel. Their home screen. Your phone buzzes. No App Store.</strong></p>
           </div>
