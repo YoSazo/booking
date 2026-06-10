@@ -68,7 +68,13 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false })
   return (
     <div className="confirmation-container" style={{ minHeight: '60vh' }}>
       <div className="confirmation-card">
-        {!booking ? (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <div style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #2E7D5B', borderRadius: '50%', width: 28, height: 28, animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+            <p style={{ fontSize: 14, color: '#6b7280', fontWeight: 500 }}>Loading your itinerary...</p>
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+          </div>
+        ) : !booking ? (
           <>
             <div className="confirmation-header" style={{ textAlign: 'center' }}>
               <h2 style={{ marginBottom: 6 }}>Find your reservation</h2>

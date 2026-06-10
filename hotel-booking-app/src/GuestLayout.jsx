@@ -25,12 +25,11 @@ export default function GuestLayout({ children, hotelName }) {
     '--border': '#D8E4DC',
     backgroundColor: 'var(--bg)',
     minHeight: '100vh',
-    fontFamily: '"DM Sans", sans-serif',
     position: 'relative'
   };
 
   const navItems = [
-    { label: 'My Stay', path: '/guest/dashboard', icon: Home },
+    { label: 'Home', path: '/guest/dashboard', icon: Home },
     { label: 'Book', path: '/guest/book', icon: CalendarSearch },
   ];
 
