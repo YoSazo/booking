@@ -191,7 +191,7 @@ export default function GuestHomePage() {
           style={styles.actionButton}
         >
           <MessageCircle size={17} color="#2E7D5B" />
-          <span>Message Front Desk</span>
+          <span>Message</span>
         </button>
       </div>
 

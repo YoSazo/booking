@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
 import CalendarModal from './CalendarModal.jsx';
@@ -232,8 +232,10 @@ function App() {
   const location = useLocation(); 
 
   // PWA "Remember Me" Logic: If they land on the home screen and have an active stay,
-  // redirect them straight to the Guest Home dashboard.
+  // redirect them straight to the Guest Home dashboard. Only on initial app load.
+  const initialRedirectDone = useRef(false);
   useEffect(() => {
+    if (initialRedirectDone.current) return;
     if (location.pathname === '/') {
       const storedStay = localStorage.getItem('marketel_guest_stay');
       if (storedStay) {
@@ -244,7 +246,9 @@ function App() {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (checkoutDate >= today) {
+              initialRedirectDone.current = true;
               navigate('/guest/home', { replace: true });
+              return;
             } else {
               localStorage.removeItem('marketel_guest_stay');
             }
@@ -254,6 +258,7 @@ function App() {
         }
       }
     }
+    initialRedirectDone.current = true;
   }, [location.pathname, navigate]);
   
   const [checkinDate, setCheckinDate] = useState(null);

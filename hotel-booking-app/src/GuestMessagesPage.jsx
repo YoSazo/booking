@@ -355,7 +355,7 @@ const styles = {
   messagesArea: {
     flex: 1,
     overflowY: 'auto',
-    padding: '0 16px 16px',
+    padding: '0 16px 200px',
     WebkitOverflowScrolling: 'touch',
   },
   messagesList: {
@@ -477,12 +477,16 @@ const styles = {
 
   // Compose bar
   composeBar: {
-    flexShrink: 0,
+    position: 'fixed',
+    bottom: 110,
+    left: 0,
+    right: 0,
     background: '#fff',
     borderTop: '1px solid #e5e7eb',
     padding: '10px 12px',
-    paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-    marginBottom: 90,
+    zIndex: 99,
+    maxWidth: 540,
+    margin: '0 auto',
   },
   chipsScroll: {
     display: 'flex',
