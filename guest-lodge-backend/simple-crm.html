@@ -6323,22 +6323,12 @@ function confirmEditAddRoom() {
 
 // ── APPS PAGE ─────────────────────────────────────────
 
-// Hotel domains proxy /frontdesk to Render but not /apps-showcase — use backend origin for assets.
-function appsShowcaseUrl(file) {
-  const path = '/apps-showcase/' + file;
-  const host = location.hostname;
-  if (host.endsWith('.onrender.com') || host === 'localhost' || host === '127.0.0.1') {
-    return path;
-  }
-  return 'https://guest-lodge-backend.onrender.com' + path;
-}
-
 const APPS_SHOWCASE = {
-  homeScreen: appsShowcaseUrl('home-screen.png'),
-  guestBook: appsShowcaseUrl('guest-book.png'),
-  guestHome: appsShowcaseUrl('guest-home.png'),
-  guestMessages: appsShowcaseUrl('guest-messages.png'),
-  frontdeskMessages: appsShowcaseUrl('frontdesk-messages.png'),
+  homeScreen: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123562/home_screen_with_front_desk_and_booking_engine_w3w8bg.png',
+  guestBook: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123568/Book_page_booking_engine_juu9y4.png',
+  guestHome: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123564/Home_page_booking_engine_uks92o.png',
+  guestMessages: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123561/Messages_page_booking_engine_jfcztr.png',
+  frontdeskMessages: 'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781123567/Bookings_guest_messages_front_desk_fir5nj.png',
   notifVideo: 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
 };
 
