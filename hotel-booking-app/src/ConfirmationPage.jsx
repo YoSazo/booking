@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGuest } from './GuestProvider.jsx';
 import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import InstallAppBanner from './InstallAppBanner.jsx';
@@ -19,6 +20,7 @@ const formatDateWithSuffix = (date) => {
 
 function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, apiBaseUrl = '', hotelId }) {
   const navigate = useNavigate();
+  const { setGuestStay } = useGuest();
   const [showCallModal, setShowCallModal] = useState(false);
   const [callModalDismissed, setCallModalDismissed] = useState(false);
 
@@ -48,16 +50,18 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
     };
   }, [bookingDetails, callModalDismissed]);
 
-  // Save the stay to localStorage so the PWA "remembers" the user
+  // Save the stay so the PWA remembers the guest across sessions
   useEffect(() => {
     if (reservationCode && bookingDetails?.checkout && guestInfo?.email) {
-      localStorage.setItem('marketel_guest_stay', JSON.stringify({
+      setGuestStay({
         code: reservationCode,
         email: guestInfo.email,
-        checkout: bookingDetails.checkout
-      }));
+        checkout: bookingDetails.checkout,
+        name: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ').trim(),
+        phone: guestInfo.phone || '',
+      });
     }
-  }, [reservationCode, bookingDetails, guestInfo]);
+  }, [reservationCode, bookingDetails, guestInfo, setGuestStay]);
 
   const handleDismissCallModal = () => {
     setShowCallModal(false);

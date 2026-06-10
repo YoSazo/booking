@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Send, Search } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 
 const QUICK_CHIPS = ['Early check-in', 'Late check-out', 'Extra towels', 'Quiet room'];
@@ -52,6 +53,7 @@ function formatRelativeTime(dateStr) {
 
 export default function GuestMessagesPage() {
   const { guestStay, apiBaseUrl, hotelId } = useGuest();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messageText, setMessageText] = useState('');
@@ -141,8 +143,12 @@ export default function GuestMessagesPage() {
 
   // Initial load
   useEffect(() => {
+    if (!guestStay?.code) {
+      setLoading(false);
+      return;
+    }
     fetchMessages(true);
-  }, [fetchMessages]);
+  }, [fetchMessages, guestStay?.code]);
 
   // Poll every 15 seconds
   useEffect(() => {
@@ -227,6 +233,39 @@ export default function GuestMessagesPage() {
       handleSend();
     }
   };
+
+  if (!guestStay?.code) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <h1 style={styles.headerTitle}>Messages</h1>
+          <p style={styles.headerSubtitle}>Front Desk</p>
+        </div>
+        <div style={styles.emptyContainer}>
+          <div style={styles.emptyEmoji}>💬</div>
+          <p style={styles.emptyTitle}>Connect your reservation</p>
+          <p style={styles.emptySubtitle}>
+            Find your booking to message the front desk — or book a room first.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/booking')}
+            style={styles.lookupButton}
+          >
+            <Search size={17} />
+            Find my reservation
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            style={styles.lookupLink}
+          >
+            Book a room →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -520,6 +559,33 @@ const styles = {
     margin: 0,
     maxWidth: 260,
     lineHeight: 1.5,
+  },
+  lookupButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    padding: '14px 24px',
+    borderRadius: 12,
+    border: 'none',
+    background: '#2E7D5B',
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 700,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    cursor: 'pointer',
+  },
+  lookupLink: {
+    marginTop: 12,
+    padding: '8px 12px',
+    background: 'none',
+    border: 'none',
+    color: '#2E7D5B',
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    cursor: 'pointer',
   },
 
   spinner: {

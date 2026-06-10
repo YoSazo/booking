@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CalendarPlus, CalendarClock, Search } from 'lucide-react';
 import { GuestMessageCard, downloadStayIcs } from './guestMessaging.jsx';
+import { useGuest } from './GuestProvider.jsx';
 
 const fmtDate = (d) => {
   const dt = new Date(d);
@@ -12,6 +13,7 @@ const fmtDate = (d) => {
 function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
   const { code: codeParam } = useParams();
   const navigate = useNavigate();
+  const { setGuestStay } = useGuest();
   const resolvedHotelId = hotelId || hotel?.id;
 
   const [codeInput, setCodeInput] = useState(codeParam || '');
@@ -34,6 +36,14 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         setBooking(data.booking);
+        const b = data.booking;
+        setGuestStay({
+          code: b.reservationCode,
+          email: b.guestEmail || email?.trim() || '',
+          checkout: b.checkout,
+          name: [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ').trim(),
+          phone: b.guestPhone || '',
+        });
       } else {
         setBooking(null);
         setError(data.message || 'We couldn’t find that reservation.');
@@ -42,7 +52,7 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
       setError('Something went wrong. Please try again.');
     }
     setLoading(false);
-  }, [apiBaseUrl, resolvedHotelId]);
+  }, [apiBaseUrl, resolvedHotelId, setGuestStay]);
 
   // Magic-link path: code in the URL → fetch immediately (code is the secret).
   useEffect(() => {

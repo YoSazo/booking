@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isStandalone } from './pwaUtils.js';
 
 const BRAND = '#2E7D5B';
 
@@ -7,12 +8,6 @@ function isIos() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
     // iPadOS 13+ reports as Mac with touch
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-function isStandalone() {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia?.('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
 }
 
 // "Tap to Install" — lets a guest add this property to their home screen so

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight } from 'lucide-react';
+import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, Search } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
+import { isStandalone } from './pwaUtils.js';
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -20,11 +21,60 @@ const calcNights = (checkin, checkout) => {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 };
 
-export default function GuestHomePage() {
+function PreBookHub({ hotel, onBook, onFindReservation }) {
+  const hotelName = hotel?.name || 'Your Hotel';
+  const subtitle = hotel?.subtitle || '';
+  const address = hotel?.address || '';
+  const phone = hotel?.phone || '';
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.greetingSection}>
+        <h1 style={styles.greeting}>{hotelName}</h1>
+        <p style={styles.greetingSubtitle}>
+          {isStandalone()
+            ? 'Welcome — book a stay or find an existing reservation.'
+            : subtitle || 'Book direct and save.'}
+        </p>
+      </div>
+
+      {(address || phone) && (
+        <div style={styles.card}>
+          {address && (
+            <div style={styles.hubInfoRow}>
+              <MapPin size={18} color="#2E7D5B" style={{ flexShrink: 0 }} />
+              <span style={styles.hubInfoText}>{address}</span>
+            </div>
+          )}
+          {phone && (
+            <a href={`tel:${phone}`} style={{ ...styles.hubInfoRow, textDecoration: 'none', marginTop: address ? 12 : 0 }}>
+              <Phone size={18} color="#2E7D5B" style={{ flexShrink: 0 }} />
+              <span style={{ ...styles.hubInfoText, color: '#2E7D5B', fontWeight: 600 }}>{phone}</span>
+            </a>
+          )}
+        </div>
+      )}
+
+      <button type="button" onClick={onBook} style={{ ...styles.primaryButton, width: '100%', marginBottom: 10 }}>
+        Book a room
+      </button>
+      <button
+        type="button"
+        onClick={onFindReservation}
+        style={styles.secondaryButton}
+      >
+        <Search size={17} />
+        Find my reservation
+      </button>
+    </div>
+  );
+}
+
+export default function GuestHomePage({ hotel: hotelProp }) {
   const { guestStay, apiBaseUrl, hotelId } = useGuest();
   const navigate = useNavigate();
   const [booking, setBooking] = useState(null);
-  const [hotel, setHotel] = useState(null);
+  const [lookupHotel, setLookupHotel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -49,7 +99,7 @@ export default function GuestHomePage() {
 
         if (data.success && data.booking) {
           setBooking(data.booking);
-          if (data.hotel) setHotel(data.hotel);
+          if (data.hotel) setLookupHotel(data.hotel);
         } else {
           setError('Could not load your stay details.');
         }
@@ -63,6 +113,17 @@ export default function GuestHomePage() {
     return () => { cancelled = true; };
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
 
+  // No active stay — hotel hub (especially for installed PWA before booking)
+  if (!guestStay?.code) {
+    return (
+      <PreBookHub
+        hotel={hotelProp}
+        onBook={() => navigate('/')}
+        onFindReservation={() => navigate('/booking')}
+      />
+    );
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -75,8 +136,8 @@ export default function GuestHomePage() {
     );
   }
 
-  // No stay / expired
-  if (!guestStay || !booking) {
+  // Stay expired or lookup failed
+  if (!booking) {
     return (
       <div style={styles.page}>
         <div style={styles.emptyContainer}>
@@ -85,12 +146,12 @@ export default function GuestHomePage() {
           <p style={styles.emptySubtitle}>
             {error || 'Book your next getaway and it will appear here.'}
           </p>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            style={styles.primaryButton}
-          >
-            Book your next stay
+          <button type="button" onClick={() => navigate('/')} style={{ ...styles.primaryButton, marginBottom: 10 }}>
+            Book a room
+          </button>
+          <button type="button" onClick={() => navigate('/booking')} style={styles.secondaryButton}>
+            <Search size={17} />
+            Find my reservation
           </button>
         </div>
       </div>
@@ -111,7 +172,7 @@ export default function GuestHomePage() {
 
   const handleAddToCalendar = () => {
     downloadStayIcs({
-      hotel: hotel || { name: booking.hotelName || 'Hotel' },
+      hotel: lookupHotel || hotelProp || { name: booking.hotelName || 'Hotel' },
       bookingDetails: { checkin, checkout },
       reservationCode: confirmationCode,
     });
@@ -296,6 +357,32 @@ const styles = {
     fontWeight: 700,
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
     cursor: 'pointer',
+  },
+  secondaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '14px 28px',
+    borderRadius: 12,
+    border: '1.5px solid #d7e3dc',
+    background: '#f5f9f6',
+    color: '#2E7D5B',
+    fontSize: 15,
+    fontWeight: 700,
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    cursor: 'pointer',
+  },
+  hubInfoRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  hubInfoText: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 1.5,
   },
 
   // Greeting

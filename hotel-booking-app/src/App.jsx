@@ -8,6 +8,7 @@ import { calculateTieredPrice } from './priceCalculator.js';
 import getHotelId from './utils/getHotelId';
 import { GuestProvider } from './GuestProvider.jsx';
 import GuestLayout from './GuestLayout.jsx';
+import { isStandalone } from './pwaUtils.js';
 
 // Lazy-load heavy pages so they don't bloat the initial landing page bundle.
 // GuestInfoPage pulls in Stripe + Google Maps — biggest win.
@@ -231,33 +232,42 @@ function App() {
   // State management
   const location = useLocation(); 
 
-  // PWA "Remember Me" Logic: If they land on the home screen and have an active stay,
-  // redirect them straight to the Guest Home dashboard. Only on initial app load.
+  // PWA entry: installed app opens to Guest Home (hotel hub). Active stays skip the booking page.
+  // Browser visitors stay on the booking engine until they book.
   const initialRedirectDone = useRef(false);
   useEffect(() => {
     if (initialRedirectDone.current) return;
-    if (location.pathname === '/') {
-      const storedStay = localStorage.getItem('marketel_guest_stay');
-      if (storedStay) {
-        try {
-          const stay = JSON.parse(storedStay);
-          if (stay.code && (stay.checkout || stay.checkoutDate)) {
-            const checkoutDate = new Date(stay.checkout || stay.checkoutDate);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (checkoutDate >= today) {
-              initialRedirectDone.current = true;
-              navigate('/guest/home', { replace: true });
-              return;
-            } else {
-              localStorage.removeItem('marketel_guest_stay');
-            }
+    if (location.pathname !== '/') {
+      initialRedirectDone.current = true;
+      return;
+    }
+
+    let hasActiveStay = false;
+    const storedStay = localStorage.getItem('marketel_guest_stay');
+    if (storedStay) {
+      try {
+        const stay = JSON.parse(storedStay);
+        if (stay.code && (stay.checkout || stay.checkoutDate)) {
+          const checkoutDate = new Date(stay.checkout || stay.checkoutDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (checkoutDate >= today) {
+            hasActiveStay = true;
+          } else {
+            localStorage.removeItem('marketel_guest_stay');
           }
-        } catch (e) {
-          localStorage.removeItem('marketel_guest_stay');
         }
+      } catch (e) {
+        localStorage.removeItem('marketel_guest_stay');
       }
     }
+
+    if (hasActiveStay || isStandalone()) {
+      initialRedirectDone.current = true;
+      navigate('/guest/home', { replace: true });
+      return;
+    }
+
     initialRedirectDone.current = true;
   }, [location.pathname, navigate]);
   

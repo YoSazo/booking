@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, CalendarSearch, MessageCircle } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
+import { isStandalone } from './pwaUtils.js';
 
 const NAV_TABS = [
   { key: 'home', label: 'Home', icon: Home, path: '/guest/home' },
@@ -52,8 +53,9 @@ export default function GuestLayout({ children }) {
     return () => clearInterval(interval);
   }, [isGuest, fetchUnread]);
 
-  // If not a guest, just pass children through
-  if (!isGuest) return <>{children}</>;
+  // Browser visitors: booking funnel only. Installed PWA: full app shell even before booking.
+  const showAppShell = isGuest || isStandalone();
+  if (!showAppShell) return <>{children}</>;
 
   const showNav = isMobile;
 
