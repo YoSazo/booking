@@ -15,9 +15,6 @@ const MyBookingPage = lazy(() => import('./MyBookingPage.jsx'));
 const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper.jsx'));
 const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 
-import { useGuest } from './GuestProvider.jsx';
-import GuestLayout from './GuestLayout.jsx';
-
 
 const hotelId = getHotelId();
 const staticHotel = hotelData[hotelId] || null;
@@ -230,14 +227,36 @@ function App() {
   // State management
   const location = useLocation(); 
 
-  const { isGuest, guestStay, isLoading: isGuestLoading } = useGuest();
-
-  // If they land on the home screen and have an active stay, redirect them straight to their dashboard.
+  // PWA "Remember Me" Logic: If they land on the home screen and have an active stay,
+  // redirect them straight to their dashboard.
   useEffect(() => {
-    if (location.pathname === '/' && isGuest && guestStay?.code) {
-      navigate(`/guest/dashboard`, { replace: true });
+    if (location.pathname === '/') {
+      const storedStay = localStorage.getItem('marketel_guest_stay');
+      if (storedStay) {
+        try {
+          const stay = JSON.parse(storedStay);
+          if (stay.code && stay.checkout) {
+            // Check if checkout is in the future or today
+            const checkoutDate = new Date(stay.checkout);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Start of today
+            
+            if (checkoutDate >= today) {
+              // Active stay — redirect!
+              // Include the email in state or search params so the lookup succeeds easily if needed,
+              // or just let MyBookingPage handle it. MyBookingPage fetches based on code.
+              navigate(`/booking/${stay.code}?email=${encodeURIComponent(stay.email || '')}`, { replace: true });
+            } else {
+              // Stay has passed, clear memory
+              localStorage.removeItem('marketel_guest_stay');
+            }
+          }
+        } catch (e) {
+          localStorage.removeItem('marketel_guest_stay');
+        }
+      }
     }
-  }, [location.pathname, isGuest, guestStay, navigate]);
+  }, [location.pathname, navigate]);
   
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
@@ -641,36 +660,11 @@ const handleConfirmBooking = async (bookingDetails) => {
   }
 
   return (
-    <GuestLayout hotelName={currentHotel?.name}>
-      <ScrollToTop />
+    <>
+    <ScrollToTop />
       <PageTransition>
         <Routes>
-          {/* Default booking search - maps to /guest/book if logged in */}
           <Route path="/" element={
-              <BookingPage
-                hotel={currentHotel}
-                roomData={availableRooms}
-                rates={RATES}
-                selectedRoom={selectedRoom}
-                checkinDate={checkinDate}
-                checkoutDate={checkoutDate}
-                isCalendarOpen={isCalendarOpen}
-                onRoomSelect={handleRoomSelect}
-                onGuestsChange={handleGuestCountChange}
-                onPetsChange={handlePetCountChange}
-                onConfirmBooking={handleConfirmBooking}
-                onCalendarOpen={() => setIsCalendarOpen(true)}
-                onCalendarClose={() => setIsCalendarOpen(false)}
-                onDatesChange={handleDatesUpdate}
-                isLoading={isLoading}
-                onOpenLightbox={handleOpenLightbox}
-                isProcessingBooking={isProcessingBooking}
-                setIsProcessingBooking={setIsProcessingBooking}
-                onHotelUpdate={(updates) => setCurrentHotel(prev => ({ ...prev, ...updates }))}
-                hotelId={currentHotel.id || hotelId}              />
-          } />
-          
-          <Route path="/guest/book" element={
               <BookingPage
                 hotel={currentHotel}
                 roomData={availableRooms}
@@ -724,7 +718,7 @@ const handleConfirmBooking = async (bookingDetails) => {
             </Suspense>
           } />
 
-          {/* Persistent guest reservation page (magic link + manual lookup + PWA session) */}
+          {/* Persistent guest reservation page (magic link + manual lookup) */}
           <Route path="/booking" element={
             <Suspense fallback={null}>
               <MyBookingPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
@@ -733,12 +727,6 @@ const handleConfirmBooking = async (bookingDetails) => {
           <Route path="/booking/:code" element={
             <Suspense fallback={null}>
               <MyBookingPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
-            </Suspense>
-          } />
-          
-          <Route path="/guest/dashboard" element={
-            <Suspense fallback={null}>
-              <MyBookingPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} isDashboard />
             </Suspense>
           } />
 
@@ -778,7 +766,7 @@ const handleConfirmBooking = async (bookingDetails) => {
         rates={RATES}
       />
       
-    </GuestLayout>
+    </>
   );
 }
 

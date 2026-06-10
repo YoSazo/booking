@@ -8,7 +8,6 @@ import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged,
 import LoadingScreen from './LoadingScreen.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
-import { useGuest } from './GuestProvider.jsx';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 // Strategy 3: preload Stripe JS early (on checkout entry) but avoid mounting heavy payment UI until Step 4.
@@ -99,13 +98,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const stripe = useStripe();
     const elements = useElements();
     const [currentStep, setCurrentStep] = useState(1);
-    
-    // Use the global guest session to pre-fill known data
-    const { isGuest, guestStay } = useGuest();
-    
     const [formData, setFormData] = useState({
-        firstName: '', lastName: '', phone: '+1 ', 
-        email: (isGuest && guestStay?.email) ? guestStay.email : '',
+        firstName: '', lastName: '', phone: '+1 ', email: '',
         address: '', city: '', state: '', zip: '',
     });
     const location = useLocation();

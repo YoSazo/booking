@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CalendarPlus, CalendarClock, Search } from 'lucide-react';
 import { GuestMessageCard, downloadStayIcs } from './guestMessaging.jsx';
-import { useGuest } from './GuestProvider.jsx';
 
 const fmtDate = (d) => {
   const dt = new Date(d);
@@ -10,10 +9,9 @@ const fmtDate = (d) => {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(dt);
 };
 
-function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false }) {
+function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
   const { code: codeParam } = useParams();
   const navigate = useNavigate();
-  const { isGuest, guestStay, logout } = useGuest();
   const resolvedHotelId = hotelId || hotel?.id;
 
   const [codeInput, setCodeInput] = useState(codeParam || '');
@@ -51,13 +49,6 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false })
     if (codeParam) lookup(codeParam, '');
   }, [codeParam, lookup]);
 
-  // Dashboard path: read from GuestProvider
-  useEffect(() => {
-    if (isDashboard && isGuest && guestStay?.code) {
-      lookup(guestStay.code, guestStay.email);
-    }
-  }, [isDashboard, isGuest, guestStay, lookup]);
-
   const guestInfo = booking ? {
     firstName: booking.guestFirstName,
     lastName: booking.guestLastName,
@@ -68,13 +59,7 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false })
   return (
     <div className="confirmation-container" style={{ minHeight: '60vh' }}>
       <div className="confirmation-card">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <div style={{ border: '3px solid #f3f3f3', borderTop: '3px solid #2E7D5B', borderRadius: '50%', width: 28, height: 28, animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-            <p style={{ fontSize: 14, color: '#6b7280', fontWeight: 500 }}>Loading your itinerary...</p>
-            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-          </div>
-        ) : !booking ? (
+        {!booking ? (
           <>
             <div className="confirmation-header" style={{ textAlign: 'center' }}>
               <h2 style={{ marginBottom: 6 }}>Find your reservation</h2>
@@ -116,17 +101,15 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false })
               </button>
             </div>
 
-            {!isDashboard && (
-              <p style={{ textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 18 }}>
-                Need a new stay?{' '}
-                <button type="button" onClick={() => {
-                  localStorage.removeItem('marketel_guest_stay');
-                  navigate('/');
-                }} style={{ background: 'none', border: 'none', color: '#2E7D5B', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>
-                  Book now →
-                </button>
-              </p>
-            )}
+            <p style={{ textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 18 }}>
+              Need a new stay?{' '}
+              <button type="button" onClick={() => {
+                localStorage.removeItem('marketel_guest_stay');
+                navigate('/');
+              }} style={{ background: 'none', border: 'none', color: '#2E7D5B', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>
+                Book now →
+              </button>
+            </p>
           </>
         ) : (
           <>
@@ -164,18 +147,16 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false })
               >
                 <CalendarPlus size={17} /> Add to Calendar
               </button>
-              {!isDashboard && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.removeItem('marketel_guest_stay');
-                    navigate('/');
-                  }}
-                  style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', borderRadius: 12, cursor: 'pointer', border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}
-                >
-                  <CalendarClock size={17} /> Extend / Book again
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('marketel_guest_stay');
+                  navigate('/');
+                }}
+                style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', borderRadius: 12, cursor: 'pointer', border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}
+              >
+                <CalendarClock size={17} /> Extend / Book again
+              </button>
             </div>
 
             <GuestMessageCard
