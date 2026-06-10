@@ -92,10 +92,7 @@ export default function GuestMessagesPage() {
     return () => clearInterval(interval);
   }, [fetchMessages]);
 
-  // Auto-scroll on messages change
-  useEffect(() => {
-    scrollToBottom('auto');
-  }, [messages, scrollToBottom]);
+  // No auto-scroll — user lands at top of conversation
 
   // Mark hotel messages as read (fire-and-forget)
   useEffect(() => {
@@ -185,7 +182,7 @@ export default function GuestMessagesPage() {
       <div ref={scrollContainerRef} style={styles.messagesArea}>
         {loading ? (
           <div style={styles.emptyContainer}>
-            <div style={styles.logoSpriteBounce} />
+            <div style={styles.spinner} />
           </div>
         ) : messages.length === 0 ? (
           <div style={styles.emptyContainer}>
@@ -303,54 +300,19 @@ export default function GuestMessagesPage() {
   );
 }
 
-/* ── Inject sprite animation keyframes ── */
-const spriteKeyframes = `
-@keyframes spritePlay {
-  0%    { background-position: 0 0; }
-  2.78% { background-position: -27px 0; }
-  5.56% { background-position: -54px 0; }
-  8.33% { background-position: -81px 0; }
-  11.11% { background-position: -108px 0; }
-  13.89% { background-position: -135px 0; }
-  16.67% { background-position: 0 -32px; }
-  19.44% { background-position: -27px -32px; }
-  22.22% { background-position: -54px -32px; }
-  25%    { background-position: -81px -32px; }
-  27.78% { background-position: -108px -32px; }
-  30.56% { background-position: -135px -32px; }
-  33.33% { background-position: 0 -64px; }
-  36.11% { background-position: -27px -64px; }
-  38.89% { background-position: -54px -64px; }
-  41.67% { background-position: -81px -64px; }
-  44.44% { background-position: -108px -64px; }
-  47.22% { background-position: -135px -64px; }
-  50%    { background-position: 0 -96px; }
-  52.78% { background-position: -27px -96px; }
-  55.56% { background-position: -54px -96px; }
-  58.33% { background-position: -81px -96px; }
-  61.11% { background-position: -108px -96px; }
-  63.89% { background-position: -135px -96px; }
-  66.67% { background-position: 0 -128px; }
-  69.44% { background-position: -27px -128px; }
-  72.22% { background-position: -54px -128px; }
-  75%    { background-position: -81px -128px; }
-  77.78% { background-position: -108px -128px; }
-  80.56% { background-position: -135px -128px; }
-  83.33% { background-position: 0 -160px; }
-  86.11% { background-position: -27px -160px; }
-  88.89% { background-position: -54px -160px; }
-  91.67% { background-position: -81px -160px; }
-  94.44% { background-position: -108px -160px; }
-  97.22% { background-position: -135px -160px; }
+const spinnerKeyframes = `
+@keyframes guestMsgSpinner {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 `;
 
 if (typeof document !== 'undefined') {
-  const id = 'guest-msg-sprite-style';
+  const id = 'guest-msg-spinner-style';
   if (!document.getElementById(id)) {
     const styleEl = document.createElement('style');
     styleEl.id = id;
-    styleEl.textContent = spriteKeyframes;
+    styleEl.textContent = spinnerKeyframes;
     document.head.appendChild(styleEl);
   }
 }
@@ -502,20 +464,19 @@ const styles = {
     lineHeight: 1.5,
   },
 
-  // Marketel logo sprite bounce (replaces spinner)
-  logoSpriteBounce: {
-    width: 27,
-    height: 32,
-    backgroundImage: 'url(/marketel-sprite.png)',
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: '162px 192px',
-    animation: 'spritePlay 3s steps(1) infinite',
+  spinner: {
+    width: 30,
+    height: 30,
+    border: '3px solid #e5e7eb',
+    borderTopColor: '#2E7D5B',
+    borderRadius: '50%',
+    animation: 'guestMsgSpinner 0.8s linear infinite',
   },
 
   // Floating compose bar — no background box, transparent & floating
   composeBar: {
     position: 'fixed',
-    bottom: 120,
+    bottom: 140,
     left: 0,
     right: 0,
     padding: '0 12px',
