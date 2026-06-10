@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CalendarPlus, CalendarClock, Search } from 'lucide-react';
 import { GuestMessageCard, downloadStayIcs } from './guestMessaging.jsx';
+import { useGuest } from './GuestProvider.jsx';
 
 const fmtDate = (d) => {
   const dt = new Date(d);
@@ -9,9 +10,10 @@ const fmtDate = (d) => {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(dt);
 };
 
-function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
+function MyBookingPage({ hotel, apiBaseUrl = '', hotelId, isDashboard = false }) {
   const { code: codeParam } = useParams();
   const navigate = useNavigate();
+  const { isGuest, guestStay, logout } = useGuest();
   const resolvedHotelId = hotelId || hotel?.id;
 
   const [codeInput, setCodeInput] = useState(codeParam || '');
@@ -48,6 +50,13 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
   useEffect(() => {
     if (codeParam) lookup(codeParam, '');
   }, [codeParam, lookup]);
+
+  // Dashboard path: read from GuestProvider
+  useEffect(() => {
+    if (isDashboard && isGuest && guestStay?.code) {
+      lookup(guestStay.code, guestStay.email);
+    }
+  }, [isDashboard, isGuest, guestStay, lookup]);
 
   const guestInfo = booking ? {
     firstName: booking.guestFirstName,
@@ -101,15 +110,17 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
               </button>
             </div>
 
-            <p style={{ textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 18 }}>
-              Need a new stay?{' '}
-              <button type="button" onClick={() => {
-                localStorage.removeItem('marketel_guest_stay');
-                navigate('/');
-              }} style={{ background: 'none', border: 'none', color: '#2E7D5B', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>
-                Book now →
-              </button>
-            </p>
+            {!isDashboard && (
+              <p style={{ textAlign: 'center', fontSize: 13, color: '#6b7280', marginTop: 18 }}>
+                Need a new stay?{' '}
+                <button type="button" onClick={() => {
+                  localStorage.removeItem('marketel_guest_stay');
+                  navigate('/');
+                }} style={{ background: 'none', border: 'none', color: '#2E7D5B', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>
+                  Book now →
+                </button>
+              </p>
+            )}
           </>
         ) : (
           <>
@@ -147,16 +158,18 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
               >
                 <CalendarPlus size={17} /> Add to Calendar
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.removeItem('marketel_guest_stay');
-                  navigate('/');
-                }}
-                style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', borderRadius: 12, cursor: 'pointer', border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}
-              >
-                <CalendarClock size={17} /> Extend / Book again
-              </button>
+              {!isDashboard && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('marketel_guest_stay');
+                    navigate('/');
+                  }}
+                  style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', borderRadius: 12, cursor: 'pointer', border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}
+                >
+                  <CalendarClock size={17} /> Extend / Book again
+                </button>
+              )}
             </div>
 
             <GuestMessageCard
