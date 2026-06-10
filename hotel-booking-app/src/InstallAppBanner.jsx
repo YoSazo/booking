@@ -51,6 +51,7 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId }) {
 
   // Don't show if already installed/running standalone, dismissed, or if there's
   // no way to install (non-iOS browser that never fired beforeinstallprompt).
+  if (typeof window !== 'undefined' && window.innerWidth > 768) return null;
   if (installed || isStandalone() || dismissed) return null;
   if (!ios && !deferredPrompt) return null;
 
