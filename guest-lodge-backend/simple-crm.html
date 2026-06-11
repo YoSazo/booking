@@ -1746,7 +1746,7 @@
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href='/frontdesk?pin='+encodeURIComponent(token)+'&hotelId='+encodeURIComponent(activeHotelId)+'&welcome=1';">🔄 Redo Tour</button>
+      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';">🔄 Redo Tour</button>
     </div>
   </header>
 
@@ -3420,10 +3420,13 @@ function applyFilter() {
     const appsEl2 = document.getElementById('appsView');
     if (appsEl2) appsEl2.style.display = 'block';
     closeAvailabilityDayPopover();
-    renderAppsView();
+    const appsTourOpen = !!document.getElementById('appsTourLightbox');
+    if (!appsTourOpen) renderAppsView();
     // First time they find the Apps tab — walk them through the journey
-    if (!localStorage.getItem('appsTourDone')) {
-      setTimeout(() => { startAppsTour(); }, 500);
+    if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
+      setTimeout(() => {
+        if (!document.getElementById('appsTourLightbox')) startAppsTour();
+      }, 500);
     }
     return;
   }
@@ -6667,6 +6670,7 @@ function appsTourRender() {
 
 function startAppsTour() {
   if (localStorage.getItem('appsTourDone')) return;
+  if (document.getElementById('appsTourLightbox')) return;
 
   const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
   const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
