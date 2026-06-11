@@ -3421,8 +3421,8 @@ function applyFilter() {
     if (appsEl2) appsEl2.style.display = 'block';
     closeAvailabilityDayPopover();
     renderAppsView();
-    // Fire Apps tour on first visit after main tour is complete
-    if (localStorage.getItem('settingsTourDone') && !localStorage.getItem('appsTourDone')) {
+    // First time they find the Apps tab — walk them through the journey
+    if (!localStorage.getItem('appsTourDone')) {
       setTimeout(() => { startAppsTour(); }, 500);
     }
     return;
@@ -4690,8 +4690,7 @@ function showWelcomeModal() {
       <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">This is where you:<br><br>
         <strong>Set up</strong> your booking page<br>
         <strong>See bookings</strong> when they come in<br>
-        <strong>Put Front Desk on your phone</strong> — the <strong>Apps</strong> tab shows you how<br>
-        <strong>Notify your guests</strong> from the Apps tab too</p>
+        <strong>Track revenue</strong> your page generates</p>
       <button id="welcomeModalGotIt" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Got it — show me around</button>
     </div>
   `;
@@ -4976,13 +4975,6 @@ function startSettingsTour() {
       tooltipPosition: 'above'
     },
     {
-      target: '#appsView',
-      text: '',
-      openAccordion: false,
-      tab: 'apps',
-      customModal: 'apps'
-    },
-    {
       target: '#bookingsList',
       text: '',
       openAccordion: false,
@@ -5011,18 +5003,6 @@ function startSettingsTour() {
     cleanupTour();
     // Jump straight to the finale modal — they must see the "share your link" reality check
     showFinaleMockModal();
-  }
-
-  function showAppsTourFromSettings() {
-    renderAppsView();
-    startAppsTour({
-      fromMainTour: true,
-      onFinish: () => {
-        step++;
-        localStorage.setItem('settingsTourStep', String(step));
-        showStep();
-      },
-    });
   }
 
   function showStep() {
@@ -5075,11 +5055,6 @@ function startSettingsTour() {
     // Custom modal for availability tab — multi-page walkthrough
     if (s.customModal === 'availability') {
       showAvailabilityMockModal();
-      return;
-    }
-    // Apps tab — end of tour before finale
-    if (s.customModal === 'apps') {
-      showAppsTourFromSettings();
       return;
     }
     // Finale modal — tour complete, clear next action
@@ -6615,9 +6590,8 @@ function renderAppsView() {
 
 
 // ── APPS TOUR ─────────────────────────────────────────
-function startAppsTour(opts) {
-  opts = opts || {};
-  if (!opts.fromMainTour && localStorage.getItem('appsTourDone')) return;
+function startAppsTour() {
+  if (localStorage.getItem('appsTourDone')) return;
 
   const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
   const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
@@ -6625,7 +6599,7 @@ function startAppsTour(opts) {
   const iconUrl = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
 
   let tourStep = 0;
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   // Ensure animation style exists
   if (!document.getElementById('tourModalAnimStyle')) {
@@ -6644,7 +6618,6 @@ function startAppsTour(opts) {
   function finish() {
     cleanup();
     localStorage.setItem('appsTourDone', '1');
-    if (typeof opts.onFinish === 'function') opts.onFinish();
   }
 
   function stepDots(current) {
@@ -6680,6 +6653,41 @@ function startAppsTour(opts) {
 
   function showTourStep() {
     if (tourStep === 0) {
+      const poster = appsCloudinaryImg(APPS_SHOWCASE.frontdeskMessages, 320);
+      buildModal(`
+        <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:22px 20px 18px;text-align:center;">
+          <div style="font-size:18px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:8px;">Put Front Desk on your phone</div>
+          <p style="font-size:13px;color:rgba(255,255,255,0.9);line-height:1.55;margin:0;">You're on <strong>Front Desk</strong> right now. Save it to your home screen — works like an app, no app store. Your phone buzzes when someone books you.</p>
+        </div>
+        <div style="background:#0a0a0a;padding:16px 16px 8px;">
+          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
+            <source src="${APPS_SHOWCASE.frontdeskInstallVideo}" type="video/mp4">
+          </video>
+        </div>
+        <div style="padding:16px 22px 0;text-align:center;">
+          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 16px;">Same steps as <strong>Put Front Desk on my phone</strong> at the top of this page.</p>
+        </div>`, 'Next →');
+    }
+    else if (tourStep === 1) {
+      const poster = appsCloudinaryImg(APPS_SHOWCASE.guestHome, 320);
+      buildModal(`
+        <div style="padding:20px 22px 12px;text-align:center;">
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Your guests can save your hotel too</div>
+          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">They put <strong>${hName}</strong> on their phone — your booking engine. You get Front Desk. They get your hotel. Both on the home screen.</p>
+        </div>
+        <div style="background:#0a0a0a;padding:12px 16px 8px;">
+          ${tourShowcaseImg(APPS_SHOWCASE.homeScreen, 'Front Desk and guest hotel on home screen')}
+        </div>
+        <div style="background:#0a0a0a;padding:8px 16px 12px;">
+          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
+            <source src="${APPS_SHOWCASE.guestInstallVideo}" type="video/mp4">
+          </video>
+        </div>
+        <div style="padding:12px 22px 0;text-align:center;">
+          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 16px;">They tap <strong>Add to Home Screen</strong> on your booking website. Upload your logo on this page so they see <strong>${shortName}</strong>.</p>
+        </div>`, 'Next →');
+    }
+    else if (tourStep === 2) {
       const poster = appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 320);
       buildModal(`
         <div style="background:#0a0a0a;padding:20px 16px 16px;">
@@ -6688,40 +6696,30 @@ function startAppsTour(opts) {
           </video>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">When someone books you, your phone buzzes.</div>
-          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's why you save Front Desk to your phone. You find out right away — like a text. Not hours later in email.</p>
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">When someone books you, your phone buzzes</div>
+          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's why you put Front Desk on your phone — you find out right away, before email, before Airbnb.</p>
         </div>`, 'Next →');
     }
-    else if (tourStep === 1) {
-      buildModal(`
-        <div style="background:#0a0a0a;padding:20px 16px 16px;">
-          ${tourShowcaseImg(APPS_SHOWCASE.homeScreen, 'Two apps on a phone')}
-        </div>
-        <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You get one app. Your guests get another.</div>
-          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">You save <strong>Front Desk</strong> to your phone — that's this site you're on now. Your guests save <strong>${hName}</strong> to theirs. Both work like apps. You don't need the app store.</p>
-        </div>`, 'Next →');
-    }
-    else if (tourStep === 2) {
+    else if (tourStep === 3) {
       const poster = appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 320);
       buildModal(`
         <div style="background:#0a0a0a;padding:20px 16px 16px;">
           <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
-            <source src="${APPS_SHOWCASE.guestMessageNotifVideo}" type="video/mp4">
+            <source src="${APPS_SHOWCASE.guestBroadcastVideo}" type="video/mp4">
           </video>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Your guest texts you. You text back.</div>
-          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">"What's the WiFi?" — they type it in your hotel app. You reply in <strong>Bookings</strong>. Their phone buzzes with your answer.</p>
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You can notify all your guests at once</div>
+          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Once they have your hotel on their phone, you can send everyone a notification — a sale, an event, or a check-in reminder. Scroll down on this page to try it.</p>
         </div>`, 'Next →');
     }
-    else if (tourStep === 3) {
+    else if (tourStep === 4) {
       const iconEl = iconUrl
         ? `<img src="${iconUrl}" alt="${hName}" style="width:56px;height:56px;border-radius:14px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,0.15);">`
         : `<div style="width:56px;height:56px;border-radius:14px;background:var(--green);color:#fff;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
       buildModal(`
         <div style="padding:24px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:12px;line-height:1.3;">Here's what you need to do</div>
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:12px;line-height:1.3;">Now do these two things</div>
           <div style="background:#f8faf9;border:1.5px solid #bbf7d0;border-radius:14px;padding:14px;text-align:left;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:800;color:#2E7D5B;margin-bottom:6px;">STEP 1</div>
             <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Put Front Desk on your phone</div>
