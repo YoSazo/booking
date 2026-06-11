@@ -6321,6 +6321,7 @@ let _appsLbItems = [];
 let _appsLbIdx   = 0;
 
 function appsOpenLightbox(items, startIdx) {
+  appsTourClose(false);
   _appsLbItems = items;
   _appsLbIdx   = startIdx || 0;
   let lb = document.getElementById('appsLightbox');
@@ -6328,9 +6329,10 @@ function appsOpenLightbox(items, startIdx) {
     lb = document.createElement('div');
     lb.id = 'appsLightbox';
     lb.style.cssText = [
-      'position:fixed;inset:0;z-index:102000;background:rgba(0,0,0,0.96);',
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;',
+      'position:fixed;inset:0;z-index:102000;background:#000;',
+      'display:flex;flex-direction:column;align-items:center;justify-content:flex-start;',
       'overscroll-behavior:contain;touch-action:pan-y;',
+      'padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);',
     ].join('');
     document.body.appendChild(lb);
     document.body.style.overflow = 'hidden';
@@ -6398,18 +6400,15 @@ function appsLbRender() {
   </div>` : '';
 
   lb.innerHTML = `
-    <!-- top bar -->
-    <div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;z-index:1;">
+    <div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) 16px 12px;z-index:2;">
       <div style="font-size:12px;color:rgba(255,255,255,0.6);font-weight:600;">${counter}</div>
       <button onclick="appsCloseLightbox()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">✕</button>
     </div>
-    <!-- media -->
-    <div style="position:relative;width:100%;flex:1;display:flex;align-items:center;justify-content:center;padding:54px 56px 0;">
+    <div style="position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:52px 16px 8px;box-sizing:border-box;">
       ${mediaHtml}
       ${prevBtn}${nextBtn}
     </div>
-    <!-- title + caption + dots -->
-    <div style="padding:10px 20px 24px;text-align:center;width:100%;max-width:420px;">
+    <div style="flex-shrink:0;padding:8px 20px max(20px,env(safe-area-inset-bottom));text-align:center;width:100%;max-width:420px;margin:0 auto;box-sizing:border-box;">
       ${item.title ? `<div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.35;">${item.title}</div>` : ''}
       ${item.caption ? `<div style="font-size:12px;color:rgba(255,255,255,0.65);line-height:1.55;margin-bottom:10px;">${item.caption}</div>` : ''}
       ${dotNav}
@@ -6589,7 +6588,83 @@ function renderAppsView() {
 }
 
 
-// ── APPS TOUR ─────────────────────────────────────────
+// ── APPS TOUR (fullscreen lightbox) ───────────────────
+let _appsTourSteps = [];
+let _appsTourIdx = 0;
+
+function appsTourClose(markDone) {
+  const lb = document.getElementById('appsTourLightbox');
+  if (lb) {
+    if (lb._swipeStart) lb.removeEventListener('touchstart', lb._swipeStart);
+    if (lb._swipeEnd) lb.removeEventListener('touchend', lb._swipeEnd);
+    lb.remove();
+  }
+  document.body.style.overflow = '';
+  if (markDone) localStorage.setItem('appsTourDone', '1');
+}
+
+function appsTourNav(dir) {
+  const next = _appsTourIdx + dir;
+  if (next < 0 || next >= _appsTourSteps.length) return;
+  _appsTourIdx = next;
+  appsTourRender();
+}
+
+function appsTourRender() {
+  const lb = document.getElementById('appsTourLightbox');
+  if (!lb) return;
+  const step = _appsTourSteps[_appsTourIdx];
+  const total = _appsTourSteps.length;
+  const isLast = _appsTourIdx >= total - 1;
+  const counter = `${_appsTourIdx + 1} / ${total}`;
+  const btnLabel = isLast ? 'Got it — show me' : 'Next →';
+
+  const dots = Array.from({ length: total }, (_, i) =>
+    `<div style="width:7px;height:7px;border-radius:50%;background:${i === _appsTourIdx ? '#fff' : 'rgba(255,255,255,0.35)'};"></div>`
+  ).join('');
+
+  let mediaHtml = '';
+  if (step.type === 'cta') {
+    mediaHtml = `<div style="width:100%;max-width:320px;padding:0 8px;box-sizing:border-box;">${step.ctaHtml}</div>`;
+  } else if (step.type === 'video') {
+    mediaHtml = `<video autoplay loop muted playsinline webkit-playsinline preload="metadata"
+      style="max-width:100%;max-height:min(50dvh,440px);width:auto;height:auto;display:block;${appsPhoneImgStyle()}"
+      poster="${step.poster || ''}">
+      <source src="${step.src}" type="video/mp4">
+    </video>`;
+  } else {
+    mediaHtml = `<img src="${step.src}" alt="${step.alt || ''}" loading="eager" decoding="async"
+      style="max-width:100%;max-height:min(50dvh,440px);width:auto;height:auto;display:block;object-fit:contain;${appsPhoneImgStyle()}">`;
+  }
+
+  lb.innerHTML = `
+    <div style="flex-shrink:0;width:100%;display:flex;align-items:center;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) 16px 10px;box-sizing:border-box;">
+      <div style="font-size:12px;color:rgba(255,255,255,0.55);font-weight:600;">${counter}</div>
+      <button type="button" id="appsTourSkipBtn" style="background:rgba(255,255,255,0.12);border:none;color:rgba(255,255,255,0.8);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:8px 14px;border-radius:20px;">Skip</button>
+    </div>
+    <div style="flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding:0 16px;box-sizing:border-box;overflow:hidden;">
+      ${mediaHtml}
+    </div>
+    <div style="flex-shrink:0;width:100%;max-width:400px;margin:0 auto;padding:12px 20px max(16px,env(safe-area-inset-bottom));box-sizing:border-box;text-align:center;">
+      <div style="font-size:17px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:6px;">${step.title}</div>
+      ${step.caption ? `<div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.55;margin-bottom:14px;">${step.caption}</div>` : ''}
+      <button type="button" id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">${btnLabel}</button>
+      <div style="display:flex;gap:6px;justify-content:center;">${dots}</div>
+    </div>`;
+
+  document.getElementById('appsTourNextBtn').onclick = () => {
+    if (isLast) {
+      appsTourClose(true);
+      const appsEl = document.getElementById('appsView');
+      if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      _appsTourIdx++;
+      appsTourRender();
+    }
+  };
+  document.getElementById('appsTourSkipBtn').onclick = () => appsTourClose(true);
+}
+
 function startAppsTour() {
   if (localStorage.getItem('appsTourDone')) return;
 
@@ -6597,156 +6672,92 @@ function startAppsTour() {
   const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
   const initial = hName.trim().charAt(0).toUpperCase();
   const iconUrl = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
+  const iconEl = iconUrl
+    ? `<img src="${iconUrl}" alt="${hName}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">`
+    : `<div style="width:52px;height:52px;border-radius:14px;background:#2E7D5B;color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</div>`;
 
-  let tourStep = 0;
-  const totalSteps = 5;
-
-  // Ensure animation style exists
-  if (!document.getElementById('tourModalAnimStyle')) {
-    const animStyle = document.createElement('style');
-    animStyle.id = 'tourModalAnimStyle';
-    animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
-    document.head.appendChild(animStyle);
-  }
-
-  function cleanup() {
-    const ov = document.getElementById('appsTourOverlay');
-    if (ov) ov.remove();
-    document.body.style.overflow = '';
-  }
-
-  function finish() {
-    cleanup();
-    localStorage.setItem('appsTourDone', '1');
-  }
-
-  function stepDots(current) {
-    return Array.from({length: totalSteps}, (_, i) =>
-      `<div style="width:7px;height:7px;border-radius:50%;background:${i === current ? '#2E7D5B' : '#d1d5db'};transition:background 0.2s;"></div>`
-    ).join('');
-  }
-
-  function buildModal(innerHtml, btnLabel) {
-    cleanup();
-    const overlay = document.createElement('div');
-    overlay.id = 'appsTourOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;padding:20px 16px;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);';
-    overlay.innerHTML = `
-      <div style="background:white;border-radius:24px;max-width:340px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.4);animation:tourModalSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);overflow:hidden;">
-        ${innerHtml}
-        <div style="padding:0 22px 22px;text-align:center;">
-          <button id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">${btnLabel}</button>
-          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:12px;">${stepDots(tourStep)}</div>
-          <button id="appsTourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;display:block;margin:0 auto;">Skip</button>
+  _appsTourSteps = [
+    {
+      type: 'video',
+      src: APPS_SHOWCASE.frontdeskInstallVideo,
+      poster: appsCloudinaryImg(APPS_SHOWCASE.frontdeskMessages, 400),
+      title: 'Put Front Desk on your phone',
+      caption: `You're on <strong>Front Desk</strong> right now. Save it to your home screen — works like an app, no app store. Same steps as <strong>Put Front Desk on my phone</strong> at the top of this page.`,
+    },
+    {
+      type: 'image',
+      src: appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 520),
+      alt: 'Two apps on home screen',
+      title: 'Your guests can save your hotel too',
+      caption: `You get <strong>Front Desk</strong>. They get <strong>${hName}</strong>. Both sit on the home screen — like real apps.`,
+    },
+    {
+      type: 'video',
+      src: APPS_SHOWCASE.guestInstallVideo,
+      poster: appsCloudinaryImg(APPS_SHOWCASE.guestHome, 400),
+      title: 'How your guests save your hotel',
+      caption: `They tap <strong>Add to Home Screen</strong> on your booking website. Upload your logo on this page so they see <strong>${shortName}</strong>.`,
+    },
+    {
+      type: 'video',
+      src: APPS_SHOWCASE.bookingNotifVideo,
+      poster: appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 400),
+      title: 'When someone books you, your phone buzzes',
+      caption: `That's why you put Front Desk on your phone — you find out right away, before email, before Airbnb.`,
+    },
+    {
+      type: 'video',
+      src: APPS_SHOWCASE.guestBroadcastVideo,
+      poster: appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 400),
+      title: 'You can notify all your guests at once',
+      caption: `Once they have your hotel on their phone, notify everyone — a sale, an event, or a check-in reminder. Scroll down on this page to try it.`,
+    },
+    {
+      type: 'cta',
+      title: 'Now do these two things',
+      caption: '',
+      ctaHtml: `
+        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:4px;">STEP 1</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Put Front Desk on your phone</div>
+          <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">Tap <strong>Put Front Desk on my phone</strong> at the top when you close this.</p>
         </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-    document.getElementById('appsTourNextBtn').onclick = () => { tourStep++; showTourStep(); };
-    document.getElementById('appsTourSkipBtn').onclick = () => { finish(); };
-  }
-
-  function tourShowcaseImg(src, alt) {
-    const sm = appsCloudinaryImg(src, 320);
-    return `<img src="${sm}" alt="${alt}" loading="eager" decoding="async" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle('box-shadow:0 6px 24px rgba(0,0,0,0.35);')}">`;
-  }
-
-  function showTourStep() {
-    if (tourStep === 0) {
-      const poster = appsCloudinaryImg(APPS_SHOWCASE.frontdeskMessages, 320);
-      buildModal(`
-        <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:22px 20px 18px;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:8px;">Put Front Desk on your phone</div>
-          <p style="font-size:13px;color:rgba(255,255,255,0.9);line-height:1.55;margin:0;">You're on <strong>Front Desk</strong> right now. Save it to your home screen — works like an app, no app store. Your phone buzzes when someone books you.</p>
-        </div>
-        <div style="background:#0a0a0a;padding:16px 16px 8px;">
-          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
-            <source src="${APPS_SHOWCASE.frontdeskInstallVideo}" type="video/mp4">
-          </video>
-        </div>
-        <div style="padding:16px 22px 0;text-align:center;">
-          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 16px;">Same steps as <strong>Put Front Desk on my phone</strong> at the top of this page.</p>
-        </div>`, 'Next →');
-    }
-    else if (tourStep === 1) {
-      const poster = appsCloudinaryImg(APPS_SHOWCASE.guestHome, 320);
-      buildModal(`
-        <div style="padding:20px 22px 12px;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Your guests can save your hotel too</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">They put <strong>${hName}</strong> on their phone — your booking engine. You get Front Desk. They get your hotel. Both on the home screen.</p>
-        </div>
-        <div style="background:#0a0a0a;padding:12px 16px 8px;">
-          ${tourShowcaseImg(APPS_SHOWCASE.homeScreen, 'Front Desk and guest hotel on home screen')}
-        </div>
-        <div style="background:#0a0a0a;padding:8px 16px 12px;">
-          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
-            <source src="${APPS_SHOWCASE.guestInstallVideo}" type="video/mp4">
-          </video>
-        </div>
-        <div style="padding:12px 22px 0;text-align:center;">
-          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 16px;">They tap <strong>Add to Home Screen</strong> on your booking website. Upload your logo on this page so they see <strong>${shortName}</strong>.</p>
-        </div>`, 'Next →');
-    }
-    else if (tourStep === 2) {
-      const poster = appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 320);
-      buildModal(`
-        <div style="background:#0a0a0a;padding:20px 16px 16px;">
-          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
-            <source src="${APPS_SHOWCASE.bookingNotifVideo}" type="video/mp4">
-          </video>
-        </div>
-        <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">When someone books you, your phone buzzes</div>
-          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's why you put Front Desk on your phone — you find out right away, before email, before Airbnb.</p>
-        </div>`, 'Next →');
-    }
-    else if (tourStep === 3) {
-      const poster = appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 320);
-      buildModal(`
-        <div style="background:#0a0a0a;padding:20px 16px 16px;">
-          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
-            <source src="${APPS_SHOWCASE.guestBroadcastVideo}" type="video/mp4">
-          </video>
-        </div>
-        <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You can notify all your guests at once</div>
-          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Once they have your hotel on their phone, you can send everyone a notification — a sale, an event, or a check-in reminder. Scroll down on this page to try it.</p>
-        </div>`, 'Next →');
-    }
-    else if (tourStep === 4) {
-      const iconEl = iconUrl
-        ? `<img src="${iconUrl}" alt="${hName}" style="width:56px;height:56px;border-radius:14px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,0.15);">`
-        : `<div style="width:56px;height:56px;border-radius:14px;background:var(--green);color:#fff;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
-      buildModal(`
-        <div style="padding:24px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:12px;line-height:1.3;">Now do these two things</div>
-          <div style="background:#f8faf9;border:1.5px solid #bbf7d0;border-radius:14px;padding:14px;text-align:left;margin-bottom:12px;">
-            <div style="font-size:12px;font-weight:800;color:#2E7D5B;margin-bottom:6px;">STEP 1</div>
-            <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Put Front Desk on your phone</div>
-            <p style="font-size:13px;color:#4b5563;margin:0;line-height:1.5;">When this closes, tap <strong>Put Front Desk on my phone</strong> at the top.</p>
-          </div>
-          <div style="background:#f8faf9;border:1.5px solid var(--border);border-radius:14px;padding:14px;text-align:left;margin-bottom:14px;">
-            <div style="font-size:12px;font-weight:800;color:#2E7D5B;margin-bottom:6px;">STEP 2</div>
-            <div style="display:flex;align-items:center;gap:12px;">
-              ${iconEl}
-              <div>
-                <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Upload your hotel logo</div>
-                <p style="font-size:13px;color:#4b5563;margin:0;line-height:1.45;">So your guests see <strong>${shortName}</strong> on their phone — not a random letter.</p>
-              </div>
+        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;">
+          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:8px;">STEP 2</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            ${iconEl}
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Upload your hotel logo</div>
+              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">So guests see <strong>${shortName}</strong> — not a random letter.</p>
             </div>
           </div>
-          <p style="font-size:12px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">The rest is optional — tap any row anytime if you want to see how it works.</p>
-        </div>`, 'Got it — show me');
-    }
-    else {
-      finish();
-      // Scroll to top of apps page
-      const appsEl = document.getElementById('appsView');
-      if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
+        </div>`,
+    },
+  ];
 
-  showTourStep();
+  _appsTourIdx = 0;
+  appsCloseLightbox();
+  appsTourClose(false);
+
+  const lb = document.createElement('div');
+  lb.id = 'appsTourLightbox';
+  lb.style.cssText = [
+    'position:fixed;inset:0;z-index:102001;background:#000;',
+    'display:flex;flex-direction:column;',
+    'overscroll-behavior:contain;touch-action:pan-y;',
+    'padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);',
+  ].join('');
+  let touchStartX = 0;
+  lb._swipeStart = (e) => { touchStartX = e.changedTouches[0].clientX; };
+  lb._swipeEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) appsTourNav(dx < 0 ? 1 : -1);
+  };
+  lb.addEventListener('touchstart', lb._swipeStart, { passive: true });
+  lb.addEventListener('touchend', lb._swipeEnd, { passive: true });
+  document.body.appendChild(lb);
+  document.body.style.overflow = 'hidden';
+  appsTourRender();
 }
 
 
