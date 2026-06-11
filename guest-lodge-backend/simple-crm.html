@@ -4918,26 +4918,6 @@ function startSettingsTour() {
       tab: 'settings'
     },
     {
-      target: '#frontdeskInstallCard',
-      text: 'Want a buzz the second a guest books? Add Front Desk to your home screen and turn on notifications — takes 3 seconds.',
-      openAccordion: false,
-      targetParent: true,
-      tab: 'settings'
-    },
-    {
-      target: '#guestBroadcastCard',
-      text: 'Send push notifications to your guests — great for promotions, events, or just saying hello.',
-      openAccordion: false,
-      tab: 'settings'
-    },
-    {
-      target: '#appIconPreview',
-      text: 'Upload your own app icon here — this is what guests see on their home screen when they install your booking page. Make it yours.',
-      openAccordion: false,
-      targetParent: true,
-      tab: 'settings'
-    },
-    {
       target: '#edit-rate-nightly',
       text: 'You can change your rates here — nightly, weekly, and monthly.',
       openAccordion: true,
@@ -4992,6 +4972,13 @@ function startSettingsTour() {
       tooltipPosition: 'above'
     },
     {
+      target: '#appsView',
+      text: '',
+      openAccordion: false,
+      tab: 'apps',
+      customModal: 'apps'
+    },
+    {
       target: '#bookingsList',
       text: '',
       openAccordion: false,
@@ -5020,6 +5007,18 @@ function startSettingsTour() {
     cleanupTour();
     // Jump straight to the finale modal — they must see the "share your link" reality check
     showFinaleMockModal();
+  }
+
+  function showAppsTourFromSettings() {
+    renderAppsView();
+    startAppsTour({
+      fromMainTour: true,
+      onFinish: () => {
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+      },
+    });
   }
 
   function showStep() {
@@ -5072,6 +5071,11 @@ function startSettingsTour() {
     // Custom modal for availability tab — multi-page walkthrough
     if (s.customModal === 'availability') {
       showAvailabilityMockModal();
+      return;
+    }
+    // Apps tab — end of tour before finale
+    if (s.customModal === 'apps') {
+      showAppsTourFromSettings();
       return;
     }
     // Finale modal — tour complete, clear next action
@@ -5268,7 +5272,7 @@ function startSettingsTour() {
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Your guests get a "Tap to Install" button on your booking page. You can set your own custom app icon in Settings.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Your guests get a "Tap to Install" button on your booking page. Upload your icon anytime on the Apps tab.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
@@ -5757,39 +5761,6 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
         </div>
       </div>
-      ${frontdeskInstallCardHtml()}
-      <div class="booking-card" id="guestBroadcastCard" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Guest Notifications</div>
-          <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Send a push notification to all guests who subscribed on the Messages tab — great for promotions, events, or check-in reminders.</p>
-          <div style="margin-bottom:10px;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Title</div>
-            <input type="text" id="guest-broadcast-title" value="${(hotelName || '').replace(/"/g, '&quot;')}" maxlength="120" placeholder="Notification title" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
-          </div>
-          <div style="margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Message</div>
-            <textarea id="guest-broadcast-body" maxlength="500" placeholder="Your message to guests…" style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
-          </div>
-          <button id="guest-broadcast-btn" onclick="sendGuestBroadcast()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send to All Guests</button>
-          <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:10px 0 0;text-align:center;font-weight:600;"></p>
-        </div>
-      </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text);">Your App Icon</div>
-          <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">When a guest taps <strong>Install</strong> on your booking page, your hotel lands on their home screen. This is the icon they'll see — make it yours.</p>
-          <div style="display:flex;align-items:center;gap:16px;">
-            <div id="appIconPreview" style="width:68px;height:68px;border-radius:16px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:30px;font-weight:800;">
-              ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;">` : (hotelName ? hotelName.trim().charAt(0).toUpperCase() : '🏨')}
-            </div>
-            <div style="flex:1;min-width:0;">
-              <input type="file" id="appIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-              <button onclick="document.getElementById('appIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
-              <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0;line-height:1.4;">Square image works best (512×512). PNG or JPG.</p>
-            </div>
-          </div>
-        </div>
-      </div>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
@@ -6230,22 +6201,16 @@ function squareCropImage(file, size = 512) {
 }
 
 function setAppIconPreviewLoading() {
-  const spinner = '<div style="width:24px;height:24px;border:3px solid rgba(255,255,255,0.5);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></div>';
-  ['appIconPreview', 'appsAppIconPreview'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = spinner;
-  });
+  const el = document.getElementById('appsAppIconPreview');
+  if (!el) return;
+  el.innerHTML = '<div style="width:24px;height:24px;border:3px solid rgba(255,255,255,0.5);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></div>';
 }
 
 function setAppIconPreviewImage(url) {
-  const html = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:cover;">';
-  ['appIconPreview', 'appsAppIconPreview'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.style.background = '#fff';
-      el.innerHTML = html;
-    }
-  });
+  const el = document.getElementById('appsAppIconPreview');
+  if (!el) return;
+  el.style.background = '#fff';
+  el.innerHTML = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:cover;">';
 }
 
 async function uploadAppIcon(input) {
@@ -6270,14 +6235,12 @@ async function uploadAppIcon(input) {
       activeHotelAppIcon = data.appIconUrl;
       setAppIconPreviewImage(data.appIconUrl);
       if (typeof updateFrontdeskManifestLink === 'function') updateFrontdeskManifestLink();
-      toast('App icon updated! Guests who install your page will see it.', 'success');
+      toast('Logo updated! Guests will see it on their phone.', 'success');
     } else {
       toast(data.message || 'Failed to upload icon', 'error');
       const initial = ((typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'H').trim().charAt(0).toUpperCase() || '🏨';
-      ['appIconPreview', 'appsAppIconPreview'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) { el.style.background = 'var(--green)'; el.innerHTML = initial; }
-      });
+      const el = document.getElementById('appsAppIconPreview');
+      if (el) { el.style.background = 'var(--green)'; el.innerHTML = initial; }
     }
   } catch (e) {
     toast('Failed to upload icon', 'error');
@@ -6508,48 +6471,50 @@ function renderAppsView() {
   if (fdInstalled && fdGranted) {
     fdCtaHtml = `<div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
       <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
-      <div><div style="font-size:13px;font-weight:700;color:#166534;">You're all set</div><div style="font-size:11px;color:#166534;margin-top:2px;">Front Desk is installed and notifications are on.</div></div>
+      <div><div style="font-size:13px;font-weight:700;color:#166534;">Done!</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Front Desk is on your phone. We'll buzz you when someone books.</div></div>
     </div>`;
   } else if (fdInstalled) {
-    fdCtaHtml = `<button onclick="toggleAppNotifications()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on notifications</button>`;
+    fdCtaHtml = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">One more tap — turn on alerts so your phone buzzes when a guest books.</p>
+      <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button>`;
   } else {
-    fdCtaHtml = `<button onclick="handleInstallFrontdesk()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Add Front Desk to my home screen →</button>`;
+    fdCtaHtml = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">This puts <strong>Front Desk</strong> on your phone — the green app that tells you when someone books. Takes 3 seconds.</p>
+      <button onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Put Front Desk on my phone</button>`;
   }
 
-  // Lightbox galleries — each question opens one of these
+  // Lightbox — plain language only
   const homeScreenItems = [
-    { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Home screen', title: 'Two apps on one home screen',
-      caption: `<strong>Front Desk</strong> is yours — bookings and alerts. <strong>${hName}</strong> is theirs — book and message you direct. No App Store.` },
+    { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Two phone apps', title: 'Two apps on the same phone screen',
+      caption: `<strong>Front Desk</strong> (green) is for you — see bookings and messages. <strong>${hName}</strong> is for guests — they tap it to book or text you. No downloading from a store.` },
   ];
   const guestItems = [
-    { type: 'image', src: APPS_SHOWCASE.guestHome, alt: 'Guest home', title: 'Home',
-      caption: 'Their stay at a glance — check-in info, WiFi, and quick links.' },
-    { type: 'image', src: APPS_SHOWCASE.guestBook, alt: 'Guest book page', title: 'Book',
-      caption: 'Reserve direct from your icon. No OTA in the middle.' },
-    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest messages', title: 'Messages',
-      caption: 'Chat with Front Desk — right from their home screen.' },
+    { type: 'image', src: APPS_SHOWCASE.guestHome, alt: 'Guest home screen', title: 'What the guest sees — Home',
+      caption: 'Their stay info — when they check in, WiFi password, and more.' },
+    { type: 'image', src: APPS_SHOWCASE.guestBook, alt: 'Guest book screen', title: 'What the guest sees — Book a room',
+      caption: 'They book a room straight from your hotel. You keep the money — no middleman.' },
+    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest messages', title: 'What the guest sees — Message you',
+      caption: 'They can text you questions right from the app — like "What\'s the WiFi?"' },
   ];
   const guestInstallItems = [
-    { type: 'video', src: APPS_SHOWCASE.guestInstallVideo, poster: APPS_SHOWCASE.guestHome, alt: 'Guest install', title: 'How a guest installs your hotel',
-      caption: 'They visit your booking page, tap Add to Home Screen. Done — your icon is on their phone.' },
+    { type: 'video', src: APPS_SHOWCASE.guestInstallVideo, poster: APPS_SHOWCASE.guestHome, alt: 'Guest adds hotel to phone', title: 'How a guest puts your hotel on their phone',
+      caption: 'They open your booking website on their phone and tap <strong>Add to Home Screen</strong>. Your hotel shows up like an app. You don\'t have to do anything.' },
   ];
   const bookingNotifItems = [
-    { type: 'video', src: APPS_SHOWCASE.bookingNotifVideo, poster: APPS_SHOWCASE.homeScreen, alt: 'Booking notification', title: 'When someone books',
-      caption: 'Your phone buzzes the second they book — before email, before Airbnb.' },
+    { type: 'video', src: APPS_SHOWCASE.bookingNotifVideo, poster: APPS_SHOWCASE.homeScreen, alt: 'Booking alert on phone', title: 'Someone books — your phone buzzes',
+      caption: 'You get a message on your phone right away — before email, before Airbnb tells you.' },
   ];
   const messageItems = [
-    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest messages', title: 'Guest messages you',
-      caption: 'They ask from your hotel app — "How do I connect to WiFi?" and the like.' },
-    { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Front Desk reply', title: 'You reply from Front Desk',
-      caption: 'Reply from Bookings — they get a push on their phone. No SMS.' },
-    { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessages, alt: 'Message notification', title: 'Their phone buzzes',
-      caption: 'Guest asks → you reply → notification lands on their lock screen.' },
+    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest sends message', title: 'Guest sends you a message',
+      caption: 'Example: "How do I connect to WiFi?" — they type it in your hotel app.' },
+    { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'You reply', title: 'You type a reply',
+      caption: 'You answer in the <strong>Bookings</strong> tab. Takes 5 seconds.' },
+    { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessages, alt: 'Guest gets reply alert', title: 'Their phone buzzes with your answer',
+      caption: 'They see your reply pop up on their phone — like getting a text from you.' },
   ];
   const frontdeskInstallItems = [
-    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'Front Desk install', title: 'Add Front Desk to your home screen',
-      caption: 'One tap to install. Bookings, messages, and alerts — all in one app.' },
-    { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Front Desk messages', title: 'Reply from anywhere',
-      caption: 'Guest messages show up in Bookings. Reply and they get notified instantly.' },
+    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to add Front Desk', title: 'How to put Front Desk on your phone',
+      caption: 'Watch this short video — same steps as the green button at the top of this page.' },
+    { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Reply to guest', title: 'Reply to guests from your phone',
+      caption: 'Guest messages show up in <strong>Bookings</strong>. Tap reply — they get it on their phone.' },
   ];
 
   function enc(arr) { return JSON.stringify(arr).replace(/"/g, '&quot;'); }
@@ -6557,50 +6522,80 @@ function renderAppsView() {
   el.innerHTML = `
   <style>
     .apps-page { padding:4px 0 28px; }
-    .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.6;margin:0 0 20px; }
-    .apps-intro strong { color:var(--text); font-weight:700; }
-    .apps-icon-card { display:flex;align-items:center;gap:14px;margin-bottom:22px;padding:16px;background:var(--white);border-radius:16px;border:1.5px solid var(--border);box-shadow:var(--shadow); }
+    .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
+    .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
+    .apps-step-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px; }
+    .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
+    .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
+    .apps-icon-card { display:flex;align-items:center;gap:14px; }
+    .apps-how-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:22px 0 10px; }
+    .apps-how-sub { font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.45; }
     .apps-q-list { display:flex;flex-direction:column;gap:8px;margin-bottom:20px; }
-    .apps-q { display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 18px;border:none;background:var(--white);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;font-family:inherit;box-shadow:var(--shadow);transition:background 0.15s,border-color 0.15s; }
+    .apps-q { display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px 16px;border:none;background:var(--white);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;font-family:inherit;box-shadow:var(--shadow);transition:background 0.15s,border-color 0.15s; }
     .apps-q:active { background:var(--bg); border-color:var(--green); }
     .apps-q-text { flex:1;min-width:0; }
     .apps-q-title { font-size:14px;font-weight:700;color:var(--text);line-height:1.35; }
-    .apps-q-hint { font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.45; }
-    .apps-q-chevron { font-size:22px;color:var(--text-muted);flex-shrink:0;margin-left:14px;line-height:1; }
-    .apps-actions { display:flex;flex-direction:column;gap:10px;margin-top:4px; }
+    .apps-q-hint { font-size:12px;color:var(--text-muted);margin-top:3px;line-height:1.45; }
+    .apps-q-chevron { font-size:20px;color:var(--green);flex-shrink:0;margin-left:12px;line-height:1;font-weight:700; }
+    .apps-broadcast-card { background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow); }
     .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.5; }
   </style>
 
   <div class="apps-page">
 
-    <p class="apps-intro"><strong>Your hotel</strong> on their phone. <strong>Front Desk</strong> on yours. Tap a question to see real screenshots and recordings.</p>
+    <h2 class="apps-headline">Your phone + their phone</h2>
+    <p class="apps-intro">Two things on this page: put <strong>Front Desk</strong> on <em>your</em> phone so you know when someone books. Upload <strong>your logo</strong> so guests see <strong>${hName}</strong> on <em>their</em> phone.</p>
 
-    <div class="apps-icon-card">
-      <div id="appsAppIconPreview" style="width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:24px;font-weight:800;">
-        ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="App icon" style="width:100%;height:100%;object-fit:cover;">` : hotelInitial}
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">Your app icon</div>
-        <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;line-height:1.4;">Guests see this when they install <strong>${hName}</strong>.</p>
-        <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-        <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:7px 12px;border-radius:9px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
+    <div class="apps-step-label">Step 1 — do this first</div>
+    <div class="apps-step-card">
+      <div class="apps-step-title">Put Front Desk on your phone</div>
+      ${fdCtaHtml}
+    </div>
+
+    <div class="apps-step-label">Step 2</div>
+    <div class="apps-step-card">
+      <div class="apps-step-title">Upload your hotel logo</div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">When a guest saves your hotel to their phone, this picture is what they see. Use your logo or a photo of your property.</p>
+      <div class="apps-icon-card">
+        <div id="appsAppIconPreview" style="width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:24px;font-weight:800;">
+          ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:cover;">` : hotelInitial}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
+          <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change logo' : 'Upload logo'}</button>
+        </div>
       </div>
     </div>
+
+    <div class="apps-how-label">How it works — tap to watch</div>
+    <p class="apps-how-sub">Not sure yet? Tap any row below. You'll see real photos and short videos from a real phone.</p>
 
     <div class="apps-q-list">
-      ${appsQuestionRow('Two apps on one home screen', 'Front Desk + ' + hName + ' — no App Store', enc(homeScreenItems), 0)}
-      ${appsQuestionRow('What do guests see?', 'Home, book, and message you', enc(guestItems), 0)}
-      ${appsQuestionRow('How does a guest install your hotel?', 'Tap Add on your booking page', enc(guestInstallItems), 0)}
-      ${appsQuestionRow('What happens when someone books?', 'Your phone buzzes first', enc(bookingNotifItems), 0)}
-      ${appsQuestionRow('How does messaging work?', 'They message → you reply → they buzz', enc(messageItems), 0)}
-      ${appsQuestionRow('How do I add Front Desk?', 'Install + reply from Bookings', enc(frontdeskInstallItems), 0)}
+      ${appsQuestionRow('Someone books — your phone buzzes', 'See what the alert looks like', enc(bookingNotifItems), 0)}
+      ${appsQuestionRow('What does the guest see?', 'Home, book a room, message you', enc(guestItems), 0)}
+      ${appsQuestionRow('Guest texts you — you text back', 'Like WiFi questions', enc(messageItems), 0)}
+      ${appsQuestionRow('How does a guest get your hotel on their phone?', 'They tap one button on your website', enc(guestInstallItems), 0)}
+      ${appsQuestionRow('Both apps on the same phone screen', 'Yours + theirs, side by side', enc(homeScreenItems), 0)}
+      ${appsQuestionRow('Need help putting Front Desk on your phone?', 'Short video walkthrough', enc(frontdeskInstallItems), 0)}
     </div>
 
-    <div class="apps-actions">
-      ${fdCtaHtml}
-      ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Preview guest booking page ↗</button>` : ''}
+    <div class="apps-broadcast-card">
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Text all your guests at once</div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">Later, when guests have your hotel on their phone, you can send everyone a message — like a group text. Good for sales, events, or "check-in is at 3pm."</p>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Subject line</div>
+        <input type="text" id="guest-broadcast-title" value="${hName.replace(/"/g, '&quot;')}" maxlength="120" placeholder="e.g. Jack's Inn" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Your message</div>
+        <textarea id="guest-broadcast-body" maxlength="500" placeholder="e.g. Pool is open until 10pm tonight!" style="width:100%;min-height:72px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
+      <button id="guest-broadcast-btn" onclick="sendGuestBroadcast()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send to all guests</button>
+      <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
     </div>
-    <p class="apps-footnote">iPhone and Android — no app store needed.</p>
+
+    ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">See what guests see on your website ↗</button>` : ''}
+    <p class="apps-footnote">Works on iPhone and Android. No app store. No extra fees.</p>
 
   </div>`;
 
@@ -6609,8 +6604,9 @@ function renderAppsView() {
 
 
 // ── APPS TOUR ─────────────────────────────────────────
-function startAppsTour() {
-  if (localStorage.getItem('appsTourDone')) return;
+function startAppsTour(opts) {
+  opts = opts || {};
+  if (!opts.fromMainTour && localStorage.getItem('appsTourDone')) return;
 
   const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
   const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
@@ -6637,11 +6633,12 @@ function startAppsTour() {
   function finish() {
     cleanup();
     localStorage.setItem('appsTourDone', '1');
+    if (typeof opts.onFinish === 'function') opts.onFinish();
   }
 
   function stepDots(current) {
     return Array.from({length: totalSteps}, (_, i) =>
-      `<div style="width:7px;height:7px;border-radius:50%;background:${i === current ? '#fff' : 'rgba(255,255,255,0.3)'};transition:background 0.2s;"></div>`
+      `<div style="width:7px;height:7px;border-radius:50%;background:${i === current ? '#2E7D5B' : '#d1d5db'};transition:background 0.2s;"></div>`
     ).join('');
   }
 
@@ -6654,11 +6651,9 @@ function startAppsTour() {
       <div style="background:white;border-radius:24px;max-width:340px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.4);animation:tourModalSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);overflow:hidden;">
         ${innerHtml}
         <div style="padding:0 22px 22px;text-align:center;">
-          <button id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">${btnLabel}</button>
-          <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
-            <div style="display:flex;gap:6px;">${stepDots(tourStep)}</div>
-            <button id="appsTourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip</button>
-          </div>
+          <button id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">${btnLabel}</button>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:12px;">${stepDots(tourStep)}</div>
+          <button id="appsTourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;display:block;margin:0 auto;">Skip</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -6674,16 +6669,29 @@ function startAppsTour() {
 
   function showTourStep() {
     if (tourStep === 0) {
+      const poster = appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 320);
       buildModal(`
         <div style="background:#0a0a0a;padding:20px 16px 16px;">
-          ${tourShowcaseImg(APPS_SHOWCASE.homeScreen, 'Home screen with Front Desk and guest hotel apps')}
+          <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${poster}">
+            <source src="${APPS_SHOWCASE.bookingNotifVideo}" type="video/mp4">
+          </video>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Two icons. One home screen.</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;"><strong>Front Desk</strong> is yours — you get buzzed when they book. <strong>${hName}</strong> is theirs — they book and message you direct. No App Store.</p>
-        </div>`, 'Got it — what else? →');
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Someone books. Your phone buzzes.</div>
+          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">That's the whole point. You find out right away — like getting a text. Not hours later in email.</p>
+        </div>`, 'Next →');
     }
     else if (tourStep === 1) {
+      buildModal(`
+        <div style="background:#0a0a0a;padding:20px 16px 16px;">
+          ${tourShowcaseImg(APPS_SHOWCASE.homeScreen, 'Two apps on a phone')}
+        </div>
+        <div style="padding:22px 22px 0;text-align:center;">
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Two apps. Same phone screen.</div>
+          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;"><strong>Front Desk</strong> (green) goes on <em>your</em> phone. <strong>${hName}</strong> goes on the <em>guest's</em> phone. Both look like normal apps. Nothing to buy from a store.</p>
+        </div>`, 'Next →');
+    }
+    else if (tourStep === 2) {
       const poster = appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 320);
       buildModal(`
         <div style="background:#0a0a0a;padding:20px 16px 16px;">
@@ -6692,46 +6700,34 @@ function startAppsTour() {
           </video>
         </div>
         <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">See this buzz?</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Guest asks "How do I connect to WiFi?" — you reply — their phone buzzes. <strong>No SMS needed.</strong></p>
-        </div>`, 'Makes sense →');
-    }
-    else if (tourStep === 2) {
-      buildModal(`
-        <div style="background:#0a0a0a;padding:16px 12px 12px;">
-          <div style="display:flex;gap:8px;align-items:flex-start;justify-content:center;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:9px;color:rgba(255,255,255,0.55);text-align:center;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Guest</div>
-              ${tourShowcaseImg(APPS_SHOWCASE.guestMessages, 'Guest messages')}
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:9px;color:rgba(255,255,255,0.55);text-align:center;font-weight:700;text-transform:uppercase;margin-bottom:6px;">You</div>
-              ${tourShowcaseImg(APPS_SHOWCASE.frontdeskMessages, 'Front Desk reply')}
-            </div>
-          </div>
-        </div>
-        <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">They message. You reply. They get a buzz.</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">No SMS. No third-party app. You own the conversation — forever.</p>
-        </div>`, 'One more thing →');
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Guest asks a question. You answer. They see it.</div>
+          <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 16px;">"What's the WiFi?" — they type it in your hotel app. You reply in <strong>Bookings</strong>. Their phone buzzes with your answer.</p>
+        </div>`, 'Next →');
     }
     else if (tourStep === 3) {
       const iconEl = iconUrl
-        ? `<img src="${iconUrl}" alt="${hName}" style="width:64px;height:64px;border-radius:14px;object-fit:cover;box-shadow:0 8px 24px rgba(46,125,91,0.4);">`
-        : `<div style="width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,#2E7D5B,#1a5c3f);color:#fff;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(46,125,91,0.4);">${initial}</div>`;
+        ? `<img src="${iconUrl}" alt="${hName}" style="width:56px;height:56px;border-radius:14px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,0.15);">`
+        : `<div style="width:56px;height:56px;border-radius:14px;background:var(--green);color:#fff;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
       buildModal(`
-        <div style="background:linear-gradient(160deg,#1a2b22 0%,#2E7D5B 100%);padding:28px 20px 22px;text-align:center;">
-          <div style="display:flex;justify-content:center;margin-bottom:16px;">${iconEl}</div>
-          <div style="font-size:20px;font-weight:800;color:#fff;line-height:1.3;margin-bottom:6px;">${shortName}</div>
-          <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:500;">No App Store. They tap Add. Done.</div>
-        </div>
-        <div style="padding:22px 22px 0;text-align:center;">
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Make it yours</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.6;margin:0 0 16px;">Upload your own icon on the Apps tab so guests see your brand — not a demo. Takes 5 seconds.</p>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:14px;">
-            <p style="font-size:12px;color:#166534;margin:0;line-height:1.5;"><strong>Your hotel. Their home screen. Your phone buzzes. No App Store.</strong></p>
+        <div style="padding:24px 22px 0;text-align:center;">
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:12px;line-height:1.3;">Two things to do on this page</div>
+          <div style="background:#f8faf9;border:1.5px solid #bbf7d0;border-radius:14px;padding:14px;text-align:left;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:800;color:#2E7D5B;margin-bottom:6px;">STEP 1</div>
+            <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Put Front Desk on your phone</div>
+            <p style="font-size:13px;color:#4b5563;margin:0;line-height:1.5;">Tap the big green button at the top when this popup closes.</p>
           </div>
-        </div>`, 'Got it — show me the page ✓');
+          <div style="background:#f8faf9;border:1.5px solid var(--border);border-radius:14px;padding:14px;text-align:left;margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:800;color:#2E7D5B;margin-bottom:6px;">STEP 2</div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              ${iconEl}
+              <div>
+                <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Upload your hotel logo</div>
+                <p style="font-size:13px;color:#4b5563;margin:0;line-height:1.45;">So guests see <strong>${shortName}</strong> on their phone — not a random letter.</p>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:12px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Everything else on this page is optional — tap a row anytime to watch how it works.</p>
+        </div>`, 'OK — show me the page');
     }
     else {
       finish();
