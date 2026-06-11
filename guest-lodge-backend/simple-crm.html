@@ -4181,18 +4181,18 @@ async function sendGuestBroadcast() {
   const title = titleEl?.value.trim();
   const body = bodyEl?.value.trim();
   if (!title || !body) {
-    toast('Enter a title and message', 'error');
+    toast('Enter a title and what you want to notify them about', 'error');
     return;
   }
   const btn = document.getElementById('guest-broadcast-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Notifying…'; }
   if (resultEl) resultEl.textContent = '';
   try {
     const data = await api('POST', '/api/crm/guest-broadcast', { title, body });
     if (data.success) {
       const msg = data.sent > 0
-        ? `Sent to ${data.sent} guest${data.sent === 1 ? '' : 's'}`
-        : 'No subscribed guests yet';
+        ? `Notified ${data.sent} guest${data.sent === 1 ? '' : 's'}`
+        : 'No guests to notify yet';
       if (resultEl) resultEl.textContent = msg;
       toast(msg, data.sent > 0 ? 'success' : '');
       if (bodyEl) bodyEl.value = '';
@@ -4202,7 +4202,7 @@ async function sendGuestBroadcast() {
   } catch (e) {
     toast('Broadcast failed', 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Send to All Guests'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Notify all guests'; }
   }
 }
 
@@ -4687,7 +4687,11 @@ function showWelcomeModal() {
     <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
       <div style="font-size:32px;margin-bottom:12px;">🏨</div>
       <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
-      <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 20px;">This is where you:<br><strong>Customize</strong> your booking page<br><strong>See bookings</strong> that come in<br><strong>Track revenue</strong> your page generates</p>
+      <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">This is where you:<br><br>
+        <strong>Set up</strong> your booking page<br>
+        <strong>See bookings</strong> when they come in<br>
+        <strong>Put Front Desk on your phone</strong> — the <strong>Apps</strong> tab shows you how<br>
+        <strong>Notify your guests</strong> from the Apps tab too</p>
       <button id="welcomeModalGotIt" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Got it — show me around</button>
     </div>
   `;
@@ -6314,7 +6318,8 @@ const APPS_SHOWCASE = {
   bookingNotifVideo:        'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
   guestMessageNotifVideo:   'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_23-43-50_1_z22p4m.mp4',
   guestInstallVideo:        'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_00-03-19_1_lgdf59.mp4',
-  frontdeskInstallVideo:    'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_17-20-14_1_xplzxa.mp4',
+  frontdeskInstallVideo:    'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_19-49-38_1_tc1bzm.mp4',
+  guestBroadcastVideo:      'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/v1781196304/ScreenRecording_06-11-2026_19-41-56_1_kjgudg.mp4',
 };
 
 // Real iPhone screenshots — rounded corners sell the "phone" look without a mockup frame.
@@ -6580,18 +6585,24 @@ function renderAppsView() {
     </div>
 
     <div class="apps-broadcast-card">
-      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Text all your guests at once</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">Once your guests have your hotel on their phone, you can message everyone at once — like a group text. Great for a sale, an event, or "check-in is at 3pm."</p>
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Notify all your guests at once</div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">Once your guests have your hotel on their phone, you can notify everyone at once. Great for a sale, an event, or reminding them check-in is at 3pm.</p>
       <div style="margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Subject line</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Notification title</div>
         <input type="text" id="guest-broadcast-title" value="${hName.replace(/"/g, '&quot;')}" maxlength="120" placeholder="e.g. Jack's Inn" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
       <div style="margin-bottom:10px;">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Your message</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">What you're notifying them about</div>
         <textarea id="guest-broadcast-body" maxlength="500" placeholder="e.g. Pool is open until 10pm tonight!" style="width:100%;min-height:72px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
       </div>
-      <button id="guest-broadcast-btn" onclick="sendGuestBroadcast()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send to all guests</button>
+      <button id="guest-broadcast-btn" onclick="sendGuestBroadcast()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Notify all guests</button>
       <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+        <p style="font-size:11px;color:var(--text-muted);margin:0 0 10px;line-height:1.45;text-align:center;">This is what pops up on their phone when you notify them:</p>
+        <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 360)}">
+          <source src="${APPS_SHOWCASE.guestBroadcastVideo}" type="video/mp4">
+        </video>
+      </div>
     </div>
 
     ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">See what your guests see on your website ↗</button>` : ''}
