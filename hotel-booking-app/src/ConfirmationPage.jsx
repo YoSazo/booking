@@ -174,6 +174,8 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
             appIconUrl={hotel?.appIconUrl}
             hotelId={resolvedHotelId}
             reservationCode={reservationCode}
+            apiBaseUrl={apiBaseUrl}
+            touchpoint="confirmation-page"
             variant="hero"
           />
 

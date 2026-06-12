@@ -44,8 +44,23 @@ model Booking {
   notes       String?
   callLog     String?  // stored as JSON string
 
-  // Guest PWA adoption — pre-check-in install reminder email
+  // Guest PWA adoption
   guestInstallReminderSentAt DateTime?
+  guestAppInstalledAt        DateTime?
+}
+
+model GuestInstallEvent {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  hotelId         String
+  reservationCode String?
+  touchpoint      String   // confirmation-page, frontdesk-qr-guest, confirmation-email, etc.
+  eventType       String   // view | cta_click | installed
+  userAgent       String?
+
+  @@index([hotelId, createdAt])
+  @@index([hotelId, eventType, createdAt])
+  @@index([reservationCode])
 }
 
 model PaymentDeclinedLead {

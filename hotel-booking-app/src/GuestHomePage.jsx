@@ -223,6 +223,8 @@ export default function GuestHomePage({ hotel: hotelProp }) {
         appIconUrl={hotelProp?.appIconUrl || lookupHotel?.appIconUrl}
         hotelId={hotelId}
         reservationCode={confirmationCode}
+        apiBaseUrl={apiBaseUrl}
+        touchpoint="guest-home"
         variant="card"
       />
 

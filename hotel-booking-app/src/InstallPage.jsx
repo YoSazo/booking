@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Smartphone, CheckCircle2 } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
@@ -7,6 +7,7 @@ import {
   BRAND, isIos, isAndroid, qrCodeUrl,
   HotelIcon, IosInstallSteps, IosInstallSheet, InstallBenefits,
 } from './guestInstallUi.jsx';
+import { trackGuestInstall, installTouchpointFromRef } from './guestInstallTracking.js';
 
 function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const [searchParams] = useSearchParams();
@@ -24,14 +25,36 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const hotelName = hotel?.name || 'Your Hotel';
   const appIconUrl = hotel?.appIconUrl || '';
   const installPageUrl = typeof window !== 'undefined' ? window.location.href.split('#')[0] : '';
+  const touchpoint = installTouchpointFromRef(ref);
+  const trackCode = code || guestStay?.code || undefined;
+
+  const markInstalled = useCallback(() => {
+    setInstalled(true);
+    trackGuestInstall(apiBaseUrl, resolvedHotelId, {
+      touchpoint,
+      eventType: 'installed',
+      reservationCode: trackCode,
+    });
+  }, [apiBaseUrl, resolvedHotelId, touchpoint, trackCode]);
 
   useEffect(() => {
+    if (isStandalone()) {
+      markInstalled();
+      return undefined;
+    }
+
+    trackGuestInstall(apiBaseUrl, resolvedHotelId, {
+      touchpoint,
+      eventType: 'view',
+      reservationCode: trackCode,
+    });
+
     const onBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     const onInstalled = () => {
-      setInstalled(true);
+      markInstalled();
       setDeferredPrompt(null);
     };
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
@@ -40,7 +63,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, []);
+  }, [apiBaseUrl, resolvedHotelId, touchpoint, trackCode, markInstalled]);
 
   // Link reservation when opened from email / QR with ?code=
   useEffect(() => {
@@ -70,7 +93,16 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
     return () => { cancelled = true; };
   }, [code, resolvedHotelId, apiBaseUrl, guestStay?.code, setGuestStay]);
 
+  const trackCta = () => {
+    trackGuestInstall(apiBaseUrl, resolvedHotelId, {
+      touchpoint,
+      eventType: 'cta_click',
+      reservationCode: trackCode,
+    });
+  };
+
   const handleInstall = async () => {
+    trackCta();
     if (isIos()) {
       setShowIosSheet(true);
       return;
@@ -78,7 +110,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') setInstalled(true);
+      if (choice?.outcome === 'accepted') markInstalled();
       setDeferredPrompt(null);
     }
   };
@@ -146,8 +178,11 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
         {isIos() ? (
           <div style={{ marginBottom: 16 }}>
             <IosInstallSteps hotelName={hotelName} appIconUrl={appIconUrl} />
-            <button type="button" onClick={() => setShowIosSheet(true)} style={{ ...styles.primaryBtn, marginTop: 16 }}>
+            <button type="button" onClick={() => { trackCta(); setShowIosSheet(true); }} style={{ ...styles.primaryBtn, marginTop: 16 }}>
               <Smartphone size={18} /> Show me how
+            </button>
+            <button type="button" onClick={markInstalled} style={styles.iosConfirmBtn}>
+              I've added it to my home screen
             </button>
           </div>
         ) : (
@@ -176,7 +211,12 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
       </div>
 
       {showIosSheet && (
-        <IosInstallSheet hotelName={hotelName} appIconUrl={appIconUrl} onClose={() => setShowIosSheet(false)} />
+        <IosInstallSheet
+          hotelName={hotelName}
+          appIconUrl={appIconUrl}
+          onClose={() => setShowIosSheet(false)}
+          onConfirmInstalled={markInstalled}
+        />
       )}
     </div>
   );
@@ -260,6 +300,19 @@ const styles = {
     color: '#9ca3af',
     lineHeight: 1.5,
     margin: '8px 0 0',
+  },
+  iosConfirmBtn: {
+    width: '100%',
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    border: `1.5px solid ${BRAND}`,
+    background: 'white',
+    color: BRAND,
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
   },
   loading: {
     textAlign: 'center',

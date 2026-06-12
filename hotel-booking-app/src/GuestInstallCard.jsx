@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Smartphone } from 'lucide-react';
 import { isStandalone } from './pwaUtils.js';
 import { BRAND, isIos, HotelIcon, IosInstallSheet } from './guestInstallUi.jsx';
+import { trackGuestInstall } from './guestInstallTracking.js';
 
-/**
- * Post-booking install CTA — always visible until installed or dismissed.
- * Links to /install for full walkthrough + QR on desktop.
- */
 function GuestInstallCard({
   hotelName,
   appIconUrl,
   hotelId,
   reservationCode,
+  apiBaseUrl = '',
+  touchpoint = 'card',
   variant = 'card',
   headline,
   subline,
@@ -26,18 +25,39 @@ function GuestInstallCard({
   const storageKey = `installDismissed_${hotelId || 'default'}`;
   const ios = isIos();
   const isHero = variant === 'hero';
+  const effectiveCode = reservationCode || undefined;
+
+  const markInstalled = useCallback(() => {
+    setInstalled(true);
+    trackGuestInstall(apiBaseUrl, hotelId, {
+      touchpoint,
+      eventType: 'installed',
+      reservationCode: effectiveCode,
+    });
+  }, [apiBaseUrl, hotelId, touchpoint, effectiveCode]);
 
   useEffect(() => {
     try {
       if (localStorage.getItem(storageKey) === '1') setDismissed(true);
     } catch (e) { /* ignore */ }
 
+    if (isStandalone()) {
+      markInstalled();
+      return undefined;
+    }
+
+    trackGuestInstall(apiBaseUrl, hotelId, {
+      touchpoint,
+      eventType: 'view',
+      reservationCode: effectiveCode,
+    });
+
     const onBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     const onInstalled = () => {
-      setInstalled(true);
+      markInstalled();
       setDeferredPrompt(null);
     };
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
@@ -46,15 +66,24 @@ function GuestInstallCard({
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, [storageKey]);
+  }, [storageKey, apiBaseUrl, hotelId, touchpoint, effectiveCode, markInstalled]);
 
   if (installed || isStandalone() || dismissed) return null;
 
-  const installPath = reservationCode
-    ? `/install?code=${encodeURIComponent(reservationCode)}&ref=card`
-    : '/install?ref=card';
+  const installPath = effectiveCode
+    ? `/install?code=${encodeURIComponent(effectiveCode)}&ref=${encodeURIComponent(touchpoint)}`
+    : `/install?ref=${encodeURIComponent(touchpoint)}`;
+
+  const trackCta = () => {
+    trackGuestInstall(apiBaseUrl, hotelId, {
+      touchpoint,
+      eventType: 'cta_click',
+      reservationCode: effectiveCode,
+    });
+  };
 
   const handlePrimary = async () => {
+    trackCta();
     if (ios) {
       setShowIosSheet(true);
       return;
@@ -62,7 +91,7 @@ function GuestInstallCard({
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') setInstalled(true);
+      if (choice?.outcome === 'accepted') markInstalled();
       setDeferredPrompt(null);
       return;
     }
@@ -76,6 +105,15 @@ function GuestInstallCard({
 
   const title = headline || `Add ${hotelName || 'us'} to your home screen`;
   const subtitle = subline || 'Message the front desk, get check-in updates, and book direct — like a real app.';
+
+  const iosSheet = showIosSheet && (
+    <IosInstallSheet
+      hotelName={hotelName}
+      appIconUrl={appIconUrl}
+      onClose={() => setShowIosSheet(false)}
+      onConfirmInstalled={markInstalled}
+    />
+  );
 
   if (isHero) {
     return (
@@ -109,7 +147,7 @@ function GuestInstallCard({
           {!ios && !deferredPrompt && (
             <button
               type="button"
-              onClick={() => navigate(installPath)}
+              onClick={() => { trackCta(); navigate(installPath); }}
               style={{
                 width: '100%', marginTop: 8, padding: 10, borderRadius: 10, border: 'none',
                 background: 'transparent', color: 'rgba(255,255,255,0.75)', fontSize: 13,
@@ -120,9 +158,7 @@ function GuestInstallCard({
             </button>
           )}
         </div>
-        {showIosSheet && (
-          <IosInstallSheet hotelName={hotelName} appIconUrl={appIconUrl} onClose={() => setShowIosSheet(false)} />
-        )}
+        {iosSheet}
       </>
     );
   }
@@ -164,9 +200,7 @@ function GuestInstallCard({
           ×
         </button>
       </div>
-      {showIosSheet && (
-        <IosInstallSheet hotelName={hotelName} appIconUrl={appIconUrl} onClose={() => setShowIosSheet(false)} />
-      )}
+      {iosSheet}
     </>
   );
 }

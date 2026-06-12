@@ -204,6 +204,42 @@ async function sendGuestInstallReminderEmail({ guestEmail, guestName, hotelName,
     }
 }
 
+async function recordGuestInstallEvent({ hotelId, reservationCode, touchpoint, eventType, userAgent }) {
+    if (!hotelId || !touchpoint || !eventType) return;
+    try {
+        await prisma.guestInstallEvent.create({
+            data: {
+                hotelId,
+                reservationCode: reservationCode || null,
+                touchpoint: String(touchpoint).slice(0, 64),
+                eventType: String(eventType).slice(0, 32),
+                userAgent: userAgent ? String(userAgent).slice(0, 512) : null,
+            },
+        });
+    } catch (e) {
+        console.error('GuestInstallEvent create failed:', e.message);
+    }
+}
+
+async function markGuestAppInstalled(hotelId, reservationCode) {
+    if (!hotelId || !reservationCode) return;
+    try {
+        await prisma.booking.updateMany({
+            where: {
+                hotelId,
+                guestAppInstalledAt: null,
+                OR: [
+                    { ourReservationCode: reservationCode },
+                    { pmsConfirmationCode: reservationCode },
+                ],
+            },
+            data: { guestAppInstalledAt: new Date() },
+        });
+    } catch (e) {
+        console.error('markGuestAppInstalled failed:', e.message);
+    }
+}
+
 /** Send pre-check-in install reminders for bookings checking in within ~36 hours. */
 async function runGuestInstallReminders() {
     if (!emailTransporter) return { sent: 0, skipped: 0 };
@@ -216,6 +252,7 @@ async function runGuestInstallReminders() {
     const bookings = await prisma.booking.findMany({
         where: {
             guestInstallReminderSentAt: null,
+            guestAppInstalledAt: null,
             guestEmail: { not: '' },
             checkinDate: { gte: windowStart, lte: windowEnd },
             status: { not: 'cancelled' },
@@ -227,10 +264,7 @@ async function runGuestInstallReminders() {
     let skipped = 0;
     for (const b of bookings) {
         const code = b.pmsConfirmationCode || b.ourReservationCode;
-        const hasPush = await prisma.pushSubscription.findFirst({
-            where: { hotelId: b.hotelId, reservationCode: code, source: 'guest' },
-        }).catch(() => null);
-        if (hasPush) {
+        if (b.guestAppInstalledAt) {
             await prisma.booking.update({
                 where: { id: b.id },
                 data: { guestInstallReminderSentAt: new Date() },
@@ -3981,6 +4015,97 @@ app.post('/api/guest-push-subscribe', async (req, res) => {
     } catch (e) {
         console.error('guest-push-subscribe error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to save subscription' });
+    }
+});
+
+// Guest PWA install funnel — view, CTA click, installed (public).
+app.post('/api/guest-install-event', async (req, res) => {
+    try {
+        const { hotelId, reservationCode, touchpoint, eventType } = req.body || {};
+        if (!hotelId || !touchpoint || !eventType) {
+            return res.status(400).json({ success: false, message: 'hotelId, touchpoint, and eventType are required.' });
+        }
+        const allowed = ['view', 'cta_click', 'installed'];
+        if (!allowed.includes(eventType)) {
+            return res.status(400).json({ success: false, message: 'Invalid eventType.' });
+        }
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status || 400).json({ success: false, message: validation.message });
+        }
+
+        const code = reservationCode ? String(reservationCode).trim() : null;
+        await recordGuestInstallEvent({
+            hotelId: validation.hotelId,
+            reservationCode: code,
+            touchpoint: String(touchpoint).trim(),
+            eventType,
+            userAgent: req.headers['user-agent'],
+        });
+
+        if (eventType === 'installed') {
+            await markGuestAppInstalled(validation.hotelId, code);
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('guest-install-event error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to record event' });
+    }
+});
+
+// CRM: guest install funnel stats (last 30 days).
+app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const [events, installedBookings, recentBookings] = await Promise.all([
+            prisma.guestInstallEvent.findMany({
+                where: { hotelId, createdAt: { gte: since } },
+                select: { touchpoint: true, eventType: true, reservationCode: true },
+            }).catch(() => []),
+            prisma.booking.count({
+                where: { hotelId, guestAppInstalledAt: { gte: since } },
+            }).catch(() => 0),
+            prisma.booking.count({
+                where: { hotelId, createdAt: { gte: since }, status: { not: 'cancelled' } },
+            }).catch(() => 0),
+        ]);
+
+        const byTouchpoint = {};
+        for (const ev of events) {
+            const tp = ev.touchpoint || 'unknown';
+            if (!byTouchpoint[tp]) byTouchpoint[tp] = { views: 0, cta_clicks: 0, installed: 0 };
+            if (ev.eventType === 'view') byTouchpoint[tp].views++;
+            else if (ev.eventType === 'cta_click') byTouchpoint[tp].cta_clicks++;
+            else if (ev.eventType === 'installed') byTouchpoint[tp].installed++;
+        }
+
+        const totals = events.reduce((acc, ev) => {
+            if (ev.eventType === 'view') acc.views++;
+            else if (ev.eventType === 'cta_click') acc.cta_clicks++;
+            else if (ev.eventType === 'installed') acc.installed++;
+            return acc;
+        }, { views: 0, cta_clicks: 0, installed: 0 });
+
+        const installRate = recentBookings > 0
+            ? Math.round((installedBookings / recentBookings) * 100)
+            : 0;
+
+        res.json({
+            success: true,
+            periodDays: 30,
+            totals,
+            installedBookings,
+            recentBookings,
+            installRatePercent: installRate,
+            byTouchpoint,
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 

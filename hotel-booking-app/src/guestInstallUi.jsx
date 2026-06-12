@@ -65,7 +65,7 @@ export function IosInstallSteps({ hotelName, appIconUrl }) {
   );
 }
 
-export function IosInstallSheet({ hotelName, appIconUrl, onClose }) {
+export function IosInstallSheet({ hotelName, appIconUrl, onClose, onConfirmInstalled }) {
   return (
     <div
       onClick={onClose}
@@ -95,16 +95,31 @@ export function IosInstallSheet({ hotelName, appIconUrl, onClose }) {
           </div>
         </div>
         <IosInstallSteps hotelName={hotelName} appIconUrl={appIconUrl} />
+        {onConfirmInstalled && (
+          <button
+            type="button"
+            onClick={() => { onConfirmInstalled(); onClose(); }}
+            style={{
+              width: '100%', marginTop: 22, padding: 14, borderRadius: 12,
+              border: 'none', background: BRAND, color: 'white', fontSize: 15,
+              fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            I've added it to my home screen
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
           style={{
-            width: '100%', marginTop: 22, padding: 14, borderRadius: 12,
-            border: 'none', background: BRAND, color: 'white', fontSize: 15,
-            fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            width: '100%', marginTop: onConfirmInstalled ? 10 : 22, padding: 14, borderRadius: 12,
+            border: onConfirmInstalled ? `1.5px solid ${BRAND}` : 'none',
+            background: onConfirmInstalled ? 'white' : BRAND,
+            color: onConfirmInstalled ? BRAND : 'white',
+            fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
-          Got it
+          {onConfirmInstalled ? 'Not yet' : 'Got it'}
         </button>
       </div>
     </div>

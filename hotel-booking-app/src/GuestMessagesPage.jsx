@@ -284,6 +284,8 @@ export default function GuestMessagesPage({ hotel }) {
             appIconUrl={hotel?.appIconUrl}
             hotelId={hotelId}
             reservationCode={guestStay?.code}
+            apiBaseUrl={apiBaseUrl}
+            touchpoint="messages-card"
             variant="card"
             subline="Install to get reply notifications on your phone — like a text from the hotel."
           />

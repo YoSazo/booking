@@ -56,6 +56,7 @@ async function main() {
   const bookings = await prisma.booking.findMany({
     where: {
       guestInstallReminderSentAt: null,
+      guestAppInstalledAt: null,
       guestEmail: { not: '' },
       checkinDate: { gte: windowStart, lte: windowEnd },
       status: { not: 'cancelled' },
@@ -68,10 +69,7 @@ async function main() {
 
   for (const b of bookings) {
     const code = b.pmsConfirmationCode || b.ourReservationCode;
-    const hasPush = await prisma.pushSubscription.findFirst({
-      where: { hotelId: b.hotelId, reservationCode: code, source: 'guest' },
-    });
-    if (hasPush) {
+    if (b.guestAppInstalledAt) {
       await prisma.booking.update({ where: { id: b.id }, data: { guestInstallReminderSentAt: new Date() } });
       continue;
     }

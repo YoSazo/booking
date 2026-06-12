@@ -1745,6 +1745,7 @@
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
+      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR for guest to scan">📲 Check-in QR</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
       <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';">🔄 Redo Tour</button>
     </div>
@@ -4177,6 +4178,120 @@ async function enableNotifications() {
   }
 }
 
+function getBookingReservationCode(b) {
+  return (b && (b.pmsConfirmationCode || b.ourReservationCode)) || '';
+}
+
+function buildGuestInstallUrlForQr(reservationCode, ref) {
+  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  if (!domain) return '';
+  const params = new URLSearchParams({ ref: ref || 'frontdesk-qr-generic' });
+  if (reservationCode) params.set('code', reservationCode);
+  return 'https://' + domain + '/install?' + params.toString();
+}
+
+function showCheckinQrOverlay(preselectedCode) {
+  const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
+
+  const existing = document.getElementById('checkinQrOverlay');
+  if (existing) existing.remove();
+
+  let selectedCode = preselectedCode || '';
+  let mode = selectedCode ? 'guest' : 'generic';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayAfterTomorrow = new Date(today);
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+  const arrivals = (bookings || []).filter(function(b) {
+    if (b.paymentDeclined) return false;
+    if (!b.checkinDate) return false;
+    const ci = new Date(b.checkinDate);
+    ci.setHours(0, 0, 0, 0);
+    return ci >= today && ci <= dayAfterTomorrow;
+  });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'checkinQrOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:102500;background:#0a0f0d;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;';
+
+  function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+  function render() {
+    const ref = mode === 'guest' && selectedCode ? 'frontdesk-qr-guest' : 'frontdesk-qr-generic';
+    const url = buildGuestInstallUrlForQr(mode === 'guest' ? selectedCode : '', ref);
+    const qr = url ? 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=' + encodeURIComponent(url) : '';
+
+    const guestOptions = arrivals.map(function(b) {
+      const code = getBookingReservationCode(b);
+      const name = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ');
+      const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+      return '<option value="' + escAttr(code) + '"' + (code === selectedCode ? ' selected' : '') + '>' + escAttr(name) + ' — ' + escAttr(ci) + '</option>';
+    }).join('');
+
+    overlay.innerHTML = ''
+      + '<button type="button" id="checkinQrClose" style="position:absolute;top:max(12px,env(safe-area-inset-top));right:16px;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,0.12);color:#fff;font-size:22px;cursor:pointer;font-family:inherit;">×</button>'
+      + '<div style="text-align:center;max-width:400px;width:100%;">'
+      + '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Guest scans this</div>'
+      + '<h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#fff;line-height:1.3;">Add ' + escAttr(hName) + ' to their phone</h2>'
+      + '<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.5;">Takes about 10 seconds. They can message you and book direct next time.</p>'
+      + '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">'
+      + '<button type="button" data-qr-mode="generic" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'generic' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">Any guest</button>'
+      + '<button type="button" data-qr-mode="guest" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'guest' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">This guest</button>'
+      + '</div>'
+      + (mode === 'guest' ? (
+          '<div style="margin-bottom:16px;text-align:left;">'
+          + '<label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;margin-bottom:6px;">Checking in today or tomorrow</label>'
+          + (arrivals.length
+            ? '<select id="checkinQrGuestSelect" style="width:100%;padding:12px;border-radius:10px;border:none;font-family:inherit;font-size:14px;">' + guestOptions + '</select>'
+            : '<input id="checkinQrCodeInput" type="text" placeholder="Confirmation code" value="' + escAttr(selectedCode) + '" style="width:100%;padding:12px;border-radius:10px;border:none;font-family:inherit;font-size:14px;box-sizing:border-box;">')
+          + '</div>'
+        ) : '')
+      + (qr ? '<img src="' + qr + '" alt="QR code" width="280" height="280" style="border-radius:16px;background:#fff;padding:12px;max-width:min(280px,80vw);height:auto;">' : '')
+      + '<p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">'
+      + (mode === 'guest' && selectedCode ? 'Links to their reservation + install' : 'Generic install — good for room cards')
+      + '</p></div>';
+
+    document.getElementById('checkinQrClose').onclick = closeCheckinQrOverlay;
+    overlay.querySelectorAll('[data-qr-mode]').forEach(function(btn) {
+      btn.onclick = function() {
+        mode = btn.getAttribute('data-qr-mode');
+        if (mode === 'guest' && !selectedCode && arrivals.length) {
+          selectedCode = getBookingReservationCode(arrivals[0]);
+        }
+        render();
+      };
+    });
+    const sel = document.getElementById('checkinQrGuestSelect');
+    if (sel) {
+      sel.onchange = function() { selectedCode = sel.value; render(); };
+      if (!selectedCode && sel.value) selectedCode = sel.value;
+    }
+    const inp = document.getElementById('checkinQrCodeInput');
+    if (inp) {
+      inp.oninput = function() { selectedCode = inp.value.trim(); };
+    }
+  }
+
+  function closeCheckinQrOverlay() {
+    overlay.remove();
+    document.body.style.overflow = '';
+  }
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+  render();
+}
+
+function closeCheckinQrOverlay() {
+  const el = document.getElementById('checkinQrOverlay');
+  if (el) el.remove();
+  document.body.style.overflow = '';
+}
+
 function prefillGuestInstallBroadcast() {
   const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
   const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
@@ -6544,6 +6659,10 @@ function renderAppsView() {
 
   <div class="apps-page">
 
+    <div id="guestInstallStats" class="apps-step-card" style="margin-bottom:14px;padding:14px 16px;">
+      <div style="font-size:12px;color:var(--text-muted);">Loading guest install stats…</div>
+    </div>
+
     <h2 class="apps-headline">You on your phone. Guests on theirs.</h2>
     <p class="apps-intro">You're on <strong>Front Desk</strong> right now. Save it to your phone's home screen — it works like an app, but you don't need the app store. When someone books you, your phone buzzes. Your guests can save <strong>${hName}</strong> the same way — just upload your logo in Step 2 so they recognize you on their phone.</p>
 
@@ -6571,7 +6690,9 @@ function renderAppsView() {
     <div class="apps-step-label">Step 3 — get guests on their phones</div>
     <div class="apps-step-card">
       <div class="apps-step-title">Help guests install your hotel app</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">After someone books, they get an email with an <strong>Add to Home Screen</strong> link. You can also print this QR for the front desk or rooms — guests scan it to install <strong>${hName}</strong> on their phone.</p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;line-height:1.55;">After someone books, they get an email with an <strong>Add to Home Screen</strong> link. At check-in, tap <strong>📲 Check-in QR</strong> at the top of Front Desk — full-screen QR, one tap.</p>
+      <button type="button" onclick="showCheckinQrOverlay()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:14px;">📲 Show check-in QR (full screen)</button>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">For room cards, print the generic link below (no guest name). For a specific guest at the desk, use the button above and pick <strong>This guest</strong>.</p>
       ${guestInstallUrl !== '#' ? `
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px;">
         ${guestInstallQr ? `<img src="${guestInstallQr}" alt="Guest install QR" width="120" height="120" style="border-radius:10px;border:1px solid var(--border);flex-shrink:0;">` : ''}
@@ -6626,6 +6747,48 @@ function renderAppsView() {
   </div>`;
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
+  loadGuestInstallStats();
+}
+
+async function loadGuestInstallStats() {
+  const el = document.getElementById('guestInstallStats');
+  if (!el) return;
+  try {
+    const data = await api('GET', '/api/crm/guest-install-stats');
+    if (!data.success) throw new Error(data.message || 'Failed');
+    const t = data.totals || {};
+    const rate = data.installRatePercent != null ? data.installRatePercent : 0;
+    const rows = Object.entries(data.byTouchpoint || {})
+      .filter(function(entry) { return (entry[1].views || entry[1].installed); })
+      .sort(function(a, b) { return (b[1].installed || 0) - (a[1].installed || 0); })
+      .slice(0, 5);
+    const rowHtml = rows.length ? rows.map(function(entry) {
+      const label = entry[0].replace(/-/g, ' ');
+      const s = entry[1];
+      return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border);">'
+        + '<span style="color:var(--text);font-weight:600;text-transform:capitalize;">' + label + '</span>'
+        + '<span style="color:var(--text-muted);white-space:nowrap;">' + (s.views || 0) + ' views · ' + (s.installed || 0) + ' installed</span>'
+        + '</div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text-muted);">No install activity yet — try the check-in QR at the desk.</div>';
+
+    el.innerHTML = ''
+      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Guest installs — last 30 days</div>'
+      + '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + rate + '%</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">of bookings installed</div></div>'
+      + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + (data.installedBookings || 0) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">confirmed installs</div></div>'
+      + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + (t.views || 0) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">install page views</div></div>'
+      + '</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">By touchpoint</div>'
+      + rowHtml;
+  } catch (e) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Install stats unavailable right now.</div>';
+  }
 }
 
 
