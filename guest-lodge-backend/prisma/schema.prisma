@@ -43,6 +43,9 @@ model Booking {
   callStatus  String?  @default("not-called")
   notes       String?
   callLog     String?  // stored as JSON string
+
+  // Guest PWA adoption — pre-check-in install reminder email
+  guestInstallReminderSentAt DateTime?
 }
 
 model PaymentDeclinedLead {

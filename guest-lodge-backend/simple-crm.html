@@ -4177,6 +4177,23 @@ async function enableNotifications() {
   }
 }
 
+function prefillGuestInstallBroadcast() {
+  const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  const installUrl = domain ? 'https://' + domain + '/install' : '';
+  const titleEl = document.getElementById('guest-broadcast-title');
+  const bodyEl = document.getElementById('guest-broadcast-body');
+  if (titleEl) titleEl.value = hName;
+  if (bodyEl) {
+    bodyEl.value = installUrl
+      ? `Add ${hName} to your home screen — message us anytime and book direct next time. Tap here: ${installUrl}`
+      : `Add ${hName} to your home screen — message us anytime and book direct next time.`;
+  }
+  const card = document.querySelector('.apps-broadcast-card');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast('Pre-filled — edit if you like, then tap Notify all guests', 'success');
+}
+
 async function sendGuestBroadcast() {
   const titleEl = document.getElementById('guest-broadcast-title');
   const bodyEl = document.getElementById('guest-broadcast-body');
@@ -6445,6 +6462,8 @@ function renderAppsView() {
   const hotelInitial = hName.trim().charAt(0).toUpperCase() || '🏨';
   const domain      = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
   const bookingUrl  = domain ? 'https://' + domain : '#';
+  const guestInstallUrl = domain ? 'https://' + domain + '/install' : '#';
+  const guestInstallQr  = guestInstallUrl !== '#' ? 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(guestInstallUrl) : '';
 
   // Front Desk CTA — state-aware
   const fdInstalled = isStandaloneApp() || frontdeskInstalled;
@@ -6547,6 +6566,25 @@ function renderAppsView() {
           <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change logo' : 'Upload logo'}</button>
         </div>
       </div>
+    </div>
+
+    <div class="apps-step-label">Step 3 — get guests on their phones</div>
+    <div class="apps-step-card">
+      <div class="apps-step-title">Help guests install your hotel app</div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">After someone books, they get an email with an <strong>Add to Home Screen</strong> link. You can also print this QR for the front desk or rooms — guests scan it to install <strong>${hName}</strong> on their phone.</p>
+      ${guestInstallUrl !== '#' ? `
+      <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px;">
+        ${guestInstallQr ? `<img src="${guestInstallQr}" alt="Guest install QR" width="120" height="120" style="border-radius:10px;border:1px solid var(--border);flex-shrink:0;">` : ''}
+        <div style="flex:1;min-width:180px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Guest install link</div>
+          <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
+          <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="padding:8px 14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px;">Copy link</button>
+          <button type="button" onclick="prefillGuestInstallBroadcast()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Notify guests</button>
+        </div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:12px;font-size:12px;color:var(--text-muted);line-height:1.55;">
+        <strong style="color:var(--text);">Room card idea:</strong> Print the QR with text: <em>"Scan to message us &amp; book direct — ${hName}"</em>
+      </div>` : '<p style="font-size:12px;color:var(--text-muted);margin:0;">Your booking domain is still setting up — check back shortly.</p>'}
     </div>
 
     <div class="apps-how-label">Want to see how it works?</div>

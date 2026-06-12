@@ -97,8 +97,7 @@ async function sendWelcomeEmail(toEmail, hotelName, pin, domain) {
 
 // Build a durable link back to the guest's reservation page (survives closing
 // the app). Prefers the hotel's own domain; falls back to the request origin.
-async function buildGuestBookingUrl(hotelId, code, req) {
-    if (!code) return '';
+async function buildGuestSiteBase(hotelId, req) {
     let base = '';
     try {
         const d = await prisma.hotelDomain.findFirst({ where: { hotelId }, orderBy: { isPrimary: 'desc' } });
@@ -108,11 +107,60 @@ async function buildGuestBookingUrl(hotelId, code, req) {
         const ref = req.headers?.referer || req.headers?.origin || '';
         try { const u = new URL(ref); base = `${u.protocol}//${u.host}`; } catch (_) {}
     }
+    return base;
+}
+
+async function buildGuestBookingUrl(hotelId, code, req) {
+    if (!code) return '';
+    const base = await buildGuestSiteBase(hotelId, req);
     if (!base) return '';
     return `${base}/booking/${encodeURIComponent(code)}`;
 }
 
-async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, checkout, nights, total, reservationCode, bookingUrl }) {
+async function buildGuestInstallUrl(hotelId, code, req, ref = 'email') {
+    const base = await buildGuestSiteBase(hotelId, req);
+    if (!base) return '';
+    const params = new URLSearchParams();
+    if (code) params.set('code', code);
+    if (ref) params.set('ref', ref);
+    const qs = params.toString();
+    return `${base}/install${qs ? `?${qs}` : ''}`;
+}
+
+function guestInstallEmailBlockHtml({ hotelName, installUrl }) {
+    if (!installUrl) return '';
+    const safeName = hotelName || 'your hotel';
+    return `<div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:12px;padding:20px;margin:0 0 20px;text-align:center;">
+        <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">📱 Add ${safeName} to your phone</div>
+        <p style="margin:0 0 16px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.55;">Message the front desk, get check-in updates, and book direct next time — like a real app, no app store.</p>
+        <a href="${installUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Add to Home Screen →</a>
+        <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:12px;line-height:1.5;">On iPhone: open the link in Safari → Share → Add to Home Screen</div>
+    </div>`;
+}
+
+async function notifyGuestBookingConfirmed({ req, hotelId, guestInfo, bookingDetails, reservationCode }) {
+    if (!guestInfo?.email) return;
+    const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, phone: true } }).catch(() => null);
+    const emailCode = reservationCode || bookingDetails?.reservationCode;
+    const bookingUrl = await buildGuestBookingUrl(hotelId, emailCode, req);
+    const installUrl = await buildGuestInstallUrl(hotelId, emailCode, req, 'confirmation-email');
+    sendGuestConfirmationEmail({
+        guestEmail: guestInfo.email,
+        guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
+        hotelName: hotelForEmail?.name || 'Your Hotel',
+        hotelPhone: hotelForEmail?.phone || '',
+        roomName: bookingDetails.name || bookingDetails.roomName,
+        checkin: bookingDetails.checkin,
+        checkout: bookingDetails.checkout,
+        nights: bookingDetails.nights,
+        total: bookingDetails.total,
+        reservationCode: emailCode,
+        bookingUrl,
+        installUrl,
+    });
+}
+
+async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, checkout, nights, total, reservationCode, bookingUrl, installUrl }) {
     if (!emailTransporter || !guestEmail) return;
     try {
         const checkinStr = new Date(checkin).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -120,7 +168,8 @@ async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, ho
         const totalStr = total ? `$${Number(total).toFixed(2)}` : '';
         const phoneStr = hotelPhone ? ` — ${hotelPhone}` : '.';
 
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Reservation Confirmed ✓</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.5;">Your reservation at <strong>${hotelName}</strong> is confirmed. Here are your details:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;"><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Room</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${roomName}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-in</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkinStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-out</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkoutStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Nights</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${nights}</div></td></tr>${totalStr ? `<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Total</div><div style="font-size:15px;font-weight:600;color:#2E7D5B;">${totalStr}</div></td></tr>` : ''}<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Confirmation #</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${reservationCode}</div></td></tr></table>${bookingUrl ? `<div style="text-align:center;margin:0 0 20px;"><a href="${bookingUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 26px;border-radius:10px;">View my reservation</a><div style="font-size:11px;color:#9ca3af;margin-top:8px;">Message the front desk, add to your calendar, or book again anytime.</div></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">If you have any questions, contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const installBlock = guestInstallEmailBlockHtml({ hotelName, installUrl });
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Reservation Confirmed ✓</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.5;">Your reservation at <strong>${hotelName}</strong> is confirmed. Here are your details:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;"><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Room</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${roomName}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-in</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkinStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-out</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkoutStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Nights</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${nights}</div></td></tr>${totalStr ? `<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Total</div><div style="font-size:15px;font-weight:600;color:#2E7D5B;">${totalStr}</div></td></tr>` : ''}<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Confirmation #</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${reservationCode}</div></td></tr></table>${installBlock}${bookingUrl ? `<div style="text-align:center;margin:0 0 20px;"><a href="${bookingUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 26px;border-radius:10px;">View my reservation</a><div style="font-size:11px;color:#9ca3af;margin-top:8px;">Message the front desk, add to your calendar, or book again anytime.</div></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">If you have any questions, contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
 
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
@@ -132,6 +181,99 @@ async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, ho
     } catch (e) {
         console.error('❌ Guest confirmation email failed:', e.message);
     }
+}
+
+async function sendGuestInstallReminderEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, installUrl, bookingUrl }) {
+    if (!emailTransporter || !guestEmail || !installUrl) return false;
+    try {
+        const checkinStr = new Date(checkin).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        const phoneStr = hotelPhone ? ` — ${hotelPhone}` : '.';
+        const installBlock = guestInstallEmailBlockHtml({ hotelName, installUrl });
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Check-in tomorrow at ${hotelName}</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">You're checking in <strong>${checkinStr}</strong>${roomName ? ` in <strong>${roomName}</strong>` : ''}. Add <strong>${hotelName}</strong> to your home screen now — message us for WiFi, early check-in, or anything you need.</p>${installBlock}${bookingUrl ? `<div style="text-align:center;margin:0 0 16px;"><a href="${bookingUrl}" style="display:inline-block;background:#f3f4f6;color:#1a1a2e;text-decoration:none;font-size:13px;font-weight:600;padding:11px 20px;border-radius:10px;">View reservation details</a></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Questions? Contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        await emailTransporter.sendMail({
+            from: `"${hotelName}" <support@bookmarketel.com>`,
+            to: guestEmail,
+            subject: `Add ${hotelName} to your phone before check-in`,
+            html,
+        });
+        console.log(`✅ Guest install reminder sent to ${guestEmail}`);
+        return true;
+    } catch (e) {
+        console.error('❌ Guest install reminder failed:', e.message);
+        return false;
+    }
+}
+
+/** Send pre-check-in install reminders for bookings checking in within ~36 hours. */
+async function runGuestInstallReminders() {
+    if (!emailTransporter) return { sent: 0, skipped: 0 };
+    const now = new Date();
+    const windowStart = new Date(now);
+    windowStart.setHours(windowStart.getHours() + 12);
+    const windowEnd = new Date(now);
+    windowEnd.setHours(windowEnd.getHours() + 36);
+
+    const bookings = await prisma.booking.findMany({
+        where: {
+            guestInstallReminderSentAt: null,
+            guestEmail: { not: '' },
+            checkinDate: { gte: windowStart, lte: windowEnd },
+            status: { not: 'cancelled' },
+        },
+        take: 50,
+    }).catch(() => []);
+
+    let sent = 0;
+    let skipped = 0;
+    for (const b of bookings) {
+        const code = b.pmsConfirmationCode || b.ourReservationCode;
+        const hasPush = await prisma.pushSubscription.findFirst({
+            where: { hotelId: b.hotelId, reservationCode: code, source: 'guest' },
+        }).catch(() => null);
+        if (hasPush) {
+            await prisma.booking.update({
+                where: { id: b.id },
+                data: { guestInstallReminderSentAt: new Date() },
+            }).catch(() => {});
+            skipped++;
+            continue;
+        }
+
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: b.hotelId },
+            select: { name: true, phone: true },
+        }).catch(() => null);
+        const domain = await prisma.hotelDomain.findFirst({
+            where: { hotelId: b.hotelId },
+            orderBy: { isPrimary: 'desc' },
+        }).catch(() => null);
+        const base = domain?.domain ? `https://${domain.domain}` : '';
+        if (!base) { skipped++; continue; }
+
+        const installUrl = `${base}/install?code=${encodeURIComponent(code)}&ref=checkin-reminder`;
+        const bookingUrl = `${base}/booking/${encodeURIComponent(code)}`;
+        const ok = await sendGuestInstallReminderEmail({
+            guestEmail: b.guestEmail,
+            guestName: [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'there',
+            hotelName: hotel?.name || 'Your Hotel',
+            hotelPhone: hotel?.phone || '',
+            roomName: b.roomName,
+            checkin: b.checkinDate,
+            installUrl,
+            bookingUrl,
+        });
+        if (ok) {
+            await prisma.booking.update({
+                where: { id: b.id },
+                data: { guestInstallReminderSentAt: new Date() },
+            }).catch(() => {});
+            sent++;
+        } else {
+            skipped++;
+        }
+    }
+    if (sent > 0) console.log(`📱 Guest install reminders sent: ${sent}`);
+    return { sent, skipped };
 }
 
 // Web Push configuration
@@ -1573,6 +1715,13 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     }
                 });
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
+                notifyGuestBookingConfirmed({
+                    req,
+                    hotelId: hotelValidation.hotelId,
+                    guestInfo,
+                    bookingDetails,
+                    reservationCode: pmsResponse.reservationID,
+                });
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -1615,22 +1764,12 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     }
                 });
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
-                // Send guest confirmation email
-                const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true, phone: true } }).catch(() => null);
-                const emailCode = pmsResponse.reservationID || bookingDetails.reservationCode;
-                const bookingUrl = await buildGuestBookingUrl(hotelValidation.hotelId, emailCode, req);
-                sendGuestConfirmationEmail({
-                    guestEmail: guestInfo.email,
-                    guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
-                    hotelName: hotelForEmail?.name || 'Your Hotel',
-                    hotelPhone: hotelForEmail?.phone || '',
-                    roomName: bookingDetails.name || bookingDetails.roomName,
-                    checkin: bookingDetails.checkin,
-                    checkout: bookingDetails.checkout,
-                    nights: bookingDetails.nights,
-                    total: bookingDetails.total,
-                    reservationCode: emailCode,
-                    bookingUrl,
+                notifyGuestBookingConfirmed({
+                    req,
+                    hotelId: hotelValidation.hotelId,
+                    guestInfo,
+                    bookingDetails,
+                    reservationCode: pmsResponse.reservationID,
                 });
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
@@ -1724,6 +1863,13 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     });
                     dbSaveSuccess = true;
                     triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
+                    notifyGuestBookingConfirmed({
+                        req,
+                        hotelId: hotelValidation.hotelId,
+                        guestInfo,
+                        bookingDetails,
+                        reservationCode: pmsResponse.data.reservationID,
+                    });
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -2957,22 +3103,12 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                     }
                 });
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
-                // Send guest confirmation email
-                const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelValidation.hotelId }, select: { name: true, phone: true } }).catch(() => null);
-                const emailCode = pmsResponse.reservationID || bookingDetails.reservationCode;
-                const bookingUrl = await buildGuestBookingUrl(hotelValidation.hotelId, emailCode, req);
-                sendGuestConfirmationEmail({
-                    guestEmail: guestInfo.email,
-                    guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
-                    hotelName: hotelForEmail?.name || 'Your Hotel',
-                    hotelPhone: hotelForEmail?.phone || '',
-                    roomName: bookingDetails.name || bookingDetails.roomName,
-                    checkin: bookingDetails.checkin,
-                    checkout: bookingDetails.checkout,
-                    nights: bookingDetails.nights,
-                    total: bookingDetails.total,
-                    reservationCode: emailCode,
-                    bookingUrl,
+                notifyGuestBookingConfirmed({
+                    req,
+                    hotelId: hotelValidation.hotelId,
+                    guestInfo,
+                    bookingDetails,
+                    reservationCode: pmsResponse.reservationID,
                 });
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
@@ -6814,5 +6950,11 @@ telemetry.setupRoutes(app);
 
 app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);
+    // Pre-check-in guest install reminders (12–36h before check-in)
+    if (process.env.ENABLE_GUEST_INSTALL_REMINDERS !== 'false') {
+        const REMINDER_INTERVAL_MS = 60 * 60 * 1000;
+        setTimeout(() => runGuestInstallReminders().catch((e) => console.error('Guest install reminders:', e.message)), 90_000);
+        setInterval(() => runGuestInstallReminders().catch((e) => console.error('Guest install reminders:', e.message)), REMINDER_INTERVAL_MS);
+    }
 });
 

@@ -4,6 +4,7 @@ import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, S
 import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { isStandalone } from './pwaUtils.js';
+import GuestInstallCard from './GuestInstallCard.jsx';
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -19,6 +20,15 @@ const calcNights = (checkin, checkout) => {
   const a = new Date(checkin);
   const b = new Date(checkout);
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
+};
+
+const isCheckinToday = (checkinStr) => {
+  if (!checkinStr) return false;
+  const d = new Date(checkinStr);
+  const now = new Date();
+  return d.getUTCFullYear() === now.getUTCFullYear()
+    && d.getUTCMonth() === now.getUTCMonth()
+    && d.getUTCDate() === now.getUTCDate();
 };
 
 function PreBookHub({ hotel, onBook, onFindReservation }) {
@@ -178,6 +188,13 @@ export default function GuestHomePage({ hotel: hotelProp }) {
     });
   };
 
+  const checkinDate = checkin ? new Date(checkin) : null;
+  const now = new Date();
+  const isCheckinSoon = checkinDate && (() => {
+    const diffDays = Math.round((checkinDate - now) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 1;
+  })();
+
   return (
     <div style={styles.page}>
       {/* Greeting */}
@@ -185,6 +202,29 @@ export default function GuestHomePage({ hotel: hotelProp }) {
         <h1 style={styles.greeting}>Welcome, {firstName}</h1>
         <p style={styles.greetingSubtitle}>Here's your upcoming stay</p>
       </div>
+
+      {isCheckinSoon && (
+        <button
+          type="button"
+          onClick={() => navigate('/guest/check-in')}
+          style={{
+            width: '100%', marginBottom: 16, padding: 14, borderRadius: 14,
+            border: 'none', background: 'linear-gradient(135deg,#1a2b22,#2E7D5B)',
+            color: 'white', fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+            cursor: 'pointer', textAlign: 'left',
+          }}
+        >
+          {isCheckinToday(checkin) ? '✓ Check-in today — tap for WiFi & messages' : 'Check-in tomorrow — get ready →'}
+        </button>
+      )}
+
+      <GuestInstallCard
+        hotelName={hotelProp?.name || lookupHotel?.name}
+        appIconUrl={hotelProp?.appIconUrl || lookupHotel?.appIconUrl}
+        hotelId={hotelId}
+        reservationCode={confirmationCode}
+        variant="card"
+      />
 
       {/* Stay card */}
       <div style={styles.card}>

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, Search } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
+import GuestInstallCard from './GuestInstallCard.jsx';
+import { isStandalone } from './pwaUtils.js';
 
 const QUICK_CHIPS = ['Early check-in', 'Late check-out', 'Extra towels', 'Quiet room'];
 
@@ -51,7 +53,7 @@ function formatRelativeTime(dateStr) {
   });
 }
 
-export default function GuestMessagesPage() {
+export default function GuestMessagesPage({ hotel }) {
   const { guestStay, apiBaseUrl, hotelId } = useGuest();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
@@ -274,6 +276,19 @@ export default function GuestMessagesPage() {
         <h1 style={styles.headerTitle}>Messages</h1>
         <p style={styles.headerSubtitle}>Front Desk</p>
       </div>
+
+      {!isStandalone() && (
+        <div style={{ padding: '0 16px', marginBottom: 8 }}>
+          <GuestInstallCard
+            hotelName={hotel?.name}
+            appIconUrl={hotel?.appIconUrl}
+            hotelId={hotelId}
+            reservationCode={guestStay?.code}
+            variant="card"
+            subline="Install to get reply notifications on your phone — like a text from the hotel."
+          />
+        </div>
+      )}
 
       {/* Message area */}
       <div ref={scrollContainerRef} style={styles.messagesArea}>

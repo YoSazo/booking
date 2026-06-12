@@ -19,6 +19,8 @@ const CheckoutReturnPageWrapper = lazy(() => import('./CheckoutReturnPageWrapper
 const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 const GuestHomePage = lazy(() => import('./GuestHomePage.jsx'));
 const GuestMessagesPage = lazy(() => import('./GuestMessagesPage.jsx'));
+const InstallPage = lazy(() => import('./InstallPage.jsx'));
+const GuestCheckInPage = lazy(() => import('./GuestCheckInPage.jsx'));
 
 
 const hotelId = getHotelId();
@@ -712,6 +714,16 @@ const handleConfirmBooking = async (bookingDetails) => {
           <Route path="/guest/messages" element={
             <Suspense fallback={null}>
               <GuestMessagesPage hotel={currentHotel} />
+            </Suspense>
+          } />
+          <Route path="/install" element={
+            <Suspense fallback={null}>
+              <InstallPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
+            </Suspense>
+          } />
+          <Route path="/guest/check-in" element={
+            <Suspense fallback={null}>
+              <GuestCheckInPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
             </Suspense>
           } />
 

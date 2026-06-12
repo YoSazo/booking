@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGuest } from './GuestProvider.jsx';
 import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
-import InstallAppBanner from './InstallAppBanner.jsx';
+import GuestInstallCard from './GuestInstallCard.jsx';
 import { GuestMessageCard, downloadStayIcs } from './guestMessaging.jsx';
 
 const formatDateWithSuffix = (date) => {
@@ -166,8 +166,16 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           <div className="confirmation-header">
             <h2>Booking Confirmed!</h2>
             <p className="confirmation-code">Confirmation Code: <strong>#{reservationCode}</strong></p>
-            <p className="confirmation-email">A confirmation email has been sent to <strong>{guestInfo.email}</strong></p>
+            <p className="confirmation-email">A confirmation email has been sent to <strong>{guestInfo.email}</strong> with a link to add {hotel?.name || 'us'} to your phone.</p>
           </div>
+
+          <GuestInstallCard
+            hotelName={hotel?.name}
+            appIconUrl={hotel?.appIconUrl}
+            hotelId={resolvedHotelId}
+            reservationCode={reservationCode}
+            variant="hero"
+          />
 
           <div className="stay-details-card">
             <div className="detail-row">
@@ -335,12 +343,17 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
             hotelPhone={hotelPhone}
           />
 
-          {/* Save this property to the home screen */}
-          <InstallAppBanner
-            hotelName={hotel?.name}
-            appIconUrl={hotel?.appIconUrl}
-            hotelId={resolvedHotelId}
-          />
+          <button
+            type="button"
+            onClick={() => navigate('/guest/check-in')}
+            style={{
+              width: '100%', marginTop: 8, padding: 13, borderRadius: 12,
+              border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',
+              fontSize: 14, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+            }}
+          >
+            Prepare for check-in →
+          </button>
         </div>
       </div>
     </>

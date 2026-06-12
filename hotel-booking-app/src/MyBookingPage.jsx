@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CalendarPlus, CalendarClock, Search } from 'lucide-react';
 import { GuestMessageCard, downloadStayIcs } from './guestMessaging.jsx';
+import GuestInstallCard from './GuestInstallCard.jsx';
 import { useGuest } from './GuestProvider.jsx';
 
 const fmtDate = (d) => {
@@ -169,6 +170,16 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
               </button>
             </div>
 
+            <GuestInstallCard
+              hotelName={hotel?.name}
+              appIconUrl={hotel?.appIconUrl}
+              hotelId={resolvedHotelId}
+              reservationCode={booking.reservationCode}
+              variant="hero"
+              headline={`Add ${hotel?.name || 'us'} to your phone`}
+              subline="You opened this from your confirmation email — tap to install and message the front desk."
+            />
+
             <GuestMessageCard
               apiBaseUrl={apiBaseUrl}
               hotelId={resolvedHotelId}
@@ -176,6 +187,18 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
               guestInfo={guestInfo}
               hotelPhone={hotelPhone}
             />
+
+            <button
+              type="button"
+              onClick={() => navigate('/guest/check-in')}
+              style={{
+                width: '100%', marginTop: 12, padding: 13, borderRadius: 12,
+                border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',
+                fontSize: 14, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+              }}
+            >
+              Prepare for check-in →
+            </button>
           </>
         )}
       </div>
