@@ -423,6 +423,23 @@ const corsOptions = {
 // Webhook needs raw body
 app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
+
+// Front Desk must be registered BEFORE express.static(public) — otherwise static
+// sees public/frontdesk/ as a directory and 301-redirects /frontdesk → /frontdesk/,
+// which on Vercel hotel domains falls through to the booking-engine SPA.
+const FRONTDESK_BUILT = path.join(__dirname, 'public', 'frontdesk', 'index.html');
+const FRONTDESK_LEGACY = path.join(__dirname, 'simple-crm.html');
+function serveFrontdesk(_req, res) {
+    res.setHeader('Cache-Control', 'no-cache');
+    const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
+    res.sendFile(file);
+}
+app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
+app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'frontdesk', 'assets'), {
+    maxAge: '365d',
+    immutable: true,
+}));
+
 app.use('/uploads', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
@@ -4675,15 +4692,6 @@ async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMe
 // /crm redirects to /frontdesk (crm.html removed)
 app.get('/crm', (req, res) => {
     res.redirect(301, '/frontdesk');
-});
-
-// Serve Front Desk (Vite build, fallback to legacy monolith)
-const FRONTDESK_BUILT = path.join(__dirname, 'public', 'frontdesk', 'index.html');
-const FRONTDESK_LEGACY = path.join(__dirname, 'simple-crm.html');
-app.get('/frontdesk', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
-    res.sendFile(file);
 });
 
 // Serve front desk demo (for setup wizard preview)

@@ -1,6 +1,8 @@
 {
   "rewrites": [
     { "source": "/frontdesk", "destination": "https://guest-lodge-backend.onrender.com/frontdesk" },
+    { "source": "/frontdesk/", "destination": "https://guest-lodge-backend.onrender.com/frontdesk/" },
+    { "source": "/frontdesk/assets/(.*)", "destination": "https://guest-lodge-backend.onrender.com/frontdesk/assets/$1" },
     { "source": "/api/(.*)", "destination": "https://guest-lodge-backend.onrender.com/api/$1" },
     { "source": "/apps-showcase/(.*)", "destination": "https://guest-lodge-backend.onrender.com/apps-showcase/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
