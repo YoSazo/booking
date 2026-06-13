@@ -42,6 +42,7 @@ const STATE_KEYS = [
   'activeHotelAppIcon', 'appsViewPlatform', 'activeHotelDomain', 'activeHotelContext', 'bootInFlight',
   'deferredInstallPrompt', 'frontdeskInstalled', '_magicLoginPending', 'editRooms',
   'messageUnreadCount', 'bookingsVirtualList', 'bookingsVirtualRaf',
+  'messagesInboxOpen', 'selectedMessageThread',
   'CRM_HOTEL_BY_HOST', 'CRM_HOTEL_LABELS', 'ALLOWED_REVENUE_PERIODS', 'OTA_COMMISSION_RATE',
 ];
 
@@ -221,14 +222,16 @@ const css = slice(16, 1697);
 fs.mkdirSync(path.join(out, 'styles'), { recursive: true });
 fs.writeFileSync(path.join(out, 'styles', 'core.css'), css);
 
+const PWA_START = lineAt('// ── PWA INSTALL');
 const SETTINGS_START = lineAt('// ── SETTINGS TAB');
 const APPS_START = lineAt('// ── APPS PAGE');
 const INIT_START = lineAt('// ── INIT');
 const HELPERS_START = lineAt('// ── HELPERS');
 const TOAST_LINE = lines.findIndex((l) => /^function toast\(/.test(l)) + 1;
 if (TOAST_LINE < 1) throw new Error('function toast not found');
+if (PWA_START < 1) throw new Error('PWA marker not found');
 
-let coreBlock = slice(1937, HELPERS_START - 1) + '\n\n' + slice(TOAST_LINE, SETTINGS_START - 1);
+let coreBlock = slice(PWA_START, HELPERS_START - 1) + '\n\n' + slice(TOAST_LINE, SETTINGS_START - 1);
 coreBlock = coreBlock
   .replace(/^let deferredInstallPrompt = null;\n/m, '')
   .replace(/^let frontdeskInstalled = false;\n/m, '')
@@ -325,6 +328,8 @@ export const fd = {
   _magicLoginPending: false,
   editRooms: [],
   messageUnreadCount: 0,
+  messagesInboxOpen: false,
+  selectedMessageThread: '',
   bookingsVirtualList: [],
   bookingsVirtualRaf: 0,
 };
