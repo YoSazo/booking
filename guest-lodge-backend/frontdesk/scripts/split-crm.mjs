@@ -266,9 +266,12 @@ coreBlock = rewriteFd(coreBlock);
 
 const settingsBlock = slice(SETTINGS_START, APPS_START - 1).replace(/^let editRooms = \[\];\n?/m, '');
 const appsBlock = slice(APPS_START, INIT_START - 1);
-const initEnd = lines.findIndex((l) => l.trim() === '</script>');
-if (initEnd < 0) throw new Error('</script> not found');
-const initBlock = slice(INIT_START, initEnd);
+const initEndLine = lines.findIndex((l, i) => i >= INIT_START - 1 && l.trim() === '</script>');
+if (initEndLine < 0) throw new Error('</script> not found after INIT');
+const initBlock = slice(INIT_START, initEndLine);
+if (!initBlock.includes('bootCrmApp()')) {
+  throw new Error('init block is missing bootCrmApp() — check INIT / </script> slice bounds');
+}
 
 const stateJs = `/** Shared mutable Front Desk state */
 export const fd = {
