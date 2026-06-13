@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { readGuestStay, writeGuestStay, clearGuestStay } from './guestStayStorage.js';
 
 const GuestContext = createContext(null);
 
@@ -7,33 +8,19 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('marketel_guest_stay');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Only treat as active if checkout is today or later
-        const checkout = new Date(parsed.checkout || parsed.checkoutDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (checkout >= today) {
-          setGuestStayState(parsed);
-        }
-      }
-    } catch (e) { /* ignore */ }
+    setGuestStayState(readGuestStay(hotelId));
     setIsLoading(false);
-  }, []);
+  }, [hotelId]);
 
   const setGuestStay = (stay) => {
-    setGuestStayState(stay);
-    try {
-      if (stay) localStorage.setItem('marketel_guest_stay', JSON.stringify(stay));
-      else localStorage.removeItem('marketel_guest_stay');
-    } catch (e) { /* ignore */ }
+    const scoped = stay && hotelId ? { ...stay, hotelId } : stay;
+    setGuestStayState(scoped);
+    writeGuestStay(scoped);
   };
 
   const clearGuest = () => {
     setGuestStayState(null);
-    try { localStorage.removeItem('marketel_guest_stay'); } catch (e) { /* ignore */ }
+    clearGuestStay();
   };
 
   const isGuest = !!guestStay;

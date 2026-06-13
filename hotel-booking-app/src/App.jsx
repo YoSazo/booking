@@ -9,6 +9,7 @@ import getHotelId from './utils/getHotelId';
 import { GuestProvider } from './GuestProvider.jsx';
 import GuestLayout from './GuestLayout.jsx';
 import { isStandalone } from './pwaUtils.js';
+import { readGuestStay } from './guestStayStorage.js';
 
 // Lazy-load heavy pages so they don't bloat the initial landing page bundle.
 // GuestInfoPage pulls in Stripe + Google Maps — biggest win.
@@ -234,8 +235,8 @@ function App() {
   // State management
   const location = useLocation(); 
 
-  // PWA entry: installed app opens to Guest Home (hotel hub). Active stays skip the booking page.
-  // Browser visitors stay on the booking engine until they book.
+  // PWA entry: installed app opens to Guest Home. Returning guests with a stay at
+  // this hotel skip the booking page. Other hotels' stays must not hijack the engine.
   const initialRedirectDone = useRef(false);
   useEffect(() => {
     if (initialRedirectDone.current) return;
@@ -244,25 +245,7 @@ function App() {
       return;
     }
 
-    let hasActiveStay = false;
-    const storedStay = localStorage.getItem('marketel_guest_stay');
-    if (storedStay) {
-      try {
-        const stay = JSON.parse(storedStay);
-        if (stay.code && (stay.checkout || stay.checkoutDate)) {
-          const checkoutDate = new Date(stay.checkout || stay.checkoutDate);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (checkoutDate >= today) {
-            hasActiveStay = true;
-          } else {
-            localStorage.removeItem('marketel_guest_stay');
-          }
-        }
-      } catch (e) {
-        localStorage.removeItem('marketel_guest_stay');
-      }
-    }
+    const hasActiveStay = !!readGuestStay(hotelId);
 
     if (hasActiveStay || isStandalone()) {
       initialRedirectDone.current = true;
@@ -271,7 +254,7 @@ function App() {
     }
 
     initialRedirectDone.current = true;
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, hotelId]);
   
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
