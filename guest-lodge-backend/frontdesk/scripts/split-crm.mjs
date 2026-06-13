@@ -235,8 +235,8 @@ coreBlock = coreBlock
 coreBlock = rewriteFd(coreBlock);
 
 const settingsBlock = slice(4492, 6547).replace(/^let editRooms = \[\];\n?/m, '');
-const appsBlock = slice(6548, 7097);
-const initBlock = slice(7099, 7112);
+const appsBlock = slice(6548, 7122);
+const initBlock = slice(7124, 7138);
 
 const stateJs = `/** Shared mutable Front Desk state */
 export const fd = {
