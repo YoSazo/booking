@@ -19,6 +19,12 @@ function slice(start, end) {
   return lines.slice(start - 1, end).join('\n');
 }
 
+function lineAt(marker) {
+  const idx = lines.findIndex((l) => l.includes(marker));
+  if (idx < 0) throw new Error(`Section marker not found: ${marker}`);
+  return idx + 1;
+}
+
 function extractFunctions(code) {
   const names = new Set();
   const re = /^(?:async )?function (\w+)\s*\(/gm;
@@ -169,11 +175,60 @@ function rewriteFd(code) {
   return unmask(out, parts);
 }
 
+const APPLY_FILTER_APPS_BLOCK = `if (currentFilter === 'apps') {
+    if (bookingsEl) bookingsEl.style.display = 'none';
+    if (availabilityEl) availabilityEl.style.display = 'none';
+    if (revenueEl) revenueEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
+    const editEl2 = document.getElementById('editView');
+    if (editEl2) editEl2.style.display = 'none';
+    if (msgPanel) msgPanel.style.display = 'none';
+    const appsEl2 = document.getElementById('appsView');
+    if (appsEl2) {
+      appsEl2.style.display = 'block';
+      if (!appsEl2.querySelector('.apps-page')) {
+        appsEl2.innerHTML = '<div class="loading" style="padding:48px 0;"><div class="logo-sprite-bounce"></div></div>';
+      }
+    }
+    closeAvailabilityDayPopover();
+    loadAppsModule().then(() => {
+      const appsTourOpen = !!document.getElementById('appsTourLightbox');
+      if (!appsTourOpen) ensureAppsViewRendered();
+      if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
+        setTimeout(() => {
+          if (!document.getElementById('appsTourLightbox')) startAppsTour();
+        }, 500);
+      }
+    }).catch(() => {
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Apps</div></div>';
+    });
+    return;
+  }
+
+  `;
+
+function patchApplyFilterAppsBlock(code) {
+  const fnStart = code.indexOf('function applyFilter()');
+  if (fnStart < 0) throw new Error('applyFilter not found in core block');
+  const appsStart = code.indexOf("if (currentFilter === 'apps')", fnStart);
+  const tail = "if (bookingsEl) bookingsEl.style.display = '';";
+  const tailAt = code.indexOf(tail, appsStart);
+  if (appsStart < 0 || tailAt < 0) throw new Error('applyFilter apps block not found');
+  return code.slice(0, appsStart) + APPLY_FILTER_APPS_BLOCK + code.slice(tailAt);
+}
+
 const css = slice(16, 1697);
 fs.mkdirSync(path.join(out, 'styles'), { recursive: true });
 fs.writeFileSync(path.join(out, 'styles', 'core.css'), css);
 
-let coreBlock = slice(1937, 4470) + '\n\n' + slice(4483, 4490);
+const SETTINGS_START = lineAt('// ── SETTINGS TAB');
+const APPS_START = lineAt('// ── APPS PAGE');
+const INIT_START = lineAt('// ── INIT');
+const HELPERS_START = lineAt('// ── HELPERS');
+const TOAST_LINE = lines.findIndex((l) => /^function toast\(/.test(l)) + 1;
+if (TOAST_LINE < 1) throw new Error('function toast not found');
+
+let coreBlock = slice(1937, HELPERS_START - 1) + '\n\n' + slice(TOAST_LINE, SETTINGS_START - 1);
 coreBlock = coreBlock
   .replace(/^let deferredInstallPrompt = null;\n/m, '')
   .replace(/^let frontdeskInstalled = false;\n/m, '')
@@ -195,34 +250,9 @@ coreBlock = coreBlock
     });
     return;
   }`
-  )
-  .replace(
-    /if \(currentFilter === 'apps'\) \{[\s\S]*?return;\n  \}\n\n  if \(bookingsEl\)/,
-    `if (currentFilter === 'apps') {
-    if (bookingsEl) bookingsEl.style.display = 'none';
-    if (availabilityEl) availabilityEl.style.display = 'none';
-    if (revenueEl) revenueEl.style.display = 'none';
-    if (settingsEl) settingsEl.style.display = 'none';
-    const editEl2 = document.getElementById('editView');
-    if (editEl2) editEl2.style.display = 'none';
-    if (msgPanel) msgPanel.style.display = 'none';
-    const appsEl2 = document.getElementById('appsView');
-    if (appsEl2) appsEl2.style.display = 'block';
-    closeAvailabilityDayPopover();
-    loadAppsModule().then(() => {
-      const appsTourOpen = !!document.getElementById('appsTourLightbox');
-      if (!appsTourOpen) renderAppsView();
-      if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
-        setTimeout(() => {
-          if (!document.getElementById('appsTourLightbox')) startAppsTour();
-        }, 500);
-      }
-    });
-    return;
-  }
-
-  if (bookingsEl)`
-  )
+  );
+coreBlock = patchApplyFilterAppsBlock(coreBlock);
+coreBlock = coreBlock
   .replace(
     /await Promise\.allSettled\(\[\n    loadManualAvailability\(\),\n    loadBookings\(\{ deferMessages: true \}\),\n  \]\);/,
     `await loadSettingsModule();
@@ -234,9 +264,11 @@ coreBlock = coreBlock
 
 coreBlock = rewriteFd(coreBlock);
 
-const settingsBlock = slice(4492, 6547).replace(/^let editRooms = \[\];\n?/m, '');
-const appsBlock = slice(6548, 7122);
-const initBlock = slice(7124, 7138);
+const settingsBlock = slice(SETTINGS_START, APPS_START - 1).replace(/^let editRooms = \[\];\n?/m, '');
+const appsBlock = slice(APPS_START, INIT_START - 1);
+const initEnd = lines.findIndex((l) => l.trim() === '</script>');
+if (initEnd < 0) throw new Error('</script> not found');
+const initBlock = slice(INIT_START, initEnd);
 
 const stateJs = `/** Shared mutable Front Desk state */
 export const fd = {

@@ -3136,6 +3136,10 @@ async function refreshCurrentView() {
   if (!token || !activeHotelId || document.getElementById('app').style.display === 'none') return;
   // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
   if (currentFilter === 'settings') return;
+  if (currentFilter === 'apps') {
+    loadAppsModule().then(() => loadGuestInstallStats()).catch(() => {});
+    return;
+  }
   const tasks = [loadBookings()];
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
@@ -3546,16 +3550,24 @@ function applyFilter() {
     if (editEl2) editEl2.style.display = 'none';
     if (msgPanel) msgPanel.style.display = 'none';
     const appsEl2 = document.getElementById('appsView');
-    if (appsEl2) appsEl2.style.display = 'block';
-    closeAvailabilityDayPopover();
-    const appsTourOpen = !!document.getElementById('appsTourLightbox');
-    if (!appsTourOpen) renderAppsView();
-    // First time they find the Apps tab — walk them through the journey
-    if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
-      setTimeout(() => {
-        if (!document.getElementById('appsTourLightbox')) startAppsTour();
-      }, 500);
+    if (appsEl2) {
+      appsEl2.style.display = 'block';
+      if (!appsEl2.querySelector('.apps-page')) {
+        appsEl2.innerHTML = '<div class="loading" style="padding:48px 0;"><div class="logo-sprite-bounce"></div></div>';
+      }
     }
+    closeAvailabilityDayPopover();
+    loadAppsModule().then(() => {
+      const appsTourOpen = !!document.getElementById('appsTourLightbox');
+      if (!appsTourOpen) ensureAppsViewRendered();
+      if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
+        setTimeout(() => {
+          if (!document.getElementById('appsTourLightbox')) startAppsTour();
+        }, 500);
+      }
+    }).catch(() => {
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Apps</div></div>';
+    });
     return;
   }
 
@@ -4431,8 +4443,11 @@ function prefillGuestInstallBroadcast() {
       ? `Add ${hName} to your home screen — message us anytime and book direct next time. Tap here: ${installUrl}`
       : `Add ${hName} to your home screen — message us anytime and book direct next time.`;
   }
-  const card = document.querySelector('.apps-broadcast-card');
-  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const notifyFold = document.querySelector('#appsView details.apps-fold:last-of-type');
+  if (notifyFold) {
+    notifyFold.open = true;
+    notifyFold.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
   toast('Pre-filled — edit if you like, then tap Notify all guests', 'success');
 }
 
@@ -6477,6 +6492,10 @@ async function uploadAppIcon(input) {
     if (data.success && data.appIconUrl) {
       activeHotelAppIcon = data.appIconUrl;
       setAppIconPreviewImage(data.appIconUrl);
+      const appsEl = document.getElementById('appsView');
+      if (appsEl) {
+        appsEl.dataset.appsKey = (activeHotelId || '') + '|' + data.appIconUrl + '|' + (activeHotelDomain || '');
+      }
       if (typeof updateFrontdeskManifestLink === 'function') updateFrontdeskManifestLink();
       toast('Logo updated! Guests will see it on their phone.', 'success');
     } else {
@@ -6697,6 +6716,18 @@ function detectAppPlatform() {
   return 'ios';
 }
 
+function ensureAppsViewRendered(force) {
+  const el = document.getElementById('appsView');
+  if (!el) return;
+  const key = (activeHotelId || '') + '|' + (activeHotelAppIcon || '') + '|' + (activeHotelDomain || '');
+  if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
+    renderAppsView();
+    el.dataset.appsKey = key;
+  } else {
+    loadGuestInstallStats();
+  }
+}
+
 function renderAppsView() {
   const el = document.getElementById('appsView');
   if (!el) return;
@@ -6801,7 +6832,7 @@ function renderAppsView() {
   <div class="apps-page">
 
     <div id="guestInstallStats" class="apps-step-card" style="margin-bottom:14px;padding:14px 16px;">
-      <div style="font-size:12px;color:var(--text-muted);">Loading guest install stats…</div>
+      <div class="loading" style="padding:8px 0;"><div class="logo-sprite-bounce"></div></div>
     </div>
 
     <h2 class="apps-headline">Apps on your phone</h2>
@@ -6841,17 +6872,17 @@ function renderAppsView() {
           <span class="apps-fold-chevron" aria-hidden="true">›</span>
         </summary>
         <div class="apps-fold-body">
-          <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:12px;margin-bottom:12px;">
-            ${guestInstallQr ? `<img src="${guestInstallQr}" alt="Guest install QR" width="100" height="100" style="border-radius:10px;border:1px solid var(--border);flex-shrink:0;">` : ''}
-            <div style="flex:1;min-width:160px;">
-              <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
-              <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="padding:8px 14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px;">Copy link</button>
+          <div style="margin-top:12px;margin-bottom:12px;">
+            <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="padding:8px 14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Copy link</button>
               <button type="button" onclick="prefillGuestInstallBroadcast()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Notify guests</button>
             </div>
           </div>
-          <div style="background:var(--bg);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--text-muted);line-height:1.45;">
+          <div style="background:var(--bg);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--text-muted);line-height:1.45;margin-bottom:12px;">
             <strong style="color:var(--text);">Room card:</strong> <em>"Scan to message us &amp; book direct — ${hName}"</em>
           </div>
+          ${guestInstallQr ? `<div style="text-align:center;"><img src="${guestInstallQr}" alt="Guest install QR" width="100" height="100" style="border-radius:10px;border:1px solid var(--border);"></div>` : ''}
         </div>
       </details>` : '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>'}
     </div>
@@ -7125,6 +7156,11 @@ function startAppsTour(opts) {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/frontdesk-sw.js').catch(() => {});
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 bootCrmApp();
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(() => { loadAppsModule().catch(() => {}); }, { timeout: 4000 });
+} else {
+  setTimeout(() => { loadAppsModule().catch(() => {}); }, 2000);
+}
 setInterval(refreshCurrentView, 30000);
 (function(){
   function loadTelemetry(){
