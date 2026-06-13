@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Marketel · Front Desk</title>
+  <link rel="manifest" href="/manifest-simple-crm.json">
+  <meta name="theme-color" content="#EEF2EF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Front Desk">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script>
+  (function(){
+    function loadClarity(){
+      (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");
+    }
+    if ('requestIdleCallback' in window) requestIdleCallback(loadClarity, { timeout: 5000 });
+    else setTimeout(loadClarity, 3000);
+  })();
+  </script>
+</head>
+<body>
+
+<div id="bootScreen" class="login-screen">
+  <div class="login-card status-card">
+    <div class="login-logo">
+      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    </div>
+    <div class="status-title" id="bootTitle">Connecting to hotel...</div>
+    <p class="status-message" id="bootMessage">Checking this domain and loading front desk context.</p>
+    <div class="status-spinner-wrap" id="bootSpinnerWrap">
+      <div class="logo-sprite-bounce"></div>
+    </div>
+    <div class="status-debug" id="bootDebug"></div>
+    <div class="status-actions">
+      <button class="login-btn" id="bootRetryBtn" onclick="bootCrmApp()" style="display:none">Retry</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginScreen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    </div>
+    <p>Front Desk — Enter your PIN to continue</p>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+    <div id="forgotPinSection" style="margin-top:14px;text-align:center;">
+      <a href="#" onclick="showMagicLinkForm(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Email me a login link</a>
+      <div id="magicLinkForm" style="display:none;margin-top:12px;">
+        <input class="login-input" type="email" id="magicLinkEmail" placeholder="Your email address" style="margin-bottom:10px;">
+        <button class="login-btn" onclick="sendMagicLink()" style="background:#2E7D5B;">Send Login Link</button>
+        <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header class="header">
+    <div class="header-logo">
+      <img src="/marketellogo.svg" alt="" class="header-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="header-logo-text">
+      <span class="header-logo-suffix">Front Desk</span>
+    </div>
+    <div class="header-right">
+      <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
+      <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
+      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR for guest to scan">📲 Check-in QR</button>
+      <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';">🔄 Redo Tour</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="tabs-container">
+      <div class="tabs-slider" id="tabsSlider"></div>
+      <button type="button" class="tab active" data-nav-filter="settings" onclick="setFilter('settings', this)">
+        Settings
+      </button>
+      <button type="button" class="tab" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
+        Bookings <span class="tab-badge" id="countNeedsCalled">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
+      </button>
+      <button type="button" class="tab" data-nav-filter="apps" onclick="setFilter('apps', this)">
+        Apps
+      </button>
+    </div>
+    <div id="goLiveBanner" style="display:none;"></div>
+    <div id="messagesPanel" style="display:none;"></div>
+    <div id="bookingsList">
+      <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
+    </div>
+    <div id="appsView" style="display:none;"></div>
+  </div>
+
+  <div id="previewSiteBar" style="display:none;"></div>
+
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
+    <button type="button" class="mobile-nav-item active" data-nav-filter="settings">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
+      <span class="mobile-nav-label">Settings</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="bookings">
+      <span class="mobile-nav-icon-wrap" style="position:relative;"><i data-lucide="inbox"></i><span id="msgUnreadDot" style="display:none;position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e0245e;border:2px solid #fff;"></span></span>
+      <span class="mobile-nav-label">Bookings</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="availability">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="door-open"></i></span>
+      <span class="mobile-nav-label">Availability</span>
+    </button>
+    <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="revenue" id="mobileNavRevenueBtn">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="trending-up"></i></span>
+      <span class="mobile-nav-label">Revenue</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-nav-filter="apps">
+      <span class="mobile-nav-icon-wrap"><i data-lucide="smartphone"></i></span>
+      <span class="mobile-nav-label">Apps</span>
+    </button>
+  </nav>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<div class="notes-modal-overlay" id="notesModal" onclick="closeNotesModal(event)">
+  <div class="notes-modal" onclick="event.stopPropagation()">
+    <div class="notes-modal-header">
+      <div class="notes-modal-title">Add Note</div>
+      <button class="notes-modal-close" onclick="closeNotesModal()">×</button>
+    </div>
+    <div class="notes-modal-body">
+      <label class="notes-input-label">Note</label>
+      <textarea class="notes-input" id="noteInput" placeholder="Add details about the booking, guest requests, or call notes..."></textarea>
+    </div>
+    <div class="notes-modal-footer">
+      <button class="notes-btn notes-btn-cancel" onclick="closeNotesModal()">Cancel</button>
+      <button class="notes-btn notes-btn-save" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

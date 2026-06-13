@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- SOURCE OF TRUTH for Front Desk. Run `npm run build:frontdesk` after edits. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -11,8 +12,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Front Desk">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
@@ -1687,8 +1686,25 @@
         white-space: nowrap;
       }
     }
+    #appsView, #revenueView, #settingsView, #editView {
+      content-visibility: auto;
+      contain-intrinsic-size: 1px 480px;
+    }
+    #bookingsList.bookings-virtual {
+      overflow-y: auto;
+      max-height: calc(100dvh - 200px);
+      -webkit-overflow-scrolling: touch;
+    }
   </style>
-<script type="text/javascript">(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");</script>
+<script>
+(function(){
+  function loadClarity(){
+    (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");
+  }
+  if ('requestIdleCallback' in window) requestIdleCallback(loadClarity, { timeout: 5000 });
+  else setTimeout(loadClarity, 3000);
+})();
+</script>
 </head>
 <body>
 
@@ -1823,6 +1839,7 @@
 let token = '';
 let bookings = [];
 let guestMessages = [];
+let messageUnreadCount = 0;
 let currentFilter = 'settings';
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
@@ -1865,6 +1882,57 @@ const CRM_HOTEL_LABELS = {
   'home-place-suites': 'Home Place Suites',
   'suite-stay': 'Suite Stay',
 };
+
+let lucideLoadPromise = null;
+function ensureLucideLoaded() {
+  if (typeof lucide !== 'undefined') return Promise.resolve();
+  if (lucideLoadPromise) return lucideLoadPromise;
+  lucideLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('lucide load failed'));
+    document.head.appendChild(s);
+  });
+  return lucideLoadPromise;
+}
+
+async function optimizeRoomPhotoForUpload(file) {
+  if (!file || !file.type.startsWith('image/')) return file;
+  if (file.type === 'image/webp' && file.size < 400000) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxW = 1600;
+    const maxH = 1200;
+    let w = bitmap.width;
+    let h = bitmap.height;
+    const scale = Math.min(1, maxW / w, maxH / h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/webp', 0.82);
+    });
+    const base = (file.name || 'room-photo').replace(/\.[^.]+$/, '') || 'room-photo';
+    return new File([blob], base + '.webp', { type: 'image/webp' });
+  } catch (_) {
+    return file;
+  }
+}
+
+function scheduleDeferredMessagesLoad() {
+  const run = () => {
+    if (currentFilter === 'bookings') loadMessages();
+    else loadMessageBadges();
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2500 });
+  else setTimeout(run, 600);
+}
 
 // ── PWA INSTALL / NOTIFICATIONS STATE ──────────────────────────
 // Captured as early as possible so the "Install Front Desk" button can fire the
@@ -2652,6 +2720,14 @@ async function startCrmApp(verification) {
   requestAnimationFrame(realignActiveTab);
   setTimeout(realignActiveTab, 120);
 
+  initMobileBottomNav();
+  updateMobileRevenueNavVisibility();
+  syncMobileNavActive(currentFilter);
+  ensureLucideLoaded().then(() => {
+    refreshMobileBottomNavIcons();
+    requestAnimationFrame(refreshMobileBottomNavIcons);
+  }).catch(() => {});
+
   // If coming from setup (has welcome param) or returning from preview (has tab param), open Settings
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
@@ -2670,15 +2746,10 @@ async function startCrmApp(verification) {
 
   await Promise.allSettled([
     loadManualAvailability(),
-    loadBookings(),
+    loadBookings({ deferMessages: true }),
   ]);
 
-  initMobileBottomNav();
-  updateMobileRevenueNavVisibility();
-  syncMobileNavActive(currentFilter);
   refreshMobileBottomNavIcons();
-  requestAnimationFrame(refreshMobileBottomNavIcons);
-  setTimeout(refreshMobileBottomNavIcons, 80);
 
   // Sync tab chrome if we deep-linked straight to Bookings (e.g. from a push).
   if (currentFilter === 'bookings') {
@@ -2851,7 +2922,7 @@ async function bootCrmApp() {
 }
 
 // ── LOAD ───────────────────────────────────────────────
-async function loadBookings() {
+async function loadBookings(opts = {}) {
   try {
     const data = await api('GET', '/api/crm/bookings');
     if (!data.success) throw new Error(data.message);
@@ -2865,7 +2936,8 @@ async function loadBookings() {
     
     // Render based on current filter
     applyFilter();
-    loadMessages();
+    if (opts.deferMessages) scheduleDeferredMessagesLoad();
+    else loadMessages();
   } catch(e) {
     if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
@@ -2878,18 +2950,30 @@ async function loadBookings() {
 }
 
 // ── GUEST MESSAGES ─────────────────────────────────────
+async function loadMessageBadges() {
+  try {
+    const data = await api('GET', '/api/crm/messages/unread-count');
+    if (!data.success) return;
+    messageUnreadCount = Number(data.unread) || 0;
+    updateMessageBadges();
+  } catch (e) { /* non-fatal */ }
+}
+
 async function loadMessages() {
   try {
     const data = await api('GET', '/api/crm/messages');
     if (!data.success) return;
     guestMessages = data.messages || [];
+    messageUnreadCount = 0;
     updateMessageBadges();
     if (currentFilter === 'bookings') renderMessages();
   } catch (e) { /* non-fatal */ }
 }
 
 function updateMessageBadges() {
-  const unread = guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length;
+  const unread = guestMessages.length
+    ? guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
+    : messageUnreadCount;
   const badge = document.getElementById('msgUnreadBadge');
   if (badge) {
     badge.textContent = unread;
@@ -3063,8 +3147,111 @@ async function refreshCurrentView() {
 }
 
 // ── RENDER ─────────────────────────────────────────────
+const BOOKING_CARD_EST_HEIGHT = 300;
+const BOOKING_VIRTUAL_THRESHOLD = 25;
+let bookingsVirtualList = [];
+let bookingsVirtualRaf = 0;
+
+function bookingCardHtml(b) {
+  const isDeclined = b.notes && b.notes.includes('PAYMENT DECLINED');
+  const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+  const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+  const ago = timeAgo(b.createdAt);
+  const rawPhoneDigits = String(b.guestPhone || '').replace(/\D/g, '');
+  let localPhoneDigits = rawPhoneDigits;
+  if (localPhoneDigits.length > 10 && localPhoneDigits.startsWith('1')) {
+    localPhoneDigits = localPhoneDigits.slice(1);
+  }
+  localPhoneDigits = localPhoneDigits.slice(0, 10);
+  const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
+  const noteBtnClass = currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
+  return `
+    <div class="booking-card">
+      <div class="card-accent ${isDeclined ? 'declined' : ''}"></div>
+      <div class="card-inner">
+        <div class="card-top">
+          <div class="guest-info">
+            <div class="guest-name">${esc(b.guestFirstName)} ${esc(b.guestLastName)}</div>
+            <div class="guest-time">${ago}</div>
+          </div>
+          <div class="card-amount">$${Number(b.grandTotal).toFixed(2)}</div>
+        </div>
+        <div class="card-meta">
+          <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
+          <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
+          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : '<div class="pay-chip">💳 Pay at check-in</div>'}
+        </div>
+        <div class="card-dates">
+          <div class="date-block">
+            <div class="date-label">Check-in</div>
+            <div class="date-value">${ci}</div>
+          </div>
+          <div class="date-block">
+            <div class="date-label">Check-out</div>
+            <div class="date-value">${co}</div>
+          </div>
+          <div class="date-block">
+            <div class="date-label">Guests</div>
+            <div class="date-value">${b.guests || 1} guest${(b.guests || 1) !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+        <div class="card-contact">
+          <div class="contact-details">
+            <div class="contact-phone">${esc(b.guestPhone)}</div>
+            <div class="contact-email">${esc(b.guestEmail)}</div>
+          </div>
+        </div>
+        ${b.notes ? `
+        <div class="card-notes">
+          <div class="notes-header">
+            <div class="notes-title">Notes</div>
+          </div>
+          <div class="notes-content">${esc(b.notes)}</div>
+        </div>
+        ` : ''}
+        <div class="card-footer">
+          ${phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`}
+          <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function ensureBookingsVirtualScroll() {
+  const el = document.getElementById('bookingsList');
+  if (!el || el.dataset.virtualBound === '1') return;
+  el.dataset.virtualBound = '1';
+  el.classList.add('bookings-virtual');
+  el.addEventListener('scroll', () => {
+    if (bookingsVirtualRaf) return;
+    bookingsVirtualRaf = requestAnimationFrame(() => {
+      bookingsVirtualRaf = 0;
+      renderBookingsWindow();
+    });
+  }, { passive: true });
+}
+
+function renderBookingsWindow() {
+  const el = document.getElementById('bookingsList');
+  const list = bookingsVirtualList;
+  if (!el || !list.length) return;
+  const scrollTop = el.scrollTop || 0;
+  const viewHeight = el.clientHeight || window.innerHeight;
+  const start = Math.max(0, Math.floor(scrollTop / BOOKING_CARD_EST_HEIGHT) - 2);
+  const end = Math.min(list.length, Math.ceil((scrollTop + viewHeight) / BOOKING_CARD_EST_HEIGHT) + 2);
+  const topPad = start * BOOKING_CARD_EST_HEIGHT;
+  const bottomPad = Math.max(0, (list.length - end) * BOOKING_CARD_EST_HEIGHT);
+  el.innerHTML = `<div style="height:${topPad}px" aria-hidden="true"></div>`
+    + list.slice(start, end).map(bookingCardHtml).join('')
+    + `<div style="height:${bottomPad}px" aria-hidden="true"></div>`;
+}
+
 function renderBookings(list) {
   const el = document.getElementById('bookingsList');
+  if (!el) return;
+  el.classList.remove('bookings-virtual');
+  delete el.dataset.virtualBound;
+  bookingsVirtualList = [];
 
   if (list.length === 0) {
     // Check photo status from API (editRooms might not be loaded yet)
@@ -3132,82 +3319,22 @@ function renderBookings(list) {
     return;
   }
 
-  el.innerHTML = list.map(b => {
-    const isDeclined = b.notes && b.notes.includes('PAYMENT DECLINED');
-    const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-    const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-    const ago = timeAgo(b.createdAt);
-    const rawPhoneDigits = String(b.guestPhone || '').replace(/\D/g, '');
-    let localPhoneDigits = rawPhoneDigits;
-    if (localPhoneDigits.length > 10 && localPhoneDigits.startsWith('1')) {
-      localPhoneDigits = localPhoneDigits.slice(1);
-    }
-    localPhoneDigits = localPhoneDigits.slice(0, 10);
-    const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
+  if (list.length > BOOKING_VIRTUAL_THRESHOLD) {
+    bookingsVirtualList = list;
+    ensureBookingsVirtualScroll();
+    renderBookingsWindow();
+    return;
+  }
 
-    const noteBtnClass = currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
-    return `
-    <div class="booking-card">
-      <div class="card-accent ${isDeclined ? 'declined' : ''}"></div>
-      <div class="card-inner">
-
-        <div class="card-top">
-          <div class="guest-info">
-            <div class="guest-name">${esc(b.guestFirstName)} ${esc(b.guestLastName)}</div>
-            <div class="guest-time">${ago}</div>
-          </div>
-          <div class="card-amount">$${Number(b.grandTotal).toFixed(2)}</div>
-        </div>
-
-        <div class="card-meta">
-          <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
-          <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
-          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : '<div class="pay-chip">💳 Pay at check-in</div>'}
-        </div>
-
-        <div class="card-dates">
-          <div class="date-block">
-            <div class="date-label">Check-in</div>
-            <div class="date-value">${ci}</div>
-          </div>
-          <div class="date-block">
-            <div class="date-label">Check-out</div>
-            <div class="date-value">${co}</div>
-          </div>
-          <div class="date-block">
-            <div class="date-label">Guests</div>
-            <div class="date-value">${b.guests || 1} guest${(b.guests || 1) !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
-
-        <div class="card-contact">
-          <div class="contact-details">
-            <div class="contact-phone">${esc(b.guestPhone)}</div>
-            <div class="contact-email">${esc(b.guestEmail)}</div>
-          </div>
-        </div>
-
-        ${b.notes ? `
-        <div class="card-notes">
-          <div class="notes-header">
-            <div class="notes-title">Notes</div>
-          </div>
-          <div class="notes-content">${esc(b.notes)}</div>
-        </div>
-        ` : ''}
-
-        <div class="card-footer">
-          ${phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`}
-          <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = list.map(bookingCardHtml).join('');
 }
 
 // ── FILTER TABS ────────────────────────────────────────
 function refreshMobileBottomNavIcons() {
-  if (typeof lucide === 'undefined' || typeof lucide.createIcons !== 'function') return;
+  if (typeof lucide === 'undefined' || typeof lucide.createIcons !== 'function') {
+    ensureLucideLoaded().then(() => refreshMobileBottomNavIcons()).catch(() => {});
+    return;
+  }
   const root = document.getElementById('mobileBottomNav');
   if (!root || !root.querySelector('i[data-lucide]')) return;
   try {
@@ -4388,7 +4515,7 @@ async function loadSettings() {
         html += `
           <div class="booking-card" style="margin-bottom:14px;">
             <div style="position:relative;">
-              ${hasImage ? `<img src="${r.images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;border-radius:14px 14px 0 0;">` : `<div style="width:100%;height:140px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-radius:14px 14px 0 0;">No photos yet</div>`}
+              ${hasImage ? `<img src="${r.images[0].url}" loading="lazy" decoding="async" style="width:100%;height:200px;object-fit:cover;display:block;border-radius:14px 14px 0 0;">` : `<div style="width:100%;height:140px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-radius:14px 14px 0 0;">No photos yet</div>`}
               <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
                 📷 ${hasImage ? 'Change Photo' : '+ Add Photo'}
                 <input type="file" accept="image/*" style="display:none;" onchange="settingsUploadPhoto(event,'${r.id}')">
@@ -4607,8 +4734,9 @@ function checklistGoTo(target, label) {
 async function settingsUploadPhoto(event, roomId) {
   const file = event.target.files[0];
   if (!file) return;
+  const optimized = await optimizeRoomPhotoForUpload(file);
   const fd = new FormData();
-  fd.append('image', file);
+  fd.append('image', optimized, optimized.name || 'room.webp');
   try {
     const res = await fetch(`/api/crm/rooms/${roomId}/images?hotelId=${encodeURIComponent(activeHotelId)}`, {
       method: 'POST',
@@ -5961,13 +6089,13 @@ function renderEditRoomsCards() {
     return `
     <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
       <div style="position:relative;">
-        ${images.length ? `<img src="${images[0].url}" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
+        ${images.length ? `<img src="${images[0].url}" loading="lazy" decoding="async" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
         <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
           📷 + Add Photos
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
         </label>
       </div>
-      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
+      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" loading="lazy" decoding="async" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       <div style="padding:18px;">
         <div style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
@@ -6254,8 +6382,9 @@ async function uploadEditImages(event, roomId) {
   }
   let uploaded = 0;
   for (const file of files) {
+    const optimized = await optimizeRoomPhotoForUpload(file);
     const fd = new FormData();
-    fd.append('image', file);
+    fd.append('image', optimized, optimized.name || 'room.webp');
     try {
       const res = await fetch(`/api/crm/rooms/${roomId}/images`, {
         method: 'POST',
@@ -6971,8 +7100,17 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/frontdesk-s
 document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 bootCrmApp();
 setInterval(refreshCurrentView, 30000);
+(function(){
+  function loadTelemetry(){
+    const s = document.createElement('script');
+    s.src = '/marketel-telemetry.js';
+    s.defer = true;
+    document.body.appendChild(s);
+  }
+  if ('requestIdleCallback' in window) requestIdleCallback(loadTelemetry, { timeout: 8000 });
+  else setTimeout(loadTelemetry, 4000);
+})();
 </script>
-<script src="/marketel-telemetry.js"></script>
 </body>
 </html>
 

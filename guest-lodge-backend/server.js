@@ -427,6 +427,7 @@ app.use('/uploads', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     next();
 }, express.static(path.join(__dirname, 'public', 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -4676,9 +4677,13 @@ app.get('/crm', (req, res) => {
     res.redirect(301, '/frontdesk');
 });
 
-// Serve Simple CRM HTML (for front desk)
+// Serve Front Desk (Vite build, fallback to legacy monolith)
+const FRONTDESK_BUILT = path.join(__dirname, 'public', 'frontdesk', 'index.html');
+const FRONTDESK_LEGACY = path.join(__dirname, 'simple-crm.html');
 app.get('/frontdesk', (req, res) => {
-    res.sendFile(path.join(__dirname, 'simple-crm.html'));
+    res.setHeader('Cache-Control', 'no-cache');
+    const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
+    res.sendFile(file);
 });
 
 // Serve front desk demo (for setup wizard preview)
@@ -5375,6 +5380,7 @@ app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
 // Upload room image
 const multer = require('multer');
 const fs = require('fs');
+const { optimizeRoomImageBuffer } = require('./lib/optimizeRoomImage');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 // Cloudflare R2 setup
@@ -5430,6 +5436,33 @@ async function uploadToR2(buffer, key, contentType) {
     return `${R2_PUBLIC_URL}/${key}`;
 }
 
+async function saveOptimizedRoomImage(req, roomId) {
+    if (!req.file) return null;
+    let inputBuffer = req.file.buffer;
+    if (!inputBuffer && req.file.path) {
+        inputBuffer = fs.readFileSync(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
+    }
+    if (!inputBuffer) return null;
+    const optimized = await optimizeRoomImageBuffer(inputBuffer, req.file.mimetype);
+    let url;
+    if (R2_PUBLIC_URL) {
+        const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${optimized.ext}`;
+        url = await uploadToR2(optimized.buffer, key, optimized.contentType);
+    } else {
+        const dir = path.join(__dirname, 'public', 'uploads', req.hotelId || 'unknown');
+        fs.mkdirSync(dir, { recursive: true });
+        const fname = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${optimized.ext}`;
+        fs.writeFileSync(path.join(dir, fname), optimized.buffer);
+        url = `/uploads/${req.hotelId}/${fname}`;
+    }
+    const count = await prisma.roomImage.count({ where: { roomId } });
+    const image = await prisma.roomImage.create({
+        data: { roomId, url, sortOrder: count },
+    });
+    return image;
+}
+
 app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
@@ -5440,17 +5473,10 @@ app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
 }, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-        let url;
-        if (R2_PUBLIC_URL) {
-            const ext = path.extname(req.file.originalname) || '.jpg';
-            const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
-            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
-        } else {
-            url = `/uploads/${req.hotelId}/${req.file.filename}`;
-        }
-        const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
-        const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
-        res.json({ success: true, image: { id: image.id, url: image.url } });
+        const image = await saveOptimizedRoomImage(req, req.params.roomId);
+        if (!image) return res.status(400).json({ error: 'No image uploaded' });
+        const returnUrl = R2_PUBLIC_URL ? image.url : `${req.protocol}://${req.get('host')}${image.url}`;
+        res.json({ success: true, image: { id: image.id, url: returnUrl } });
     } catch (e) {
         console.error('Image upload error:', e.message);
         res.status(500).json({ error: 'Failed to upload' });
@@ -6678,17 +6704,8 @@ app.post('/api/crm/rooms/:roomId/images', crmAuth, (req, res, next) => {
 }, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ success: false, message: 'No image' });
-        let url;
-        if (R2_PUBLIC_URL) {
-            const ext = path.extname(req.file.originalname) || '.jpg';
-            const key = `${req.hotelId}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
-            url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
-        } else {
-            url = `/uploads/${req.hotelId}/${req.file.filename}`;
-        }
-        const count = await prisma.roomImage.count({ where: { roomId: req.params.roomId } });
-        const image = await prisma.roomImage.create({ data: { roomId: req.params.roomId, url, sortOrder: count } });
-        // If R2, url is already absolute; if disk, prepend host
+        const image = await saveOptimizedRoomImage(req, req.params.roomId);
+        if (!image) return res.status(400).json({ success: false, message: 'No image' });
         const returnUrl = R2_PUBLIC_URL ? image.url : `${req.protocol}://${req.get('host')}${image.url}`;
         res.json({ success: true, image: { id: image.id, url: returnUrl } });
     } catch (e) {
@@ -6751,13 +6768,29 @@ app.post('/api/crm/rates', crmAuth, async (req, res) => {
     }
 });
 
-// Get bookings for CRM - last 7 days + all future
+// Get bookings for CRM - last 7 days + all future (slim payload for list cards)
+const CRM_BOOKING_LIST_SELECT = {
+    id: true,
+    createdAt: true,
+    guestFirstName: true,
+    guestLastName: true,
+    guestEmail: true,
+    guestPhone: true,
+    roomName: true,
+    checkinDate: true,
+    checkoutDate: true,
+    nights: true,
+    grandTotal: true,
+    callStatus: true,
+    notes: true,
+};
+
 app.get('/api/crm/bookings', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        // Get regular bookings
         const bookings = await withRetry(() => prisma.booking.findMany({
+            select: CRM_BOOKING_LIST_SELECT,
             orderBy: { checkinDate: 'asc' },
             where: {
                 hotelId,
@@ -6767,12 +6800,26 @@ app.get('/api/crm/bookings', crmAuth, async (req, res) => {
             }
         }));
         
-        // Get payment declined leads and transform them to look like bookings
         const declinedLeads = await withRetry(() => prisma.paymentDeclinedLead.findMany({
+            select: {
+                id: true,
+                createdAt: true,
+                hotelId: true,
+                guestFirstName: true,
+                guestLastName: true,
+                guestEmail: true,
+                guestPhone: true,
+                roomName: true,
+                checkinDate: true,
+                checkoutDate: true,
+                nights: true,
+                grandTotal: true,
+                errorMessage: true,
+            },
             orderBy: { createdAt: 'desc' },
             where: {
                 hotelId,
-                called: false // Only show uncalled declined leads
+                called: false
             }
         }));
         
@@ -6934,6 +6981,29 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
 });
 
 // Delete a booking
+// Lightweight unread count for message badges (no message bodies).
+app.get('/api/crm/messages/unread-count', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const unread = await withRetry(() => prisma.guestMessage.count({
+            where: {
+                hotelId,
+                readAt: null,
+                OR: [
+                    { sender: null },
+                    { sender: { not: 'hotel' } },
+                ],
+                createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
+            },
+        }));
+        res.json({ success: true, unread });
+    } catch (e) {
+        console.error('CRM messages unread-count error:', e.message);
+        res.status(500).json({ success: false, message: 'Failed to load unread count' });
+    }
+});
+
 // List guest messages for the Front Desk (recent first) + unread count.
 app.get('/api/crm/messages', crmAuth, async (req, res) => {
     try {

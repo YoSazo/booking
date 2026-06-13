@@ -1,4 +1,6 @@
 node_modules
+frontdesk/node_modules
+frontdesk/src
 # Keep environment variables out of version control
 .env
 

@@ -1,0 +1,332 @@
+#!/usr/bin/env node
+/**
+ * Splits simple-crm.html into Vite source files.
+ * Run: node frontdesk/scripts/split-crm.mjs
+ */
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname, '../..');
+const src = path.join(root, 'simple-crm.html');
+const out = path.resolve(__dirname, '../src');
+
+const html = fs.readFileSync(src, 'utf8');
+const lines = html.split('\n');
+
+function slice(start, end) {
+  return lines.slice(start - 1, end).join('\n');
+}
+
+function extractFunctions(code) {
+  const names = new Set();
+  const re = /^(?:async )?function (\w+)\s*\(/gm;
+  let m;
+  while ((m = re.exec(code)) !== null) names.add(m[1]);
+  return [...names].sort();
+}
+
+/** Rewrite bare state identifiers to fd.* (mutable shared state). */
+const STATE_KEYS = [
+  'token', 'bookings', 'guestMessages', 'currentFilter', 'manualAvailability', 'manualSelectedRoom',
+  'availabilityYear', 'availabilityMonth', 'availabilityEditingDay', 'availabilityDaySaving',
+  'editingRoomName', 'pendingDeleteRoomName', 'currentHotelPms', 'revenueEnabled', 'hotelSubscribed',
+  'revenuePeriod', 'revenueCache', 'revenueLoading', 'revenueError', 'activeHotelId', 'activeHotelName',
+  'activeHotelAppIcon', 'appsViewPlatform', 'activeHotelDomain', 'activeHotelContext', 'bootInFlight',
+  'deferredInstallPrompt', 'frontdeskInstalled', '_magicLoginPending', 'editRooms',
+  'messageUnreadCount', 'bookingsVirtualList', 'bookingsVirtualRaf',
+  'CRM_HOTEL_BY_HOST', 'CRM_HOTEL_LABELS', 'ALLOWED_REVENUE_PERIODS', 'OTA_COMMISSION_RATE',
+];
+
+function rewriteFd(code) {
+  return code.split(/('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")/g).map((part, i) => {
+    if (i % 2 === 1) return part;
+    let out = part;
+    for (const key of STATE_KEYS) {
+      const re = new RegExp(`(?<![.\\w])${key}(?!\\s*:[^=])(?![\\w])`, 'g');
+      out = out.replace(re, `fd.${key}`);
+    }
+    return out;
+  }).join('');
+}
+
+const css = slice(16, 1697);
+fs.mkdirSync(path.join(out, 'styles'), { recursive: true });
+fs.writeFileSync(path.join(out, 'styles', 'core.css'), css);
+
+let coreBlock = slice(1937, 4470) + '\n\n' + slice(4483, 4490);
+coreBlock = coreBlock
+  .replace(/^let deferredInstallPrompt = null;\n/m, '')
+  .replace(/^let frontdeskInstalled = false;\n/m, '')
+  .replace(/^let _magicLoginPending = false;\n/m, '')
+  .replace(
+    /if \(currentFilter === 'settings'\) \{[\s\S]*?if \(!editRooms\.length\) loadEditRooms\(\);\n    return;\n  \}/,
+    `if (currentFilter === 'settings') {
+    if (bookingsEl) bookingsEl.style.display = 'none';
+    if (availabilityEl) availabilityEl.style.display = 'none';
+    if (revenueEl) revenueEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
+    const editEl = document.getElementById('editView');
+    if (editEl) editEl.style.display = 'block';
+    closeAvailabilityDayPopover();
+    loadSettingsModule().then(() => {
+      if (!editRooms.length) loadEditRooms();
+    });
+    return;
+  }`
+  )
+  .replace(
+    /if \(currentFilter === 'apps'\) \{[\s\S]*?return;\n  \}\n\n  if \(bookingsEl\)/,
+    `if (currentFilter === 'apps') {
+    if (bookingsEl) bookingsEl.style.display = 'none';
+    if (availabilityEl) availabilityEl.style.display = 'none';
+    if (revenueEl) revenueEl.style.display = 'none';
+    if (settingsEl) settingsEl.style.display = 'none';
+    const editEl2 = document.getElementById('editView');
+    if (editEl2) editEl2.style.display = 'none';
+    if (msgPanel) msgPanel.style.display = 'none';
+    const appsEl2 = document.getElementById('appsView');
+    if (appsEl2) appsEl2.style.display = 'block';
+    closeAvailabilityDayPopover();
+    loadAppsModule().then(() => {
+      const appsTourOpen = !!document.getElementById('appsTourLightbox');
+      if (!appsTourOpen) renderAppsView();
+      if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
+        setTimeout(() => {
+          if (!document.getElementById('appsTourLightbox')) startAppsTour();
+        }, 500);
+      }
+    });
+    return;
+  }
+
+  if (bookingsEl)`
+  )
+  .replace(
+    /await Promise\.allSettled\(\[\n    loadManualAvailability\(\),\n    loadBookings\(\{ deferMessages: true \}\),\n  \]\);/,
+    `await loadSettingsModule();
+  await Promise.allSettled([
+    loadManualAvailability(),
+    loadBookings({ deferMessages: true }),
+  ]);`
+  );
+
+coreBlock = rewriteFd(coreBlock);
+
+const settingsBlock = slice(4492, 6547).replace(/^let editRooms = \[\];\n?/m, '');
+const appsBlock = slice(6548, 7097);
+const initBlock = slice(7099, 7112);
+
+const stateJs = `/** Shared mutable Front Desk state */
+export const fd = {
+  token: '',
+  bookings: [],
+  guestMessages: [],
+  currentFilter: 'settings',
+  manualAvailability: { rooms: [], overrides: {} },
+  manualSelectedRoom: '',
+  availabilityYear: new Date().getFullYear(),
+  availabilityMonth: new Date().getMonth(),
+  availabilityEditingDay: '',
+  availabilityDaySaving: false,
+  editingRoomName: '',
+  pendingDeleteRoomName: '',
+  currentHotelPms: '',
+  revenueEnabled: false,
+  hotelSubscribed: false,
+  revenuePeriod: '30d',
+  revenueCache: {},
+  revenueLoading: false,
+  revenueError: '',
+  ALLOWED_REVENUE_PERIODS: new Set(['today', '7d', '30d', 'all']),
+  OTA_COMMISSION_RATE: 0.25,
+  activeHotelId: '',
+  activeHotelName: '',
+  activeHotelAppIcon: '',
+  appsViewPlatform: 'ios',
+  activeHotelDomain: '',
+  activeHotelContext: null,
+  bootInFlight: false,
+  CRM_HOTEL_BY_HOST: {
+    'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
+    'booking-kappa-nine.vercel.app': 'guest-lodge-minot',
+    'stcroix.clickinns.com': 'st-croix-wisconsin',
+    'homeplacesuites.clickinns.com': 'home-place-suites',
+    'myhomeplacesuites.com': 'home-place-suites',
+    'www.myhomeplacesuites.com': 'home-place-suites',
+    'suitestay.clickinns.com': 'suite-stay',
+    'clickinns.com': 'suite-stay',
+    'www.clickinns.com': 'suite-stay',
+  },
+  CRM_HOTEL_LABELS: {
+    'guest-lodge-minot': 'Guest Lodge Minot',
+    'st-croix-wisconsin': 'St. Croix Wisconsin',
+    'home-place-suites': 'Home Place Suites',
+    'suite-stay': 'Suite Stay',
+  },
+  deferredInstallPrompt: null,
+  frontdeskInstalled: false,
+  _magicLoginPending: false,
+  editRooms: [],
+  messageUnreadCount: 0,
+  bookingsVirtualList: [],
+  bookingsVirtualRaf: 0,
+};
+`;
+
+const stateImport = `import { fd } from './state.js';\n`;
+
+const utilsJs = `${stateImport}
+let lucideLoadPromise = null;
+
+function ensureLucideLoaded() {
+  if (typeof lucide !== 'undefined') return Promise.resolve();
+  if (lucideLoadPromise) return lucideLoadPromise;
+  lucideLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('lucide load failed'));
+    document.head.appendChild(s);
+  });
+  return lucideLoadPromise;
+}
+
+async function optimizeRoomPhotoForUpload(file) {
+  if (!file || !file.type.startsWith('image/')) return file;
+  if (file.type === 'image/webp' && file.size < 400000) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxW = 1600;
+    const maxH = 1200;
+    let w = bitmap.width;
+    let h = bitmap.height;
+    const scale = Math.min(1, maxW / w, maxH / h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/webp', 0.82);
+    });
+    const base = (file.name || 'room-photo').replace(/\\.[^.]+$/, '') || 'room-photo';
+    return new File([blob], base + '.webp', { type: 'image/webp' });
+  } catch (_) {
+    return file;
+  }
+}
+
+function scheduleDeferredMessagesLoad() {
+  const run = () => {
+    if (fd.currentFilter === 'bookings') loadMessages();
+    else loadMessageBadges();
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2500 });
+  else setTimeout(run, 600);
+}
+
+export function exposeToWindow(obj) {
+  Object.assign(window, obj);
+}
+
+export { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad };
+`;
+
+const coreFns = extractFunctions(coreBlock);
+const settingsFns = extractFunctions(rewriteFd(settingsBlock));
+const appsFns = extractFunctions(rewriteFd(appsBlock));
+
+const corePatched = coreBlock;
+
+const coreJs = `${stateImport}
+import { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
+
+let settingsModulePromise = null;
+let appsModulePromise = null;
+
+export function loadSettingsModule() {
+  if (!settingsModulePromise) {
+    settingsModulePromise = import('./settings.js').then((m) => {
+      m.install();
+      return m;
+    });
+  }
+  return settingsModulePromise;
+}
+
+export function loadAppsModule() {
+  if (!appsModulePromise) {
+    appsModulePromise = import('./apps.js').then((m) => {
+      m.install();
+      return m;
+    });
+  }
+  return appsModulePromise;
+}
+
+${corePatched}
+
+${rewriteFd(initBlock)}
+
+exposeToWindow({
+${[...coreFns, 'loadSettingsModule', 'loadAppsModule'].map((n) => `  ${n},`).join('\n')}
+});
+`;
+
+const settingsJs = `${stateImport}
+import { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
+
+${rewriteFd(settingsBlock)}
+
+const _settingsExports = {
+${settingsFns.map((n) => `  ${n},`).join('\n')}
+};
+
+export function install() {
+  exposeToWindow(_settingsExports);
+}
+
+export default _settingsExports;
+`;
+
+const appsJs = `${stateImport}
+import { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
+
+${rewriteFd(appsBlock)}
+
+const _appsExports = {
+${appsFns.map((n) => `  ${n},`).join('\n')}
+};
+
+export function install() {
+  exposeToWindow(_appsExports);
+}
+
+export default _appsExports;
+`;
+
+fs.writeFileSync(path.join(out, 'state.js'), stateJs);
+fs.writeFileSync(path.join(out, 'utils.js'), utilsJs);
+fs.writeFileSync(path.join(out, 'core.js'), coreJs);
+fs.writeFileSync(path.join(out, 'settings.js'), settingsJs);
+fs.writeFileSync(path.join(out, 'apps.js'), appsJs);
+fs.writeFileSync(path.join(out, 'main.js'), `import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/dm-sans/700.css';
+import '@fontsource/dm-mono/400.css';
+import '@fontsource/dm-mono/500.css';
+import './styles/core.css';
+import './core.js';
+`);
+
+console.log('Split OK', {
+  coreKb: Math.round(coreJs.length / 1024),
+  settingsKb: Math.round(settingsJs.length / 1024),
+  appsKb: Math.round(appsJs.length / 1024),
+});

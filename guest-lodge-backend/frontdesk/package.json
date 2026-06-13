@@ -1,0 +1,17 @@
+{
+  "name": "frontdesk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "split": "node scripts/split-crm.mjs",
+    "build": "node scripts/split-crm.mjs && vite build",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@fontsource/dm-mono": "^5.2.5",
+    "@fontsource/dm-sans": "^5.2.5"
+  }
+}
