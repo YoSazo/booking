@@ -4310,7 +4310,7 @@ function getBookingReservationCode(b) {
 }
 
 function buildGuestInstallUrlForQr(reservationCode, ref) {
-  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  const domain = activeHotelDomain || '';
   if (!domain) return '';
   const params = new URLSearchParams({ ref: ref || 'frontdesk-qr-generic' });
   if (reservationCode) params.set('code', reservationCode);
@@ -4318,8 +4318,8 @@ function buildGuestInstallUrlForQr(reservationCode, ref) {
 }
 
 function showCheckinQrOverlay(preselectedCode) {
-  const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
-  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  const hName = activeHotelName || 'Your Hotel';
+  const domain = activeHotelDomain || '';
   if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
 
   const existing = document.getElementById('checkinQrOverlay');
@@ -4420,8 +4420,8 @@ function closeCheckinQrOverlay() {
 }
 
 function prefillGuestInstallBroadcast() {
-  const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
-  const domain = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  const hName = activeHotelName || 'Your Hotel';
+  const domain = activeHotelDomain || '';
   const installUrl = domain ? 'https://' + domain + '/install' : '';
   const titleEl = document.getElementById('guest-broadcast-title');
   const bodyEl = document.getElementById('guest-broadcast-body');
@@ -5482,7 +5482,7 @@ function startSettingsTour() {
     document.body.appendChild(blurOverlay);
     document.body.style.overflow = 'hidden';
 
-    const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+    const hName = activeHotelName || 'Your Hotel';
     const initial = hName.trim().charAt(0).toUpperCase();
     const shortName = hName.length > 10 ? hName.slice(0, 10) : hName;
 
@@ -6481,7 +6481,7 @@ async function uploadAppIcon(input) {
       toast('Logo updated! Guests will see it on their phone.', 'success');
     } else {
       toast(data.message || 'Failed to upload icon', 'error');
-      const initial = ((typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'H').trim().charAt(0).toUpperCase() || '🏨';
+      const initial = (activeHotelName || 'H').trim().charAt(0).toUpperCase() || '🏨';
       const el = document.getElementById('appsAppIconPreview');
       if (el) { el.style.background = 'var(--green)'; el.innerHTML = initial; }
     }
@@ -6551,7 +6551,7 @@ const APPS_SHOWCASE = {
   homeScreen:          'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179630/unnamed_lbsctp.jpg',
   guestHome:           'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2475_1_jxip3r.png',
   guestBook:           'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179611/IMG_2476_1_tqbmgz.png',
-  guestMessages:       'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2477_1_zgodnn.png',
+  guestMessagesImg:    'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2477_1_zgodnn.png',
   frontdeskMessages:   'https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179656/unnamed_2_qfhkrr.png',
   // Videos — live recordings
   bookingNotifVideo:        'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_21-14-19_1_eckwlk.mp4',
@@ -6702,9 +6702,9 @@ function renderAppsView() {
   if (!el) return;
 
   const hName       = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
-  const hotelAppIcon = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
+  const hotelAppIcon = activeHotelAppIcon || '';
   const hotelInitial = hName.trim().charAt(0).toUpperCase() || '🏨';
-  const domain      = (typeof activeHotelDomain !== 'undefined' && activeHotelDomain) ? activeHotelDomain : '';
+  const domain      = activeHotelDomain || '';
   const bookingUrl  = domain ? 'https://' + domain : '#';
   const guestInstallUrl = domain ? 'https://' + domain + '/install' : '#';
   const guestInstallQr  = guestInstallUrl !== '#' ? 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(guestInstallUrl) : '';
@@ -6736,7 +6736,7 @@ function renderAppsView() {
       caption: 'Their stay info — check-in time, your WiFi password, and more.' },
     { type: 'image', src: APPS_SHOWCASE.guestBook, alt: 'Guest book screen', title: 'What your guests see — Book a room',
       caption: 'They book directly with you. You keep the money — no middleman.' },
-    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest messages', title: 'What your guests see — Message you',
+    { type: 'image', src: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest messages', title: 'What your guests see — Message you',
       caption: 'They text you from the app — like "What\'s the WiFi password?"' },
   ];
   const guestInstallItems = [
@@ -6748,11 +6748,11 @@ function renderAppsView() {
       caption: 'You find out right away — before email, before Airbnb tells you.' },
   ];
   const messageItems = [
-    { type: 'image', src: APPS_SHOWCASE.guestMessages, alt: 'Guest sends message', title: 'Your guest texts you',
+    { type: 'image', src: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest sends message', title: 'Your guest texts you',
       caption: 'Like "How do I connect to WiFi?" — they type it in your hotel app.' },
     { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'You reply', title: 'You text them back',
       caption: 'Open <strong>Bookings</strong>, type your reply. Takes 5 seconds.' },
-    { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessages, alt: 'Guest gets reply alert', title: 'Their phone buzzes with your answer',
+    { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest gets reply alert', title: 'Their phone buzzes with your answer',
       caption: 'They get your reply on their phone — like a text from you.' },
   ];
   const frontdeskInstallItems = [
@@ -6864,7 +6864,7 @@ function renderAppsView() {
       <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
         <p style="font-size:11px;color:var(--text-muted);margin:0 0 10px;line-height:1.45;text-align:center;">This is what pops up on their phone when you notify them:</p>
-        <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 360)}">
+        <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;${appsPhoneImgStyle()}" poster="${appsCloudinaryImg(APPS_SHOWCASE.guestMessagesImg, 360)}">
           <source src="${APPS_SHOWCASE.guestBroadcastVideo}" type="video/mp4">
         </video>
       </div>
@@ -7002,10 +7002,10 @@ function startAppsTour() {
   if (localStorage.getItem('appsTourDone')) return;
   if (document.getElementById('appsTourLightbox')) return;
 
-  const hName = (typeof activeHotelName !== 'undefined' && activeHotelName) ? activeHotelName : 'Your Hotel';
+  const hName = activeHotelName || 'Your Hotel';
   const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
   const initial = hName.trim().charAt(0).toUpperCase();
-  const iconUrl = (typeof activeHotelAppIcon !== 'undefined') ? activeHotelAppIcon : '';
+  const iconUrl = activeHotelAppIcon || '';
   const iconEl = iconUrl
     ? `<img src="${iconUrl}" alt="${hName}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">`
     : `<div style="width:52px;height:52px;border-radius:14px;background:#2E7D5B;color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</div>`;
@@ -7042,7 +7042,7 @@ function startAppsTour() {
     {
       type: 'video',
       src: APPS_SHOWCASE.guestBroadcastVideo,
-      poster: appsCloudinaryImg(APPS_SHOWCASE.guestMessages, 400),
+      poster: appsCloudinaryImg(APPS_SHOWCASE.guestMessagesImg, 400),
       title: 'You can notify all your guests at once',
       caption: `Once they have your hotel on their phone, notify everyone — a sale, an event, or a check-in reminder. Scroll down on this page to try it.`,
     },

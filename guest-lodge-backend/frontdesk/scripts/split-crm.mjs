@@ -39,16 +39,134 @@ const STATE_KEYS = [
   'CRM_HOTEL_BY_HOST', 'CRM_HOTEL_LABELS', 'ALLOWED_REVENUE_PERIODS', 'OTA_COMMISSION_RATE',
 ];
 
-function rewriteFd(code) {
-  return code.split(/('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")/g).map((part, i) => {
-    if (i % 2 === 1) return part;
-    let out = part;
-    for (const key of STATE_KEYS) {
-      const re = new RegExp(`(?<![.\\w])${key}(?!\\s*:[^=])(?![\\w])`, 'g');
-      out = out.replace(re, `fd.${key}`);
+function isRegexStart(prevChar) {
+  return !prevChar || /[\(=\[{!&|?:;,\}\s]/.test(prevChar);
+}
+
+/** Mask comments and string/template literal segments so identifier rewrite skips them. */
+function maskNonCode(code) {
+  const parts = [];
+  let result = '';
+  let i = 0;
+  while (i < code.length) {
+    const c = code[i];
+    const c2 = code[i + 1];
+    if (c === '/' && c2 === '/') {
+      let j = i + 2;
+      while (j < code.length && code[j] !== '\n') j++;
+      parts.push(code.slice(i, j));
+      result += `\0M${parts.length - 1}\0`;
+      i = j;
+      continue;
     }
-    return out;
-  }).join('');
+    if (c === '/' && c2 === '*') {
+      let j = i + 2;
+      while (j < code.length - 1 && !(code[j] === '*' && code[j + 1] === '/')) j++;
+      j = Math.min(j + 2, code.length);
+      parts.push(code.slice(i, j));
+      result += `\0M${parts.length - 1}\0`;
+      i = j;
+      continue;
+    }
+    if (c === '/' && c2 !== '/' && c2 !== '*') {
+      const prev = result.replace(/\0M\d+\0/g, ' ').trimEnd().slice(-1);
+      if (isRegexStart(prev)) {
+        let j = i + 1;
+        let inClass = false;
+        while (j < code.length) {
+          const ch = code[j];
+          if (ch === '\\') { j += 2; continue; }
+          if (ch === '[') { inClass = true; j++; continue; }
+          if (ch === ']' && inClass) { inClass = false; j++; continue; }
+          if (ch === '/' && !inClass) {
+            j++;
+            while (j < code.length && /[a-z]/i.test(code[j])) j++;
+            break;
+          }
+          j++;
+        }
+        result += code.slice(i, j);
+        i = j;
+        continue;
+      }
+    }
+    if (c === "'" || c === '"') {
+      const quote = c;
+      let j = i + 1;
+      while (j < code.length) {
+        if (code[j] === '\\') { j += 2; continue; }
+        if (code[j] === quote) { j++; break; }
+        j++;
+      }
+      parts.push(code.slice(i, j));
+      result += `\0M${parts.length - 1}\0`;
+      i = j;
+      continue;
+    }
+    if (c === '`') {
+      result += '`';
+      i++;
+      while (i < code.length) {
+        if (code[i] === '\\') {
+          parts.push(code.slice(i, i + 2));
+          result += `\0M${parts.length - 1}\0`;
+          i += 2;
+          continue;
+        }
+        if (code[i] === '$' && code[i + 1] === '{') {
+          result += '${';
+          i += 2;
+          let depth = 1;
+          while (i < code.length && depth > 0) {
+            if (code[i] === '{') depth++;
+            else if (code[i] === '}') depth--;
+            result += code[i];
+            i++;
+          }
+          continue;
+        }
+        if (code[i] === '`') {
+          result += '`';
+          i++;
+          break;
+        }
+        let j = i;
+        while (j < code.length && code[j] !== '\\' && code[j] !== '$' && code[j] !== '`') j++;
+        if (j > i) {
+          parts.push(code.slice(i, j));
+          result += `\0M${parts.length - 1}\0`;
+          i = j;
+          continue;
+        }
+        parts.push(code[i]);
+        result += `\0M${parts.length - 1}\0`;
+        i++;
+      }
+      continue;
+    }
+    result += c;
+    i++;
+  }
+  return { masked: result, parts };
+}
+
+function unmask(code, parts) {
+  return code.replace(/\0M(\d+)\0/g, (_, n) => parts[Number(n)]);
+}
+
+function rewriteFd(code) {
+  const FILTER_LITERALS = ['settings', 'bookings', 'revenue', 'apps', 'availability', 'needs-call', 'called'];
+  const { masked, parts } = maskNonCode(code);
+  let out = masked;
+  for (const key of STATE_KEYS) {
+    out = out.replace(new RegExp(`(?<!fd\\.)\\b${key}\\b`, 'g'), `fd.${key}`);
+  }
+  out = out.replace(/fd\.fd\./g, 'fd.');
+  for (const v of FILTER_LITERALS) {
+    out = out.replace(new RegExp(`'fd\\.${v}'`, 'g'), `'${v}'`);
+    out = out.replace(new RegExp(`"fd\\.${v}"`, 'g'), `"${v}"`);
+  }
+  return unmask(out, parts);
 }
 
 const css = slice(16, 1697);
@@ -60,6 +178,8 @@ coreBlock = coreBlock
   .replace(/^let deferredInstallPrompt = null;\n/m, '')
   .replace(/^let frontdeskInstalled = false;\n/m, '')
   .replace(/^let _magicLoginPending = false;\n/m, '')
+  .replace(/^let bookingsVirtualList = \[\];\n/m, '')
+  .replace(/^let bookingsVirtualRaf = 0;\n/m, '')
   .replace(
     /if \(currentFilter === 'settings'\) \{[\s\S]*?if \(!editRooms\.length\) loadEditRooms\(\);\n    return;\n  \}/,
     `if (currentFilter === 'settings') {
@@ -324,6 +444,22 @@ import '@fontsource/dm-mono/500.css';
 import './styles/core.css';
 import './core.js';
 `);
+
+function assertNoBareState(filePath, code) {
+  const { masked } = maskNonCode(code);
+  const bare = [];
+  for (const key of STATE_KEYS) {
+    const re = new RegExp(`(?<!fd\\.)\\b${key}\\b`);
+    if (re.test(masked)) bare.push(key);
+  }
+  if (bare.length) {
+    throw new Error(`${path.basename(filePath)}: bare state refs: ${bare.join(', ')}`);
+  }
+}
+
+for (const [name, code] of [['core.js', coreJs], ['settings.js', settingsJs], ['apps.js', appsJs]]) {
+  assertNoBareState(path.join(out, name), code);
+}
 
 console.log('Split OK', {
   coreKb: Math.round(coreJs.length / 1024),
