@@ -28,6 +28,10 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
   const hotelPhone = hotel?.phone || '(701) 289-5992';
   const resolvedHotelId = hotelId || hotel?.id;
 
+  useEffect(() => () => {
+    document.body.style.overflow = '';
+  }, []);
+
   useEffect(() => {
     if (!bookingDetails) return;
 
@@ -347,7 +351,11 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
 
           <button
             type="button"
-            onClick={() => navigate('/guest/check-in')}
+            onClick={() => {
+              document.body.style.overflow = '';
+              setShowCallModal(false);
+              navigate('/guest/check-in');
+            }}
             style={{
               width: '100%', marginTop: 8, padding: 13, borderRadius: 12,
               border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',

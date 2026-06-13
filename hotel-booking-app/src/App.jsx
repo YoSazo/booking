@@ -53,9 +53,20 @@ function ScrollToTop() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // Clear scroll locks left by modals (confirmation call, calendar, guest-info).
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
   }, [pathname]);
 
   return null;
+}
+
+const GUEST_APP_ROUTE = /^\/(guest\/|install|final-confirmation|booking)/;
+
+function isGuestAppRoute(pathname) {
+  return GUEST_APP_ROUTE.test(pathname || '');
 }
 
 // Page transition wrapper - slides pages left/right on navigation
@@ -65,18 +76,24 @@ function PageTransition({ children }) {
   const [transitionStage, setTransitionStage] = useState('idle');
 
   useEffect(() => {
-    if (location.pathname !== displayLocation.pathname) {
-      // Start exit animation
-      setTransitionStage('exit');
-      
-      // After exit animation, swap content and enter
-      const timer = setTimeout(() => {
-        setDisplayLocation(location);
-        setTransitionStage('enter');
-      }, 250); // Match the exit animation duration
-      
-      return () => clearTimeout(timer);
+    if (location.pathname === displayLocation.pathname) return;
+
+    // Guest app routes swap instantly — slide transitions leave the old page
+    // mounted and can block the bottom nav until a full refresh.
+    if (isGuestAppRoute(location.pathname) || isGuestAppRoute(displayLocation.pathname)) {
+      setDisplayLocation(location);
+      setTransitionStage('idle');
+      return;
     }
+
+    setTransitionStage('exit');
+
+    const timer = setTimeout(() => {
+      setDisplayLocation(location);
+      setTransitionStage('enter');
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [location, displayLocation]);
 
   const handleAnimationEnd = () => {

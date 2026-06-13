@@ -55,19 +55,25 @@ export default function GuestLayout({ children }) {
 
   // Browser visitors: booking funnel only. Installed PWA: full app shell even before booking.
   const showAppShell = isGuest || isStandalone();
-  if (!showAppShell) return <>{children}</>;
+  const showNav = showAppShell && isMobile;
 
-  const showNav = isMobile;
-
-  // Determine active tab
-  const activeTab = NAV_TABS.find((t) => {
-    if (t.path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(t.path);
-  })?.key || 'home';
+  // Determine active tab (guest routes + confirmation all live under "Home")
+  const activeTab = (() => {
+    if (location.pathname.startsWith('/guest/messages')) return 'messages';
+    if (location.pathname === '/') return 'book';
+    if (
+      location.pathname.startsWith('/guest/') ||
+      location.pathname === '/final-confirmation' ||
+      location.pathname.startsWith('/booking')
+    ) {
+      return 'home';
+    }
+    return 'book';
+  })();
 
   return (
     <div style={styles.wrapper}>
-      <div style={styles.content}>{children}</div>
+      <div style={{ ...styles.content, paddingBottom: showNav ? 110 : 0 }}>{children}</div>
 
       {showNav && (
         <nav style={styles.pill}>
@@ -146,7 +152,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-around',
     gap: 2,
-    zIndex: 9999,
+    zIndex: 10050,
     minWidth: 260,
     maxWidth: 340,
     width: '88%',
