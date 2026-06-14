@@ -42,7 +42,7 @@ const STATE_KEYS = [
   'activeHotelAppIcon', 'appsViewPlatform', 'activeHotelDomain', 'activeHotelContext', 'bootInFlight',
   'deferredInstallPrompt', 'frontdeskInstalled', '_magicLoginPending', 'editRooms',
   'messageUnreadCount', 'bookingsVirtualList', 'bookingsVirtualRaf',
-  'messagesInboxOpen', 'selectedMessageThread',
+  'messagesInboxOpen', 'messagesThreadPickerOpen', 'selectedMessageThread',
   'CRM_HOTEL_BY_HOST', 'CRM_HOTEL_LABELS', 'ALLOWED_REVENUE_PERIODS', 'OTA_COMMISSION_RATE',
 ];
 
@@ -329,6 +329,7 @@ export const fd = {
   editRooms: [],
   messageUnreadCount: 0,
   messagesInboxOpen: false,
+  messagesThreadPickerOpen: false,
   selectedMessageThread: '',
   bookingsVirtualList: [],
   bookingsVirtualRaf: 0,

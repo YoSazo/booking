@@ -1841,6 +1841,7 @@ let bookings = [];
 let guestMessages = [];
 let messageUnreadCount = 0;
 let messagesInboxOpen = false;
+let messagesThreadPickerOpen = false;
 let selectedMessageThread = '';
 let currentFilter = 'settings';
 let manualAvailability = { rooms: [], overrides: {} };
@@ -1932,6 +1933,10 @@ function scheduleDeferredMessagesLoad() {
     if (currentFilter === 'bookings') loadMessages();
     else loadMessageBadges();
   };
+  if (currentFilter === 'bookings') {
+    setTimeout(run, 0);
+    return;
+  }
   if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2500 });
   else setTimeout(run, 600);
 }
@@ -3033,17 +3038,38 @@ function pickDefaultMessageThread(threadList) {
   return (unread || threadList[0]).key;
 }
 
+function threadSummary(thread) {
+  const hasUnread = thread.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
+  const sorted = thread.msgs.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const latest = sorted[sorted.length - 1];
+  const preview = latest?.body
+    ? latest.body.replace(/\s+/g, ' ').trim().slice(0, 56) + (latest.body.length > 56 ? '…' : '')
+    : (latest?.requests?.length ? latest.requests.join(', ') : 'Request');
+  return { hasUnread, latest, preview };
+}
+
+function toggleMessageThreadPicker() {
+  messagesThreadPickerOpen = !messagesThreadPickerOpen;
+  renderMessages();
+}
+
+function pickMessageThread(key) {
+  selectedMessageThread = key || '';
+  messagesThreadPickerOpen = false;
+  renderMessages();
+}
+
 function toggleMessagesInbox() {
   messagesInboxOpen = !messagesInboxOpen;
   if (messagesInboxOpen && !selectedMessageThread) {
     selectedMessageThread = pickDefaultMessageThread(buildMessageThreads());
   }
+  if (!messagesInboxOpen) messagesThreadPickerOpen = false;
   renderMessages();
 }
 
 function setMessageThread(key) {
-  selectedMessageThread = key || '';
-  renderMessages();
+  pickMessageThread(key);
 }
 
 function renderMessageThreadDetail(thread) {
@@ -3096,12 +3122,64 @@ function renderMessageThreadDetail(thread) {
     </div>`;
 }
 
+function renderMessageThreadPicker(threadList, activeThread) {
+  const summary = threadSummary(activeThread);
+  const pickerList = messagesThreadPickerOpen ? `
+    <div style="margin-top:6px;border:1.5px solid #e6e9e7;border-radius:12px;background:#fff;box-shadow:0 10px 28px rgba(0,0,0,0.12);max-height:min(50vh,280px);overflow-y:auto;">
+      ${threadList.map(thread => {
+        const s = threadSummary(thread);
+        const isActive = thread.key === activeThread.key;
+        return `
+        <button type="button" onclick="pickMessageThread('${esc(thread.key)}')" style="width:100%;display:block;padding:12px 14px;border:none;border-bottom:1px solid #f0f2f1;background:${isActive ? '#f4fbf6' : '#fff'};font-family:inherit;text-align:left;cursor:pointer;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:13px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:6px;">
+                ${s.hasUnread ? '<span style="width:7px;height:7px;border-radius:50%;background:#e0245e;flex-shrink:0;"></span>' : ''}
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(thread.guestName || 'Guest')}</span>
+                ${thread.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;white-space:nowrap;">· ${esc(thread.roomName)}</span>` : ''}
+              </div>
+              <div style="font-size:12px;color:#6b7280;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.preview)}</div>
+              <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${esc(timeAgo(s.latest?.createdAt))}${thread.code ? ` · #${esc(thread.code)}` : ''}</div>
+            </div>
+            ${isActive ? '<span style="font-size:11px;font-weight:700;color:#2E7D5B;flex-shrink:0;">✓</span>' : ''}
+          </div>
+        </button>`;
+      }).join('')}
+    </div>` : '';
+
+  return `
+    <div style="flex:1;min-width:200px;position:relative;">
+      <span style="display:block;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Booking conversation</span>
+      <button type="button" onclick="toggleMessageThreadPicker()" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid #d1d5db;background:#fff;font-family:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:13px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:6px;">
+            ${summary.hasUnread ? '<span style="width:7px;height:7px;border-radius:50%;background:#e0245e;flex-shrink:0;"></span>' : ''}
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(activeThread.guestName || 'Guest')}</span>
+            ${activeThread.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;white-space:nowrap;">· ${esc(activeThread.roomName)}</span>` : ''}
+          </div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(summary.preview)}</div>
+        </div>
+        <span style="font-size:14px;color:#9ca3af;flex-shrink:0;transition:transform 0.2s;transform:rotate(${messagesThreadPickerOpen ? '180deg' : '0deg'});">▾</span>
+      </button>
+      ${pickerList}
+    </div>`;
+}
+
 function renderMessages() {
   const panel = document.getElementById('messagesPanel');
   if (!panel) return;
 
   const threadList = buildMessageThreads();
-  if (threadList.length === 0) { panel.innerHTML = ''; return; }
+  if (threadList.length === 0) {
+    const pending = messageUnreadCount > 0;
+    panel.innerHTML = pending ? `
+      <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
+        <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
+        <div style="font-size:14px;font-weight:600;color:#6b7280;">Loading guest messages…</div>
+      </div>` : '';
+    if (pending && currentFilter === 'bookings') loadMessages();
+    return;
+  }
 
   const threadKeys = new Set(threadList.map(t => t.key));
   if (!selectedMessageThread || !threadKeys.has(selectedMessageThread)) {
@@ -3111,41 +3189,17 @@ function renderMessages() {
   const unreadCount = guestMessages.filter(m => !m.read && (m.sender || 'guest') === 'guest').length;
   const activeThread = threadList.find(t => t.key === selectedMessageThread) || threadList[0];
 
-  const threadOptions = threadList.map(thread => {
-    const hasUnread = thread.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
-    const sorted = thread.msgs.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    const latest = sorted[sorted.length - 1];
-    const preview = latest?.body
-      ? latest.body.replace(/\s+/g, ' ').trim().slice(0, 48) + (latest.body.length > 48 ? '…' : '')
-      : (latest?.requests?.length ? latest.requests.join(', ') : 'Request');
-    const label = [
-      thread.guestName || 'Guest',
-      thread.roomName || '',
-      hasUnread ? '· new' : '',
-      '·',
-      timeAgo(latest?.createdAt),
-      '—',
-      preview,
-    ].filter(Boolean).join(' ');
-    return `<option value="${esc(thread.key)}"${thread.key === selectedMessageThread ? ' selected' : ''}>${esc(label)}</option>`;
-  }).join('');
-
   const inboxBody = messagesInboxOpen ? `
     <div style="padding:0 16px 16px;border-top:1px solid #e6e9e7;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;">
-        <label style="flex:1;min-width:200px;display:block;">
-          <span style="display:block;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Booking conversation</span>
-          <select onchange="setMessageThread(this.value)" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid #d1d5db;background:#fff;font-family:inherit;font-size:13px;font-weight:600;color:#1a1a1a;cursor:pointer;">
-            ${threadOptions}
-          </select>
-        </label>
+      <div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        ${renderMessageThreadPicker(threadList, activeThread)}
         ${unreadCount > 0 ? `<button onclick="markAllMessagesRead()" style="align-self:flex-end;padding:8px 12px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Mark all read</button>` : ''}
       </div>
       ${renderMessageThreadDetail(activeThread)}
     </div>` : '';
 
   panel.innerHTML = `
-    <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;overflow:hidden;">
+    <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;">
       <button type="button" onclick="toggleMessagesInbox()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border:none;background:transparent;font-family:inherit;cursor:pointer;text-align:left;">
         <div style="display:flex;align-items:center;gap:8px;min-width:0;">
           <span style="font-size:15px;font-weight:800;color:#1a1a1a;white-space:nowrap;">💬 Guest messages</span>
@@ -3213,6 +3267,7 @@ async function refreshCurrentView() {
     return;
   }
   const tasks = [loadBookings()];
+  if (currentFilter === 'bookings') tasks.push(loadMessages());
   if (currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
   }
@@ -3492,6 +3547,7 @@ function setFilter(filter, btn) {
     return;
   }
   applyFilter();
+  if (filter === 'bookings') loadMessages();
 }
 
 function moveSlider(activeTab) {
@@ -3651,7 +3707,8 @@ function applyFilter() {
   if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
   if (msgPanel) msgPanel.style.display = '';
-  renderMessages();
+  if (!guestMessages.length) loadMessages();
+  else renderMessages();
   renderBookings(bookings);
 }
 
