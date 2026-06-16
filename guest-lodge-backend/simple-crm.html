@@ -1769,7 +1769,7 @@
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
       <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR so guests install your hotel app">📲 Guest app QR</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
+      <button class="refresh-btn" onclick="clearLaunchChecklistFlagsForHotel();localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');sessionStorage.removeItem('launchGuideShown');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
     </div>
   </header>
 
@@ -2695,10 +2695,24 @@ async function verifyCrmToken(pin) {
   return json;
 }
 
+function launchChecklistKey(flag) {
+  const hid = activeHotelId || 'default';
+  return `launch_${hid}_${flag}`;
+}
+function hasLaunchChecklistFlag(flag) {
+  return !!localStorage.getItem(launchChecklistKey(flag));
+}
+function setLaunchChecklistFlag(flag) {
+  localStorage.setItem(launchChecklistKey(flag), '1');
+}
+function clearLaunchChecklistFlagsForHotel() {
+  ['rates', 'link'].forEach((f) => localStorage.removeItem(launchChecklistKey(f)));
+}
+
 function getLaunchChecklistState() {
   const hasPhoto = editRooms.length > 0 && editRooms.some(r => r.images && r.images.length > 0);
-  const hasRates = !!localStorage.getItem('ratesChanged');
-  const hasLink = !!localStorage.getItem('linkCopied');
+  const hasRates = hasLaunchChecklistFlag('rates');
+  const hasLink = hasLaunchChecklistFlag('link');
   const steps = [
     { key: 'photo', done: hasPhoto, label: 'Add a room photo', hint: 'Tap the photo on Your page' },
     { key: 'rates', done: hasRates, label: 'Set your prices', hint: 'Nightly, weekly, monthly' },
@@ -2742,8 +2756,12 @@ function propertyStatusStripHtml() {
         <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:8px;">Cancel anytime</div>
       </div>`;
   }
-  const dots = steps.map(s => `<span title="${esc(s.label)}" style="width:10px;height:10px;border-radius:50%;background:${s.done ? '#2E7D5B' : '#d1d5db'};display:inline-block;flex-shrink:0;"></span>`).join('');
-  const stepNum = next ? doneCount + 1 : total;
+  const dots = steps.map((s, i) => {
+    const nextIdx = next ? steps.findIndex(x => x.key === next.key) : -1;
+    const bg = s.done ? '#2E7D5B' : (i === nextIdx ? '#f59e0b' : '#d1d5db');
+    return `<span title="${esc(s.label)}" style="width:10px;height:10px;border-radius:50%;background:${bg};display:inline-block;flex-shrink:0;${i === nextIdx ? 'box-shadow:0 0 0 2px #fff,0 0 0 4px #f59e0b;' : ''}"></span>`;
+  }).join('');
+  const stepNum = next ? steps.findIndex(s => s.key === next.key) + 1 : total;
   const stepLabel = next ? next.label : 'Turn on bookings';
   const stepHint = next ? next.hint : '';
   return `
@@ -4926,7 +4944,7 @@ async function loadSettings() {
 
 function settingsCopyLink() {
   const input = document.getElementById('settings-booking-url');
-  if (input) navigator.clipboard.writeText(input.value).then(() => { localStorage.setItem('linkCopied', '1'); advanceTourIfNeeded(); toast('Link copied!', 'success'); }).catch(() => toast('Copy failed', 'error'));
+  if (input) navigator.clipboard.writeText(input.value).then(() => { setLaunchChecklistFlag('link'); advanceTourIfNeeded(); toast('Link copied!', 'success'); }).catch(() => toast('Copy failed', 'error'));
 }
 
 function checklistGoToRates() {
@@ -4991,7 +5009,7 @@ function copyBookingLinkFromChecklist() {
   const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
   const url = 'https://' + domain;
   navigator.clipboard.writeText(url).then(() => {
-    localStorage.setItem('linkCopied', '1');
+    setLaunchChecklistFlag('link');
     advanceTourIfNeeded();
     advanceSetupAfterAction('link');
     toast('Link copied!', 'success');
@@ -5117,8 +5135,8 @@ function advanceTourIfNeeded() {
   if (localStorage.getItem('settingsTourDone')) return;
   const step = parseInt(localStorage.getItem('settingsTourStep') || '0');
   const hasPhoto = editRooms.some(r => r.images && r.images.length > 0);
-  const hasRates = !!localStorage.getItem('ratesChanged');
-  const hasLink = !!localStorage.getItem('linkCopied');
+  const hasRates = hasLaunchChecklistFlag('rates');
+  const hasLink = hasLaunchChecklistFlag('link');
 
   // Steps: 0=header info, 1=photo, 2=rates, 3=copy link
   if (step === 1 && hasPhoto) localStorage.setItem('settingsTourStep', '2');
@@ -5272,8 +5290,11 @@ function showWelcomeModal() {
   document.body.appendChild(overlay);
   document.getElementById('welcomeModalGotIt').onclick = () => {
     overlay.remove();
-    // Start tour after a short delay to let DOM settle
-    setTimeout(() => { startSettingsTour(); }, 200);
+    if (!hotelSubscribed) {
+      setTimeout(() => { maybeAutoGuideLaunchStep(); }, 400);
+    } else {
+      setTimeout(() => { startSettingsTour(); }, 200);
+    }
   };
 }
 
@@ -5471,6 +5492,12 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
 function startSettingsTour() {
+  // Setup mode uses the step-by-step checklist instead of the full product tour.
+  if (!hotelSubscribed) {
+    localStorage.setItem('settingsTourDone', '1');
+    localStorage.removeItem('settingsTourStep');
+    return;
+  }
   // Only show once
   if (localStorage.getItem('settingsTourDone')) return;
 
@@ -5496,10 +5523,9 @@ function startSettingsTour() {
       tab: 'settings'
     },
     {
-      target: '#edit-rate-nightly',
+      target: '#launchStepRates',
       text: 'You can change your rates here — nightly, weekly, and monthly.',
       openAccordion: true,
-      targetParent: true,
       tab: 'settings'
     },
     {
@@ -5518,6 +5544,7 @@ function startSettingsTour() {
       target: '#edit-new-pin',
       text: 'This is your login PIN — you\'ll need it to access this dashboard next time. You can change it here anytime.',
       openAccordion: true,
+      expandAccountHelp: true,
       tab: 'settings'
     },
     {
@@ -5576,6 +5603,11 @@ function startSettingsTour() {
 
   function skipToFinale() {
     cleanupTour();
+    if (!hotelSubscribed) {
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.removeItem('settingsTourStep');
+      return;
+    }
     // Jump straight to the finale modal — they must see the "share your link" reality check
     showFinaleMockModal();
   }
@@ -5685,12 +5717,24 @@ function startSettingsTour() {
 
   function showStepForElement(el, s) {
 
+    // Reveal hidden setup sections so tour targets are measurable (live hotels only).
+    document.querySelectorAll('[data-setup-focus]').forEach((node) => node.classList.remove('setup-hidden'));
+
+    if (s.expandAccountHelp) {
+      const accountCard = document.querySelector('[data-setup-focus="extra"].booking-card');
+      const body = accountCard?.querySelector('.accordion-body');
+      const header = accountCard?.querySelector('[onclick*="toggleSection"]');
+      if (body && body.style.display === 'none' && header) toggleSection(header);
+    }
+
     // Open accordion if needed — find the accordion-body that contains this element
     if (s.openAccordion) {
-      const acc = el.closest('.accordion-body');
+      let acc = el.closest('.accordion-body');
+      if (!acc && el.querySelector) acc = el.querySelector('.accordion-body');
       if (acc && acc.style.display === 'none') {
         acc.style.display = 'block';
-        const arrow = acc.previousElementSibling?.querySelector('.accordion-arrow');
+        const header = acc.previousElementSibling;
+        const arrow = header?.querySelector('.accordion-arrow');
         if (arrow) arrow.style.transform = 'rotate(90deg)';
       }
     }
@@ -5718,8 +5762,8 @@ function startSettingsTour() {
     // Scroll element into view and wait for scroll to finish before positioning tooltip
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    // Use a longer delay to ensure scroll completes, then measure position
-    setTimeout(() => { positionTooltip(el, s); }, 500);
+    const delay = (s.openAccordion || s.expandAccountHelp) ? 750 : 500;
+    setTimeout(() => { positionTooltip(el, s); }, delay);
   }
 
   function positionTooltip(el, s) {
@@ -5905,7 +5949,7 @@ function startSettingsTour() {
       navigator.clipboard.writeText(url).catch(() => {});
       cleanupTour();
       localStorage.setItem('settingsTourDone', '1');
-      localStorage.setItem('linkCopied', '1');
+      setLaunchChecklistFlag('link');
       localStorage.removeItem('settingsTourStep');
       toast('Booking link copied!', 'success');
       // Show the test drive modal
@@ -6237,7 +6281,7 @@ async function loadEditRooms() {
     const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
-    const ratesOpen = !localStorage.getItem('ratesChanged');
+    const ratesOpen = !hasLaunchChecklistFlag('rates');
     let html = `
       <button data-setup-focus="extra" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:14px;">See what guests see →</button>
       <div data-setup-focus="basics" class="booking-card" style="margin-bottom:14px;">
@@ -6356,7 +6400,7 @@ async function loadEditRooms() {
     applySetupStepFocus();
     if (typeof lucide !== 'undefined') lucide.createIcons();
     // Trigger tour guide on first visit (only if on settings tab and onboarding is done)
-    setTimeout(() => { if (currentFilter === 'settings' && localStorage.getItem('onboardingDone') && !localStorage.getItem('settingsTourDone') && !document.getElementById('welcomeModalOverlay')) startSettingsTour(); }, 300);
+    setTimeout(() => { if (hotelSubscribed && currentFilter === 'settings' && localStorage.getItem('onboardingDone') && !localStorage.getItem('settingsTourDone') && !document.getElementById('welcomeModalOverlay')) startSettingsTour(); }, 300);
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
   }
@@ -6555,7 +6599,7 @@ async function saveRates() {
   const monthly = parseFloat(document.getElementById('edit-rate-monthly')?.value) || 999;
   try {
     await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
-    localStorage.setItem('ratesChanged', '1');
+    setLaunchChecklistFlag('rates');
     advanceTourIfNeeded();
     advanceSetupAfterAction('rates');
     toast('Rates saved!', 'success');
@@ -6583,7 +6627,7 @@ async function changePin() {
 
 function copyBookingLink(url) {
   navigator.clipboard.writeText(url).then(() => {
-    localStorage.setItem('linkCopied', '1');
+    setLaunchChecklistFlag('link');
     advanceTourIfNeeded();
     advanceSetupAfterAction('link');
     toast('Link copied!', 'success');
@@ -6666,7 +6710,7 @@ async function saveEditRoom(roomId) {
 async function uploadEditImages(event, roomId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
-  // Show loading on the room card
+  event.target.value = '';
   const card = document.getElementById('edit-card-' + roomId);
   const imgContainer = card?.querySelector('div:first-child');
   if (imgContainer) {
@@ -6674,18 +6718,20 @@ async function uploadEditImages(event, roomId) {
     imgContainer.insertAdjacentHTML('beforeend', '<div id="upload-spinner-' + roomId + '" style="position:absolute;inset:0;background:rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;z-index:5;flex-direction:column;gap:6px;"><div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;"></div><div id="upload-progress-' + roomId + '" style="font-size:12px;color:var(--text-muted);font-weight:600;">0 / ' + files.length + '</div></div>');
   }
   let uploaded = 0;
+  let lastError = '';
+  const hotelQ = activeHotelId ? `?hotelId=${encodeURIComponent(activeHotelId)}` : '';
   for (const file of files) {
     const optimized = await optimizeRoomPhotoForUpload(file);
     const fd = new FormData();
     fd.append('image', optimized, optimized.name || 'room.webp');
     try {
-      const res = await fetch(`/api/crm/rooms/${roomId}/images`, {
+      const res = await fetch(`/api/crm/rooms/${roomId}/images${hotelQ}`, {
         method: 'POST',
         headers: { 'x-crm-token': token },
         body: fd,
       });
-      const data = await res.json();
-      if (data.success && data.image) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.image) {
         const room = editRooms.find(r => r.id === roomId);
         if (room) {
           if (!room.images) room.images = [];
@@ -6693,19 +6739,25 @@ async function uploadEditImages(event, roomId) {
           if (!room.imageUrl) room.imageUrl = data.image.url;
         }
         uploaded++;
+      } else {
+        lastError = data.message || `Upload failed (${res.status})`;
       }
-    } catch (e) { /* skip failed */ }
-    // Update progress
+    } catch (e) {
+      lastError = e.message || 'Upload failed';
+    }
     const prog = document.getElementById('upload-progress-' + roomId);
     if (prog) prog.textContent = uploaded + ' / ' + files.length;
   }
-  // Remove spinner
   const spinner = document.getElementById('upload-spinner-' + roomId);
   if (spinner) spinner.remove();
   renderEditRoomsCards();
   advanceTourIfNeeded();
-  advanceSetupAfterAction('photo');
-  toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added!', 'success');
+  if (uploaded > 0) {
+    advanceSetupAfterAction('photo');
+    toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added!', 'success');
+  } else {
+    toast(lastError || 'Upload failed — try JPG or PNG', 'error');
+  }
 }
 
 // Center-crop any uploaded image to a perfect square PNG before sending it up.

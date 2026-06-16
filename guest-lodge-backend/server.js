@@ -5408,8 +5408,10 @@ const uploadMemory = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        cb(null, allowed.includes(file.mimetype));
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+        const ext = (file.originalname || '').toLowerCase();
+        const ok = allowed.includes(file.mimetype) || /\.(jpe?g|png|webp)$/i.test(ext);
+        cb(null, ok);
     },
 });
 
@@ -5426,8 +5428,10 @@ const uploadStorage = multer.diskStorage({
     },
 });
 const uploadDisk = multer({ storage: uploadStorage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const ext = (file.originalname || '').toLowerCase();
+    const ok = allowed.includes(file.mimetype) || /\.(jpe?g|png|webp)$/i.test(ext);
+    cb(null, ok);
 }});
 
 // Choose upload middleware based on R2 config
@@ -6706,14 +6710,18 @@ app.delete('/api/crm/rooms/:roomId', crmAuth, async (req, res) => {
 });
 
 // Upload room image
-app.post('/api/crm/rooms/:roomId/images', crmAuth, (req, res, next) => {
-    req.hotelId = req.crmDefaultHotelId || req.crmResolvedHotelId || 'unknown';
-    next();
-}, upload.single('image'), async (req, res) => {
+app.post('/api/crm/rooms/:roomId/images', crmAuth, upload.single('image'), async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ success: false, message: 'No image' });
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        req.hotelId = hotelId;
+        if (!req.file) return res.status(400).json({ success: false, message: 'No image file received' });
+        const room = await withRetry(() => prisma.room.findFirst({
+            where: { id: req.params.roomId, hotelId },
+        }));
+        if (!room) return res.status(404).json({ success: false, message: 'Room not found for this hotel' });
         const image = await saveOptimizedRoomImage(req, req.params.roomId);
-        if (!image) return res.status(400).json({ success: false, message: 'No image' });
+        if (!image) return res.status(400).json({ success: false, message: 'Could not process image' });
         const returnUrl = R2_PUBLIC_URL ? image.url : `${req.protocol}://${req.get('host')}${image.url}`;
         res.json({ success: true, image: { id: image.id, url: returnUrl } });
     } catch (e) {
