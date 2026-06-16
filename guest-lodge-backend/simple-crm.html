@@ -1761,9 +1761,9 @@
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
-      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR for guest to scan">📲 Check-in QR</button>
+      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR so guests install your hotel app">📲 Guest app QR</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';">🔄 Redo Tour</button>
+      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
     </div>
   </header>
 
@@ -1771,13 +1771,13 @@
     <div class="tabs-container">
       <div class="tabs-slider" id="tabsSlider"></div>
       <button type="button" class="tab active" data-nav-filter="settings" onclick="setFilter('settings', this)">
-        Settings
+        Your page
       </button>
       <button type="button" class="tab" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
-        Bookings <span class="tab-badge" id="countNeedsCalled">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
+        Bookings <span class="tab-badge" id="countNeedsCalled" style="display:none;">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
       </button>
       <button type="button" class="tab" data-nav-filter="apps" onclick="setFilter('apps', this)">
-        Apps
+        Guest app
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
@@ -1793,8 +1793,8 @@
 
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main">
     <button type="button" class="mobile-nav-item active" data-nav-filter="settings">
-      <span class="mobile-nav-icon-wrap"><i data-lucide="settings"></i></span>
-      <span class="mobile-nav-label">Settings</span>
+      <span class="mobile-nav-icon-wrap"><i data-lucide="globe"></i></span>
+      <span class="mobile-nav-label">Your page</span>
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="bookings">
       <span class="mobile-nav-icon-wrap" style="position:relative;"><i data-lucide="inbox"></i><span id="msgUnreadDot" style="display:none;position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e0245e;border:2px solid #fff;"></span></span>
@@ -1810,7 +1810,7 @@
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="apps">
       <span class="mobile-nav-icon-wrap"><i data-lucide="smartphone"></i></span>
-      <span class="mobile-nav-label">Apps</span>
+      <span class="mobile-nav-label">Guest app</span>
     </button>
   </nav>
 </div>
@@ -2490,7 +2490,7 @@ function ensureAvailabilityUi() {
     const settingsBtn = document.createElement('button');
     settingsBtn.className = 'tab';
     settingsBtn.setAttribute('type', 'button');
-    settingsBtn.innerHTML = 'Settings';
+    settingsBtn.innerHTML = 'Your page';
     settingsBtn.dataset.navFilter = 'settings';
     settingsBtn.onclick = function () { setFilter('settings', settingsBtn); };
     tabs.appendChild(settingsBtn);
@@ -2524,7 +2524,7 @@ function ensureAvailabilityUi() {
 
           <div class="availability-card mobile-cal-card">
             <div id="availabilityNoRoom" class="availability-empty">
-              Add a room type to start managing manual availability.
+              Add an <strong>inventory room</strong> here to control how many units are open each day. This is separate from rooms on your booking page (under <strong>Your page</strong>).
             </div>
             <div id="availabilityCalendarWrap" style="display:none">
               <div class="cal-header">
@@ -2540,6 +2540,7 @@ function ensureAvailabilityUi() {
                 <div class="legend-item"><div class="legend-dot" style="background:#FEF3C7;border:1px solid #F59E0B"></div>Partial</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#FEE2E2;border:1px solid #E05252"></div>Full</div>
                 <div class="legend-item"><div class="legend-dot" style="background:#f2f4f3;border:1px solid #d0d7d3"></div>Closed</div>
+                <div class="legend-item" style="width:100%;margin-top:4px;">Numbers on each day = <strong>rooms still available</strong> to book</div>
               </div>
               <div id="roomMobileActions" class="room-mobile-actions" style="display:none">
                 <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">✎ Edit room</button>
@@ -2553,7 +2554,8 @@ function ensureAvailabilityUi() {
 
       <div id="roomsAddModalBg" class="rooms-modal-bg">
         <div class="rooms-modal" onclick="event.stopPropagation()">
-          <h3>New room type</h3>
+          <h3>Inventory room</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin:-6px 0 12px;line-height:1.45;">For the <strong>Availability</strong> calendar only — how many units are open per day. Add photos &amp; descriptions under <strong>Your page</strong>.</p>
           <input id="roomsAddNameInput" type="text" placeholder="Room name (e.g. King Room)">
           <input id="roomsAddUnitsInput" type="number" min="1" step="1" placeholder="Total rooms">
           <div class="rooms-modal-row">
@@ -2686,6 +2688,37 @@ async function verifyCrmToken(pin) {
   return json;
 }
 
+function goLiveBannerHtml() {
+  return `
+    <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Guests can preview — but can&apos;t book yet</div>
+      <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your booking page is visible online, but reservations stay disabled until you activate. Turn it on when you&apos;re ready to take direct bookings.</p>
+      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate direct bookings — $99/mo →</button>
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+    </div>`;
+}
+
+function updateGoLiveBanner() {
+  const banner = document.getElementById('goLiveBanner');
+  if (!banner) return;
+  const onRelevantTab = currentFilter === 'bookings' || currentFilter === 'settings';
+  const shouldShow = !hotelSubscribed && onRelevantTab;
+  banner.style.display = shouldShow ? 'block' : 'none';
+  if (shouldShow) banner.innerHTML = goLiveBannerHtml();
+}
+
+function updateBookingsTabBadge() {
+  const badge = document.getElementById('countNeedsCalled');
+  if (!badge) return;
+  const needsCalls = (bookings || []).filter(b => b.callStatus === 'not-called').length;
+  const unreadMsgs = guestMessages.length
+    ? guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
+    : messageUnreadCount;
+  const actionable = needsCalls + unreadMsgs;
+  badge.textContent = actionable;
+  badge.style.display = actionable > 0 ? '' : 'none';
+}
+
 async function startCrmApp(verification) {
   currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   revenueEnabled = !!(verification && verification.isManualPms);
@@ -2701,24 +2734,7 @@ async function startCrmApp(verification) {
 
   // Track subscription status globally for banner visibility
   hotelSubscribed = !!(verification && verification.subscribed);
-
-  // Show/hide Go Live banner based on subscription status
-  const banner = document.getElementById('goLiveBanner');
-  if (banner) {
-    // Only show on bookings tab, after tour is done, when not subscribed
-    const tourDone = localStorage.getItem('settingsTourDone');
-    const showBanner = !hotelSubscribed && tourDone && currentFilter === 'bookings';
-    banner.style.display = showBanner ? 'block' : 'none';
-    if (showBanner) {
-      banner.innerHTML = `
-        <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
-          <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
-          <p style="font-size:12px;color:rgba(255,255,255,0.8);margin:0 0 14px;line-height:1.5;">Guests can see your booking page but can't complete a reservation yet.</p>
-          <button onclick="goLive()" style="width:100%;max-width:260px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
-          <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
-        </div>`;
-    }
-  }
+  updateGoLiveBanner();
 
   const realignActiveTab = () => {
     const activeTab = document.querySelector('.tab.active');
@@ -2775,6 +2791,7 @@ async function startCrmApp(verification) {
     cleanUrl.searchParams.delete('activated');
     window.history.replaceState({}, '', cleanUrl);
     hotelSubscribed = true;
+    updateGoLiveBanner();
     const _goLiveBanner = document.getElementById('goLiveBanner');
     if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
     showActivatedModal();
@@ -2938,8 +2955,8 @@ async function loadBookings(opts = {}) {
     
     // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    document.getElementById('countNeedsCalled').textContent = bookings.length;
     document.getElementById('statCount').textContent = needsCalls.length;
+    updateBookingsTabBadge();
     
     // Render based on current filter
     applyFilter();
@@ -2988,6 +3005,7 @@ function updateMessageBadges() {
   }
   const dot = document.getElementById('msgUnreadDot');
   if (dot) dot.style.display = unread > 0 ? '' : 'none';
+  updateBookingsTabBadge();
 }
 
 function timeAgo(iso) {
@@ -3296,6 +3314,9 @@ function bookingCardHtml(b) {
   localPhoneDigits = localPhoneDigits.slice(0, 10);
   const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
   const noteBtnClass = currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
+  const payChip = isDeclined
+    ? '<div class="declined-chip">⚠️ Card declined</div>'
+    : `<div class="pay-chip" title="Guest&apos;s card was verified only (small hold may apply). Collect $${Number(b.grandTotal).toFixed(2)} at check-in — nothing charged online.">💳 Collect at check-in</div>`;
   return `
     <div class="booking-card">
       <div class="card-accent ${isDeclined ? 'declined' : ''}"></div>
@@ -3310,7 +3331,7 @@ function bookingCardHtml(b) {
         <div class="card-meta">
           <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
           <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
-          ${isDeclined ? '<div class="declined-chip">⚠️ Card declined</div>' : '<div class="pay-chip">💳 Pay at check-in</div>'}
+          ${payChip}
         </div>
         <div class="card-dates">
           <div class="date-block">
@@ -3407,20 +3428,28 @@ function renderBookings(list) {
 
     const allDone = hasPhoto && hasSharedLink && !!localStorage.getItem('ratesChanged');
 
-    if (allDone) {
+    if (allDone && hotelSubscribed) {
       el.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">🚀</div>
-          <div class="empty-text">Your engine is live!</div>
-          <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting bookings.</div>
+          <div class="empty-text">You&apos;re live — waiting for bookings</div>
+          <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting direct reservations.</div>
           <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
+        </div>`;
+    } else if (allDone && !hotelSubscribed) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🔒</div>
+          <div class="empty-text">Almost there — activate bookings</div>
+          <div class="empty-sub" style="margin-bottom:12px;">Your page is set up. Turn on direct bookings so guests can complete a reservation.</div>
+          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
         </div>`;
     } else {
       el.innerHTML = `
         <div style="padding:20px 0;">
           <div style="text-align:center;margin-bottom:20px;">
-            <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Launch Checklist</div>
-            <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">Complete these to start getting bookings</p>
+            <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Launch checklist</div>
+            <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">Finish these on the <strong>Your page</strong> tab, then activate when ready</p>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px;">
             <button onclick="checklistGoTo('#editRoomsCards label', 'Tap here to add your photo')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${hasPhoto ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
@@ -3548,6 +3577,7 @@ function setFilter(filter, btn) {
   }
   applyFilter();
   if (filter === 'bookings') loadMessages();
+  updateGoLiveBanner();
 }
 
 function moveSlider(activeTab) {
@@ -3618,18 +3648,7 @@ function applyFilter() {
 
   // Hide go-live banner on non-bookings tabs
   if (goLiveBanner) {
-    const tourDone = localStorage.getItem('settingsTourDone');
-    const shouldShow = currentFilter === 'bookings' && !hotelSubscribed && tourDone;
-    goLiveBanner.style.display = shouldShow ? 'block' : 'none';
-    if (shouldShow && !goLiveBanner.innerHTML.trim()) {
-      goLiveBanner.innerHTML = `
-        <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
-          <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Your page is inactive</div>
-          <p style="font-size:12px;color:rgba(255,255,255,0.8);margin:0 0 14px;line-height:1.5;">Guests can see your booking page but can't complete a reservation yet.</p>
-          <button onclick="goLive()" style="width:100%;max-width:260px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
-          <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
-        </div>`;
-    }
+    updateGoLiveBanner();
   }
 
   if (currentFilter === 'settings') {
@@ -3694,7 +3713,7 @@ function applyFilter() {
         }, 500);
       }
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Apps</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest app</div></div>';
     });
     return;
   }
@@ -3798,7 +3817,7 @@ function renderRoomPills() {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'room-pill-add';
-  addBtn.textContent = '+ Add room type';
+  addBtn.textContent = '+ Add inventory room';
   addBtn.addEventListener('click', openRoomsAddModal);
   // Only show if no rooms exist yet (otherwise use Edit tab)
   if (bar.querySelectorAll('.room-pill').length === 0) {
@@ -4295,8 +4314,8 @@ async function markConfirmed(id) {
     
     // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    document.getElementById('countNeedsCalled').textContent = bookings.length;
     document.getElementById('statCount').textContent = needsCalls.length;
+    updateBookingsTabBadge();
     
     applyFilter();
     toast('Marked as called', 'success');
@@ -5133,7 +5152,7 @@ function showActivatedModal() {
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>You're billed monthly.</strong> Cancel anytime from <strong>Settings → Manage Subscription</strong> — no contracts.</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>You're billed monthly.</strong> Cancel anytime from <strong>Your page → Manage Subscription</strong> — no contracts.</span>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
@@ -5658,7 +5677,7 @@ function startSettingsTour() {
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Your guests get a "Tap to Install" button on your booking page. Upload your icon anytime on the Apps tab.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests get a "Tap to Install" button on your booking page. Upload your icon on the <strong>Guest app</strong> tab.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
@@ -5977,7 +5996,7 @@ function startSettingsTour() {
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
                 <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">🛏 King Room</span>
                 <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">🌙 3 nights</span>
-                <span style="background:#eff6ff;color:#1e40af;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">💳 Pay at check-in</span>
+                <span style="background:#eff6ff;color:#1e40af;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">💳 Collect at check-in</span>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px;background:#f8faf9;border-radius:10px;margin-bottom:14px;">
                 <div style="text-align:center;">
@@ -6084,7 +6103,8 @@ async function loadEditRooms() {
         </div>
       </div>
       <div id="editRoomsCards"></div>
-      <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:12px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add room type</button>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 4px;line-height:1.45;">These rooms appear on your <strong>guest booking page</strong> (photos, description, rates). For day-by-day inventory, use the <strong>Availability</strong> tab.</p>
+      <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
@@ -6964,8 +6984,8 @@ function renderAppsView() {
       <div class="loading" style="padding:8px 0;"><div class="logo-sprite-bounce"></div></div>
     </div>
 
-    <h2 class="apps-headline">Apps on your phone</h2>
-    <p class="apps-intro">Save <strong>Front Desk</strong> to your home screen — your phone buzzes when someone books. Guests can save <strong>${hName}</strong> the same way.</p>
+    <h2 class="apps-headline">Guest app &amp; your phone</h2>
+    <p class="apps-intro"><strong>Step 1 — you:</strong> save Front Desk to your phone (booking alerts). <strong>Step 2 — guests:</strong> they save <strong>${hName}</strong> to their home screen to message you and book direct.</p>
     <button type="button" class="apps-tour-replay" onclick="startAppsTour({replay:true})">▶ Watch how it works</button>
 
     <div class="apps-step-label">Step 1</div>
@@ -6993,7 +7013,7 @@ function renderAppsView() {
     <div class="apps-step-card">
       <div class="apps-step-title">Get guests on their phones</div>
       <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.45;">At check-in, show a full-screen QR. Guests tap <strong>Add to Home Screen</strong> — your hotel lands on their phone like an app.</p>
-      <button type="button" onclick="showCheckinQrOverlay()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📲 Show check-in QR</button>
+      <button type="button" onclick="showCheckinQrOverlay()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📲 Show guest app QR</button>
       ${guestInstallUrl !== '#' ? `
       <details class="apps-fold" style="margin-top:12px;margin-bottom:0;box-shadow:none;">
         <summary class="apps-fold-summary">
@@ -7083,7 +7103,7 @@ async function loadGuestInstallStats() {
         + '<span style="color:var(--text);font-weight:600;text-transform:capitalize;">' + label + '</span>'
         + '<span style="color:var(--text-muted);white-space:nowrap;">' + (s.views || 0) + ' views · ' + (s.installed || 0) + ' installed</span>'
         + '</div>';
-    }).join('') : '<div style="font-size:12px;color:var(--text-muted);">No install activity yet — try the check-in QR at the desk.</div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text-muted);">No install activity yet — show the <strong>Guest app QR</strong> at check-in.</div>';
 
     el.innerHTML = ''
       + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Guest installs — last 30 days</div>'
