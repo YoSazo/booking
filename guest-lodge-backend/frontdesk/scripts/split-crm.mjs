@@ -33,7 +33,7 @@ function extractFunctions(code) {
   return [...names].sort();
 }
 
-/** Rewrite bare state identifiers to fd.* (mutable shared state). */
+/** Rewrite bare state identifiers to crm.* (mutable shared state). Never use `fd` as a local var — it used to collide with the old `fd` prefix. */
 const STATE_KEYS = [
   'token', 'bookings', 'guestMessages', 'currentFilter', 'manualAvailability', 'manualSelectedRoom',
   'availabilityYear', 'availabilityMonth', 'availabilityEditingDay', 'availabilityDaySaving',
@@ -166,12 +166,12 @@ function rewriteFd(code) {
   const { masked, parts } = maskNonCode(code);
   let out = masked;
   for (const key of STATE_KEYS) {
-    out = out.replace(new RegExp(`(?<!fd\\.)\\b${key}\\b`, 'g'), `fd.${key}`);
+    out = out.replace(new RegExp(`(?<!crm\\.)\\b${key}\\b`, 'g'), `crm.${key}`);
   }
-  out = out.replace(/fd\.fd\./g, 'fd.');
+  out = out.replace(/crm\.crm\./g, 'crm.');
   for (const v of FILTER_LITERALS) {
-    out = out.replace(new RegExp(`'fd\\.${v}'`, 'g'), `'${v}'`);
-    out = out.replace(new RegExp(`"fd\\.${v}"`, 'g'), `"${v}"`);
+    out = out.replace(new RegExp(`'crm\\.${v}'`, 'g'), `'${v}'`);
+    out = out.replace(new RegExp(`"crm\\.${v}"`, 'g'), `"${v}"`);
   }
   return unmask(out, parts);
 }
@@ -278,7 +278,7 @@ if (!initBlock.includes('bootCrmApp()')) {
 }
 
 const stateJs = `/** Shared mutable Front Desk state */
-export const fd = {
+export const crm = {
   token: '',
   bookings: [],
   guestMessages: [],
@@ -337,7 +337,7 @@ export const fd = {
 };
 `;
 
-const stateImport = `import { fd } from './state.js';\n`;
+const stateImport = `import { crm } from './state.js';\n`;
 
 const utilsJs = `${stateImport}
 let lucideLoadPromise = null;
@@ -385,7 +385,7 @@ async function optimizeRoomPhotoForUpload(file) {
 
 function scheduleDeferredMessagesLoad() {
   const run = () => {
-    if (fd.currentFilter === 'bookings') loadMessages();
+    if (crm.currentFilter === 'bookings') loadMessages();
     else loadMessageBadges();
   };
   if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2500 });
@@ -491,7 +491,7 @@ function assertNoBareState(filePath, code) {
   const { masked } = maskNonCode(code);
   const bare = [];
   for (const key of STATE_KEYS) {
-    const re = new RegExp(`(?<!fd\\.)\\b${key}\\b`);
+    const re = new RegExp(`(?<!crm\\.)\\b${key}\\b`);
     if (re.test(masked)) bare.push(key);
   }
   if (bare.length) {

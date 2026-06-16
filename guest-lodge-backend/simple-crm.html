@@ -5061,27 +5061,42 @@ function checklistGoTo(target, label) {
   }, 200);
 }
 
+function getCrmAuthToken() {
+  const t = String(token || localStorage.getItem('crmToken') || '').trim();
+  if (t) token = t;
+  return t;
+}
+
+async function postRoomImageUpload(roomId, file) {
+  const authToken = getCrmAuthToken();
+  if (!authToken) throw new Error('Not logged in');
+  const optimized = await optimizeRoomPhotoForUpload(file);
+  const uploadForm = new FormData();
+  uploadForm.append('image', optimized, optimized.name || 'room.webp');
+  const qs = new URLSearchParams();
+  if (activeHotelId) qs.set('hotelId', activeHotelId);
+  qs.set('token', authToken);
+  const res = await fetch(`/api/crm/rooms/${roomId}/images?${qs}`, {
+    method: 'POST',
+    headers: { 'x-crm-token': authToken },
+    body: uploadForm,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || data.error || `Upload failed (${res.status})`);
+  }
+  return data;
+}
+
 async function settingsUploadPhoto(event, roomId) {
   const file = event.target.files[0];
   if (!file) return;
-  const optimized = await optimizeRoomPhotoForUpload(file);
-  const fd = new FormData();
-  fd.append('image', optimized, optimized.name || 'room.webp');
   try {
-    const res = await fetch(`/api/crm/rooms/${roomId}/images?hotelId=${encodeURIComponent(activeHotelId)}`, {
-      method: 'POST',
-      headers: { 'x-crm-token': token },
-      body: fd,
-    });
-    const data = await res.json();
-    if (data.success) {
-      toast('Photo uploaded!', 'success');
-      loadSettings();
-    } else {
-      toast(data.message || 'Upload failed', 'error');
-    }
+    await postRoomImageUpload(roomId, file);
+    toast('Photo uploaded!', 'success');
+    loadSettings();
   } catch (e) {
-    toast('Upload failed', 'error');
+    toast(e.message || 'Upload failed', 'error');
   }
 }
 
@@ -6719,19 +6734,10 @@ async function uploadEditImages(event, roomId) {
   }
   let uploaded = 0;
   let lastError = '';
-  const hotelQ = activeHotelId ? `?hotelId=${encodeURIComponent(activeHotelId)}` : '';
   for (const file of files) {
-    const optimized = await optimizeRoomPhotoForUpload(file);
-    const fd = new FormData();
-    fd.append('image', optimized, optimized.name || 'room.webp');
     try {
-      const res = await fetch(`/api/crm/rooms/${roomId}/images${hotelQ}`, {
-        method: 'POST',
-        headers: { 'x-crm-token': token },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success && data.image) {
+      const data = await postRoomImageUpload(roomId, file);
+      if (data.image) {
         const room = editRooms.find(r => r.id === roomId);
         if (room) {
           if (!room.images) room.images = [];
@@ -6739,8 +6745,6 @@ async function uploadEditImages(event, roomId) {
           if (!room.imageUrl) room.imageUrl = data.image.url;
         }
         uploaded++;
-      } else {
-        lastError = data.message || `Upload failed (${res.status})`;
       }
     } catch (e) {
       lastError = e.message || 'Upload failed';
@@ -6805,18 +6809,22 @@ async function uploadAppIcon(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   setAppIconPreviewLoading();
-  const fd = new FormData();
+  const uploadForm = new FormData();
   try {
     const squared = await squareCropImage(file, 512);
-    fd.append('icon', squared, 'app-icon.png');
+    uploadForm.append('icon', squared, 'app-icon.png');
   } catch (_) {
-    fd.append('icon', file); // fall back to raw upload if canvas fails
+    uploadForm.append('icon', file); // fall back to raw upload if canvas fails
   }
   try {
-    const res = await fetch('/api/crm/hotel-app-icon', {
+    const authToken = getCrmAuthToken();
+    const qs = new URLSearchParams();
+    if (activeHotelId) qs.set('hotelId', activeHotelId);
+    if (authToken) qs.set('token', authToken);
+    const res = await fetch(`/api/crm/hotel-app-icon?${qs}`, {
       method: 'POST',
-      headers: { 'x-crm-token': token },
-      body: fd,
+      headers: { 'x-crm-token': authToken },
+      body: uploadForm,
     });
     const data = await res.json();
     if (data.success && data.appIconUrl) {
