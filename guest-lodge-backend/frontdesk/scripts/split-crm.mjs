@@ -218,7 +218,8 @@ function patchApplyFilterAppsBlock(code) {
   return code.slice(0, appsStart) + APPLY_FILTER_APPS_BLOCK + code.slice(tailAt);
 }
 
-const css = slice(16, 1697);
+const styleCloseLine = lineAt('</style>');
+const css = slice(16, styleCloseLine - 1);
 fs.mkdirSync(path.join(out, 'styles'), { recursive: true });
 fs.writeFileSync(path.join(out, 'styles', 'core.css'), css);
 
