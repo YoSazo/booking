@@ -1600,12 +1600,6 @@
     .mobile-nav-item.mobile-nav-item--hidden {
       display: none !important;
     }
-    .tab.tab--hidden {
-      display: none !important;
-    }
-    #app.setup-mode .setup-hidden {
-      display: none !important;
-    }
     @media (max-width: 600px) {
       #app .container {
         padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
@@ -1769,7 +1763,7 @@
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
       <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR so guests install your hotel app">📲 Guest app QR</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <button class="refresh-btn" onclick="clearLaunchChecklistFlagsForHotel();localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');sessionStorage.removeItem('launchGuideShown');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
+      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
     </div>
   </header>
 
@@ -1786,7 +1780,7 @@
         Guest app
       </button>
     </div>
-    <div id="propertyStatusStrip" style="display:none;"></div>
+    <div id="goLiveBanner" style="display:none;"></div>
     <div id="messagesPanel" style="display:none;"></div>
     <div id="bookingsList">
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
@@ -1806,7 +1800,7 @@
       <span class="mobile-nav-icon-wrap" style="position:relative;"><i data-lucide="inbox"></i><span id="msgUnreadDot" style="display:none;position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#e0245e;border:2px solid #fff;"></span></span>
       <span class="mobile-nav-label">Bookings</span>
     </button>
-    <button type="button" class="mobile-nav-item mobile-nav-item--hidden" data-nav-filter="availability" id="mobileNavAvailabilityBtn">
+    <button type="button" class="mobile-nav-item" data-nav-filter="availability">
       <span class="mobile-nav-icon-wrap"><i data-lucide="door-open"></i></span>
       <span class="mobile-nav-label">Availability</span>
     </button>
@@ -2483,7 +2477,6 @@ function ensureAvailabilityUi() {
   const tabs = document.querySelector('.tabs-container');
   if (tabs && !document.getElementById('countRooms')) {
     const btn = document.createElement('button');
-    btn.id = 'availabilityTabBtn';
     btn.className = 'tab';
     btn.setAttribute('type', 'button');
     btn.innerHTML = 'Availability <span class="tab-badge" id="countRooms">0</span>';
@@ -2695,168 +2688,23 @@ async function verifyCrmToken(pin) {
   return json;
 }
 
-function launchChecklistKey(flag) {
-  const hid = activeHotelId || 'default';
-  return `launch_${hid}_${flag}`;
-}
-function hasLaunchChecklistFlag(flag) {
-  return !!localStorage.getItem(launchChecklistKey(flag));
-}
-function setLaunchChecklistFlag(flag) {
-  localStorage.setItem(launchChecklistKey(flag), '1');
-}
-function clearLaunchChecklistFlagsForHotel() {
-  ['rates', 'link'].forEach((f) => localStorage.removeItem(launchChecklistKey(f)));
-}
-
-function getLaunchChecklistState() {
-  const hasPhoto = editRooms.length > 0 && editRooms.some(r => r.images && r.images.length > 0);
-  const hasRates = hasLaunchChecklistFlag('rates');
-  const hasLink = hasLaunchChecklistFlag('link');
-  const steps = [
-    { key: 'photo', done: hasPhoto, label: 'Add a room photo', hint: 'Tap the photo on Your page' },
-    { key: 'rates', done: hasRates, label: 'Set your prices', hint: 'Nightly, weekly, monthly' },
-    { key: 'link', done: hasLink, label: 'Copy your booking link', hint: 'Text it to guests or add to Google' },
-    { key: 'activate', done: !!hotelSubscribed, label: 'Turn on bookings', hint: '$99/mo · cancel anytime' },
-  ];
-  const setupDone = hasPhoto && hasRates && hasLink;
-  const doneCount = steps.filter(s => s.done).length;
-  const next = steps.find(s => !s.done) || null;
-  return { hasPhoto, hasRates, hasLink, steps, doneCount, total: steps.length, setupDone, next };
-}
-
-function jumpToLaunchStep(key) {
-  localStorage.setItem('settingsTourDone', '1');
-  if (key === 'photo') checklistGoTo('#editRoomsCards label', 'Tap here to add your photo');
-  else if (key === 'rates') checklistGoToRates();
-  else if (key === 'link') checklistGoTo('[data-launch-step="link"]', 'Tap Copy Link');
-  else if (key === 'activate') goLive();
-}
-
-function propertyStatusStripHtml() {
-  const { steps, doneCount, total, setupDone, next } = getLaunchChecklistState();
-  if (hotelSubscribed) {
-    return `
-      <div style="background:#f0fdf4;border:2px solid #2E7D5B;border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;line-height:1;">✅</span>
-          <div>
-            <div style="font-size:15px;font-weight:800;color:#1a1a1a;">You&apos;re live</div>
-            <div style="font-size:13px;color:#166534;margin-top:2px;">Guests can book on your page right now.</div>
-          </div>
-        </div>
-      </div>`;
-  }
-  if (setupDone) {
-    return `
-      <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:14px;padding:16px;margin-bottom:14px;text-align:center;">
-        <div style="font-size:15px;font-weight:800;color:white;margin-bottom:4px;">Last step — turn on bookings</div>
-        <p style="font-size:13px;color:rgba(255,255,255,0.9);margin:0 0 12px;line-height:1.45;">Your page looks good. Guests still can&apos;t book until you flip the switch.</p>
-        <button type="button" onclick="goLive()" style="width:100%;padding:14px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Turn on bookings — $99/mo →</button>
-        <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:8px;">Cancel anytime</div>
-      </div>`;
-  }
-  const dots = steps.map((s, i) => {
-    const nextIdx = next ? steps.findIndex(x => x.key === next.key) : -1;
-    const bg = s.done ? '#2E7D5B' : (i === nextIdx ? '#f59e0b' : '#d1d5db');
-    return `<span title="${esc(s.label)}" style="width:10px;height:10px;border-radius:50%;background:${bg};display:inline-block;flex-shrink:0;${i === nextIdx ? 'box-shadow:0 0 0 2px #fff,0 0 0 4px #f59e0b;' : ''}"></span>`;
-  }).join('');
-  const stepNum = next ? steps.findIndex(s => s.key === next.key) + 1 : total;
-  const stepLabel = next ? next.label : 'Turn on bookings';
-  const stepHint = next ? next.hint : '';
+function goLiveBannerHtml() {
   return `
-    <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:14px;padding:14px 16px;margin-bottom:14px;">
-      <div style="font-size:15px;font-weight:800;color:#92400e;">Step ${stepNum} of ${total}: ${stepLabel}</div>
-      <div style="font-size:13px;color:#78350f;margin:6px 0 10px;line-height:1.45;">${stepHint}</div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;">${dots}</div>
-      <button type="button" onclick="jumpToLaunchStep('${next ? next.key : 'activate'}')" style="width:100%;padding:14px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Do this now →</button>
+    <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Guests can preview — but can&apos;t book yet</div>
+      <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your booking page is visible online, but reservations stay disabled until you activate. Turn it on when you&apos;re ready to take direct bookings.</p>
+      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate direct bookings — $99/mo →</button>
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
     </div>`;
 }
 
-function updatePropertyStatusStrip() {
-  const strip = document.getElementById('propertyStatusStrip');
-  if (!strip) return;
-  const showOn = hotelSubscribed
-    ? ['settings', 'bookings', 'apps'].includes(currentFilter)
-    : currentFilter === 'settings';
-  strip.style.display = showOn ? 'block' : 'none';
-  if (showOn) strip.innerHTML = propertyStatusStripHtml();
-}
-
-function getSetupFocus() {
-  if (hotelSubscribed) return 'live';
-  const { hasPhoto, hasRates, hasLink, setupDone } = getLaunchChecklistState();
-  if (setupDone) return 'activate';
-  if (!hasPhoto) return 'basics';
-  if (!hasRates) return 'rates';
-  if (!hasLink) return 'link';
-  return 'activate';
-}
-
-function applySetupStepFocus() {
-  const focus = getSetupFocus();
-  const show = new Set();
-  if (focus === 'basics') { show.add('basics'); show.add('photo'); }
-  else if (focus === 'rates') show.add('rates');
-  else if (focus === 'link') show.add('link');
-  document.querySelectorAll('[data-setup-focus]').forEach(el => {
-    const f = el.getAttribute('data-setup-focus');
-    el.classList.toggle('setup-hidden', focus !== 'live' && !show.has(f));
-  });
-}
-
-function syncSetupModeUi() {
-  const live = !!hotelSubscribed;
-  const app = document.getElementById('app');
-  if (app) app.classList.toggle('setup-mode', !live);
-
-  const desktopTab = document.getElementById('availabilityTabBtn') || document.querySelector('.tab[data-nav-filter="availability"]');
-  if (desktopTab) desktopTab.classList.toggle('tab--hidden', !live);
-  const mobileAvail = document.getElementById('mobileNavAvailabilityBtn') || document.querySelector('.mobile-nav-item[data-nav-filter="availability"]');
-  if (mobileAvail) mobileAvail.classList.toggle('mobile-nav-item--hidden', !live);
-
-  ['bookings', 'apps'].forEach((f) => {
-    const tab = document.querySelector(`.tab[data-nav-filter="${f}"]`);
-    if (tab) tab.classList.toggle('tab--hidden', !live);
-    const mob = document.querySelector(`.mobile-nav-item[data-nav-filter="${f}"]`);
-    if (mob) mob.classList.toggle('mobile-nav-item--hidden', !live);
-  });
-
-  const tabsContainer = document.querySelector('.tabs-container');
-  if (tabsContainer) tabsContainer.classList.toggle('setup-hidden', !live);
-
-  const stat = document.getElementById('statNew');
-  if (stat) stat.classList.toggle('setup-hidden', !live);
-  document.querySelectorAll('.header-right .refresh-btn').forEach((btn) => {
-    btn.classList.toggle('setup-hidden', !live);
-  });
-
-  const settingsTab = document.querySelector('.tab[data-nav-filter="settings"]');
-  if (settingsTab) settingsTab.textContent = live ? 'Your page' : 'Setup';
-  const settingsMobileLabel = document.querySelector('.mobile-nav-item[data-nav-filter="settings"] .mobile-nav-label');
-  if (settingsMobileLabel) settingsMobileLabel.textContent = live ? 'Your page' : 'Setup';
-
-  if (!live && currentFilter !== 'settings') {
-    const settingsBtn = document.querySelector('[data-nav-filter="settings"]');
-    setFilter('settings', settingsBtn);
-  }
-
-  applySetupStepFocus();
-}
-
-function maybeAutoGuideLaunchStep() {
-  if (hotelSubscribed) return;
-  if (sessionStorage.getItem('launchGuideShown')) return;
-  const { next, setupDone } = getLaunchChecklistState();
-  if (!next || next.key === 'activate') return;
-  if (setupDone) return;
-  sessionStorage.setItem('launchGuideShown', '1');
-  setTimeout(async () => {
-    const settingsBtn = document.querySelector('[data-nav-filter="settings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="settings"]');
-    setFilter('settings', settingsBtn);
-    if (!document.getElementById('edit-rate-nightly')) await loadEditRooms();
-    jumpToLaunchStep(next.key);
-  }, 700);
+function updateGoLiveBanner() {
+  const banner = document.getElementById('goLiveBanner');
+  if (!banner) return;
+  const onRelevantTab = currentFilter === 'bookings' || currentFilter === 'settings';
+  const shouldShow = !hotelSubscribed && onRelevantTab;
+  banner.style.display = shouldShow ? 'block' : 'none';
+  if (shouldShow) banner.innerHTML = goLiveBannerHtml();
 }
 
 function updateBookingsTabBadge() {
@@ -2886,8 +2734,7 @@ async function startCrmApp(verification) {
 
   // Track subscription status globally for banner visibility
   hotelSubscribed = !!(verification && verification.subscribed);
-  updatePropertyStatusStrip();
-  syncSetupModeUi();
+  updateGoLiveBanner();
 
   const realignActiveTab = () => {
     const activeTab = document.querySelector('.tab.active');
@@ -2906,7 +2753,6 @@ async function startCrmApp(verification) {
 
   // If coming from setup (has welcome param) or returning from preview (has tab param), open Settings
   const urlParams = new URLSearchParams(window.location.search);
-  const isWelcomeVisit = urlParams.has('welcome');
   if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
     currentFilter = 'settings';
     const cleanUrl = new URL(window.location);
@@ -2925,14 +2771,6 @@ async function startCrmApp(verification) {
     loadManualAvailability(),
     loadBookings({ deferMessages: true }),
   ]);
-
-  if (!hotelSubscribed) {
-    try {
-      const res = await api('GET', '/api/crm/rooms');
-      if (res?.rooms) editRooms = res.rooms;
-      updatePropertyStatusStrip();
-    } catch (_) { /* ignore */ }
-  }
 
   refreshMobileBottomNavIcons();
 
@@ -2953,8 +2791,9 @@ async function startCrmApp(verification) {
     cleanUrl.searchParams.delete('activated');
     window.history.replaceState({}, '', cleanUrl);
     hotelSubscribed = true;
-    updatePropertyStatusStrip();
-    syncSetupModeUi();
+    updateGoLiveBanner();
+    const _goLiveBanner = document.getElementById('goLiveBanner');
+    if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
     showActivatedModal();
   }
 
@@ -2970,12 +2809,6 @@ async function startCrmApp(verification) {
 
   // First time opening the INSTALLED app → offer to turn on booking alerts.
   maybePromptInstalledNotifications();
-
-  if (!isWelcomeVisit && urlParams.get('activated') !== '1' && urlParams.get('action') !== 'go-live') {
-    maybeAutoGuideLaunchStep();
-  }
-
-  syncSetupModeUi();
 }
 
 async function doLogin() {
@@ -3360,7 +3193,7 @@ function renderMessages() {
     panel.innerHTML = pending ? `
       <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
         <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
-        <div style="font-size:14px;font-weight:600;color:#6b7280;">Loading guest texts…</div>
+        <div style="font-size:14px;font-weight:600;color:#6b7280;">Loading guest messages…</div>
       </div>` : '';
     if (pending && currentFilter === 'bookings') loadMessages();
     return;
@@ -3387,7 +3220,7 @@ function renderMessages() {
     <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;">
       <button type="button" onclick="toggleMessagesInbox()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border:none;background:transparent;font-family:inherit;cursor:pointer;text-align:left;">
         <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-          <span style="font-size:15px;font-weight:800;color:#1a1a1a;white-space:nowrap;">💬 Guest texts</span>
+          <span style="font-size:15px;font-weight:800;color:#1a1a1a;white-space:nowrap;">💬 Guest messages</span>
           <span style="font-size:12px;font-weight:600;color:#6b7280;white-space:nowrap;">${threadList.length} booking${threadList.length === 1 ? '' : 's'}</span>
           ${unreadCount > 0 ? `<span style="background:#e0245e;color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap;">${unreadCount} new</span>` : ''}
         </div>
@@ -3573,55 +3406,73 @@ function renderBookings(list) {
   bookingsVirtualList = [];
 
   if (list.length === 0) {
-    const { hasPhoto, hasLink, steps, setupDone } = getLaunchChecklistState();
+    // Check photo status from API (editRooms might not be loaded yet)
+    const hasPhoto = editRooms.length > 0 
+      ? editRooms.some(r => r.images && r.images.length > 0)
+      : false;
+    const hasSharedLink = !!localStorage.getItem('linkCopied');
 
     // If editRooms not loaded yet, fetch to check photo status
     if (editRooms.length === 0) {
       api('GET', '/api/crm/rooms').then(res => {
         if (res?.rooms) {
           editRooms = res.rooms;
-          renderBookings(list);
+          renderBookings(list); // Re-render with updated data
         }
       }).catch(() => {});
     }
 
-    const checkIcon = (done) => done
+    const checkIcon = (done) => done 
       ? '<div style="width:24px;height:24px;border-radius:50%;background:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>'
       : '<div style="width:24px;height:24px;border-radius:6px;border:2px solid #d0d7d3;flex-shrink:0;"></div>';
 
-    if (setupDone && hotelSubscribed) {
+    const allDone = hasPhoto && hasSharedLink && !!localStorage.getItem('ratesChanged');
+
+    if (allDone && hotelSubscribed) {
       el.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">🚀</div>
           <div class="empty-text">You&apos;re live — waiting for bookings</div>
-          <div class="empty-sub" style="margin-bottom:12px;">Share your link. When someone books, they&apos;ll show up here.</div>
-          <button onclick="copyBookingLinkFromChecklist()" style="padding:14px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">📋 Copy your link</button>
+          <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting direct reservations.</div>
+          <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
         </div>`;
-    } else if (setupDone && !hotelSubscribed) {
+    } else if (allDone && !hotelSubscribed) {
       el.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🔓</div>
-          <div class="empty-text">One button left</div>
-          <div class="empty-sub" style="margin-bottom:12px;">Your page is ready. Turn on bookings so guests can reserve.</div>
-          <button onclick="goLive()" style="padding:14px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Turn on bookings — $99/mo →</button>
+          <div class="empty-icon">🔒</div>
+          <div class="empty-text">Almost there — activate bookings</div>
+          <div class="empty-sub" style="margin-bottom:12px;">Your page is set up. Turn on direct bookings so guests can complete a reservation.</div>
+          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
         </div>`;
     } else {
-      const stepButtons = steps.map(s => `
-        <button type="button" onclick="jumpToLaunchStep('${s.key}')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${s.done ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
-          ${checkIcon(s.done)}
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#1a1a2e;">${s.label}</div>
-            <div style="font-size:12px;color:#6b7280;">${s.hint}</div>
-          </div>
-        </button>`).join('');
       el.innerHTML = `
         <div style="padding:20px 0;">
           <div style="text-align:center;margin-bottom:20px;">
-            <div style="font-size:18px;font-weight:800;color:#1a1a2e;">4 steps to go live</div>
-            <p style="font-size:13px;color:#6b7280;margin:6px 0 0;line-height:1.45;">Tap each one. We&apos;ll show you exactly where to tap.</p>
+            <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Launch checklist</div>
+            <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">Finish these on the <strong>Your page</strong> tab, then activate when ready</p>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px;">
-            ${stepButtons}
+            <button onclick="checklistGoTo('#editRoomsCards label', 'Tap here to add your photo')" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${hasPhoto ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(hasPhoto)}
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Add a photo to your room</div>
+                <div style="font-size:12px;color:#6b7280;">Guests book more when they see photos</div>
+              </div>
+            </button>
+            <button onclick="checklistGoToRates()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${localStorage.getItem('ratesChanged') ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(!!localStorage.getItem('ratesChanged'))}
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Change your rates</div>
+                <div style="font-size:12px;color:#6b7280;">Set your nightly, weekly, and monthly pricing</div>
+              </div>
+            </button>
+            <button onclick="copyBookingLinkFromChecklist()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${hasSharedLink ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(hasSharedLink)}
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Share your booking link</div>
+                <div style="font-size:12px;color:#6b7280;">Text it to a guest or add to Google Business</div>
+              </div>
+            </button>
           </div>
         </div>`;
     }
@@ -3696,15 +3547,6 @@ function initMobileBottomNav() {
 
 function setFilter(filter, btn) {
   if (filter === 'revenue' && !revenueEnabled) return;
-  if (!hotelSubscribed && filter !== 'settings') {
-    if (filter === 'availability') {
-      toast('Turn on bookings first — then you can set daily availability.', 'info');
-    } else {
-      toast('Finish setup on this page first — one step at a time.', 'info');
-    }
-    filter = 'settings';
-    btn = document.querySelector('.tab[data-nav-filter="settings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="settings"]');
-  }
   currentFilter = filter;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   let tabBtn = null;
@@ -3735,8 +3577,7 @@ function setFilter(filter, btn) {
   }
   applyFilter();
   if (filter === 'bookings') loadMessages();
-  updatePropertyStatusStrip();
-  syncSetupModeUi();
+  updateGoLiveBanner();
 }
 
 function moveSlider(activeTab) {
@@ -3795,7 +3636,7 @@ function applyFilter() {
   const availabilityEl = document.getElementById('availabilityView');
   const revenueEl = document.getElementById('revenueView');
   const settingsEl = document.getElementById('settingsView');
-  const statusStrip = document.getElementById('propertyStatusStrip');
+  const goLiveBanner = document.getElementById('goLiveBanner');
   const msgPanel = document.getElementById('messagesPanel');
   if (msgPanel) msgPanel.style.display = 'none';
   const appsEl = document.getElementById('appsView');
@@ -3805,8 +3646,9 @@ function applyFilter() {
   const ptr = document.getElementById('checklistPointer');
   if (ptr) ptr.remove();
 
-  if (statusStrip) {
-    updatePropertyStatusStrip();
+  // Hide go-live banner on non-bookings tabs
+  if (goLiveBanner) {
+    updateGoLiveBanner();
   }
 
   if (currentFilter === 'settings') {
@@ -4944,7 +4786,7 @@ async function loadSettings() {
 
 function settingsCopyLink() {
   const input = document.getElementById('settings-booking-url');
-  if (input) navigator.clipboard.writeText(input.value).then(() => { setLaunchChecklistFlag('link'); advanceTourIfNeeded(); toast('Link copied!', 'success'); }).catch(() => toast('Copy failed', 'error'));
+  if (input) navigator.clipboard.writeText(input.value).then(() => { localStorage.setItem('linkCopied', '1'); advanceTourIfNeeded(); toast('Link copied!', 'success'); }).catch(() => toast('Copy failed', 'error'));
 }
 
 function checklistGoToRates() {
@@ -4997,21 +4839,12 @@ function checklistGoToRates() {
   }, 200);
 }
 
-function advanceSetupAfterAction(stepKey) {
-  updatePropertyStatusStrip();
-  applySetupStepFocus();
-  const target = stepKey === 'photo' ? document.getElementById('launchStepRates')
-    : stepKey === 'rates' ? document.querySelector('[data-launch-step="link"]') : null;
-  if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
-}
-
 function copyBookingLinkFromChecklist() {
   const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
   const url = 'https://' + domain;
   navigator.clipboard.writeText(url).then(() => {
-    setLaunchChecklistFlag('link');
+    localStorage.setItem('linkCopied', '1');
     advanceTourIfNeeded();
-    advanceSetupAfterAction('link');
     toast('Link copied!', 'success');
     loadBookings();
   }).catch(() => toast('Copy failed', 'error'));
@@ -5150,8 +4983,8 @@ function advanceTourIfNeeded() {
   if (localStorage.getItem('settingsTourDone')) return;
   const step = parseInt(localStorage.getItem('settingsTourStep') || '0');
   const hasPhoto = editRooms.some(r => r.images && r.images.length > 0);
-  const hasRates = hasLaunchChecklistFlag('rates');
-  const hasLink = hasLaunchChecklistFlag('link');
+  const hasRates = !!localStorage.getItem('ratesChanged');
+  const hasLink = !!localStorage.getItem('linkCopied');
 
   // Steps: 0=header info, 1=photo, 2=rates, 3=copy link
   if (step === 1 && hasPhoto) localStorage.setItem('settingsTourStep', '2');
@@ -5305,11 +5138,8 @@ function showWelcomeModal() {
   document.body.appendChild(overlay);
   document.getElementById('welcomeModalGotIt').onclick = () => {
     overlay.remove();
-    if (!hotelSubscribed) {
-      setTimeout(() => { maybeAutoGuideLaunchStep(); }, 400);
-    } else {
-      setTimeout(() => { startSettingsTour(); }, 200);
-    }
+    // Start tour after a short delay to let DOM settle
+    setTimeout(() => { startSettingsTour(); }, 200);
   };
 }
 
@@ -5507,7 +5337,7 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
 function startSettingsTour() {
-  // Setup mode uses the step-by-step checklist instead of the full product tour.
+  // Pre-live hotels use the go-live banner + checklist — skip the full product tour.
   if (!hotelSubscribed) {
     localStorage.setItem('settingsTourDone', '1');
     localStorage.removeItem('settingsTourStep');
@@ -5538,9 +5368,10 @@ function startSettingsTour() {
       tab: 'settings'
     },
     {
-      target: '#launchStepRates',
+      target: '#edit-rate-nightly',
       text: 'You can change your rates here — nightly, weekly, and monthly.',
       openAccordion: true,
+      targetParent: true,
       tab: 'settings'
     },
     {
@@ -5559,7 +5390,6 @@ function startSettingsTour() {
       target: '#edit-new-pin',
       text: 'This is your login PIN — you\'ll need it to access this dashboard next time. You can change it here anytime.',
       openAccordion: true,
-      expandAccountHelp: true,
       tab: 'settings'
     },
     {
@@ -5618,11 +5448,6 @@ function startSettingsTour() {
 
   function skipToFinale() {
     cleanupTour();
-    if (!hotelSubscribed) {
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.removeItem('settingsTourStep');
-      return;
-    }
     // Jump straight to the finale modal — they must see the "share your link" reality check
     showFinaleMockModal();
   }
@@ -5732,24 +5557,12 @@ function startSettingsTour() {
 
   function showStepForElement(el, s) {
 
-    // Reveal hidden setup sections so tour targets are measurable (live hotels only).
-    document.querySelectorAll('[data-setup-focus]').forEach((node) => node.classList.remove('setup-hidden'));
-
-    if (s.expandAccountHelp) {
-      const accountCard = document.querySelector('[data-setup-focus="extra"].booking-card');
-      const body = accountCard?.querySelector('.accordion-body');
-      const header = accountCard?.querySelector('[onclick*="toggleSection"]');
-      if (body && body.style.display === 'none' && header) toggleSection(header);
-    }
-
     // Open accordion if needed — find the accordion-body that contains this element
     if (s.openAccordion) {
-      let acc = el.closest('.accordion-body');
-      if (!acc && el.querySelector) acc = el.querySelector('.accordion-body');
+      const acc = el.closest('.accordion-body');
       if (acc && acc.style.display === 'none') {
         acc.style.display = 'block';
-        const header = acc.previousElementSibling;
-        const arrow = header?.querySelector('.accordion-arrow');
+        const arrow = acc.previousElementSibling?.querySelector('.accordion-arrow');
         if (arrow) arrow.style.transform = 'rotate(90deg)';
       }
     }
@@ -5777,8 +5590,8 @@ function startSettingsTour() {
     // Scroll element into view and wait for scroll to finish before positioning tooltip
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    const delay = (s.openAccordion || s.expandAccountHelp) ? 750 : 500;
-    setTimeout(() => { positionTooltip(el, s); }, delay);
+    // Use a longer delay to ensure scroll completes, then measure position
+    setTimeout(() => { positionTooltip(el, s); }, 500);
   }
 
   function positionTooltip(el, s) {
@@ -5964,7 +5777,7 @@ function startSettingsTour() {
       navigator.clipboard.writeText(url).catch(() => {});
       cleanupTour();
       localStorage.setItem('settingsTourDone', '1');
-      setLaunchChecklistFlag('link');
+      localStorage.setItem('linkCopied', '1');
       localStorage.removeItem('settingsTourStep');
       toast('Booking link copied!', 'success');
       // Show the test drive modal
@@ -6296,40 +6109,91 @@ async function loadEditRooms() {
     const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
-    const ratesOpen = !hasLaunchChecklistFlag('rates');
     let html = `
-      <button data-setup-focus="extra" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:14px;">See what guests see →</button>
-      <div data-setup-focus="basics" class="booking-card" style="margin-bottom:14px;">
+      <button onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
+      <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
-          <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">STEP 1 OF 4</div>
-          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px;">Your hotel name &amp; phone</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
           <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
             <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
           </div>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
+          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
         </div>
-      </div>
-      <div data-setup-focus="photo">
-      <div style="margin-bottom:6px;">
-        <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">STEP 2 OF 4</div>
-        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">Room photo</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px;line-height:1.45;">Tap <strong>+ Add Photos</strong> on a room. Guests book more when they see pictures.</p>
       </div>
       <div id="editRoomsCards"></div>
-      <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add another room</button>
-      </div>
-      <div data-setup-focus="rates" class="booking-card" id="launchStepRates" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div>
-            <div style="font-size:13px;font-weight:800;color:var(--green);">STEP 3 OF 4</div>
-            <div style="font-size:15px;font-weight:700;color:var(--text);">Your prices</div>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 4px;line-height:1.45;">These rooms appear on your <strong>guest booking page</strong> (photos, description, rates). For day-by-day inventory, use the <strong>Availability</strong> tab.</p>
+      <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
+          <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
+            <!-- Back button pill (matches .back-button-pill) -->
+            <div style="padding:12px 16px 0;">
+              <span style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:600;box-shadow:0 2px 6px rgba(16,185,129,0.2);">‹ Back to Booking</span>
+            </div>
+            <!-- Cancellation policy banner (matches .static-banner — white pill with shadow) -->
+            <div style="padding:10px 16px;display:flex;justify-content:center;">
+              <div style="background:white;border-radius:20px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px dashed #10b981;width:fit-content;max-width:100%;position:relative;">
+                <div style="position:absolute;top:-8px;right:8px;background:#10b981;color:white;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;">Editable</div>
+                <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;font-size:11px;color:#111827;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
+              </div>
+            </div>
+            <!-- Progress bar (matches .checkout-progress-bar with pill step-circles) -->
+            <div style="padding:8px 16px 14px;position:relative;">
+              <div style="display:flex;justify-content:space-between;align-items:center;position:relative;">
+                <!-- Connecting line -->
+                <div style="position:absolute;top:11px;left:15%;right:15%;height:2px;background:#ddd;z-index:0;"></div>
+                <!-- Step 1: Review Cart (active/completed) -->
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
+                  <div style="width:40px;height:16px;border-radius:999px;background:#28a745;border:2px solid #28a745;"></div>
+                  <span style="font-size:10px;color:#000;font-weight:600;">Review Cart</span>
+                </div>
+                <!-- Step 2: Info (inactive) -->
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
+                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
+                  <span style="font-size:10px;color:#888;">Info</span>
+                </div>
+                <!-- Step 3: Payment (inactive) -->
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
+                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
+                  <span style="font-size:10px;color:#888;">Payment</span>
+                </div>
+              </div>
+            </div>
+            <!-- Placeholder content -->
+            <div style="padding:0 16px 14px;">
+              <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
+                <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
+                <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
+              </div>
+            </div>
           </div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;transform:rotate(${ratesOpen ? '90deg' : '0deg'});" class="accordion-arrow">›</span>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
+          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
         </div>
-        <div class="accordion-body" style="display:${ratesOpen ? 'block' : 'none'};padding:0 18px 18px;">
+      </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:18px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
+          <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
+            <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
+            <button onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
+          </div>
+          <div style="text-align:center;margin-bottom:10px;">
+            <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
+        </div>
+      </div>
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+          <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
+          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+        </div>
+        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
             <div>
               <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
@@ -6344,78 +6208,51 @@ async function loadEditRooms() {
               <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
             </div>
           </div>
-          <button onclick="saveRates()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save prices</button>
+          <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
         </div>
       </div>
-      <div data-setup-focus="link" class="booking-card" data-launch-step="link" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">STEP 4 OF 4</div>
-          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;">Your booking link</div>
-          <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
-            <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
-            <button onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:10px 20px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy link</button>
-          </div>
-          <div style="text-align:center;margin-bottom:10px;">
-            <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
-          </div>
-          <p style="font-size:12px;color:var(--text-muted);text-align:center;margin:0;">Text this to guests or paste on Google.</p>
-        </div>
-      </div>
-      <div data-setup-focus="extra" class="booking-card" style="margin-bottom:14px;">
+      <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Checkout banner (optional)</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text);">Change PIN</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;">
-            <div style="padding:12px 16px 0;">
-              <span style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:600;">‹ Back to Booking</span>
-            </div>
-            <div style="padding:10px 16px;display:flex;justify-content:center;">
-              <div style="background:white;border-radius:20px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px dashed #10b981;width:fit-content;max-width:100%;position:relative;">
-                <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;font-size:11px;color:#111827;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
-              </div>
-            </div>
-            <div style="padding:0 16px 14px;">
-              <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
-                <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
-                <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
-              </div>
-            </div>
+          <div style="margin-bottom:12px;">
+            <input type="text" id="edit-new-pin" value="${token}" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
           </div>
-          <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;text-align:center;">Guests see this during checkout.</p>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save banner</button>
+          <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
         </div>
       </div>
-      <div data-setup-focus="extra" class="booking-card" style="margin-bottom:14px;">
+      ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Account &amp; help</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">Change PIN</div>
+          <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
+        </div>
+      </div>` : ''}
+      <div class="booking-card" style="margin-bottom:14px;">
+        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+          <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
+          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+        </div>
+        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
           <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" value="${token}" placeholder="New PIN (4+ characters)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+            <textarea id="supportMessage" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
           </div>
-          <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">Update PIN</button>
-          ${hotelRes?.subscribed ? `
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">Billing</div>
-          <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">Manage subscription</button>` : ''}
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">Need help?</div>
-          <div style="margin-bottom:12px;">
-            <textarea id="supportMessage" placeholder="What do you need? We'll email you back." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
-          </div>
-          <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send message</button>
+          <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
         </div>
       </div>
     `;
     list.innerHTML = html;
     renderEditRoomsCards();
-    updatePropertyStatusStrip();
-    applySetupStepFocus();
     if (typeof lucide !== 'undefined') lucide.createIcons();
     // Trigger tour guide on first visit (only if on settings tab and onboarding is done)
-    setTimeout(() => { if (hotelSubscribed && currentFilter === 'settings' && localStorage.getItem('onboardingDone') && !localStorage.getItem('settingsTourDone') && !document.getElementById('welcomeModalOverlay')) startSettingsTour(); }, 300);
+    setTimeout(() => { if (currentFilter === 'settings' && localStorage.getItem('onboardingDone') && !localStorage.getItem('settingsTourDone') && !document.getElementById('welcomeModalOverlay')) startSettingsTour(); }, 300);
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
   }
@@ -6614,9 +6451,8 @@ async function saveRates() {
   const monthly = parseFloat(document.getElementById('edit-rate-monthly')?.value) || 999;
   try {
     await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
-    setLaunchChecklistFlag('rates');
+    localStorage.setItem('ratesChanged', '1');
     advanceTourIfNeeded();
-    advanceSetupAfterAction('rates');
     toast('Rates saved!', 'success');
   } catch (e) {
     toast('Failed to save rates', 'error');
@@ -6642,10 +6478,7 @@ async function changePin() {
 
 function copyBookingLink(url) {
   navigator.clipboard.writeText(url).then(() => {
-    setLaunchChecklistFlag('link');
-    advanceTourIfNeeded();
-    advanceSetupAfterAction('link');
-    toast('Link copied!', 'success');
+    toast('Booking link copied!', 'success');
   }).catch(() => {
     toast('Failed to copy', 'error');
   });
@@ -6725,7 +6558,7 @@ async function saveEditRoom(roomId) {
 async function uploadEditImages(event, roomId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
-  event.target.value = '';
+  // Show loading on the room card
   const card = document.getElementById('edit-card-' + roomId);
   const imgContainer = card?.querySelector('div:first-child');
   if (imgContainer) {
@@ -6757,10 +6590,9 @@ async function uploadEditImages(event, roomId) {
   renderEditRoomsCards();
   advanceTourIfNeeded();
   if (uploaded > 0) {
-    advanceSetupAfterAction('photo');
-    toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added!', 'success');
+    toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
   } else {
-    toast(lastError || 'Upload failed — try JPG or PNG', 'error');
+    toast(lastError || 'Upload failed', 'error');
   }
 }
 
