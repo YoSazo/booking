@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Smartphone, CheckCircle2 } from 'lucide-react';
+import { Share, Smartphone, Loader2, Copy, ArrowRight, MessageCircle } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { isStandalone } from './pwaUtils.js';
 import {
-  BRAND, isIos, isAndroid, qrCodeUrl,
-  HotelIcon, IosInstallSteps, IosInstallSheet, InstallBenefits,
+  BRAND,
+  INSTALL_THEME,
+  isIos,
+  isAndroid,
+  qrCodeUrl,
+  HotelIcon,
+  IosInstallSheet,
+  InstallBenefits,
+  SuccessCheckIcon,
 } from './guestInstallUi.jsx';
 import { trackGuestInstall, installTouchpointFromRef } from './guestInstallTracking.js';
 
@@ -20,13 +27,18 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIosSheet, setShowIosSheet] = useState(false);
   const [installed, setInstalled] = useState(isStandalone());
+  const [installing, setInstalling] = useState(false);
   const [lookupDone, setLookupDone] = useState(!code);
+  const [copied, setCopied] = useState(false);
 
   const hotelName = hotel?.name || 'Your Hotel';
   const appIconUrl = hotel?.appIconUrl || '';
   const installPageUrl = typeof window !== 'undefined' ? window.location.href.split('#')[0] : '';
   const touchpoint = installTouchpointFromRef(ref);
   const trackCode = code || guestStay?.code || undefined;
+  const ios = isIos();
+  const android = isAndroid();
+  const showQr = typeof window !== 'undefined' && window.innerWidth >= 480 && installPageUrl && !ios && !android;
 
   const markInstalled = useCallback(() => {
     setInstalled(true);
@@ -56,6 +68,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
     const onInstalled = () => {
       markInstalled();
       setDeferredPrompt(null);
+      setInstalling(false);
     };
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onInstalled);
@@ -65,7 +78,6 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
     };
   }, [apiBaseUrl, resolvedHotelId, touchpoint, trackCode, markInstalled]);
 
-  // Link reservation when opened from email / QR with ?code=
   useEffect(() => {
     if (!code || !resolvedHotelId || !apiBaseUrl || guestStay?.code === code) {
       setLookupDone(true);
@@ -103,22 +115,37 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
 
   const handleInstall = async () => {
     trackCta();
-    if (isIos()) {
-      setShowIosSheet(true);
-      return;
-    }
-    if (deferredPrompt) {
+    if (!deferredPrompt) return;
+    setInstalling(true);
+    try {
       deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice.catch(() => null);
       if (choice?.outcome === 'accepted') markInstalled();
       setDeferredPrompt(null);
+    } finally {
+      setInstalling(false);
     }
   };
+
+  const handleCopyLink = async () => {
+    if (!installPageUrl) return;
+    try {
+      await navigator.clipboard.writeText(installPageUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch (e) { /* ignore */ }
+  };
+
+  const subtitle = ref === 'checkin-reminder'
+    ? "You're almost here — install now so you can message us and get updates."
+    : 'Works like an app. No app store. Message us anytime and book direct next time.';
 
   if (!lookupDone) {
     return (
       <div style={styles.page}>
-        <div style={styles.loading}>Loading…</div>
+        <div style={styles.body}>
+          <div style={styles.loading}>Loading…</div>
+        </div>
       </div>
     );
   }
@@ -126,94 +153,134 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   if (installed) {
     return (
       <div style={styles.page}>
-        <div style={styles.card}>
-          <CheckCircle2 size={48} color={BRAND} style={{ marginBottom: 12 }} />
-          <h1 style={styles.title}>{hotelName} is on your phone</h1>
-          <p style={styles.subtitle}>Open it from your home screen anytime.</p>
-          <button
-            type="button"
-            onClick={() => navigate(guestStay?.code ? '/guest/home' : '/')}
-            style={styles.primaryBtn}
-          >
-            {guestStay?.code ? 'Go to my stay' : 'Book a room'}
-          </button>
-          {guestStay?.code && (
+        <style>{installKeyframes}</style>
+        <div style={styles.body}>
+          <div style={styles.main}>
+            <SuccessCheckIcon />
+            <h1 style={styles.title}>{hotelName} is on your phone</h1>
+            <p style={{ ...styles.subtitle, marginBottom: 0 }}>Open it anytime from your home screen — no browser needed.</p>
+          </div>
+          <div style={styles.footer}>
             <button
               type="button"
-              onClick={() => navigate('/guest/messages')}
-              style={styles.secondaryBtn}
+              onClick={() => navigate(guestStay?.code ? '/guest/home' : '/')}
+              style={styles.primaryBtn}
             >
-              Message the front desk
+              {guestStay?.code ? 'Go to my stay' : 'Book a room'}
             </button>
-          )}
+            {guestStay?.code && (
+              <button
+                type="button"
+                onClick={() => navigate('/guest/messages')}
+                style={styles.secondaryBtn}
+              >
+                <MessageCircle size={16} strokeWidth={2.2} />
+                Message the front desk
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
-  const showQr = typeof window !== 'undefined' && window.innerWidth >= 480 && installPageUrl;
+  let ctaBlock = null;
+  if (ios) {
+    ctaBlock = (
+      <>
+        <button
+          type="button"
+          onClick={() => { trackCta(); setShowIosSheet(true); }}
+          style={styles.primaryBtn}
+        >
+          <Share size={18} color="#fff" strokeWidth={2.2} />
+          Show me how
+        </button>
+        <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
+      </>
+    );
+  } else if (android) {
+    ctaBlock = (
+      <>
+        <button
+          type="button"
+          onClick={handleInstall}
+          style={{
+            ...styles.primaryBtn,
+            opacity: (!deferredPrompt && !installing) ? 0.55 : 1,
+            cursor: (!deferredPrompt && !installing) ? 'not-allowed' : 'pointer',
+          }}
+          disabled={installing || !deferredPrompt}
+        >
+          {installing ? (
+            <>
+              <Loader2 size={18} strokeWidth={2.2} style={{ animation: 'installSpin 0.8s linear infinite' }} />
+              Installing…
+            </>
+          ) : (
+            <>
+              <Smartphone size={18} strokeWidth={2.2} />
+              Add to Home Screen
+            </>
+          )}
+        </button>
+        <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
+      </>
+    );
+  } else if (showQr) {
+    ctaBlock = (
+      <>
+        <div style={styles.qrBlock}>
+          <p style={styles.qrLabel}>Scan with your phone</p>
+          <img src={qrCodeUrl(installPageUrl, 170)} alt="QR code" width={170} height={170} style={{ borderRadius: 12, display: 'block', margin: '0 auto' }} />
+        </div>
+        <div style={styles.copyRow}>
+          <input readOnly value={installPageUrl} style={styles.copyInput} aria-label="Install page link" />
+          <button type="button" onClick={handleCopyLink} style={styles.copyBtn}>
+            {copied ? 'Copied!' : <><Copy size={14} strokeWidth={2.2} /> Copy</>}
+          </button>
+        </div>
+      </>
+    );
+  } else {
+    ctaBlock = (
+      <p style={styles.hint}>
+        Open this page on your phone in Chrome or Safari to install.
+      </p>
+    );
+  }
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={72} />
+      <style>{installKeyframes}</style>
+      <div style={styles.body}>
+        <div style={styles.main}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={72} />
+          </div>
+          <h1 style={styles.title}>Add {hotelName} to your phone</h1>
+          <p style={styles.subtitle}>{subtitle}</p>
+
+          <InstallBenefits />
         </div>
-        <h1 style={styles.title}>Add {hotelName} to your phone</h1>
-        <p style={styles.subtitle}>
-          {ref === 'checkin-reminder'
-            ? 'You\'re almost here — install now so you can message us and get updates.'
-            : 'Works like an app. No app store. Message us anytime and book direct next stay.'}
-        </p>
 
-        <InstallBenefits />
-
-        {showQr && (
-          <div style={styles.qrBlock}>
-            <p style={styles.qrLabel}>Scan on your phone</p>
-            <img src={qrCodeUrl(installPageUrl, 180)} alt="QR code" width={180} height={180} style={{ borderRadius: 12 }} />
-          </div>
-        )}
-
-        {isIos() ? (
-          <div style={{ marginBottom: 16 }}>
-            <IosInstallSteps hotelName={hotelName} appIconUrl={appIconUrl} />
-            <button type="button" onClick={() => { trackCta(); setShowIosSheet(true); }} style={{ ...styles.primaryBtn, marginTop: 16 }}>
-              <Smartphone size={18} /> Show me how
+        <div style={styles.footer}>
+          {ctaBlock}
+          {guestStay?.code && (
+            <button type="button" onClick={() => navigate('/guest/check-in')} style={styles.secondaryBtn}>
+              Continue to check-in
+              <ArrowRight size={16} strokeWidth={2.2} />
             </button>
-            <button type="button" onClick={markInstalled} style={styles.iosConfirmBtn}>
-              I've added it to my home screen
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleInstall}
-            style={styles.primaryBtn}
-            disabled={!deferredPrompt && !isAndroid()}
-          >
-            <Smartphone size={18} />
-            {deferredPrompt ? 'Install now' : (isAndroid() ? 'Use Chrome menu → Install app' : 'Open on your phone to install')}
-          </button>
-        )}
-
-        {!isIos() && !deferredPrompt && (
-          <p style={styles.hint}>
-            On this device: open this page on your phone in Chrome, then tap Install when prompted.
-          </p>
-        )}
-
-        {guestStay?.code && (
-          <button type="button" onClick={() => navigate('/guest/check-in')} style={styles.secondaryBtn}>
-            Continue to check-in →
-          </button>
-        )}
+          )}
+        </div>
       </div>
 
       {showIosSheet && (
         <IosInstallSheet
           hotelName={hotelName}
           appIconUrl={appIconUrl}
+          title={`Install ${hotelName}`}
+          subtitle="Add it to your home screen — takes 3 seconds."
           onClose={() => setShowIosSheet(false)}
           onConfirmInstalled={markInstalled}
         />
@@ -222,39 +289,64 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   );
 }
 
+const installKeyframes = `
+  @keyframes installPopIn {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+  }
+  @keyframes installSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
 const styles = {
   page: {
-    minHeight: '60vh',
-    padding: '24px 16px 40px',
-    background: '#f4f7f9',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    minHeight: '100dvh',
+    width: '100%',
+    background: INSTALL_THEME.white,
+    fontFamily: "'DM Sans', Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+    boxSizing: 'border-box',
+  },
+  body: {
+    minHeight: '100dvh',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: 'max(32px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom))',
     maxWidth: 480,
     margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box',
+    textAlign: 'center',
   },
-  card: {
-    background: 'white',
-    borderRadius: 20,
-    padding: '28px 22px',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+  main: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    textAlign: 'center',
+  },
+  footer: {
+    flexShrink: 0,
+    paddingTop: 28,
     textAlign: 'center',
   },
   title: {
-    margin: '0 0 8px',
+    margin: '0 0 10px',
     fontSize: 22,
     fontWeight: 800,
-    color: '#1a1a2e',
-    lineHeight: 1.25,
+    color: INSTALL_THEME.text,
+    lineHeight: 1.28,
   },
   subtitle: {
-    margin: '0 0 20px',
+    margin: '0 0 24px',
     fontSize: 14,
-    color: '#6b7280',
+    color: INSTALL_THEME.textMuted,
     lineHeight: 1.55,
   },
   primaryBtn: {
     width: '100%',
-    padding: 14,
-    borderRadius: 12,
+    padding: 15,
+    borderRadius: 14,
     border: 'none',
     background: BRAND,
     color: 'white',
@@ -266,58 +358,87 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 10,
+    boxShadow: '0 6px 16px rgba(46,125,91,0.25)',
   },
   secondaryBtn: {
     width: '100%',
-    padding: 12,
-    borderRadius: 12,
-    border: '1px solid #d7e3dc',
-    background: '#f5f9f6',
+    padding: 14,
+    borderRadius: 14,
+    border: `1.5px solid ${BRAND}`,
+    background: INSTALL_THEME.white,
     color: BRAND,
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    marginTop: 8,
+    marginTop: 9,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   qrBlock: {
-    background: '#f8f9fa',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
+    background: INSTALL_THEME.bg,
+    border: `1px solid ${INSTALL_THEME.border}`,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 14,
+    textAlign: 'center',
   },
   qrLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 700,
-    color: '#6b7280',
+    color: INSTALL_THEME.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: '0.05em',
+    letterSpacing: '0.06em',
     margin: '0 0 12px',
   },
-  hint: {
-    fontSize: 12,
-    color: '#9ca3af',
-    lineHeight: 1.5,
-    margin: '8px 0 0',
+  copyRow: {
+    display: 'flex',
+    gap: 8,
+    marginBottom: 4,
   },
-  iosConfirmBtn: {
-    width: '100%',
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 12,
-    border: `1.5px solid ${BRAND}`,
-    background: 'white',
-    color: BRAND,
-    fontSize: 14,
+  copyInput: {
+    flex: 1,
+    minWidth: 0,
+    padding: '10px 12px',
+    borderRadius: 10,
+    border: `1.5px solid ${INSTALL_THEME.border}`,
+    fontFamily: "'DM Mono', ui-monospace, monospace",
+    fontSize: 11.5,
+    color: INSTALL_THEME.textMuted,
+    background: INSTALL_THEME.white,
+    boxSizing: 'border-box',
+  },
+  copyBtn: {
+    flexShrink: 0,
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: 'none',
+    background: BRAND,
+    color: '#fff',
+    fontFamily: 'inherit',
+    fontSize: 12,
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'inherit',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hint: {
+    fontSize: 11.5,
+    color: INSTALL_THEME.textMuted,
+    marginTop: 12,
+    lineHeight: 1.5,
   },
   loading: {
     textAlign: 'center',
     padding: 48,
-    color: '#6b7280',
+    color: INSTALL_THEME.textMuted,
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 };
 

@@ -6,7 +6,10 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+if (!process.env.STRIPE_SECRET_KEY) {
+    console.warn('⚠️  STRIPE_SECRET_KEY missing — add it to guest-lodge-backend/.env (payment routes will fail until then)');
+}
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_local_missing_set_STRIPE_SECRET_KEY_in_env');
 const xml2js = require('xml2js');
 const http = require('http');
 const https = require('https');
@@ -334,10 +337,22 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 }
 
 const app = express();
+
+function getPrismaDatasourceUrl() {
+    const base = process.env.DATABASE_URL || '';
+    if (!base) return base;
+    const isLocalDb = /localhost|127\.0\.0\.1/i.test(base);
+    const connectionLimit = process.env.PRISMA_CONNECTION_LIMIT || (isLocalDb ? '10' : '1');
+    const poolTimeout = process.env.PRISMA_POOL_TIMEOUT || '20';
+    const parts = [`connection_limit=${connectionLimit}`, `pool_timeout=${poolTimeout}`];
+    if (!isLocalDb && connectionLimit === '1') parts.unshift('pgbouncer=true');
+    return base + (base.includes('?') ? '&' : '?') + parts.join('&');
+}
+
 const prisma = new PrismaClient({
     datasources: {
         db: {
-            url: process.env.DATABASE_URL + (process.env.DATABASE_URL?.includes('?') ? '&' : '?') + 'pgbouncer=true&connection_limit=1&pool_timeout=20'
+            url: getPrismaDatasourceUrl(),
         }
     },
     log: ['error'],
@@ -350,16 +365,25 @@ async function withRetry(fn, retries = 3, delay = 1000) {
             return await fn();
         } catch (e) {
             const msg = e?.message || '';
-            const isConnErr =
-                msg.includes("Can't reach database") ||
-                msg.includes('P1001') ||
-                msg.includes('P1017') ||
+            const isPoolTimeout =
                 msg.includes('P2024') ||
-                msg.includes('Engine is not yet connected') ||
-                msg.includes('timed out') ||
-                msg.includes('Connection refused') ||
-                msg.includes('ECONNRESET') ||
-                msg.includes('socket hang up');
+                msg.includes('connection pool') ||
+                msg.includes('pool timeout');
+            const isConnErr =
+                !isPoolTimeout && (
+                    msg.includes("Can't reach database") ||
+                    msg.includes('P1001') ||
+                    msg.includes('P1017') ||
+                    msg.includes('Engine is not yet connected') ||
+                    msg.includes('timed out') ||
+                    msg.includes('Connection refused') ||
+                    msg.includes('ECONNRESET') ||
+                    msg.includes('socket hang up')
+                );
+            if (isPoolTimeout && i < retries - 1) {
+                await new Promise(r => setTimeout(r, delay * (i + 1)));
+                continue;
+            }
             if (isConnErr && i < retries - 1) {
                 console.log(`DB connection failed, retrying in ${delay}ms... (${i + 1}/${retries})`);
                 await prisma.$disconnect();
@@ -4080,7 +4104,7 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
         if (!hotelId) return;
 
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const [events, installedBookings, recentBookings] = await Promise.all([
+        const [events, installedBookings, recentBookings, guestPushSubscribers] = await Promise.all([
             prisma.guestInstallEvent.findMany({
                 where: { hotelId, createdAt: { gte: since } },
                 select: { touchpoint: true, eventType: true, reservationCode: true },
@@ -4090,6 +4114,9 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
             }).catch(() => 0),
             prisma.booking.count({
                 where: { hotelId, createdAt: { gte: since }, status: { not: 'cancelled' } },
+            }).catch(() => 0),
+            prisma.pushSubscription.count({
+                where: { hotelId, source: 'guest' },
             }).catch(() => 0),
         ]);
 
@@ -4120,6 +4147,7 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
             installedBookings,
             recentBookings,
             installRatePercent: installRate,
+            guestPushSubscribers,
             byTouchpoint,
         });
     } catch (e) {
@@ -7006,10 +7034,7 @@ app.get('/api/crm/messages/unread-count', crmAuth, async (req, res) => {
             where: {
                 hotelId,
                 readAt: null,
-                OR: [
-                    { sender: null },
-                    { sender: { not: 'hotel' } },
-                ],
+                sender: { not: 'hotel' },
                 createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
             },
         }));

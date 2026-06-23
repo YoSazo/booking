@@ -39,8 +39,8 @@ const STATE_KEYS = [
   'availabilityYear', 'availabilityMonth', 'availabilityEditingDay', 'availabilityDaySaving',
   'editingRoomName', 'pendingDeleteRoomName', 'currentHotelPms', 'revenueEnabled', 'hotelSubscribed',
   'revenuePeriod', 'revenueCache', 'revenueLoading', 'revenueError', 'activeHotelId', 'activeHotelName',
-  'activeHotelAppIcon', 'appsViewPlatform', 'activeHotelDomain', 'activeHotelContext', 'bootInFlight',
-  'deferredInstallPrompt', 'frontdeskInstalled', '_magicLoginPending', 'editRooms',
+  'activeHotelAppIcon', 'appsViewPlatform', 'activeHotelDomain', 'activeHotelContext', 'settingsTourActive', 'bootInFlight',
+  'deferredInstallPrompt', 'frontdeskInstalled', '_magicLoginPending', 'editRooms', 'editRoomsLoadPromise',
   'messageUnreadCount', 'bookingsVirtualList', 'bookingsVirtualRaf',
   'messagesInboxOpen', 'messagesThreadPickerOpen', 'selectedMessageThread',
   'CRM_HOTEL_BY_HOST', 'CRM_HOTEL_LABELS', 'ALLOWED_REVENUE_PERIODS', 'OTA_COMMISSION_RATE',
@@ -169,6 +169,10 @@ function rewriteFd(code) {
     out = out.replace(new RegExp(`(?<!crm\\.)\\b${key}\\b`, 'g'), `crm.${key}`);
   }
   out = out.replace(/crm\.crm\./g, 'crm.');
+  // Undo false positives: foo.bookings → foo.crm.bookings when foo is an API object, not crm state.
+  for (const key of STATE_KEYS) {
+    out = out.replace(new RegExp(`([a-zA-Z_$][\\w$]*)\\.crm\\.${key}\\b`, 'g'), `$1.${key}`);
+  }
   for (const v of FILTER_LITERALS) {
     out = out.replace(new RegExp(`'crm\\.${v}'`, 'g'), `'${v}'`);
     out = out.replace(new RegExp(`"crm\\.${v}"`, 'g'), `"${v}"`);
@@ -195,13 +199,8 @@ const APPLY_FILTER_APPS_BLOCK = `if (currentFilter === 'apps') {
     loadAppsModule().then(() => {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
-      if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
-        setTimeout(() => {
-          if (!document.getElementById('appsTourLightbox')) startAppsTour();
-        }, 500);
-      }
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Apps</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Phones</div></div>';
     });
     return;
   }
@@ -240,7 +239,7 @@ coreBlock = coreBlock
   .replace(/^let bookingsVirtualList = \[\];\n/m, '')
   .replace(/^let bookingsVirtualRaf = 0;\n/m, '')
   .replace(
-    /if \(currentFilter === 'settings'\) \{[\s\S]*?if \(!editRooms\.length\) loadEditRooms\(\);\n    return;\n  \}/,
+    /if \(currentFilter === 'settings'\) \{[\s\S]*?if \(needsEditPageLoad\(\)\) \{[\s\S]*?refreshRatesInputs\(\);\n    \}\n    return;\n  \}/,
     `if (currentFilter === 'settings') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
@@ -250,7 +249,13 @@ coreBlock = coreBlock
     if (editEl) editEl.style.display = 'block';
     closeAvailabilityDayPopover();
     loadSettingsModule().then(() => {
-      if (!editRooms.length) loadEditRooms();
+      const needsLoad = typeof window.needsEditPageLoad === 'function' && window.needsEditPageLoad();
+      if (needsLoad) {
+        if (typeof window.invokeLoadEditRooms === 'function') window.invokeLoadEditRooms();
+        else if (typeof window.loadEditRooms === 'function') window.loadEditRooms();
+      } else if (typeof window.refreshRatesInputs === 'function' && window.isEditPageDomReady && window.isEditPageDomReady()) {
+        window.refreshRatesInputs();
+      }
     });
     return;
   }`
@@ -258,12 +263,13 @@ coreBlock = coreBlock
 coreBlock = patchApplyFilterAppsBlock(coreBlock);
 coreBlock = coreBlock
   .replace(
-    /await Promise\.allSettled\(\[\n    loadManualAvailability\(\),\n    loadBookings\(\{ deferMessages: true \}\),\n  \]\);/,
-    `await loadSettingsModule();
-  await Promise.allSettled([
-    loadManualAvailability(),
-    loadBookings({ deferMessages: true }),
-  ]);`
+    /} else \{\n    await Promise\.allSettled\(\[\n      loadManualAvailability\(\),\n      loadBookings\(\{ deferMessages: true \}\),\n    \]\);/,
+    `} else {
+    await loadSettingsModule();
+    await Promise.allSettled([
+      loadManualAvailability(),
+      loadBookings({ deferMessages: true }),
+    ]);`
   );
 
 coreBlock = rewriteFd(coreBlock);
@@ -306,6 +312,7 @@ export const crm = {
   appsViewPlatform: 'ios',
   activeHotelDomain: '',
   activeHotelContext: null,
+  settingsTourActive: false,
   bootInFlight: false,
   CRM_HOTEL_BY_HOST: {
     'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
@@ -328,6 +335,7 @@ export const crm = {
   frontdeskInstalled: false,
   _magicLoginPending: false,
   editRooms: [],
+  editRoomsLoadPromise: null,
   messageUnreadCount: 0,
   messagesInboxOpen: false,
   messagesThreadPickerOpen: false,

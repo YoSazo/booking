@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install Page — Redesign Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  /* ==========================================================================
+     DESIGN TOKENS — KEEP
+     Same variables already used in simple-crm.html. If InstallPage.jsx /
+     guestInstallUi.jsx get their own stylesheet, copy this block verbatim so
+     both surfaces stay visually identical.
+     ========================================================================== */
+  :root{
+    --green:#2E7D5B; --green-light:#4CAF7D; --green-pale:#E8F5EE;
+    --green-mint:#C8EDD9; --bg:#EEF2EF; --white:#FFFFFF;
+    --text:#1A2B22; --text-muted:#6B7D72; --border:#D8E4DC;
+    --shadow:0 2px 12px rgba(46,125,91,0.10);
+    --shadow-lg:0 8px 32px rgba(46,125,91,0.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+
+  /* ==========================================================================
+     PREVIEW SCAFFOLDING ONLY — DO NOT PORT
+     Everything in this block (body background, stage header, device switcher,
+     phone bezel, browser chrome, status bar, notch) exists purely so this can
+     be viewed as a chat artifact. None of it belongs in InstallPage.jsx.
+     ========================================================================== */
+  body{
+    font-family:'DM Sans',sans-serif;
+    background:#0f1a15;
+    background-image:radial-gradient(circle at 20% 0%, #16261f 0%, #0f1a15 55%);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 60px;
+    color:var(--text);
+  }
+  .stage-header{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-bottom:26px;
+  }
+  .stage-title{ color:#fff; }
+  .stage-title .eyebrow{
+    font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--green-light);margin-bottom:4px;
+  }
+  .stage-title h1{ font-size:18px;font-weight:700; }
+  .controls{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .device-switch{
+    display:flex; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+    border-radius:12px; padding:4px; gap:2px;
+  }
+  .device-switch button{
+    border:none; background:none; color:rgba(255,255,255,0.55);
+    font-family:inherit; font-size:13px; font-weight:600; padding:8px 14px;
+    border-radius:9px; cursor:pointer; transition:all .15s;
+  }
+  .device-switch button:hover{ color:#fff; }
+  .device-switch button.active{ background:var(--green); color:#fff; }
+  .name-input-wrap{
+    display:flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+    border-radius:12px; padding:6px 12px;
+  }
+  .name-input-wrap label{ font-size:11px; color:rgba(255,255,255,0.45); font-weight:600; white-space:nowrap; }
+  .name-input-wrap input{
+    background:none; border:none; outline:none; color:#fff;
+    font-family:inherit; font-size:13px; font-weight:600; width:130px;
+  }
+  .reset-btn{
+    border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04);
+    color:rgba(255,255,255,0.7); font-family:inherit; font-size:12px; font-weight:600;
+    padding:9px 14px; border-radius:10px; cursor:pointer; transition:all .15s;
+  }
+  .reset-btn:hover{ background:rgba(255,255,255,0.1); color:#fff; }
+
+  .canvas{ width:100%; display:flex; justify-content:center; }
+
+  /* Phone bezel mockup — fake hardware frame, not a real component */
+  .device-frame{
+    width:336px; padding:12px;
+    background:linear-gradient(160deg,#1c1c1e,#050505);
+    border-radius:52px;
+    box-shadow:0 30px 70px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(255,255,255,0.06);
+  }
+  /* .device-screen is just the mockup "viewport" — in the real app this is
+     simply the browser window. The real page starts at .install-card below. */
+  .device-screen{
+    position:relative;
+    width:100%; height:660px;
+    background:var(--bg);
+    border-radius:40px;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .status-bar{
+    flex-shrink:0; height:46px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 26px; font-family:'DM Mono',monospace; font-size:13px; font-weight:600; color:var(--text);
+    background:var(--bg);
+  }
+  .notch{
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:120px; height:26px; background:#050505; border-radius:0 0 18px 18px; z-index:5;
+  }
+  .battery{ display:flex; align-items:center; gap:3px; }
+  .battery .pill{ width:20px; height:10px; border:1.4px solid var(--text); border-radius:3px; position:relative; }
+  .battery .pill::after{ content:'';position:absolute;right:-3px;top:2.5px;width:2px;height:5px;background:var(--text);border-radius:0 1px 1px 0; }
+  .battery .fill{ position:absolute; inset:1.4px; width:70%; background:var(--text); border-radius:1px; }
+
+  /* .screen-scroll is the mockup's scroll container. In the real app this is
+     just InstallPage's root <div style={styles.page}> — see .install-card
+     below for the part worth copying. */
+  .screen-scroll{ flex:1; overflow-y:auto; padding:6px 18px 28px; }
+  .screen-scroll::-webkit-scrollbar{ display:none; }
+
+  /* Fake desktop browser chrome (traffic-light dots + URL bar) */
+  .device-frame.desktop{
+    width:760px; border-radius:18px; padding:0;
+    background:#1c1c1e; box-shadow:0 30px 70px rgba(0,0,0,0.5);
+  }
+  .browser-bar{
+    height:42px; display:flex; align-items:center; gap:14px; padding:0 16px;
+    background:#262626; border-radius:18px 18px 0 0;
+  }
+  .browser-dots{ display:flex; gap:7px; }
+  .browser-dots span{ width:11px; height:11px; border-radius:50%; }
+  .browser-dots span:nth-child(1){ background:#ff5f57; }
+  .browser-dots span:nth-child(2){ background:#febc2e; }
+  .browser-dots span:nth-child(3){ background:#28c840; }
+  .browser-url{
+    flex:1; background:#3a3a3c; border-radius:8px; padding:7px 14px;
+    font-family:'DM Mono',monospace; font-size:12px; color:rgba(255,255,255,0.55);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .device-frame.desktop .device-screen{
+    height:600px; border-radius:0 0 18px 18px;
+  }
+  .device-frame.desktop .screen-scroll{
+    display:flex; align-items:center; justify-content:center; padding:40px;
+  }
+  .device-frame.desktop .status-bar, .device-frame.desktop .notch{ display:none; }
+  /* ======================= END PREVIEW SCAFFOLDING ======================= */
+
+
+  /* ==========================================================================
+     PRODUCT STYLES — PORT THESE
+     This is the actual redesign. Move this block into InstallPage.jsx's
+     `styles` object (or a shared install.css) and guestInstallUi.jsx.
+     Component mapping:
+       .install-card        -> InstallPage's <div style={styles.card}>
+       .hotel-icon           -> HotelIcon() in guestInstallUi.jsx
+       .install-title/.install-subtitle -> styles.title / styles.subtitle
+       .benefits/.benefit-*  -> InstallBenefits() in guestInstallUi.jsx
+       .btn / .btn-primary / .btn-secondary / .btn-ghost -> styles.primaryBtn /
+                                styles.secondaryBtn / iosConfirmBtn equivalents
+       .qr-block/.copy-row   -> the existing QR block in InstallPage.jsx, plus
+                                a new copy-link row (not in the original)
+       .sheet-overlay/.sheet/.step* -> IosInstallSheet() + IosInstallSteps()
+       .success-icon          -> replaces the CheckCircle2 lucide icon
+     ========================================================================== */
+  .install-card{
+    background:var(--white); border-radius:22px; padding:26px 22px 24px;
+    box-shadow:var(--shadow); text-align:center;
+    animation:cardIn .35s ease;
+  }
+  @keyframes cardIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+  .hotel-icon{
+    width:68px; height:68px; border-radius:18px; margin:0 auto 16px;
+    background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:28px; font-weight:800; box-shadow:0 8px 18px rgba(46,125,91,0.28);
+  }
+  .install-title{ font-size:21px; font-weight:800; color:var(--text); line-height:1.28; margin-bottom:8px; }
+  .install-subtitle{ font-size:13.5px; color:var(--text-muted); line-height:1.55; margin-bottom:20px; }
+
+  .benefits{ display:flex; flex-direction:column; gap:10px; margin-bottom:22px; text-align:left; }
+  .benefit-row{
+    display:flex; align-items:center; gap:12px; background:var(--bg);
+    border:1px solid var(--border); border-radius:14px; padding:11px 13px;
+  }
+  .benefit-icon{
+    width:34px; height:34px; border-radius:10px; flex-shrink:0;
+    background:var(--green-pale); color:var(--green); display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+  }
+  .benefit-text{ font-size:13px; font-weight:600; color:var(--text); line-height:1.4; }
+
+  .btn{
+    width:100%; padding:14px; border-radius:14px; border:none; cursor:pointer;
+    font-family:inherit; font-size:14.5px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    transition:transform .12s, background .15s;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--green); color:#fff; box-shadow:0 6px 16px rgba(46,125,91,0.25); }
+  .btn-primary:hover{ background:#245f46; }
+  .btn-secondary{
+    background:var(--white); color:var(--green); border:1.5px solid var(--green);
+    margin-top:9px;
+  }
+  .btn-secondary:hover{ background:var(--green-pale); }
+  .btn-ghost{
+    background:none; color:var(--text-muted); border:1.5px dashed var(--border);
+    margin-top:9px;
+  }
+
+  .hint{ font-size:11.5px; color:var(--text-muted); margin-top:12px; line-height:1.5; }
+
+  /* QR (desktop) */
+  .qr-block{
+    background:var(--bg); border:1px solid var(--border); border-radius:16px;
+    padding:18px; margin-bottom:18px;
+  }
+  .qr-label{
+    font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;
+    letter-spacing:0.06em; margin-bottom:12px;
+  }
+  .qr-block img{ border-radius:12px; display:block; margin:0 auto; }
+  .copy-row{
+    display:flex; gap:8px; margin-top:14px;
+  }
+  .copy-row input{
+    flex:1; min-width:0; padding:10px 12px; border-radius:10px; border:1.5px solid var(--border);
+    font-family:'DM Mono',monospace; font-size:11.5px; color:var(--text-muted); background:var(--white);
+  }
+  .copy-row button{
+    flex-shrink:0; padding:10px 14px; border-radius:10px; border:none; background:var(--green);
+    color:#fff; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+  }
+
+  /* Bottom sheet — NOTE: here it's `position:absolute` because it's
+     constrained inside the fake phone screen for this preview. In the real
+     app (IosInstallSheet) it should stay `position:fixed; inset:0;` exactly
+     like the current implementation, so it covers the whole viewport. */
+  .sheet-overlay{
+    position:absolute; inset:0; z-index:20; background:rgba(10,20,15,0.45);
+    display:flex; align-items:flex-end; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .22s ease;
+  }
+  .sheet-overlay.open{ opacity:1; pointer-events:auto; }
+  .sheet{
+    width:100%; background:var(--white); border-radius:24px 24px 0 0;
+    padding:22px 22px 26px; box-shadow:0 -10px 40px rgba(0,0,0,0.2);
+    transform:translateY(100%); transition:transform .28s cubic-bezier(.32,.72,0,1);
+  }
+  .sheet-overlay.open .sheet{ transform:translateY(0); }
+  .sheet-handle{ width:38px; height:4px; border-radius:99px; background:var(--border); margin:0 auto 16px; }
+  .sheet-head{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .sheet-head .hotel-icon{ width:42px; height:42px; border-radius:12px; font-size:17px; margin:0; flex-shrink:0; }
+  .sheet-head-title{ font-size:15px; font-weight:800; color:var(--text); }
+  .sheet-head-sub{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .step{ display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+  .step-badge{
+    width:26px; height:26px; border-radius:50%; background:var(--green-pale); color:var(--green);
+    font-weight:800; font-size:12.5px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .step-text{ font-size:13.5px; color:var(--text); line-height:1.5; padding-top:2px; }
+  .step-text b{ color:var(--text); }
+
+  .success-icon{
+    width:62px; height:62px; border-radius:50%; margin:0 auto 16px;
+    background:var(--green); display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 20px rgba(46,125,91,0.3);
+    animation:popIn .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes popIn{ from{transform:scale(0);} to{transform:scale(1);} }
+  .success-icon svg{ width:28px; height:28px; }
+  /* ========================== END PRODUCT STYLES ========================== */
+
+  /* PREVIEW SCAFFOLDING ONLY */
+  .footer-note{ text-align:center; color:rgba(255,255,255,0.32); font-size:11.5px; margin-top:22px; max-width:500px; }
+</style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       PREVIEW SCAFFOLDING ONLY — DO NOT PORT
+       The stage header (eyebrow/title + device switcher + hotel name input +
+       reset button) is chat-artifact UI for comparing iPhone/Android/Desktop
+       side by side. None of this exists in the real app.
+       ========================================================================== -->
+  <div class="stage-header">
+    <div class="stage-title">
+      <div class="eyebrow">Front Desk · Guest Install Page</div>
+      <h1>Redesign preview</h1>
+    </div>
+    <div class="controls">
+      <div class="name-input-wrap">
+        <label>Hotel</label>
+        <input id="hotelNameInput" type="text" value="Suite Stay" maxlength="24">
+      </div>
+      <div class="device-switch">
+        <button data-device="ios" class="active">iPhone</button>
+        <button data-device="android">Android</button>
+        <button data-device="desktop">Desktop</button>
+      </div>
+      <button class="reset-btn" id="resetBtn">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="canvas">
+    <!-- Phone bezel / browser chrome below is fake hardware framing for the
+         preview only. The real mount point starts at #screenScroll's content
+         (.install-card) and the #sheetOverlay/#sheet markup. -->
+    <div class="device-frame" id="deviceFrame">
+      <div class="notch" id="notch"></div>
+      <div class="device-screen">
+        <div class="status-bar" id="statusBar">
+          <span>9:41</span>
+          <div class="battery"><div class="pill"><div class="fill"></div></div></div>
+        </div>
+
+        <!-- ====================================================================
+             PRODUCT MOUNT POINT — PORT THIS PART
+             #screenScroll's innerHTML (built by mainCardHtml() in the script
+             below) is the actual InstallPage redesign: hotel icon, headline,
+             benefits list, and the per-device CTA / QR block.
+             ==================================================================== -->
+        <div class="screen-scroll" id="screenScroll"></div>
+
+        <!-- #sheetOverlay + #sheet = IosInstallSheet redesign. Real structure,
+             fake `position:absolute` containment (see CSS note above). -->
+        <div class="sheet-overlay" id="sheetOverlay">
+          <div class="sheet" id="sheet"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">Same green / DM Sans theme as Front Desk — simplified to one clear action per screen. Switch devices above to see the iPhone, Android, and desktop QR flows.</p>
+
+<script>
+  // ==========================================================================
+  // STATE
+  // REAL: sheetOpen / installed / installing map 1:1 to InstallPage.jsx's
+  //       existing useState hooks (showIosSheet, installed, deferredPrompt).
+  // PREVIEW ONLY: `device` just drives this mockup's device switcher — in the
+  //       real app, replace every `state.device === 'ios'` check below with
+  //       the real isIos()/isAndroid() functions already in guestInstallUi.jsx.
+  // ==========================================================================
+  const state = {
+    device: 'ios',        // PREVIEW ONLY — real app uses isIos()/isAndroid()
+    sheetOpen: false,     // REAL — same as showIosSheet
+    installed: false,     // REAL — same as installed
+    installing: false,    // REAL — same idea as awaiting deferredPrompt.userChoice
+  };
+
+  const hotelInput = document.getElementById('hotelNameInput');   // PREVIEW ONLY
+  const deviceFrame = document.getElementById('deviceFrame');      // PREVIEW ONLY
+  const screenScroll = document.getElementById('screenScroll');    // mount point
+  const sheetOverlay = document.getElementById('sheetOverlay');    // REAL
+  const sheetEl = document.getElementById('sheet');                // REAL
+  const notch = document.getElementById('notch');                  // PREVIEW ONLY
+  const statusBar = document.getElementById('statusBar');          // PREVIEW ONLY
+
+  // REAL — same role as `hotelName` derived from the `hotel` prop in
+  // InstallPage.jsx (`hotel?.name || 'Your Hotel'`).
+  function hotelName(){ return (hotelInput.value || 'Your Hotel').trim() || 'Your Hotel'; }
+  // REAL — same logic as HotelIcon()'s `initial` fallback in guestInstallUi.jsx.
+  function initial(){ return hotelName().charAt(0).toUpperCase(); }
+
+  // REAL — drop-in replacement for the lucide CheckCircle2 icon used in the
+  // "installed" state.
+  function checkSvg(){
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  }
+
+  // REAL — this is the redesigned InstallBenefits() component body.
+  function benefitsHtml(){
+    const items = [
+      ['💬','Message the front desk anytime'],
+      ['🔔','Get instant replies & stay updates'],
+      ['🏨','Book direct next time — skip the middleman'],
+    ];
+    return '<div class="benefits">' + items.map(i =>
+      '<div class="benefit-row"><div class="benefit-icon">'+i[0]+'</div><div class="benefit-text">'+i[1]+'</div></div>'
+    ).join('') + '</div>';
+  }
+
+  // ==========================================================================
+  // REAL — this is the actual redesigned InstallPage body. In React, turn the
+  // three branches below into JSX conditionals exactly like the current file
+  // already does for `installed` / `isIos()` / `deferredPrompt` / desktop QR.
+  // The only PREVIEW-ONLY bit inside is `slug(hotelName())` used to fake a
+  // believable URL for the QR/copy row — replace with the real
+  // `installPageUrl` from window.location.href.split('#')[0].
+  // ==========================================================================
+  function mainCardHtml(){
+    if (state.installed) {
+      return `
+        <div class="install-card">
+          <div class="success-icon">${checkSvg()}</div>
+          <div class="install-title">${hotelName()} is on your phone 🎉</div>
+          <div class="install-subtitle">Open it anytime from your home screen — no browser needed.</div>
+          <button class="btn btn-primary">Go to my stay</button>
+          <button class="btn btn-secondary">Message the front desk</button>
+        </div>`;
+    }
+
+    let cta = '';
+    if (state.device === 'ios') {
+      // REAL — maps to handleInstall() when isIos() is true (setShowIosSheet(true))
+      cta = `<button class="btn btn-primary" onclick="openSheet()">📤 Show me how</button>
+             <p class="hint">Takes 5 seconds · works just like an app</p>`;
+    } else if (state.device === 'android') {
+      // REAL — maps to handleInstall() using deferredPrompt.prompt()
+      cta = `<button class="btn btn-primary" onclick="installAndroid()">${state.installing ? '⏳ Installing…' : '⬇️ Add to Home Screen'}</button>
+             <p class="hint">Takes 5 seconds · works just like an app</p>`;
+    } else {
+      // REAL — maps to the existing `showQr` block in InstallPage.jsx.
+      // PREVIEW ONLY: `slug(hotelName())` fakes a URL — use the real
+      // `installPageUrl` (window.location.href.split('#')[0]) instead.
+      const url = 'https://' + slug(hotelName()) + '.bookmarketel.com/install';
+      const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(url);
+      cta = `
+        <div class="qr-block">
+          <div class="qr-label">Scan with your phone</div>
+          <img src="${qr}" width="170" height="170" alt="QR code">
+        </div>
+        <div class="copy-row">
+          <input readonly value="${url}">
+          <button onclick="this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy',1200)">Copy</button>
+        </div>`;
+    }
+
+    return `
+      <div class="install-card">
+        <div class="hotel-icon">${initial()}</div>
+        <div class="install-title">Add ${hotelName()} to your phone</div>
+        <div class="install-subtitle">Works like an app. No app store. Message us anytime and book direct next time.</div>
+        ${benefitsHtml()}
+        ${cta}
+      </div>`;
+  }
+
+  // REAL — this is the redesigned IosInstallSheet() + IosInstallSteps() body.
+  function sheetHtml(){
+    return `
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <div class="hotel-icon">${initial()}</div>
+        <div>
+          <div class="sheet-head-title">Install ${hotelName()}</div>
+          <div class="sheet-head-sub">Takes 5 seconds — message us anytime.</div>
+        </div>
+      </div>
+      <div class="step"><div class="step-badge">1</div><div class="step-text">Tap the <b>Share</b> button in Safari</div></div>
+      <div class="step"><div class="step-badge">2</div><div class="step-text">Scroll down and tap <b>Add to Home Screen</b> ➕</div></div>
+      <div class="step"><div class="step-badge">3</div><div class="step-text">Tap <b>Add</b> — ${hotelName()} is on your home screen</div></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="confirmInstalled()">I've added it to my home screen</button>
+      <button class="btn btn-ghost" onclick="closeSheet()">Not yet</button>`;
+  }
+
+  // PREVIEW ONLY — fakes a booking-domain URL for the desktop QR/copy row.
+  function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'hotel'; }
+
+  // PREVIEW ONLY (mostly) — this innerHTML-based render loop only exists
+  // because this is a static HTML mockup, not a React tree. In React, you'd
+  // just conditionally render JSX from state instead of calling render().
+  // The two lines marked REAL below are the only state-driven behavior worth
+  // preserving conceptually (content swap + sheet open/close).
+  function render(){
+    screenScroll.innerHTML = mainCardHtml();   // REAL — re-render on state change
+    sheetEl.innerHTML = sheetHtml();           // REAL — re-render on state change
+    sheetOverlay.classList.toggle('open', state.sheetOpen); // REAL — same as showIosSheet && <IosInstallSheet/>
+
+    // PREVIEW ONLY from here down — phone bezel / desktop browser chrome swapping.
+    const isDesktop = state.device === 'desktop';
+    deviceFrame.classList.toggle('desktop', isDesktop);
+    notch.style.display = (state.device === 'ios') ? 'block' : 'none';
+    statusBar.style.display = isDesktop ? 'none' : 'flex';
+
+    if (isDesktop) {
+      if (!deviceFrame.querySelector('.browser-bar')) {
+        const bar = document.createElement('div');
+        bar.className = 'browser-bar';
+        bar.innerHTML = `<div class="browser-dots"><span></span><span></span><span></span></div>
+          <div class="browser-url">https://${slug(hotelName())}.bookmarketel.com/install</div>`;
+        deviceFrame.insertBefore(bar, deviceFrame.firstChild);
+      } else {
+        deviceFrame.querySelector('.browser-url').textContent = `https://${slug(hotelName())}.bookmarketel.com/install`;
+      }
+    } else {
+      const bar = deviceFrame.querySelector('.browser-bar');
+      if (bar) bar.remove();
+    }
+  }
+
+  // REAL — these four handlers map directly to InstallPage.jsx's existing
+  // handleInstall() / setShowIosSheet() / markInstalled() logic.
+  function openSheet(){ state.sheetOpen = true; render(); }
+  function closeSheet(){ state.sheetOpen = false; render(); }
+  function confirmInstalled(){ state.sheetOpen = false; state.installed = true; render(); }
+
+  function installAndroid(){
+    if (state.installing || state.installed) return;
+    state.installing = true; render();
+    // PREVIEW ONLY: the setTimeout fakes the native install prompt's delay.
+    // REAL app already awaits `deferredPrompt.userChoice` for this instead.
+    setTimeout(() => { state.installing = false; state.installed = true; render(); }, 700);
+  }
+
+  // PREVIEW SCAFFOLDING ONLY — device switcher, hotel-name input, reset button,
+  // click-outside-to-close. None of this exists in the real app except the
+  // click-outside-to-close pattern, which mirrors the original IosInstallSheet's
+  // onClick={onClose} wrapper.
+  document.querySelectorAll('.device-switch button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.device-switch button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.device = btn.dataset.device;
+      state.sheetOpen = false;
+      render();
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    state.installed = false; state.sheetOpen = false; state.installing = false; render();
+  });
+
+  hotelInput.addEventListener('input', render);
+  sheetOverlay.addEventListener('click', (e) => { if (e.target === sheetOverlay) closeSheet(); }); // REAL pattern
+
+  window.openSheet = openSheet;
+  window.closeSheet = closeSheet;
+  window.confirmInstalled = confirmInstalled;
+  window.installAndroid = installAndroid;
+
+  render();
+</script>
+</body>
+</html>

@@ -26,9 +26,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 5174,
     proxy: {
-      '/api': 'http://localhost:3000',
-      '/frontdesk-sw.js': 'http://localhost:3000',
-      '/manifest-simple-crm.json': 'http://localhost:3000',
+      '/api': 'http://localhost:3001',
+      '/frontdesk-sw.js': 'http://localhost:3001',
+      '/manifest-simple-crm.json': 'http://localhost:3001',
     },
   },
 }));

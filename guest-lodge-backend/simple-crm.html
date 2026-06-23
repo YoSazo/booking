@@ -15,14 +15,23 @@
   <style>
     :root {
       --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
-      --green-mint: #C8EDD9; --bg: #EEF2EF; --white: #FFFFFF;
-      --text: #1A2B22; --text-muted: #6B7D72; --border: #D8E4DC;
+      --green-mint: #C8EDD9; --green-dark: #245F46; --bg: #EEF2EF; --white: #FFFFFF;
+      --surface-subtle: #F4F8F5; --text: #1A2B22; --text-muted: #6B7D72;
+      --text-soft: #4B5D52; --border: #D8E4DC; --border-soft: #E6EEE9;
       --red: #E05252; --amber: #F59E0B;
-      --shadow: 0 2px 12px rgba(46,125,91,0.10);
-      --shadow-lg: 0 8px 32px rgba(46,125,91,0.14);
+      --shadow-sm: 0 1px 2px rgba(26,43,34,0.04), 0 1px 3px rgba(46,125,91,0.06);
+      --shadow: 0 2px 6px rgba(46,125,91,0.06), 0 8px 20px rgba(46,125,91,0.08);
+      --shadow-lg: 0 4px 14px rgba(46,125,91,0.08), 0 18px 44px rgba(46,125,91,0.13);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+    body {
+      font-family: 'DM Sans', sans-serif; color: var(--text); min-height: 100vh; overflow-x: hidden;
+      background: var(--bg);
+      background-image: radial-gradient(1200px 600px at 50% -10%, #FBFDFC 0%, rgba(251,253,252,0) 60%), linear-gradient(180deg, #F2F7F4 0%, var(--bg) 220px);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility; letter-spacing: -0.01em;
+    }
     /* Prevent iOS zoom on input focus (exclude WYSIWYG preview inputs) */
     input, textarea, select { font-size: 16px !important; }
     #edit-hotel-name { font-size: 24px !important; }
@@ -72,23 +81,27 @@
       width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
       border-radius: 12px; font-family: inherit; font-size: 18px; text-align: center;
       letter-spacing: 4px; outline: none; margin-bottom: 12px; color: var(--text);
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .login-input:focus { border-color: var(--green); }
+    .login-input:focus { border-color: var(--green); box-shadow: 0 0 0 4px var(--green-pale); }
     .login-btn {
-      width: 100%; padding: 13px; background: var(--green); color: white;
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, var(--green-light) 0%, var(--green) 60%, var(--green-dark) 100%);
+      color: white; box-shadow: 0 6px 18px rgba(46,125,91,0.3);
       border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
-      font-weight: 600; cursor: pointer; transition: background 0.15s;
+      font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
     }
-    .login-btn:hover { background: #245f46; }
+    .login-btn:hover { transform: translateY(-1px); box-shadow: 0 9px 26px rgba(46,125,91,0.38); }
     .login-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
 
     /* ── HEADER ── */
     .header {
-      background: var(--white); border-bottom: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.78);
+      -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+      border-bottom: 1px solid var(--border-soft);
       padding: 8px 16px; min-height: 58px; display: flex; align-items: center;
       justify-content: space-between; position: sticky; top: 0; z-index: 100;
-      box-shadow: 0 1px 8px rgba(46,125,91,0.07);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 6px 18px rgba(46,125,91,0.06);
       gap: 8px; flex-wrap: wrap;
     }
     .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: var(--text); flex-shrink: 0; }
@@ -130,10 +143,12 @@
       display: flex;
       gap: 0;
       margin-bottom: 20px;
-      background: var(--bg);
-      border: 2px solid var(--border);
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--border-soft);
       border-radius: 16px;
       padding: 5px;
+      box-shadow: var(--shadow-sm);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
       position: relative;
       width: 100%;
       max-width: 100%;
@@ -237,22 +252,22 @@
 
     /* ── BOOKING CARD ── */
     .booking-card {
-      background: var(--white); border: 2px solid var(--border);
+      background: var(--white); border: 1px solid var(--border);
       border-radius: 20px; overflow: hidden;
       box-shadow: var(--shadow); margin-bottom: 14px;
-      transition: transform 0.15s, box-shadow 0.15s;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
     }
-    .booking-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    .booking-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--green-mint); }
 
-    .card-accent { height: 5px; background: var(--green); }
-    .card-accent.declined { background: var(--amber); }
+    .card-accent { height: 5px; background: linear-gradient(90deg, var(--green) 0%, var(--green-light) 100%); }
+    .card-accent.declined { background: linear-gradient(90deg, var(--amber) 0%, #FBBF24 100%); }
 
     .card-inner { padding: 20px 22px; }
 
     /* TOP ROW */
     .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 17px; }
     .guest-info { display: flex; flex-direction: column; gap: 4px; }
-    .guest-name { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .guest-name { font-size: 24px; font-weight: 700; color: var(--text); line-height: 1.2; letter-spacing: -0.02em; }
     .guest-time { font-size: 15px; color: var(--text-muted); font-weight: 500; }
 
     .card-amount { 
@@ -298,13 +313,14 @@
 
     .phone-call-btn {
       display: flex; align-items: center; gap: 8px;
-      background: var(--green); color: white;
+      background: linear-gradient(135deg, var(--green-light) 0%, var(--green) 60%, var(--green-dark) 100%);
+      color: white;
       border: none; border-radius: 14px; padding: 13px 22px;
       font-family: inherit; font-size: 18px; font-weight: 700;
       cursor: pointer; text-decoration: none; transition: all 0.15s;
-      flex-shrink: 0;
+      flex-shrink: 0; box-shadow: 0 4px 14px rgba(46,125,91,0.28);
     }
-    .phone-call-btn:hover { background: #245f46; transform: scale(1.03); }
+    .phone-call-btn:hover { transform: translateY(-1px) scale(1.02); box-shadow: 0 6px 20px rgba(46,125,91,0.36); }
 
     /* FOOTER */
     .card-footer { display: flex; gap: 11px; padding-top: 17px; border-top: 1.4px solid var(--border); }
@@ -313,8 +329,11 @@
       font-size: 17px; font-weight: 600; cursor: pointer; border: 2px solid transparent;
       transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px;
     }
-    .btn-confirm { background: var(--green); color: white; }
-    .btn-confirm:hover { background: #245f46; }
+    .btn-confirm {
+      background: linear-gradient(135deg, var(--green-light) 0%, var(--green) 60%, var(--green-dark) 100%);
+      color: white; box-shadow: 0 4px 14px rgba(46,125,91,0.26);
+    }
+    .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 7px 22px rgba(46,125,91,0.34); }
     .btn-note { background: var(--white); color: var(--text); border-color: var(--border); }
     .btn-note:hover { border-color: var(--green); color: var(--green); background: var(--green-pale); }
     .btn-note-quiet {
@@ -415,9 +434,9 @@
     .card-notes {
       margin-top: 12px;
       padding: 12px;
-      background: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
+      background: var(--surface-subtle);
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
     }
     .notes-header {
       display: flex;
@@ -428,21 +447,21 @@
     .notes-title {
       font-size: 12px;
       font-weight: 600;
-      color: #6b7280;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .notes-count {
       font-size: 11px;
-      background: #e5e7eb;
-      color: #6b7280;
+      background: var(--green-pale);
+      color: var(--green);
       padding: 2px 8px;
       border-radius: 10px;
       font-weight: 600;
     }
     .notes-content {
       font-size: 13px;
-      color: #374151;
+      color: var(--text-soft);
       line-height: 1.5;
       white-space: pre-wrap;
       max-height: 100px;
@@ -450,7 +469,7 @@
     }
     .notes-empty {
       font-size: 12px;
-      color: #9ca3af;
+      color: var(--text-muted);
       font-style: italic;
     }
 
@@ -459,7 +478,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(26, 43, 34, 0.45);
       z-index: 10000;
       align-items: center;
       justify-content: center;
@@ -467,11 +486,11 @@
       backdrop-filter: blur(4px);
     }
     .notes-modal {
-      background: white;
+      background: var(--white);
       border-radius: 16px;
       width: 100%;
       max-width: 500px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--shadow-lg);
       animation: modalSlideUp 0.2s ease-out;
     }
     @keyframes modalSlideUp {
@@ -486,7 +505,7 @@
     }
     .notes-modal-header {
       padding: 20px 24px;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--border-soft);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -494,15 +513,15 @@
     .notes-modal-title {
       font-size: 18px;
       font-weight: 700;
-      color: #111827;
+      color: var(--text);
     }
     .notes-modal-close {
       width: 32px;
       height: 32px;
       border-radius: 8px;
       border: none;
-      background: #f3f4f6;
-      color: #6b7280;
+      background: var(--surface-subtle);
+      color: var(--text-muted);
       font-size: 20px;
       cursor: pointer;
       display: flex;
@@ -511,8 +530,8 @@
       transition: all 0.15s;
     }
     .notes-modal-close:hover {
-      background: #e5e7eb;
-      color: #111827;
+      background: var(--green-pale);
+      color: var(--green);
     }
     .notes-modal-body {
       padding: 24px;
@@ -521,28 +540,29 @@
       display: block;
       font-size: 13px;
       font-weight: 600;
-      color: #374151;
+      color: var(--text-soft);
       margin-bottom: 8px;
     }
     .notes-input {
       width: 100%;
       min-height: 120px;
       padding: 12px;
-      border: 2px solid #e5e7eb;
+      border: 1.5px solid var(--border);
       border-radius: 10px;
       font-family: inherit;
       font-size: 14px;
-      color: #111827;
+      color: var(--text);
       resize: vertical;
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
     .notes-input:focus {
-      border-color: #2E7D5B;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--green-pale);
     }
     .notes-modal-footer {
       padding: 16px 24px;
-      border-top: 1px solid #e5e7eb;
+      border-top: 1px solid var(--border-soft);
       display: flex;
       gap: 12px;
       justify-content: flex-end;
@@ -558,18 +578,18 @@
       font-family: inherit;
     }
     .notes-btn-cancel {
-      background: #f3f4f6;
-      color: #6b7280;
+      background: var(--surface-subtle);
+      color: var(--text-muted);
     }
     .notes-btn-cancel:hover {
-      background: #e5e7eb;
+      background: var(--border);
     }
     .notes-btn-save {
-      background: #2E7D5B;
-      color: white;
+      background: var(--green);
+      color: #fff;
     }
     .notes-btn-save:hover {
-      background: #245f46;
+      background: var(--green-dark);
     }
 
     .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 7px; }
@@ -667,6 +687,78 @@
       color: var(--text-muted);
       padding: 30px 10px;
       font-size: 14px;
+    }
+    .two-room-explainer {
+      background: linear-gradient(135deg, #f0f7f3 0%, #e8f0ec 100%);
+      border: 1.5px solid #c5ddd0;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .two-room-explainer-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+    }
+    .two-room-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .two-room-col {
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px;
+      border: 1.5px solid var(--border);
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--text-soft);
+    }
+    .two-room-col--here {
+      border-color: var(--green);
+      box-shadow: 0 0 0 1px rgba(46,125,91,0.15);
+    }
+    .two-room-col-label {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--green);
+      margin-bottom: 4px;
+    }
+    .two-room-col:not(.two-room-col--here) .two-room-col-label { color: var(--text-muted); }
+    .two-room-explainer-foot {
+      font-size: 12px;
+      color: var(--text-soft);
+      line-height: 1.5;
+      margin: 0 0 10px;
+    }
+    .two-room-explainer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .two-room-btn {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .two-room-btn--primary {
+      border: none;
+      background: var(--green);
+      color: #fff;
+    }
+    .two-room-btn--ghost {
+      border: 1.5px solid var(--border);
+      background: #fff;
+      color: var(--text);
     }
 
     .cal-header {
@@ -938,7 +1030,7 @@
         background: var(--white);
         border: 1.5px solid var(--border);
         border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        box-shadow: var(--shadow-lg);
         transition: opacity 0.15s ease, transform 0.15s ease;
         padding: 0;
         display: none;
@@ -1120,7 +1212,7 @@
         color: white;
       }
       #availabilityDayPopover .sheet-save-btn:hover {
-        background: #245f46;
+        background: var(--green-dark);
       }
       #availabilityDayPopover .sheet-cancel-btn {
         min-width: 96px;
@@ -1220,7 +1312,7 @@
       overflow-y: auto;
       background: var(--white);
       border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      box-shadow: var(--shadow-lg);
       transform: translate(-50%, -50%) scale(0.9);
       opacity: 0;
       transition: transform .2s ease, opacity .2s ease;
@@ -1604,6 +1696,9 @@
       #app .container {
         padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
       }
+      #app.has-go-live-banner .container {
+        padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px));
+      }
       .tabs-container {
         display: none !important;
       }
@@ -1640,7 +1735,7 @@
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.02em;
-        color: #64748b;
+        color: var(--text-muted);
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
       }
@@ -1651,13 +1746,13 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #64748b;
+        color: var(--text-muted);
         transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
       }
       .mobile-nav-item .mobile-nav-icon-wrap svg {
         width: 22px;
         height: 22px;
-        stroke: #64748b;
+        stroke: var(--text-muted);
         flex-shrink: 0;
       }
       .mobile-nav-item.active .mobile-nav-icon-wrap svg {
@@ -1685,6 +1780,24 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      /* Go-live banner uses top space — extra bottom scroll room above mobile nav */
+      #app.has-go-live-banner .availability-view,
+      #app.has-go-live-banner .revenue-view,
+      #app.has-go-live-banner #appsView,
+      #app.has-go-live-banner #editView,
+      #app.has-go-live-banner #bookingsList {
+        padding-bottom: 56px;
+      }
+      #app.has-go-live-banner #bookingsList.bookings-virtual {
+        max-height: calc(100dvh - 300px);
+      }
+    }
+    #app.has-go-live-banner .availability-view,
+    #app.has-go-live-banner .revenue-view,
+    #app.has-go-live-banner #appsView,
+    #app.has-go-live-banner #editView,
+    #app.has-go-live-banner #bookingsList {
+      padding-bottom: 28px;
     }
     #appsView, #revenueView, #settingsView, #editView {
       content-visibility: auto;
@@ -1761,9 +1874,9 @@
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
-      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR so guests install your hotel app">📲 Guest app QR</button>
+      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR for guests to save your hotel">📲 Guest QR</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
+      <button class="refresh-btn" onclick="replayWalkthrough()" title="Replay the walkthrough">❓ How it works</button>
     </div>
   </header>
 
@@ -1777,7 +1890,7 @@
         Bookings <span class="tab-badge" id="countNeedsCalled" style="display:none;">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
       </button>
       <button type="button" class="tab" data-nav-filter="apps" onclick="setFilter('apps', this)">
-        Guest app
+        Phones
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
@@ -1810,7 +1923,7 @@
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="apps">
       <span class="mobile-nav-icon-wrap"><i data-lucide="smartphone"></i></span>
-      <span class="mobile-nav-label">Guest app</span>
+      <span class="mobile-nav-label">Phones</span>
     </button>
   </nav>
 </div>
@@ -1867,6 +1980,8 @@ let activeHotelAppIcon = '';
 let appsViewPlatform = 'ios'; // set by detectAppPlatform() on first render
 let activeHotelDomain = '';
 let activeHotelContext = null;
+let settingsTourActive = false;
+let editRoomsLoadPromise = null;
 let bootInFlight = false;
 const CRM_HOTEL_BY_HOST = {
   'guestlodgeminot.clickinns.com': 'guest-lodge-minot',
@@ -1929,7 +2044,9 @@ async function optimizeRoomPhotoForUpload(file) {
 }
 
 function scheduleDeferredMessagesLoad() {
+  if (settingsTourActive) return;
   const run = () => {
+    if (settingsTourActive) return;
     if (currentFilter === 'bookings') loadMessages();
     else loadMessageBadges();
   };
@@ -1946,6 +2063,8 @@ function scheduleDeferredMessagesLoad() {
 // browser's native install prompt on Android/desktop.
 let deferredInstallPrompt = null;
 let frontdeskInstalled = false;
+let guestPushSubscriberCount = 0;
+const GUEST_BROADCAST_DEMO_VIDEO = 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/v1781196304/ScreenRecording_06-11-2026_19-41-56_1_kjgudg.mp4';
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
@@ -1955,6 +2074,7 @@ window.addEventListener('appinstalled', () => {
   frontdeskInstalled = true;
   deferredInstallPrompt = null;
   try { refreshFrontdeskInstallCard(); } catch (_) {}
+  try { window.refreshAppsInstallSection?.(); } catch (_) {}
 });
 
 function isIosDevice() {
@@ -1963,8 +2083,21 @@ function isIosDevice() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 function isStandaloneApp() {
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('pwa') === '1') return true;
+    if (qs.get('pwa') === '0') return false;
+    if (sessionStorage.getItem('frontdeskSimulatePwa') === '1') return true;
+  } catch (_) {}
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
     window.navigator.standalone === true;
+}
+function isPwaSimulated() {
+  try {
+    if (new URLSearchParams(window.location.search).get('pwa') === '1') return true;
+    return sessionStorage.getItem('frontdeskSimulatePwa') === '1';
+  } catch (_) {}
+  return false;
 }
 function pushSupported() {
   return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
@@ -2439,7 +2572,7 @@ function renderRevenueView() {
   const savedCopyEl = document.getElementById('revenueSavingsCopy');
   const revenueValue = Number(data.rev || 0);
   if (revEl) revEl.textContent = formatCurrencyCompact(revenueValue);
-  if (bookingsEl) bookingsEl.textContent = String(data.bookings || 0);
+  if (bookingsEl) bookingsEl.textContent = String(data['bookings'] || 0);
   const savedAmount = revenueValue * OTA_COMMISSION_RATE;
   if (savedEl) savedEl.textContent = formatCurrencyCompact(savedAmount);
   if (savedCopyEl) savedCopyEl.textContent = revenuePeriod === 'today' ? 'You saved today' : `You saved (${currentPeriodLabel.toLowerCase()})`;
@@ -2448,6 +2581,11 @@ function renderRevenueView() {
 
 async function loadRevenueData(force = false) {
   if (!revenueEnabled) return;
+  if (settingsTourActive) {
+    seedTourRevenueShell();
+    renderRevenueView();
+    return;
+  }
   revenuePeriod = normalizeRevenuePeriod(revenuePeriod);
 
   const cached = revenueCache[revenuePeriod];
@@ -2523,9 +2661,7 @@ function ensureAvailabilityUi() {
           <div id="roomsPillBar" class="room-pill-bar"></div>
 
           <div class="availability-card mobile-cal-card">
-            <div id="availabilityNoRoom" class="availability-empty">
-              Add an <strong>inventory room</strong> here to control how many units are open each day. This is separate from rooms on your booking page (under <strong>Your page</strong>).
-            </div>
+            <div id="availabilityNoRoom" class="availability-empty"></div>
             <div id="availabilityCalendarWrap" style="display:none">
               <div class="cal-header">
                 <div id="availabilityMonthLabel" class="cal-month-label"></div>
@@ -2698,13 +2834,27 @@ function goLiveBannerHtml() {
     </div>`;
 }
 
+function goLiveInlineCardHtml() {
+  if (hotelSubscribed || settingsTourActive) return '';
+  return `
+    <div class="booking-card" id="tour-go-live-card" style="margin-bottom:14px;background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border:none;">
+      <div style="padding:18px;text-align:center;">
+        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Preview mode — bookings disabled</div>
+        <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Guests can browse your page but can&apos;t complete a reservation until you activate.</p>
+        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate direct bookings — $99/mo →</button>
+        <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+      </div>
+    </div>`;
+}
+
 function updateGoLiveBanner() {
   const banner = document.getElementById('goLiveBanner');
   if (!banner) return;
-  const onRelevantTab = currentFilter === 'bookings' || currentFilter === 'settings';
-  const shouldShow = !hotelSubscribed && onRelevantTab;
+  const shouldShow = !hotelSubscribed && !banner.dataset.tourHidden && !settingsTourActive;
   banner.style.display = shouldShow ? 'block' : 'none';
   if (shouldShow) banner.innerHTML = goLiveBannerHtml();
+  const app = document.getElementById('app');
+  if (app) app.classList.toggle('has-go-live-banner', shouldShow);
 }
 
 function updateBookingsTabBadge() {
@@ -2719,6 +2869,65 @@ function updateBookingsTabBadge() {
   badge.style.display = actionable > 0 ? '' : 'none';
 }
 
+function seedTourRevenueShell() {
+  if (!revenueEnabled) return;
+  revenuePeriod = normalizeRevenuePeriod(revenuePeriod || '30d');
+  if (!revenueCache[revenuePeriod]) {
+    revenueCache[revenuePeriod] = { rev: 0, rooms: [{ name: 'Your rooms', rev: 0 }] };
+  }
+  revenueLoading = false;
+  revenueError = '';
+  const statusEl = document.getElementById('revenueStatus');
+  const contentEl = document.getElementById('revenueContent');
+  if (statusEl) statusEl.innerHTML = '';
+  if (contentEl) contentEl.style.display = 'block';
+  renderRevenueView();
+}
+
+async function invokeLoadEditRooms() {
+  if (typeof loadSettingsModule === 'function') await loadSettingsModule();
+  const fn = (typeof loadEditRooms === 'function')
+    ? loadEditRooms
+    : (typeof window.loadEditRooms === 'function' ? window.loadEditRooms : null);
+  return fn ? fn() : Promise.resolve();
+}
+window.invokeLoadEditRooms = invokeLoadEditRooms;
+
+function hydrateCrmInBackground() {
+  void (async () => {
+    if (typeof loadSettingsModule === 'function') await loadSettingsModule();
+    if (revenueEnabled) seedTourRevenueShell();
+    const editLoad = (typeof needsEditPageLoad === 'function' && needsEditPageLoad())
+      ? invokeLoadEditRooms()
+      : Promise.resolve();
+    // Your page first — availability/bookings can wait so we don't stampede the DB.
+    await editLoad;
+    await Promise.allSettled([
+      loadBookings({ deferMessages: true, silent: true }),
+      loadManualAvailability({ silent: true }),
+    ]);
+  })();
+}
+
+async function hydrateCrmAfterTour() {
+  if (typeof loadSettingsModule === 'function') await loadSettingsModule();
+  settingsTourActive = false;
+  updateGoLiveBanner();
+  const editLoad = (typeof needsEditPageLoad === 'function' && needsEditPageLoad())
+    ? invokeLoadEditRooms()
+    : Promise.resolve();
+  await Promise.allSettled([
+    editLoad,
+    loadManualAvailability(),
+    loadBookings({ deferMessages: true }),
+    revenueEnabled ? loadRevenueData(true) : Promise.resolve(),
+  ]);
+}
+
+function finishTourHydration() {
+  void hydrateCrmAfterTour();
+}
+
 async function startCrmApp(verification) {
   currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   revenueEnabled = !!(verification && verification.isManualPms);
@@ -2728,6 +2937,43 @@ async function startCrmApp(verification) {
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('pwa') === '1') {
+    try { sessionStorage.setItem('frontdeskSimulatePwa', '1'); } catch (_) {}
+  } else {
+    try { sessionStorage.removeItem('frontdeskSimulatePwa'); } catch (_) {}
+  }
+  const isFirstWelcome = urlParams.has('welcome') && !localStorage.getItem('onboardingDone');
+
+  if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
+    currentFilter = 'settings';
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('tab');
+    // Keep ?welcome=1 in the URL until the welcome modal is dismissed (refresh-safe).
+    if (urlParams.has('welcome') && localStorage.getItem('onboardingDone')) {
+      cleanUrl.searchParams.delete('welcome');
+    }
+    window.history.replaceState({}, '', cleanUrl);
+  } else if (urlParams.get('tab') === 'bookings') {
+    currentFilter = 'bookings';
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('tab');
+    window.history.replaceState({}, '', cleanUrl);
+  } else if (urlParams.get('tab') === 'apps' || urlParams.get('tab') === 'phones') {
+    currentFilter = 'apps';
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('tab');
+    window.history.replaceState({}, '', cleanUrl);
+  }
+
+  if (isFirstWelcome) {
+    if (revenueEnabled) seedTourRevenueShell();
+    if (typeof loadSettingsModule === 'function') await loadSettingsModule();
+    applyFilter();
+    hydrateCrmInBackground();
+  }
+
   document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -2751,41 +2997,29 @@ async function startCrmApp(verification) {
     requestAnimationFrame(refreshMobileBottomNavIcons);
   }).catch(() => {});
 
-  // If coming from setup (has welcome param) or returning from preview (has tab param), open Settings
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
-    currentFilter = 'settings';
-    const cleanUrl = new URL(window.location);
-    cleanUrl.searchParams.delete('welcome');
-    cleanUrl.searchParams.delete('tab');
-    window.history.replaceState({}, '', cleanUrl);
-  } else if (urlParams.get('tab') === 'bookings') {
-    // Deep link from a guest-message push notification.
-    currentFilter = 'bookings';
-    const cleanUrl = new URL(window.location);
-    cleanUrl.searchParams.delete('tab');
-    window.history.replaceState({}, '', cleanUrl);
+  if (isFirstWelcome) {
+    showWelcomeModal();
+  } else {
+    await Promise.allSettled([
+      loadManualAvailability(),
+      loadBookings({ deferMessages: true }),
+    ]);
+
+    refreshMobileBottomNavIcons();
+
+    if (currentFilter === 'bookings') {
+      setFilter('bookings', document.querySelector('.tab[data-nav-filter="bookings"]'));
+    } else if (currentFilter === 'apps') {
+      setFilter('apps', document.querySelector('.tab[data-nav-filter="apps"]')
+        || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]'));
+    }
   }
 
-  await Promise.allSettled([
-    loadManualAvailability(),
-    loadBookings({ deferMessages: true }),
-  ]);
-
-  refreshMobileBottomNavIcons();
-
-  // Sync tab chrome if we deep-linked straight to Bookings (e.g. from a push).
-  if (currentFilter === 'bookings') {
-    setFilter('bookings', document.querySelector('.tab[data-nav-filter="bookings"]'));
-  }
-
-  // If redirected here with ?action=go-live, trigger Stripe checkout immediately
   if (urlParams.get('action') === 'go-live') {
     window.history.replaceState({}, '', window.location.pathname);
     goLive();
   }
 
-  // Just came back from a successful payment — reassure them about what happens next
   if (urlParams.get('activated') === '1') {
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('activated');
@@ -2794,17 +3028,41 @@ async function startCrmApp(verification) {
     updateGoLiveBanner();
     const _goLiveBanner = document.getElementById('goLiveBanner');
     if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
-    showActivatedModal();
+    const openActivatedModal = () => {
+      const fn = (typeof showActivatedModal === 'function')
+        ? showActivatedModal
+        : (typeof window.showActivatedModal === 'function' ? window.showActivatedModal : null);
+      if (fn) fn();
+    };
+    if (typeof loadSettingsModule === 'function') {
+      loadSettingsModule().then(openActivatedModal).catch(openActivatedModal);
+    } else {
+      openActivatedModal();
+    }
   }
 
-  // Show welcome modal on first visit (skip questionnaire, go straight to tour)
-  if (!localStorage.getItem('onboardingDone') && urlParams.has('welcome')) {
-    localStorage.setItem('onboardingDone', '1');
-    showWelcomeModal();
-  } else {
-    // Returning user — mark onboarding and tour as done so they never fire
-    localStorage.setItem('onboardingDone', '1');
-    localStorage.setItem('settingsTourDone', '1');
+  if (!isFirstWelcome) {
+    if (!localStorage.getItem('onboardingDone')) localStorage.setItem('onboardingDone', '1');
+    // Don't mark tour done if a step is in progress (e.g. refresh mid-walkthrough).
+    if (!localStorage.getItem('settingsTourDone') && !localStorage.getItem('settingsTourStep')) {
+      localStorage.setItem('settingsTourDone', '1');
+    }
+    if (localStorage.getItem('settingsTourStep') === 'handoff') {
+      localStorage.removeItem('settingsTourStep');
+      if (!localStorage.getItem('settingsTourDone')) {
+        const runFinale = () => {
+          const showFinale = (typeof showFinaleMockModal === 'function')
+            ? showFinaleMockModal
+            : window.showFinaleMockModal;
+          if (typeof showFinale === 'function') showFinale();
+        };
+        if (typeof loadSettingsModule === 'function') {
+          loadSettingsModule().then(runFinale).catch(runFinale);
+        } else {
+          runFinale();
+        }
+      }
+    }
   }
 
   // First time opening the INSTALLED app → offer to turn on booking alerts.
@@ -2947,6 +3205,7 @@ async function bootCrmApp() {
 
 // ── LOAD ───────────────────────────────────────────────
 async function loadBookings(opts = {}) {
+  const silent = !!opts.silent;
   try {
     const data = await api('GET', '/api/crm/bookings');
     if (!data.success) throw new Error(data.message);
@@ -2955,14 +3214,20 @@ async function loadBookings(opts = {}) {
     
     // Update counts
     const needsCalls = bookings.filter(b => b.callStatus === 'not-called');
-    document.getElementById('statCount').textContent = needsCalls.length;
+    const statEl = document.getElementById('statCount');
+    if (statEl) statEl.textContent = needsCalls.length;
     updateBookingsTabBadge();
     
+    if (silent) {
+      if (opts.deferMessages) scheduleDeferredMessagesLoad();
+      return;
+    }
     // Render based on current filter
     applyFilter();
     if (opts.deferMessages) scheduleDeferredMessagesLoad();
     else loadMessages();
   } catch(e) {
+    if (silent) return;
     if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
       <div class="empty-state">
@@ -3187,14 +3452,15 @@ function renderMessages() {
   const panel = document.getElementById('messagesPanel');
   if (!panel) return;
 
+  const installNudge = bookingsFrontdeskNudgeHtml();
   const threadList = buildMessageThreads();
   if (threadList.length === 0) {
     const pending = messageUnreadCount > 0;
-    panel.innerHTML = pending ? `
+    panel.innerHTML = (pending ? `
       <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
         <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
         <div style="font-size:14px;font-weight:600;color:#6b7280;">Loading guest messages…</div>
-      </div>` : '';
+      </div>` : '') + installNudge;
     if (pending && currentFilter === 'bookings') loadMessages();
     return;
   }
@@ -3216,7 +3482,7 @@ function renderMessages() {
       ${renderMessageThreadDetail(activeThread)}
     </div>` : '';
 
-  panel.innerHTML = `
+  panel.innerHTML = installNudge + `
     <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;">
       <button type="button" onclick="toggleMessagesInbox()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border:none;background:transparent;font-family:inherit;cursor:pointer;text-align:left;">
         <div style="display:flex;align-items:center;gap:8px;min-width:0;">
@@ -3561,18 +3827,35 @@ function setFilter(filter, btn) {
   }
   syncMobileNavActive(filter);
   if (filter === 'availability') {
-    // Show the tab immediately with a loading state
     applyFilter();
+    if ((manualAvailability.rooms || []).length) {
+      renderAvailabilityView();
+      updateGoLiveBanner();
+      return;
+    }
     const calWrap = document.getElementById('availabilityCalendarWrap');
     const noRoom = document.getElementById('availabilityNoRoom');
     if (calWrap) calWrap.style.display = 'none';
     if (noRoom) { noRoom.style.display = 'block'; noRoom.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading availability…</div>'; }
     loadManualAvailability().then(() => { renderAvailabilityView(); }).catch(() => { renderAvailabilityView(); });
+    updateGoLiveBanner();
     return;
   }
   if (filter === 'revenue') {
     applyFilter();
+    if (settingsTourActive) {
+      seedTourRevenueShell();
+      renderRevenueView();
+      updateGoLiveBanner();
+      return;
+    }
+    if (revenueCache[revenuePeriod] && !revenueLoading) {
+      renderRevenueView();
+      updateGoLiveBanner();
+      return;
+    }
     loadRevenueData();
+    updateGoLiveBanner();
     return;
   }
   applyFilter();
@@ -3631,6 +3914,146 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('load', refreshMobileBottomNavIcons, { once: true });
 });
 
+function twoRoomExplainerHtml(context) {
+  const isBookingPage = context === 'booking-page';
+  if (isBookingPage) {
+    return `<div class="two-room-explainer" id="bookingPageRoomExplainer">
+      <div class="two-room-explainer-title">Two places for rooms — don't mix them up</div>
+      <div class="two-room-cols">
+        <div class="two-room-col two-room-col--here">
+          <div class="two-room-col-label">① Your page (here)</div>
+          What guests see when they book — photos, description, and rates.
+        </div>
+        <div class="two-room-col">
+          <div class="two-room-col-label">② Availability tab</div>
+          How many units you have open each day — your inventory calendar.
+        </div>
+      </div>
+      <p class="two-room-explainer-foot">Start here: add the room types guests should see. Then open <strong>Availability</strong> and add matching inventory rooms so the calendar isn't empty.</p>
+      <div class="two-room-explainer-actions">
+        <button type="button" class="two-room-btn two-room-btn--ghost" onclick="goToAvailabilityTab()">Next: set up Availability →</button>
+      </div>
+    </div>`;
+  }
+  const bookingNames = (editRooms || []).map((r) => r.name).filter(Boolean);
+  const namesHint = bookingNames.length
+    ? `Your booking page already has: <strong>${bookingNames.map((n) => esc(n)).join(', ')}</strong>. Add matching inventory rooms here (same names work best).`
+    : 'You haven\'t added booking page rooms yet — set those up under <strong>Your page</strong> first.';
+  return `<div class="two-room-explainer">
+    <div class="two-room-explainer-title">This calendar is empty because inventory isn't set up yet</div>
+    <div class="two-room-cols">
+      <div class="two-room-col">
+        <div class="two-room-col-label">Your page</div>
+        Guest-facing rooms — photos, copy, rates.
+      </div>
+      <div class="two-room-col two-room-col--here">
+        <div class="two-room-col-label">Availability (here)</div>
+        Day-by-day counts — how many units are open to sell.
+      </div>
+    </div>
+    <p class="two-room-explainer-foot">${namesHint}</p>
+    <div class="two-room-explainer-actions">
+      <button type="button" class="two-room-btn two-room-btn--primary" onclick="openRoomsAddModal()">+ Add inventory room</button>
+      <button type="button" class="two-room-btn two-room-btn--ghost" onclick="setFilter('settings', document.querySelector('[data-nav-filter=\\'settings\\']'))">← Back to Your page</button>
+    </div>
+  </div>`;
+}
+window.twoRoomExplainerHtml = twoRoomExplainerHtml;
+
+function goToAvailabilityTab() {
+  const tabBtn = document.querySelector('.tab[data-nav-filter="availability"]')
+    || document.querySelector('.mobile-nav-item[data-nav-filter="availability"]');
+  setFilter('availability', tabBtn);
+}
+
+function renderAvailabilityEmptyState() {
+  const noRoom = document.getElementById('availabilityNoRoom');
+  if (!noRoom) return;
+  const fn = typeof twoRoomExplainerHtml === 'function' ? twoRoomExplainerHtml : window.twoRoomExplainerHtml;
+  noRoom.innerHTML = fn ? fn('availability') : '';
+  noRoom.style.display = 'block';
+}
+
+function isEditPageDomReady() {
+  const list = document.getElementById('editRoomsList');
+  if (!list) return false;
+  const nightly = list.querySelector('#edit-rate-nightly');
+  return !!nightly && !nightly.readOnly;
+}
+window.isEditPageDomReady = isEditPageDomReady;
+
+function needsEditPageLoad() {
+  return !isEditPageDomReady();
+}
+window.needsEditPageLoad = needsEditPageLoad;
+
+async function refreshRatesInputs() {
+  const nightlyEl = document.getElementById('edit-rate-nightly');
+  if (!nightlyEl || nightlyEl.readOnly) return;
+  try {
+    const res = await api('GET', '/api/crm/rooms');
+    if (!res?.rates) return;
+    nightlyEl.value = res.rates.nightly;
+    const weeklyEl = document.getElementById('edit-rate-weekly');
+    const monthlyEl = document.getElementById('edit-rate-monthly');
+    if (weeklyEl) weeklyEl.value = res.rates.weekly;
+    if (monthlyEl) monthlyEl.value = res.rates.monthly;
+  } catch (e) { /* ignore */ }
+}
+window.refreshRatesInputs = refreshRatesInputs;
+
+function applyGuestBroadcastAudienceUi() {
+  const audience = document.getElementById('guest-broadcast-audience');
+  const btn = document.getElementById('guest-broadcast-btn');
+  const count = guestPushSubscriberCount || 0;
+  if (audience) {
+    audience.textContent = count === 0
+      ? 'No guests have notifications on yet — show your QR at check-in first.'
+      : count === 1
+        ? '1 guest has notifications on for you.'
+        : count + ' guests have notifications on for you.';
+    audience.style.color = count === 0 ? 'var(--text-muted)' : '#166534';
+    audience.style.fontWeight = count === 0 ? '500' : '700';
+    audience.style.background = count === 0 ? 'var(--bg)' : '#f0fdf4';
+    audience.style.borderColor = count === 0 ? 'var(--border)' : '#bbf7d0';
+  }
+  if (btn) {
+    const enabled = count > 0;
+    btn.disabled = !enabled;
+    btn.style.background = enabled ? 'var(--green)' : '#c5d5cc';
+    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    btn.style.opacity = enabled ? '1' : '0.9';
+  }
+}
+
+function guestBroadcastCardHtml() {
+  const hName = (activeHotelName || 'Your Hotel').replace(/"/g, '&quot;');
+  return `<div id="guestBroadcastCard" style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:16px 18px;">
+    <div style="font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:4px;">📣 Notify all guests at once</div>
+    <p style="font-size:12px;color:#6b7280;margin:0 0 10px;line-height:1.45;">Push a sale, event, or check-in reminder to everyone who installed your guest app.</p>
+    <div id="guest-broadcast-audience" style="font-size:12px;line-height:1.45;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);">Checking who can receive notifications…</div>
+    <button type="button" onclick="prefillGuestInstallBroadcast()" style="background:none;border:none;padding:0;color:var(--green);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;margin:-4px 0 12px;">Suggest install reminder message</button>
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Title</div>
+      <input type="text" id="guest-broadcast-title" value="${hName}" maxlength="120" placeholder="e.g. Jack's Inn" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Message</div>
+      <textarea id="guest-broadcast-body" maxlength="500" placeholder="e.g. Pool is open until 10pm tonight!" style="width:100%;min-height:64px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+    </div>
+    <button id="guest-broadcast-btn" type="button" onclick="sendGuestBroadcast()" disabled style="width:100%;padding:12px;border-radius:10px;border:none;background:#c5d5cc;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;">Send notification</button>
+    <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;text-align:center;">What guests see</div>
+      <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
+        src="${GUEST_BROADCAST_DEMO_VIDEO}"
+        style="width:100%;max-width:260px;display:block;margin:0 auto;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.14);background:#000;">
+      </video>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:8px 0 0;line-height:1.45;">Their phone buzzes with your message — like a text from you.</p>
+    </div>
+  </div>`;
+}
+
 function applyFilter() {
   const bookingsEl = document.getElementById('bookingsList');
   const availabilityEl = document.getElementById('availabilityView');
@@ -3641,12 +4064,13 @@ function applyFilter() {
   if (msgPanel) msgPanel.style.display = 'none';
   const appsEl = document.getElementById('appsView');
   if (appsEl) appsEl.style.display = 'none';
-  updatePreviewSiteBar();
+  const previewBar = document.getElementById('previewSiteBar');
+  if (previewBar) previewBar.style.display = (currentFilter === 'settings') ? 'block' : 'none';
   // Remove any checklist pointer when switching tabs
   const ptr = document.getElementById('checklistPointer');
   if (ptr) ptr.remove();
 
-  // Hide go-live banner on non-bookings tabs
+  // Refresh go-live banner (all tabs when not subscribed; hidden during tour)
   if (goLiveBanner) {
     updateGoLiveBanner();
   }
@@ -3660,8 +4084,11 @@ function applyFilter() {
     const editEl = document.getElementById('editView');
     if (editEl) editEl.style.display = 'block';
     closeAvailabilityDayPopover();
-    // Only load if not already loaded (prevents wiping unsaved inputs)
-    if (!editRooms.length) loadEditRooms();
+    if (needsEditPageLoad()) {
+      invokeLoadEditRooms();
+    } else if (isEditPageDomReady()) {
+      refreshRatesInputs();
+    }
     return;
   }
 
@@ -3707,13 +4134,8 @@ function applyFilter() {
     loadAppsModule().then(() => {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
-      if (!localStorage.getItem('appsTourDone') && !appsTourOpen) {
-        setTimeout(() => {
-          if (!document.getElementById('appsTourLightbox')) startAppsTour();
-        }, 500);
-      }
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest app</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Phones</div></div>';
     });
     return;
   }
@@ -3731,7 +4153,8 @@ function applyFilter() {
   renderBookings(bookings);
 }
 
-async function loadManualAvailability() {
+async function loadManualAvailability(opts = {}) {
+  const silent = !!opts.silent;
   try {
     const data = await api('GET', '/api/crm/manual-availability');
     if (!data.success) throw new Error(data.message || 'Failed to load manual availability');
@@ -3744,9 +4167,9 @@ async function loadManualAvailability() {
       manualSelectedRoom = manualAvailability.rooms[0].name;
     }
     refreshRoomBadge();
-    renderAvailabilityView();
+    if (!silent) renderAvailabilityView();
   } catch (e) {
-    toast('Could not load manual availability', 'error');
+    if (!silent) toast('Could not load manual availability', 'error');
   }
 }
 
@@ -3960,9 +4383,9 @@ function renderAvailabilityView() {
   const activeLabel = document.getElementById('availabilityActiveRoomLabel');
 
   if (!manualSelectedRoom) {
-    if (noRoom) noRoom.style.display = 'block';
+    renderAvailabilityEmptyState();
     if (calWrap) calWrap.style.display = 'none';
-    if (activeLabel) activeLabel.textContent = 'Select a room type first.';
+    if (activeLabel) activeLabel.textContent = 'Add an inventory room to open the calendar.';
     closeAvailabilityDayPopover();
     return;
   }
@@ -4477,10 +4900,51 @@ function buildGuestInstallUrlForQr(reservationCode, ref) {
   return 'https://' + domain + '/install?' + params.toString();
 }
 
-function showCheckinQrOverlay(preselectedCode) {
+function promptUploadLogoBeforeQr(preselectedCode) {
+  const existing = document.getElementById('logoGateOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'logoGateOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:102400;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:24px 22px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="font-size:28px;margin-bottom:10px;">🖼️</div>
+      <h2 style="font-size:17px;font-weight:800;color:#1a1a2e;margin:0 0 8px;line-height:1.35;">Upload your hotel logo first?</h2>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${activeHotelName || 'your hotel'}</strong> to their phone. Takes 5 seconds.</p>
+      <input type="file" id="logoGateFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
+      <button type="button" id="logoGateUploadBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Upload logo</button>
+      <button type="button" id="logoGateSkipBtn" style="width:100%;padding:10px;border:none;background:transparent;color:#9ca3af;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Show QR without logo</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  document.getElementById('logoGateUploadBtn').onclick = () => {
+    document.getElementById('logoGateFileInput').click();
+  };
+  document.getElementById('logoGateFileInput').onchange = async (e) => {
+    const input = e.target;
+    if (!input.files || !input.files[0]) return;
+    await uploadAppIcon(input);
+    if (activeHotelAppIcon) {
+      close();
+      showCheckinQrOverlay(preselectedCode, true);
+    }
+  };
+  document.getElementById('logoGateSkipBtn').onclick = () => {
+    close();
+    showCheckinQrOverlay(preselectedCode, true);
+  };
+}
+
+function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   const hName = activeHotelName || 'Your Hotel';
   const domain = activeHotelDomain || '';
   if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
+  if (!skipLogoGate && !preselectedCode && !activeHotelAppIcon) {
+    promptUploadLogoBeforeQr(preselectedCode);
+    return;
+  }
 
   const existing = document.getElementById('checkinQrOverlay');
   if (existing) existing.remove();
@@ -4591,15 +5055,22 @@ function prefillGuestInstallBroadcast() {
       ? `Add ${hName} to your home screen — message us anytime and book direct next time. Tap here: ${installUrl}`
       : `Add ${hName} to your home screen — message us anytime and book direct next time.`;
   }
-  const notifyFold = document.querySelector('#appsView details.apps-fold:last-of-type');
-  if (notifyFold) {
-    notifyFold.open = true;
-    notifyFold.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('guestBroadcastCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (currentFilter !== 'apps') {
+    const tabBtn = document.querySelector('.tab[data-nav-filter="apps"]')
+      || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]');
+    setFilter('apps', tabBtn);
+    setTimeout(() => {
+      document.getElementById('guestBroadcastCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
   }
-  toast('Pre-filled — edit if you like, then tap Notify all guests', 'success');
 }
 
 async function sendGuestBroadcast() {
+  if (!guestPushSubscriberCount) {
+    toast('No guests have notifications on yet — show your QR at check-in first', 'error');
+    return;
+  }
   const titleEl = document.getElementById('guest-broadcast-title');
   const bodyEl = document.getElementById('guest-broadcast-body');
   const resultEl = document.getElementById('guest-broadcast-result');
@@ -4627,7 +5098,8 @@ async function sendGuestBroadcast() {
   } catch (e) {
     toast('Broadcast failed', 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Notify all guests'; }
+    if (btn) btn.textContent = 'Send notification';
+    applyGuestBroadcastAudienceUi();
   }
 }
 
@@ -4670,6 +5142,10 @@ async function loadSettings() {
     const rooms = ratesRes?.rooms || [];
 
     let html = '';
+
+    if (!hotelRes?.subscribed) {
+      html += goLiveInlineCardHtml();
+    }
 
     // Room Cards with photo upload
     if (rooms.length) {
@@ -4972,6 +5448,24 @@ function openPreviewSite() {
   window.open(url, '_blank');
 }
 
+function guestBookingEngineUrl() {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocal && activeHotelId) {
+    return 'http://localhost:5173/?hotelId=' + encodeURIComponent(activeHotelId);
+  }
+  const domain = activeHotelDomain || '';
+  return domain ? 'https://' + domain + '/' : '';
+}
+
+function openGuestBookingEngine() {
+  const url = guestBookingEngineUrl();
+  if (!url) {
+    toast('Your booking domain is still setting up.', 'info');
+    return;
+  }
+  window.open(url, '_blank');
+}
+
 function updatePreviewSiteBar() {
   const bar = document.getElementById('previewSiteBar');
   if (!bar) return;
@@ -4999,6 +5493,7 @@ function advanceTourIfNeeded() {
   document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
     el.style.position = el.dataset.tourOrigPosition || '';
     el.style.zIndex = '';
+    el.style.isolation = '';
     el.style.boxShadow = '';
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
@@ -5120,34 +5615,175 @@ function showOnboardingQuestions() {
 }
 
 // ── WELCOME MODAL (after questionnaire) ────────────────────────
+function replayWalkthrough() {
+  ['onboardingDone', 'settingsTourDone', 'settingsTourStep', 'linkCopied', 'ratesChanged', 'appsTourDone', 'postActivationTourDone'].forEach((k) => {
+    localStorage.removeItem(k);
+  });
+  const u = new URL(window.location.href);
+  u.searchParams.set('welcome', '1');
+  const hid = u.searchParams.get('hotelId') || activeHotelId || '';
+  if (hid) u.searchParams.set('hotelId', hid);
+  location.href = u.pathname + '?' + u.searchParams.toString();
+}
+
 function showWelcomeModal() {
   const overlay = document.createElement('div');
   overlay.id = 'welcomeModalOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
-  overlay.innerHTML = `
-    <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
-      <div style="font-size:32px;margin-bottom:12px;">🏨</div>
-      <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
-      <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">This is where you:<br><br>
-        <strong>Set up</strong> your booking page<br>
-        <strong>See bookings</strong> when they come in<br>
-        <strong>Track revenue</strong> your page generates</p>
-      <button id="welcomeModalGotIt" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Got it — show me around</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  document.getElementById('welcomeModalGotIt').onclick = () => {
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;';
+
+  function startSettingsTourFromWelcome() {
+    localStorage.setItem('onboardingDone', '1');
+    localStorage.removeItem('settingsTourDone');
+    localStorage.removeItem('settingsTourStep');
+    try {
+      const cleanUrl = new URL(window.location);
+      cleanUrl.searchParams.delete('welcome');
+      window.history.replaceState({}, '', cleanUrl);
+    } catch (_) {}
+    const startTour = (typeof startSettingsTour === 'function')
+      ? startSettingsTour
+      : (typeof window.startSettingsTour === 'function' ? window.startSettingsTour : null);
+    if (startTour) startTour();
     overlay.remove();
-    // Start tour after a short delay to let DOM settle
-    setTimeout(() => { startSettingsTour(); }, 200);
-  };
+  }
+
+  function renderWelcomeStep() {
+    overlay.innerHTML = `
+      <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+        <div style="font-size:32px;margin-bottom:12px;">🏨</div>
+        <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
+        <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">This is where you:<br><br>
+          <strong>Set up</strong> your booking page<br>
+          <strong>See bookings</strong> when they come in<br>
+          <strong>Track revenue</strong> your page generates<br><br>
+          Your page starts in <strong style="color:#1a1a2e;">preview mode</strong> — activate for <strong style="color:#1a5c3f;">$99/mo</strong> when you&apos;re ready to accept reservations.</p>
+        <button id="welcomeModalNext" type="button" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Show me how →</button>
+      </div>`;
+    document.getElementById('welcomeModalNext').onclick = startSettingsTourFromWelcome;
+  }
+
+  document.body.appendChild(overlay);
+  renderWelcomeStep();
+  if (typeof invokeLoadEditRooms === 'function') void invokeLoadEditRooms();
 }
+
+function cleanupPostActivationTourUi() {
+  const tooltip = document.getElementById('postActivationTourTooltip');
+  if (tooltip) tooltip.remove();
+  const overlay = document.getElementById('postActivationTourOverlay');
+  if (overlay) overlay.remove();
+  document.querySelectorAll('[data-post-activation-highlight]').forEach((el) => {
+    el.style.boxShadow = '';
+    el.style.position = '';
+    el.style.zIndex = '';
+    el.removeAttribute('data-post-activation-highlight');
+  });
+  document.body.style.overflow = '';
+}
+
+function finishPostActivationTour() {
+  cleanupPostActivationTourUi();
+  localStorage.setItem('postActivationTourDone', '1');
+  const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]')
+    || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
+  try { setFilter('bookings', tabBtn); } catch (e) { /* ignore */ }
+}
+
+function startPostActivationTabTour() {
+  if (localStorage.getItem('postActivationTourDone')) {
+    finishPostActivationTour();
+    return;
+  }
+  cleanupPostActivationTourUi();
+
+  const steps = [
+    {
+      tab: 'availability',
+      navFilter: 'availability',
+      text: '<strong>Availability</strong> — add inventory rooms here and control how many units are open each day. (Separate from booking page rooms on Your page.)',
+    },
+  ];
+  if (revenueEnabled) {
+    steps.push({
+      tab: 'revenue',
+      navFilter: 'revenue',
+      text: '<strong>Revenue</strong> — see direct booking income and how much you\'re saving vs OTA commissions.',
+    });
+  }
+  steps.push({
+    tab: 'bookings',
+    navFilter: 'bookings',
+    text: '<strong>Bookings</strong> — live reservations land here. You\'ll get a push alert for each new one.',
+  });
+
+  let stepIdx = 0;
+
+  function showStep() {
+    cleanupPostActivationTourUi();
+    if (stepIdx >= steps.length) {
+      finishPostActivationTour();
+      return;
+    }
+
+    const s = steps[stepIdx];
+    const tabBtn = document.querySelector(`.tab[data-nav-filter="${s.navFilter}"]`)
+      || document.querySelector(`.mobile-nav-item[data-nav-filter="${s.navFilter}"]`);
+    if (tabBtn) setFilter(s.tab, tabBtn);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'postActivationTourOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.55);';
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    setTimeout(() => {
+      const target = document.querySelector(`.tab[data-nav-filter="${s.navFilter}"]`)
+        || document.querySelector(`.mobile-nav-item[data-nav-filter="${s.navFilter}"]`);
+      if (target) {
+        target.setAttribute('data-post-activation-highlight', '1');
+        target.style.position = 'relative';
+        target.style.zIndex = '100003';
+        target.style.boxShadow = '0 0 0 3px #fff, 0 0 0 6px #2E7D5B';
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+
+      const rect = target ? target.getBoundingClientRect() : { left: 24, bottom: 80, width: 200 };
+      const tooltip = document.createElement('div');
+      tooltip.id = 'postActivationTourTooltip';
+      const tooltipW = Math.min(300, window.innerWidth - 32);
+      const left = Math.max(16, Math.min(rect.left + rect.width / 2 - tooltipW / 2, window.innerWidth - tooltipW - 16));
+      const top = Math.min(rect.bottom + 14, window.innerHeight - 180);
+      tooltip.style.cssText = `position:fixed;z-index:100004;left:${left}px;top:${top}px;max-width:${tooltipW}px;width:${tooltipW}px;`;
+      const isLast = stepIdx >= steps.length - 1;
+      tooltip.innerHTML = `
+        <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
+          <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
+          <p style="margin:0 0 14px;">${s.text}</p>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Bookings' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
+        </div>`;
+      document.body.appendChild(tooltip);
+
+      document.getElementById('postActivationTourNext').onclick = () => {
+        stepIdx += 1;
+        showStep();
+      };
+      document.getElementById('postActivationTourSkip').onclick = () => {
+        finishPostActivationTour();
+      };
+    }, s.tab === 'availability' ? 80 : 0);
+  }
+
+  showStep();
+}
+window.startPostActivationTabTour = startPostActivationTabTour;
 
 // Shown when the owner returns from a successful Go Live payment — removes all
 // ambiguity about what just happened and what's now true for their hotel.
 function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
   const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
+  const unlockedTabs = revenueEnabled ? 'Availability, Revenue, and Bookings' : 'Availability and Bookings';
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -5163,11 +5799,11 @@ function showActivatedModal() {
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>New bookings appear right here</strong> in your Bookings tab, and you'll get a notification for each one.</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>New bookings appear in Bookings</strong> — you'll get a notification for each one.</span>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>You're billed monthly.</strong> Cancel anytime from <strong>Your page → Manage Subscription</strong> — no contracts.</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>${unlockedTabs}</strong> are now part of your daily workflow.</span>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
@@ -5175,20 +5811,34 @@ function showActivatedModal() {
         </div>
       </div>
       ${bookingDomain ? `<p style="font-size:12px;color:#6b7280;margin:0 0 16px;">Your booking page: <strong style="color:#2E7D5B;">${bookingDomain}</strong></p>` : ''}
-      <button id="activatedModalDone" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Got it — take me to my bookings</button>
+      <button id="activatedModalTour" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Show me the new tabs →</button>
+      <button id="activatedModalSkip" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #d6e9df;background:#fff;color:#6b7280;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Skip — go to Bookings</button>
     </div>
   `;
   document.body.appendChild(overlay);
-  document.getElementById('activatedModalDone').onclick = () => {
+  document.getElementById('activatedModalTour').onclick = () => {
     overlay.remove();
+    startPostActivationTabTour();
+  };
+  document.getElementById('activatedModalSkip').onclick = () => {
+    overlay.remove();
+    localStorage.setItem('postActivationTourDone', '1');
     try { setFilter('bookings'); } catch (e) { /* ignore */ }
   };
 }
 
-// ── DOWNLOAD FRONT DESK (Settings card) ────────────────────────
+// ── DOWNLOAD FRONT DESK (Bookings tab nudge) ───────────────────
 // Owner-facing: install THIS front desk to the home screen to receive booking
 // notifications. Deliberately framed around alerts + "Front Desk" so it never
 // reads as the guest booking engine (which is installed from the booking page).
+function bookingsFrontdeskNudgeHtml() {
+  const installed = isStandaloneApp() || frontdeskInstalled;
+  if (!installed) return frontdeskInstallCardHtml();
+  if (!pushSupported()) return '';
+  const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  return granted ? '' : frontdeskInstallCardHtml();
+}
+
 function frontdeskInstallCardHtml() {
   const installed = isStandaloneApp() || frontdeskInstalled;
   const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
@@ -5219,9 +5869,22 @@ function frontdeskInstallCardHtml() {
 }
 
 function refreshFrontdeskInstallCard() {
+  if (currentFilter === 'bookings') {
+    renderMessages();
+    return;
+  }
   const el = document.getElementById('frontdeskInstallCard');
   if (!el) return;
-  el.outerHTML = frontdeskInstallCardHtml();
+  const html = bookingsFrontdeskNudgeHtml();
+  if (!html) el.remove();
+  else el.outerHTML = html;
+}
+
+function refreshAppsInstallSection() {
+  const fn = (typeof ensureAppsViewRendered === 'function')
+    ? ensureAppsViewRendered
+    : window.ensureAppsViewRendered;
+  if (typeof fn === 'function') fn(true);
 }
 
 function handleInstallFrontdesk() {
@@ -5238,6 +5901,7 @@ function handleInstallFrontdesk() {
       if (choice && choice.outcome === 'accepted') { frontdeskInstalled = true; }
       deferredInstallPrompt = null;
       refreshFrontdeskInstallCard();
+      refreshAppsInstallSection();
     }).catch(() => {});
   } else {
     toast('Use your browser menu → "Install app" / "Add to Home screen".', 'info');
@@ -5258,6 +5922,7 @@ async function toggleAppNotifications() {
   }
   await enableNotifications();
   refreshFrontdeskInstallCard();
+  refreshAppsInstallSection();
 }
 
 // First-launch nudge inside the INSTALLED app. Installing a PWA never asks for
@@ -5296,6 +5961,7 @@ function showNotifPromptModal() {
     overlay.remove();
     await enableNotifications();   // runs inside this tap → gesture requirement satisfied
     refreshFrontdeskInstallCard();
+    refreshAppsInstallSection();
   };
   document.getElementById('notifPromptLater').onclick = () => overlay.remove();
 }
@@ -5336,17 +6002,363 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
 }
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
-function startSettingsTour() {
-  // Pre-live hotels use the go-live banner + checklist — skip the full product tour.
-  if (!hotelSubscribed) {
-    localStorage.setItem('settingsTourDone', '1');
-    localStorage.removeItem('settingsTourStep');
-    return;
+function ensureTourBlurOverlay() {
+  let overlay = document.getElementById('tourBlurOverlay');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'tourBlurOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);';
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+  return overlay;
+}
+
+function cleanupSettingsTourUi() {
+  const prev = document.getElementById('tourTooltip');
+  if (prev) prev.remove();
+  const prevOverlay = document.getElementById('tourBlurOverlay');
+  if (prevOverlay) prevOverlay.remove();
+  document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
+    el.style.position = el.dataset.tourOrigPosition || '';
+    el.style.zIndex = '';
+    el.style.isolation = '';
+    el.style.boxShadow = '';
+    el.removeAttribute('data-tour-highlighted');
+    delete el.dataset.tourOrigPosition;
+  });
+  const goLiveBanner = document.getElementById('goLiveBanner');
+  if (goLiveBanner && goLiveBanner.dataset.tourHidden) {
+    delete goLiveBanner.dataset.tourHidden;
+    if (typeof updateGoLiveBanner === 'function') updateGoLiveBanner();
   }
+  document.body.style.overflow = '';
+}
+
+function openTourAccordion(el, stepDef) {
+  if (!stepDef.openAccordion) return;
+  const card = stepDef.accordionCard
+    ? document.querySelector(stepDef.accordionCard)
+    : (el && el.closest ? el.closest('.booking-card') : null);
+  if (!card) return;
+  const acc = card.querySelector('.accordion-body');
+  if (!acc) return;
+  const hidden = acc.style.display === 'none' || getComputedStyle(acc).display === 'none';
+  if (hidden) {
+    acc.style.display = 'block';
+    const arrow = card.querySelector('.accordion-arrow');
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+  }
+}
+
+function queryTourSelector(selectorList) {
+  if (!selectorList) return null;
+  for (const sel of String(selectorList).split(',').map(t => t.trim()).filter(Boolean)) {
+    const el = document.querySelector(sel);
+    if (el && el.isConnected) return el;
+  }
+  return null;
+}
+
+function resolveTourHighlightEl(el, stepDef) {
+  if (stepDef.highlightSelector) {
+    const highlighted = queryTourSelector(stepDef.highlightSelector);
+    if (highlighted) return highlighted;
+  }
+  if (stepDef.highlightCard) {
+    const card = stepDef.accordionCard
+      ? document.querySelector(stepDef.accordionCard)
+      : (el && el.closest ? el.closest('.booking-card') : null);
+    if (card) return card;
+  }
+  if (stepDef.targetParent) {
+    return el.closest('.booking-card') || el.closest('.accordion-body') || el;
+  }
+  return el;
+}
+
+function resolveLiveTourElement(el, stepDef) {
+  if (!stepDef) return el;
+  const selectors = String(stepDef.target || '').split(',').map(t => t.trim()).filter(Boolean);
+  for (const sel of selectors) {
+    const candidate = document.querySelector(sel);
+    if (candidate && candidate.isConnected) return candidate;
+  }
+  if (stepDef.accordionCard) {
+    const card = document.querySelector(stepDef.accordionCard);
+    if (card && card.isConnected) return card;
+  }
+  return el && el.isConnected ? el : null;
+}
+
+function tourElementRect(el, allowPartial) {
+  if (!el || !el.isConnected) return null;
+  const rect = el.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return null;
+  if (!allowPartial && (rect.bottom < 8 || rect.top > window.innerHeight - 8)) return null;
+  return rect;
+}
+
+function tourAnchorRect(stepDef, highlightEl) {
+  const anchor = queryTourSelector(stepDef.anchorSelector);
+  if (anchor) {
+    const r = tourElementRect(anchor, true);
+    if (r) return r;
+  }
+  return tourElementRect(highlightEl, true);
+}
+
+function scrollTourTargetIntoView(el, stepDef) {
+  const scrollSel = stepDef.scrollTarget || stepDef.accordionCard;
+  const target = (scrollSel ? queryTourSelector(scrollSel) : null) || el;
+  if (!target && !stepDef.scrollToTop) return Promise.resolve();
+
+  const block = stepDef.scrollBlock || 'center';
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const behavior = (settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth';
+
+  return new Promise((resolve) => {
+    const applyPadding = () => {
+      const padTop = stepDef.scrollPadTop ?? 80;
+      const padBottom = stepDef.scrollPadBottom ?? 130;
+      const measure = queryTourSelector(stepDef.anchorSelector)
+        || (target && target.isConnected ? target : null)
+        || (el && el.isConnected ? el : null);
+      if (!measure) {
+        resolve();
+        return;
+      }
+      const rect = measure.getBoundingClientRect();
+      if (rect.top < padTop) window.scrollBy({ top: rect.top - padTop, left: 0, behavior: 'auto' });
+      if (rect.bottom > window.innerHeight - padBottom) {
+        window.scrollBy({ top: rect.bottom - window.innerHeight + padBottom, left: 0, behavior: 'auto' });
+      }
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    };
+
+    const scrollTargetIntoPlace = () => {
+      if (target) target.scrollIntoView({ behavior: stepDef.scrollToTop ? 'auto' : behavior, block, inline: 'nearest' });
+      applyPadding();
+    };
+
+    if (stepDef.scrollToTop) {
+      window.scrollTo({ top: 0, left: 0, behavior });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      if (stepDef.scrollToTopOnly) {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+        return;
+      }
+      if (behavior === 'auto') {
+        scrollTargetIntoPlace();
+        return;
+      }
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('scrollend', onScrollEnd);
+        clearTimeout(fallbackTimer);
+        scrollTargetIntoPlace();
+      };
+      const onScrollEnd = () => finish();
+      if ('onscrollend' in window) window.addEventListener('scrollend', onScrollEnd, { once: true });
+      const fallbackTimer = setTimeout(finish, 520);
+      return;
+    }
+
+    if (!target) {
+      resolve();
+      return;
+    }
+
+    target.scrollIntoView({ behavior, block, inline: 'nearest' });
+
+    if (behavior === 'auto') {
+      applyPadding();
+      return;
+    }
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('scrollend', onScrollEnd);
+      clearTimeout(fallbackTimer);
+      applyPadding();
+    };
+    const onScrollEnd = () => finish();
+    if ('onscrollend' in window) window.addEventListener('scrollend', onScrollEnd, { once: true });
+    const fallbackTimer = setTimeout(finish, 620);
+  });
+}
+
+function handoffToGuestAppsTour() {
+  cleanupSettingsTourUi();
+  // Keep a marker so refresh mid–Guest App tour does not auto-mark settings tour done.
+  localStorage.setItem('settingsTourStep', 'handoff');
+  const go = () => {
+    const tabBtn = document.querySelector('.tab[data-nav-filter="apps"]') || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]');
+    if (tabBtn) setFilter('apps', tabBtn);
+    const renderApps = (typeof ensureAppsViewRendered === 'function')
+      ? ensureAppsViewRendered
+      : window.ensureAppsViewRendered;
+    if (typeof renderApps === 'function') renderApps(true);
+    const startTour = (typeof startAppsTour === 'function')
+      ? startAppsTour
+      : window.startAppsTour;
+    if (typeof startTour === 'function') startTour({ chainFromSettingsTour: true });
+  };
+  const loadApps = (typeof loadAppsModule === 'function')
+    ? loadAppsModule
+    : window.loadAppsModule;
+  if (typeof loadApps === 'function') {
+    loadApps().then(go).catch(go);
+  } else {
+    go();
+  }
+}
+
+function showFinaleMockModal() {
+  settingsTourActive = false;
+  updateGoLiveBanner();
+  const blurOverlay = document.createElement('div');
+  blurOverlay.id = 'tourBlurOverlay';
+  blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);';
+  document.body.appendChild(blurOverlay);
+  document.body.style.overflow = 'hidden';
+
+  const modal = document.createElement('div');
+  modal.id = 'tourTooltip';
+  modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
+      <div style="padding:24px 20px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:12px;">🚀</div>
+        <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">You're all set!</div>
+        <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking engine is live. Here's what to do next:</p>
+        <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:16px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">1️⃣</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Share your booking link</strong> — add it to your Google Business Profile, your website, text it to guests, or run ads to it</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">2️⃣</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Wait for your first booking</strong> — you'll see it appear right here</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">3️⃣</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Call the guest</strong> to confirm and collect payment at check-in</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <span style="font-size:14px;">📲</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Later:</strong> open <strong>Phones</strong> for your check-in QR and guest-app tools</span>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff7ed;border-radius:10px;padding:10px 12px;border:1px solid #fed7aa;margin-bottom:16px;">
+          <p style="font-size:12px;color:#9a3412;margin:0;line-height:1.5;">⚠️ We're not an ad agency — you won't get bookings unless you get your link in front of people.</p>
+        </div>
+        <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy my link & let's go!</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  if (!document.getElementById('tourModalAnimStyle')) {
+    const animStyle = document.createElement('style');
+    animStyle.id = 'tourModalAnimStyle';
+    animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
+    document.head.appendChild(animStyle);
+  }
+
+  document.getElementById('tourNextBtn').onclick = () => {
+    const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+    const url = 'https://' + domain;
+    navigator.clipboard.writeText(url).catch(() => {});
+    cleanupSettingsTourUi();
+    settingsTourActive = false;
+    localStorage.setItem('settingsTourDone', '1');
+    localStorage.setItem('linkCopied', '1');
+    localStorage.removeItem('settingsTourStep');
+    toast('Booking link copied!', 'success');
+    finishTourHydration();
+    showTestDriveModal(url);
+  };
+}
+
+function showTestDriveModal(bookingUrl) {
+  const overlay = document.createElement('div');
+  overlay.id = 'testDriveOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
+      <div style="padding:28px 22px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">🚀</div>
+        <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Go live and start accepting bookings</div>
+        <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your engine is built. Your link is copied. Activate to let guests book.</p>
+        <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:20px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Your booking page goes live</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Card verification prevents no-shows</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Get notified when bookings come in</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">No commission — ever</span></div>
+          </div>
+        </div>
+        <button id="activateNowBtn" style="width:100%;padding:16px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">$99/mo — Go Live Now</button>
+        <p style="font-size:11px;color:#6b7280;margin:0 0 16px;">Cancel anytime · No contracts</p>
+        <button id="activateLaterBtn" style="background:none;border:none;color:#9ca3af;font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;">Not ready yet — keep my page inactive</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('activateNowBtn').onclick = () => {
+    overlay.remove();
+    const goLiveToken = token;
+    fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': goLiveToken }, body: JSON.stringify({ hotelId: activeHotelId }) })
+      .then(r => r.json())
+      .then(data => { if (data.success && data.url) window.location.href = data.url; else toast('Something went wrong. Try again.', 'error'); })
+      .catch(() => toast('Something went wrong. Try again.', 'error'));
+  };
+
+  document.getElementById('activateLaterBtn').onclick = () => {
+    overlay.remove();
+    const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
+    if (tabBtn) setFilter('bookings', tabBtn);
+  };
+}
+
+function startSettingsTour() {
   // Only show once
   if (localStorage.getItem('settingsTourDone')) return;
 
-  let step = parseInt(localStorage.getItem('settingsTourStep') || '0');
+  if (localStorage.getItem('settingsTourStep') === 'handoff') {
+    localStorage.removeItem('settingsTourStep');
+    showFinaleMockModal();
+    return;
+  }
+
+  settingsTourActive = true;
+  updateGoLiveBanner();
+  seedTourRevenueShell();
+
+  const settingsTab = document.querySelector('.tab[data-nav-filter="settings"]')
+    || document.querySelector('.mobile-nav-item[data-nav-filter="settings"]');
+  if (settingsTab) setFilter('settings', settingsTab);
+
+  function kickEditPageLoadIfNeeded() {
+    const ready = (typeof window.isEditPageDomReady === 'function' && window.isEditPageDomReady())
+      || (typeof isEditPageDomReady === 'function' && isEditPageDomReady());
+    if (ready) return;
+    const needs = (typeof window.needsEditPageLoad === 'function' && window.needsEditPageLoad())
+      || (typeof needsEditPageLoad === 'function' && needsEditPageLoad());
+    if (!needs && !editRoomsLoadPromise) return;
+    const invoke = (typeof window.invokeLoadEditRooms === 'function')
+      ? window.invokeLoadEditRooms
+      : (typeof invokeLoadEditRooms === 'function' ? invokeLoadEditRooms : null);
+    if (invoke) void invoke();
+  }
+  kickEditPageLoadIfNeeded();
+
   const steps = [
     {
       target: '',
@@ -5368,29 +6380,46 @@ function startSettingsTour() {
       tab: 'settings'
     },
     {
-      target: '#edit-rate-nightly',
+      target: '#tour-rates-card',
+      highlightSelector: '#tour-rates-card',
+      anchorSelector: '#tour-rates-header',
+      scrollTarget: '#tour-rates-card',
       text: 'You can change your rates here — nightly, weekly, and monthly.',
       openAccordion: true,
-      targetParent: true,
-      tab: 'settings'
+      accordionCard: '#tour-rates-card',
+      tab: 'settings',
+      scrollBlock: 'center',
+      scrollPadBottom: 280,
+      tooltipAnchor: 'card-bottom'
     },
     {
-      target: 'button[onclick*="copyBookingLink"]',
+      target: '#tour-copy-link-btn',
       text: 'This is your booking URL — the link guests use to book with you directly.',
       openAccordion: false,
-      tab: 'settings'
+      tab: 'settings',
+      tooltipPosition: 'below'
     },
     {
-      target: 'button[onclick*="openPreviewSite"]',
+      target: '#tour-preview-btn',
       text: 'Preview your booking engine to see exactly what your guests see.',
       openAccordion: false,
-      tab: 'settings'
+      tab: 'settings',
+      tooltipPosition: 'below',
+      scrollToTop: true,
+      scrollToTopOnly: true
     },
     {
-      target: '#edit-new-pin',
+      target: '#tour-pin-card',
+      highlightSelector: '#tour-pin-card',
+      anchorSelector: '#tour-pin-header',
+      scrollTarget: '#tour-pin-card',
       text: 'This is your login PIN — you\'ll need it to access this dashboard next time. You can change it here anytime.',
       openAccordion: true,
-      tab: 'settings'
+      accordionCard: '#tour-pin-card',
+      tab: 'settings',
+      tooltipAnchor: 'card-top',
+      scrollBlock: 'center',
+      scrollPadBottom: 200
     },
     {
       target: '#bookingsList',
@@ -5422,42 +6451,61 @@ function startSettingsTour() {
       tooltipPosition: 'above'
     },
     {
-      target: '#bookingsList',
-      text: '',
+      target: '#tour-fd-install-btn, #tour-fd-installed-badge',
+      text: 'Add Front Desk to your home screen — same website you\'re on now, not the App Store. Takes about 3 seconds. You\'ll get a buzz when guests book.',
       openAccordion: false,
-      tab: 'bookings',
-      customModal: 'finale'
+      tab: 'apps',
+      waitForVisible: true,
+      tooltipPosition: 'below',
+      scrollBlock: 'nearest'
+    },
+    {
+      target: '#tour-guest-icon-btn',
+      anchorSelector: '#tour-guest-icon-btn',
+      scrollTarget: '#tour-guest-icon-section, #tour-fd-install-card',
+      text: 'Guests can save your direct booking page to their home screen too — upload your logo so it stands out when they do.',
+      openAccordion: false,
+      tab: 'apps',
+      waitForVisible: true,
+      noHighlight: true,
+      freezeTooltip: true,
+      tooltipPosition: 'below',
+      scrollBlock: 'center',
+      scrollPadBottom: 260,
+      scrollPadTop: 88
     }
   ];
 
+  let step = parseInt(localStorage.getItem('settingsTourStep') || '0', 10);
+  if (!Number.isFinite(step) || step < 0 || step >= steps.length) {
+    step = 0;
+    localStorage.removeItem('settingsTourStep');
+  }
+
   function cleanupTour() {
-    const prev = document.getElementById('tourTooltip');
-    if (prev) prev.remove();
-    const prevOverlay = document.getElementById('tourBlurOverlay');
-    if (prevOverlay) prevOverlay.remove();
-    // Remove any lingering highlight styles — restore original position
-    document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
-      el.style.position = el.dataset.tourOrigPosition || '';
-      el.style.zIndex = '';
-      el.style.boxShadow = '';
-      el.removeAttribute('data-tour-highlighted');
-      delete el.dataset.tourOrigPosition;
-    });
-    document.body.style.overflow = '';
+    cleanupSettingsTourUi();
   }
 
   function skipToFinale() {
     cleanupTour();
-    // Jump straight to the finale modal — they must see the "share your link" reality check
+    localStorage.removeItem('settingsTourStep');
     showFinaleMockModal();
+  }
+
+  function scheduleTourStepContent(stepDef) {
+    if (stepDef.customModal) {
+      showStepContent(stepDef);
+      return;
+    }
+    requestAnimationFrame(() => showStepContent(stepDef));
   }
 
   function showStep() {
     cleanupTour();
 
     if (step >= steps.length) {
-      localStorage.setItem('settingsTourDone', '1');
       localStorage.removeItem('settingsTourStep');
+      showFinaleMockModal();
       return;
     }
 
@@ -5471,21 +6519,23 @@ function startSettingsTour() {
       return;
     }
 
+    // Dim immediately on highlight steps so there is no blank gap after modal transitions.
+    if (!s.customModal) ensureTourBlurOverlay();
+
     // Switch tab if this step requires a different tab
     if (s.tab && s.tab !== currentFilter) {
       const tabBtn = document.querySelector(`.tab[data-nav-filter="${s.tab}"]`) || document.querySelector(`.mobile-nav-item[data-nav-filter="${s.tab}"]`);
       if (tabBtn) setFilter(s.tab, tabBtn);
-      // For custom modals, show immediately after tab switch (no need to wait for elements)
-      if (s.customModal) {
-        setTimeout(() => { showStepContent(s); }, 150);
-      } else {
-        // Wait longer for tab content to fully render (especially async tabs like availability/revenue)
-        setTimeout(() => { showStepContent(s); }, 800);
+      if (s.tab === 'apps') {
+        const renderApps = (typeof ensureAppsViewRendered === 'function')
+          ? ensureAppsViewRendered
+          : window.ensureAppsViewRendered;
+        if (typeof renderApps === 'function') renderApps(true);
       }
+      scheduleTourStepContent(s);
       return;
     }
-    // Small delay even on same tab to let DOM settle
-    setTimeout(() => { showStepContent(s); }, 100);
+    scheduleTourStepContent(s);
   }
 
   function showStepContent(s) {
@@ -5504,7 +6554,6 @@ function startSettingsTour() {
       showAvailabilityMockModal();
       return;
     }
-    // Finale modal — tour complete, clear next action
     if (s.customModal === 'finale') {
       showFinaleMockModal();
       return;
@@ -5514,19 +6563,31 @@ function startSettingsTour() {
     if (s.waitForVisible) {
       const targets = s.target.split(',').map(t => t.trim());
       let attempts = 0;
-      const maxAttempts = 20; // 20 * 200ms = 4 seconds max wait
+      const maxAttempts = 30;
+      ensureTourBlurOverlay();
+      const pollMs = settingsTourActive ? 60 : 200;
       const pollForVisible = () => {
         attempts++;
+        if (s.tab === 'apps') {
+          const renderApps = (typeof ensureAppsViewRendered === 'function')
+            ? ensureAppsViewRendered
+            : window.ensureAppsViewRendered;
+          if (typeof renderApps === 'function') renderApps(true);
+        }
         let el = null;
         for (const t of targets) {
           el = document.querySelector(t);
-          if (el && el.offsetParent !== null) break;
-          el = null;
+          if (el) break;
         }
         if (el) {
-          showStepForElement(el, s);
-        } else if (attempts < maxAttempts) {
-          setTimeout(pollForVisible, 200);
+          if (s.openAccordion) openTourAccordion(el, s);
+          if (s.openAccordion || el.offsetParent !== null) {
+            showStepForElement(el, s);
+            return;
+          }
+        }
+        if (attempts < maxAttempts) {
+          setTimeout(pollForVisible, pollMs);
         } else {
           // Give up, skip this step
           step++;
@@ -5538,127 +6599,285 @@ function startSettingsTour() {
       return;
     }
 
-    // Try multiple selectors (comma-separated)
-    let el = null;
-    const targets = s.target.split(',').map(t => t.trim());
-    for (const t of targets) {
-      el = document.querySelector(t);
-      // Skip elements that are hidden/display:none — BUT allow if openAccordion will reveal it
-      if (el && !s.openAccordion && el.offsetParent === null && getComputedStyle(el).position !== 'fixed') {
-        el = null;
-        continue;
+    function findTourTarget(stepDef) {
+      const targets = stepDef.target.split(',').map(t => t.trim());
+      for (const t of targets) {
+        const candidate = document.querySelector(t);
+        if (!candidate) continue;
+        if (!stepDef.openAccordion && candidate.offsetParent === null && getComputedStyle(candidate).position !== 'fixed') {
+          continue;
+        }
+        return candidate;
       }
-      if (el) break;
+      if (stepDef.accordionCard) {
+        const card = document.querySelector(stepDef.accordionCard);
+        if (card) return card;
+      }
+      return null;
     }
-    if (!el) { step++; localStorage.setItem('settingsTourStep', String(step)); showStep(); return; }
 
-    showStepForElement(el, s);
+    function resolveTourTarget(stepDef, onFound) {
+      const found = findTourTarget(stepDef);
+      if (found) {
+        onFound(found);
+        return;
+      }
+      const needsEditPage = stepDef.tab === 'settings' && !stepDef.customModal && stepDef.target;
+      const needsAppsPage = stepDef.tab === 'apps' && !stepDef.customModal && stepDef.target;
+      if (!needsEditPage && !needsAppsPage) {
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+        return;
+      }
+      ensureTourBlurOverlay();
+      let attempts = 0;
+      if (needsEditPage) kickEditPageLoadIfNeeded();
+      if (needsAppsPage) {
+        const renderApps = (typeof ensureAppsViewRendered === 'function')
+          ? ensureAppsViewRendered
+          : window.ensureAppsViewRendered;
+        if (typeof renderApps === 'function') renderApps(true);
+      }
+      const pollMs = settingsTourActive ? 60 : 250;
+      const pollForTarget = () => {
+        attempts++;
+        if (needsAppsPage) {
+          const renderApps = (typeof ensureAppsViewRendered === 'function')
+            ? ensureAppsViewRendered
+            : window.ensureAppsViewRendered;
+          if (typeof renderApps === 'function') renderApps(true);
+        }
+        const el = findTourTarget(stepDef);
+        if (el) {
+          onFound(el);
+          return;
+        }
+        kickEditPageLoadIfNeeded();
+        if (needsAppsPage) {
+          const renderApps = (typeof ensureAppsViewRendered === 'function')
+            ? ensureAppsViewRendered
+            : window.ensureAppsViewRendered;
+          if (typeof renderApps === 'function') renderApps(true);
+        }
+        if (attempts < 48) {
+          setTimeout(pollForTarget, pollMs);
+        } else {
+          step++;
+          localStorage.setItem('settingsTourStep', String(step));
+          showStep();
+        }
+      };
+      pollForTarget();
+    }
+
+    resolveTourTarget(s, (el) => showStepForElement(el, s));
   }
 
   function showStepForElement(el, s) {
+    openTourAccordion(el, s);
+    el = resolveTourHighlightEl(el, s);
+    if (!el || !el.isConnected) {
+      el = resolveLiveTourElement(el, s);
+      if (el) el = resolveTourHighlightEl(el, s);
+    }
+    if (!el) {
+      step++;
+      localStorage.setItem('settingsTourStep', String(step));
+      showStep();
+      return;
+    }
 
-    // Open accordion if needed — find the accordion-body that contains this element
-    if (s.openAccordion) {
-      const acc = el.closest('.accordion-body');
-      if (acc && acc.style.display === 'none') {
-        acc.style.display = 'block';
-        const arrow = acc.previousElementSibling?.querySelector('.accordion-arrow');
-        if (arrow) arrow.style.transform = 'rotate(90deg)';
+    const goLiveBanner = document.getElementById('goLiveBanner');
+    if (goLiveBanner && s.tab === 'settings') {
+      goLiveBanner.dataset.tourHidden = '1';
+      goLiveBanner.style.display = 'none';
+    }
+
+    const highlightEl = el;
+    ensureTourBlurOverlay();
+    void scrollTourTargetIntoView(highlightEl, s).then(() => {
+      if (!highlightEl.isConnected) {
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+        return;
+      }
+      openTourAccordion(highlightEl, s);
+
+      if (!s.noHighlight) {
+        if (!highlightEl.dataset.tourOrigPosition) highlightEl.dataset.tourOrigPosition = highlightEl.style.position || '';
+        highlightEl.style.position = highlightEl.style.position || 'relative';
+        highlightEl.style.zIndex = '99999';
+        highlightEl.style.isolation = 'isolate';
+        highlightEl.style.boxShadow = '0 0 0 4px #2E7D5B, 0 0 20px rgba(46,125,91,0.3)';
+        highlightEl.setAttribute('data-tour-highlighted', '1');
+      }
+
+      const placeTooltip = () => {
+        const anchor = queryTourSelector(s.anchorSelector);
+        const tipTarget = anchor || highlightEl;
+        if (s.freezeTooltip) {
+          const rect = tipTarget && tipTarget.isConnected ? tipTarget.getBoundingClientRect() : null;
+          positionTooltip(tipTarget, s, rect && rect.width >= 2 ? rect : null);
+          return;
+        }
+        const liveEl = resolveLiveTourElement(highlightEl, s);
+        let tipEl = liveEl ? resolveTourHighlightEl(liveEl, s) : highlightEl;
+        openTourAccordion(tipEl, s);
+        const rect = s.tooltipAnchor ? null : tourAnchorRect(s, tipEl);
+        positionTooltip(tipEl || highlightEl, s, rect);
+      };
+
+      if (s.freezeTooltip) {
+        requestAnimationFrame(() => requestAnimationFrame(placeTooltip));
+        return;
+      }
+
+      const positionAfterLayout = (attempt = 0) => {
+        requestAnimationFrame(() => {
+          if (s.tooltipAnchor) {
+            placeTooltip();
+            return;
+          }
+          const liveEl = resolveLiveTourElement(highlightEl, s);
+          let tipEl = liveEl ? resolveTourHighlightEl(liveEl, s) : highlightEl;
+          openTourAccordion(tipEl, s);
+          const rect = tourAnchorRect(s, tipEl);
+          if (!rect && attempt < 4) {
+            requestAnimationFrame(() => positionAfterLayout(attempt + 1));
+            return;
+          }
+          positionTooltip(tipEl || highlightEl, s, rect);
+        });
+      };
+      positionAfterLayout(0);
+    });
+  }
+
+  function positionTooltip(el, s, measuredRect) {
+    const prev = document.getElementById('tourTooltip');
+    if (prev) prev.remove();
+
+    const tooltip = document.createElement('div');
+    tooltip.id = 'tourTooltip';
+
+    const skipHtml = `<div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>`;
+    const nextLabel = step < steps.length - 1 ? 'Next \u2192' : 'Got it!';
+    const bodyHtml = `
+      <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
+        <p style="margin:0 0 12px;">${s.text}</p>
+        <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${nextLabel}</button>
+        ${skipHtml}
+      </div>`;
+
+    if (s.tooltipAnchor === 'card-bottom' || s.tooltipAnchor === 'card-top') {
+      const card = queryTourSelector(s.highlightSelector) || el;
+      const header = queryTourSelector(s.anchorSelector);
+      if (card) {
+        const cardRect = card.getBoundingClientRect();
+        const headerRect = header ? header.getBoundingClientRect() : null;
+        const tooltipMaxWidth = Math.min(280, window.innerWidth - 32);
+        const pointerX = cardRect.left + cardRect.width / 2;
+        const tooltipLeft = Math.max(16, Math.min(pointerX - tooltipMaxWidth / 2, window.innerWidth - tooltipMaxWidth - 16));
+        const arrowLeft = Math.max(20, Math.min(pointerX - tooltipLeft, tooltipMaxWidth - 20));
+        const estTipHeight = 132;
+
+        if (s.tooltipAnchor === 'card-bottom') {
+          const spaceBelow = window.innerHeight - cardRect.bottom;
+          const tooltipTop = Math.min(cardRect.bottom + 12, window.innerHeight - estTipHeight - 16);
+          if (spaceBelow >= estTipHeight + 20) {
+            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${tooltipTop}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+            tooltip.innerHTML = `
+              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
+              ${bodyHtml}`;
+          } else {
+            const attachY = headerRect ? headerRect.top : cardRect.top;
+            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - attachY + 10}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+            tooltip.innerHTML = `
+              ${bodyHtml}
+              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
+          }
+        } else {
+          const attachY = cardRect.top;
+          const spaceAbove = cardRect.top - 16;
+          if (spaceAbove >= estTipHeight + 24) {
+            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - attachY + 10}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+            tooltip.innerHTML = `
+              ${bodyHtml}
+              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
+          } else {
+            const tooltipTop = Math.min(cardRect.top + (headerRect ? headerRect.height : 48) + 12, window.innerHeight - estTipHeight - 16);
+            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${tooltipTop}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+            tooltip.innerHTML = `
+              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
+              ${bodyHtml}`;
+          }
+        }
+        document.body.appendChild(tooltip);
+        wireTourTooltipButtons();
+        return;
       }
     }
 
-    // If targetParent, highlight the parent card instead
-    if (s.targetParent) {
-      el = el.closest('.booking-card') || el.closest('.accordion-body') || el;
+    const rect = measuredRect || tourAnchorRect(s, el);
+
+    if (!rect) {
+      tooltip.style.cssText = 'position:fixed;z-index:100000;left:50%;top:50%;transform:translate(-50%,-50%);max-width:280px;width:calc(100% - 32px);';
+      tooltip.innerHTML = bodyHtml;
+      document.body.appendChild(tooltip);
+      wireTourTooltipButtons();
+      return;
     }
-
-    // Add dark overlay + lock scroll
-    const blurOverlay = document.createElement('div');
-    blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);';
-    document.body.appendChild(blurOverlay);
-    document.body.style.overflow = 'hidden';
-
-    // Highlight the target element — preserve original position
-    if (!el.dataset.tourOrigPosition) el.dataset.tourOrigPosition = el.style.position || '';
-    el.style.position = el.style.position || 'relative';
-    el.style.zIndex = '99999';
-    el.style.isolation = 'isolate';
-    el.style.boxShadow = '0 0 0 4px #2E7D5B, 0 0 20px rgba(46,125,91,0.3)';
-    el.setAttribute('data-tour-highlighted', '1');
-
-    // Scroll element into view and wait for scroll to finish before positioning tooltip
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    // Use a longer delay to ensure scroll completes, then measure position
-    setTimeout(() => { positionTooltip(el, s); }, 500);
-  }
-
-  function positionTooltip(el, s) {
-    const rect = el.getBoundingClientRect();
-    const tooltip = document.createElement('div');
-    tooltip.id = 'tourTooltip';
 
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const tooltipMaxWidth = Math.min(280, window.innerWidth - 32);
-
-    // Calculate horizontal center aligned with the element
     const elCenterX = rect.left + rect.width / 2;
     const tooltipLeft = Math.max(16, Math.min(elCenterX - tooltipMaxWidth / 2, window.innerWidth - tooltipMaxWidth - 16));
-    // Arrow offset from left edge of tooltip to point at element center
     const arrowLeft = Math.max(20, Math.min(elCenterX - tooltipLeft, tooltipMaxWidth - 20));
 
-    const skipHtml = `<div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>`;
-
-    // Determine position: use override if specified, otherwise auto-detect
-    const position = s.tooltipPosition || (spaceBelow > 130 ? 'below' : spaceAbove > 130 ? 'above' : 'center');
+    let position = s.tooltipPosition || (spaceBelow > 150 ? 'below' : spaceAbove > 150 ? 'above' : 'center');
+    if (position === 'below' && spaceBelow < 130 && spaceAbove > spaceBelow) position = 'above';
+    if (position === 'above' && spaceAbove < 130 && spaceBelow > spaceAbove) position = 'below';
+    if (position === 'below' && rect.bottom + 150 > window.innerHeight) position = 'above';
 
     if (position === 'below') {
-      // Position below the element
-      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${rect.bottom + 12}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+      const top = Math.min(rect.bottom + 8, window.innerHeight - 24);
+      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${top}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
       tooltip.innerHTML = `
         <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
-        <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
-          <p style="margin:0 0 12px;">${s.text}</p>
-          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
-          ${skipHtml}
-        </div>`;
+        ${bodyHtml}`;
     } else if (position === 'above') {
-      // Position above the element
-      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - rect.top + 12}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${Math.max(16, window.innerHeight - rect.top + 8)}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
       tooltip.innerHTML = `
-        <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
-          <p style="margin:0 0 12px;">${s.text}</p>
-          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
-          ${skipHtml}
-        </div>
+        ${bodyHtml}
         <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
     } else {
-      // Fallback: center on screen
-      tooltip.style.cssText = `position:fixed;z-index:100000;left:50%;top:50%;transform:translate(-50%,-50%);max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-      tooltip.innerHTML = `
-        <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
-          <p style="margin:0 0 12px;">${s.text}</p>
-          <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${step < steps.length - 1 ? 'Next \u2192' : 'Got it!'}</button>
-          ${skipHtml}
-        </div>`;
+      tooltip.style.cssText = 'position:fixed;z-index:100000;left:50%;top:50%;transform:translate(-50%,-50%);max-width:280px;width:calc(100% - 32px);';
+      tooltip.innerHTML = bodyHtml;
     }
     document.body.appendChild(tooltip);
+    wireTourTooltipButtons();
+  }
 
-    document.getElementById('tourNextBtn').onclick = () => {
-      cleanupTour();
-      step++;
-      localStorage.setItem('settingsTourStep', String(step));
-      showStep();
-    };
-
-    document.getElementById('tourSkipBtn').onclick = () => {
-      skipToFinale();
-    };
+  function wireTourTooltipButtons() {
+    const nextBtn = document.getElementById('tourNextBtn');
+    const skipBtn = document.getElementById('tourSkipBtn');
+    if (nextBtn) {
+      nextBtn.onclick = () => {
+        cleanupTour();
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+      };
+    }
+    if (skipBtn) skipBtn.onclick = () => { skipToFinale(); };
   }
 
   function showHomescreenMockModal() {
+    if (typeof invokeLoadEditRooms === 'function') void invokeLoadEditRooms();
+
     // Dark overlay
     const blurOverlay = document.createElement('div');
     blurOverlay.id = 'tourBlurOverlay';
@@ -5676,7 +6895,14 @@ function startSettingsTour() {
     const iconBaseStyle = 'width:32px;height:32px;border-radius:9px;box-sizing:border-box;';
     const labelBaseStyle = 'height:8px;max-width:46px;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     const ghostTile = `<div style="${tileWrapStyle}"><div style="${iconBaseStyle}background:rgba(255,255,255,0.22);"></div><div style="${labelBaseStyle}"></div></div>`;
-    const hotelTile = `<div style="${tileWrapStyle}"><div style="${iconBaseStyle}background:#fff;color:#2E7D5B;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.95);box-shadow:0 6px 14px rgba(0,0,0,0.28);">${initial}</div><div style="${labelBaseStyle}font-size:7.5px;color:#fff;font-weight:700;">${shortName}</div></div>`;
+    const hotelIconUrl = activeHotelAppIcon || '';
+    const hotelTileInner = hotelIconUrl
+      ? `<img src="${hotelIconUrl}" alt="" style="width:100%;height:100%;object-fit:contain;">`
+      : initial;
+    const hotelTileBoxStyle = hotelIconUrl
+      ? `${iconBaseStyle}background:#fff;padding:5px;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.95);box-shadow:0 6px 14px rgba(0,0,0,0.28);`
+      : `${iconBaseStyle}background:#fff;color:#2E7D5B;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.95);box-shadow:0 6px 14px rgba(0,0,0,0.28);`;
+    const hotelTile = `<div style="${tileWrapStyle}"><div style="${hotelTileBoxStyle}">${hotelTileInner}</div><div style="${labelBaseStyle}font-size:7.5px;color:#fff;font-weight:700;">${shortName}</div></div>`;
     const homeTiles = [ghostTile, ghostTile, ghostTile, ghostTile, hotelTile, ghostTile, ghostTile, ghostTile].join('');
 
     const modal = document.createElement('div');
@@ -5698,7 +6924,7 @@ function startSettingsTour() {
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests get a "Tap to Install" button on your booking page. Upload your icon on the <strong>Guest app</strong> tab.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your hotel from your booking page or a QR — set that up under <strong>Phones</strong>.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
@@ -5719,113 +6945,6 @@ function startSettingsTour() {
       showStep();
     };
     document.getElementById('tourSkipBtn').onclick = () => { skipToFinale(); };
-  }
-
-  function showFinaleMockModal() {
-    // Dark overlay
-    const blurOverlay = document.createElement('div');
-    blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.7);';
-    document.body.appendChild(blurOverlay);
-    document.body.style.overflow = 'hidden';
-
-    const modal = document.createElement('div');
-    modal.id = 'tourTooltip';
-    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
-    modal.innerHTML = `
-      <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
-        <div style="padding:24px 20px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:12px;">🚀</div>
-          <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">You're all set!</div>
-          <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking engine is live. Here's what to do next:</p>
-          <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:16px;">
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <div style="display:flex;align-items:flex-start;gap:8px;">
-                <span style="font-size:14px;">1️⃣</span>
-                <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Share your booking link</strong> — add it to your Google Business Profile, your website, text it to guests, or run ads to it</span>
-              </div>
-              <div style="display:flex;align-items:flex-start;gap:8px;">
-                <span style="font-size:14px;">2️⃣</span>
-                <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Wait for your first booking</strong> — you'll see it appear right here</span>
-              </div>
-              <div style="display:flex;align-items:flex-start;gap:8px;">
-                <span style="font-size:14px;">3️⃣</span>
-                <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Call the guest</strong> to confirm and collect payment at check-in</span>
-              </div>
-            </div>
-          </div>
-          <div style="background:#fff7ed;border-radius:10px;padding:10px 12px;border:1px solid #fed7aa;margin-bottom:16px;">
-            <p style="font-size:12px;color:#9a3412;margin:0;line-height:1.5;">⚠️ We're not an ad agency — you won't get bookings unless you get your link in front of people.</p>
-          </div>
-          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy my link & let's go!</button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-
-    // Add slide-up animation
-    if (!document.getElementById('tourModalAnimStyle')) {
-      const animStyle = document.createElement('style');
-      animStyle.id = 'tourModalAnimStyle';
-      animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
-      document.head.appendChild(animStyle);
-    }
-
-    document.getElementById('tourNextBtn').onclick = () => {
-      // Copy booking link to clipboard so they have it ready to share
-      const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
-      const url = 'https://' + domain;
-      navigator.clipboard.writeText(url).catch(() => {});
-      cleanupTour();
-      localStorage.setItem('settingsTourDone', '1');
-      localStorage.setItem('linkCopied', '1');
-      localStorage.removeItem('settingsTourStep');
-      toast('Booking link copied!', 'success');
-      // Show the test drive modal
-      showTestDriveModal(url);
-    };
-  }
-
-  function showTestDriveModal(bookingUrl) {
-    const overlay = document.createElement('div');
-    overlay.id = 'testDriveOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px 16px;';
-    overlay.innerHTML = `
-      <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
-        <div style="padding:28px 22px;text-align:center;">
-          <div style="font-size:36px;margin-bottom:12px;">🚀</div>
-          <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Go live and start accepting bookings</div>
-          <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your engine is built. Your link is copied. Activate to let guests book.</p>
-          <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:20px;">
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Your booking page goes live</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Card verification prevents no-shows</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Get notified when bookings come in</span></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">No commission — ever</span></div>
-            </div>
-          </div>
-          <button id="activateNowBtn" style="width:100%;padding:16px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">$99/mo — Go Live Now</button>
-          <p style="font-size:11px;color:#6b7280;margin:0 0 16px;">Cancel anytime · No contracts</p>
-          <button id="activateLaterBtn" style="background:none;border:none;color:#9ca3af;font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;">Not ready yet — keep my page inactive</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-
-    document.getElementById('activateNowBtn').onclick = () => {
-      overlay.remove();
-      // Trigger Stripe checkout via go-live endpoint
-      const goLiveToken = token;
-      fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': goLiveToken }, body: JSON.stringify({ hotelId: activeHotelId }) })
-        .then(r => r.json())
-        .then(data => { if (data.success && data.url) window.location.href = data.url; else toast('Something went wrong. Try again.', 'error'); })
-        .catch(() => toast('Something went wrong. Try again.', 'error'));
-    };
-
-    document.getElementById('activateLaterBtn').onclick = () => {
-      overlay.remove();
-      // Switch to bookings tab
-      const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]') || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
-      if (tabBtn) setFilter('bookings', tabBtn);
-    };
   }
 
   function showAvailabilityMockModal() {
@@ -6079,20 +7198,28 @@ function startSettingsTour() {
 let editRooms = [];
 
 async function loadEditRooms() {
+  if (isEditPageDomReady()) return;
+  if (editRoomsLoadPromise) return editRoomsLoadPromise;
   const list = document.getElementById('editRoomsList');
   if (!list) return;
+  editRoomsLoadPromise = (async () => {
   list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
   try {
-    const res = await api('GET', '/api/crm/rooms');
+    const [res, hotelRes] = await Promise.all([
+      api('GET', '/api/crm/rooms'),
+      api('GET', '/api/crm/verify'),
+    ]);
     if (!res.rooms) throw new Error('No data');
     editRooms = res.rooms;
-
-    // Fetch hotel info for name/subtitle/address/phone editing
-    const hotelRes = await api('GET', '/api/crm/verify');
     const hotelName = hotelRes?.hotelName || '';
     // Keep the global name in sync — context API can fall back to the hotel id,
     // but verify returns the real name (used by the tour's home-screen modal).
     if (hotelName) activeHotelName = hotelName;
+    if (hotelRes) {
+      hotelSubscribed = !!hotelRes.subscribed;
+      if (typeof updateGoLiveBanner === 'function') updateGoLiveBanner();
+      else if (typeof window.updateGoLiveBanner === 'function') window.updateGoLiveBanner();
+    }
     const hotelSubtitle = hotelRes?.hotelSubtitle || '';
     const hotelAddress = hotelRes?.hotelAddress || '';
     const hotelPhone = hotelRes?.hotelPhone || '';
@@ -6110,7 +7237,7 @@ async function loadEditRooms() {
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
-      <button onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
+      <button id="tour-preview-btn" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
@@ -6123,8 +7250,8 @@ async function loadEditRooms() {
           <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
         </div>
       </div>
+      ${(typeof twoRoomExplainerHtml === 'function' ? twoRoomExplainerHtml : window.twoRoomExplainerHtml)('booking-page')}
       <div id="editRoomsCards"></div>
-      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 4px;line-height:1.45;">These rooms appear on your <strong>guest booking page</strong> (photos, description, rates). For day-by-day inventory, use the <strong>Availability</strong> tab.</p>
       <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
@@ -6175,12 +7302,12 @@ async function loadEditRooms() {
           <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
         </div>
       </div>
-      <div class="booking-card" style="margin-bottom:14px;">
+      <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
           <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
             <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
-            <button onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
+            <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
           </div>
           <div style="text-align:center;margin-bottom:10px;">
             <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
@@ -6188,13 +7315,14 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
         </div>
       </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+      ${goLiveInlineCardHtml()}
+      <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
+        <div id="tour-rates-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div id="tour-rates-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
             <div>
               <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
               <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
@@ -6211,8 +7339,8 @@ async function loadEditRooms() {
           <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
         </div>
       </div>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+      <div class="booking-card" id="tour-pin-card" style="margin-bottom:14px;">
+        <div id="tour-pin-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Change PIN</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
         </div>
@@ -6251,10 +7379,14 @@ async function loadEditRooms() {
     list.innerHTML = html;
     renderEditRoomsCards();
     if (typeof lucide !== 'undefined') lucide.createIcons();
-    // Trigger tour guide on first visit (only if on settings tab and onboarding is done)
-    setTimeout(() => { if (currentFilter === 'settings' && localStorage.getItem('onboardingDone') && !localStorage.getItem('settingsTourDone') && !document.getElementById('welcomeModalOverlay')) startSettingsTour(); }, 300);
   } catch (e) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load your page</div><div class="empty-sub">Check your connection and refresh.</div></div>';
+  }
+  })();
+  try {
+    await editRoomsLoadPromise;
+  } finally {
+    editRoomsLoadPromise = null;
   }
 }
 
@@ -6263,12 +7395,13 @@ function renderEditRooms() {
 }
 
 function renderEditRoomsCards() {
-  const list = document.getElementById('editRoomsCards') || document.getElementById('editRoomsList');
+  const cards = document.getElementById('editRoomsCards');
+  if (!cards) return;
   if (!editRooms.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
+    cards.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
     return;
   }
-  list.innerHTML = editRooms.map(r => {
+  cards.innerHTML = editRooms.map(r => {
     const currentAmenities = (r.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
     const images = r.images || [];
     return `
@@ -6634,7 +7767,19 @@ function setAppIconPreviewImage(url) {
   const el = document.getElementById('appsAppIconPreview');
   if (!el) return;
   el.style.background = '#fff';
-  el.innerHTML = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:cover;">';
+  el.innerHTML = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:contain;">';
+}
+
+function restoreAppIconPreview() {
+  const el = document.getElementById('appsAppIconPreview');
+  if (!el) return;
+  el.style.background = '#fff';
+  if (activeHotelAppIcon) {
+    setAppIconPreviewImage(activeHotelAppIcon);
+    return;
+  }
+  const initial = (activeHotelName || 'H').trim().charAt(0).toUpperCase() || '🏨';
+  el.innerHTML = '<span style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--green);border-radius:8px;">' + initial + '</span>';
 }
 
 async function uploadAppIcon(input) {
@@ -6670,12 +7815,11 @@ async function uploadAppIcon(input) {
       toast('Logo updated! Guests will see it on their phone.', 'success');
     } else {
       toast(data.message || 'Failed to upload icon', 'error');
-      const initial = (activeHotelName || 'H').trim().charAt(0).toUpperCase() || '🏨';
-      const el = document.getElementById('appsAppIconPreview');
-      if (el) { el.style.background = 'var(--green)'; el.innerHTML = initial; }
+      restoreAppIconPreview();
     }
   } catch (e) {
     toast('Failed to upload icon', 'error');
+    restoreAppIconPreview();
   }
   input.value = '';
 }
@@ -6869,13 +8013,23 @@ function appsLbRender() {
 }
 
 // Tap a question → lightbox with screenshot or video
-function appsQuestionRow(question, hint, itemsEnc, startIdx) {
-  return `<button type="button" class="apps-q" onclick="appsOpenLightbox(${itemsEnc},${startIdx})">
+function appsVideoBadgeHtml(label, variant) {
+  const text = label || 'Video';
+  const cls = 'apps-media-badge' + (variant === 'light' ? ' apps-media-badge--light' : '');
+  return `<span class="${cls}" title="Short video walkthrough"><span class="apps-media-badge__ring" aria-hidden="true"><span class="apps-media-badge__play" aria-hidden="true"></span></span><span class="apps-media-badge__label">${text}</span></span>`;
+}
+
+function appsQuestionRow(question, hint, itemsEnc, startIdx, isVideo) {
+  const badge = isVideo ? appsVideoBadgeHtml('Video') : '';
+  const chevron = isVideo
+    ? `<span class="apps-q-media" aria-hidden="true"><span class="apps-q-media__play"></span></span>`
+    : `<span class="apps-q-chevron" aria-hidden="true">›</span>`;
+  return `<button type="button" class="apps-q${isVideo ? ' apps-q--video' : ''}" onclick="appsOpenLightbox(${itemsEnc},${startIdx})">
     <div class="apps-q-text">
-      <div class="apps-q-title">${question}</div>
-      ${hint ? `<div class="apps-q-hint">${hint}</div>` : ''}
+      <div class="apps-q-title">${question}${badge}</div>
+      ${hint ? `<div class="apps-q-hint">${hint}</div>` : (isVideo ? `<div class="apps-q-hint">Tap to watch — about 1 min</div>` : '')}
     </div>
-    <span class="apps-q-chevron" aria-hidden="true">›</span>
+    ${chevron}
   </button>`;
 }
 
@@ -6908,26 +8062,11 @@ function renderAppsView() {
   const domain      = activeHotelDomain || '';
   const bookingUrl  = domain ? 'https://' + domain : '#';
   const guestInstallUrl = domain ? 'https://' + domain + '/install' : '#';
-  const guestInstallQr  = guestInstallUrl !== '#' ? 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(guestInstallUrl) : '';
 
-  // Front Desk CTA — state-aware
-  const fdInstalled = isStandaloneApp() || frontdeskInstalled;
-  const fdGranted   = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
-  let fdCtaHtml;
-  if (fdInstalled && fdGranted) {
-    fdCtaHtml = `<div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
-      <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
-      <div><div style="font-size:13px;font-weight:700;color:#166534;">You're all set!</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Front Desk is on your phone. When someone books, your phone will buzz.</div></div>
-    </div>`;
-  } else if (fdInstalled) {
-    fdCtaHtml = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">You're almost done — tap below so your phone buzzes when a guest books you.</p>
-      <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button>`;
-  } else {
-    fdCtaHtml = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;">Save <strong>Front Desk</strong> to your phone's home screen — same site you're on now, one tap away. Your phone will buzz when someone books. Takes 3 seconds.</p>
-      <button onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Put Front Desk on my phone</button>`;
-  }
+  function enc(arr) { return JSON.stringify(arr).replace(/"/g, '&quot;'); }
 
-  // Lightbox — plain language only
+  const guestInstallPoster = appsCloudinaryImg(APPS_SHOWCASE.guestHome, 520);
+
   const homeScreenItems = [
     { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Two phone apps', title: 'Your app and theirs — same home screen',
       caption: `You get <strong>Front Desk</strong> — check bookings and reply to guests. Your guests get <strong>${hName}</strong> — they tap it to book you or text you. No app store.` },
@@ -6944,10 +8083,6 @@ function renderAppsView() {
     { type: 'video', src: APPS_SHOWCASE.guestInstallVideo, poster: APPS_SHOWCASE.guestHome, alt: 'Guest adds hotel to phone', title: 'How your guests put your hotel on their phone',
       caption: 'They open your booking website and tap <strong>Add to Home Screen</strong>. Your hotel shows up on their phone like an app. You don\'t need to do anything.' },
   ];
-  const bookingNotifItems = [
-    { type: 'video', src: APPS_SHOWCASE.bookingNotifVideo, poster: APPS_SHOWCASE.homeScreen, alt: 'Booking alert on phone', title: 'When someone books you, your phone buzzes',
-      caption: 'You find out right away — before email, before Airbnb tells you.' },
-  ];
   const messageItems = [
     { type: 'image', src: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest sends message', title: 'Your guest texts you',
       caption: 'Like "How do I connect to WiFi?" — they type it in your hotel app.' },
@@ -6956,14 +8091,111 @@ function renderAppsView() {
     { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest gets reply alert', title: 'Their phone buzzes with your answer',
       caption: 'They get your reply on their phone — like a text from you.' },
   ];
+
+  const fdInApp = isStandaloneApp() || frontdeskInstalled;
+  const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+
   const frontdeskInstallItems = [
-    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to add Front Desk', title: 'How to put Front Desk on your phone',
-      caption: 'Same steps as tapping <strong>Put Front Desk on my phone</strong> at the top of this page.' },
+    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to add Front Desk', title: 'Add Front Desk to your home screen',
+      caption: 'Tap <strong>Add to Home Screen</strong> in your browser — same site you\'re on now. No App Store. Takes about 3 seconds.' },
     { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Reply to guest', title: 'You reply from your phone',
       caption: 'Messages from guests show up in <strong>Bookings</strong>. Tap reply — they get it on their phone.' },
   ];
 
-  function enc(arr) { return JSON.stringify(arr).replace(/"/g, '&quot;'); }
+  let fdCtaHtml;
+  if (fdInApp && fdGranted) {
+    fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
+      <div><div style="font-size:13px;font-weight:700;color:#166534;">On your home screen</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">You'll get a buzz when someone books — even if this is closed.</div></div>
+    </div>`;
+  } else if (fdInApp) {
+    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">You're on the home-screen version. Turn on alerts so your phone buzzes when a guest books.</p>
+      <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
+  } else {
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">This website — the one you're on right now — can sit on your home screen like an app. <strong>No App Store.</strong> About 3 seconds. It's a shortcut, not a download, but it can <strong>buzz you when guests book</strong>.</p>
+      <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Add Front Desk to my home screen</button>
+      <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)" style="margin-top:0;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>`;
+  }
+
+  const logoBlockHtml = `
+    <div class="apps-icon-card">
+      <div id="appsAppIconPreview" style="width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);background:#fff;border:1px solid var(--border);padding:8px;box-sizing:border-box;color:#fff;font-size:24px;font-weight:800;">
+        ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:contain;">` : `<span style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--green);border-radius:8px;">${hotelInitial}</span>`}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this when they save <strong>${hName}</strong> to their phone.</div>
+        <button type="button" id="tour-guest-icon-btn" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
+      </div>
+    </div>`;
+
+  const checkinActionsHtml = `
+      <button type="button" onclick="showCheckinQrOverlay()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">📲 Show QR at check-in</button>
+      ${guestInstallUrl !== '#' ? `
+      <button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;text-align:center;line-height:1.5;">Scroll down and install <strong style="color:var(--text);">${hName}</strong> on your home screen to see what guests see.</p>` : ''}
+      ${guestInstallUrl === '#' ? '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>' : ''}`;
+
+  const appsHelpBodyHtml = `
+        <div id="guestInstallStats" style="display:none;margin-bottom:14px;"></div>
+        ${guestInstallUrl !== '#' ? `
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">Share install link</div>
+          <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
+          <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy install link</button>
+        </div>` : ''}
+        <div class="apps-section-divider" style="margin-top:0;padding-top:14px;">How guests add your hotel</div>
+        <div style="border-radius:12px;background:#f4f7f9;border:1px solid var(--border);margin:0 0 12px;padding:16px;text-align:center;">
+          <img src="${guestInstallPoster}" alt="Guest saves hotel to phone" loading="eager" decoding="sync" style="max-width:140px;width:55%;height:auto;min-height:120px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,0.1);">
+        </div>
+        <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(guestInstallItems)},0)" style="margin-bottom:12px;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how guests install (1 min)</span></button>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Guests tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Then they can book and message you direct.</p>
+        <button type="button" class="apps-tour-replay" onclick="startAppsTour({replay:true})" style="margin-bottom:14px;">▶ Watch full walkthrough</button>
+        <div class="apps-q-list">
+          ${appsQuestionRow('What guests see on their phone', '', enc(guestItems), 0, false)}
+          ${appsQuestionRow('How guests add your hotel', '', enc(guestInstallItems), 0, true)}
+          ${appsQuestionRow('Guest texts you, you text back', '', enc(messageItems), 0, true)}
+          ${appsQuestionRow('Your app and theirs — side by side', '', enc(homeScreenItems), 0, false)}
+        </div>
+        ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}`;
+
+  const appsMainHtml = fdInApp ? `
+    <div class="apps-step-card" id="tour-fd-install-card">
+      <div class="apps-step-title" style="margin-bottom:14px;">Change your icon</div>
+      ${logoBlockHtml}
+    </div>
+    ${guestBroadcastCardHtml()}
+    <div class="apps-step-card">
+      <div class="apps-step-title" style="margin-bottom:14px;">At check-in</div>
+      ${checkinActionsHtml}
+    </div>` : `
+    <p class="apps-intro">Two shortcuts on the home screen — yours and theirs. No App Store, no extra apps to download.</p>
+    <div class="apps-step-card" id="tour-fd-install-card">
+      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your phone</div>
+      <div class="apps-step-title">Add Front Desk to your home screen</div>
+      ${fdCtaHtml}
+    </div>
+    <div class="apps-step-card">
+      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
+      <div class="apps-step-title">Guests save <strong>${hName}</strong> to their phone</div>
+      <div style="border-radius:12px;background:#f4f7f9;border:1px solid var(--border);margin:0 0 12px;padding:16px;text-align:center;">
+        <img src="${guestInstallPoster}" alt="Guest saves hotel to phone" loading="eager" decoding="sync" style="max-width:140px;width:55%;height:auto;min-height:120px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,0.1);">
+      </div>
+      <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(guestInstallItems)},0)" style="margin-bottom:14px;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Same idea — they tap <strong>Add to Home Screen</strong> on your booking page (or scan your QR at check-in). Then they can book and message you direct.</p>
+      <div id="tour-guest-icon-section">
+      <div class="apps-step-title" style="margin-bottom:10px;">Change your icon</div>
+      ${logoBlockHtml}
+      </div>
+      <div style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
+        <div class="apps-step-title" style="margin-bottom:12px;">At check-in</div>
+        ${checkinActionsHtml}
+      </div>
+    </div>`;
+
+  const appsFootnoteHtml = fdInApp
+    ? 'Booking alerts live on the <strong>Bookings</strong> tab · iPhone &amp; Android home-screen shortcuts'
+    : 'iPhone &amp; Android · home-screen shortcuts · no App Store';
 
   el.innerHTML = `
   <style>
@@ -6971,6 +8203,7 @@ function renderAppsView() {
     .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
     .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
     .apps-step-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px; }
+    .apps-section-divider { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin:24px 0 14px;padding-top:18px;border-top:1.5px solid var(--border); }
     .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
     .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
     .apps-icon-card { display:flex;align-items:center;gap:14px; }
@@ -6980,9 +8213,27 @@ function renderAppsView() {
     .apps-q { display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px 16px;border:none;background:var(--white);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;font-family:inherit;box-shadow:var(--shadow);transition:background 0.15s,border-color 0.15s; }
     .apps-q:active { background:var(--bg); border-color:var(--green); }
     .apps-q-text { flex:1;min-width:0; }
-    .apps-q-title { font-size:14px;font-weight:700;color:var(--text);line-height:1.35; }
+    .apps-q-title { font-size:14px;font-weight:700;color:var(--text);line-height:1.35;display:flex;flex-wrap:wrap;align-items:center;gap:6px; }
     .apps-q-hint { font-size:12px;color:var(--text-muted);margin-top:3px;line-height:1.45; }
     .apps-q-chevron { font-size:20px;color:var(--green);flex-shrink:0;margin-left:12px;line-height:1;font-weight:700; }
+    .apps-q--video { border-color:#bbf7d0;background:linear-gradient(135deg,#fff 0%,#f0fdf4 100%); }
+    .apps-q-media { flex-shrink:0;margin-left:12px;width:34px;height:34px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(46,125,91,0.35); }
+    .apps-q-media__play { width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent #fff;margin-left:2px; }
+    .apps-media-badge { display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 4px;border-radius:999px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #86efac;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.45px;color:#166534;line-height:1;vertical-align:middle;flex-shrink:0; }
+    .apps-media-badge--light { background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.28);color:#fff; }
+    .apps-media-badge--light .apps-media-badge__ring { border-color:rgba(255,255,255,0.45); }
+    .apps-media-badge--light .apps-media-badge__play { background:rgba(255,255,255,0.95); }
+    .apps-media-badge--light .apps-media-badge__play::after { border-color:transparent transparent transparent #166534; }
+    .apps-media-badge__ring { width:16px;height:16px;border-radius:50%;border:2px solid #4ade80;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;animation:appsVideoPulse 2s ease-in-out infinite; }
+    .apps-media-badge__play { width:10px;height:10px;border-radius:50%;background:#166534;display:block;position:relative;flex-shrink:0; }
+    .apps-media-badge__play::after { content:'';width:0;height:0;border-style:solid;border-width:3px 0 3px 5px;border-color:transparent transparent transparent #fff;margin-left:1px; }
+    .apps-media-badge__label { line-height:1; }
+    .apps-video-teaser { display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px 14px;border-radius:12px;border:1.5px dashed #86efac;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);color:#166534;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s,border-color 0.15s; }
+    .apps-video-teaser:active { background:#dcfce7;border-color:#4ade80; }
+    .apps-video-teaser__play { width:28px;height:28px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 10px rgba(46,125,91,0.35);position:relative; }
+    .apps-video-teaser__play::after { content:'';width:0;height:0;border-style:solid;border-width:6px 0 6px 9px;border-color:transparent transparent transparent #fff;margin-left:2px; }
+    @keyframes appsVideoPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.08);opacity:0.85} }
+    .apps-step-title-row { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px; }
     .apps-broadcast-card { background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow); }
     .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.5; }
     .apps-tour-replay { display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--white);color:var(--green);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:18px;box-shadow:var(--shadow); }
@@ -7001,103 +8252,21 @@ function renderAppsView() {
 
   <div class="apps-page">
 
-    <div id="guestInstallStats" class="apps-step-card" style="margin-bottom:14px;padding:14px 16px;">
-      <div class="loading" style="padding:8px 0;"><div class="logo-sprite-bounce"></div></div>
-    </div>
+    ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
+    <h2 class="apps-headline">Phones</h2>
+    ${appsMainHtml}
 
-    <h2 class="apps-headline">Guest app &amp; your phone</h2>
-    <p class="apps-intro"><strong>Step 1 — you:</strong> save Front Desk to your phone (booking alerts). <strong>Step 2 — guests:</strong> they save <strong>${hName}</strong> to their home screen to message you and book direct.</p>
-    <button type="button" class="apps-tour-replay" onclick="startAppsTour({replay:true})">▶ Watch how it works</button>
-
-    <div class="apps-step-label">Step 1</div>
-    <div class="apps-step-card">
-      <div class="apps-step-title">Put Front Desk on your phone</div>
-      ${fdCtaHtml}
-    </div>
-
-    <div class="apps-step-label">Step 2</div>
-    <div class="apps-step-card">
-      <div class="apps-step-title">Upload your hotel logo</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.45;">Guests see this icon when they save your hotel to their phone.</p>
-      <div class="apps-icon-card">
-        <div id="appsAppIconPreview" style="width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);background:${hotelAppIcon ? '#fff' : 'var(--green)'};color:#fff;font-size:24px;font-weight:800;">
-          ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:cover;">` : hotelInitial}
-        </div>
-        <div style="flex:1;min-width:0;">
-          <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-          <button type="button" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change logo' : 'Upload logo'}</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="apps-step-label">Step 3</div>
-    <div class="apps-step-card">
-      <div class="apps-step-title">Get guests on their phones</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.45;">At check-in, show a full-screen QR. Guests tap <strong>Add to Home Screen</strong> — your hotel lands on their phone like an app.</p>
-      <button type="button" onclick="showCheckinQrOverlay()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📲 Show guest app QR</button>
-      ${guestInstallUrl !== '#' ? `
-      <details class="apps-fold" style="margin-top:12px;margin-bottom:0;box-shadow:none;">
-        <summary class="apps-fold-summary">
-          <div><div class="apps-fold-title">Share install link</div><div class="apps-fold-meta">Copy link, room cards, notify guests</div></div>
-          <span class="apps-fold-chevron" aria-hidden="true">›</span>
-        </summary>
-        <div class="apps-fold-body">
-          <div style="margin-top:12px;margin-bottom:12px;">
-            <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="padding:8px 14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Copy link</button>
-              <button type="button" onclick="prefillGuestInstallBroadcast()" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Notify guests</button>
-            </div>
-          </div>
-          <div style="background:var(--bg);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--text-muted);line-height:1.45;margin-bottom:12px;">
-            <strong style="color:var(--text);">Room card:</strong> <em>"Scan to message us &amp; book direct — ${hName}"</em>
-          </div>
-          ${guestInstallQr ? `<div style="text-align:center;"><img src="${guestInstallQr}" alt="Guest install QR" width="100" height="100" style="border-radius:10px;border:1px solid var(--border);"></div>` : ''}
-        </div>
-      </details>` : '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>'}
-    </div>
-
-    <details class="apps-fold">
+    <details class="apps-fold" id="appsHelpFold" style="margin-top:8px;">
       <summary class="apps-fold-summary">
-        <div><div class="apps-fold-title">How does it work?</div><div class="apps-fold-meta">6 topics · tap for photos &amp; videos</div></div>
+        <div><div class="apps-fold-title">Help</div><div class="apps-fold-meta">How it works · walkthrough · FAQs</div></div>
         <span class="apps-fold-chevron" aria-hidden="true">›</span>
       </summary>
       <div class="apps-fold-body">
-        <div class="apps-q-list">
-          ${appsQuestionRow('When someone books you, your phone buzzes', '', enc(bookingNotifItems), 0)}
-          ${appsQuestionRow('What guests see on their phone', '', enc(guestItems), 0)}
-          ${appsQuestionRow('Guest texts you, you text back', '', enc(messageItems), 0)}
-          ${appsQuestionRow('How guests add your hotel', '', enc(guestInstallItems), 0)}
-          ${appsQuestionRow('Your app and theirs — side by side', '', enc(homeScreenItems), 0)}
-          ${appsQuestionRow('Put Front Desk on your phone', '', enc(frontdeskInstallItems), 0)}
-        </div>
+        ${appsHelpBodyHtml}
       </div>
     </details>
 
-    <details class="apps-fold">
-      <summary class="apps-fold-summary">
-        <div><div class="apps-fold-title">Notify all guests at once</div><div class="apps-fold-meta">Sale, event, or check-in reminder</div></div>
-        <span class="apps-fold-chevron" aria-hidden="true">›</span>
-      </summary>
-      <div class="apps-fold-body">
-        <div style="margin-top:12px;margin-bottom:8px;">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Title</div>
-          <input type="text" id="guest-broadcast-title" value="${hName.replace(/"/g, '&quot;')}" maxlength="120" placeholder="e.g. Jack's Inn" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
-        </div>
-        <div style="margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Message</div>
-          <textarea id="guest-broadcast-body" maxlength="500" placeholder="e.g. Pool is open until 10pm tonight!" style="width:100%;min-height:64px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
-        </div>
-        <button id="guest-broadcast-btn" onclick="sendGuestBroadcast()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send notification</button>
-        <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
-        <video autoplay loop muted playsinline webkit-playsinline preload="metadata" style="width:100%;max-width:240px;height:auto;display:block;margin:14px auto 0;${appsPhoneImgStyle()}" poster="${appsCloudinaryImg(APPS_SHOWCASE.guestMessagesImg, 360)}">
-          <source src="${APPS_SHOWCASE.guestBroadcastVideo}" type="video/mp4">
-        </video>
-      </div>
-    </details>
-
-    ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}
-    <p class="apps-footnote">iPhone &amp; Android · no app store · no extra fees</p>
+    <p class="apps-footnote">${appsFootnoteHtml}</p>
 
   </div>`;
 
@@ -7107,11 +8276,21 @@ function renderAppsView() {
 
 async function loadGuestInstallStats() {
   const el = document.getElementById('guestInstallStats');
-  if (!el) return;
   try {
     const data = await api('GET', '/api/crm/guest-install-stats');
     if (!data.success) throw new Error(data.message || 'Failed');
+    guestPushSubscriberCount = data.guestPushSubscribers ?? 0;
+    applyGuestBroadcastAudienceUi();
+    if (!el) return;
     const t = data.totals || {};
+    const installed = data.installedBookings || 0;
+    const views = t.views || 0;
+    if (!installed && !views) {
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+    el.style.display = 'block';
     const rate = data.installRatePercent != null ? data.installRatePercent : 0;
     const rows = Object.entries(data.byTouchpoint || {})
       .filter(function(entry) { return (entry[1].views || entry[1].installed); })
@@ -7124,7 +8303,7 @@ async function loadGuestInstallStats() {
         + '<span style="color:var(--text);font-weight:600;text-transform:capitalize;">' + label + '</span>'
         + '<span style="color:var(--text-muted);white-space:nowrap;">' + (s.views || 0) + ' views · ' + (s.installed || 0) + ' installed</span>'
         + '</div>';
-    }).join('') : '<div style="font-size:12px;color:var(--text-muted);">No install activity yet — show the <strong>Guest app QR</strong> at check-in.</div>';
+    }).join('') : '';
 
     el.innerHTML = ''
       + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Guest installs — last 30 days</div>'
@@ -7133,16 +8312,20 @@ async function loadGuestInstallStats() {
       + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + rate + '%</div>'
       + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">of bookings installed</div></div>'
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
-      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + (data.installedBookings || 0) + '</div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + installed + '</div>'
       + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">confirmed installs</div></div>'
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
-      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + (t.views || 0) + '</div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + views + '</div>'
       + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">install page views</div></div>'
       + '</div>'
-      + '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">By touchpoint</div>'
-      + rowHtml;
+      + (rowHtml ? '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">By touchpoint</div>' + rowHtml : '');
   } catch (e) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Install stats unavailable right now.</div>';
+    guestPushSubscriberCount = 0;
+    applyGuestBroadcastAudienceUi();
+    if (el) {
+      el.style.display = 'none';
+      el.innerHTML = '';
+    }
   }
 }
 
@@ -7150,6 +8333,7 @@ async function loadGuestInstallStats() {
 // ── APPS TOUR (fullscreen lightbox) ───────────────────
 let _appsTourSteps = [];
 let _appsTourIdx = 0;
+let _appsTourChainFromSettings = false;
 
 function appsTourClose(markDone) {
   const lb = document.getElementById('appsTourLightbox');
@@ -7159,7 +8343,29 @@ function appsTourClose(markDone) {
     lb.remove();
   }
   document.body.style.overflow = '';
-  if (markDone) localStorage.setItem('appsTourDone', '1');
+  const wasChain = _appsTourChainFromSettings;
+  _appsTourChainFromSettings = false;
+  try {
+    const refresh = (typeof ensureAppsViewRendered === 'function')
+      ? ensureAppsViewRendered
+      : window.ensureAppsViewRendered;
+    if (typeof refresh === 'function') refresh(true);
+  } catch (_) {}
+  if (markDone) {
+    localStorage.setItem('appsTourDone', '1');
+    const chainedFromSettings = wasChain
+      || localStorage.getItem('settingsTourStep') === 'handoff'
+      || settingsTourActive;
+    if (chainedFromSettings) {
+      const finale = (typeof showFinaleMockModal === 'function')
+        ? showFinaleMockModal
+        : window.showFinaleMockModal;
+      if (typeof finale === 'function') {
+        finale();
+        return;
+      }
+    }
+  }
 }
 
 function appsTourNav(dir) {
@@ -7176,7 +8382,8 @@ function appsTourRender() {
   const total = _appsTourSteps.length;
   const isLast = _appsTourIdx >= total - 1;
   const counter = `${_appsTourIdx + 1} / ${total}`;
-  const btnLabel = isLast ? 'Got it — show me' : 'Next →';
+  const btnLabel = isLast ? (_appsTourChainFromSettings ? 'Next — you\'re almost done' : 'Got it — show me') : 'Next →';
+  const titleBadge = step.type === 'video' ? appsVideoBadgeHtml('1 min', 'light') : '';
 
   const dots = Array.from({ length: total }, (_, i) =>
     `<div style="width:7px;height:7px;border-radius:50%;background:${i === _appsTourIdx ? '#fff' : 'rgba(255,255,255,0.35)'};"></div>`
@@ -7205,7 +8412,7 @@ function appsTourRender() {
       ${mediaHtml}
     </div>
     <div style="flex-shrink:0;width:100%;max-width:400px;margin:0 auto;padding:12px 20px max(16px,env(safe-area-inset-bottom));box-sizing:border-box;text-align:center;">
-      <div style="font-size:17px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:6px;">${step.title}</div>
+      <div style="font-size:17px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:6px;display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;">${step.title}${titleBadge}</div>
       ${step.caption ? `<div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.55;margin-bottom:14px;">${step.caption}</div>` : ''}
       <button type="button" id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">${btnLabel}</button>
       <div style="display:flex;gap:6px;justify-content:center;">${dots}</div>
@@ -7213,9 +8420,12 @@ function appsTourRender() {
 
   document.getElementById('appsTourNextBtn').onclick = () => {
     if (isLast) {
+      const chain = _appsTourChainFromSettings;
       appsTourClose(true);
-      const appsEl = document.getElementById('appsView');
-      if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!chain) {
+        const appsEl = document.getElementById('appsView');
+        if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     } else {
       _appsTourIdx++;
       appsTourRender();
@@ -7226,7 +8436,9 @@ function appsTourRender() {
 
 function startAppsTour(opts) {
   const replay = opts && opts.replay;
-  if (!replay && localStorage.getItem('appsTourDone')) return;
+  const chainFromSettings = opts && opts.chainFromSettingsTour;
+  _appsTourChainFromSettings = !!chainFromSettings;
+  if (!replay && !chainFromSettings && localStorage.getItem('appsTourDone')) return;
   if (document.getElementById('appsTourLightbox')) return;
 
   const hName = activeHotelName || 'Your Hotel';
@@ -7234,62 +8446,46 @@ function startAppsTour(opts) {
   const initial = hName.trim().charAt(0).toUpperCase();
   const iconUrl = activeHotelAppIcon || '';
   const iconEl = iconUrl
-    ? `<img src="${iconUrl}" alt="${hName}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">`
+    ? `<div style="width:52px;height:52px;border-radius:14px;background:#fff;padding:8px;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><img src="${iconUrl}" alt="${hName}" style="width:100%;height:100%;object-fit:contain;"></div>`
     : `<div style="width:52px;height:52px;border-radius:14px;background:#2E7D5B;color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</div>`;
 
   _appsTourSteps = [
     {
       type: 'video',
-      src: APPS_SHOWCASE.frontdeskInstallVideo,
-      poster: appsCloudinaryImg(APPS_SHOWCASE.frontdeskMessages, 400),
-      title: 'Put Front Desk on your phone',
-      caption: `You're on <strong>Front Desk</strong> right now. Save it to your home screen — works like an app, no app store. Same steps as <strong>Put Front Desk on my phone</strong> at the top of this page.`,
+      src: APPS_SHOWCASE.guestInstallVideo,
+      poster: appsCloudinaryImg(APPS_SHOWCASE.guestHome, 400),
+      title: 'Guests save your hotel to their phone',
+      caption: `They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> on the Phones tab so they see <strong>${shortName}</strong>.`,
     },
     {
       type: 'image',
-      src: appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 520),
-      alt: 'Two apps on home screen',
-      title: 'Your guests can save your hotel too',
-      caption: `You get <strong>Front Desk</strong>. They get <strong>${hName}</strong>. Both sit on the home screen — like real apps.`,
-    },
-    {
-      type: 'video',
-      src: APPS_SHOWCASE.guestInstallVideo,
-      poster: appsCloudinaryImg(APPS_SHOWCASE.guestHome, 400),
-      title: 'How your guests save your hotel',
-      caption: `They tap <strong>Add to Home Screen</strong> on your booking website. Upload your logo on this page so they see <strong>${shortName}</strong>.`,
-    },
-    {
-      type: 'video',
-      src: APPS_SHOWCASE.bookingNotifVideo,
-      poster: appsCloudinaryImg(APPS_SHOWCASE.homeScreen, 400),
-      title: 'When someone books you, your phone buzzes',
-      caption: `That's why you put Front Desk on your phone — you find out right away, before email, before Airbnb.`,
-    },
-    {
-      type: 'video',
-      src: APPS_SHOWCASE.guestBroadcastVideo,
-      poster: appsCloudinaryImg(APPS_SHOWCASE.guestMessagesImg, 400),
-      title: 'You can notify all your guests at once',
-      caption: `Once they have your hotel on their phone, notify everyone — a sale, an event, or a check-in reminder. Scroll down on this page to try it.`,
+      src: appsCloudinaryImg(APPS_SHOWCASE.guestHome, 520),
+      alt: 'Guest home screen',
+      title: 'What guests see after they install',
+      caption: 'Their stay info, direct booking, and a way to message you — all from one icon on their phone.',
     },
     {
       type: 'cta',
-      title: 'Now do these two things',
+      title: 'On the Phones tab',
       caption: '',
       ctaHtml: `
         <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:4px;">STEP 1</div>
-          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Put Front Desk on your phone</div>
-          <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">Tap <strong>Put Front Desk on my phone</strong> at the top when you close this.</p>
+          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:4px;">AT CHECK-IN</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">📲 Show QR at check-in</div>
+          <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">Full-screen QR — guests scan to save <strong>${shortName}</strong>.</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:4px;">NOTIFY GUESTS</div>
+          <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">📣 Notify all guests at once</div>
+          <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">Push a sale, event, or install reminder to everyone on your guest app.</p>
         </div>
         <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;">
-          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:8px;">STEP 2</div>
+          <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:8px;">CHANGE YOUR ICON</div>
           <div style="display:flex;align-items:center;gap:12px;">
             ${iconEl}
             <div>
-              <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Upload your hotel logo</div>
-              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">So guests see <strong>${shortName}</strong> — not a random letter.</p>
+              <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Your logo on their home screen</div>
+              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of the <strong>Phones</strong> tab. Tap <strong>Help</strong> for the full walkthrough.</p>
             </div>
           </div>
         </div>`,

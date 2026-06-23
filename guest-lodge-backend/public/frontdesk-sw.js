@@ -1,5 +1,5 @@
 // Front Desk PWA — push notifications + shell caching
-const CACHE = 'frontdesk-v3';
+const CACHE = 'frontdesk-v4';
 const PRECACHE = [
   '/marketellogo.svg',
   '/marketel.svg',

@@ -13,7 +13,7 @@ function isIos() {
 // "Tap to Install" — lets a guest add this property to their home screen so
 // they book direct next time (no Safari, no OTA). Android/desktop use the
 // native install prompt; iOS Safari gets a themed Add-to-Home-Screen sheet.
-function InstallAppBanner({ hotelName, appIconUrl, hotelId }) {
+function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIosSheet, setShowIosSheet] = useState(false);
   const [installed, setInstalled] = useState(false);
@@ -46,8 +46,11 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId }) {
 
   // Don't show if already installed/running standalone, dismissed, or if there's
   // no way to install (non-iOS browser that never fired beforeinstallprompt).
-  if (installed || isStandalone() || dismissed) return null;
-  if (!ios && !deferredPrompt) return null;
+  // Owner preview from Front Desk always shows the banner so they can see guest UI.
+  if (!ownerPreview) {
+    if (installed || isStandalone() || dismissed) return null;
+    if (!ios && !deferredPrompt) return null;
+  }
 
   const handleInstall = async () => {
     if (ios) {
@@ -79,7 +82,9 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId }) {
 
   return (
     <>
-      <div style={{
+      <div
+        id="guest-install"
+        style={{
         display: 'flex', alignItems: 'center', gap: 14,
         background: 'white', border: '1px solid #e5e7eb', borderRadius: 16,
         padding: '14px 16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
@@ -104,6 +109,7 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId }) {
         >
           Install
         </button>
+        {!ownerPreview && (
         <button
           onClick={handleDismiss}
           aria-label="Dismiss"
@@ -115,6 +121,7 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId }) {
         >
           ×
         </button>
+        )}
       </div>
 
       {showIosSheet && (

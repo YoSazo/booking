@@ -55,7 +55,8 @@ export default function GuestLayout({ children }) {
 
   // Browser visitors: booking funnel only. Installed PWA: full app shell even before booking.
   const showAppShell = isGuest || isStandalone();
-  const showNav = showAppShell && isMobile;
+  const isInstallPage = location.pathname === '/install';
+  const showNav = showAppShell && isMobile && !isInstallPage;
 
   // Determine active tab (guest routes + confirmation all live under "Home")
   const activeTab = (() => {
@@ -135,7 +136,6 @@ const styles = {
   content: {
     width: '100%',
     minHeight: '100vh',
-    paddingBottom: 110,
   },
   pill: {
     position: 'fixed',

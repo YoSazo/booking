@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import { trackPageView } from './trackingService.js';
@@ -29,6 +29,36 @@ function BookingPage({
 }) {
   useEffect(() => { trackPageView(); }, []);
   useEffect(() => { setIsProcessingBooking(false); }, []);
+
+  const ownerScrollInstall = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('scroll') === 'install';
+  }, []);
+
+  useEffect(() => {
+    if (!ownerScrollInstall) return undefined;
+
+    let cancelled = false;
+    const scrollToInstall = () => {
+      const el = document.getElementById('guest-install');
+      if (!el || cancelled) return false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
+    };
+
+    if (scrollToInstall()) return undefined;
+
+    const interval = setInterval(() => {
+      if (scrollToInstall()) clearInterval(interval);
+    }, 250);
+    const timeout = setTimeout(() => clearInterval(interval), 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [ownerScrollInstall, isLoading, roomData]);
 
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
@@ -128,11 +158,12 @@ function BookingPage({
         )}
       </main>
 
-      {roomData && roomData.length > 0 && (
+      {(roomData?.length > 0 || ownerScrollInstall) && (
         <InstallAppBanner
           hotelName={hotel.name}
           appIconUrl={hotel.appIconUrl}
           hotelId={hotelId}
+          ownerPreview={ownerScrollInstall}
         />
       )}
     </div>

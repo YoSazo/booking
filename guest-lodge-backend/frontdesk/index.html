@@ -73,9 +73,9 @@
     <div class="header-right">
       <div id="statNew" class="stat-pill">📥 <strong id="statCount">0</strong> Needs Call</div>
       <button class="refresh-btn notify-off" id="btnNotify" onclick="enableNotifications()" style="display:none;">Notifications: Off</button>
-      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR so guests install your hotel app">📲 Guest app QR</button>
+      <button class="refresh-btn" onclick="showCheckinQrOverlay()" title="Full-screen QR for guests to save your hotel">📲 Guest QR</button>
       <button class="refresh-btn" onclick="refreshCurrentView()">↻ Refresh</button>
-      <button class="refresh-btn" onclick="localStorage.removeItem('onboardingDone');localStorage.removeItem('settingsTourDone');localStorage.removeItem('settingsTourStep');localStorage.removeItem('linkCopied');localStorage.removeItem('ratesChanged');localStorage.removeItem('appsTourDone');location.href=window.location.pathname+'?welcome=1';" title="Replay the walkthrough">❓ How it works</button>
+      <button class="refresh-btn" onclick="replayWalkthrough()" title="Replay the walkthrough">❓ How it works</button>
     </div>
   </header>
 
@@ -89,7 +89,7 @@
         Bookings <span class="tab-badge" id="countNeedsCalled" style="display:none;">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
       </button>
       <button type="button" class="tab" data-nav-filter="apps" onclick="setFilter('apps', this)">
-        Guest app
+        Phones
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
@@ -121,7 +121,7 @@
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="apps">
       <span class="mobile-nav-icon-wrap"><i data-lucide="smartphone"></i></span>
-      <span class="mobile-nav-label">Guest app</span>
+      <span class="mobile-nav-label">Phones</span>
     </button>
   </nav>
 </div>
