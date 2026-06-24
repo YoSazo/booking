@@ -2421,18 +2421,6 @@ function syncRevenueUi() {
     return;
   }
 
-  const tabs = document.querySelector('.tabs-container');
-  if (tabs && !existingBtn) {
-    const btn = document.createElement('button');
-    btn.className = 'tab';
-    btn.id = 'revenueTabBtn';
-    btn.setAttribute('type', 'button');
-    btn.dataset.navFilter = 'revenue';
-    btn.textContent = 'Revenue';
-    btn.onclick = function () { setFilter('revenue', btn); };
-    tabs.appendChild(btn);
-  }
-
   const container = document.querySelector('.container');
   if (container && !existingView) {
     container.insertAdjacentHTML('beforeend', `
@@ -2613,15 +2601,6 @@ async function loadRevenueData(force = false) {
 
 function ensureAvailabilityUi() {
   const tabs = document.querySelector('.tabs-container');
-  if (tabs && !document.getElementById('countRooms')) {
-    const btn = document.createElement('button');
-    btn.className = 'tab';
-    btn.setAttribute('type', 'button');
-    btn.innerHTML = 'Availability <span class="tab-badge" id="countRooms">0</span>';
-    btn.dataset.navFilter = 'availability';
-    btn.onclick = function () { setFilter('availability', btn); };
-    tabs.appendChild(btn);
-  }
 
   // Add Settings tab if not present
   if (tabs && !tabs.querySelector('[data-nav-filter="settings"]')) {
@@ -5684,9 +5663,9 @@ function cleanupPostActivationTourUi() {
 function finishPostActivationTour() {
   cleanupPostActivationTourUi();
   localStorage.setItem('postActivationTourDone', '1');
-  const tabBtn = document.querySelector('.tab[data-nav-filter="bookings"]')
-    || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
-  try { setFilter('bookings', tabBtn); } catch (e) { /* ignore */ }
+  const tabBtn = document.querySelector('.tab[data-nav-filter="apps"]')
+    || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]');
+  try { setFilter('apps', tabBtn); } catch (e) { /* ignore */ }
 }
 
 function startPostActivationTabTour() {
@@ -5698,23 +5677,16 @@ function startPostActivationTabTour() {
 
   const steps = [
     {
-      tab: 'availability',
-      navFilter: 'availability',
-      text: '<strong>Availability</strong> — add inventory rooms here and control how many units are open each day. (Separate from booking page rooms on Your page.)',
+      tab: 'bookings',
+      navFilter: 'bookings',
+      text: '<strong>Bookings</strong> — live reservations land here. You\'ll get a push alert for each new one.',
+    },
+    {
+      tab: 'apps',
+      navFilter: 'apps',
+      text: '<strong>Phones</strong> — put your guest booking app on their home screen and send install reminders.',
     },
   ];
-  if (revenueEnabled) {
-    steps.push({
-      tab: 'revenue',
-      navFilter: 'revenue',
-      text: '<strong>Revenue</strong> — see direct booking income and how much you\'re saving vs OTA commissions.',
-    });
-  }
-  steps.push({
-    tab: 'bookings',
-    navFilter: 'bookings',
-    text: '<strong>Bookings</strong> — live reservations land here. You\'ll get a push alert for each new one.',
-  });
 
   let stepIdx = 0;
 
@@ -5759,7 +5731,7 @@ function startPostActivationTabTour() {
         <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
           <p style="margin:0 0 14px;">${s.text}</p>
-          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Bookings' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Phones' : 'Next tab →'}</button>
           <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
         </div>`;
       document.body.appendChild(tooltip);
@@ -5771,7 +5743,7 @@ function startPostActivationTabTour() {
       document.getElementById('postActivationTourSkip').onclick = () => {
         finishPostActivationTour();
       };
-    }, s.tab === 'availability' ? 80 : 0);
+    }, s.tab === 'apps' ? 80 : 0);
   }
 
   showStep();
@@ -5783,7 +5755,7 @@ window.startPostActivationTabTour = startPostActivationTabTour;
 function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
   const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
-  const unlockedTabs = revenueEnabled ? 'Availability, Revenue, and Bookings' : 'Availability and Bookings';
+  const unlockedTabs = 'Bookings and Phones';
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -5811,7 +5783,7 @@ function showActivatedModal() {
         </div>
       </div>
       ${bookingDomain ? `<p style="font-size:12px;color:#6b7280;margin:0 0 16px;">Your booking page: <strong style="color:#2E7D5B;">${bookingDomain}</strong></p>` : ''}
-      <button id="activatedModalTour" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Show me the new tabs →</button>
+      <button id="activatedModalTour" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Quick tour →</button>
       <button id="activatedModalSkip" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #d6e9df;background:#fff;color:#6b7280;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Skip — go to Bookings</button>
     </div>
   `;
