@@ -7767,15 +7767,35 @@ function toggleSection(header) {
   }
 }
 
+let goLiveInFlight = false;
+function showGoLiveOverlay() {
+  if (document.getElementById('goLiveOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'goLiveOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;';
+  ov.innerHTML = '<div class="logo-sprite-bounce"></div><div style="font-size:14px;font-weight:700;color:#1a5c3f;">Opening secure checkout…</div><div style="font-size:12px;color:#6b7280;">Taking you to Stripe — one moment</div>';
+  document.body.appendChild(ov);
+}
+function hideGoLiveOverlay() {
+  const ov = document.getElementById('goLiveOverlay');
+  if (ov) ov.remove();
+}
 async function goLive() {
+  if (goLiveInFlight) return;
+  goLiveInFlight = true;
+  showGoLiveOverlay();
   try {
     const res = await api('POST', '/api/crm/go-live');
     if (res.success && res.url) {
-      window.location.href = res.url;
-    } else {
-      toast(res.message || 'Failed to start checkout', 'error');
+      window.location.href = res.url; // leave overlay up through the redirect
+      return;
     }
+    hideGoLiveOverlay();
+    goLiveInFlight = false;
+    toast(res.message || 'Failed to start checkout', 'error');
   } catch (e) {
+    hideGoLiveOverlay();
+    goLiveInFlight = false;
     toast('Failed to start checkout. Try again.', 'error');
   }
 }
@@ -7905,19 +7925,24 @@ function setAppIconPreviewImage(url) {
   const el = document.getElementById('appsAppIconPreview');
   if (!el) return;
   el.style.background = '#fff';
+  el.style.border = '1px solid var(--border)';
+  el.style.padding = '8px';
   el.innerHTML = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:contain;">';
 }
 
 function restoreAppIconPreview() {
   const el = document.getElementById('appsAppIconPreview');
   if (!el) return;
-  el.style.background = '#fff';
   if (activeHotelAppIcon) {
     setAppIconPreviewImage(activeHotelAppIcon);
     return;
   }
+  // Letter icon: full-bleed green edge-to-edge, no white inner frame.
   const initial = (activeHotelName || 'H').trim().charAt(0).toUpperCase() || '🏨';
-  el.innerHTML = '<span style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--green);border-radius:8px;">' + initial + '</span>';
+  el.style.background = 'transparent';
+  el.style.border = 'none';
+  el.style.padding = '0';
+  el.innerHTML = '<span style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--green);color:#fff;border-radius:14px;font-size:24px;font-weight:800;">' + initial + '</span>';
 }
 
 async function uploadAppIcon(input) {
@@ -8255,10 +8280,21 @@ function renderAppsView() {
       <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)" style="margin-top:0;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>`;
   }
 
+  // Icon preview must match what guests actually see: an uploaded logo gets a
+  // white frame (object-fit:contain, good for transparent logos); the generated
+  // letter icon is full-bleed green edge-to-edge (same as the loop tile + the
+  // real guest-app icon) — no white inner frame.
+  const iconBoxBase = 'width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);box-sizing:border-box;';
+  const iconBoxStyle = hotelAppIcon
+    ? iconBoxBase + 'background:#fff;border:1px solid var(--border);padding:8px;'
+    : iconBoxBase;
+  const iconInnerHtml = hotelAppIcon
+    ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:contain;">`
+    : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:14px;font-size:24px;font-weight:800;">${hotelInitial}</span>`;
   const logoBlockHtml = `
     <div class="apps-icon-card">
-      <div id="appsAppIconPreview" style="width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);background:#fff;border:1px solid var(--border);padding:8px;box-sizing:border-box;color:#fff;font-size:24px;font-weight:800;">
-        ${hotelAppIcon ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:contain;">` : `<span style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--green);border-radius:8px;">${hotelInitial}</span>`}
+      <div id="appsAppIconPreview" style="${iconBoxStyle}">
+        ${iconInnerHtml}
       </div>
       <div style="flex:1;min-width:0;">
         <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">

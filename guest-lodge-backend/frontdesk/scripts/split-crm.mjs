@@ -35,7 +35,7 @@ function extractFunctions(code) {
 
 /** Rewrite bare state identifiers to crm.* (mutable shared state). Never use `fd` as a local var — it used to collide with the old `fd` prefix. */
 const STATE_KEYS = [
-  'token', 'bookings', 'guestMessages', 'currentFilter', 'manualAvailability', 'manualSelectedRoom',
+  'token', 'bookings', 'guestMessages', 'currentFilter', 'bookingCallFilter', 'manualAvailability', 'manualSelectedRoom',
   'availabilityYear', 'availabilityMonth', 'availabilityEditingDay', 'availabilityDaySaving',
   'editingRoomName', 'pendingDeleteRoomName', 'currentHotelPms', 'revenueEnabled', 'hotelSubscribed',
   'revenuePeriod', 'revenueCache', 'revenueLoading', 'revenueError', 'blockedDemand', 'activeHotelId', 'activeHotelName',
@@ -289,6 +289,7 @@ export const crm = {
   bookings: [],
   guestMessages: [],
   currentFilter: 'settings',
+  bookingCallFilter: 'all',
   manualAvailability: { rooms: [], overrides: {} },
   manualSelectedRoom: '',
   availabilityYear: new Date().getFullYear(),
