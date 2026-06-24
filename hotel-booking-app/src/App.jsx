@@ -69,22 +69,17 @@ function isGuestAppRoute(pathname) {
   return GUEST_APP_ROUTE.test(pathname || '');
 }
 
-// Page transition wrapper - slides pages left/right on navigation
+// Page transition wrapper - slides pages left/right on navigation (booking funnel only).
+// Guest / PWA routes use the router location directly so nav taps actually swap views.
 function PageTransition({ children }) {
   const location = useLocation();
+  const skipTransition = isGuestAppRoute(location.pathname);
   const [displayLocation, setDisplayLocation] = useState(location);
   const [transitionStage, setTransitionStage] = useState('idle');
 
   useEffect(() => {
+    if (skipTransition) return;
     if (location.pathname === displayLocation.pathname) return;
-
-    // Guest app routes swap instantly — slide transitions leave the old page
-    // mounted and can block the bottom nav until a full refresh.
-    if (isGuestAppRoute(location.pathname) || isGuestAppRoute(displayLocation.pathname)) {
-      setDisplayLocation(location);
-      setTransitionStage('idle');
-      return;
-    }
 
     setTransitionStage('exit');
 
@@ -94,7 +89,11 @@ function PageTransition({ children }) {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [location, displayLocation]);
+  }, [location, displayLocation, skipTransition]);
+
+  if (skipTransition) {
+    return <div className="page-transition">{children}</div>;
+  }
 
   const handleAnimationEnd = () => {
     if (transitionStage === 'enter') {
@@ -102,10 +101,9 @@ function PageTransition({ children }) {
     }
   };
 
-  // Clone children with the displayLocation so Routes renders the old page during exit
   const childrenWithLocation = React.cloneElement(children, {
     location: displayLocation,
-    key: displayLocation.pathname
+    key: displayLocation.pathname,
   });
 
   return (

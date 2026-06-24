@@ -104,7 +104,7 @@ function GuestInstallCard({
   };
 
   const title = headline || `Add ${hotelName || 'us'} to your home screen`;
-  const subtitle = subline || 'Message the front desk, get check-in updates, and book direct — like a real app.';
+  const subtitle = subline || 'Get check-in updates and message the front desk — lives on your home screen. No App Store.';
 
   const iosSheet = showIosSheet && (
     <IosInstallSheet
@@ -128,7 +128,7 @@ function GuestInstallCard({
             <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={56} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.75, marginBottom: 4 }}>
-                Recommended — takes 5 seconds
+                No App Store · about 3 seconds
               </div>
               <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.3, marginBottom: 6 }}>{title}</div>
               <div style={{ fontSize: 13, opacity: 0.88, lineHeight: 1.5 }}>{subtitle}</div>

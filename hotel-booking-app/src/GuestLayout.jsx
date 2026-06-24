@@ -18,15 +18,27 @@ export default function GuestLayout({ children }) {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : true
   );
+  // Nav only after Add to Home Screen — re-check on install + display-mode change.
+  const [installedApp, setInstalledApp] = useState(() => isStandalone());
 
-  // Track viewport width — hide nav on desktop
+  useEffect(() => {
+    const syncInstalled = () => setInstalledApp(isStandalone());
+    syncInstalled();
+    window.addEventListener('appinstalled', syncInstalled);
+    const mq = window.matchMedia?.('(display-mode: standalone)');
+    mq?.addEventListener?.('change', syncInstalled);
+    return () => {
+      window.removeEventListener('appinstalled', syncInstalled);
+      mq?.removeEventListener?.('change', syncInstalled);
+    };
+  }, []);
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Poll for unread messages every 30s
   const fetchUnread = useCallback(async () => {
     if (!guestStay?.code || !hotelId) return;
     try {
@@ -47,18 +59,16 @@ export default function GuestLayout({ children }) {
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
 
   useEffect(() => {
-    if (!isGuest) return;
+    if (!installedApp || !isGuest) return;
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
-  }, [isGuest, fetchUnread]);
+  }, [installedApp, isGuest, fetchUnread]);
 
-  // Browser visitors: booking funnel only. Installed PWA: full app shell even before booking.
-  const showAppShell = isGuest || isStandalone();
   const isInstallPage = location.pathname === '/install';
-  const showNav = showAppShell && isMobile && !isInstallPage;
+  // Bottom nav: installed PWA only. Browser booking flow stays nav-free.
+  const showNav = installedApp && isMobile && !isInstallPage;
 
-  // Determine active tab (guest routes + confirmation all live under "Home")
   const activeTab = (() => {
     if (location.pathname.startsWith('/guest/messages')) return 'messages';
     if (location.pathname === '/') return 'book';
@@ -77,7 +87,7 @@ export default function GuestLayout({ children }) {
       <div style={{ ...styles.content, paddingBottom: showNav ? 110 : 0 }}>{children}</div>
 
       {showNav && (
-        <nav style={styles.pill}>
+        <nav style={styles.pill} aria-label="Guest app">
           {NAV_TABS.map((tab) => {
             const isActive = activeTab === tab.key;
             const Icon = tab.icon;
@@ -93,7 +103,6 @@ export default function GuestLayout({ children }) {
                   transform: isActive ? 'translateY(-2px)' : 'none',
                 }}
               >
-                {/* Icon wrapper */}
                 <div
                   style={{
                     ...styles.iconWrapper,
@@ -105,12 +114,10 @@ export default function GuestLayout({ children }) {
                     color={isActive ? '#fff' : '#64748b'}
                     strokeWidth={isActive ? 2.2 : 1.8}
                   />
-                  {/* Unread dot for messages */}
                   {isMessages && unreadCount > 0 && (
                     <span style={styles.unreadDot} />
                   )}
                 </div>
-                {/* Label */}
                 <span
                   style={{
                     ...styles.tabLabel,

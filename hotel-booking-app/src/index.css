@@ -1598,6 +1598,70 @@ body {
   }
 }
 
+.confirmation-container--install-first {
+  margin: 24px auto 48px;
+  max-width: 520px;
+}
+
+.confirmation-card--slim {
+  padding: 28px 24px 22px;
+  margin-bottom: 4px;
+}
+
+.confirmation-details {
+  margin-top: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  text-align: left;
+}
+
+.confirmation-details--muted summary {
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.confirmation-details summary {
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.confirmation-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.confirmation-details summary::after {
+  content: '›';
+  float: right;
+  color: #9ca3af;
+  font-size: 18px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.confirmation-details[open] summary::after {
+  transform: rotate(-90deg);
+}
+
+.confirmation-details__body {
+  padding: 0 16px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.confirmation-details__footnote {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
 /* --- UPDATED Styles for Confirmation Page --- */
 .confirmation-container {
   width: 90%;
