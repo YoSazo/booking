@@ -128,6 +128,30 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             setShowLoadingScreen(false);
         }
     }, [isProcessing]);
+
+    // D19: proof-of-demand. When a real guest reaches payment on a hotel that
+    // hasn't activated online booking, record the blocked attempt so the owner
+    // can see "N guests tried to book." Best-effort; never blocks the UI.
+    const blockedBeaconSent = useRef(false);
+    useEffect(() => {
+        const gated = !isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4;
+        if (!gated || blockedBeaconSent.current) return;
+        blockedBeaconSent.current = true;
+        try {
+            const base = apiBaseUrl || '';
+            fetch(`${base}/api/hotel/${encodeURIComponent(hotel.id || hotelId)}/booking-intent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomName: bookingDetails?.name || null,
+                    checkin: bookingDetails?.checkin || null,
+                    checkout: bookingDetails?.checkout || null,
+                    nights: bookingDetails?.nights || null,
+                }),
+                keepalive: true,
+            }).catch(() => {});
+        } catch (e) { /* silent */ }
+    }, [isPreviewMode, hotel, currentStep, apiBaseUrl, bookingDetails]);
     const [errorMessage, setErrorMessage] = useState('');
     const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
     const latestFormData = useRef(formData);
@@ -1378,30 +1402,28 @@ const handlePayLaterBooking = async (e) => {
 
     return (
         <>
-            {/* Freemium gate: overlay + sticky banner when not subscribed AND on payment step */}
+            {/* D16: guest-facing gate — guests NEVER see owner billing. When the
+                hotel hasn't activated online booking, show a clean "opens soon"
+                message and a call-to-book fallback. The blocked attempt is
+                beaconed for the owner's proof-of-demand signal (D19). */}
             {!isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4 && (
               <>
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.3)', zIndex: 9998, pointerEvents: 'all' }} />
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
-                  <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '8px' }}>Go live to accept bookings</div>
-                  <button onClick={() => { 
-                    // If this is running as an installed PWA (home-screen app), the
-                    // front desk + Stripe flow must open in a real browser tab.
-                    // Navigating in-place would replace the booking engine inside
-                    // the installed app and trap the owner on the front desk.
-                    const isStandalone = (typeof window !== 'undefined') && (
-                      window.matchMedia?.('(display-mode: standalone)').matches ||
-                      window.navigator.standalone === true
-                    );
-                    if (isStandalone) { window.open('/frontdesk?action=go-live', '_blank', 'noopener'); return; }
-                    const token = localStorage.getItem('crmToken') || '';
-                    if (!token) { window.location.href = '/frontdesk?action=go-live'; return; }
-                    fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': token } })
-                      .then(r => r.json())
-                      .then(data => { if (data.success && data.url) window.location.href = data.url; else window.location.href = '/frontdesk?action=go-live'; })
-                      .catch(() => { window.location.href = '/frontdesk?action=go-live'; });
-                  }} style={{ width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Activate — $99/mo →</button>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', marginTop: '6px' }}>No commission. Cancel anytime.</div>
+                  <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>Online booking opens soon</div>
+                  <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: '13px', lineHeight: 1.45, marginBottom: hotel.phone ? '12px' : '0', maxWidth: '360px', marginLeft: 'auto', marginRight: 'auto' }}>
+                    {hotel.phone
+                      ? 'This room isn\u2019t bookable online just yet \u2014 call us and we\u2019ll reserve it for you right now.'
+                      : 'This room isn\u2019t bookable online just yet. Please check back shortly.'}
+                  </div>
+                  {hotel.phone && (
+                    <a
+                      href={`tel:${hotel.phone}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer', textDecoration: 'none' }}
+                    >
+                      <PhoneCall size={17} /> Call {hotel.phone}
+                    </a>
+                  )}
                 </div>
               </>
             )}

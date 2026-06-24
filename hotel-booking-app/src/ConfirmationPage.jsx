@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuest } from './GuestProvider.jsx';
-import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock } from 'lucide-react';
+import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
@@ -18,10 +18,34 @@ const formatDateWithSuffix = (date) => {
   return `${monthYear} ${day}${suffix}`;
 };
 
-function PaymentSummary({ bookingDetails }) {
+// Single source of truth for the money story (D13). Returns the numbers the
+// "Your stay" card and the full breakdown both render, so the promise never
+// word-drifts across surfaces.
+function getStayMoney(bookingDetails) {
   if (!bookingDetails) return null;
+  const { bookingType, total = 0, originalTotal } = bookingDetails;
+  if (bookingType === 'trial') {
+    return { paidToday: 69, total: originalTotal ?? total, dueAtCheckin: null,
+      note: 'Your $69 is 100% credited toward any extended stay — just ask the front desk to extend.', tone: 'good' };
+  }
+  if (bookingType === 'reserve') {
+    return { paidToday: 20, total, dueAtCheckin: total - 20,
+      note: 'Your room is guaranteed. The $20 reservation fee is non-refundable.', tone: 'info' };
+  }
+  if (bookingType === 'payLater') {
+    return { paidToday: 0, total, dueAtCheckin: total, holdNote: true,
+      note: 'Card verified with a $1 hold (released immediately). Pay at the front desk when you check in.', tone: 'info' };
+  }
+  // standard / full / default — split deposit
+  return { paidToday: total / 2, total, dueAtCheckin: total / 2, tone: 'good' };
+}
 
-  const { bookingType, total, originalTotal } = bookingDetails;
+const money = (n) => '$' + Number(n || 0).toFixed(2);
+
+function PaymentSummary({ bookingDetails }) {
+  const m = getStayMoney(bookingDetails);
+  if (!m) return null;
+  const { bookingType } = bookingDetails;
 
   return (
     <div className="stay-details-card" style={{ marginTop: 0 }}>
@@ -29,99 +53,42 @@ function PaymentSummary({ bookingDetails }) {
         Payment Summary
       </h3>
 
-      {bookingType === 'trial' && (
-        <>
-          <div className="detail-row">
-            <span className="detail-label">Paid Today</span>
-            <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>$69.00</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Original Stay Total</span>
-            <span className="detail-value">{'$' + originalTotal?.toFixed(2)}</span>
-          </div>
-          <div style={{
-            marginTop: '16px', padding: '12px', background: '#e7f3ff', borderRadius: '8px',
-            fontSize: '14px', lineHeight: '1.6',
-          }}>
-            <strong>🎉 Trial Night Booked!</strong>
-            <br />
-            Your $69 is <strong>100% credited</strong> toward any extended stay. Just come to the front desk to extend!
-          </div>
-        </>
+      <div className="detail-row">
+        <span className="detail-label">Paid today</span>
+        <span className="detail-value" style={{ color: '#2E7D5B', fontWeight: '700' }}>{money(m.paidToday)}</span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-label">{bookingType === 'trial' ? 'Original stay total' : 'Total stay cost'}</span>
+        <span className="detail-value">{money(m.total)}</span>
+      </div>
+      {m.dueAtCheckin != null && (
+        <div className="detail-row">
+          <span className="detail-label">Due at check-in</span>
+          <span className="detail-value" style={{ fontWeight: '700' }}>{money(m.dueAtCheckin)}</span>
+        </div>
       )}
 
-      {bookingType === 'reserve' && (
-        <>
-          <div className="detail-row">
-            <span className="detail-label">Paid Today</span>
-            <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>$20.00</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Total Stay Cost</span>
-            <span className="detail-value">{'$' + total?.toFixed(2)}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Due at Check-in</span>
-            <span className="detail-value" style={{ fontWeight: '700' }}>{'$' + (total - 20).toFixed(2)}</span>
-          </div>
-          <div style={{
-            marginTop: '16px', padding: '12px', background: '#fff3cd', borderRadius: '8px',
-            fontSize: '14px', lineHeight: '1.6',
-          }}>
-            <strong>⚠️ Room Reserved!</strong>
-            <br />
-            Your room is guaranteed. Non-refundable $20 reservation fee applied.
-          </div>
-        </>
-      )}
-
-      {bookingType === 'payLater' && (
-        <>
-          <div className="detail-row">
-            <span className="detail-label">Paid Today</span>
-            <span className="detail-value" style={{ color: '#17a2b8', fontWeight: '700' }}>$0.00</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Total Stay Cost</span>
-            <span className="detail-value">{'$' + total?.toFixed(2)}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Due at Check-in</span>
-            <span className="detail-value" style={{ fontWeight: '700' }}>{'$' + total?.toFixed(2)}</span>
-          </div>
-          <div style={{
-            marginTop: '16px', padding: '12px', background: '#fff3cd', borderRadius: '8px',
-            fontSize: '14px', lineHeight: '1.6',
-          }}>
-            <strong>⚠️ No-Show Policy</strong>
-            <br />
-            Your card has been validated with a $1 temporary hold (released immediately). If you don&apos;t show up, only the $1 verification fee applies.
-            <br /><br />
-            ✅ <strong>When you check in:</strong> Pay {'$' + total?.toFixed(2)} at the front desk
-            <br />
-            ❌ <strong>If you don&apos;t show:</strong> $1 verification fee applies
-          </div>
-        </>
-      )}
-
-      {(!bookingType || bookingType === 'standard' || bookingType === 'full') && (
-        <>
-          <div className="detail-row">
-            <span className="detail-label">Paid Today</span>
-            <span className="detail-value" style={{ color: '#28a745', fontWeight: '700' }}>{'$' + (total / 2).toFixed(2)}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Total Stay Cost</span>
-            <span className="detail-value">{'$' + total?.toFixed(2)}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Due at Check-in</span>
-            <span className="detail-value" style={{ fontWeight: '700' }}>{'$' + (total / 2).toFixed(2)}</span>
-          </div>
-        </>
+      {m.note && (
+        <div style={{
+          marginTop: '16px', padding: '12px 14px', borderRadius: '10px',
+          background: m.tone === 'good' ? '#eef6f1' : '#f4f7f9',
+          border: '1px solid ' + (m.tone === 'good' ? '#cfe6da' : '#e2e8f0'),
+          fontSize: '14px', lineHeight: '1.6', color: '#374151',
+          display: 'flex', gap: '10px', alignItems: 'flex-start',
+        }}>
+          <span style={{ color: '#2E7D5B', flexShrink: 0, marginTop: '1px' }}>
+            {m.tone === 'good' ? <PartyPopper size={18} /> : <ShieldCheckLite />}
+          </span>
+          <span>{m.note}</span>
+        </div>
       )}
     </div>
   );
+}
+
+// Tiny inline check icon to avoid another import; brand-green.
+function ShieldCheckLite() {
+  return <Check size={18} />;
 }
 
 function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, apiBaseUrl = '', hotelId }) {
@@ -134,6 +101,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
   const hotelPhone = hotel?.phone || '(701) 289-5992';
   const resolvedHotelId = hotelId || hotel?.id;
   const hotelName = hotel?.name || 'us';
+  const stayMoney = getStayMoney(bookingDetails);
 
   useEffect(() => () => {
     document.body.style.overflow = '';
@@ -256,7 +224,8 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
         </div>
       )}
 
-      <div className="confirmation-container confirmation-container--install-first">
+      <div className="confirmation-container">
+        {/* 1. Compact success + code (D4: success is a header, not a full-bleed hero) */}
         <div className="confirmation-card confirmation-card--slim">
           <div className="success-checkmark">
             <svg className="checkmark-icon" viewBox="0 0 52 52">
@@ -264,16 +233,74 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
             </svg>
           </div>
-
           <div className="confirmation-header">
-            <h2>Booking Confirmed!</h2>
-            <p className="confirmation-code">Confirmation Code: <strong>#{reservationCode}</strong></p>
-            <p className="confirmation-email">
-              A confirmation email has been sent to <strong>{guestInfo.email}</strong>.
-            </p>
+            <h2>Booking confirmed</h2>
+            <p className="confirmation-code">Confirmation code <strong>#{reservationCode}</strong></p>
           </div>
         </div>
 
+        {/* 2. YOUR STAY — always visible (was hidden in <details>). The money
+            line is the trust payoff and must never be a tap away. */}
+        <div className="stay-details-card stay-summary-card">
+          <div className="stay-summary-card__head">
+            <span className="stay-summary-card__title">{bookingDetails.name || 'Your room'}</span>
+            <span className="stay-summary-card__badge">Confirmed</span>
+          </div>
+
+          <div className="stay-summary-card__dates">
+            <div className="stay-summary-card__date">
+              <span className="detail-label">Check-in</span>
+              <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkin)}</span>
+            </div>
+            <div className="stay-summary-card__date">
+              <span className="detail-label">Check-out</span>
+              <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkout)}</span>
+            </div>
+            <div className="stay-summary-card__nights">
+              <Moon size={14} /> {bookingDetails.nights} night{bookingDetails.nights > 1 ? 's' : ''}
+            </div>
+          </div>
+
+          {stayMoney && (
+            <div className="stay-summary-card__money">
+              <div className="detail-row">
+                <span className="detail-label">Paid today</span>
+                <span className="detail-value" style={{ color: '#2E7D5B', fontWeight: 700 }}>{money(stayMoney.paidToday)}</span>
+              </div>
+              {stayMoney.holdNote && (
+                <div className="detail-row">
+                  <span className="detail-label">$1 hold</span>
+                  <span className="detail-value" style={{ color: '#6b7280' }}>released immediately</span>
+                </div>
+              )}
+              {stayMoney.dueAtCheckin != null && (
+                <div className="detail-row">
+                  <span className="detail-label">Due at check-in</span>
+                  <span className="detail-value" style={{ fontWeight: 700 }}>{money(stayMoney.dueAtCheckin)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="stay-summary-card__actions">
+            <button
+              type="button"
+              onClick={() => downloadStayIcs({ hotel, bookingDetails, reservationCode })}
+              className="stay-summary-card__btn"
+            >
+              <CalendarPlus size={17} /> Add to calendar
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="stay-summary-card__btn"
+            >
+              <CalendarClock size={17} /> Extend / rebook
+            </button>
+          </div>
+        </div>
+
+        {/* 3. STAY IN TOUCH — install is secondary, framed as how you reach us */}
         <GuestInstallCard
           hotelName={hotelName}
           appIconUrl={hotel?.appIconUrl}
@@ -282,78 +309,22 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           apiBaseUrl={apiBaseUrl}
           touchpoint="confirmation-page"
           variant="hero"
-          headline={`Add ${hotelName} to your home screen`}
-          subline="Tap below — takes 3 seconds. You'll get notified when check-in is ready and can message the front desk directly."
+          headline={`Stay in touch — add ${hotelName} to your home screen`}
+          subline="Message the front desk and get check-in updates. No app store, about 3 seconds."
         />
 
+        {/* 4. Fine print — the only thing that stays collapsed */}
         <details className="confirmation-details">
-          <summary>Booking &amp; payment details</summary>
+          <summary>Payment breakdown &amp; policy</summary>
           <div className="confirmation-details__body">
-            <div className="stay-details-card" style={{ marginTop: 0 }}>
-              <div className="detail-row">
-                <span className="detail-label">Check-in</span>
-                <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkin)}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Check-out</span>
-                <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkout)}</span>
-              </div>
-              <div className="detail-row nights-row">
-                <span className="detail-label">
-                  <img src="/moon.png" alt="Nights" className="moon-icon" />
-                  Duration
-                </span>
-                <span className="detail-value">{bookingDetails.nights} Night{bookingDetails.nights > 1 ? 's' : ''}</span>
-              </div>
-            </div>
-
             <PaymentSummary bookingDetails={bookingDetails} />
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => downloadStayIcs({ hotel, bookingDetails, reservationCode })}
-                style={{
-                  flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: '8px', padding: '13px 14px', borderRadius: '12px', cursor: 'pointer',
-                  border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',
-                  fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
-                }}
-              >
-                <CalendarPlus size={17} /> Add to Calendar
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                style={{
-                  flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: '8px', padding: '13px 14px', borderRadius: '12px', cursor: 'pointer',
-                  border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B',
-                  fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
-                }}
-              >
-                <CalendarClock size={17} /> Extend / Book again
-              </button>
-            </div>
-
             {hotel?.cancellationPolicy && (
               <p className="confirmation-details__footnote">{hotel.cancellationPolicy}</p>
             )}
-          </div>
-        </details>
-
-        <details className="confirmation-details confirmation-details--muted">
-          <summary>Prefer email updates?</summary>
-          <div className="confirmation-details__body">
-            <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: 1.55, margin: 0 }}>
-              No problem — we&apos;ll send check-in reminders and updates to <strong style={{ color: '#374151' }}>{guestInfo.email}</strong>.
-              Install the app anytime for instant notifications and direct messaging.
+            <p className="confirmation-details__footnote" style={{ marginTop: 12 }}>
+              A confirmation email was sent to <strong style={{ color: '#374151' }}>{guestInfo.email}</strong>.
+              Questions? Call {hotelPhone} — we&apos;re happy to help.
             </p>
-            {!hotel?.cancellationPolicy && (
-              <p className="confirmation-details__footnote" style={{ marginTop: 12 }}>
-                Questions? Call {hotelPhone} — we&apos;re happy to help.
-              </p>
-            )}
           </div>
         </details>
       </div>

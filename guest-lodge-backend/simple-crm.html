@@ -62,6 +62,23 @@
     .login-logo-icon { height: 48px; width: auto; }
     .login-logo-text { height: 28px; width: auto; }
     .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+    /* D21: hotel-led login brand */
+    .login-hotel-brand { margin-bottom: 22px; }
+    .login-hotel-icon {
+      width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 14px;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+      background: var(--green); color: #fff; font-size: 26px; font-weight: 800;
+      box-shadow: 0 6px 18px rgba(46,125,91,0.25);
+    }
+    .login-hotel-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .login-hotel-name { font-size: 22px; font-weight: 800; color: var(--text); margin: 0 0 4px; line-height: 1.25; }
+    .login-card .login-descriptor { font-size: 13px; color: var(--text-muted); margin: 0; }
+    .login-footer {
+      margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .login-footer-logo { height: 13px; width: auto; opacity: 0.65; }
     .status-title {
       font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 12px;
     }
@@ -1848,14 +1865,14 @@
   </div>
 </div>
 
-<!-- LOGIN -->
+<!-- LOGIN (D21: hotel brand leads; Marketel is a quiet footer) -->
 <div id="loginScreen" class="login-screen" style="display:none">
   <div class="login-card">
-    <div class="login-logo">
-      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
-      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    <div class="login-hotel-brand">
+      <div id="loginHotelIcon" class="login-hotel-icon" style="display:none"></div>
+      <h1 class="login-hotel-name" id="loginHotelName">Front Desk</h1>
+      <p class="login-descriptor" id="loginDescriptor">Front Desk · staff login</p>
     </div>
-    <p>Front Desk — Enter your PIN to continue</p>
     <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20" autocomplete="current-password" enterkeyhint="go">
     <button type="button" class="login-btn" id="signInBtn">Sign In</button>
     <div class="login-error" id="loginError"></div>
@@ -1866,6 +1883,10 @@
         <button type="button" class="login-btn" id="magicLinkSendBtn" style="background:#2E7D5B;">Send Login Link</button>
         <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
       </div>
+    </div>
+    <div class="login-footer">
+      <img src="/marketel.svg" alt="" class="login-footer-logo">
+      <span>Powered by Marketel</span>
     </div>
   </div>
 </div>
@@ -2270,13 +2291,27 @@ function updateHotelChrome() {
   const label = activeHotelName ? `Front Desk · ${activeHotelName}` : 'Front Desk';
   const headerSuffix = document.querySelector('.header-logo-suffix');
   if (headerSuffix) headerSuffix.textContent = label;
-  const loginCopy = document.querySelector('#loginScreen p');
-  if (loginCopy) {
-    loginCopy.textContent = activeHotelName
-      ? `${activeHotelName} — Enter your PIN to continue`
-      : 'Front Desk — Enter your PIN to continue';
+  // D21: hotel name leads the login screen; "Front Desk · staff login" is the
+  // descriptor; Marketel sits in the footer.
+  const loginName = document.getElementById('loginHotelName');
+  const loginDescriptor = document.getElementById('loginDescriptor');
+  if (loginName) loginName.textContent = activeHotelName || 'Front Desk';
+  if (loginDescriptor) {
+    loginDescriptor.textContent = activeHotelName ? 'Front Desk · staff login' : 'Staff login';
   }
-  document.title = activeHotelName ? `Marketel · ${activeHotelName} Front Desk` : 'Marketel · Front Desk';
+  const loginIcon = document.getElementById('loginHotelIcon');
+  if (loginIcon) {
+    if (activeHotelAppIcon) {
+      loginIcon.innerHTML = `<img src="${activeHotelAppIcon}" alt="">`;
+      loginIcon.style.display = 'flex';
+    } else if (activeHotelName) {
+      loginIcon.innerHTML = `<span>${esc(activeHotelName.trim().charAt(0).toUpperCase())}</span>`;
+      loginIcon.style.display = 'flex';
+    } else {
+      loginIcon.style.display = 'none';
+    }
+  }
+  document.title = activeHotelName ? `${activeHotelName} · Front Desk` : 'Front Desk · Marketel';
   updateFrontdeskManifestLink();
 }
 
@@ -2951,6 +2986,10 @@ async function startCrmApp(verification) {
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
     window.history.replaceState({}, '', cleanUrl);
+  } else if (!urlParams.has('welcome') && verification && verification.subscribed) {
+    // D6: live hotels open on Bookings — the daily-loop default ("anything new?").
+    // Pre-activation hotels fall through to 'settings' so setup stays first.
+    currentFilter = 'bookings';
   }
 
   if (isFirstWelcome) {

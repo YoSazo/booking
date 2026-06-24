@@ -586,6 +586,18 @@ body {
   margin: 0;
 }
 
+/* D8 — neutral "choose dates" state instead of a misleading "$0 today" */
+.premium-pricing-card--empty {
+  background: #f4f7f9;
+  border: 1px solid #e2e8f0;
+}
+.pricing-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px;
+}
+
 .price-balance-highlight {
   font-weight: 700;
   color: #1f2937;
@@ -1604,8 +1616,91 @@ body {
 }
 
 .confirmation-card--slim {
-  padding: 28px 24px 22px;
-  margin-bottom: 4px;
+  padding: 24px 24px 18px;
+  margin-bottom: 12px;
+}
+
+/* D4 / 1D.1 — "Your stay" summary card: always visible, stay-first hierarchy */
+.stay-summary-card {
+  text-align: left;
+  margin: 0 auto 14px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.stay-summary-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.stay-summary-card__title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1a1a2e;
+}
+.stay-summary-card__badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2E7D5B;
+  background: #eef6f1;
+  border: 1px solid #cfe6da;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.stay-summary-card__dates {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef2f0;
+}
+.stay-summary-card__date {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stay-summary-card__nights {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-left: auto;
+}
+.stay-summary-card__money {
+  padding: 14px 0 4px;
+}
+.stay-summary-card__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.stay-summary-card__btn {
+  flex: 1 1 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid #d7e3dc;
+  background: #f5f9f6;
+  color: #2E7D5B;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+}
+.stay-summary-card__btn:active {
+  background: #eef6f1;
 }
 
 .confirmation-details {

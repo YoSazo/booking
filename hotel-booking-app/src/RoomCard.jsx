@@ -446,13 +446,10 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             </p>
           </div>
         ) : (
-          <div className="premium-pricing-card">
-            <div className="pricing-main">
-              <span className="price-today-large">$0</span>
-              <span className="price-today-label">today</span>
-            </div>
+          <div className="premium-pricing-card premium-pricing-card--empty">
+            <p className="pricing-empty-title">Choose dates to see rates</p>
             <p className="pricing-subtitle">
-            Tap Select Room to see pricing
+              Pick your check-in and check-out to see the price for this room.
             </p>
           </div>
         )}

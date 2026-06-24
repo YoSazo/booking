@@ -4098,6 +4098,57 @@ app.post('/api/guest-install-event', async (req, res) => {
     }
 });
 
+// D19: blocked-demand capture (public). A guest reached payment on a hotel that
+// hasn't activated online booking. Record it so the owner sees proof of demand
+// ("N guests tried to book"). Works on UNsubscribed hotels by design, so it
+// resolves the hotel directly rather than requiring an active subscription.
+app.post('/api/hotel/:hotelId/booking-intent', async (req, res) => {
+    try {
+        const hotel = await resolveHotelForManifest(req.params.hotelId);
+        if (!hotel) return res.json({ success: true }); // unknown hotel — no-op, never error the guest
+        const { roomName, checkin, checkout, nights } = req.body || {};
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId: hotel.id,
+                eventName: 'BlockedBookingAttempt',
+                contentName: roomName ? String(roomName).slice(0, 120) : null,
+                checkinDate: checkin ? String(checkin).slice(0, 40) : null,
+                checkoutDate: checkout ? String(checkout).slice(0, 40) : null,
+                nights: Number.isFinite(Number(nights)) ? Number(nights) : null,
+                userAgent: req.headers['user-agent'] || null,
+                ipAddress: req.ip || req.socket?.remoteAddress || null,
+            },
+        }).catch(() => {});
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: true }); // never block the guest UI on analytics
+    }
+});
+
+// CRM: blocked-demand count (last 30 days) — powers the owner's "N guests tried
+// to book — activate to accept reservations like these" proof-of-demand nudge.
+app.get('/api/crm/blocked-demand', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const sinceToday = new Date(); sinceToday.setHours(0, 0, 0, 0);
+        const [total, today, recent] = await Promise.all([
+            prisma.funnelEvent.count({ where: { hotelId, eventName: 'BlockedBookingAttempt', createdAt: { gte: since } } }).catch(() => 0),
+            prisma.funnelEvent.count({ where: { hotelId, eventName: 'BlockedBookingAttempt', createdAt: { gte: sinceToday } } }).catch(() => 0),
+            prisma.funnelEvent.findMany({
+                where: { hotelId, eventName: 'BlockedBookingAttempt', createdAt: { gte: since } },
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+                select: { contentName: true, checkinDate: true, checkoutDate: true, nights: true, createdAt: true },
+            }).catch(() => []),
+        ]);
+        res.json({ success: true, periodDays: 30, total, today, recent });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // CRM: guest install funnel stats (last 30 days).
 app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
     try {
