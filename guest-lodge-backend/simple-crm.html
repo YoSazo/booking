@@ -1930,6 +1930,7 @@
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
     <div id="messagesPanel" style="display:none;"></div>
+    <div id="bookingFilterChips" style="display:none;"></div>
     <div id="bookingsList">
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
     </div>
@@ -1992,6 +1993,7 @@ let messagesInboxOpen = false;
 let messagesThreadPickerOpen = false;
 let selectedMessageThread = '';
 let currentFilter = 'settings';
+let bookingCallFilter = 'all'; // D17: Bookings list call-status chip filter (all | needs | called)
 let manualAvailability = { rooms: [], overrides: {} };
 let manualSelectedRoom = '';
 let availabilityYear = new Date().getFullYear();
@@ -2864,14 +2866,27 @@ function blockedDemandLineHtml() {
     </div>`;
 }
 
+// D19: the persistent, every-tab surface is a CALM STATUS PILL — not a sales
+// banner. The full gradient CTA card (goLiveInlineCardHtml) is reserved for
+// high-intent moments (Bookings empty state, Your page, Phones). When real
+// blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
+// that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
+  const demand = blockedDemand && blockedDemand.total > 0 ? blockedDemand.total : 0;
+  if (demand > 0) {
+    return `
+      <div onclick="goLive()" role="button" tabindex="0" style="display:flex;align-items:center;gap:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 14px;margin-bottom:14px;cursor:pointer;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;flex-shrink:0;"></span>
+        <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.4;">${demand} guest${demand>1?'s':''} tried to book — turn on direct bookings to accept reservations like these.</span>
+        <span style="margin-left:auto;white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;">Go live →</span>
+      </div>`;
+  }
   return `
-    <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Your booking page is built and ready</div>
-      <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">It&apos;s already live for guests to preview. Flip the switch to start accepting direct bookings — nothing else to set up.</p>
-      ${blockedDemandLineHtml()}
-      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $199/mo →</button>
-      <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+    <div onclick="goLive()" role="button" tabindex="0" style="display:flex;align-items:center;gap:10px;background:#eef6f1;border:1px solid #cfe6da;border-radius:999px;padding:8px 14px;margin-bottom:14px;cursor:pointer;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;flex-shrink:0;"></span>
+      <span style="font-size:13px;color:#1a5c3f;font-weight:600;">Preview mode</span>
+      <span style="font-size:12px;color:#6b7280;line-height:1.4;">· guests can browse, but can&apos;t book yet</span>
+      <span style="margin-left:auto;white-space:nowrap;font-size:13px;color:#2E7D5B;font-weight:700;">Go live →</span>
     </div>`;
 }
 
@@ -2923,6 +2938,38 @@ function updateBookingsTabBadge() {
   const actionable = needsCalls + unreadMsgs;
   badge.textContent = actionable;
   badge.style.display = actionable > 0 ? '' : 'none';
+}
+
+// D17: call-status filter chips at the top of the Bookings list, so the
+// "needs a call" workflow is visible and actionable on mobile (Maya's main device).
+function setBookingCallFilter(f) {
+  bookingCallFilter = (f === 'needs' || f === 'called') ? f : 'all';
+  renderBookings(bookings);
+}
+
+function renderBookingFilterChips(counts) {
+  const wrap = document.getElementById('bookingFilterChips');
+  if (!wrap) return;
+  // Only on the Bookings tab, and only when there's something to filter.
+  if (currentFilter !== 'bookings' || !counts || counts.all === 0) {
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+  const chip = (id, label, n, accent) => {
+    const active = bookingCallFilter === id;
+    const bg = active ? (accent || '#2E7D5B') : '#fff';
+    const fg = active ? '#fff' : '#374151';
+    const bd = active ? (accent || '#2E7D5B') : '#e5e7eb';
+    return `<button type="button" onclick="setBookingCallFilter('${id}')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;border:1.5px solid ${bd};background:${bg};color:${fg};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">${label}<span style="font-weight:800;opacity:${active ? '1' : '0.7'};">${n}</span></button>`;
+  };
+  wrap.style.display = 'block';
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;-webkit-overflow-scrolling:touch;">
+      ${chip('all', 'All', counts.all)}
+      ${chip('needs', 'Needs call', counts.needs, '#ea580c')}
+      ${chip('called', 'Called', counts.called)}
+    </div>`;
 }
 
 function seedTourRevenueShell() {
@@ -3735,12 +3782,33 @@ function renderBookingsWindow() {
     + `<div style="height:${bottomPad}px" aria-hidden="true"></div>`;
 }
 
-function renderBookings(list) {
+function renderBookings(fullList) {
   const el = document.getElementById('bookingsList');
   if (!el) return;
+  fullList = fullList || [];
   el.classList.remove('bookings-virtual');
   delete el.dataset.virtualBound;
   bookingsVirtualList = [];
+
+  // D17: counts come from the full set; the chips apply a view filter.
+  const counts = {
+    all: fullList.length,
+    needs: fullList.filter(b => b.callStatus === 'not-called').length,
+    called: fullList.filter(b => b.callStatus !== 'not-called').length,
+  };
+  renderBookingFilterChips(counts);
+
+  let list = fullList;
+  if (bookingCallFilter === 'needs') list = fullList.filter(b => b.callStatus === 'not-called');
+  else if (bookingCallFilter === 'called') list = fullList.filter(b => b.callStatus !== 'not-called');
+
+  // D17: a filter that matches nothing (but bookings exist) shows a quiet note,
+  // never the launch checklist.
+  if (list.length === 0 && fullList.length > 0) {
+    const label = bookingCallFilter === 'needs' ? 'No bookings need a call right now' : 'No called bookings yet';
+    el.innerHTML = `<div class="empty-state" style="padding:32px 0;"><div class="empty-text" style="font-size:15px;">${label}</div><div class="empty-sub">Switch filters above to see your other bookings.</div></div>`;
+    return;
+  }
 
   if (list.length === 0) {
     // Check photo status from API (editRooms might not be loaded yet)
@@ -4144,9 +4212,15 @@ function applyFilter() {
   const ptr = document.getElementById('checklistPointer');
   if (ptr) ptr.remove();
 
-  // Refresh go-live banner (all tabs when not subscribed; hidden during tour)
+  // D19: refresh the calm preview-mode pill (all tabs when not subscribed; hidden during tour)
   if (goLiveBanner) {
     updateGoLiveBanner();
+  }
+
+  // D17: filter chips belong to the Bookings tab only.
+  const bookingChips = document.getElementById('bookingFilterChips');
+  if (bookingChips && currentFilter !== 'bookings') {
+    bookingChips.style.display = 'none';
   }
 
   if (currentFilter === 'settings') {
