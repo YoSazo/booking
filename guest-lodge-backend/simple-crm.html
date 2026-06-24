@@ -6424,7 +6424,7 @@ function startSettingsTour() {
     },
     {
       target: '#tour-fd-install-btn, #tour-fd-installed-badge',
-      text: 'Add Front Desk to your home screen — same website you\'re on now, not the App Store. Takes about 3 seconds. You\'ll get a buzz when guests book.',
+      text: 'No download — it lives on your home screen like any other app. Takes about 3 seconds. You\'ll get a buzz when guests book.',
       openAccordion: false,
       tab: 'apps',
       waitForVisible: true,
@@ -8069,7 +8069,7 @@ function renderAppsView() {
 
   const frontdeskInstallItems = [
     { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to add Front Desk', title: 'Add Front Desk to your home screen',
-      caption: 'Tap <strong>Add to Home Screen</strong> in your browser — same site you\'re on now. No App Store. Takes about 3 seconds.' },
+      caption: 'Tap <strong>Add to Home Screen</strong> in your browser. No App Store. Takes about 3 seconds.' },
     { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Reply to guest', title: 'You reply from your phone',
       caption: 'Messages from guests show up in <strong>Bookings</strong>. Tap reply — they get it on their phone.' },
   ];
@@ -8081,10 +8081,10 @@ function renderAppsView() {
       <div><div style="font-size:13px;font-weight:700;color:#166534;">On your home screen</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">You'll get a buzz when someone books — even if this is closed.</div></div>
     </div>`;
   } else if (fdInApp) {
-    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">You're on the home-screen version. Turn on alerts so your phone buzzes when a guest books.</p>
+    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's on your home screen. Turn on alerts so your phone buzzes when a guest books.</p>
       <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
-    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">This website — the one you're on right now — can sit on your home screen like an app. <strong>No App Store.</strong> About 3 seconds. It's a shortcut, not a download, but it can <strong>buzz you when guests book</strong>.</p>
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">This page can live on your home screen like an app. No App Store. Takes about 3 seconds. And it'll buzz you when guests book.</p>
       <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Add Front Desk to my home screen</button>
       <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)" style="margin-top:0;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>`;
   }
@@ -8141,7 +8141,7 @@ function renderAppsView() {
       <div class="apps-step-title" style="margin-bottom:14px;">At check-in</div>
       ${checkinActionsHtml}
     </div>` : `
-    <p class="apps-intro">Two shortcuts on the home screen — yours and theirs. No App Store, no extra apps to download.</p>
+    <p class="apps-intro">Yours and theirs — both live on the home screen like real apps. No App Store, no downloads, no friction.</p>
     <div class="apps-step-card" id="tour-fd-install-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your phone</div>
       <div class="apps-step-title">Add Front Desk to your home screen</div>
@@ -8166,8 +8166,8 @@ function renderAppsView() {
     </div>`;
 
   const appsFootnoteHtml = fdInApp
-    ? 'Booking alerts live on the <strong>Bookings</strong> tab · iPhone &amp; Android home-screen shortcuts'
-    : 'iPhone &amp; Android · home-screen shortcuts · no App Store';
+    ? 'Booking alerts live on the <strong>Bookings</strong> tab · installs on iPhone &amp; Android'
+    : 'iPhone &amp; Android · lives on your home screen · no App Store';
 
   el.innerHTML = `
   <style>
