@@ -1717,6 +1717,7 @@
     .mobile-nav-item.mobile-nav-item--hidden {
       display: none !important;
     }
+    .tab.tab--hidden { display: none !important; }
     @media (max-width: 600px) {
       #app .container {
         padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
@@ -1917,6 +1918,12 @@
       <button type="button" class="tab" data-nav-filter="bookings" onclick="setFilter('bookings', this)">
         Bookings <span class="tab-badge" id="countNeedsCalled" style="display:none;">0</span><span class="tab-badge" id="msgUnreadBadge" style="display:none;background:#e0245e;color:#fff;">0</span>
       </button>
+      <button type="button" class="tab" data-nav-filter="availability" onclick="setFilter('availability', this)">
+        Availability
+      </button>
+      <button type="button" class="tab tab--hidden" data-nav-filter="revenue" id="desktopTabRevenueBtn" onclick="setFilter('revenue', this)">
+        Revenue
+      </button>
       <button type="button" class="tab" data-nav-filter="apps" onclick="setFilter('apps', this)">
         Phones
       </button>
@@ -1996,6 +2003,7 @@ let pendingDeleteRoomName = '';
 let currentHotelPms = '';
 let revenueEnabled = false;
 let hotelSubscribed = false;
+let blockedDemand = { total: 0, today: 0, recent: [] }; // D19: proof of demand
 let revenuePeriod = '30d';
 let revenueCache = {};
 let revenueLoading = false;
@@ -2845,12 +2853,24 @@ async function verifyCrmToken(pin) {
   return json;
 }
 
+// D19: proof-of-demand line — the strongest converter for a skeptical owner.
+function blockedDemandLineHtml() {
+  if (!blockedDemand || blockedDemand.total < 1) return '';
+  const n = blockedDemand.today > 0 ? blockedDemand.today : blockedDemand.total;
+  const when = blockedDemand.today > 0 ? 'today' : 'recently';
+  return `
+    <div style="background:rgba(255,255,255,0.16);border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:12.5px;color:#fff;font-weight:600;line-height:1.45;">
+      ${n} guest${n > 1 ? 's' : ''} tried to book ${when} — activate to accept reservations like these.
+    </div>`;
+}
+
 function goLiveBannerHtml() {
   return `
     <div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Guests can preview — but can&apos;t book yet</div>
-      <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your booking page is visible online, but reservations stay disabled until you activate. Turn it on when you&apos;re ready to take direct bookings.</p>
-      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate direct bookings — $99/mo →</button>
+      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Your booking page is built and ready</div>
+      <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">It&apos;s already live for guests to preview. Flip the switch to start accepting direct bookings — nothing else to set up.</p>
+      ${blockedDemandLineHtml()}
+      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $99/mo →</button>
       <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
     </div>`;
 }
@@ -2860,12 +2880,27 @@ function goLiveInlineCardHtml() {
   return `
     <div class="booking-card" id="tour-go-live-card" style="margin-bottom:14px;background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border:none;">
       <div style="padding:18px;text-align:center;">
-        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">🔒 Preview mode — bookings disabled</div>
-        <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Guests can browse your page but can&apos;t complete a reservation until you activate.</p>
-        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate direct bookings — $99/mo →</button>
+        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Ready to go live</div>
+        <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your page is built and previewing for guests. Flip the switch to start accepting reservations.</p>
+        ${blockedDemandLineHtml()}
+        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $99/mo →</button>
         <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
       </div>
     </div>`;
+}
+
+// D19: fetch blocked-demand counts and refresh any visible go-live surfaces.
+async function loadBlockedDemand() {
+  if (hotelSubscribed) return;
+  try {
+    const data = await api('GET', '/api/crm/blocked-demand');
+    if (data && data.success) {
+      blockedDemand = { total: data.total || 0, today: data.today || 0, recent: data.recent || [] };
+      updateGoLiveBanner();
+      const inline = document.getElementById('tour-go-live-card');
+      if (inline) inline.outerHTML = goLiveInlineCardHtml();
+    }
+  } catch (e) { /* non-fatal */ }
 }
 
 function updateGoLiveBanner() {
@@ -3006,6 +3041,7 @@ async function startCrmApp(verification) {
   // Track subscription status globally for banner visibility
   hotelSubscribed = !!(verification && verification.subscribed);
   updateGoLiveBanner();
+  if (!hotelSubscribed) loadBlockedDemand();
 
   const realignActiveTab = () => {
     const activeTab = document.querySelector('.tab.active');
@@ -3740,11 +3776,12 @@ function renderBookings(list) {
     } else if (allDone && !hotelSubscribed) {
       el.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🔒</div>
-          <div class="empty-text">Almost there — activate bookings</div>
-          <div class="empty-sub" style="margin-bottom:12px;">Your page is set up. Turn on direct bookings so guests can complete a reservation.</div>
-          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Activate — $99/mo →</button>
+          <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
+          <div class="empty-text">Your page is ready to go live</div>
+          <div class="empty-sub" style="margin-bottom:12px;">Everything&apos;s set up. Flip the switch to start accepting direct bookings.${blockedDemand && blockedDemand.total > 0 ? ` <strong>${blockedDemand.total} guest${blockedDemand.total>1?'s':''} already tried to book.</strong>` : ''}</div>
+          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $99/mo →</button>
         </div>`;
+      if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
     } else {
       el.innerHTML = `
         <div style="padding:20px 0;">
@@ -3822,8 +3859,10 @@ function syncMobileNavActive(filter) {
 
 function updateMobileRevenueNavVisibility() {
   const el = document.getElementById('mobileNavRevenueBtn');
-  if (!el) return;
-  el.classList.toggle('mobile-nav-item--hidden', !revenueEnabled);
+  if (el) el.classList.toggle('mobile-nav-item--hidden', !revenueEnabled);
+  // D7: keep the desktop Revenue tab in sync (desktop must reach Revenue too).
+  const deskEl = document.getElementById('desktopTabRevenueBtn');
+  if (deskEl) deskEl.classList.toggle('tab--hidden', !revenueEnabled);
 }
 
 function initMobileBottomNav() {
@@ -8155,20 +8194,40 @@ function renderAppsView() {
     </div>`;
 
   const checkinActionsHtml = `
-      <button type="button" onclick="showCheckinQrOverlay()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">📲 Show QR at check-in</button>
+      <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR</button>
       ${guestInstallUrl !== '#' ? `
-      <button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
-      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;text-align:center;line-height:1.5;">Scroll down and install <strong style="color:var(--text);">${hName}</strong> on your home screen to see what guests see.</p>` : ''}
+      <button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>` : ''}
       ${guestInstallUrl === '#' ? '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>' : ''}`;
 
+  // Guest install link — promoted out of the Help fold so it's always reachable (§1D.2).
+  const guestInstallLinkHtml = guestInstallUrl !== '#' ? `
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div class="apps-step-title" style="font-size:13px;margin-bottom:8px;">Guest install link</div>
+        <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
+        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy install link</button>
+        <div id="guestInstallStats" style="display:none;margin-top:12px;"></div>
+      </div>` : '<div id="guestInstallStats" style="display:none;"></div>';
+
+  // Loop diagram — shows the two-app relationship on every visit (§1D.2).
+  const loopGuestTile = hotelAppIcon
+    ? `<img src="${hotelAppIcon}" alt="" style="width:100%;height:100%;object-fit:contain;">`
+    : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:12px;font-size:22px;font-weight:800;">${hotelInitial}</span>`;
+  const loopDiagramHtml = `
+    <div class="apps-loop">
+      <div class="apps-loop-side">
+        <div class="apps-loop-tile apps-loop-tile--fd"><img src="/marketellogo.svg" alt="" style="width:62%;height:62%;object-fit:contain;"></div>
+        <div class="apps-loop-name">Front Desk</div>
+        <div class="apps-loop-sub">buzzes when they book</div>
+      </div>
+      <div class="apps-loop-arrow" aria-hidden="true">⇄</div>
+      <div class="apps-loop-side">
+        <div class="apps-loop-tile apps-loop-tile--guest">${loopGuestTile}</div>
+        <div class="apps-loop-name">${hName}</div>
+        <div class="apps-loop-sub">book &amp; message, 1 tap</div>
+      </div>
+    </div>`;
+
   const appsHelpBodyHtml = `
-        <div id="guestInstallStats" style="display:none;margin-bottom:14px;"></div>
-        ${guestInstallUrl !== '#' ? `
-        <div style="margin-bottom:16px;">
-          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">Share install link</div>
-          <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
-          <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy install link</button>
-        </div>` : ''}
         <div class="apps-section-divider" style="margin-top:0;padding-top:14px;">How guests add your hotel</div>
         <div style="border-radius:12px;background:#f4f7f9;border:1px solid var(--border);margin:0 0 12px;padding:16px;text-align:center;">
           <img src="${guestInstallPoster}" alt="Guest saves hotel to phone" loading="eager" decoding="sync" style="max-width:140px;width:55%;height:auto;min-height:120px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,0.1);">
@@ -8184,38 +8243,22 @@ function renderAppsView() {
         </div>
         ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}`;
 
-  const appsMainHtml = fdInApp ? `
-    <div class="apps-step-card" id="tour-fd-install-card">
-      <div class="apps-step-title" style="margin-bottom:14px;">Change your icon</div>
-      ${logoBlockHtml}
-    </div>
-    ${guestBroadcastCardHtml()}
-    <div class="apps-step-card">
-      <div class="apps-step-title" style="margin-bottom:14px;">At check-in</div>
-      ${checkinActionsHtml}
-    </div>` : `
-    <p class="apps-intro">Yours and theirs — both live on the home screen like real apps. No App Store, no downloads, no friction.</p>
+  const appsMainHtml = `
+    ${loopDiagramHtml}
     <div class="apps-step-card" id="tour-fd-install-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your phone</div>
-      <div class="apps-step-title">Add Front Desk to your home screen</div>
+      <div class="apps-step-title">${fdInApp ? 'Front Desk — on your home screen' : 'Add Front Desk to your home screen'}</div>
       ${fdCtaHtml}
     </div>
     <div class="apps-step-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
-      <div class="apps-step-title">Guests save <strong>${hName}</strong> to their phone</div>
-      <div style="border-radius:12px;background:#f4f7f9;border:1px solid var(--border);margin:0 0 12px;padding:16px;text-align:center;">
-        <img src="${guestInstallPoster}" alt="Guest saves hotel to phone" loading="eager" decoding="sync" style="max-width:140px;width:55%;height:auto;min-height:120px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,0.1);">
-      </div>
-      <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(guestInstallItems)},0)" style="margin-bottom:14px;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
-      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Same idea — they tap <strong>Add to Home Screen</strong> on your booking page (or scan your QR at check-in). Then they can book and message you direct.</p>
-      <div id="tour-guest-icon-section">
-      <div class="apps-step-title" style="margin-bottom:10px;">Change your icon</div>
+      ${checkinActionsHtml}
+      ${guestInstallLinkHtml}
+    </div>
+    ${guestBroadcastCardHtml()}
+    <div class="apps-step-card" id="tour-guest-icon-section">
+      <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
       ${logoBlockHtml}
-      </div>
-      <div style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">
-        <div class="apps-step-title" style="margin-bottom:12px;">At check-in</div>
-        ${checkinActionsHtml}
-      </div>
     </div>`;
 
   const appsFootnoteHtml = fdInApp
@@ -8227,6 +8270,13 @@ function renderAppsView() {
     .apps-page { padding:4px 0 28px; }
     .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
     .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
+    .apps-loop { display:flex;align-items:flex-start;justify-content:center;gap:14px;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1.5px solid #bbf7d0;border-radius:16px;padding:18px 14px;margin:0 0 16px; }
+    .apps-loop-side { flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center; }
+    .apps-loop-tile { width:54px;height:54px;border-radius:14px;background:#fff;border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px; }
+    .apps-loop-tile--guest { padding:0; }
+    .apps-loop-name { font-size:13px;font-weight:800;color:var(--text);line-height:1.25;word-break:break-word; }
+    .apps-loop-sub { font-size:11px;color:var(--text-muted);line-height:1.35;margin-top:3px; }
+    .apps-loop-arrow { flex-shrink:0;align-self:center;font-size:22px;color:var(--green);font-weight:700;padding-top:14px; }
     .apps-step-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px; }
     .apps-section-divider { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin:24px 0 14px;padding-top:18px;border-top:1.5px solid var(--border); }
     .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }

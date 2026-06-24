@@ -92,7 +92,7 @@ function CheckoutReturnPage({ onComplete }) {
                     onClick={() => window.location.href = '/'} 
                     style={{
                         padding: '12px 24px', 
-                        backgroundColor: '#15803d', 
+                        backgroundColor: '#1f5c43', 
                         color: 'white', 
                         border: 'none', 
                         borderRadius: '8px',

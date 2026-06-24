@@ -11,6 +11,7 @@ import {
   qrCodeUrl,
   HotelIcon,
   IosInstallSheet,
+  AndroidInstallSteps,
   InstallBenefits,
   SuccessCheckIcon,
 } from './guestInstallUi.jsx';
@@ -26,6 +27,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
 
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIosSheet, setShowIosSheet] = useState(false);
+  const [showAndroidSteps, setShowAndroidSteps] = useState(false);
   const [installed, setInstalled] = useState(isStandalone());
   const [installing, setInstalling] = useState(false);
   const [lookupDone, setLookupDone] = useState(!code);
@@ -199,18 +201,14 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
         <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
       </>
     );
-  } else if (android) {
+  } else if (android && deferredPrompt) {
     ctaBlock = (
       <>
         <button
           type="button"
           onClick={handleInstall}
-          style={{
-            ...styles.primaryBtn,
-            opacity: (!deferredPrompt && !installing) ? 0.55 : 1,
-            cursor: (!deferredPrompt && !installing) ? 'not-allowed' : 'pointer',
-          }}
-          disabled={installing || !deferredPrompt}
+          style={styles.primaryBtn}
+          disabled={installing}
         >
           {installing ? (
             <>
@@ -224,6 +222,27 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
             </>
           )}
         </button>
+        <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
+      </>
+    );
+  } else if (android) {
+    // D10: no browser prompt available — never a disabled button. Show the
+    // manual Chrome steps, which always work.
+    ctaBlock = (
+      <>
+        <button
+          type="button"
+          onClick={() => { trackCta(); setShowAndroidSteps((v) => !v); }}
+          style={styles.primaryBtn}
+        >
+          <Smartphone size={18} strokeWidth={2.2} />
+          {showAndroidSteps ? 'Hide steps' : 'Add to Home Screen'}
+        </button>
+        {showAndroidSteps && (
+          <div style={{ marginTop: 16, textAlign: 'left', background: INSTALL_THEME.bg, border: `1px solid ${INSTALL_THEME.border}`, borderRadius: 14, padding: 16 }}>
+            <AndroidInstallSteps />
+          </div>
+        )}
         <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
       </>
     );

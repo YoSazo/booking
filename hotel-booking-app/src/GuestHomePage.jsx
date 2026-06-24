@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, Search } from 'lucide-react';
+import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, Search, MessageSquare, FileText } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { isStandalone } from './pwaUtils.js';
@@ -190,10 +190,16 @@ export default function GuestHomePage({ hotel: hotelProp }) {
 
   const checkinDate = checkin ? new Date(checkin) : null;
   const now = new Date();
-  const isCheckinSoon = checkinDate && (() => {
-    const diffDays = Math.round((checkinDate - now) / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays <= 1;
-  })();
+  const checkinDaysAway = checkinDate
+    ? Math.round((checkinDate - now) / (1000 * 60 * 60 * 24))
+    : null;
+  // D12: 48h arrival window — check-in becomes the top card.
+  const isCheckinSoon = checkinDaysAway != null && checkinDaysAway >= 0 && checkinDaysAway <= 2;
+  const checkinLabel = isCheckinToday(checkin)
+    ? 'Check-in today'
+    : checkinDaysAway === 1
+      ? 'Check-in tomorrow'
+      : `Check-in in ${checkinDaysAway} days`;
 
   return (
     <div style={styles.page}>
@@ -203,19 +209,22 @@ export default function GuestHomePage({ hotel: hotelProp }) {
         <p style={styles.greetingSubtitle}>Here's your upcoming stay</p>
       </div>
 
+      {/* D12/1D.5: check-in is the TOP card inside the 48h window */}
       {isCheckinSoon && (
-        <button
-          type="button"
-          onClick={() => navigate('/guest/check-in')}
-          style={{
-            width: '100%', marginBottom: 16, padding: 14, borderRadius: 14,
-            border: 'none', background: 'linear-gradient(135deg,#1a2b22,#2E7D5B)',
-            color: 'white', fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-            cursor: 'pointer', textAlign: 'left',
-          }}
-        >
-          {isCheckinToday(checkin) ? '✓ Check-in today — tap for WiFi & messages' : 'Check-in tomorrow — get ready →'}
-        </button>
+        <div style={styles.checkinCard}>
+          <div style={styles.checkinPill}>
+            <span style={styles.checkinDot} /> {checkinLabel}
+          </div>
+          <div style={styles.checkinTitle}>Almost here, {firstName} — get ready</div>
+          <div style={styles.checkinActions}>
+            <button type="button" onClick={() => navigate('/guest/messages')} style={styles.checkinBtn}>
+              <MessageSquare size={17} /> Message front desk
+            </button>
+            <button type="button" onClick={() => navigate('/guest/check-in')} style={styles.checkinBtnGhost}>
+              <FileText size={17} /> View my stay
+            </button>
+          </div>
+        </div>
       )}
 
       <GuestInstallCard
@@ -425,6 +434,75 @@ const styles = {
     fontSize: 14,
     color: '#475569',
     lineHeight: 1.5,
+  },
+
+  // Check-in top card (D12/1D.5)
+  checkinCard: {
+    background: 'linear-gradient(135deg,#1a2b22,#2E7D5B)',
+    borderRadius: 16,
+    padding: '18px',
+    marginBottom: 16,
+    color: '#fff',
+    boxShadow: '0 6px 20px rgba(46,125,91,0.25)',
+  },
+  checkinPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    fontSize: 12,
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.92)',
+    marginBottom: 8,
+  },
+  checkinDot: {
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    background: '#7ee2b8',
+    display: 'inline-block',
+  },
+  checkinTitle: {
+    fontSize: 18,
+    fontWeight: 800,
+    lineHeight: 1.3,
+    marginBottom: 14,
+  },
+  checkinActions: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  checkinBtn: {
+    flex: '1 1 150px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '12px 14px',
+    borderRadius: 12,
+    border: 'none',
+    background: '#fff',
+    color: '#1a5c3f',
+    fontSize: 14,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  },
+  checkinBtnGhost: {
+    flex: '1 1 150px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '12px 14px',
+    borderRadius: 12,
+    border: '1.5px solid rgba(255,255,255,0.55)',
+    background: 'transparent',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
   },
 
   // Greeting

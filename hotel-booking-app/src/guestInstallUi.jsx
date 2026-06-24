@@ -181,6 +181,34 @@ export function IosInstallSteps() {
   );
 }
 
+/** D10: Android manual steps — Chrome self-install always works, so we never
+ *  show a disabled CTA. Mirrors IosInstallSteps. */
+export function AndroidInstallSteps() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={stepBadgeStyle}>1</span>
+        <div style={stepTextStyle}>
+          Tap the <strong>⋮ menu</strong> in Chrome&apos;s top-right corner
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={stepBadgeStyle}>2</span>
+        <div style={stepTextStyle}>
+          Tap <strong>Add to Home screen</strong>
+          <SquarePlus size={18} color={BRAND} strokeWidth={2} aria-hidden />
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={stepBadgeStyle}>3</span>
+        <div style={{ ...stepTextStyle, display: 'block' }}>
+          Tap <strong>Add</strong> — done! It&apos;s on your home screen.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function IosInstallSheet({
   hotelName,
   appIconUrl,

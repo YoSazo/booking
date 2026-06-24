@@ -65,7 +65,7 @@ function EditableBanner({ hotel, apiBaseUrl }) {
 
   if (!editing) {
     return (
-      <span onClick={() => setEditing(true)} style={{ cursor: 'pointer', borderBottom: '1.5px dashed #10b981', paddingBottom: '1px' }} title="Tap to edit banner">
+      <span onClick={() => setEditing(true)} style={{ cursor: 'pointer', borderBottom: '1.5px dashed #3a9b73', paddingBottom: '1px' }} title="Tap to edit banner">
         {value || 'Tap to set your cancellation policy / banner text'}
       </span>
     );
@@ -76,9 +76,9 @@ function EditableBanner({ hotel, apiBaseUrl }) {
       <input ref={inputRef} type="text" value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
         placeholder="e.g. Free cancellation up to 7 days before arrival"
-        style={{ flex: 1, border: 'none', borderBottom: '2px solid #10b981', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', padding: '2px 0' }}
+        style={{ flex: 1, border: 'none', borderBottom: '2px solid #3a9b73', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', padding: '2px 0' }}
       />
-      <button onClick={handleSave} disabled={saving} style={{ background: '#10b981', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <button onClick={handleSave} disabled={saving} style={{ background: '#3a9b73', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
         {saving ? '...' : '✓'}
       </button>
     </span>
@@ -1571,6 +1571,13 @@ const handlePayLaterBooking = async (e) => {
                     </div>
                     </div>
 
+                {/* D5/1D.4: honest step counter (flow is 3 real steps) */}
+                <div style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#6b7280', margin: '0 0 14px' }}>
+                    {currentStep === 1 && 'Step 1 of 3 — Review your stay'}
+                    {currentStep === 2 && 'Step 2 of 3 — Your details'}
+                    {currentStep === 4 && 'Step 3 of 3 — Payment'}
+                </div>
+
 
                 {/* Plan selection for 7+ nights - DESKTOP PREMIUM DESIGN */}
 
@@ -1698,14 +1705,14 @@ const handlePayLaterBooking = async (e) => {
                                                         <span>Room ({bookingDetails.nights} nights)</span>
                                                         <span style={{ 
                                                             fontSize: '12px', 
-                                                            color: '#10b981',
+                                                            color: '#3a9b73',
                                                             fontWeight: '600'
                                                         }}>
                                                             {bookingDetails.nights >= 28 ? '🎉 Monthly Rate - ' : '✨ Weekly Rate - '}
                                                             Save ${savings.toFixed(2)}
                                                         </span>
                                                     </div>
-                                                    <span className="price-value" style={{ color: '#10b981', fontWeight: '700' }}>
+                                                    <span className="price-value" style={{ color: '#3a9b73', fontWeight: '700' }}>
                                                         ${actualTotal.toFixed(2)}
                                                     </span>
                                                 </div>
@@ -1864,6 +1871,16 @@ const handlePayLaterBooking = async (e) => {
   </div>
   
   
+  {/* D5/1D.4: payment-step trust block — the keystone. Verified, never charged. */}
+  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', margin: '16px 20px 0', padding: '14px 16px', background: '#eef6f1', border: '1px solid #cfe6da', borderRadius: '12px' }}>
+    <ShieldCheck size={22} style={{ color: '#2E7D5B', flexShrink: 0, marginTop: '1px' }} />
+    <div>
+      <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a2e', marginBottom: '2px' }}>$0 charged today</div>
+      <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>$1 verification only — released instantly</div>
+      <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>You pay <strong>${bookingDetails.total.toFixed(2)}</strong> at check-in</div>
+    </div>
+  </div>
+
   {/* Only show money-back guarantee for non-reserve and non-payLater bookings */}
   {selectedPlan !== 'reserve' && selectedPlan !== 'payLater' && (
   <div className="money-back-guarantee">
@@ -2188,11 +2205,11 @@ const handlePayLaterBooking = async (e) => {
                 border: '1px solid #bbf7d0',
                 borderRadius: '10px',
                 fontSize: '13px',
-                color: '#15803d',
+                color: '#1f5c43',
                 fontWeight: '500',
                 lineHeight: '1.4'
               }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1f5c43" strokeWidth="2.5" style={{ flexShrink: 0 }}>
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
                 <span>$1 verification only — released immediately. You pay ${bookingDetails.total.toFixed(2)} at check-in.</span>
@@ -2349,7 +2366,7 @@ const handlePayLaterBooking = async (e) => {
       <div style={{
         textAlign: 'center',
         marginTop: '4px',
-        color: '#047857',
+        color: '#1f5c43',
         fontSize: '13px',
         fontWeight: '600'
       }}>
@@ -2373,7 +2390,7 @@ function GuestInfoPageWrapper(props) {
             variables: {
                 fontFamily: 'system-ui, -apple-system, sans-serif',
                 fontSizeBase: '16px',
-                colorPrimary: '#10b981',
+                colorPrimary: '#3a9b73',
                 colorDanger: '#dc2626',
                 spacingUnit: '4px',
                 borderRadius: '8px',

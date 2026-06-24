@@ -95,7 +95,7 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
             Add {hotelName || 'us'} to your home screen
           </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, lineHeight: 1.4 }}>
-            Book direct in one tap — no searching, no fees.
+            Book direct in one tap next time — no fees, no app store.
           </div>
         </div>
         <button
@@ -111,14 +111,13 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
         {!ownerPreview && (
         <button
           onClick={handleDismiss}
-          aria-label="Dismiss"
           style={{
-            flexShrink: 0, width: 24, height: 24, borderRadius: '50%', border: 'none',
-            background: 'transparent', color: '#9ca3af', fontSize: 18, lineHeight: 1,
-            cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+            flexShrink: 0, border: 'none', background: 'transparent', color: '#9ca3af',
+            fontSize: 12, fontWeight: 600, lineHeight: 1, cursor: 'pointer',
+            fontFamily: 'inherit', padding: '4px 2px', whiteSpace: 'nowrap',
           }}
         >
-          ×
+          Maybe later
         </button>
         )}
       </div>

@@ -101,7 +101,7 @@ export function GuestMessageCard({ apiBaseUrl = '', hotelId, reservationCode, gu
       </h3>
       {sent ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 12px', background: '#e8f7ee', borderRadius: '10px', marginTop: '10px' }}>
-          <CheckCircle2 size={20} style={{ color: '#28a745', flexShrink: 0 }} />
+          <CheckCircle2 size={20} style={{ color: '#2E7D5B', flexShrink: 0 }} />
           <div style={{ fontSize: '14px', color: '#1a1a1a', lineHeight: 1.5 }}>
             <strong>Sent!</strong> The front desk got your message and will follow up.{hotelPhone ? ` You can also call ${hotelPhone}.` : ''}
           </div>

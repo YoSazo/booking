@@ -8,11 +8,12 @@ html, body, #root {
 
 /* --- Basic Styles & Fonts --- */
 :root {
-    --primary-color: #007bff;
+    --primary-color: #2E7D5B;
     --secondary-color: #f8f9fa;
     --text-color: #333;
     --border-color: #dee2e6;
-    --success-color: #28a745;
+    --success-color: #2E7D5B;
+    /* D1: unified brand-green ramp (replaces legacy emerald/bootstrap palettes) */
     --card-shadow: 0 4px 8px rgba(0,0,0,0.1);
     --bg-color: #f4f7f9;
     --accent-color: #0056b3;
@@ -572,7 +573,7 @@ body {
 .price-today-large {
   font-size: 36px;
   font-weight: 700;
-  color: #059669;
+  color: #2E7D5B;
 }
 
 .price-today-label {
@@ -1370,7 +1371,7 @@ body {
 }
 
 .upsell-message strong {
-  color: #059669;
+  color: #2E7D5B;
   font-weight: 700;
 }
 
@@ -1397,9 +1398,9 @@ body {
 }
 
 .upsell-actions .yes-btn {
-  border-color: #059669;
+  border-color: #2E7D5B;
   color: white;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #3a9b73 0%, #2E7D5B 100%);
 }
 
 .upsell-actions .yes-btn:hover {
@@ -1787,7 +1788,7 @@ body {
   border-radius: 50%;
   display: block;
   stroke-width: 3;
-  stroke: #28a745;
+  stroke: #2E7D5B;
   stroke-miterlimit: 10;
   /* REMOVE the fill animation, just keep scale */
   animation: scale 0.3s ease-in-out 0.9s both;
@@ -1798,7 +1799,7 @@ body {
   stroke-dashoffset: 166;
   stroke-width: 3;
   stroke-miterlimit: 10;
-  stroke: #28a745;
+  stroke: #2E7D5B;
   fill: none;
   animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
 }
@@ -1807,7 +1808,7 @@ body {
   transform-origin: 50% 50%;
   stroke-dasharray: 48;
   stroke-dashoffset: 48;
-  stroke: #28a745;
+  stroke: #2E7D5B;
   animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
 }
 
@@ -1828,7 +1829,7 @@ body {
 
 @keyframes fill {
   100% {
-    box-shadow: inset 0px 0px 0px 30px #28a745;
+    box-shadow: inset 0px 0px 0px 30px #2E7D5B;
   }
 }
 
@@ -1850,7 +1851,7 @@ body {
 }
 
 .confirmation-code strong {
-  color: #007bff;
+  color: #2E7D5B;
   font-weight: 700;
 }
 
@@ -1907,7 +1908,7 @@ body {
 }
 
 .nights-row .detail-value {
-  color: #28a745;
+  color: #2E7D5B;
   font-weight: 700;
 }
 
@@ -2028,7 +2029,7 @@ body {
 
 .static-banner strong {
   font-weight: 700;
-  color: #059669; /* Green for emphasis */
+  color: #2E7D5B; /* Green for emphasis */
 }
 
 @media (max-width: 768px) {
@@ -2578,8 +2579,8 @@ padding: 6px 16px;
 
 /* --- Active & Completed States --- */
 .progress-step.completed .step-circle {
-  background-color: #28a745; /* Your green success color */
-  border-color: #28a745;
+  background-color: #2E7D5B; /* Your green success color */
+  border-color: #2E7D5B;
 }
 
 .progress-step.active .step-name {
@@ -3454,7 +3455,7 @@ padding: 6px 16px;
 /* --- Why we need your card (Reserve for $0) --- */
 .why-card-banner {
   /* Match money-back-guarantee styling so the shine is obvious */
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  background: linear-gradient(135deg, #2E7D5B 0%, #3a9b73 100%);
   border: 3px solid #1e7e34;
   border-radius: 16px;
   padding: 20px 24px;
@@ -3585,7 +3586,7 @@ padding: 6px 16px;
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #3a9b73, #2E7D5B);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3628,7 +3629,7 @@ padding: 6px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #059669;
+  color: #2E7D5B;
   font-size: 14px;
 }
 
@@ -3647,7 +3648,7 @@ padding: 6px 16px;
   padding: 15px 24px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #3a9b73, #2E7D5B);
   color: #fff;
   font-size: 17px;
   font-weight: 700;
@@ -3736,7 +3737,7 @@ padding: 6px 16px;
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid #10b981;
+  border: 2px solid #3a9b73;
   animation: confirmationCallPingRing 1.5s ease-out infinite;
 }
 
@@ -3759,7 +3760,7 @@ padding: 6px 16px;
   position: absolute;
   inset: 8px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #3a9b73, #2E7D5B);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3880,7 +3881,7 @@ padding: 6px 16px;
 
 .confirmation-call-phone-number-label {
   font-size: 11px;
-  color: #059669;
+  color: #2E7D5B;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -3897,7 +3898,7 @@ padding: 6px 16px;
 
 .confirmation-call-phone-number-tap {
   font-size: 12px;
-  color: #059669;
+  color: #2E7D5B;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3908,7 +3909,7 @@ padding: 6px 16px;
   padding: 15px 24px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #3a9b73, #2E7D5B);
   color: #fff;
   font-size: 16px;
   font-weight: 700;
@@ -3994,7 +3995,7 @@ padding: 6px 16px;
 
 /* --- Money-Back Guarantee Badge Styles --- */
 .money-back-guarantee {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  background: linear-gradient(135deg, #2E7D5B 0%, #3a9b73 100%);
   border: 3px solid #1e7e34;
   border-radius: 16px;
   padding: 20px 24px;
@@ -4152,7 +4153,7 @@ padding: 6px 16px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, #3a9b73 0%, #2E7D5B 100%);
     color: white;
     border: none;
     border-radius: 20px;
@@ -4166,7 +4167,7 @@ padding: 6px 16px;
 }
 
 .back-button-pill:hover {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    background: linear-gradient(135deg, #2E7D5B 0%, #1f5c43 100%);
     transform: translateY(-1px);
     box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
 }
@@ -4649,7 +4650,7 @@ padding: 6px 16px;
 .shield-icon {
   width: 32px;
   height: 32px;
-  background: #059669;
+  background: #2E7D5B;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -4664,7 +4665,7 @@ padding: 6px 16px;
 }
 
 .reserve-title { font-size: 1.1rem; font-weight: 700; color: #065f46; }
-.reserve-subtitle { font-size: 0.75rem; font-weight: 500; color: #047857; margin-top: 1px; }
+.reserve-subtitle { font-size: 0.75rem; font-weight: 500; color: #1f5c43; margin-top: 1px; }
 
 .due-at-arrival {
   background: rgba(255, 255, 255, 0.6);
@@ -4678,9 +4679,9 @@ padding: 6px 16px;
   align-items: center;
 }
 
-.due-row span:first-child { font-size: 0.85rem; color: #047857; font-weight: 500; }
+.due-row span:first-child { font-size: 0.85rem; color: #1f5c43; font-weight: 500; }
 .due-amount { font-size: 1rem; font-weight: 700; color: #065f46; }
-.due-date { font-size: 0.7rem; color: #059669; margin-top: 3px; }
+.due-date { font-size: 0.7rem; color: #2E7D5B; margin-top: 3px; }
 
 /* ========================================
    LOADING SCREEN STYLES
@@ -4878,7 +4879,7 @@ padding: 6px 16px;
   text-align: center;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #059669;
+  color: #2E7D5B;
   padding: 4px;
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   border-radius: 6px;
@@ -4894,13 +4895,13 @@ padding: 6px 16px;
 
 .calendar-discounted-price .price-label {
   font-size: 0.75rem;
-  color: #059669;
+  color: #2E7D5B;
   font-weight: 600;
 }
 
 .discount-price {
   font-size: 1.1rem;
-  color: #059669;
+  color: #2E7D5B;
   font-weight: 700;
 }
 
@@ -4925,7 +4926,7 @@ padding: 6px 16px;
 
 /* Reserve for $0 Box - Compact */
 .calendar-reserve-zero-box {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #3a9b73 0%, #2E7D5B 100%);
   border-radius: 10px;
   padding: 10px;
   display: flex;
@@ -5150,20 +5151,20 @@ padding: 6px 16px;
 }
 
 .calendar-modal-body::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(180deg, #3a9b73 0%, #2E7D5B 100%);
   border-radius: 10px;
   border: 2px solid #f1f5f9;
   min-height: 40px;
 }
 
 .calendar-modal-body::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #059669 0%, #047857 100%);
+  background: linear-gradient(180deg, #2E7D5B 0%, #1f5c43 100%);
 }
 
 /* Firefox Scrollbar */
 .calendar-modal-body {
   scrollbar-width: thin;
-  scrollbar-color: #10b981 #f1f5f9;
+  scrollbar-color: #3a9b73 #f1f5f9;
 }
 
 .calendar-content-wrapper {
@@ -5303,7 +5304,7 @@ padding: 6px 16px;
   width: calc(100% - 32px);
   margin: 16px 16px 24px 16px;
   padding: 16px;
-  background: #28a745;
+  background: #2E7D5B;
   color: white;
   border: none;
   border-radius: 10px;
