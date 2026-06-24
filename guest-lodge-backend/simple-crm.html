@@ -2870,7 +2870,7 @@ function goLiveBannerHtml() {
       <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Your booking page is built and ready</div>
       <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">It&apos;s already live for guests to preview. Flip the switch to start accepting direct bookings — nothing else to set up.</p>
       ${blockedDemandLineHtml()}
-      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $99/mo →</button>
+      <button onclick="goLive()" style="width:100%;max-width:280px;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $199/mo →</button>
       <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
     </div>`;
 }
@@ -2883,7 +2883,7 @@ function goLiveInlineCardHtml() {
         <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Ready to go live</div>
         <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your page is built and previewing for guests. Flip the switch to start accepting reservations.</p>
         ${blockedDemandLineHtml()}
-        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $99/mo →</button>
+        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $199/mo →</button>
         <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
       </div>
     </div>`;
@@ -3779,7 +3779,7 @@ function renderBookings(list) {
           <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">Your page is ready to go live</div>
           <div class="empty-sub" style="margin-bottom:12px;">Everything&apos;s set up. Flip the switch to start accepting direct bookings.${blockedDemand && blockedDemand.total > 0 ? ` <strong>${blockedDemand.total} guest${blockedDemand.total>1?'s':''} already tried to book.</strong>` : ''}</div>
-          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $99/mo →</button>
+          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $199/mo →</button>
         </div>`;
       if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
     } else {
@@ -5730,7 +5730,7 @@ function showWelcomeModal() {
           <strong>Set up</strong> your booking page<br>
           <strong>See bookings</strong> when they come in<br>
           <strong>Track revenue</strong> your page generates<br><br>
-          Your page starts in <strong style="color:#1a1a2e;">preview mode</strong> — activate for <strong style="color:#1a5c3f;">$99/mo</strong> when you&apos;re ready to accept reservations.</p>
+          Your page starts in <strong style="color:#1a1a2e;">preview mode</strong> — activate for <strong style="color:#1a5c3f;">$199/mo</strong> when you&apos;re ready to accept reservations.</p>
         <button id="welcomeModalNext" type="button" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Show me how →</button>
       </div>`;
     document.getElementById('welcomeModalNext').onclick = startSettingsTourFromWelcome;
@@ -6368,7 +6368,7 @@ function showTestDriveModal(bookingUrl) {
             <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">No commission — ever</span></div>
           </div>
         </div>
-        <button id="activateNowBtn" style="width:100%;padding:16px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">$99/mo — Go Live Now</button>
+        <button id="activateNowBtn" style="width:100%;padding:16px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">$199/mo — Go Live Now</button>
         <p style="font-size:11px;color:#6b7280;margin:0 0 16px;">Cancel anytime · No contracts</p>
         <button id="activateLaterBtn" style="background:none;border:none;color:#9ca3af;font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;">Not ready yet — keep my page inactive</button>
       </div>

@@ -5675,7 +5675,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Meta CAPI: Subscribe (payment confirmed)
         const { fbp: subFbp, fbc: subFbc } = getMetaCookies(req);
-        let subscriptionAmountUsd = 99;
+        let subscriptionAmountUsd = 199;
         try {
             subscriptionAmountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
         } catch (_) { /* use fallback */ }
@@ -5875,6 +5875,45 @@ app.post('/api/setup/:token/complete', async (req, res) => {
     } catch (e) {
         console.error('Setup complete error:', e.message, e.stack);
         res.status(500).json({ error: 'Failed to complete setup', detail: e.message });
+    }
+});
+
+// Polled by setup.html so a brand-new owner is never sent to their domain
+// before Vercel/Cloudflare finish provisioning the TLS cert — otherwise they
+// hit a Cloudflare "SSL handshake failed" page instead of their Front Desk.
+// We probe server-side because the browser can't reliably distinguish a TLS
+// handshake failure from any other network error.
+app.get('/api/setup/:token/site-status', async (req, res) => {
+    try {
+        const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
+        if (!hotel) return res.status(404).json({ ready: false, error: 'Invalid token' });
+        const domainRow = await prisma.hotelDomain.findFirst({
+            where: { hotelId: hotel.id },
+            orderBy: { isPrimary: 'desc' },
+        });
+        const domain = domainRow?.domain;
+        if (!domain) return res.json({ ready: false, reason: 'no-domain' });
+
+        let ready = false;
+        let status = 0;
+        try {
+            const probe = await axios.get(`https://${domain}/frontdesk`, {
+                timeout: 7000,
+                maxRedirects: 0,
+                validateStatus: () => true,
+                headers: { 'User-Agent': 'Marketel-SiteCheck/1.0' },
+            });
+            status = probe.status;
+            // 2xx–4xx => the TLS handshake completed and the edge is serving.
+            // 5xx (esp. Cloudflare 520–526) or a thrown error => not ready yet.
+            ready = status >= 200 && status < 500;
+        } catch (e) {
+            ready = false; // TLS handshake / DNS not propagated yet
+        }
+        res.set('Cache-Control', 'no-store');
+        res.json({ ready, status, domain });
+    } catch (e) {
+        res.json({ ready: false, error: e.message });
     }
 });
 

@@ -337,17 +337,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="form-card" style="text-align:center; padding:32px 24px;">
       <div style="font-size:36px; margin-bottom:12px;">🚀</div>
       <h2 style="font-size:22px; font-weight:800; margin-bottom:8px; color:var(--text);">You're all set!</h2>
-      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.55;">Your booking page is live in <strong style="color:var(--text);">preview mode</strong> — guests can browse but can&apos;t book yet. Activate for <strong style="color:#1a5c3f;">$99/mo</strong> when you&apos;re ready to take direct reservations.</p>
+      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.55;">Your booking page is live in <strong style="color:var(--text);">preview mode</strong> — guests can browse but can&apos;t book yet. Activate for <strong style="color:#1a5c3f;">$199/mo</strong> when you&apos;re ready to take direct reservations.</p>
       <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px; padding:14px; margin-bottom:20px;">
         <div style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Your Booking Page</div>
         <div style="font-family:monospace; font-size:15px; color:#2E7D5B; font-weight:700; word-break:break-all;" id="successDomain"></div>
-        <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Preview mode · <strong>$99/mo</strong> to accept bookings · cancel anytime</div>
+        <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Preview mode · <strong>$199/mo</strong> to accept bookings · cancel anytime</div>
       </div>
       <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
         Go to Your Dashboard →
       </a>
+      <div id="siteReadyNote" style="display:none; font-size:12px; color:var(--muted); margin-top:12px; line-height:1.5;">
+        <span class="site-ready-spinner" style="display:inline-block; width:12px; height:12px; border:2px solid #bbf7d0; border-top-color:#2E7D5B; border-radius:50%; vertical-align:-2px; margin-right:6px; animation:siteSpin 0.7s linear infinite;"></span>
+        Securing your site&apos;s connection — this can take up to a minute…
+      </div>
     </div>
   </div>
+
+  <style>@keyframes siteSpin { to { transform: rotate(360deg); } }</style>
 
 </div>
 
@@ -449,22 +455,88 @@ async function addRoomAndFinish() {
     // Link goes to front desk (their dashboard), not the booking engine
     var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     var dashboardUrl = (isLocal ? window.location.origin : domain) + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
+    window._dashboardUrl = dashboardUrl;
     document.getElementById('successLink').href = dashboardUrl;
 
-    // Site provisions during video step — link is ready by step 4
+    // The domain was just added to Vercel/Cloudflare — its TLS cert may still be
+    // provisioning. Start polling now (during the quality + video steps) so the
+    // owner isn't sent to an "SSL handshake failed" page. Local dev is always ready.
+    window._siteReady = isLocal;
+    if (!isLocal) startSiteReadinessPolling();
 
     // Send welcome email after they reach the dashboard (not during video)
     var successLink = document.getElementById('successLink');
-    successLink.addEventListener('click', function() {
-      fetch(API + '/api/setup/' + TOKEN + '/finalize', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: '', phone: '', pin: completeData.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
-      }).catch(() => {});
+    successLink.addEventListener('click', function(ev) {
+      if (!successLink.dataset.finalized) {
+        successLink.dataset.finalized = '1';
+        fetch(API + '/api/setup/' + TOKEN + '/finalize', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: '', phone: '', pin: completeData.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
+        }).catch(() => {});
+      }
+      // Hold navigation until the cert is live, then go automatically.
+      if (!window._siteReady) {
+        ev.preventDefault();
+        waitForSiteThenGo();
+      }
     });
 
     goToStep(3);
   } catch (e) { showToast('Something went wrong. Try again.', true); }
   showLoading(false);
+}
+
+// --- Site readiness (TLS provisioning) gate ------------------------------
+window._siteReady = window._siteReady || false;
+let _sitePollTimer = null;
+
+function startSiteReadinessPolling() {
+  // Surface the "preparing" state on the dashboard button right away.
+  var link = document.getElementById('successLink');
+  if (link && !window._siteReady) link.textContent = 'Preparing your site…';
+
+  let attempts = 0;
+  const maxAttempts = 60; // ~3 min at 3s intervals
+  const poll = async () => {
+    attempts++;
+    try {
+      const r = await fetch(API + '/api/setup/' + TOKEN + '/site-status', { cache: 'no-store' });
+      const d = await r.json();
+      if (d && d.ready) { onSiteReady(); return; }
+    } catch (e) { /* keep trying */ }
+    if (attempts < maxAttempts) {
+      _sitePollTimer = setTimeout(poll, 3000);
+    } else {
+      // Gave up waiting — let them through rather than trapping them.
+      onSiteReady();
+    }
+  };
+  poll();
+}
+
+function onSiteReady() {
+  if (_sitePollTimer) { clearTimeout(_sitePollTimer); _sitePollTimer = null; }
+  window._siteReady = true;
+  var link = document.getElementById('successLink');
+  if (link) link.textContent = 'Go to Your Dashboard →';
+  var note = document.getElementById('siteReadyNote');
+  if (note) note.style.display = 'none';
+}
+
+function waitForSiteThenGo() {
+  var link = document.getElementById('successLink');
+  if (link) link.textContent = 'Getting your site ready…';
+  var note = document.getElementById('siteReadyNote');
+  if (note) note.style.display = 'block';
+
+  const check = setInterval(() => {
+    if (window._siteReady) {
+      clearInterval(check);
+      window.location.href = window._dashboardUrl;
+    }
+  }, 800);
+  // Safety valve: never trap the owner — go after 90s no matter what.
+  setTimeout(() => { clearInterval(check); window.location.href = window._dashboardUrl; }, 90000);
 }
 
 loadSetup();
