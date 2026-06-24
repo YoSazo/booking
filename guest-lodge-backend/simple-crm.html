@@ -2891,7 +2891,10 @@ function goLiveBannerHtml() {
 }
 
 function goLiveInlineCardHtml() {
-  if (hotelSubscribed || settingsTourActive) return '';
+  // D19: never surface pricing during onboarding (welcome modal + settings tour).
+  // The card preloads before settingsTourActive flips true, so also gate on the
+  // tour-completion flag — value is established first, price only after.
+  if (hotelSubscribed || settingsTourActive || !localStorage.getItem('settingsTourDone')) return '';
   return `
     <div class="booking-card" id="tour-go-live-card" style="margin-bottom:14px;background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border:none;">
       <div style="padding:18px;text-align:center;">
@@ -2902,6 +2905,31 @@ function goLiveInlineCardHtml() {
         <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
       </div>
     </div>`;
+}
+
+// D19: the Your-page go-live card is gated off during onboarding (see
+// goLiveInlineCardHtml). The edit page renders once and isn't auto-rebuilt, so
+// once the tour completes we inject the card into the already-mounted DOM.
+function refreshGoLiveInlineCard() {
+  const existing = document.getElementById('tour-go-live-card');
+  const html = goLiveInlineCardHtml();
+  if (existing) {
+    if (html) existing.outerHTML = html;
+    else existing.remove();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+  if (!html) return;
+  const list = document.getElementById('editRoomsList');
+  if (!list) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html.trim();
+  const card = tmp.firstElementChild;
+  if (!card) return;
+  const ratesCard = document.getElementById('tour-rates-card');
+  if (ratesCard && ratesCard.parentNode === list) list.insertBefore(card, ratesCard);
+  else list.insertBefore(card, list.firstChild);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // D19: fetch blocked-demand counts and refresh any visible go-live surfaces.
@@ -3025,6 +3053,9 @@ async function hydrateCrmAfterTour() {
     loadBookings({ deferMessages: true }),
     revenueEnabled ? loadRevenueData(true) : Promise.resolve(),
   ]);
+  // Tour is over and value is established — now the go-live pricing card is
+  // allowed to surface on Your page (it was gated off during onboarding).
+  refreshGoLiveInlineCard();
 }
 
 function finishTourHydration() {
@@ -5804,7 +5835,7 @@ function showWelcomeModal() {
           <strong>Set up</strong> your booking page<br>
           <strong>See bookings</strong> when they come in<br>
           <strong>Track revenue</strong> your page generates<br><br>
-          Your page starts in <strong style="color:#1a1a2e;">preview mode</strong> — activate for <strong style="color:#1a5c3f;">$199/mo</strong> when you&apos;re ready to accept reservations.</p>
+          Your page starts in <strong style="color:#1a1a2e;">preview mode</strong> — flip the switch to start accepting reservations whenever you&apos;re ready.</p>
         <button id="welcomeModalNext" type="button" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Show me how →</button>
       </div>`;
     document.getElementById('welcomeModalNext').onclick = startSettingsTourFromWelcome;
