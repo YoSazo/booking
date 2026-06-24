@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Bell, Building2, CheckCircle2, Share, SquarePlus } from 'lucide-react';
+import { MessageCircle, Bell, Building2, CheckCircle2, Share, SquarePlus, X } from 'lucide-react';
 
 export const BRAND = '#2E7D5B';
 export const IOS_SHARE_BLUE = '#007aff';
@@ -185,7 +185,6 @@ export function IosInstallSheet({
   hotelName,
   appIconUrl,
   onClose,
-  onConfirmInstalled,
   title,
   subtitle = 'Add it to your home screen — takes 3 seconds.',
   openUrl,
@@ -194,7 +193,6 @@ export function IosInstallSheet({
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -208,8 +206,8 @@ export function IosInstallSheet({
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
+          position: 'relative',
           background: '#fff',
           width: '100%',
           maxWidth: 440,
@@ -218,7 +216,32 @@ export function IosInstallSheet({
           boxShadow: '0 -8px 40px rgba(0,0,0,0.2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: 'none',
+            background: '#f3f4f6',
+            color: '#6b7280',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0,
+            fontFamily: 'inherit',
+          }}
+        >
+          <X size={18} strokeWidth={2.5} aria-hidden />
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, paddingRight: 36 }}>
           <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={48} style={{ margin: 0, boxShadow: 'none' }} />
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a2e' }}>
@@ -257,70 +280,6 @@ export function IosInstallSheet({
         ) : null}
 
         <IosInstallSteps />
-
-        {onConfirmInstalled ? (
-          <button
-            type="button"
-            onClick={() => { onConfirmInstalled(); onClose(); }}
-            style={{
-              width: '100%',
-              marginTop: 22,
-              padding: 14,
-              borderRadius: 12,
-              border: 'none',
-              background: BRAND,
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            I&apos;ve added it to my home screen
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: '100%',
-              marginTop: 22,
-              padding: 14,
-              borderRadius: 12,
-              border: 'none',
-              background: BRAND,
-              color: '#fff',
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Got it
-          </button>
-        )}
-
-        {onConfirmInstalled ? (
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: '100%',
-              marginTop: 10,
-              padding: 14,
-              borderRadius: 12,
-              border: `1.5px solid ${INSTALL_THEME.border}`,
-              background: 'none',
-              color: INSTALL_THEME.textMuted,
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Not yet
-          </button>
-        ) : null}
       </div>
     </div>
   );

@@ -441,11 +441,11 @@ export function loadAppsModule() {
 
 ${corePatched}
 
-${rewriteFd(initBlock)}
-
 exposeToWindow({
 ${[...coreFns, 'loadSettingsModule', 'loadAppsModule'].map((n) => `  ${n},`).join('\n')}
 });
+
+${rewriteFd(initBlock)}
 `;
 
 const settingsJs = `${stateImport}

@@ -282,7 +282,6 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
           title={`Install ${hotelName}`}
           subtitle="Add it to your home screen — takes 3 seconds."
           onClose={() => setShowIosSheet(false)}
-          onConfirmInstalled={markInstalled}
         />
       )}
     </div>

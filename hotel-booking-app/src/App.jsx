@@ -231,15 +231,14 @@ function App() {
     iosTitle.content = currentHotel?.name || 'Book Now';
     document.head.appendChild(iosTitle);
 
-    if (currentHotel?.appIconUrl) {
-      let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
-      if (!appleIcon) {
-        appleIcon = document.createElement('link');
-        appleIcon.rel = 'apple-touch-icon';
-        document.head.appendChild(appleIcon);
-      }
-      appleIcon.href = currentHotel.appIconUrl;
+    const guestIconUrl = `${API_BASE_URL}/api/hotel/${encodeURIComponent(hotelId)}/guest-app-icon.png?s=180`;
+    let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    if (!appleIcon) {
+      appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      document.head.appendChild(appleIcon);
     }
+    appleIcon.href = guestIconUrl;
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/engine-sw.js').catch(() => {});

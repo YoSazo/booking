@@ -44,11 +44,14 @@
 
     /* ── LOGIN ── */
     .login-screen {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+      padding: 16px;
       background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
     }
     .login-card {
-      background: white; border-radius: 20px; padding: 40px 36px; width: 340px;
+      background: white; border-radius: 20px;
+      padding: clamp(28px, 8vw, 40px) clamp(22px, 6vw, 36px);
+      width: min(340px, 100%); max-width: 100%;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
     }
     .status-card {
@@ -85,13 +88,18 @@
     }
     .login-input:focus { border-color: var(--green); box-shadow: 0 0 0 4px var(--green-pale); }
     .login-btn {
-      width: 100%; padding: 13px;
+      width: 100%; padding: 13px; min-height: 48px;
       background: linear-gradient(135deg, var(--green-light) 0%, var(--green) 60%, var(--green-dark) 100%);
       color: white; box-shadow: 0 6px 18px rgba(46,125,91,0.3);
-      border: none; border-radius: 12px; font-family: inherit; font-size: 15px;
-      font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      border: none; border-radius: 12px; font-family: inherit; font-size: 16px;
+      font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
-    .login-btn:hover { transform: translateY(-1px); box-shadow: 0 9px 26px rgba(46,125,91,0.38); }
+    .login-btn:disabled { opacity: 0.72; cursor: wait; transform: none; box-shadow: 0 4px 12px rgba(46,125,91,0.2); }
+    @media (hover: hover) and (pointer: fine) {
+      .login-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 9px 26px rgba(46,125,91,0.38); }
+    }
+    .login-btn:active:not(:disabled) { transform: scale(0.98); }
     .login-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
 
     /* ── HEADER ── */
@@ -1848,15 +1856,14 @@
       <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
     </div>
     <p>Front Desk — Enter your PIN to continue</p>
-    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
-      onkeydown="if(event.key==='Enter') doLogin()">
-    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20" autocomplete="current-password" enterkeyhint="go">
+    <button type="button" class="login-btn" id="signInBtn">Sign In</button>
     <div class="login-error" id="loginError"></div>
     <div id="forgotPinSection" style="margin-top:14px;text-align:center;">
       <a href="#" onclick="showMagicLinkForm(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Email me a login link</a>
       <div id="magicLinkForm" style="display:none;margin-top:12px;">
         <input class="login-input" type="email" id="magicLinkEmail" placeholder="Your email address" style="margin-bottom:10px;">
-        <button class="login-btn" onclick="sendMagicLink()" style="background:#2E7D5B;">Send Login Link</button>
+        <button type="button" class="login-btn" id="magicLinkSendBtn" style="background:#2E7D5B;">Send Login Link</button>
         <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
       </div>
     </div>
@@ -3051,11 +3058,16 @@ async function startCrmApp(verification) {
 async function doLogin() {
   const pin = document.getElementById('pinInput').value.trim();
   const err = document.getElementById('loginError');
+  const btn = document.getElementById('signInBtn');
   err.textContent = '';
   if (!activeHotelId) { err.textContent = 'Hotel context is still loading'; return; }
   if (!pin) { err.textContent = 'Please enter PIN'; return; }
-  
-  // Verify PIN with server first
+
+  const prevLabel = btn ? btn.textContent : 'Sign In';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+  }
   try {
     const verification = await verifyCrmToken(pin);
     token = pin;
@@ -3063,6 +3075,11 @@ async function doLogin() {
     await startCrmApp(verification);
   } catch (e) {
     err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : (e.message || 'Connection failed');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+    }
   }
 }
 
@@ -5949,8 +5966,9 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
     ? `<img src="${iconUrl}" alt="" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;">`
     : `<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${(activeHotelName || 'B').trim().charAt(0).toUpperCase()}</div>`;
   overlay.innerHTML = `
-    <div id="iosInstallSheetCard" style="background:#fff;width:100%;max-width:440px;border-radius:20px 20px 0 0;padding:24px 22px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.2);">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+    <div id="iosInstallSheetCard" style="position:relative;background:#fff;width:100%;max-width:440px;border-radius:20px 20px 0 0;padding:24px 22px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.2);">
+      <button type="button" id="iosInstallSheetClose" aria-label="Close" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;color:#6b7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-size:20px;line-height:1;font-family:inherit;">×</button>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-right:36px;">
         ${iconTile}
         <div><div style="font-size:16px;font-weight:800;color:#1a1a2e;">${title || 'Install app'}</div>
         <div style="font-size:12px;color:#6b7280;margin-top:2px;">${subtitle || ''}</div></div>
@@ -5961,16 +5979,12 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
         <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span><div style="font-size:14px;color:#374151;line-height:1.4;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">Scroll down and tap <strong>Add to Home Screen</strong> <i data-lucide="square-plus" style="width:18px;height:18px;color:#2E7D5B;vertical-align:middle;"></i></div></div>
         <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span><div style="font-size:14px;color:#374151;line-height:1.4;">Tap <strong>Add</strong> — done! It's on your home screen.</div></div>
       </div>
-      <button id="iosInstallSheetDone" style="width:100%;margin-top:22px;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Got it</button>
     </div>`;
   document.body.appendChild(overlay);
   if (typeof lucide !== 'undefined') lucide.createIcons();
   const close = () => overlay.remove();
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  const card = document.getElementById('iosInstallSheetCard');
-  if (card) card.addEventListener('click', (e) => e.stopPropagation());
-  const doneBtn = document.getElementById('iosInstallSheetDone');
-  if (doneBtn) doneBtn.onclick = close;
+  const closeBtn = document.getElementById('iosInstallSheetClose');
+  if (closeBtn) closeBtn.onclick = close;
 }
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
@@ -8492,7 +8506,12 @@ function startAppsTour(opts) {
 
 // ── INIT ───────────────────────────────────────────────
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/frontdesk-sw.js').catch(() => {});
-document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+const signInBtn = document.getElementById('signInBtn');
+if (signInBtn) signInBtn.addEventListener('click', () => { void doLogin(); });
+const pinInputEl = document.getElementById('pinInput');
+if (pinInputEl) pinInputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') void doLogin(); });
+const magicLinkSendBtn = document.getElementById('magicLinkSendBtn');
+if (magicLinkSendBtn) magicLinkSendBtn.addEventListener('click', () => { void sendMagicLink(); });
 bootCrmApp();
 if ('requestIdleCallback' in window) {
   requestIdleCallback(() => { loadAppsModule().catch(() => {}); }, { timeout: 4000 });

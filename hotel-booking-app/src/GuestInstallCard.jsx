@@ -113,7 +113,6 @@ function GuestInstallCard({
       title={`Install ${hotelName || 'our app'}`}
       subtitle="Add it to your home screen — takes 3 seconds."
       onClose={() => setShowIosSheet(false)}
-      onConfirmInstalled={markInstalled}
     />
   );
 

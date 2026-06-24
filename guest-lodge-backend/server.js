@@ -15,6 +15,7 @@ const http = require('http');
 const https = require('https');
 const webpush = require('web-push');
 const nodemailer = require('nodemailer');
+const sharp = require('sharp');
 const telemetry = require('./marketel-signal-extractor');
 
 // Marketel CAPI (separate pixel for the onboarding funnel)
@@ -5826,46 +5827,107 @@ app.post('/api/setup/:token/complete', async (req, res) => {
     }
 });
 
+function escapeXml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function hotelLetterInitial(name) {
+    const match = String(name || 'H').trim().match(/[A-Za-z0-9]/);
+    return match ? match[0].toUpperCase() : 'H';
+}
+
+function isRasterAppIconUrl(url) {
+    if (!url) return false;
+    const ext = url.split('?')[0].split('.').pop().toLowerCase();
+    return ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
+}
+
+async function resolveHotelForManifest(hotelId) {
+    let hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId } });
+    if (!hotel) {
+        const domainGuess = hotelId + '.bookmarketel.com';
+        const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+        if (domainRecord) {
+            hotel = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId } });
+        }
+    }
+    return hotel;
+}
+
+async function renderHotelLetterIconPng(letter, size) {
+    const safeSize = Math.min(512, Math.max(64, Number(size) || 192));
+    const fontSize = Math.round(safeSize * 0.46);
+    const radius = Math.round(safeSize * 0.22);
+    const svg = `<svg width="${safeSize}" height="${safeSize}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" rx="${radius}" fill="#2E7D5B"/>
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="${fontSize}" fill="#ffffff">${escapeXml(letter)}</text>
+</svg>`;
+    return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+function buildGuestManifestIcons(hotel, hotelId, baseUrl) {
+    const id = (hotel && hotel.id) || hotelId;
+    const iconBase = `${baseUrl}/api/hotel/${encodeURIComponent(id)}/guest-app-icon.png`;
+    return [
+        { src: `${iconBase}?s=192`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: `${iconBase}?s=512`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: `${iconBase}?s=512`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ];
+}
+
+// Per-hotel home-screen icon: uploaded logo, or a generated letter tile (e.g. "M" for Mo's Hotel).
+app.get('/api/hotel/:hotelId/guest-app-icon.png', async (req, res) => {
+    try {
+        const allowedSizes = [96, 128, 152, 180, 192, 256, 512];
+        let size = parseInt(req.query.s, 10) || 192;
+        if (!allowedSizes.includes(size)) size = 192;
+
+        const hotel = await resolveHotelForManifest(req.params.hotelId);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+        let png;
+        if (hotel && isRasterAppIconUrl(hotel.appIconUrl)) {
+            const iconUrl = hotel.appIconUrl.startsWith('http') ? hotel.appIconUrl : baseUrl + hotel.appIconUrl;
+            const response = await axios.get(iconUrl, { responseType: 'arraybuffer', timeout: 10000 });
+            png = await sharp(Buffer.from(response.data))
+                .resize(size, size, { fit: 'cover' })
+                .png()
+                .toBuffer();
+        } else {
+            png = await renderHotelLetterIconPng(hotelLetterInitial(hotel?.name), size);
+        }
+
+        res.set('Content-Type', 'image/png');
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cache-Control', hotel?.appIconUrl ? 'public, max-age=300' : 'public, max-age=86400');
+        res.send(png);
+    } catch (e) {
+        console.error('Guest app icon error:', e.message);
+        try {
+            const png = await renderHotelLetterIconPng('H', 192);
+            res.set('Content-Type', 'image/png');
+            res.send(png);
+        } catch {
+            res.status(500).end();
+        }
+    }
+});
+
 // Dynamic per-hotel PWA manifest — lets each hotel be installed to the home
 // screen as "their" app (their name + their icon). Served same-origin via the
 // booking engine's /api proxy so install prompts work.
 app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
     try {
-        let hotel = await prisma.hotelConfig.findUnique({
-            where: { id: req.params.hotelId },
-            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
-        });
-        if (!hotel) {
-            const domainGuess = req.params.hotelId + '.bookmarketel.com';
-            const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
-            if (domainRecord) {
-                hotel = await prisma.hotelConfig.findUnique({
-                    where: { id: domainRecord.hotelId },
-                    include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
-                });
-            }
-        }
+        const hotel = await resolveHotelForManifest(req.params.hotelId);
 
         const name = (hotel && hotel.name) || 'Book Now';
+        const hotelId = (hotel && hotel.id) || req.params.hotelId;
         const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const resolveImgUrl = (url) => (url && url.startsWith('http')) ? url : baseUrl + (url || '');
-
-        // Icon priority: custom raster icon → Marketel PNG. Never fall back to
-        // SVG: iOS ignores SVG home-screen icons (renders blank), so the default
-        // must be a real PNG served at the standard sizes.
-        const customExt = (hotel && hotel.appIconUrl ? hotel.appIconUrl.split('?')[0].split('.').pop() : '').toLowerCase();
-        const customIsRaster = hotel && hotel.appIconUrl && ['png', 'jpg', 'jpeg', 'webp'].includes(customExt);
-        const icons = customIsRaster
-            ? [
-                { src: hotel.appIconUrl, sizes: '192x192', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
-                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'any' },
-                { src: hotel.appIconUrl, sizes: '512x512', type: customExt === 'webp' ? 'image/webp' : customExt === 'png' ? 'image/png' : 'image/jpeg', purpose: 'maskable' },
-            ]
-            : [
-                { src: `${baseUrl}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-                { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-            ];
+        const icons = buildGuestManifestIcons(hotel, hotelId, baseUrl);
 
         const manifest = {
             name,

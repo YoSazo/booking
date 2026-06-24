@@ -20,9 +20,9 @@
     else setTimeout(loadClarity, 3000);
   })();
   </script>
-  <script type="module" crossorigin src="/frontdesk/assets/index-RU8yhhJq.js"></script>
-  <link rel="modulepreload" crossorigin href="/frontdesk/assets/settings-B_huUS59.js">
-  <link rel="stylesheet" crossorigin href="/frontdesk/assets/index-Dyr5F3-X.css">
+  <script type="module" crossorigin src="/frontdesk/assets/index-C54vkCNR.js"></script>
+  <link rel="modulepreload" crossorigin href="/frontdesk/assets/settings-ClZfaBNJ.js">
+  <link rel="stylesheet" crossorigin href="/frontdesk/assets/index-BCkV4zj5.css">
 </head>
 <body>
 
@@ -51,15 +51,14 @@
       <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
     </div>
     <p>Front Desk — Enter your PIN to continue</p>
-    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20"
-      onkeydown="if(event.key==='Enter') doLogin()">
-    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20" autocomplete="current-password" enterkeyhint="go">
+    <button type="button" class="login-btn" id="signInBtn">Sign In</button>
     <div class="login-error" id="loginError"></div>
     <div id="forgotPinSection" style="margin-top:14px;text-align:center;">
       <a href="#" onclick="showMagicLinkForm(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Email me a login link</a>
       <div id="magicLinkForm" style="display:none;margin-top:12px;">
         <input class="login-input" type="email" id="magicLinkEmail" placeholder="Your email address" style="margin-bottom:10px;">
-        <button class="login-btn" onclick="sendMagicLink()" style="background:#2E7D5B;">Send Login Link</button>
+        <button type="button" class="login-btn" id="magicLinkSendBtn" style="background:#2E7D5B;">Send Login Link</button>
         <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
       </div>
     </div>

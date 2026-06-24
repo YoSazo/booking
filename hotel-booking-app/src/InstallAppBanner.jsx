@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { isStandalone } from './pwaUtils.js';
-
-const BRAND = '#2E7D5B';
+import { BRAND, IosInstallSheet } from './guestInstallUi.jsx';
 
 function isIos() {
   if (typeof navigator === 'undefined') return false;
@@ -125,96 +124,14 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
       </div>
 
       {showIosSheet && (
-        <div
-          onClick={() => setShowIosSheet(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 10000,
-            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'white', width: '100%', maxWidth: 440,
-              borderRadius: '20px 20px 0 0', padding: '24px 22px 32px',
-              boxShadow: '0 -8px 40px rgba(0,0,0,0.2)',
-              animation: 'installSheetUp 0.3s ease',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-              {iconTile}
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a2e' }}>
-                  Install {hotelName || 'our app'}
-                </div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                  Takes 5 seconds — book direct anytime.
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{
-                  width: 26, height: 26, borderRadius: '50%', background: '#f0fdf4',
-                  color: BRAND, fontWeight: 800, fontSize: 13, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>1</span>
-                <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>
-                  Tap the <strong>Share</strong> button
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 22, height: 22, margin: '0 4px', verticalAlign: 'middle',
-                    color: '#007aff',
-                  }}>
-                    <svg width="16" height="18" viewBox="0 0 16 20" fill="none">
-                      <path d="M8 1L8 13" stroke="#007aff" strokeWidth="1.6" strokeLinecap="round" />
-                      <path d="M4.5 4.5L8 1L11.5 4.5" stroke="#007aff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M3 8H2.5C1.67 8 1 8.67 1 9.5V17C1 17.83 1.67 18.5 2.5 18.5H13.5C14.33 18.5 15 17.83 15 17V9.5C15 8.67 14.33 8 13.5 8H13" stroke="#007aff" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </span>
-                  in your browser bar
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{
-                  width: 26, height: 26, borderRadius: '50%', background: '#f0fdf4',
-                  color: BRAND, fontWeight: 800, fontSize: 13, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>2</span>
-                <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>
-                  Scroll down and tap <strong>Add to Home Screen</strong>
-                  <span style={{ marginLeft: 4 }}>➕</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{
-                  width: 26, height: 26, borderRadius: '50%', background: '#f0fdf4',
-                  color: BRAND, fontWeight: 800, fontSize: 13, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>3</span>
-                <div style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>
-                  Tap <strong>Add</strong> — done! We're on your home screen.
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowIosSheet(false)}
-              style={{
-                width: '100%', marginTop: 22, padding: '14px', borderRadius: 12,
-                border: 'none', background: BRAND, color: 'white', fontSize: 15,
-                fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
+        <IosInstallSheet
+          hotelName={hotelName}
+          appIconUrl={appIconUrl}
+          title={`Install ${hotelName || 'our app'}`}
+          subtitle="Takes about 3 seconds — book direct anytime."
+          onClose={() => setShowIosSheet(false)}
+        />
       )}
-
-      <style>{`@keyframes installSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
     </>
   );
 }
