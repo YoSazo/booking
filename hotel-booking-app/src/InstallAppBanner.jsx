@@ -16,15 +16,8 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIosSheet, setShowIosSheet] = useState(false);
   const [installed, setInstalled] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-
-  const storageKey = `installDismissed_${hotelId || 'default'}`;
 
   useEffect(() => {
-    try {
-      if (localStorage.getItem(storageKey) === '1') setDismissed(true);
-    } catch (e) { /* ignore */ }
-
     const onBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -39,15 +32,16 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, [storageKey]);
+  }, []);
 
   const ios = isIos();
 
-  // Don't show if already installed/running standalone, dismissed, or if there's
-  // no way to install (non-iOS browser that never fired beforeinstallprompt).
+  // Don't show if already installed/running standalone, or if there's no way to
+  // install (non-iOS browser that never fired beforeinstallprompt). The banner is
+  // not dismissible — it stays as a passive Install affordance.
   // Owner preview from Front Desk always shows the banner so they can see guest UI.
   if (!ownerPreview) {
-    if (installed || isStandalone() || dismissed) return null;
+    if (installed || isStandalone()) return null;
     if (!ios && !deferredPrompt) return null;
   }
 
@@ -62,11 +56,6 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
       if (choice?.outcome === 'accepted') setInstalled(true);
       setDeferredPrompt(null);
     }
-  };
-
-  const handleDismiss = () => {
-    setDismissed(true);
-    try { localStorage.setItem(storageKey, '1'); } catch (e) { /* ignore */ }
   };
 
   const iconTile = appIconUrl ? (
@@ -84,42 +73,31 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
       <div
         id="guest-install"
         style={{
-        display: 'flex', alignItems: 'center', gap: 14,
         background: 'white', border: '1px solid #e5e7eb', borderRadius: 16,
         padding: '14px 16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
         margin: '20px 0 8px',
       }}>
-        {iconTile}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.3 }}>
-            Add {hotelName || 'us'} to your home screen
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, lineHeight: 1.4 }}>
-            Book direct in one tap next time — no fees, no app store.
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {iconTile}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.3 }}>
+              Add {hotelName || 'us'} to your home screen
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, lineHeight: 1.4 }}>
+              Book direct in one tap next time — no fees, no app store.
+            </div>
           </div>
         </div>
         <button
           onClick={handleInstall}
           style={{
-            flexShrink: 0, padding: '10px 16px', borderRadius: 10, border: 'none',
-            background: BRAND, color: 'white', fontSize: 13, fontWeight: 700,
-            cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+            width: '100%', marginTop: 14, padding: '12px 16px', borderRadius: 10,
+            border: 'none', background: BRAND, color: 'white', fontSize: 14,
+            fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
           Install
         </button>
-        {!ownerPreview && (
-        <button
-          onClick={handleDismiss}
-          style={{
-            flexShrink: 0, border: 'none', background: 'transparent', color: '#9ca3af',
-            fontSize: 12, fontWeight: 600, lineHeight: 1, cursor: 'pointer',
-            fontFamily: 'inherit', padding: '4px 2px', whiteSpace: 'nowrap',
-          }}
-        >
-          Maybe later
-        </button>
-        )}
       </div>
 
       {showIosSheet && (

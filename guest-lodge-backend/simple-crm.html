@@ -8391,16 +8391,17 @@ function renderAppsView() {
       <div class="apps-step-title">${fdInApp ? 'Front Desk — on your home screen' : 'Add Front Desk to your home screen'}</div>
       ${fdCtaHtml}
     </div>
-    <div class="apps-step-card">
-      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
-      ${checkinActionsHtml}
-      ${guestInstallLinkHtml}
-    </div>
-    ${guestBroadcastCardHtml()}
     <div class="apps-step-card" id="tour-guest-icon-section">
       <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
       ${logoBlockHtml}
-    </div>`;
+    </div>
+    <div class="apps-step-card">
+      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Just like you can save Front Desk to your home screen, your guests can save <strong>${hName}</strong> to theirs — one tap, no app store. Then you're on their phone, and they book and message you direct.</p>
+      ${checkinActionsHtml}
+      ${guestInstallLinkHtml}
+    </div>
+    ${guestBroadcastCardHtml()}`;
 
   const appsFootnoteHtml = fdInApp
     ? 'Booking alerts live on the <strong>Bookings</strong> tab · installs on iPhone &amp; Android'
