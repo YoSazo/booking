@@ -5692,7 +5692,7 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
 const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY)
     : null;
-const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_UduliUOPjkESCJ';
+const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_Uls6PKBuIH3dFL';
 
 async function getMarketelSubscriptionPrice() {
     if (!marketelStripe) throw new Error('Payment not configured');
@@ -6552,7 +6552,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             console.log(`✅ Hotel subscribed: ${hotelId}`);
             // Track
             prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotelId } }).catch(() => {});
-            let subscriptionAmountUsd = 99;
+            let subscriptionAmountUsd = 199;
             try {
                 subscriptionAmountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
             } catch (_) { /* use fallback */ }
