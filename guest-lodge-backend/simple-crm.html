@@ -2009,6 +2009,7 @@ let revenueEnabled = false;
 let hotelSubscribed = false;
 let blockedDemand = { total: 0, today: 0, recent: [] }; // D19: proof of demand
 let bookingsSubview = 'bookings'; // 'bookings' | 'growth' — Bookings-tab segmented control
+let launchStatus = null;          // { photo, rates } — server-truth for the launch checklist
 let growthFunnel = null;          // { pageViews, checkoutStarted, blockedAttempts, completedBookings }
 let growthChecklist = {};         // owner self-reported "Get found" steps
 let growthPeriod = '30d';         // 'today' | '7d' | '30d'
@@ -3004,6 +3005,19 @@ function renderBookingFilterChips(counts) {
       ${chip('needs', 'Needs call', counts.needs, '#ea580c')}
       ${chip('called', 'Called', counts.called)}
     </div>`;
+}
+
+// Launch checklist truth: a real photo and real rates exist on the server.
+async function loadLaunchStatus() {
+  try {
+    const res = await api('GET', '/api/crm/rooms');
+    if (!res || !res.success) return;
+    const photo = (res.rooms || []).some(r => (r.images && r.images.length > 0) || r.imageUrl);
+    const rates = !!(res.rates && (Number(res.rates.nightly) > 0 || Number(res.rates.weekly) > 0 || Number(res.rates.monthly) > 0));
+    launchStatus = { photo, rates };
+    if (Array.isArray(res.rooms)) editRooms = res.rooms;
+    if (currentFilter === 'bookings' && bookingsSubview !== 'growth') renderBookings(bookings);
+  } catch (e) { /* non-fatal */ }
 }
 
 // ── GROWTH ("Get found") — Bookings-tab segmented view ─────────────
@@ -4052,27 +4066,21 @@ function renderBookings(fullList) {
   }
 
   if (list.length === 0) {
-    // Check photo status from API (editRooms might not be loaded yet)
-    const hasPhoto = editRooms.length > 0 
-      ? editRooms.some(r => r.images && r.images.length > 0)
-      : false;
-    const hasSharedLink = !!localStorage.getItem('linkCopied');
-
-    // If editRooms not loaded yet, fetch to check photo status
-    if (editRooms.length === 0) {
-      api('GET', '/api/crm/rooms').then(res => {
-        if (res?.rooms) {
-          editRooms = res.rooms;
-          renderBookings(list); // Re-render with updated data
-        }
-      }).catch(() => {});
-    }
+    // Launch checklist completion is derived from SERVER truth (rooms + rates),
+    // not browser-local flags — a localStorage flag is wrong across devices and
+    // after a reinstall. localStorage flags are kept only as an optimistic OR.
+    if (launchStatus === null) loadLaunchStatus();
+    const hasPhoto = launchStatus
+      ? launchStatus.photo
+      : (editRooms.length > 0 ? editRooms.some(r => (r.images && r.images.length > 0) || r.imageUrl) : false);
+    const hasRates = (launchStatus ? launchStatus.rates : false) || !!localStorage.getItem('ratesChanged');
+    const hasSharedLink = !!localStorage.getItem('linkCopied') || hotelSubscribed;
 
     const checkIcon = (done) => done 
       ? '<div style="width:24px;height:24px;border-radius:50%;background:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>'
       : '<div style="width:24px;height:24px;border-radius:6px;border:2px solid #d0d7d3;flex-shrink:0;"></div>';
 
-    const allDone = hasPhoto && hasSharedLink && !!localStorage.getItem('ratesChanged');
+    const allDone = hasPhoto && hasSharedLink && hasRates;
 
     if (allDone && hotelSubscribed) {
       el.innerHTML = `
@@ -4107,8 +4115,8 @@ function renderBookings(fullList) {
                 <div style="font-size:12px;color:#6b7280;">Guests book more when they see photos</div>
               </div>
             </button>
-            <button onclick="checklistGoToRates()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${localStorage.getItem('ratesChanged') ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
-              ${checkIcon(!!localStorage.getItem('ratesChanged'))}
+            <button onclick="checklistGoToRates()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:white;border-radius:12px;border:1.5px solid ${hasRates ? '#2E7D5B' : '#e5e7eb'};cursor:pointer;text-align:left;font-family:inherit;width:100%;">
+              ${checkIcon(hasRates)}
               <div>
                 <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Change your rates</div>
                 <div style="font-size:12px;color:#6b7280;">Set your nightly, weekly, and monthly pricing</div>
@@ -7969,6 +7977,7 @@ async function saveRates() {
   try {
     await api('POST', '/api/crm/rates', { nightly, weekly, monthly });
     localStorage.setItem('ratesChanged', '1');
+    launchStatus = null; // re-derive launch checklist from fresh server truth
     advanceTourIfNeeded();
     toast('Rates saved!', 'success');
   } catch (e) {
@@ -8125,6 +8134,7 @@ async function uploadEditImages(event, roomId) {
   const spinner = document.getElementById('upload-spinner-' + roomId);
   if (spinner) spinner.remove();
   renderEditRoomsCards();
+  if (uploaded > 0) launchStatus = null; // re-derive launch checklist from fresh server truth
   advanceTourIfNeeded();
   if (uploaded > 0) {
     toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
