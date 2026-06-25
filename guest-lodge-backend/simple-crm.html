@@ -3058,8 +3058,8 @@ function ensureGrowthStyles() {
     .growth-btn{border:none;border-radius:9px;padding:9px 14px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
     .growth-btn-primary{background:#2E7D5B;color:#fff;}
     .growth-btn-ghost{background:#fff;color:#1a1a2e;border:1.5px solid #e0e4e2;}
-    .growth-link-box{display:flex;gap:8px;align-items:center;background:#f7faf8;border:1px solid #e0e4e2;border-radius:10px;padding:8px 8px 8px 12px;margin-top:11px;}
-    .growth-link-box input{flex:1;min-width:0;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:12px;color:#1a1a2e;outline:none;}
+    .growth-link-box{display:flex;flex-direction:column;gap:8px;align-items:stretch;background:#f7faf8;border:1px solid #e0e4e2;border-radius:10px;padding:12px;margin-top:11px;}
+    .growth-link-box input{width:100%;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:10px;color:#1a1a2e;outline:none;}
   `;
   document.head.appendChild(s);
 }
@@ -3191,7 +3191,7 @@ function renderGrowthPanel() {
   // treats `${...}` interpolations as raw, so nested template literals inside an
   // interpolation desync it — keep interpolations to simple values only.
   const linkBoxHtml = bookingUrl
-    ? `<div class="growth-link-box"><input type="text" readonly value="${bookingUrl}"><button type="button" class="growth-btn growth-btn-primary" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy</button></div>`
+    ? `<div class="growth-link-box"><input type="text" readonly value="${domain}"><button type="button" class="growth-btn growth-btn-primary" style="justify-content:center;" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy</button></div>`
     : `<div class="growth-step-desc" style="margin-top:8px;">Your booking link is still setting up.</div>`;
 
   const periodHtml = periodBtn('today', 'Today') + periodBtn('7d', '7 days') + periodBtn('30d', '30 days');
@@ -8569,8 +8569,8 @@ function renderAppsView() {
   const guestInstallLinkHtml = guestInstallUrl !== '#' ? `
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
         <div class="apps-step-title" style="font-size:13px;margin-bottom:8px;">Guest install link</div>
-        <input type="text" value="${guestInstallUrl}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
-        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy install link</button>
+        <input type="text" value="${guestInstallUrl.replace('https://', '')}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
+        <button type="button" onclick="navigator.clipboard.writeText('https://' + document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy install link</button>
         <div id="guestInstallStats" style="display:none;margin-top:12px;"></div>
       </div>` : '<div id="guestInstallStats" style="display:none;"></div>';
 
