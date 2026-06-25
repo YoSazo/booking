@@ -172,6 +172,7 @@ model HotelConfig {
   checkInTime   String?   @default("15:00")
   checkOutTime  String?   @default("11:00")
   cancellationPolicy String?
+  growthChecklist Json?   // owner self-reported "get found" steps: { gbp:{done,ts}, qr:{...}, textLink:{...} }
 
   domains       HotelDomain[]
   crmPins       CrmPin[]

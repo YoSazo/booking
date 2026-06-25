@@ -1929,11 +1929,13 @@
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
+    <div id="bookingsSubtabs" style="display:none;"></div>
     <div id="messagesPanel" style="display:none;"></div>
     <div id="bookingFilterChips" style="display:none;"></div>
     <div id="bookingsList">
       <div class="loading"><div class="logo-sprite-bounce"></div> Loading bookings…</div>
     </div>
+    <div id="growthPanel" style="display:none;"></div>
     <div id="appsView" style="display:none;"></div>
   </div>
 
@@ -2006,6 +2008,10 @@ let currentHotelPms = '';
 let revenueEnabled = false;
 let hotelSubscribed = false;
 let blockedDemand = { total: 0, today: 0, recent: [] }; // D19: proof of demand
+let bookingsSubview = 'bookings'; // 'bookings' | 'growth' — Bookings-tab segmented control
+let growthFunnel = null;          // { pageViews, checkoutStarted, blockedAttempts, completedBookings }
+let growthChecklist = {};         // owner self-reported "Get found" steps
+let growthPeriod = '30d';         // 'today' | '7d' | '30d'
 let revenuePeriod = '30d';
 let revenueCache = {};
 let revenueLoading = false;
@@ -2978,8 +2984,8 @@ function setBookingCallFilter(f) {
 function renderBookingFilterChips(counts) {
   const wrap = document.getElementById('bookingFilterChips');
   if (!wrap) return;
-  // Only on the Bookings tab, and only when there's something to filter.
-  if (currentFilter !== 'bookings' || !counts || counts.all === 0) {
+  // Only on the Bookings tab (not the Get found subview), and only when there's something to filter.
+  if (currentFilter !== 'bookings' || bookingsSubview === 'growth' || !counts || counts.all === 0) {
     wrap.style.display = 'none';
     wrap.innerHTML = '';
     return;
@@ -2998,6 +3004,210 @@ function renderBookingFilterChips(counts) {
       ${chip('needs', 'Needs call', counts.needs, '#ea580c')}
       ${chip('called', 'Called', counts.called)}
     </div>`;
+}
+
+// ── GROWTH ("Get found") — Bookings-tab segmented view ─────────────
+function ensureGrowthStyles() {
+  if (document.getElementById('growthStyles')) return;
+  const s = document.createElement('style');
+  s.id = 'growthStyles';
+  s.textContent = `
+    .subtab-group{display:flex;background:#eef2f0;border-radius:13px;padding:4px;gap:4px;margin:0 0 16px;width:100%;box-sizing:border-box;}
+    .subtab{flex:1;border:none;background:transparent;font-family:inherit;font-size:14px;font-weight:700;color:#6b7280;padding:10px 14px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,color .15s,box-shadow .15s;white-space:nowrap;}
+    .subtab.active{background:#fff;color:#1a1a2e;box-shadow:0 1px 4px rgba(0,0,0,0.09);}
+    .subtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ea580c;color:#fff;font-size:11px;font-weight:800;line-height:1;}
+    .growth-wrap{padding:2px 0 8px;animation:growthFade .2s ease;}
+    @keyframes growthFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .growth-card{background:#fff;border:1.5px solid #e6e9e7;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,0.045);}
+    .growth-card-title{font-size:15px;font-weight:800;color:#1a1a2e;margin:0 0 2px;}
+    .growth-card-sub{font-size:12.5px;color:#6b7280;line-height:1.5;margin:0 0 14px;}
+    .growth-period{display:inline-flex;gap:3px;background:#f1f5f3;border-radius:9px;padding:3px;margin-bottom:16px;}
+    .growth-period button{border:none;background:transparent;font-family:inherit;font-size:12px;font-weight:700;color:#6b7280;padding:6px 12px;border-radius:7px;cursor:pointer;}
+    .growth-period button.active{background:#fff;color:#2E7D5B;box-shadow:0 1px 3px rgba(0,0,0,0.09);}
+    .growth-funnel{display:flex;align-items:stretch;gap:7px;}
+    .growth-stat{flex:1;text-align:center;background:#f7faf8;border:1px solid #e6efe9;border-radius:13px;padding:15px 6px;}
+    .growth-stat-num{font-size:25px;font-weight:800;color:#1a1a2e;line-height:1;}
+    .growth-stat-num.accent{color:#2E7D5B;}
+    .growth-stat-label{font-size:11px;color:#6b7280;font-weight:600;margin-top:7px;line-height:1.3;}
+    .growth-arrow{display:flex;align-items:center;color:#cbd5d0;font-size:15px;font-weight:800;flex-shrink:0;}
+    .growth-insight{margin-top:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:11px;padding:11px 13px;font-size:12.5px;color:#166534;line-height:1.5;font-weight:600;}
+    .growth-insight.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412;}
+    .growth-step{display:flex;gap:13px;align-items:flex-start;padding:16px 0;border-top:1px solid #f0f2f1;}
+    .growth-step:first-of-type{border-top:none;padding-top:2px;}
+    .growth-step-check{flex-shrink:0;width:26px;height:26px;border-radius:50%;border:2px solid #d0d7d3;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;margin-top:1px;padding:0;}
+    .growth-step-check.done{background:#2E7D5B;border-color:#2E7D5B;}
+    .growth-step-body{flex:1;min-width:0;}
+    .growth-step-title{font-size:14px;font-weight:700;color:#1a1a2e;line-height:1.3;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .growth-pill{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#2E7D5B;background:#e8f5ee;border-radius:6px;padding:3px 7px;}
+    .growth-step-desc{font-size:12.5px;color:#6b7280;line-height:1.5;margin:5px 0 0;}
+    .growth-step-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px;}
+    .growth-btn{border:none;border-radius:9px;padding:9px 14px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+    .growth-btn-primary{background:#2E7D5B;color:#fff;}
+    .growth-btn-ghost{background:#fff;color:#1a1a2e;border:1.5px solid #e0e4e2;}
+    .growth-link-box{display:flex;gap:8px;align-items:center;background:#f7faf8;border:1px solid #e0e4e2;border-radius:10px;padding:8px 8px 8px 12px;margin-top:11px;}
+    .growth-link-box input{flex:1;min-width:0;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:12px;color:#1a1a2e;outline:none;}
+  `;
+  document.head.appendChild(s);
+}
+
+function growthTriedCount() {
+  if (growthFunnel && Number.isFinite(growthFunnel.blockedAttempts)) return growthFunnel.blockedAttempts;
+  return (blockedDemand && blockedDemand.total) || 0;
+}
+
+function renderBookingsSubtabs() {
+  const wrap = document.getElementById('bookingsSubtabs');
+  if (!wrap) return;
+  if (currentFilter !== 'bookings' || settingsTourActive) { wrap.style.display = 'none'; return; }
+  ensureGrowthStyles();
+  wrap.style.display = 'block';
+  const tried = growthTriedCount();
+  const badge = (bookingsSubview !== 'growth' && tried > 0) ? `<span class="subtab-badge">${tried}</span>` : '';
+  // Keep the 'bookings' string literal out of template interpolations — the build
+  // splitter treats ${...} as raw and would flag it as a bare state ref.
+  const onBookings = bookingsSubview !== 'growth';
+  const bkActive = onBookings ? 'active' : '';
+  const grActive = onBookings ? '' : 'active';
+  wrap.innerHTML = `
+    <div class="subtab-group" role="tablist">
+      <button type="button" role="tab" class="subtab ${bkActive}" aria-selected="${onBookings}" onclick="setBookingsSubview('bookings')">Bookings</button>
+      <button type="button" role="tab" class="subtab ${grActive}" aria-selected="${!onBookings}" onclick="setBookingsSubview('growth')">Get found${badge}</button>
+    </div>`;
+}
+
+function setBookingsSubview(view) {
+  bookingsSubview = (view === 'growth') ? 'growth' : 'bookings';
+  renderBookingsSubtabs();
+  applyBookingsSubview();
+}
+
+function applyBookingsSubview() {
+  const isGrowth = bookingsSubview === 'growth';
+  const listEl = document.getElementById('bookingsList');
+  const chipsEl = document.getElementById('bookingFilterChips');
+  const msgPanel = document.getElementById('messagesPanel');
+  const growthEl = document.getElementById('growthPanel');
+  if (listEl) listEl.style.display = isGrowth ? 'none' : '';
+  if (msgPanel) msgPanel.style.display = isGrowth ? 'none' : '';
+  if (isGrowth && chipsEl) chipsEl.style.display = 'none';
+  if (growthEl) growthEl.style.display = isGrowth ? 'block' : 'none';
+  if (isGrowth) {
+    renderGrowthPanel();
+  } else {
+    if (!guestMessages.length) loadMessages(); else renderMessages();
+    renderBookings(bookings);
+  }
+}
+
+async function loadGrowthData() {
+  try {
+    const [funnel, checklist] = await Promise.all([
+      api('GET', `/api/crm/growth-funnel?period=${encodeURIComponent(growthPeriod)}`).catch(() => null),
+      api('GET', '/api/crm/growth-checklist').catch(() => null),
+    ]);
+    if (funnel && funnel.success) growthFunnel = funnel;
+    if (checklist && checklist.success) growthChecklist = checklist.checklist || {};
+    renderBookingsSubtabs();
+    if (currentFilter === 'bookings' && bookingsSubview === 'growth') renderGrowthPanel();
+  } catch (e) { /* non-fatal */ }
+}
+
+function setGrowthPeriod(p) {
+  growthPeriod = ['today', '7d', '30d'].includes(p) ? p : '30d';
+  renderGrowthPanel();
+  loadGrowthData();
+}
+
+async function setGrowthChecklistItem(key, done) {
+  growthChecklist = { ...growthChecklist, [key]: done ? { done: true } : { done: false } };
+  renderGrowthPanel();
+  try {
+    const res = await api('POST', '/api/crm/growth-checklist', { key, done });
+    if (res && res.success) { growthChecklist = res.checklist || growthChecklist; renderGrowthPanel(); }
+  } catch (e) { toast('Could not save — try again', 'error'); }
+}
+
+function growthCheckDone(key) {
+  return !!(growthChecklist && growthChecklist[key] && growthChecklist[key].done);
+}
+
+function renderGrowthPanel() {
+  ensureGrowthStyles();
+  const el = document.getElementById('growthPanel');
+  if (!el) return;
+  const domain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
+  const bookingUrl = domain ? 'https://' + domain : '';
+  const urlAttr = bookingUrl.replace(/'/g, "\\'");
+  const f = growthFunnel || {};
+  const pv = f.pageViews || 0, cs = f.checkoutStarted || 0, blk = f.blockedAttempts || 0, bk = f.completedBookings || 0;
+
+  let insight = '', insightCls = '';
+  if (pv === 0) {
+    insight = 'No page views yet. Put your link where guests already look — start with Google below.';
+  } else if (blk > 0 && !hotelSubscribed) {
+    insight = `${blk} guest${blk > 1 ? 's' : ''} tried to book but couldn’t — you’re in preview mode. Activate to accept reservations like these.`;
+    insightCls = 'warn';
+  } else if (bk > 0) {
+    insight = `${bk} direct booking${bk > 1 ? 's' : ''} this period — that’s money you kept off the OTAs. Keep your link in front of guests.`;
+  } else if (cs > 0) {
+    insight = `${cs} reached checkout but didn’t finish. More visits up top means more bookings down here.`;
+  } else {
+    insight = 'People are viewing your page. Make it effortless to find — share your link everywhere below.';
+  }
+
+  const periodBtn = (p, label) => `<button type="button" class="${growthPeriod === p ? 'active' : ''}" onclick="setGrowthPeriod('${p}')">${label}</button>`;
+  const stat = (num, label, accent) => `<div class="growth-stat"><div class="growth-stat-num${accent ? ' accent' : ''}">${num}</div><div class="growth-stat-label">${label}</div></div>`;
+  const arrow = '<div class="growth-arrow">→</div>';
+  const checkMark = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  const step = (key, pill, title, desc, actionsHtml) => {
+    const done = growthCheckDone(key);
+    return `
+    <div class="growth-step">
+      <button type="button" class="growth-step-check ${done ? 'done' : ''}" onclick="setGrowthChecklistItem('${key}', ${done ? 'false' : 'true'})" aria-label="${done ? 'Mark not done' : 'Mark done'}">${done ? checkMark : ''}</button>
+      <div class="growth-step-body">
+        <div class="growth-step-title">${title}${pill ? `<span class="growth-pill">${pill}</span>` : ''}</div>
+        <div class="growth-step-desc">${desc}</div>
+        <div class="growth-step-actions">${actionsHtml}</div>
+      </div>
+    </div>`;
+  };
+
+  // Precompute every sub-string at statement level. The build splitter's masker
+  // treats `${...}` interpolations as raw, so nested template literals inside an
+  // interpolation desync it — keep interpolations to simple values only.
+  const linkBoxHtml = bookingUrl
+    ? `<div class="growth-link-box"><input type="text" readonly value="${bookingUrl}"><button type="button" class="growth-btn growth-btn-primary" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy</button></div>`
+    : `<div class="growth-step-desc" style="margin-top:8px;">Your booking link is still setting up.</div>`;
+
+  const periodHtml = periodBtn('today', 'Today') + periodBtn('7d', '7 days') + periodBtn('30d', '30 days');
+  const statsHtml = stat(pv, 'Page views') + arrow + stat(cs, 'Reached checkout') + arrow + stat(bk, 'Booked', true);
+
+  const funnelCard = `
+    <div class="growth-card">
+      <div class="growth-card-title">Your guest funnel</div>
+      <div class="growth-card-sub">Where your direct bookings come from. Page views are how many people landed on your booking page.</div>
+      <div class="growth-period">${periodHtml}</div>
+      <div class="growth-funnel">${statsHtml}</div>
+      <div class="growth-insight ${insightCls}">${insight}</div>
+    </div>`;
+
+  const openGoogleBtn = bookingUrl ? `<a class="growth-btn growth-btn-ghost" href="https://business.google.com/" target="_blank" rel="noopener">Open Google Business &#8599;</a>` : '';
+  const textBtn = bookingUrl ? `<button type="button" class="growth-btn growth-btn-ghost" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy link to text</button>` : '';
+  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="showCheckinQrOverlay()">Show QR</button>`;
+
+  const gbpStep = step('gbp', 'Biggest lever', 'Add your link to Google', 'Most guests find motels on Google Maps. Paste your booking link into your Google Business Profile so they book direct instead of through an OTA.', openGoogleBtn + linkBoxHtml);
+  const qrStep = step('qr', '', 'Show a QR at the front desk', 'Walk-ins and repeat guests can scan it to save your hotel and book direct next time. Print it or show it on check-in.', qrBtn);
+  const textStep = step('textLink', '', 'Text it to past guests', 'Repeat guests are your cheapest bookings. Text them your link so they skip Booking.com next time.', textBtn);
+
+  const checklistCard = `
+    <div class="growth-card">
+      <div class="growth-card-title">Get found — put your link where guests already are</div>
+      <div class="growth-card-sub">A booking page only works if people see it. These are the highest-value places to put your link — no ads required.</div>
+      ${gbpStep}${qrStep}${textStep}
+    </div>`;
+
+  el.innerHTML = `<div class="growth-wrap">${funnelCard}${checklistCard}</div>`;
 }
 
 function seedTourRevenueShell() {
@@ -3871,6 +4081,7 @@ function renderBookings(fullList) {
           <div class="empty-text">You&apos;re live — waiting for bookings</div>
           <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting direct reservations.</div>
           <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
+          <div style="margin-top:12px;"><button onclick="setBookingsSubview('growth')" style="background:none;border:none;color:#2E7D5B;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline;">See how to get found →</button></div>
         </div>`;
     } else if (allDone && !hotelSubscribed) {
       el.innerHTML = `
@@ -4237,6 +4448,10 @@ function applyFilter() {
   if (msgPanel) msgPanel.style.display = 'none';
   const appsEl = document.getElementById('appsView');
   if (appsEl) appsEl.style.display = 'none';
+  const subtabsEl = document.getElementById('bookingsSubtabs');
+  if (subtabsEl) subtabsEl.style.display = 'none';
+  const growthPanelEl = document.getElementById('growthPanel');
+  if (growthPanelEl) growthPanelEl.style.display = 'none';
   const previewBar = document.getElementById('previewSiteBar');
   if (previewBar) previewBar.style.display = (currentFilter === 'settings') ? 'block' : 'none';
   // Remove any checklist pointer when switching tabs
@@ -4326,10 +4541,10 @@ function applyFilter() {
   const editEl = document.getElementById('editView');
   if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
-  if (msgPanel) msgPanel.style.display = '';
-  if (!guestMessages.length) loadMessages();
-  else renderMessages();
-  renderBookings(bookings);
+  // Bookings-tab segmented control: Bookings | Get found
+  renderBookingsSubtabs();
+  loadGrowthData();
+  applyBookingsSubview();
 }
 
 async function loadManualAvailability(opts = {}) {

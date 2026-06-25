@@ -4,7 +4,7 @@ import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2
 import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick, trackCardDeclineModalShown, trackTapToCallFirst } from './trackingService.js';
+import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick, trackCardDeclineModalShown, trackTapToCallFirst, trackHotelFunnel } from './trackingService.js';
 import LoadingScreen from './LoadingScreen.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
@@ -132,6 +132,18 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // D19: proof-of-demand. When a real guest reaches payment on a hotel that
     // hasn't activated online booking, record the blocked attempt so the owner
     // can see "N guests tried to book." Best-effort; never blocks the UI.
+    // Per-hotel funnel: guest entered checkout (owner's "Get found" metrics). Once per session.
+    useEffect(() => {
+        const id = (hotel && hotel.id) || hotelId;
+        if (!id) return;
+        trackHotelFunnel('checkout_started', id, {
+            roomName: bookingDetails?.name || null,
+            checkin: bookingDetails?.checkin || null,
+            checkout: bookingDetails?.checkout || null,
+            nights: bookingDetails?.nights || null,
+        });
+    }, [hotel, hotelId, bookingDetails]);
+
     const blockedBeaconSent = useRef(false);
     useEffect(() => {
         const gated = !isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4;

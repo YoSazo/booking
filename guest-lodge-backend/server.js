@@ -4125,6 +4125,36 @@ app.post('/api/hotel/:hotelId/booking-intent', async (req, res) => {
     }
 });
 
+// Growth funnel capture (public). Lightweight guest-side events so the owner can
+// see "page views → tried to book → booked." Best-effort; never errors the guest.
+// Reuses FunnelEvent; the guest app throttles to ~1 per session per event.
+const GROWTH_EVENT_NAMES = { page_view: 'PageView', checkout_started: 'CheckoutStarted' };
+app.post('/api/hotel/:hotelId/track', async (req, res) => {
+    try {
+        const eventName = GROWTH_EVENT_NAMES[String(req.body?.event || '').trim()];
+        if (!eventName) return res.json({ success: true }); // unknown event — no-op
+        const hotel = await resolveHotelForManifest(req.params.hotelId);
+        if (!hotel) return res.json({ success: true });
+        const { roomName, checkin, checkout, nights, externalId } = req.body || {};
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId: hotel.id,
+                eventName,
+                contentName: roomName ? String(roomName).slice(0, 120) : null,
+                checkinDate: checkin ? String(checkin).slice(0, 40) : null,
+                checkoutDate: checkout ? String(checkout).slice(0, 40) : null,
+                nights: Number.isFinite(Number(nights)) ? Number(nights) : null,
+                externalId: externalId ? String(externalId).slice(0, 64) : null,
+                userAgent: req.headers['user-agent'] || null,
+                ipAddress: req.ip || req.socket?.remoteAddress || null,
+            },
+        }).catch(() => {});
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: true }); // never block the guest UI on analytics
+    }
+});
+
 // CRM: blocked-demand count (last 30 days) — powers the owner's "N guests tried
 // to book — activate to accept reservations like these" proof-of-demand nudge.
 app.get('/api/crm/blocked-demand', crmAuth, async (req, res) => {
@@ -4144,6 +4174,61 @@ app.get('/api/crm/blocked-demand', crmAuth, async (req, res) => {
             }).catch(() => []),
         ]);
         res.json({ success: true, periodDays: 30, total, today, recent });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// CRM: the owner's guest funnel — page views → tried to book → booked.
+// Available to every hotel (esp. pre-activation, where it matters most).
+app.get('/api/crm/growth-funnel', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const PERIODS = { today: null, '7d': 7, '30d': 30 };
+        const periodKey = PERIODS.hasOwnProperty(req.query.period) ? String(req.query.period) : '30d';
+        let since;
+        if (periodKey === 'today') { since = new Date(); since.setHours(0, 0, 0, 0); }
+        else { since = new Date(Date.now() - PERIODS[periodKey] * 24 * 60 * 60 * 1000); }
+
+        const fe = (eventName) => prisma.funnelEvent.count({ where: { hotelId, eventName, createdAt: { gte: since } } }).catch(() => 0);
+        const [pageViews, checkoutStarted, blockedAttempts, completedBookings] = await Promise.all([
+            fe('PageView'),
+            fe('CheckoutStarted'),
+            fe('BlockedBookingAttempt'),
+            prisma.booking.count({ where: { hotelId, createdAt: { gte: since }, status: { not: 'cancelled' } } }).catch(() => 0),
+        ]);
+        res.json({ success: true, period: periodKey, pageViews, checkoutStarted, blockedAttempts, completedBookings });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// CRM: owner self-reported "Get found" checklist (Google Business Profile, QR, text-the-link).
+app.get('/api/crm/growth-checklist', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await withRetry(() => prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { growthChecklist: true } }));
+        res.json({ success: true, checklist: (hotel && hotel.growthChecklist) || {} });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+const GROWTH_CHECKLIST_KEYS = new Set(['gbp', 'qr', 'textLink']);
+app.post('/api/crm/growth-checklist', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const key = String(req.body?.key || '').trim();
+        if (!GROWTH_CHECKLIST_KEYS.has(key)) return res.status(400).json({ success: false, message: 'Unknown checklist key' });
+        const done = req.body?.done !== false;
+        const current = await withRetry(() => prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { growthChecklist: true } }));
+        const checklist = (current && current.growthChecklist && typeof current.growthChecklist === 'object') ? { ...current.growthChecklist } : {};
+        checklist[key] = done ? { done: true, ts: new Date().toISOString() } : { done: false };
+        await withRetry(() => prisma.hotelConfig.update({ where: { id: hotelId }, data: { growthChecklist: checklist } }));
+        res.json({ success: true, checklist });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

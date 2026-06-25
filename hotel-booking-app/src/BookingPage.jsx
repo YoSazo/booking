@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
-import { trackPageView } from './trackingService.js';
+import { trackPageView, trackHotelFunnel } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 
 // ── Main BookingPage (Guest-facing only) ───────────────────────
@@ -29,6 +29,11 @@ function BookingPage({
 }) {
   useEffect(() => { trackPageView(); }, []);
   useEffect(() => { setIsProcessingBooking(false); }, []);
+  // Per-hotel funnel: page view (owner's "Get found" metrics). Throttled per session.
+  useEffect(() => {
+    const id = hotel?.id || hotelId;
+    if (id) trackHotelFunnel('page_view', id);
+  }, [hotel, hotelId]);
 
   const ownerScrollInstall = useMemo(() => {
     if (typeof window === 'undefined') return false;

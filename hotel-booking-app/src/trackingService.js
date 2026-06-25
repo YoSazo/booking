@@ -147,6 +147,32 @@ export const trackPageView = () => {
 };
 
 
+// --- PER-HOTEL GROWTH FUNNEL (owner-facing "Get found" metrics) ---
+// Distinct from the Meta/GA funnel above: these are scoped to a specific hotel
+// and power the Front Desk "page views → tried to book → booked" panel. Throttled
+// to once per event per session, best-effort, never blocks the guest UI.
+export const trackHotelFunnel = (event, hotelId, details = {}) => {
+    if (!hotelId || (event !== 'page_view' && event !== 'checkout_started')) return;
+    if (!shouldFireEvent(`hotelFunnel_${event}`)) return;
+    try {
+        const body = JSON.stringify({
+            event,
+            externalId: getExternalId(),
+            roomName: details.roomName || null,
+            checkin: details.checkin || null,
+            checkout: details.checkout || null,
+            nights: details.nights || null,
+        });
+        fetch(`${TRACKING_API_BASE_URL}/api/hotel/${encodeURIComponent(hotelId)}/track`, {
+            method: 'POST',
+            body,
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
+        }).catch(() => {});
+    } catch (e) { /* best-effort */ }
+};
+
+
 // --- NO CHANGES NEEDED BELOW THIS LINE ---
 // The rest of your tracking functions (trackSearch, trackAddToCart, etc.) 
 // will now automatically include the external_id.
