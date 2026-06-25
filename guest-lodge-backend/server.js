@@ -624,7 +624,10 @@ async function getDbHotelConfig(hotelId) {
     // e.g. "john-s-inn" → look up "john-s-inn.mktel.co" in HotelDomain
     if (!row && prisma.hotelDomain) {
         const domainGuess = key + '.mktel.co';
-        const domainRecord = await withRetry(() => prisma.hotelDomain.findUnique({ where: { domain: domainGuess } }));
+        let domainRecord = await withRetry(() => prisma.hotelDomain.findUnique({ where: { domain: domainGuess } }));
+        if (!domainRecord) {
+            domainRecord = await withRetry(() => prisma.hotelDomain.findUnique({ where: { domain: key + '.bookmarketel.com' } }));
+        }
         if (domainRecord) {
             row = await withRetry(() => prisma.hotelConfig.findUnique({
                 where: { id: domainRecord.hotelId },
@@ -933,7 +936,10 @@ async function getActiveHotelValidation(hotelId) {
     // Fallback: resolve via domain (e.g. "john-hotel" → "john-hotel.mktel.co" → real ID)
     if (prisma.hotelDomain) {
         const domainGuess = cleanHotelId + '.mktel.co';
-        const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } }).catch(() => null);
+        let domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } }).catch(() => null);
+        if (!domainRecord) {
+            domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: cleanHotelId + '.bookmarketel.com' } }).catch(() => null);
+        }
         if (domainRecord) {
             const row = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId }, select: { id: true, active: true } }).catch(() => null);
             if (row) {
@@ -3650,10 +3656,18 @@ async function resolveHotelDomainContext(domain) {
     const cached = hotelDomainCache.get(clean);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-    const row = await withRetry(() => prisma.hotelDomain.findUnique({
+    let row = await withRetry(() => prisma.hotelDomain.findUnique({
         where: { domain: clean },
         select: { hotelId: true, hotel: { select: { active: true } } },
     }));
+
+    if (!row && clean.endsWith('.mktel.co')) {
+        const fallbackDomain = clean.replace('.mktel.co', '.bookmarketel.com');
+        row = await withRetry(() => prisma.hotelDomain.findUnique({
+            where: { domain: fallbackDomain },
+            select: { hotelId: true, hotel: { select: { active: true } } },
+        }));
+    }
 
     const value = !row
         ? { status: 'unmapped', domain: clean }
@@ -6027,7 +6041,10 @@ async function resolveHotelForManifest(hotelId) {
     let hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId } });
     if (!hotel) {
         const domainGuess = hotelId + '.mktel.co';
-        const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+        let domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+        if (!domainRecord) {
+            domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: hotelId + '.bookmarketel.com' } });
+        }
         if (domainRecord) {
             hotel = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId } });
         }
@@ -6142,7 +6159,10 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
         });
         if (!hotel) {
             const domainGuess = req.params.hotelId + '.mktel.co';
-            const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+            let domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+            if (!domainRecord) {
+                domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: req.params.hotelId + '.bookmarketel.com' } });
+            }
             if (domainRecord) {
                 hotel = await prisma.hotelConfig.findUnique({
                     where: { id: domainRecord.hotelId },
@@ -6207,7 +6227,10 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
         // Fallback: resolve by domain if direct ID lookup fails
         if (!hotel) {
             const domainGuess = req.params.hotelId + '.mktel.co';
-            const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+            let domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
+            if (!domainRecord) {
+                domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: req.params.hotelId + '.bookmarketel.com' } });
+            }
             if (domainRecord) {
                 hotel = await prisma.hotelConfig.findUnique({
                     where: { id: domainRecord.hotelId },
