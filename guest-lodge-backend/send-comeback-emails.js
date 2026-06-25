@@ -55,7 +55,7 @@ async function main() {
     const email = hotel.ownerEmail;
     if (!email) { skipped++; continue; }
 
-    const domain = hotel.domains[0]?.domain || (hotel.id + '.bookmarketel.com');
+    const domain = hotel.domains[0]?.domain || (hotel.id + '.mktel.co');
     const baseUrl = 'https://' + domain;
     const token = generateMagicToken(email, hotel.id);
     const magicUrl = baseUrl + '/frontdesk?magic=' + encodeURIComponent(token);

@@ -3149,7 +3149,7 @@ function renderGrowthPanel() {
   ensureGrowthStyles();
   const el = document.getElementById('growthPanel');
   if (!el) return;
-  const domain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
+  const domain = activeHotelDomain || (activeHotelId ? activeHotelId + '.mktel.co' : '');
   const bookingUrl = domain ? 'https://' + domain : '';
   const urlAttr = bookingUrl.replace(/'/g, "\\'");
   const f = growthFunnel || {};
@@ -5534,7 +5534,7 @@ async function loadSettings() {
   list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
   try {
     const hotelRes = await api('GET', '/api/crm/verify');
-    const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
+    const bookingDomain = hotelRes?.domain || (activeHotelId + '.mktel.co');
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
 
@@ -5718,7 +5718,7 @@ function checklistGoToRates() {
 }
 
 function copyBookingLinkFromChecklist() {
-  const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+  const domain = activeHotelDomain || (activeHotelId + '.mktel.co');
   const url = 'https://' + domain;
   navigator.clipboard.writeText(url).then(() => {
     localStorage.setItem('linkCopied', '1');
@@ -5844,7 +5844,7 @@ async function settingsSendSupport() {
 }
 
 function openPreviewSite() {
-  const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+  const domain = activeHotelDomain || (activeHotelId + '.mktel.co');
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const url = isLocal ? 'http://localhost:5173/?hotelId=' + encodeURIComponent(activeHotelId) + '&preview=1' : 'https://' + domain + '?preview=1';
   window.open(url, '_blank');
@@ -6177,7 +6177,7 @@ window.startPostActivationTabTour = startPostActivationTabTour;
 // ambiguity about what just happened and what's now true for their hotel.
 function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
-  const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.bookmarketel.com' : '');
+  const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.mktel.co' : '');
   const unlockedTabs = 'Bookings and Phones';
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
@@ -6664,7 +6664,7 @@ function showFinaleMockModal() {
   }
 
   document.getElementById('tourNextBtn').onclick = () => {
-    const domain = activeHotelDomain || (activeHotelId + '.bookmarketel.com');
+    const domain = activeHotelDomain || (activeHotelId + '.mktel.co');
     const url = 'https://' + domain;
     navigator.clipboard.writeText(url).catch(() => {});
     cleanupSettingsTourUi();
@@ -7625,7 +7625,7 @@ async function loadEditRooms() {
     if (res.rates) rates = res.rates;
 
     // Render hotel info section + rates + PIN + rooms
-    const bookingDomain = hotelRes?.domain || (activeHotelId + '.bookmarketel.com');
+    const bookingDomain = hotelRes?.domain || (activeHotelId + '.mktel.co');
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `

@@ -449,7 +449,7 @@ async function addRoomAndFinish() {
 
     // Show success
     console.log('Complete response:', completeData);
-    const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.bookmarketel.com';
+    const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.mktel.co';
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     
     // Link goes to front desk (their dashboard), not the booking engine

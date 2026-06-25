@@ -439,6 +439,8 @@ const corsOptions = {
         if (origin.endsWith('.clickinns.com')) return callback(null, true);
         // Allow bookmarketel.com and all subdomains
         if (origin === 'https://bookmarketel.com' || origin.endsWith('.bookmarketel.com')) return callback(null, true);
+        // Allow mktel.co and all subdomains
+        if (origin === 'https://mktel.co' || origin.endsWith('.mktel.co')) return callback(null, true);
         callback(new Error('Not allowed by CORS'));
     }
 };
@@ -619,9 +621,9 @@ async function getDbHotelConfig(hotelId) {
     }));
 
     // Fallback: resolve by domain if direct ID lookup fails
-    // e.g. "john-s-inn" → look up "john-s-inn.bookmarketel.com" in HotelDomain
+    // e.g. "john-s-inn" → look up "john-s-inn.mktel.co" in HotelDomain
     if (!row && prisma.hotelDomain) {
-        const domainGuess = key + '.bookmarketel.com';
+        const domainGuess = key + '.mktel.co';
         const domainRecord = await withRetry(() => prisma.hotelDomain.findUnique({ where: { domain: domainGuess } }));
         if (domainRecord) {
             row = await withRetry(() => prisma.hotelConfig.findUnique({
@@ -928,9 +930,9 @@ async function getActiveHotelValidation(hotelId) {
     if (override.status === 'inactive') {
         return { ok: false, status: 403, message: `Hotel is inactive: ${cleanHotelId}` };
     }
-    // Fallback: resolve via domain (e.g. "john-hotel" → "john-hotel.bookmarketel.com" → real ID)
+    // Fallback: resolve via domain (e.g. "john-hotel" → "john-hotel.mktel.co" → real ID)
     if (prisma.hotelDomain) {
-        const domainGuess = cleanHotelId + '.bookmarketel.com';
+        const domainGuess = cleanHotelId + '.mktel.co';
         const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } }).catch(() => null);
         if (domainRecord) {
             const row = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId }, select: { id: true, active: true } }).catch(() => null);
@@ -5379,7 +5381,7 @@ app.get('/terms', (req, res) => {
     res.sendFile(path.join(__dirname, 'terms.html'));
 });
 
-// Root serves landing page too (for bookmarketel.com)
+// Root serves landing page too (for mktel.co)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
 });
@@ -5789,7 +5791,7 @@ app.get('/setup/:token/success', async (req, res) => {
         const hotelName = hotel.name || 'Your Hotel';
         const token = req.params.token;
         const slug = (hotelName).toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const assignedDomain = slug + '.bookmarketel.com';
+        const assignedDomain = slug + '.mktel.co';
 
         // Auto-add subdomain to Vercel
         const vercelToken = process.env.VERCEL_TOKEN;
@@ -5841,7 +5843,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
         const finalEmail = email || hotel.ownerEmail;
         if (finalEmail) {
             const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            const domain = slug + '.bookmarketel.com';
+            const domain = slug + '.mktel.co';
             const pin = String(req.body.pin || '').trim();
             sendWelcomeEmail(finalEmail, hotel.name || 'Your Hotel', pin || 'See your setup page', domain);
         }
@@ -5850,7 +5852,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
         let assignedDomain = '';
         if (domainPref === 'subdomain') {
             const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            assignedDomain = slug + '.bookmarketel.com';
+            assignedDomain = slug + '.mktel.co';
             
             // Add to Vercel via API
             const vercelToken = process.env.VERCEL_TOKEN;
@@ -5918,7 +5920,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
 
         // Generate slug from hotel name
         const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const assignedDomain = slug + '.bookmarketel.com';
+        const assignedDomain = slug + '.mktel.co';
 
         // Create domain record (ignore if exists)
         try {
@@ -6024,7 +6026,7 @@ function isRasterAppIconUrl(url) {
 async function resolveHotelForManifest(hotelId) {
     let hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId } });
     if (!hotel) {
-        const domainGuess = hotelId + '.bookmarketel.com';
+        const domainGuess = hotelId + '.mktel.co';
         const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
         if (domainRecord) {
             hotel = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId } });
@@ -6139,7 +6141,7 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
             include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } } },
         });
         if (!hotel) {
-            const domainGuess = req.params.hotelId + '.bookmarketel.com';
+            const domainGuess = req.params.hotelId + '.mktel.co';
             const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
             if (domainRecord) {
                 hotel = await prisma.hotelConfig.findUnique({
@@ -6204,7 +6206,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
 
         // Fallback: resolve by domain if direct ID lookup fails
         if (!hotel) {
-            const domainGuess = req.params.hotelId + '.bookmarketel.com';
+            const domainGuess = req.params.hotelId + '.mktel.co';
             const domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: domainGuess } });
             if (domainRecord) {
                 hotel = await prisma.hotelConfig.findUnique({
