@@ -5804,7 +5804,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         const hotelName = hotel.name || 'Your Hotel';
         const token = req.params.token;
-        const slug = (hotelName).toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const slug = (hotelName).toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
         const assignedDomain = slug + '.mktel.co';
 
         // Auto-add subdomain to Vercel
@@ -5856,7 +5856,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
         // Send welcome email with PIN
         const finalEmail = email || hotel.ownerEmail;
         if (finalEmail) {
-            const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
             const domain = slug + '.mktel.co';
             const pin = String(req.body.pin || '').trim();
             sendWelcomeEmail(finalEmail, hotel.name || 'Your Hotel', pin || 'See your setup page', domain);
@@ -5865,7 +5865,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
         // Auto-create subdomain on Vercel
         let assignedDomain = '';
         if (domainPref === 'subdomain') {
-            const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
             assignedDomain = slug + '.mktel.co';
             
             // Add to Vercel via API
@@ -5933,7 +5933,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         console.log('Complete called for:', hotel.id, hotel.name);
 
         // Generate slug from hotel name
-        const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
         const assignedDomain = slug + '.mktel.co';
 
         // Create domain record (ignore if exists)

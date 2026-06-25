@@ -17,8 +17,7 @@ function getSlug(hotelName) {
         .toLowerCase()
         .replace(/['\u2019]s\b/g, 's')
         .replace(/['\u2019]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+        .replace(/[^a-z0-9]+/g, '');
 }
 
 async function run() {
