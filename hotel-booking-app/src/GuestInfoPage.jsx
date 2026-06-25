@@ -1883,16 +1883,6 @@ const handlePayLaterBooking = async (e) => {
   </div>
   
   
-  {/* D5/1D.4: payment-step trust block — the keystone. Verified, never charged. */}
-  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', margin: '16px 20px 0', padding: '14px 16px', background: '#eef6f1', border: '1px solid #cfe6da', borderRadius: '12px' }}>
-    <ShieldCheck size={22} style={{ color: '#2E7D5B', flexShrink: 0, marginTop: '1px' }} />
-    <div>
-      <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a2e', marginBottom: '2px' }}>$0 charged today</div>
-      <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>$1 verification only — released instantly</div>
-      <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>You pay <strong>${bookingDetails.total.toFixed(2)}</strong> at check-in</div>
-    </div>
-  </div>
-
   {/* Only show money-back guarantee for non-reserve and non-payLater bookings */}
   {selectedPlan !== 'reserve' && selectedPlan !== 'payLater' && (
   <div className="money-back-guarantee">
@@ -2063,6 +2053,7 @@ const handlePayLaterBooking = async (e) => {
         <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #f0f0f0', maxWidth: '100%', boxSizing: 'border-box' }}>
             <div className="card-field-wrapper">
               <label>Billing Address</label>
+              <div style={{ width: '100%', maxWidth: '100%' }}>
               <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} libraries={['places']}>
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                 <input 
@@ -2100,6 +2091,7 @@ const handlePayLaterBooking = async (e) => {
                 />
               </Autocomplete>
               </LoadScript>
+              </div>
             </div>
             
             {/* Address fields with slide-down animation - Now stacked vertically */}
@@ -2204,30 +2196,21 @@ const handlePayLaterBooking = async (e) => {
                 </div>
               </div>
             </div>
-            
-            {/* Subtle reassurance after modal dismissed */}
-            {selectedPlan === 'payLater' && whyCardModalDismissed && paymentMethod === 'card' && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginTop: '16px',
-                padding: '10px 14px',
-                backgroundColor: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '10px',
-                fontSize: '13px',
-                color: '#1f5c43',
-                fontWeight: '500',
-                lineHeight: '1.4'
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1f5c43" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <span>$1 verification only — released immediately. You pay ${bookingDetails.total.toFixed(2)} at check-in.</span>
+
+            {/* D5/1D.4: payment-step trust block — same width as billing address field */}
+            {selectedPlan === 'payLater' && paymentMethod === 'card' && (
+              <div className="card-field-wrapper" style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '14px 16px', background: '#eef6f1', border: '1px solid #cfe6da', borderRadius: '12px' }}>
+                  <ShieldCheck size={22} style={{ color: '#2E7D5B', flexShrink: 0, marginTop: '1px' }} />
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a2e', marginBottom: '2px' }}>$0 charged today</div>
+                    <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>$1 verification only — released instantly</div>
+                    <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>You pay <strong>${bookingDetails.total.toFixed(2)}</strong> at check-in</div>
+                  </div>
+                </div>
               </div>
             )}
-
+            
             {/* Wallet selected indicator - inside card section */}
             {paymentMethod === 'wallet' && walletType && (
               <div style={{

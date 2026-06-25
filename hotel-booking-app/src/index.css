@@ -2930,6 +2930,12 @@ padding: 6px 16px;
   box-sizing: border-box;
 }
 
+/* Keep billing-address autocomplete the same width as sibling fields */
+.payment-content .card-field-wrapper > div {
+  width: 100%;
+  max-width: 100%;
+}
+
 
 .card-field-wrapper.half-width {
   width: 100%; /* Override - we'll use flexbox for the row */
