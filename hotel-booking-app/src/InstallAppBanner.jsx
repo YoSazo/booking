@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { isStandalone } from './pwaUtils.js';
-import { BRAND, IosInstallSheet } from './guestInstallUi.jsx';
+import { BRAND } from './guestInstallUi.jsx';
 
 function isIos() {
   if (typeof navigator === 'undefined') return false;
@@ -13,50 +13,9 @@ function isIos() {
 // they book direct next time (no Safari, no OTA). Android/desktop use the
 // native install prompt; iOS Safari gets a themed Add-to-Home-Screen sheet.
 function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false }) {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showIosSheet, setShowIosSheet] = useState(false);
+  // Install is gated behind Front Desk — the banner is visible so owners see
+  // what guests will see, but the button is always disabled.
   const [installed, setInstalled] = useState(false);
-
-  useEffect(() => {
-    const onBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferredPrompt(null);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
-
-  const ios = isIos();
-
-  // Don't show if already installed/running standalone, or if there's no way to
-  // install (non-iOS browser that never fired beforeinstallprompt). The banner is
-  // not dismissible — it stays as a passive Install affordance.
-  // Owner preview from Front Desk always shows the banner so they can see guest UI.
-  if (!ownerPreview) {
-    if (installed || isStandalone()) return null;
-    if (!ios && !deferredPrompt) return null;
-  }
-
-  const handleInstall = async () => {
-    if (ios) {
-      setShowIosSheet(true);
-      return;
-    }
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') setInstalled(true);
-      setDeferredPrompt(null);
-    }
-  };
 
   const iconTile = appIconUrl ? (
     <img src={appIconUrl} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
@@ -67,6 +26,9 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
       justifyContent: 'center', fontSize: 22, fontWeight: 800,
     }}>{(hotelName || 'B').trim().charAt(0).toUpperCase()}</div>
   );
+
+  // Hide entirely if already installed as a standalone PWA
+  if (installed || isStandalone()) return null;
 
   return (
     <>
@@ -89,26 +51,16 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
           </div>
         </div>
         <button
-          onClick={handleInstall}
+          disabled
           style={{
             width: '100%', marginTop: 14, padding: '12px 16px', borderRadius: 10,
-            border: 'none', background: BRAND, color: 'white', fontSize: 14,
-            fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            border: 'none', background: '#c5d5cc', color: 'white', fontSize: 14,
+            fontWeight: 700, cursor: 'not-allowed', fontFamily: 'inherit', opacity: 0.7,
           }}
         >
           Install
         </button>
       </div>
-
-      {showIosSheet && (
-        <IosInstallSheet
-          hotelName={hotelName}
-          appIconUrl={appIconUrl}
-          title={`Install ${hotelName || 'our app'}`}
-          subtitle="Takes about 3 seconds — book direct anytime."
-          onClose={() => setShowIosSheet(false)}
-        />
-      )}
     </>
   );
 }

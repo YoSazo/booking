@@ -4324,7 +4324,7 @@ app.post('/api/crm/guest-broadcast', crmAuth, async (req, res) => {
             title,
             body,
             url: '/guest/messages',
-            icon: '/icon-192.png',
+            icon: '/apple-touch-icon.png',
         }, { TTL: 60 * 60 }, 'guestBroadcast');
 
         res.json({ success: true, sent: result.sent, failed: result.failed, cleaned: result.cleaned });
@@ -4346,7 +4346,7 @@ app.post('/api/push/test', crmAuth, async (req, res) => {
             title: 'Notifications are on ✅',
             body: "This is how you'll be alerted when a guest books.",
             url: '/frontdesk',
-            icon: '/icon-192.png',
+            icon: '/apple-touch-icon.png',
         });
         const results = await Promise.allSettled(subs.map((s) =>
             webpush.sendNotification(
@@ -4494,7 +4494,7 @@ async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checki
         if (!bodyText) bodyText = 'A new booking just came in.';
 
         const sent = await sendPushToHotel(hotelId, {
-            title, body: bodyText, url: '/frontdesk', icon: '/icon-192.png',
+            title, body: bodyText, url: '/frontdesk', icon: '/apple-touch-icon.png',
         }, { TTL: 60 }, 'notifyNewBooking');
         console.log(`🔔 [push] new booking hotel=${hotelId} sent=${sent} "${title}"`);
 
@@ -4504,7 +4504,7 @@ async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checki
                 title: '🏆 Milestone reached!',
                 body: `${monthCount} bookings this month — keep it going!`,
                 url: '/frontdesk',
-                icon: '/icon-192.png',
+                icon: '/apple-touch-icon.png',
             }, { TTL: 6 * 60 * 60 }, 'milestone');
         }
     } catch (e) {
@@ -4658,7 +4658,7 @@ async function notifyGuestMessage(hotelId, guestName, preview, reservationCode =
             title: `💬 Message from ${guestName || 'a guest'}`,
             body: (preview || 'Tap to read').slice(0, 160) + tag,
             url: '/frontdesk?tab=bookings',
-            icon: '/icon-192.png',
+            icon: '/apple-touch-icon.png',
         }, { TTL: 60 * 60 }, 'guestMessage');
         console.log(`💬 [push] guest message hotel=${hotelId} sent=${sent}`);
     } catch (e) {
@@ -4727,7 +4727,7 @@ async function sendHotelDigest(hotelId) {
         title: '☀️ Good morning',
         body: lines.join('\n'),
         url: '/frontdesk',
-        icon: '/icon-192.png',
+        icon: '/apple-touch-icon.png',
     }, { TTL: 6 * 60 * 60 }, 'dailyDigest');
 }
 
@@ -4748,7 +4748,7 @@ async function maybeSendQuietNudge(hotelId, recentActiveBookings) {
         title: '😴 Quiet stretch',
         body: 'No bookings in a few days. Share your booking link to fill rooms →',
         url: '/frontdesk?tab=settings',
-        icon: '/icon-192.png',
+        icon: '/apple-touch-icon.png',
     }, { TTL: 6 * 60 * 60 }, 'quietNudge');
 }
 
@@ -4777,7 +4777,7 @@ async function sendHotelRecap(hotelId) {
         title: '🌙 Today’s recap',
         body: lines.join('\n'),
         url: '/frontdesk',
-        icon: '/icon-192.png',
+        icon: '/apple-touch-icon.png',
     }, { TTL: 6 * 60 * 60 }, 'eveningRecap');
 }
 
@@ -4839,8 +4839,8 @@ async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMe
         const payload = JSON.stringify({
             title: '🔴 URGENT: Payment Declined',
             body: `${guestName} • ${phone}\n${roomName} • ${total}\n${declineReason} - CALL NOW!`,
-            icon: '/icon-192.png',
-            badge: '/icon-192.png',
+            icon: '/apple-touch-icon.png',
+            badge: '/apple-touch-icon.png',
             tag: 'payment-declined',
             requireInteraction: true, // Keeps notification visible until dismissed
             vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern
@@ -6191,9 +6191,7 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
         // engine (which uses the custom uploaded icon). Never SVG: iOS renders
         // SVG home-screen icons blank.
         const icons = [
-            { src: `${baseUrl}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-            { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-            { src: `${baseUrl}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            { src: `${baseUrl}/apple-touch-icon.png`, sizes: '180x180', type: 'image/png', purpose: 'any' }
         ];
 
         // Root scope + simple start_url mirrors the guest booking engine, which

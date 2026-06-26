@@ -51,16 +51,16 @@ self.addEventListener('notificationclick', function(event) {
     
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-            // Check if there's already a window/tab open with the target URL
             for (let i = 0; i < clientList.length; i++) {
                 const client = clientList[i];
                 if (client.url.includes(urlToOpen) && 'focus' in client) {
                     return client.focus();
                 }
             }
-            // If not, open a new window/tab
             if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
+                const base = self.location.origin;
+                const path = urlToOpen.startsWith('/') ? urlToOpen : '/' + urlToOpen;
+                return clients.openWindow(base + path);
             }
         })
     );

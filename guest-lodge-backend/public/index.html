@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@500;600&display=swap" rel="stylesheet" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Suite Stay</title>
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: #f8faf9;
+      }
+
+      .app-boot-loader {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at center, #ffffff 0%, #f3f8f5 100%);
+      }
+
+      .app-boot-loader__mark {
+        width: 46px;
+        height: 48px;
+        background: url('/marketellogo.svg') center / contain no-repeat;
+        animation: appBootBounce 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+        filter: drop-shadow(0 10px 18px rgba(46, 125, 91, 0.16));
+      }
+
+      @keyframes appBootBounce {
+        0%, 100% { transform: translateY(0) scale(1); }
+        45% { transform: translateY(-10px) scale(1.04); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-boot-loader__mark {
+          animation: none;
+        }
+      }
+    </style>
+
+    <!-- Hotel JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Hotel",
+      "name": "Suite Stay",
+      "description": "No Deposits. No Leases. No Credit Checks. Just Simple Extended Living. Fully furnished rooms with free WiFi, TV, fridge, workstation, free parking, and weekly housekeeping.",
+      "url": "https://suitestay.clickinns.com",
+      "telephone": "+1-256-207-8086",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "65600 AL-77",
+        "addressLocality": "Talladega",
+        "addressRegion": "AL",
+        "postalCode": "35160",
+        "addressCountry": "US"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 33.452566,
+        "longitude": -86.114401
+      },
+      "image": "https://suitestay.clickinns.com/suitestayoutside.webp",
+      "priceRange": "$69 - $999",
+      "currenciesAccepted": "USD",
+      "paymentAccepted": "Credit Card, Apple Pay, Google Pay",
+      "checkinTime": "15:00",
+      "checkoutTime": "11:00",
+      "starRating": {
+        "@type": "Rating",
+        "ratingValue": "2.8"
+      },
+      "amenityFeature": [
+        { "@type": "LocationFeatureSpecification", "name": "Free WiFi", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Free Parking", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Weekly Housekeeping", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "In-Room Refrigerator", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Workstation", "value": true },
+        { "@type": "LocationFeatureSpecification", "name": "Pet Friendly", "value": true }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "2.8",
+        "reviewCount": "231",
+        "bestRating": "5"
+      },
+      "potentialAction": {
+        "@type": "ReserveAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://suitestay.clickinns.com",
+          "actionPlatform": [
+            "http://schema.org/DesktopWebPlatform",
+            "http://schema.org/MobileWebPlatform"
+          ]
+        },
+        "result": {
+          "@type": "LodgingReservation",
+          "name": "Book a Room"
+        }
+      }
+    }
+    </script>
+
+    <!-- Webkit/Safari Safety Script -->
+    <script>
+      (function() {
+        // Prevent webkit-specific bugs and ensure compatibility
+        if (/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)) {
+          // Fix for Safari input autofill issues
+          document.addEventListener('DOMContentLoaded', function() {
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(function(input) {
+              // Force Safari to respect autocomplete attributes
+              input.setAttribute('autocomplete', input.getAttribute('autocomplete') || 'off');
+            });
+          });
+
+          // Fix for Safari scroll issues with fixed elements
+          document.addEventListener('touchstart', function() {}, { passive: true });
+
+          console.log('Safari/Webkit optimizations applied');
+        }
+      })();
+    </script>
+
+    <!-- Analytics and session-recording IDs removed from the handoff build.
+         Configure your own GA, Meta Pixel, and Smartlook settings before enabling tracking. -->
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VTZ5G6XQNE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-VTZ5G6XQNE');
+    </script>
+    <script type="text/javascript">(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");</script>
+    <script type="module" crossorigin src="/assets/index-DPrgbDPu.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DC8ApN0G.css">
+  </head>
+  <body>
+    <div id="root">
+      <div class="app-boot-loader" aria-label="Loading booking page">
+        <div class="app-boot-loader__mark"></div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -4085,7 +4085,7 @@ function renderBookings(fullList) {
     if (allDone && hotelSubscribed) {
       el.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🚀</div>
+          <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">You&apos;re live — waiting for bookings</div>
           <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting direct reservations.</div>
           <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
@@ -6625,7 +6625,7 @@ function showFinaleMockModal() {
   modal.innerHTML = `
     <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
       <div style="padding:24px 20px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:12px;">🚀</div>
+        <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
         <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">You're all set!</div>
         <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking engine is live. Here's what to do next:</p>
         <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:16px;">
@@ -6662,6 +6662,7 @@ function showFinaleMockModal() {
     animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
     document.head.appendChild(animStyle);
   }
+  if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
 
   document.getElementById('tourNextBtn').onclick = () => {
     const domain = activeHotelDomain || (activeHotelId + '.mktel.co');
@@ -6685,7 +6686,7 @@ function showTestDriveModal(bookingUrl) {
   overlay.innerHTML = `
     <div style="background:white;border-radius:20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:tourModalSlideUp 0.3s ease;">
       <div style="padding:28px 22px;text-align:center;">
-        <div style="font-size:36px;margin-bottom:12px;">🚀</div>
+        <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
         <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Go live and start accepting bookings</div>
         <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your engine is built. Your link is copied. Activate to let guests book.</p>
         <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:20px;">
@@ -6702,6 +6703,7 @@ function showTestDriveModal(bookingUrl) {
       </div>
     </div>`;
   document.body.appendChild(overlay);
+  if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
 
   document.getElementById('activateNowBtn').onclick = () => {
     overlay.remove();
@@ -7701,9 +7703,9 @@ async function loadEditRooms() {
             <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
             <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
           </div>
-          <div style="text-align:center;margin-bottom:10px;">
-            <img src="${qrUrl}" alt="QR Code" style="width:140px;height:140px;border-radius:8px;border:1px solid var(--border);">
-          </div>
+          <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+            <i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR
+          </button>
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
         </div>
       </div>
@@ -8609,6 +8611,129 @@ function renderAppsView() {
         </div>
         ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}`;
 
+  // 1:1 preview of what guests see on the booking page — the install banner
+  const iconPreviewHtml = hotelAppIcon
+    ? `<img src="${hotelAppIcon}" alt="" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;">`
+    : `<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${hotelInitial}</div>`;
+
+  const guestInstallPreviewHtml = `
+    <div class="apps-step-card" style="padding:0;overflow:hidden;">
+      <div style="padding:16px 18px 14px;">
+        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">What guests see</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">While booking, guests can save <strong>${hName}</strong> to their home screen. This is what it looks like on your direct booking page.</p>
+      </div>
+      <div style="background:#f8faf9;border-top:1px solid var(--border);padding:0 18px 18px;">
+        <!-- Mini room card peek (faded) for context -->
+        <div style="opacity:0.4;pointer-events:none;user-select:none;padding-top:14px;">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:56px;height:40px;border-radius:8px;background:linear-gradient(135deg,#e8f5ee,#d1fae5);flex-shrink:0;"></div>
+              <div style="flex:1;">
+                <div style="width:60%;height:10px;border-radius:4px;background:#e5e7eb;margin-bottom:6px;"></div>
+                <div style="width:40%;height:8px;border-radius:4px;background:#e5e7eb;"></div>
+              </div>
+              <div style="padding:6px 14px;border-radius:8px;background:#e5e7eb;"><div style="width:40px;height:10px;"></div></div>
+            </div>
+          </div>
+        </div>
+        <!-- 1:1 replica of InstallAppBanner -->
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px 16px;box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-top:12px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            ${iconPreviewHtml}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:700;color:#1a1a2e;line-height:1.3;">Add ${hName} to your home screen</div>
+              <div style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">Book direct in one tap next time — no fees, no app store.</div>
+            </div>
+          </div>
+          <div style="width:100%;margin-top:14px;padding:12px 16px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-size:14px;font-weight:700;text-align:center;box-sizing:border-box;">Install</div>
+        </div>
+      </div>
+      <div style="padding:0 18px 16px;background:#f8faf9;">
+        ${bookingUrl !== '#' ? `<button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Go to direct booking page ↗</button>` : ''}
+      </div>
+    </div>`;
+
+  const isInstalledApp = isStandaloneApp();
+
+  // When NOT installed as a PWA, gate everything except the install card
+  if (!isInstalledApp) {
+    el.innerHTML = `
+    <style>
+      .apps-page { padding:4px 0 28px; }
+      .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
+      .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
+      .apps-loop { display:flex;align-items:flex-start;justify-content:center;gap:14px;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1.5px solid #bbf7d0;border-radius:16px;padding:18px 14px;margin:0 0 16px; }
+      .apps-loop-side { flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center; }
+      .apps-loop-tile { width:54px;height:54px;border-radius:14px;background:#fff;border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px; }
+      .apps-loop-tile--guest { padding:0; }
+      .apps-loop-name { font-size:13px;font-weight:800;color:var(--text);line-height:1.25;word-break:break-word; }
+      .apps-loop-sub { font-size:11px;color:var(--text-muted);line-height:1.35;margin-top:3px; }
+      .apps-loop-arrow { flex-shrink:0;align-self:center;font-size:22px;color:var(--green);font-weight:700;padding-top:14px; }
+      .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
+      .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
+      .apps-section-divider { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin:24px 0 14px;padding-top:18px;border-top:1.5px solid var(--border); }
+      .apps-video-teaser { display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px 14px;border-radius:12px;border:1.5px dashed #86efac;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);color:#166534;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s,border-color 0.15s; }
+      .apps-video-teaser:active { background:#dcfce7;border-color:#4ade80; }
+      .apps-video-teaser__play { width:28px;height:28px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 10px rgba(46,125,91,0.35);position:relative; }
+      .apps-video-teaser__play::after { content:'';width:0;height:0;border-style:solid;border-width:6px 0 6px 9px;border-color:transparent transparent transparent #fff;margin-left:2px; }
+      .apps-lock-wrapper { position:relative;margin-top:4px; }
+      .apps-lock-content { filter:blur(3px);opacity:0.45;pointer-events:none;user-select:none;-webkit-user-select:none; }
+      .apps-lock-overlay { position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:32px;z-index:10; }
+      .apps-lock-card { background:var(--white);border:1.5px solid var(--border);border-radius:18px;padding:28px 22px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.12);max-width:320px;width:100%; }
+      .apps-lock-icon { width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;display:flex;align-items:center;justify-content:center;margin:0 auto 14px; }
+      .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.5; }
+    </style>
+
+    <div class="apps-page">
+
+      <h2 class="apps-headline">Phones</h2>
+
+      ${loopDiagramHtml}
+
+      <div class="apps-step-card" id="tour-fd-install-card">
+        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your phone</div>
+        <div class="apps-step-title">Add Front Desk to your home screen</div>
+        ${fdCtaHtml}
+      </div>
+
+      <div class="apps-lock-wrapper">
+        <div class="apps-lock-overlay">
+          <div class="apps-lock-card">
+            <div class="apps-lock-icon">
+              <i data-lucide="lock" style="width:22px;height:22px;color:var(--green);"></i>
+            </div>
+            <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px;">Install to unlock</div>
+            <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0 0 16px;">Check-in QR, guest notifications, app icon, and more — all available once Front Desk is on your home screen.</p>
+            <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">
+              <span style="display:inline-flex;align-items:center;gap:8px;"><i data-lucide="download" style="width:18px;height:18px;"></i> Add to Home Screen</span>
+            </button>
+            <p style="font-size:11px;color:var(--text-muted);margin:10px 0 0;">Takes about 3 seconds · No App Store</p>
+          </div>
+        </div>
+        <div class="apps-lock-content">
+          <div class="apps-step-card" id="tour-guest-icon-section">
+            <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
+            ${logoBlockHtml}
+          </div>
+          <div class="apps-step-card">
+            <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
+            <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Just like you can save Front Desk to your home screen, your guests can save <strong>${hName}</strong> to theirs — one tap, no app store.</p>
+            ${checkinActionsHtml}
+            ${guestInstallLinkHtml}
+          </div>
+          ${guestBroadcastCardHtml()}
+        </div>
+      </div>
+
+      <p class="apps-footnote">iPhone &amp; Android · lives on your home screen · no App Store</p>
+
+    </div>`;
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  // ── PWA installed: show the full Phones tab ──
   const appsMainHtml = `
     ${loopDiagramHtml}
     <div class="apps-step-card" id="tour-fd-install-card">
@@ -8626,6 +8751,7 @@ function renderAppsView() {
       ${checkinActionsHtml}
       ${guestInstallLinkHtml}
     </div>
+    ${guestInstallPreviewHtml}
     ${guestBroadcastCardHtml()}`;
 
   const appsFootnoteHtml = fdInApp
