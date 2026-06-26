@@ -5762,6 +5762,32 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
     }
 });
 
+async function assignUniqueDomainForHotel(hotel) {
+    const existing = await prisma.hotelDomain.findFirst({
+        where: { hotelId: hotel.id, isPrimary: true },
+        orderBy: { createdAt: 'desc' }
+    });
+    if (existing) return existing.domain;
+
+    const baseSlug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
+    let slug = baseSlug;
+    let assignedDomain = slug + '.mktel.co';
+    let counter = 1;
+
+    while (true) {
+        const taken = await prisma.hotelDomain.findUnique({ where: { domain: assignedDomain } });
+        if (!taken) break;
+        slug = baseSlug + counter;
+        assignedDomain = slug + '.mktel.co';
+        counter++;
+    }
+
+    try {
+        await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
+    } catch (e) { }
+    return assignedDomain;
+}
+
 // Success page after payment — activate hotel and show confirmation
 app.get('/setup/:token/success', async (req, res) => {
     try {
@@ -5804,8 +5830,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         const hotelName = hotel.name || 'Your Hotel';
         const token = req.params.token;
-        const slug = (hotelName).toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
-        const assignedDomain = slug + '.mktel.co';
+        const assignedDomain = await assignUniqueDomainForHotel(hotel);
 
         // Auto-add subdomain to Vercel
         const vercelToken = process.env.VERCEL_TOKEN;
@@ -5823,10 +5848,7 @@ app.get('/setup/:token/success', async (req, res) => {
             }
         }
 
-        // Save domain record
-        try {
-            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
-        } catch (e) { /* might exist */ }
+        // Domain record is saved in assignUniqueDomainForHotel
 
         // Don't send welcome email here — wait until they submit their contact info via /finalize
 
@@ -5853,20 +5875,10 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             },
         });
 
-        // Send welcome email with PIN
-        const finalEmail = email || hotel.ownerEmail;
-        if (finalEmail) {
-            const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
-            const domain = slug + '.mktel.co';
-            const pin = String(req.body.pin || '').trim();
-            sendWelcomeEmail(finalEmail, hotel.name || 'Your Hotel', pin || 'See your setup page', domain);
-        }
-
         // Auto-create subdomain on Vercel
         let assignedDomain = '';
         if (domainPref === 'subdomain') {
-            const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
-            assignedDomain = slug + '.mktel.co';
+            assignedDomain = await assignUniqueDomainForHotel(hotel);
             
             // Add to Vercel via API
             const vercelToken = process.env.VERCEL_TOKEN;
@@ -5885,11 +5897,14 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
                     // Don't fail the whole request — domain can be added manually
                 }
             }
+        }
 
-            // Save domain record in DB
-            try {
-                await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
-            } catch (e) { /* might exist */ }
+        // Send welcome email with PIN
+        const finalEmail = email || hotel.ownerEmail;
+        if (finalEmail) {
+            const domain = domainPref === 'custom' ? customDomain : assignedDomain;
+            const pin = String(req.body.pin || '').trim();
+            sendWelcomeEmail(finalEmail, hotel.name || 'Your Hotel', pin || 'See your setup page', domain);
         }
 
         // Log for you to action manually
@@ -5932,14 +5947,8 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
         console.log('Complete called for:', hotel.id, hotel.name);
 
-        // Generate slug from hotel name
-        const slug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
-        const assignedDomain = slug + '.mktel.co';
-
-        // Create domain record (ignore if exists)
-        try {
-            await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
-        } catch (e) { /* Domain might already exist */ }
+        // Generate unique domain
+        const assignedDomain = await assignUniqueDomainForHotel(hotel);
 
         // Add to Vercel
         const vercelToken = process.env.VERCEL_TOKEN;
