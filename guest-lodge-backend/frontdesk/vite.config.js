@@ -13,6 +13,17 @@ export default defineConfig(({ mode }) => ({
     target: 'es2020',
     rollupOptions: {
       output: {
+        // Stable filenames — no content hashes — so Cloudflare never caches
+        // a 404 for a URL that changes on every rebuild.
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: (assetInfo) => {
+          // Keep font files in assets/ but don't rename them
+          if (/\.(woff2?|ttf|eot)$/i.test(assetInfo.name || '')) {
+            return 'assets/fonts/[name][extname]';
+          }
+          return 'assets/[name][extname]';
+        },
         manualChunks(id) {
           if (id.endsWith('settings.js')) return 'settings';
           if (id.endsWith('apps.js')) return 'apps';
