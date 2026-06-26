@@ -427,6 +427,8 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(0,0,0,0.35);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
       </div>`,document.body.appendChild(p),!document.getElementById("tourModalAnimStyle")){const y=document.createElement("style");y.id="tourModalAnimStyle",y.textContent="@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}",document.head.appendChild(y)}document.getElementById("tourNextBtn").onclick=()=>{n(),i++,localStorage.setItem("settingsTourStep",String(i)),d()},document.getElementById("tourSkipBtn").onclick=()=>{r()}}d()}async function ue(){if(isEditPageDomReady())return;if(s.editRoomsLoadPromise)return s.editRoomsLoadPromise;const e=document.getElementById("editRoomsList");if(e){s.editRoomsLoadPromise=(async()=>{e.innerHTML='<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';try{const[t,o]=await Promise.all([api("GET","/api/crm/rooms"),api("GET","/api/crm/verify")]);if(!t.rooms)throw new Error("No data");s.editRooms=t.rooms;const i=o?.hotelName||"";i&&(s.activeHotelName=i),o&&(s.hotelSubscribed=!!o.subscribed,typeof updateGoLiveBanner=="function"?updateGoLiveBanner():typeof window.updateGoLiveBanner=="function"&&window.updateGoLiveBanner());const n=o?.hotelSubtitle||"",r=o?.hotelAddress||"",a=o?.hotelPhone||"",d=o?.appIconUrl||"";s.activeHotelAppIcon=d,updateFrontdeskManifestLink();let u={nightly:69,weekly:299,monthly:999,taxRate:.1};t.rates&&(u=t.rates);const h="https://"+(o?.domain||s.activeHotelId+".mktel.co"),v="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(h);let S=`
+      <div class="settings-dashboard-grid">
+      <div class="dash-a">
       <button id="tour-preview-btn" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
@@ -440,9 +442,14 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
           <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
         </div>
       </div>
+      </div>
+      <div class="dash-b">
+      ${goLiveInlineCardHtml()}
       ${(typeof twoRoomExplainerHtml=="function"?twoRoomExplainerHtml:window.twoRoomExplainerHtml)("booking-page")}
       <div id="editRoomsCards"></div>
       <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
+      </div>
+      <div class="dash-c">
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
@@ -505,7 +512,6 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
         </div>
       </div>
-      ${goLiveInlineCardHtml()}
       <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
         <div id="tour-rates-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
@@ -565,9 +571,13 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
         </div>
       </div>
+      </div>
+      </div>
     `;e.innerHTML=S,O(),typeof lucide<"u"&&lucide.createIcons()}catch{e.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load your page</div><div class="empty-sub">Check your connection and refresh.</div></div>'}})();try{await s.editRoomsLoadPromise}finally{s.editRoomsLoadPromise=null}}}function ge(){O()}function O(){const e=document.getElementById("editRoomsCards");if(e){if(!s.editRooms.length){e.innerHTML='<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';return}e.innerHTML=s.editRooms.map(t=>{const o=(t.amenities||"").split("•").map(n=>n.trim()).filter(Boolean),i=t.images||[];return`
     <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${t.id}">
-      <div style="position:relative;">
+      <div class="room-edit-grid">
+      <div class="room-edit-media">
+      <div class="room-edit-photo" style="position:relative;">
         ${i.length?`<img src="${i[0].url}" loading="lazy" decoding="async" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">`:'<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>'}
         <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
           📷 + Add Photos
@@ -575,7 +585,8 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
         </label>
       </div>
       ${i.length>1?'<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">'+i.map(n=>`<div style="position:relative;flex-shrink:0;"><img src="${n.url}" loading="lazy" decoding="async" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${t.id}','${n.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join("")+"</div>":""}
-      <div style="padding:18px;">
+      </div>
+      <div class="room-edit-fields" style="padding:18px;">
         <div style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
           <input type="text" value="${t.name}" id="edit-name-${t.id}" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
@@ -605,6 +616,7 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
           <button onclick="saveEditRoom('${t.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Changes</button>
           <button onclick="deleteEditRoom('${t.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
         </div>
+      </div>
       </div>
     </div>`}).join("")}}function Ie(e){const t=e.toLowerCase();return t.includes("wifi")?'<i data-lucide="wifi" style="width:14px;height:14px;"></i>':t.includes("tv")||t.includes("television")?'<i data-lucide="tv" style="width:14px;height:14px;"></i>':t.includes("fridge")||t.includes("refrigerator")?'<i data-lucide="thermometer-snowflake" style="width:14px;height:14px;"></i>':t.includes("parking")?'<i data-lucide="car" style="width:14px;height:14px;"></i>':t.includes("housekeeping")||t.includes("cleaning")?'<i data-lucide="sparkles" style="width:14px;height:14px;"></i>':t.includes("bath")||t.includes("shower")?'<i data-lucide="bath" style="width:14px;height:14px;"></i>':t.includes("work")||t.includes("desk")?'<i data-lucide="laptop" style="width:14px;height:14px;"></i>':t.includes("pet")||t.includes("dog")?'<i data-lucide="paw-print" style="width:14px;height:14px;"></i>':t.includes("pool")?'<i data-lucide="waves" style="width:14px;height:14px;"></i>':t.includes("kitchen")||t.includes("microwave")?'<i data-lucide="cooking-pot" style="width:14px;height:14px;"></i>':'<i data-lucide="check" style="width:14px;height:14px;"></i>'}const Be=[{key:"wifi",label:"Free WiFi",icon:"wifi"},{key:"tv",label:"Smart TV",icon:"tv"},{key:"fridge",label:"Fridge",icon:"thermometer-snowflake"},{key:"parking",label:"Free Parking",icon:"car"},{key:"housekeeping",label:"Weekly Housekeeping",icon:"sparkles"},{key:"bath",label:"Bath",icon:"bath"},{key:"workstation",label:"Workstation",icon:"laptop"},{key:"pet",label:"Pet Friendly",icon:"paw-print"},{key:"pool",label:"Pool",icon:"waves"},{key:"kitchen",label:"Kitchenette",icon:"cooking-pot"},{key:"ac",label:"Air Conditioning",icon:"wind"},{key:"laundry",label:"Laundry",icon:"shirt"}];let xe=null;function Ae(e){xe=e;const o=(s.editRooms.find(r=>r.id===e)?.amenities||"").split("•").map(r=>r.trim().toLowerCase()).filter(Boolean);let i=document.getElementById("amenityPickerModal");i||(document.body.insertAdjacentHTML("beforeend",`
       <div id="amenityPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;align-items:center;justify-content:center;padding:20px;">

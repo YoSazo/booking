@@ -1565,9 +1565,11 @@ const handlePayLaterBooking = async (e) => {
                     {getBackButtonText()}
                 </button>
                 
+                {hotel.cancellationPolicy && (
                 <div className="static-banner">
-                    {hotel.cancellationPolicy || <>✅ Free Cancellation up to <strong>7 days before</strong> arrival. 📞 Questions? Call {hotel.phone} — we're happy to help!</>}
+                    {hotel.cancellationPolicy}
                 </div>
+                )}
             </div>
             
             <div className="guest-info-container" style={{ paddingBottom: (!isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4) ? '220px' : '120px', paddingTop: '0' }}>
