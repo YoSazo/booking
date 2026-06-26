@@ -191,9 +191,9 @@
       background: var(--white);
       border-radius: 11px;
       box-shadow: 0 2px 8px rgba(46,125,91,0.13), 0 1px 3px rgba(0,0,0,0.07);
-      transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), height 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
       z-index: 0;
-      will-change: transform, width;
+      will-change: transform, width, height;
     }
 
     .tab {
@@ -1833,6 +1833,74 @@
       overflow-y: auto;
       max-height: calc(100dvh - 200px);
       -webkit-overflow-scrolling: touch;
+    }
+
+    /* Desktop Dashboard Layout */
+    @media (min-width: 1024px) {
+      .container {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 32px;
+        max-width: 1400px;
+        align-items: start;
+        padding-top: 32px;
+      }
+      .tabs-container {
+        flex-direction: column;
+        width: 100%;
+        position: sticky;
+        top: 90px;
+        margin: 0;
+      }
+      .tab {
+        justify-content: flex-start;
+        padding: 14px 20px;
+        width: 100%;
+        text-align: left;
+      }
+      .settings-dashboard-grid {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+      .settings-dashboard-col-left {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .settings-dashboard-col-right {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .room-edit-grid {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 24px;
+        align-items: stretch;
+      }
+      .room-edit-image-container {
+        height: 100%;
+        min-height: 260px;
+      }
+      .room-edit-image-container img {
+        height: 100% !important;
+      }
+      #tour-two-room-card {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 24px;
+      }
+      .two-room-text {
+        text-align: left !important;
+        flex: 1;
+      }
+      .two-room-actions {
+        width: auto !important;
+        flex-shrink: 0;
+      }
     }
   </style>
 <script>
@@ -4261,16 +4329,26 @@ function moveSlider(activeTab) {
   const tabs = activeTab ? activeTab.closest('.tabs-container') : null;
   if (!slider || !activeTab || !tabs) return;
 
+  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
   const tabRect = activeTab.getBoundingClientRect();
   const tabsRect = tabs.getBoundingClientRect();
   const cs = getComputedStyle(tabs);
-  const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
-  const padLeft = parseFloat(cs.paddingLeft) || 0;
-  // Slider is `left: Npx` from the padding edge; delta from border box must subtract border + padding.
-  const left = tabRect.left - tabsRect.left + tabs.scrollLeft - borderLeft - padLeft;
 
-  slider.style.width = `${Math.round(tabRect.width)}px`;
-  slider.style.transform = `translateX(${Math.round(left)}px)`;
+  if (isDesktop) {
+    const borderTop = parseFloat(cs.borderTopWidth) || 0;
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const top = tabRect.top - tabsRect.top + tabs.scrollTop - borderTop - padTop;
+    slider.style.width = 'calc(100% - 10px)';
+    slider.style.height = `${Math.round(tabRect.height)}px`;
+    slider.style.transform = `translateY(${Math.round(top)}px)`;
+  } else {
+    const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
+    const padLeft = parseFloat(cs.paddingLeft) || 0;
+    const left = tabRect.left - tabsRect.left + tabs.scrollLeft - borderLeft - padLeft;
+    slider.style.width = `${Math.round(tabRect.width)}px`;
+    slider.style.height = 'calc(100% - 10px)';
+    slider.style.transform = `translateX(${Math.round(left)}px)`;
+  }
 }
 
 // Call on load to position slider under the default active tab
@@ -4309,20 +4387,22 @@ document.addEventListener('DOMContentLoaded', () => {
 function twoRoomExplainerHtml(context) {
   const isBookingPage = context === 'booking-page';
   if (isBookingPage) {
-    return `<div class="two-room-explainer" id="bookingPageRoomExplainer">
-      <div class="two-room-explainer-title">Two places for rooms — don't mix them up</div>
-      <div class="two-room-cols">
-        <div class="two-room-col two-room-col--here">
-          <div class="two-room-col-label">① Your page (here)</div>
-          What guests see when they book — photos, description, and rates.
+    return `<div class="two-room-explainer" id="tour-two-room-card">
+      <div class="two-room-text">
+        <div class="two-room-explainer-title">Two places for rooms — don't mix them up</div>
+        <div class="two-room-cols">
+          <div class="two-room-col two-room-col--here">
+            <div class="two-room-col-label">① Your page (here)</div>
+            What guests see when they book — photos, description, and rates.
+          </div>
+          <div class="two-room-col">
+            <div class="two-room-col-label">② Availability tab</div>
+            How many units you have open each day — your inventory calendar.
+          </div>
         </div>
-        <div class="two-room-col">
-          <div class="two-room-col-label">② Availability tab</div>
-          How many units you have open each day — your inventory calendar.
-        </div>
+        <p class="two-room-explainer-foot">Start here: add the room types guests should see. Then open <strong>Availability</strong> and add matching inventory rooms so the calendar isn't empty.</p>
       </div>
-      <p class="two-room-explainer-foot">Start here: add the room types guests should see. Then open <strong>Availability</strong> and add matching inventory rooms so the calendar isn't empty.</p>
-      <div class="two-room-explainer-actions">
+      <div class="two-room-explainer-actions two-room-actions">
         <button type="button" class="two-room-btn two-room-btn--ghost" onclick="goToAvailabilityTab()">Next: set up Availability →</button>
       </div>
     </div>`;
@@ -4331,20 +4411,22 @@ function twoRoomExplainerHtml(context) {
   const namesHint = bookingNames.length
     ? `Your booking page already has: <strong>${bookingNames.map((n) => esc(n)).join(', ')}</strong>. Add matching inventory rooms here (same names work best).`
     : 'You haven\'t added booking page rooms yet — set those up under <strong>Your page</strong> first.';
-  return `<div class="two-room-explainer">
-    <div class="two-room-explainer-title">This calendar is empty because inventory isn't set up yet</div>
-    <div class="two-room-cols">
-      <div class="two-room-col">
-        <div class="two-room-col-label">Your page</div>
-        Guest-facing rooms — photos, copy, rates.
+  return `<div class="two-room-explainer" id="tour-two-room-card-avail">
+    <div class="two-room-text">
+      <div class="two-room-explainer-title">This calendar is empty because inventory isn't set up yet</div>
+      <div class="two-room-cols">
+        <div class="two-room-col">
+          <div class="two-room-col-label">Your page</div>
+          Guest-facing rooms — photos, copy, rates.
+        </div>
+        <div class="two-room-col two-room-col--here">
+          <div class="two-room-col-label">Availability (here)</div>
+          Day-by-day counts — how many units are open to sell.
+        </div>
       </div>
-      <div class="two-room-col two-room-col--here">
-        <div class="two-room-col-label">Availability (here)</div>
-        Day-by-day counts — how many units are open to sell.
-      </div>
+      <p class="two-room-explainer-foot">${namesHint}</p>
     </div>
-    <p class="two-room-explainer-foot">${namesHint}</p>
-    <div class="two-room-explainer-actions">
+    <div class="two-room-explainer-actions two-room-actions">
       <button type="button" class="two-room-btn two-room-btn--primary" onclick="openRoomsAddModal()">+ Add inventory room</button>
       <button type="button" class="two-room-btn two-room-btn--ghost" onclick="setFilter('settings', document.querySelector('[data-nav-filter=\\'settings\\']'))">← Back to Your page</button>
     </div>
@@ -7631,142 +7713,157 @@ async function loadEditRooms() {
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
-      <button id="tour-preview-btn" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
-          <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
-            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-          </div>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
-        </div>
-      </div>
-      ${(typeof twoRoomExplainerHtml === 'function' ? twoRoomExplainerHtml : window.twoRoomExplainerHtml)('booking-page')}
-      <div id="editRoomsCards"></div>
-      <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
-          <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
-            <!-- Back button pill (matches .back-button-pill) -->
-            <div style="padding:12px 16px 0;">
-              <span style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:600;box-shadow:0 2px 6px rgba(16,185,129,0.2);">‹ Back to Booking</span>
-            </div>
-            <!-- Cancellation policy banner (matches .static-banner — white pill with shadow) -->
-            <div style="padding:10px 16px;display:flex;justify-content:center;">
-              <div style="background:white;border-radius:20px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px dashed #10b981;width:fit-content;max-width:100%;position:relative;">
-                <div style="position:absolute;top:-8px;right:8px;background:#10b981;color:white;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;">Editable</div>
-                <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;font-size:11px;color:#111827;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
+      <div class="settings-dashboard-grid">
+        <div class="settings-dashboard-col-left">
+          <button id="tour-preview-btn" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
+          
+          <div class="booking-card" style="margin-bottom:14px;">
+            <div style="padding:18px;">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
+              <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
+                <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+                <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+                <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+                <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
               </div>
+              <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
             </div>
-            <!-- Progress bar (matches .checkout-progress-bar with pill step-circles) -->
-            <div style="padding:8px 16px 14px;position:relative;">
-              <div style="display:flex;justify-content:space-between;align-items:center;position:relative;">
-                <!-- Connecting line -->
-                <div style="position:absolute;top:11px;left:15%;right:15%;height:2px;background:#ddd;z-index:0;"></div>
-                <!-- Step 1: Review Cart (active/completed) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:#28a745;border:2px solid #28a745;"></div>
-                  <span style="font-size:10px;color:#000;font-weight:600;">Review Cart</span>
+          </div>
+
+          <div class="booking-card" style="margin-bottom:14px;">
+            <div style="padding:18px;">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
+              <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
+                <!-- Back button pill (matches .back-button-pill) -->
+                <div style="padding:12px 16px 0;">
+                  <span style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:600;box-shadow:0 2px 6px rgba(16,185,129,0.2);">‹ Back to Booking</span>
                 </div>
-                <!-- Step 2: Info (inactive) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
-                  <span style="font-size:10px;color:#888;">Info</span>
+                <!-- Cancellation policy banner (matches .static-banner — white pill with shadow) -->
+                <div style="padding:10px 16px;display:flex;justify-content:center;">
+                  <div style="background:white;border-radius:20px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px dashed #10b981;width:fit-content;max-width:100%;position:relative;">
+                    <div style="position:absolute;top:-8px;right:8px;background:#10b981;color:white;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;">Editable</div>
+                    <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;font-size:11px;color:#111827;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
+                  </div>
                 </div>
-                <!-- Step 3: Payment (inactive) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
-                  <span style="font-size:10px;color:#888;">Payment</span>
+                <!-- Progress bar (matches .checkout-progress-bar with pill step-circles) -->
+                <div style="padding:8px 16px 14px;position:relative;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;position:relative;">
+                    <!-- Connecting line -->
+                    <div style="position:absolute;top:11px;left:15%;right:15%;height:2px;background:#ddd;z-index:0;"></div>
+                    <!-- Step 1: Review Cart (active/completed) -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
+                      <div style="width:40px;height:16px;border-radius:999px;background:#28a745;border:2px solid #28a745;"></div>
+                      <span style="font-size:10px;color:#000;font-weight:600;">Review Cart</span>
+                    </div>
+                    <!-- Step 2: Info (inactive) -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
+                      <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
+                      <span style="font-size:10px;color:#888;">Info</span>
+                    </div>
+                    <!-- Step 3: Payment (inactive) -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
+                      <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
+                      <span style="font-size:10px;color:#888;">Payment</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Placeholder content -->
+                <div style="padding:0 16px 14px;">
+                  <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
+                    <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
+                    <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
+                  </div>
                 </div>
               </div>
+              <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
+              <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
             </div>
-            <!-- Placeholder content -->
-            <div style="padding:0 16px 14px;">
-              <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
-                <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
-                <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
+          </div>
+
+          <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
+            <div style="padding:18px;">
+              <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
+              <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
+                <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
+                <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
               </div>
+              <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+                <i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR
+              </button>
+              <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
             </div>
           </div>
-          <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
-        </div>
-      </div>
-      <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
-          <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
-            <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
-            <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
-          </div>
-          <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
-            <i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR
-          </button>
-          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
-        </div>
-      </div>
-      ${goLiveInlineCardHtml()}
-      <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
-        <div id="tour-rates-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div id="tour-rates-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
-              <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+
+          <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
+            <div id="tour-rates-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+              <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
+              <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
             </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
-              <input type="number" value="${rates.weekly}" id="edit-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
-              <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            <div class="accordion-body" style="display:none;padding:0 18px 18px;">
+              <div id="tour-rates-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+                <div>
+                  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
+                  <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+                </div>
+                <div>
+                  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
+                  <input type="number" value="${rates.weekly}" id="edit-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+                </div>
+                <div>
+                  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
+                  <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+                </div>
+              </div>
+              <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
             </div>
           </div>
-          <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
-        </div>
-      </div>
-      <div class="booking-card" id="tour-pin-card" style="margin-bottom:14px;">
-        <div id="tour-pin-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Change PIN</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" value="${token}" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+
+          <div class="booking-card" id="tour-pin-card" style="margin-bottom:14px;">
+            <div id="tour-pin-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+              <div style="font-size:14px;font-weight:700;color:var(--text);">Change PIN</div>
+              <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+            </div>
+            <div class="accordion-body" style="display:none;padding:0 18px 18px;">
+              <div style="margin-bottom:12px;">
+                <input type="text" id="edit-new-pin" value="${token}" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+              </div>
+              <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
+            </div>
           </div>
-          <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
-        </div>
-      </div>
-      ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
-        </div>
-      </div>` : ''}
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="margin-bottom:12px;">
-            <textarea id="supportMessage" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
+
+          ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
+            <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+              <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
+              <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+            </div>
+            <div class="accordion-body" style="display:none;padding:0 18px 18px;">
+              <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
+            </div>
+          </div>` : ''}
+
+          <div class="booking-card" style="margin-bottom:14px;">
+            <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
+              <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
+              <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+            </div>
+            <div class="accordion-body" style="display:none;padding:0 18px 18px;">
+              <div style="margin-bottom:12px;">
+                <textarea id="supportMessage" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
+              </div>
+              <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
+            </div>
           </div>
-          <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
+        </div>
+
+        <div class="settings-dashboard-col-right">
+          ${goLiveInlineCardHtml()}
+          ${(typeof twoRoomExplainerHtml === 'function' ? twoRoomExplainerHtml : window.twoRoomExplainerHtml)('booking-page')}
+          
+          <div id="editRoomsCards"></div>
+          <button style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
         </div>
       </div>
     `;
@@ -7800,43 +7897,47 @@ function renderEditRoomsCards() {
     const images = r.images || [];
     return `
     <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
-      <div style="position:relative;">
-        ${images.length ? `<img src="${images[0].url}" loading="lazy" decoding="async" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
-        <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          📷 + Add Photos
-          <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
-        </label>
-      </div>
-      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" loading="lazy" decoding="async" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
-      <div style="padding:18px;">
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
-          <input type="text" value="${r.name}" id="edit-name-${r.id}" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
-        </div>
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Description</div>
-          <input type="text" value="${(r.description || '').replace(/"/g, '&quot;')}" id="edit-desc-${r.id}" placeholder="e.g. A spacious room with king bed and city view" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
-        </div>
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Amenities</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="edit-amenity-pills-${r.id}">
-            ${currentAmenities.map(a => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--green-pale);color:var(--green);padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;">${getAmenityIcon(a)} ${a} <button onclick="removeAmenity('${r.id}','${a.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:14px;margin-left:2px;">×</button></span>`).join('')}
+      <div class="room-edit-grid">
+        <div class="room-edit-image-container" style="display:flex;flex-direction:column;position:relative;">
+          <div style="flex:1;position:relative;display:flex;flex-direction:column;">
+            ${images.length ? `<img src="${images[0].url}" loading="lazy" decoding="async" style="width:100%;height:100%;min-height:200px;object-fit:cover;display:block;border-top-left-radius:12px;border-top-right-radius:12px;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;flex:1;min-height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-top-left-radius:12px;border-top-right-radius:12px;">No photos yet</div>`}
+            <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              📷 + Add Photos
+              <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
+            </label>
           </div>
-          <button onclick="openAmenityPicker('${r.id}')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;font-family:inherit;">+ Add amenities</button>
+          ${images.length > 1 ? `<div style="padding:10px 18px 10px;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" loading="lazy" decoding="async" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Max Guests</div>
-            <input type="number" value="${r.maxOccupancy || 4}" min="1" max="20" id="edit-occ-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+        <div style="padding:18px;">
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
+            <input type="text" value="${r.name}" id="edit-name-${r.id}" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
           </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Total Units</div>
-            <input type="number" value="${r.totalUnits || 1}" min="1" max="200" id="edit-units-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Description</div>
+            <input type="text" value="${(r.description || '').replace(/"/g, '&quot;')}" id="edit-desc-${r.id}" placeholder="e.g. A spacious room with king bed and city view" style="width:100%;font-size:14px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;color:var(--text);">
           </div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Changes</button>
-          <button onclick="deleteEditRoom('${r.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Amenities</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="edit-amenity-pills-${r.id}">
+              ${currentAmenities.map(a => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--green-pale);color:var(--green);padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;">${getAmenityIcon(a)} ${a} <button onclick="removeAmenity('${r.id}','${a.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:14px;margin-left:2px;">×</button></span>`).join('')}
+            </div>
+            <button onclick="openAmenityPicker('${r.id}')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;font-family:inherit;">+ Add amenities</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Max Guests</div>
+              <input type="number" value="${r.maxOccupancy || 4}" min="1" max="20" id="edit-occ-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Total Units</div>
+              <input type="number" value="${r.totalUnits || 1}" min="1" max="200" id="edit-units-${r.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Changes</button>
+            <button onclick="deleteEditRoom('${r.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
+          </div>
         </div>
       </div>
     </div>`;
