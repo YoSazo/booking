@@ -1897,12 +1897,10 @@
         display: flex !important;
       }
 
-      /* goLiveBanner: no bottom gap on desktop — content starts immediately */
+      /* goLiveBanner: strip all bottom spacing — content starts right below */
+      #goLiveBanner,
       #goLiveBanner > div {
         margin-bottom: 0 !important;
-      }
-      #goLiveBanner {
-        margin-bottom: 14px;
       }
 
       /* Settings → two-column dashboard. dash-a (preview + header) and
