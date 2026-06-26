@@ -1872,7 +1872,7 @@
          so grid auto-flow can never drop page content under the sidebar. */
       .container > .tabs-container {
         grid-column: 1;
-        grid-row: 1;
+        grid-row: 1 / span 99;
         position: sticky;
         top: 84px;
         flex-direction: column;
@@ -1885,6 +1885,17 @@
         grid-column: 2;
         min-width: 0;
       }
+      #goLiveBanner {
+        grid-column: 2;
+        grid-row: 1;
+      }
+      #editView, #bookingsList, .availability-view, 
+      .revenue-view, #appsView, #settingsView,
+      #bookingsSubtabs, #messagesPanel, #bookingFilterChips,
+      #growthPanel {
+        grid-column: 2;
+        grid-row: 2;
+      }
       .tabs-container .tab {
         justify-content: flex-start;
         text-align: left;
@@ -1893,10 +1904,6 @@
       }
       .tabs-container .tab-badge { margin-left: auto; }
 
-      /* On desktop sidebar: Revenue tab is always visible regardless of isManualPms */
-      .tabs-container .tab[data-nav-filter="revenue"] {
-        display: flex !important;
-      }
 
       /* goLiveBanner: strip all bottom spacing — content starts right below */
       #goLiveBanner,
@@ -2597,34 +2604,9 @@ function formatCurrencyCompact(value) {
 function syncRevenueUi() {
   const existingBtn = document.getElementById('revenueTabBtn');
   const existingView = document.getElementById('revenueView');
-  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
 
   if (!revenueEnabled) {
     if (existingBtn) existingBtn.remove();
-    if (isDesktop) {
-      // On desktop: keep/create the revenue view so the sidebar tab works,
-      // but show a friendly "not available" state inside it.
-      if (!existingView) {
-        const container = document.querySelector('.container');
-        if (container) {
-          container.insertAdjacentHTML('beforeend', `
-            <div id="revenueView" class="revenue-view" style="display:none">
-              <div class="revenue-wrap">
-                <div style="padding:24px;text-align:center;border-radius:16px;background:var(--bg);border:1.5px solid var(--border-soft);">
-                  <div style="font-size:32px;margin-bottom:12px;">📊</div>
-                  <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Revenue tracking</div>
-                  <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin:0 0 16px;">Revenue analytics are available once your property is set up with direct bookings. Accept your first reservation to start tracking earnings.</p>
-                  <button onclick="setFilter('settings',null)" style="padding:10px 20px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Set up Your Page →</button>
-                </div>
-              </div>
-            </div>
-          `);
-        }
-      }
-      updateMobileRevenueNavVisibility();
-      syncMobileNavActive(currentFilter);
-      return;
-    }
     if (existingView) existingView.remove();
     if (currentFilter === 'revenue') currentFilter = 'bookings';
     const activeTab = document.querySelector('.tab.active');
@@ -4332,11 +4314,9 @@ function syncMobileNavActive(filter) {
 function updateMobileRevenueNavVisibility() {
   const el = document.getElementById('mobileNavRevenueBtn');
   if (el) el.classList.toggle('mobile-nav-item--hidden', !revenueEnabled);
-  // Desktop sidebar: Revenue is always visible via CSS (display:flex !important);
-  // only hide it on desktop if NOT in desktop mode.
+  // Keep the desktop Revenue tab in sync too
   const deskEl = document.getElementById('desktopTabRevenueBtn');
-  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
-  if (deskEl) deskEl.classList.toggle('tab--hidden', !revenueEnabled && !isDesktop);
+  if (deskEl) deskEl.classList.toggle('tab--hidden', !revenueEnabled);
 }
 
 function initMobileBottomNav() {
@@ -4360,9 +4340,7 @@ function initMobileBottomNav() {
 }
 
 function setFilter(filter, btn) {
-  // On desktop Revenue is always accessible (shows upsell if not enabled).
-  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
-  if (filter === 'revenue' && !revenueEnabled && !isDesktop) return;
+  if (filter === 'revenue' && !revenueEnabled) return;
   currentFilter = filter;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   let tabBtn = null;
