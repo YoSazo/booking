@@ -1020,8 +1020,8 @@
       display: none;
     }
 
-    /* Desktop: day editor = bottom dock; header actions left-aligned */
-    @media (min-width: 601px) {
+    /* Tablet: day editor = bottom dock; header actions second-row on tablet only */
+    @media (min-width: 601px) and (max-width: 1023px) {
       .header {
         justify-content: flex-start;
         align-items: flex-start;
@@ -1843,6 +1843,22 @@
        collapse via display:contents so cards keep source order.
        ───────────────────────────────────────────────────────── */
     @media (min-width: 1024px) {
+      /* Single-row header: logo left, actions right, never wraps */
+      .header {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        flex-wrap: nowrap !important;
+        gap: 12px !important;
+      }
+      .header-right {
+        flex-basis: auto !important;
+        width: auto !important;
+        justify-content: flex-end !important;
+        flex-wrap: nowrap !important;
+        flex-shrink: 0;
+      }
+
       .container {
         display: grid;
         grid-template-columns: 216px minmax(0, 1fr);
@@ -1875,6 +1891,19 @@
         padding: 13px 18px;
       }
       .tabs-container .tab-badge { margin-left: auto; }
+
+      /* On desktop sidebar: Revenue tab is always visible regardless of isManualPms */
+      .tabs-container .tab[data-nav-filter="revenue"] {
+        display: flex !important;
+      }
+
+      /* goLiveBanner: no bottom gap on desktop — content starts immediately */
+      #goLiveBanner > div {
+        margin-bottom: 0 !important;
+      }
+      #goLiveBanner {
+        margin-bottom: 14px;
+      }
 
       /* Settings → two-column dashboard. dash-a (preview + header) and
          dash-c (the other config cards) stack in column 1; dash-b
@@ -2559,9 +2588,34 @@ function formatCurrencyCompact(value) {
 function syncRevenueUi() {
   const existingBtn = document.getElementById('revenueTabBtn');
   const existingView = document.getElementById('revenueView');
+  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
 
   if (!revenueEnabled) {
     if (existingBtn) existingBtn.remove();
+    if (isDesktop) {
+      // On desktop: keep/create the revenue view so the sidebar tab works,
+      // but show a friendly "not available" state inside it.
+      if (!existingView) {
+        const container = document.querySelector('.container');
+        if (container) {
+          container.insertAdjacentHTML('beforeend', `
+            <div id="revenueView" class="revenue-view" style="display:none">
+              <div class="revenue-wrap">
+                <div style="padding:24px;text-align:center;border-radius:16px;background:var(--bg);border:1.5px solid var(--border-soft);">
+                  <div style="font-size:32px;margin-bottom:12px;">📊</div>
+                  <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Revenue tracking</div>
+                  <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin:0 0 16px;">Revenue analytics are available once your property is set up with direct bookings. Accept your first reservation to start tracking earnings.</p>
+                  <button onclick="setFilter('settings',null)" style="padding:10px 20px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Set up Your Page →</button>
+                </div>
+              </div>
+            </div>
+          `);
+        }
+      }
+      updateMobileRevenueNavVisibility();
+      syncMobileNavActive(currentFilter);
+      return;
+    }
     if (existingView) existingView.remove();
     if (currentFilter === 'revenue') currentFilter = 'bookings';
     const activeTab = document.querySelector('.tab.active');
@@ -4269,9 +4323,11 @@ function syncMobileNavActive(filter) {
 function updateMobileRevenueNavVisibility() {
   const el = document.getElementById('mobileNavRevenueBtn');
   if (el) el.classList.toggle('mobile-nav-item--hidden', !revenueEnabled);
-  // D7: keep the desktop Revenue tab in sync (desktop must reach Revenue too).
+  // Desktop sidebar: Revenue is always visible via CSS (display:flex !important);
+  // only hide it on desktop if NOT in desktop mode.
   const deskEl = document.getElementById('desktopTabRevenueBtn');
-  if (deskEl) deskEl.classList.toggle('tab--hidden', !revenueEnabled);
+  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
+  if (deskEl) deskEl.classList.toggle('tab--hidden', !revenueEnabled && !isDesktop);
 }
 
 function initMobileBottomNav() {
@@ -4295,7 +4351,9 @@ function initMobileBottomNav() {
 }
 
 function setFilter(filter, btn) {
-  if (filter === 'revenue' && !revenueEnabled) return;
+  // On desktop Revenue is always accessible (shows upsell if not enabled).
+  const isDesktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
+  if (filter === 'revenue' && !revenueEnabled && !isDesktop) return;
   currentFilter = filter;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   let tabBtn = null;
