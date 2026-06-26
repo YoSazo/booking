@@ -1863,6 +1863,7 @@
         display: grid;
         grid-template-columns: 216px minmax(0, 1fr);
         column-gap: 32px;
+        row-gap: 0;
         max-width: 1360px;
         align-items: start;
         padding-top: 28px;
@@ -1899,8 +1900,18 @@
 
       /* goLiveBanner: strip all bottom spacing — content starts right below */
       #goLiveBanner,
-      #goLiveBanner > div {
+      #goLiveBanner > div,
+      #goLiveBanner > div > div {
         margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+      }
+
+      #app.has-go-live-banner #editView,
+      #app.has-go-live-banner #bookingsList,
+      #app.has-go-live-banner .availability-view,
+      #app.has-go-live-banner .revenue-view,
+      #app.has-go-live-banner #appsView {
+        margin-top: 14px;
       }
 
       /* Settings → two-column dashboard. dash-a (preview + header) and
