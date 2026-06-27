@@ -474,7 +474,7 @@ app.use('/uploads', (req, res, next) => {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     next();
 }, express.static(path.join(__dirname, 'public', 'uploads')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api/stripe-webhook')) {
