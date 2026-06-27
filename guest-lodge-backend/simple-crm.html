@@ -1973,19 +1973,19 @@
       }
       .settings-dashboard-grid > div { min-width: 0; }
 
-      /* Room editor: photos on the left, fields on the right. */
+      /* Room editor: photos above fields so desktop previews are full-width and uncropped. */
       .room-edit-grid {
         display: grid;
-        grid-template-columns: 300px minmax(0, 1fr);
-        align-items: stretch;
+        grid-template-columns: 1fr;
+        align-items: start;
       }
       .room-edit-grid > .room-edit-media {
         display: flex;
         flex-direction: column;
-        border-right: 1px solid var(--border-soft);
+        border-bottom: 1px solid var(--border-soft);
       }
-      .room-edit-grid > .room-edit-media .room-edit-photo { flex: 1; min-height: 240px; }
-      .room-edit-grid > .room-edit-media .room-edit-photo img { height: 100% !important; min-height: 240px; }
+      .room-edit-grid > .room-edit-media .room-edit-photo { height:clamp(320px, 38vw, 420px);min-height:320px;background:var(--bg); }
+      .room-edit-grid > .room-edit-media .room-edit-photo img { width:100% !important;height:100% !important;min-height:0;object-fit:contain !important;background:var(--bg); }
 
       /* Explainer card: lay text + columns out horizontally to reclaim height. */
       #tour-two-room-card {
@@ -5748,8 +5748,8 @@ async function loadSettings() {
         const hasImage = r.images && r.images.length > 0;
         html += `
           <div class="booking-card" style="margin-bottom:14px;">
-            <div style="position:relative;">
-              ${hasImage ? `<img src="${r.images[0].url}" loading="lazy" decoding="async" style="width:100%;height:200px;object-fit:cover;display:block;border-radius:14px 14px 0 0;">` : `<div style="width:100%;height:140px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-radius:14px 14px 0 0;">No photos yet</div>`}
+            <div style="position:relative;background:var(--bg);border-radius:14px 14px 0 0;overflow:hidden;">
+              ${hasImage ? `<img src="${r.images[0].url}" loading="lazy" decoding="async" style="width:100%;height:clamp(260px,34vw,380px);object-fit:contain;display:block;background:var(--bg);border-radius:14px 14px 0 0;">` : `<div style="width:100%;height:clamp(260px,34vw,380px);background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-radius:14px 14px 0 0;">No photos yet</div>`}
               <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
                 📷 ${hasImage ? 'Change Photo' : '+ Add Photo'}
                 <input type="file" accept="image/*" style="display:none;" onchange="settingsUploadPhoto(event,'${r.id}')">
@@ -7044,11 +7044,11 @@ function startSettingsTour() {
       scrollBlock: 'nearest'
     },
     {
-      target: '.apps-lock-wrapper, #tour-guest-icon-section',
-      highlightSelector: '.apps-lock-wrapper, #tour-guest-icon-section',
-      anchorSelector: '.apps-lock-card, #tour-guest-icon-section',
-      scrollTarget: '.apps-lock-wrapper, #tour-fd-install-card',
-      text: 'Install Front Desk on this device to unlock the guest tools here: check-in QR, guest install link, notifications, and app icon.',
+      target: '#tour-guest-icon-section',
+      highlightSelector: '#tour-guest-icon-section',
+      anchorSelector: '#tour-guest-icon-section',
+      scrollTarget: '#tour-guest-icon-section',
+      text: 'Set the icon guests see when they save your direct booking page. Guest QR, install link, notifications, and app tools live in this Phones tab.',
       openAccordion: false,
       tab: 'apps',
       waitForVisible: true,
@@ -8000,7 +8000,7 @@ function renderEditRoomsCards() {
       <div class="room-edit-grid">
       <div class="room-edit-media">
       <div class="room-edit-photo" style="position:relative;">
-        ${images.length ? `<img src="${images[0].url}" loading="lazy" decoding="async" style="width:100%;height:200px;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
+        ${images.length ? `<img src="${images[0].url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block;background:var(--bg);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:100%;min-height:320px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
         <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
           📷 + Add Photos
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
@@ -8854,88 +8854,7 @@ function renderAppsView() {
       </div>
     </div>`;
 
-  const isInstalledApp = isStandaloneApp();
-
-  // When NOT installed as a PWA, gate everything except the install card
-  if (!isInstalledApp) {
-    el.innerHTML = `
-    <style>
-      .apps-page { padding:4px 0 28px; }
-      .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
-      .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
-      .apps-loop { display:flex;align-items:flex-start;justify-content:center;gap:14px;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1.5px solid #bbf7d0;border-radius:16px;padding:18px 14px;margin:0 0 16px; }
-      .apps-loop-side { flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center; }
-      .apps-loop-tile { width:54px;height:54px;border-radius:14px;background:#fff;border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px; }
-      .apps-loop-tile--guest { padding:0; }
-      .apps-loop-name { font-size:13px;font-weight:800;color:var(--text);line-height:1.25;word-break:break-word; }
-      .apps-loop-sub { font-size:11px;color:var(--text-muted);line-height:1.35;margin-top:3px; }
-      .apps-loop-arrow { flex-shrink:0;align-self:center;font-size:22px;color:var(--green);font-weight:700;padding-top:14px; }
-      .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
-      .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
-      .apps-section-divider { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin:24px 0 14px;padding-top:18px;border-top:1.5px solid var(--border); }
-      .apps-video-teaser { display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px 14px;border-radius:12px;border:1.5px dashed #86efac;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);color:#166534;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s,border-color 0.15s; }
-      .apps-video-teaser:active { background:#dcfce7;border-color:#4ade80; }
-      .apps-video-teaser__play { width:28px;height:28px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 10px rgba(46,125,91,0.35);position:relative; }
-      .apps-video-teaser__play::after { content:'';width:0;height:0;border-style:solid;border-width:6px 0 6px 9px;border-color:transparent transparent transparent #fff;margin-left:2px; }
-      .apps-lock-wrapper { position:relative;margin-top:4px; }
-      .apps-lock-content { filter:blur(3px);opacity:0.45;pointer-events:none;user-select:none;-webkit-user-select:none; }
-      .apps-lock-overlay { position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:32px;z-index:10; }
-      .apps-lock-card { background:var(--white);border:1.5px solid var(--border);border-radius:18px;padding:28px 22px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.12);max-width:320px;width:100%; }
-      .apps-lock-icon { width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #bbf7d0;display:flex;align-items:center;justify-content:center;margin:0 auto 14px; }
-      .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.5; }
-    </style>
-
-    <div class="apps-page">
-
-      <h2 class="apps-headline">Phones</h2>
-
-      ${loopDiagramHtml}
-
-      <div class="apps-step-card" id="tour-fd-install-card">
-        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
-        <div class="apps-step-title">Install Front Desk</div>
-        ${fdCtaHtml}
-      </div>
-
-      <div class="apps-lock-wrapper">
-        <div class="apps-lock-overlay">
-          <div class="apps-lock-card">
-            <div class="apps-lock-icon">
-              <i data-lucide="lock" style="width:22px;height:22px;color:var(--green);"></i>
-            </div>
-            <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px;">Install to unlock</div>
-            <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0 0 16px;">Check-in QR, guest notifications, app icon, and more — all available once Front Desk is installed on this device.</p>
-            <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">
-              <span style="display:inline-flex;align-items:center;gap:8px;"><i data-lucide="download" style="width:18px;height:18px;"></i> Install Front Desk</span>
-            </button>
-            <p style="font-size:11px;color:var(--text-muted);margin:10px 0 0;">Takes about 3 seconds · No App Store</p>
-          </div>
-        </div>
-        <div class="apps-lock-content">
-          <div class="apps-step-card" id="tour-guest-icon-section">
-            <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
-            ${logoBlockHtml}
-          </div>
-          <div class="apps-step-card">
-            <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
-            <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Guests can save <strong>${hName}</strong> to their phone — one tap, no app store.</p>
-            ${checkinActionsHtml}
-            ${guestInstallLinkHtml}
-          </div>
-          ${guestInstallPreviewHtml}
-          ${guestBroadcastCardHtml()}
-        </div>
-      </div>
-
-      <p class="apps-footnote">iPhone, Android, and desktop · installs from your browser · no App Store</p>
-
-    </div>`;
-
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-    return;
-  }
-
-  // ── PWA installed: show the full Phones tab ──
+  // Show the same Phones tools in the browser and installed app; the install CTA still adapts.
   const appsMainHtml = `
     ${loopDiagramHtml}
     <div class="apps-step-card" id="tour-fd-install-card">
