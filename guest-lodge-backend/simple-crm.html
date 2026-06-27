@@ -1910,8 +1910,10 @@
       .tabs-container .tab-badge { margin-left: auto; }
 
 
-      /* goLiveBanner: strip all bottom spacing — content starts right below */
-      #goLiveBanner,
+      /* goLiveBanner: give it a sensible margin so it doesn't squish content */
+      #goLiveBanner {
+        margin-bottom: 24px !important;
+      }
       #goLiveBanner > div,
       #goLiveBanner > div > div {
         margin-bottom: 0 !important;
