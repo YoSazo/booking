@@ -3052,7 +3052,7 @@ function goLiveBannerHtml() {
   const demand = blockedDemand && blockedDemand.total > 0 ? blockedDemand.total : 0;
   if (demand > 0) {
     return `
-      <div onclick="goLive()" role="button" tabindex="0" style="display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:11px 14px;margin-bottom:14px;cursor:pointer;">
+      <div onclick="goLive()" role="button" tabindex="0" style="display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:1px 14px;margin-bottom:14px;cursor:pointer;">
         <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;flex-shrink:0;"></span>
         <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.25;">${demand} guest${demand>1?'s':''} tried to book — turn on direct bookings to accept reservations like these.</span>
         <span style="white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;line-height:1;">Go live →</span>
@@ -6215,10 +6215,7 @@ function replayWalkthrough() {
     localStorage.removeItem(k);
   });
   const u = new URL(window.location.href);
-  u.searchParams.set('welcome', '1');
-  const hid = u.searchParams.get('hotelId') || activeHotelId || '';
-  if (hid) u.searchParams.set('hotelId', hid);
-  location.href = u.pathname + '?' + u.searchParams.toString();
+  location.href = u.pathname + '?welcome';
 }
 
 function showWelcomeModal() {
@@ -7039,7 +7036,7 @@ function startSettingsTour() {
     },
     {
       target: '#tour-fd-install-btn, #tour-fd-installed-badge',
-      text: 'No download — it lives on your home screen like any other app. Takes about 3 seconds. You\'ll get a buzz when guests book.',
+      text: 'Install Front Desk on this device so it opens like an app and can send booking alerts when supported.',
       openAccordion: false,
       tab: 'apps',
       waitForVisible: true,
@@ -7047,16 +7044,15 @@ function startSettingsTour() {
       scrollBlock: 'nearest'
     },
     {
-      target: '#tour-guest-icon-btn',
-      anchorSelector: '#tour-guest-icon-btn',
-      scrollTarget: '#tour-guest-icon-section, #tour-fd-install-card',
-      text: 'Guests can save your direct booking page to their home screen too — upload your logo so it stands out when they do.',
+      target: '.apps-lock-wrapper, #tour-guest-icon-section',
+      highlightSelector: '.apps-lock-wrapper, #tour-guest-icon-section',
+      anchorSelector: '.apps-lock-card, #tour-guest-icon-section',
+      scrollTarget: '.apps-lock-wrapper, #tour-fd-install-card',
+      text: 'Install Front Desk on this device to unlock the guest tools here: check-in QR, guest install link, notifications, and app icon.',
       openAccordion: false,
       tab: 'apps',
       waitForVisible: true,
-      noHighlight: true,
-      freezeTooltip: true,
-      tooltipPosition: 'below',
+      tooltipPosition: 'above',
       scrollBlock: 'center',
       scrollPadBottom: 260,
       scrollPadTop: 88
@@ -8722,8 +8718,8 @@ function renderAppsView() {
   const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
 
   const frontdeskInstallItems = [
-    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to add Front Desk', title: 'Add Front Desk to your home screen',
-      caption: 'Tap <strong>Add to Home Screen</strong> in your browser. No App Store. Takes about 3 seconds.' },
+    { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to install Front Desk', title: 'Install Front Desk on this device',
+      caption: 'Use your browser install option. No App Store. Takes about 3 seconds.' },
     { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'Reply to guest', title: 'You reply from your phone',
       caption: 'Messages from guests show up in <strong>Bookings</strong>. Tap reply — they get it on their phone.' },
   ];
@@ -8732,14 +8728,14 @@ function renderAppsView() {
   if (fdInApp && fdGranted) {
     fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
       <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
-      <div><div style="font-size:13px;font-weight:700;color:#166534;">On your home screen</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">You'll get a buzz when someone books — even if this is closed.</div></div>
+      <div><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">You'll get booking alerts when supported — even if this is closed.</div></div>
     </div>`;
   } else if (fdInApp) {
-    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's on your home screen. Turn on alerts so your phone buzzes when a guest books.</p>
+    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's installed on this device. Turn on alerts so you know when a guest books.</p>
       <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
-    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">This page can live on your home screen like an app. No App Store. Takes about 3 seconds. And it'll buzz you when guests book.</p>
-      <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Add Front Desk to my home screen</button>
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Install this Front Desk on your device like an app. No App Store. Takes about 3 seconds. It can alert you when guests book.</p>
+      <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Install Front Desk</button>
       <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)" style="margin-top:0;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>`;
   }
 
@@ -8896,8 +8892,8 @@ function renderAppsView() {
       ${loopDiagramHtml}
 
       <div class="apps-step-card" id="tour-fd-install-card">
-        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your phone</div>
-        <div class="apps-step-title">Add Front Desk to your home screen</div>
+        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
+        <div class="apps-step-title">Install Front Desk</div>
         ${fdCtaHtml}
       </div>
 
@@ -8908,9 +8904,9 @@ function renderAppsView() {
               <i data-lucide="lock" style="width:22px;height:22px;color:var(--green);"></i>
             </div>
             <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px;">Install to unlock</div>
-            <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0 0 16px;">Check-in QR, guest notifications, app icon, and more — all available once Front Desk is on your home screen.</p>
+            <p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0 0 16px;">Check-in QR, guest notifications, app icon, and more — all available once Front Desk is installed on this device.</p>
             <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">
-              <span style="display:inline-flex;align-items:center;gap:8px;"><i data-lucide="download" style="width:18px;height:18px;"></i> Add to Home Screen</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;"><i data-lucide="download" style="width:18px;height:18px;"></i> Install Front Desk</span>
             </button>
             <p style="font-size:11px;color:var(--text-muted);margin:10px 0 0;">Takes about 3 seconds · No App Store</p>
           </div>
@@ -8931,7 +8927,7 @@ function renderAppsView() {
         </div>
       </div>
 
-      <p class="apps-footnote">iPhone &amp; Android · lives on your home screen · no App Store</p>
+      <p class="apps-footnote">iPhone, Android, and desktop · installs from your browser · no App Store</p>
 
     </div>`;
 
@@ -8943,8 +8939,8 @@ function renderAppsView() {
   const appsMainHtml = `
     ${loopDiagramHtml}
     <div class="apps-step-card" id="tour-fd-install-card">
-      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your phone</div>
-      <div class="apps-step-title">${fdInApp ? 'Front Desk — on your home screen' : 'Add Front Desk to your home screen'}</div>
+      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
+      <div class="apps-step-title">${fdInApp ? 'Front Desk — installed' : 'Install Front Desk'}</div>
       ${fdCtaHtml}
     </div>
     <div class="apps-step-card" id="tour-guest-icon-section">

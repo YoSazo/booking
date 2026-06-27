@@ -157,7 +157,7 @@ import{c as o,e as Jt,a as st,s as tt}from"./settings.js";(function(){const t=do
     <div style="background:rgba(255,255,255,0.16);border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:12.5px;color:#fff;font-weight:600;line-height:1.45;">
       ${e} guest${e>1?"s":""} tried to book ${t} — activate to accept reservations like these.
     </div>`}function wt(){const e=o.blockedDemand&&o.blockedDemand.total>0?o.blockedDemand.total:0;return e>0?`
-      <div onclick="goLive()" role="button" tabindex="0" style="display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:11px 14px;margin-bottom:14px;cursor:pointer;">
+      <div onclick="goLive()" role="button" tabindex="0" style="display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:1px 14px;margin-bottom:14px;cursor:pointer;">
         <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;flex-shrink:0;"></span>
         <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.25;">${e} guest${e>1?"s":""} tried to book — turn on direct bookings to accept reservations like these.</span>
         <span style="white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;line-height:1;">Go live →</span>
