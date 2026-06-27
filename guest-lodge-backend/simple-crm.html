@@ -629,6 +629,124 @@
     .toast.success { background: var(--green); }
     .toast.error { background: var(--red); }
 
+    .room-edit-photo {
+      position: relative;
+      height: 280px;
+      min-height: 260px;
+      background: #111827;
+      overflow: hidden;
+    }
+    .room-edit-main-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #111827;
+    }
+    .room-edit-photo-placeholder {
+      width: 100%;
+      height: 100%;
+      min-height: 280px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .room-edit-image-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: background 0.15s, transform 0.15s;
+    }
+    .room-edit-image-nav:hover { background: rgba(0,0,0,0.74); transform: translateY(-50%) scale(1.05); }
+    .room-edit-image-nav--left { left: 12px; }
+    .room-edit-image-nav--right { right: 12px; }
+    .room-edit-image-dots {
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 7px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.28);
+      backdrop-filter: blur(4px);
+    }
+    .room-edit-image-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      border: none;
+      padding: 0;
+      background: rgba(255,255,255,0.55);
+      cursor: pointer;
+      transition: width 0.15s, background 0.15s;
+    }
+    .room-edit-image-dot.active { width: 24px; background: #fff; }
+    .room-edit-photo-count {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 4;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      backdrop-filter: blur(4px);
+    }
+    .room-edit-thumbs {
+      padding: 10px 18px 0;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .room-edit-thumb-wrap {
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .room-edit-thumb {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #111827;
+      padding: 0;
+      overflow: hidden;
+      cursor: pointer;
+      display: block;
+    }
+    .room-edit-thumb.active {
+      border-color: var(--green);
+      box-shadow: 0 0 0 2px rgba(46,125,91,0.16);
+    }
+    .room-edit-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
     .availability-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .rooms-shell { display: flex; flex-direction: column; gap: 12px; }
     .room-pill-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -1973,7 +2091,7 @@
       }
       .settings-dashboard-grid > div { min-width: 0; }
 
-      /* Room editor: photos above fields so desktop previews are full-width and uncropped. */
+      /* Room editor: photos above fields so desktop previews are full-width. */
       .room-edit-grid {
         display: grid;
         grid-template-columns: 1fr;
@@ -1984,8 +2102,8 @@
         flex-direction: column;
         border-bottom: 1px solid var(--border-soft);
       }
-      .room-edit-grid > .room-edit-media .room-edit-photo { height:clamp(320px, 38vw, 420px);min-height:320px;background:var(--bg); }
-      .room-edit-grid > .room-edit-media .room-edit-photo img { width:100% !important;height:100% !important;min-height:0;object-fit:contain !important;background:var(--bg); }
+      .room-edit-grid > .room-edit-media .room-edit-photo { height:clamp(320px, 38vw, 420px);min-height:320px;background:#111827; }
+      .room-edit-grid > .room-edit-media .room-edit-photo img.room-edit-main-img { width:100% !important;height:100% !important;min-height:0;object-fit:cover !important;background:#111827; }
 
       /* Explainer card: lay text + columns out horizontally to reclaim height. */
       #tour-two-room-card {
@@ -2579,6 +2697,10 @@ async function loadHotelContext() {
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function jsStr(s) {
+  return String(s || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n');
 }
 
 function toIsoDate(dateLike) {
@@ -7994,19 +8116,29 @@ function renderEditRoomsCards() {
   }
   cards.innerHTML = editRooms.map(r => {
     const currentAmenities = (r.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
-    const images = r.images || [];
+    const images = (r.images || []).filter(img => img && img.url);
+    const roomIdJs = jsStr(r.id);
     return `
     <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
       <div class="room-edit-grid">
       <div class="room-edit-media">
-      <div class="room-edit-photo" style="position:relative;">
-        ${images.length ? `<img src="${images[0].url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block;background:var(--bg);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">` : `<div style="width:100%;height:100%;min-height:320px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">No photos yet</div>`}
+      <div class="room-edit-photo" data-photo-index="0">
+        ${images.length ? `
+          <img class="room-edit-main-img" src="${esc(images[0].url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">
+          ${images.length > 1 ? `
+            <button type="button" class="room-edit-image-nav room-edit-image-nav--left" aria-label="Previous photo" onclick="event.stopPropagation();stepEditRoomPhoto('${roomIdJs}', -1)"><i data-lucide="chevron-left" style="width:20px;height:20px;"></i></button>
+            <button type="button" class="room-edit-image-nav room-edit-image-nav--right" aria-label="Next photo" onclick="event.stopPropagation();stepEditRoomPhoto('${roomIdJs}', 1)"><i data-lucide="chevron-right" style="width:20px;height:20px;"></i></button>
+            <div class="room-edit-photo-count">1 / ${images.length}</div>
+            <div class="room-edit-image-dots">
+              ${images.map((_, idx) => `<button type="button" class="room-edit-image-dot ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="event.stopPropagation();showEditRoomPhoto('${roomIdJs}', ${idx})"></button>`).join('')}
+            </div>` : ''}
+        ` : `<div class="room-edit-photo-placeholder">No photos yet</div>`}
         <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
           📷 + Add Photos
-          <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r.id}')">
+          <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${roomIdJs}')">
         </label>
       </div>
-      ${images.length > 1 ? `<div style="padding:10px 18px 0;display:flex;gap:8px;overflow-x:auto;">` + images.map(img => `<div style="position:relative;flex-shrink:0;"><img src="${img.url}" loading="lazy" decoding="async" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"><button onclick="deleteEditImage('${r.id}','${img.id}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
+      ${images.length > 1 ? `<div class="room-edit-thumbs">` + images.map((img, idx) => `<div class="room-edit-thumb-wrap"><button type="button" class="room-edit-thumb ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="showEditRoomPhoto('${roomIdJs}', ${idx})"><img src="${esc(img.url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"></button><button type="button" onclick="event.stopPropagation();deleteEditImage('${roomIdJs}','${jsStr(img.id)}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       </div>
       <div class="room-edit-fields" style="padding:18px;">
         <div style="margin-bottom:12px;">
@@ -8042,6 +8174,43 @@ function renderEditRoomsCards() {
       </div>
     </div>`;
   }).join('');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function getEditRoomImages(roomId) {
+  const room = editRooms.find(r => String(r.id) === String(roomId));
+  return ((room && room.images) || []).filter(img => img && img.url);
+}
+
+function showEditRoomPhoto(roomId, index) {
+  const images = getEditRoomImages(roomId);
+  if (!images.length) return;
+  const card = document.getElementById('edit-card-' + roomId);
+  if (!card) return;
+  const total = images.length;
+  const next = ((Number(index) || 0) % total + total) % total;
+  const main = card.querySelector('.room-edit-main-img');
+  if (main) main.src = images[next].url;
+  card.querySelector('.room-edit-photo')?.setAttribute('data-photo-index', String(next));
+  const count = card.querySelector('.room-edit-photo-count');
+  if (count) count.textContent = (next + 1) + ' / ' + total;
+  card.querySelectorAll('.room-edit-image-dot').forEach((dot, idx) => {
+    dot.classList.toggle('active', idx === next);
+    if (idx === next) dot.setAttribute('aria-current', 'true');
+    else dot.removeAttribute('aria-current');
+  });
+  card.querySelectorAll('.room-edit-thumb').forEach((thumb, idx) => {
+    thumb.classList.toggle('active', idx === next);
+    if (idx === next) thumb.setAttribute('aria-current', 'true');
+    else thumb.removeAttribute('aria-current');
+  });
+}
+
+function stepEditRoomPhoto(roomId, delta) {
+  const card = document.getElementById('edit-card-' + roomId);
+  const photo = card?.querySelector('.room-edit-photo');
+  const current = parseInt(photo?.getAttribute('data-photo-index') || '0', 10) || 0;
+  showEditRoomPhoto(roomId, current + delta);
 }
 
 function getAmenityIcon(amenity) {
@@ -8385,7 +8554,7 @@ function setAppIconPreviewImage(url) {
   if (!el) return;
   el.style.background = '#fff';
   el.style.border = '1px solid var(--border)';
-  el.style.padding = '8px';
+  el.style.padding = '0';
   el.innerHTML = '<img src="' + url + '" alt="App icon" style="width:100%;height:100%;object-fit:contain;">';
 }
 
@@ -8739,13 +8908,11 @@ function renderAppsView() {
       <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)" style="margin-top:0;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>`;
   }
 
-  // Icon preview must match what guests actually see: an uploaded logo gets a
-  // white frame (object-fit:contain, good for transparent logos); the generated
-  // letter icon is full-bleed green edge-to-edge (same as the loop tile + the
-  // real guest-app icon) — no white inner frame.
+  // Icon preview matches the loop tile: uploaded logos use the whole square,
+  // while the generated letter icon is full-bleed green edge-to-edge.
   const iconBoxBase = 'width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);box-sizing:border-box;';
   const iconBoxStyle = hotelAppIcon
-    ? iconBoxBase + 'background:#fff;border:1px solid var(--border);padding:8px;'
+    ? iconBoxBase + 'background:#fff;border:1px solid var(--border);padding:0;'
     : iconBoxBase;
   const iconInnerHtml = hotelAppIcon
     ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:contain;">`
@@ -8765,7 +8932,8 @@ function renderAppsView() {
   const checkinActionsHtml = `
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR</button>
       ${guestInstallUrl !== '#' ? `
-      <button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>` : ''}
+      <button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Open your direct booking website to see the Install button. Guests use it to save your hotel to their home screen.</p>` : ''}
       ${guestInstallUrl === '#' ? '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>' : ''}`;
 
   // Guest install link — promoted out of the Help fold so it's always reachable (§1D.2).
@@ -8812,7 +8980,24 @@ function renderAppsView() {
         </div>
         ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}`;
 
-  // 1:1 preview of what guests see on the booking page — the install banner
+  // 1:1 preview of what guests see on the booking page: room card, then install banner.
+  const previewRoom = (editRooms || []).find(r => r && (r.name || (r.images && r.images.length))) || {};
+  const previewImages = ((previewRoom.images || []).filter(img => img && img.url));
+  const previewRoomImage = previewImages[0]?.url || 'https://suitestay.clickinns.com/kingbedsuitestay.webp';
+  const previewRoomName = previewRoom.name || 'King Suite';
+  const previewRoomDesc = previewRoom.description || 'Spacious • Fully Furnished';
+  const previewAmenities = (previewRoom.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
+  const previewAmenityNames = (previewAmenities.length ? previewAmenities : ['Free WiFi', 'Smart TV', 'Free Parking', 'Weekly Cleaning']).slice(0, 4);
+  const previewNightly = parseFloat(document.getElementById('edit-rate-nightly')?.value || document.getElementById('settings-rate-nightly')?.value) || 69;
+  const previewAmenityHtml = previewAmenityNames.map(a => `
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;min-width:0;">
+      <div style="width:34px;height:34px;background:#eff6ff;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#3b82f6;">${getAmenityIcon(a)}</div>
+      <span style="font-size:10px;line-height:1.15;color:#4b5563;font-weight:600;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a)}</span>
+    </div>`).join('');
+  const previewPhotoDots = previewImages.length > 1 ? `
+    <div style="position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:5px;padding:5px 7px;border-radius:999px;background:rgba(0,0,0,0.28);">
+      ${previewImages.slice(0, 5).map((_, idx) => `<span style="width:${idx === 0 ? '20px' : '7px'};height:7px;border-radius:999px;background:${idx === 0 ? '#fff' : 'rgba(255,255,255,0.6)'};display:block;"></span>`).join('')}
+    </div>` : '';
   const iconPreviewHtml = hotelAppIcon
     ? `<img src="${hotelAppIcon}" alt="" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;">`
     : `<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${hotelInitial}</div>`;
@@ -8821,20 +9006,31 @@ function renderAppsView() {
     <div class="apps-step-card" style="padding:0;overflow:hidden;">
       <div style="padding:16px 18px 14px;">
         <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">What guests see</div>
-        <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">While booking, guests can save <strong>${hName}</strong> to their home screen. This is what it looks like on your direct booking page.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">Guests see your rooms first, then the Install button that puts <strong>${hName}</strong> on their home screen.</p>
       </div>
-      <div style="background:#f8faf9;border-top:1px solid var(--border);padding:0 18px 18px;">
-        <!-- Mini room card peek (faded) for context -->
-        <div style="opacity:0.4;pointer-events:none;user-select:none;padding-top:14px;">
-          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:56px;height:40px;border-radius:8px;background:linear-gradient(135deg,#e8f5ee,#d1fae5);flex-shrink:0;"></div>
-              <div style="flex:1;">
-                <div style="width:60%;height:10px;border-radius:4px;background:#e5e7eb;margin-bottom:6px;"></div>
-                <div style="width:40%;height:8px;border-radius:4px;background:#e5e7eb;"></div>
-              </div>
-              <div style="padding:6px 14px;border-radius:8px;background:#e5e7eb;"><div style="width:40px;height:10px;"></div></div>
+      <div style="background:#f8faf9;border-top:1px solid var(--border);padding:14px 18px 18px;">
+        <div style="background:#fff;border:1px solid rgba(226,232,240,0.9);border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+          <div style="height:150px;position:relative;background:#111827;overflow:hidden;">
+            <img src="${esc(previewRoomImage)}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">
+            ${previewImages.length > 1 ? `<div style="position:absolute;top:10px;right:10px;padding:5px 9px;border-radius:999px;background:rgba(0,0,0,0.58);color:#fff;font-size:11px;font-weight:700;">${previewImages.length} photos</div>` : ''}
+            ${previewPhotoDots}
+          </div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div>
+              <div style="font-size:19px;font-weight:700;color:#1f2937;line-height:1.2;margin-bottom:4px;">${esc(previewRoomName)}</div>
+              <div style="font-size:13px;color:#6b7280;line-height:1.35;">${esc(previewRoomDesc)}</div>
             </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:2px 0;">
+              ${previewAmenityHtml}
+            </div>
+            <div style="background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border:1px solid #a7f3d0;border-radius:12px;padding:13px 14px;">
+              <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:3px;">
+                <span style="font-size:30px;font-weight:700;color:#2E7D5B;">$${previewNightly.toFixed(0)}</span>
+                <span style="font-size:13px;color:#6b7280;">night</span>
+              </div>
+              <div style="font-size:12px;color:#4b5563;line-height:1.35;">Choose dates to see your exact total.</div>
+            </div>
+            <div style="width:100%;padding:13px 16px;border-radius:12px;background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);color:#fff;font-size:14px;font-weight:700;text-align:center;box-shadow:0 4px 12px rgba(37,99,235,0.3);">Select Room</div>
           </div>
         </div>
         <!-- 1:1 replica of InstallAppBanner -->
@@ -8851,11 +9047,13 @@ function renderAppsView() {
       </div>
       <div style="padding:0 18px 16px;background:#f8faf9;">
         ${bookingUrl !== '#' ? `<button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Go to direct booking page ↗</button>` : ''}
+        ${bookingUrl !== '#' ? `<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;text-align:center;">Open your direct booking website to see the Install button guests use to put you on their home screen.</p>` : ''}
       </div>
     </div>`;
 
   // Show the same Phones tools in the browser and installed app; the install CTA still adapts.
   const appsMainHtml = `
+    ${guestInstallPreviewHtml}
     ${loopDiagramHtml}
     <div class="apps-step-card" id="tour-fd-install-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
@@ -8872,7 +9070,6 @@ function renderAppsView() {
       ${checkinActionsHtml}
       ${guestInstallLinkHtml}
     </div>
-    ${guestInstallPreviewHtml}
     ${guestBroadcastCardHtml()}`;
 
   const appsFootnoteHtml = fdInApp
