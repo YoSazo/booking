@@ -631,6 +631,9 @@
 
     .room-edit-photo {
       position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
       height: 280px;
       min-height: 260px;
       background: #111827;
@@ -638,10 +641,39 @@
     }
     .room-edit-main-img {
       width: 100%;
+      max-width: 100%;
+      min-width: 0;
       height: 100%;
       object-fit: cover;
       display: block;
       background: #111827;
+    }
+    #editRoomsCards,
+    #editRoomsCards .booking-card,
+    .room-edit-grid,
+    .room-edit-media,
+    .room-edit-fields {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .room-edit-photo-upload {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 6;
+      background: rgba(0,0,0,0.65);
+      color: white;
+      padding: 6px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      max-width: calc(100% - 20px);
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
     }
     .room-edit-photo-placeholder {
       width: 100%;
@@ -719,6 +751,7 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
+      max-width: 100%;
       scrollbar-width: thin;
     }
     .room-edit-thumb-wrap {
@@ -2096,11 +2129,22 @@
         display: grid;
         grid-template-columns: 1fr;
         align-items: start;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
       }
       .room-edit-grid > .room-edit-media {
         display: flex;
         flex-direction: column;
         border-bottom: 1px solid var(--border-soft);
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+      }
+      .room-edit-grid > .room-edit-fields {
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
       }
       .room-edit-grid > .room-edit-media .room-edit-photo { height:clamp(320px, 38vw, 420px);min-height:320px;background:#111827; }
       .room-edit-grid > .room-edit-media .room-edit-photo img.room-edit-main-img { width:100% !important;height:100% !important;min-height:0;object-fit:cover !important;background:#111827; }
@@ -8133,7 +8177,7 @@ function renderEditRoomsCards() {
               ${images.map((_, idx) => `<button type="button" class="room-edit-image-dot ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="event.stopPropagation();showEditRoomPhoto('${roomIdJs}', ${idx})"></button>`).join('')}
             </div>` : ''}
         ` : `<div class="room-edit-photo-placeholder">No photos yet</div>`}
-        <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <label class="room-edit-photo-upload">
           📷 + Add Photos
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${roomIdJs}')">
         </label>
@@ -9003,7 +9047,7 @@ function renderAppsView() {
     : `<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${hotelInitial}</div>`;
 
   const guestInstallPreviewHtml = `
-    <div class="apps-step-card" style="padding:0;overflow:hidden;">
+    <div class="apps-step-card apps-guest-phone-card">
       <div style="padding:16px 18px 14px;">
         <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">What guests see</div>
         <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">Guests see your rooms first, then the Install button that puts <strong>${hName}</strong> on their home screen.</p>
@@ -9091,6 +9135,7 @@ function renderAppsView() {
     .apps-step-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px; }
     .apps-section-divider { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin:24px 0 14px;padding-top:18px;border-top:1.5px solid var(--border); }
     .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
+    .apps-guest-phone-card { padding:0;overflow:hidden;position:relative; }
     .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
     .apps-icon-card { display:flex;align-items:center;gap:14px; }
     .apps-how-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:22px 0 10px; }
@@ -9134,6 +9179,30 @@ function renderAppsView() {
     .apps-fold-body { padding:0 16px 16px;border-top:1px solid var(--border); }
     .apps-fold-body .apps-q-list { margin-top:12px;margin-bottom:0; }
     .apps-fold-body .apps-how-sub { margin-top:12px;margin-bottom:0; }
+    @media (min-width: 768px) {
+      .apps-guest-phone-card {
+        width:min(390px, 100%);
+        margin:0 auto 18px;
+        border:8px solid #15221b;
+        border-radius:34px;
+        box-shadow:0 18px 50px rgba(21,34,27,0.24), var(--shadow-lg);
+      }
+      .apps-guest-phone-card::before {
+        content:'';
+        position:absolute;
+        top:9px;
+        left:50%;
+        transform:translateX(-50%);
+        width:72px;
+        height:6px;
+        border-radius:999px;
+        background:#23352b;
+        z-index:2;
+      }
+      .apps-guest-phone-card > div:first-child {
+        padding-top:28px !important;
+      }
+    }
   </style>
 
   <div class="apps-page">

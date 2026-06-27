@@ -588,7 +588,7 @@ const s={token:"",bookings:[],guestMessages:[],currentFilter:"settings",bookingC
               ${i.map((n,a)=>`<button type="button" class="room-edit-image-dot ${a===0?"active":""}" aria-label="Show photo ${a+1}" ${a===0?'aria-current="true"':""} onclick="event.stopPropagation();showEditRoomPhoto('${r}', ${a})"></button>`).join("")}
             </div>`:""}
         `:'<div class="room-edit-photo-placeholder">No photos yet</div>'}
-        <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <label class="room-edit-photo-upload">
           📷 + Add Photos
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${r}')">
         </label>
