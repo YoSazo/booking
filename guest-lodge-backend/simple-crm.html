@@ -1934,6 +1934,19 @@
         margin-top: 0;
       }
 
+      /* Bookings has multiple visible siblings; keep them stacked on desktop. */
+      #bookingsSubtabs { grid-row: 1; }
+      #messagesPanel,
+      #growthPanel { grid-row: 2; }
+      #bookingFilterChips { grid-row: 3; }
+      #bookingsList { grid-row: 4; }
+
+      #app.has-go-live-banner #bookingsSubtabs { grid-row: 2; }
+      #app.has-go-live-banner #messagesPanel,
+      #app.has-go-live-banner #growthPanel { grid-row: 3; }
+      #app.has-go-live-banner #bookingFilterChips { grid-row: 4; }
+      #app.has-go-live-banner #bookingsList { grid-row: 5; }
+
       /* Active desktop revenue panel should paint immediately when shown.
          The banner already consumes the top row, so keeping this flush avoids
          a phantom gap and prevents the revenue content from being deferred. */
@@ -3039,10 +3052,10 @@ function goLiveBannerHtml() {
   const demand = blockedDemand && blockedDemand.total > 0 ? blockedDemand.total : 0;
   if (demand > 0) {
     return `
-      <div onclick="goLive()" role="button" tabindex="0" style="display:flex;align-items:center;gap:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 14px;margin-bottom:14px;cursor:pointer;">
+      <div onclick="goLive()" role="button" tabindex="0" style="display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:11px 14px;margin-bottom:14px;cursor:pointer;">
         <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;flex-shrink:0;"></span>
-        <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.4;">${demand} guest${demand>1?'s':''} tried to book — turn on direct bookings to accept reservations like these.</span>
-        <span style="margin-left:auto;white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;">Go live →</span>
+        <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.25;">${demand} guest${demand>1?'s':''} tried to book — turn on direct bookings to accept reservations like these.</span>
+        <span style="white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;line-height:1;">Go live →</span>
       </div>`;
   }
   return `
