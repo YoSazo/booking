@@ -1889,12 +1889,17 @@
         grid-column: 2;
         grid-row: 1;
       }
+      #goLiveBanner[style*="display:none"],
+      #goLiveBanner[style*="display: none"] {
+        grid-row: auto;
+        display: none !important;
+      }
       #editView, #bookingsList, .availability-view, 
       .revenue-view, #appsView, #settingsView,
       #bookingsSubtabs, #messagesPanel, #bookingFilterChips,
       #growthPanel {
         grid-column: 2;
-        grid-row: 2;
+        grid-row: 1;
       }
       .tabs-container .tab {
         justify-content: flex-start;
@@ -1917,7 +1922,13 @@
       #app.has-go-live-banner #bookingsList,
       #app.has-go-live-banner .availability-view,
       #app.has-go-live-banner .revenue-view,
-      #app.has-go-live-banner #appsView {
+      #app.has-go-live-banner #appsView,
+      #app.has-go-live-banner #settingsView,
+      #app.has-go-live-banner #bookingsSubtabs,
+      #app.has-go-live-banner #messagesPanel,
+      #app.has-go-live-banner #bookingFilterChips,
+      #app.has-go-live-banner #growthPanel {
+        grid-row: 2;
         margin-top: 14px;
       }
 
