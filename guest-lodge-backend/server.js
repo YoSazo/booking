@@ -3462,7 +3462,7 @@ function buildCrmTokenHotelMap() {
     if (!Object.keys(map).length) {
         const fallbackPins = [CRM_PASSWORD, CRM_PASSWORD_ALT].map(v => String(v || '').trim()).filter(Boolean);
         for (const pin of fallbackPins) {
-            map[pin] = [DEFAULT_CRM_HOTEL_ID];
+            map[pin] = ['*'];
         }
     }
 
@@ -3498,12 +3498,13 @@ function resolveScopedHotelId(req, { allowFallback = true } = {}) {
     const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
     const resolvedHotelId = String(req.crmResolvedHotelId || '').trim();
     if (!allowed.length) return null;
+    const isMaster = allowed.includes('*');
     if (resolvedHotelId) {
-        if (!allowed.includes(resolvedHotelId)) return null;
+        if (!isMaster && !allowed.includes(resolvedHotelId)) return null;
         if (requested && requested !== resolvedHotelId) return null;
         return resolvedHotelId;
     }
-    if (requested && allowed.includes(requested)) return requested;
+    if (requested && (isMaster || allowed.includes(requested))) return requested;
     return allowFallback ? (req.crmDefaultHotelId || allowed[0]) : null;
 }
 
@@ -3538,7 +3539,7 @@ const crmAuth = async (req, res, next) => {
             domain: hostContext.domain || null,
         });
     }
-    if (hostContext.hotelId && !allowedHotels.includes(hostContext.hotelId)) {
+    if (hostContext.hotelId && !allowedHotels.includes(hostContext.hotelId) && !allowedHotels.includes('*')) {
         return res.status(403).json({
             success: false,
             message: `PIN is not authorized for hotel: ${hostContext.hotelId}`,
@@ -3549,7 +3550,7 @@ const crmAuth = async (req, res, next) => {
     req.crmAllowedHotels = allowedHotels;
     req.crmResolvedHotelId = hostContext.hotelId || null;
     req.crmResolvedDomain = hostContext.domain || null;
-    req.crmDefaultHotelId = hostContext.hotelId || allowedHotels[0];
+    req.crmDefaultHotelId = hostContext.hotelId || (allowedHotels[0] === '*' ? 'guest-lodge-minot' : allowedHotels[0]);
     next();
 };
 
