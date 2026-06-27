@@ -3518,6 +3518,7 @@ async function startCrmApp(verification) {
   if (isFirstWelcome) {
     showWelcomeModal();
   } else {
+    cleanupSettingsTourUi();
     await Promise.allSettled([
       loadManualAvailability(),
       loadBookings({ deferMessages: true }),
@@ -3980,7 +3981,8 @@ function renderMessages() {
   const panel = document.getElementById('messagesPanel');
   if (!panel) return;
 
-  const installNudge = bookingsFrontdeskNudgeHtml();
+  const isDesktopBookingsLayout = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
+  const installNudge = isDesktopBookingsLayout ? '' : bookingsFrontdeskNudgeHtml();
   const threadList = buildMessageThreads();
   if (threadList.length === 0) {
     const pending = messageUnreadCount > 0;
@@ -4199,6 +4201,9 @@ function renderBookings(fullList) {
   el.classList.remove('bookings-virtual');
   delete el.dataset.virtualBound;
   bookingsVirtualList = [];
+  const isDesktopBookingsLayout = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
+  const inlineInstallCard = isDesktopBookingsLayout ? bookingsFrontdeskNudgeHtml() : '';
+  const inlineInstallWrap = inlineInstallCard ? `<div style="margin-bottom:14px;">${inlineInstallCard}</div>` : '';
 
   // D17: counts come from the full set; the chips apply a view filter.
   const counts = {
@@ -4239,6 +4244,7 @@ function renderBookings(fullList) {
 
     if (allDone && hotelSubscribed) {
       el.innerHTML = `
+        ${inlineInstallWrap}
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">You&apos;re live — waiting for bookings</div>
@@ -4248,6 +4254,7 @@ function renderBookings(fullList) {
         </div>`;
     } else if (allDone && !hotelSubscribed) {
       el.innerHTML = `
+        ${inlineInstallWrap}
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">Your page is ready to go live</div>
@@ -4257,6 +4264,7 @@ function renderBookings(fullList) {
       if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
     } else {
       el.innerHTML = `
+        ${inlineInstallWrap}
         <div style="padding:20px 0;">
           <div style="text-align:center;margin-bottom:20px;">
             <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Launch checklist</div>
@@ -4401,7 +4409,7 @@ function setFilter(filter, btn) {
       updateGoLiveBanner();
       return;
     }
-    loadRevenueData();
+    loadRevenueData(true);
     updateGoLiveBanner();
     return;
   }
