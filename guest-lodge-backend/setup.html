@@ -27,6 +27,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .step { display: none; }
 .step.active { display: block; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-stagger > * { opacity: 0; }
+.fade-stagger.fade-stagger-active > * {
+  animation: fadeUp 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.fade-stagger.fade-stagger-active > *:nth-child(1) { animation-delay: 0.02s; }
+.fade-stagger.fade-stagger-active > *:nth-child(2) { animation-delay: 0.08s; }
+.fade-stagger.fade-stagger-active > *:nth-child(3) { animation-delay: 0.14s; }
+.fade-stagger.fade-stagger-active > *:nth-child(4) { animation-delay: 0.20s; }
+.fade-stagger.fade-stagger-active > *:nth-child(5) { animation-delay: 0.26s; }
+.fade-stagger.fade-stagger-active > *:nth-child(6) { animation-delay: 0.32s; }
+.fade-stagger.fade-stagger-active > *:nth-child(7) { animation-delay: 0.38s; }
 
 .form-card {
   background: var(--card); border: 1px solid var(--border);
@@ -77,13 +92,54 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .upload-preview { margin-top: 8px; }
 .upload-preview img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; margin: 4px; }
 
-/* Live card */
-.live-card {
-  background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
-  border-radius: var(--r); padding: 28px; color: white; text-align: center;
+/* Final ready card */
+.final-card { text-align: center; padding: 32px 24px; overflow: hidden; }
+.final-panel { display: block; }
+.final-panel[hidden] { display: none !important; }
+.final-logo-wrap {
+  width: 62px; height: 62px; border-radius: 18px; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: #f0fdf4; border: 1.5px solid #bbf7d0;
+  box-shadow: 0 10px 28px rgba(46,125,91,0.14);
 }
-.live-card h2 { font-size: 20px; margin-bottom: 8px; }
-.live-card p { opacity: 0.85; font-size: 14px; margin-bottom: 16px; }
+.final-logo-wrap .logo-sprite-bounce { transform: scale(1.18); }
+.final-check {
+  width: 58px; height: 58px; border-radius: 50%; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--green); color: #fff; font-size: 30px; font-weight: 800;
+  box-shadow: 0 10px 28px rgba(46,125,91,0.22);
+}
+.final-card h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; color: var(--text); }
+.final-card p { font-size: 14px; color: var(--muted); margin-bottom: 18px; line-height: 1.55; }
+.final-domain-box {
+  background: #f0fdf4; border: 1.5px solid #bbf7d0;
+  border-radius: 12px; padding: 14px; margin-bottom: 18px;
+}
+.final-domain-label {
+  font-size: 11px; font-weight: 700; color: #6b7280;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+}
+.final-domain-value {
+  font-family: monospace; font-size: 15px; color: var(--green);
+  font-weight: 700; word-break: break-all;
+}
+.final-status {
+  display: grid; gap: 8px; text-align: left; margin: 18px 0 6px;
+}
+.final-status-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; background: #f8faf9;
+  border: 1px solid var(--border); font-size: 13px; color: var(--text);
+}
+.status-dot {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #e8f5ee; color: var(--green); font-size: 12px; font-weight: 800;
+}
+.status-dot.spin {
+  border: 2px solid #bbf7d0; border-top-color: var(--green);
+  background: transparent; animation: spin 0.75s linear infinite;
+}
 
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -273,7 +329,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
   <!-- STEP 1: Hotel Name -->
   <div class="step active" id="step-1">
-    <div class="form-card">
+    <div class="form-card fade-stagger">
       <h2>Your hotel</h2>
       <div class="field">
         <label>Hotel Name</label>
@@ -285,7 +341,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
   <!-- STEP 2: Add first room -->
   <div class="step" id="step-2">
-    <div class="form-card">
+    <div class="form-card fade-stagger">
       <h2>Add your first room</h2>
       <div class="field">
         <label>Room Name</label>
@@ -298,7 +354,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
   <!-- STEP 3: Quality question -->
   <div class="step" id="step-3">
-    <div class="form-card" style="text-align:center;">
+    <div class="form-card fade-stagger" style="text-align:center;">
       <h2 style="font-size:18px; margin-bottom:16px;">Why do you want a booking engine?</h2>
       <div style="display:flex; flex-direction:column; gap:10px;">
         <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_commissions')">I'm tired of paying OTA commissions</button>
@@ -312,7 +368,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <!-- STEP 4: Video showcase - see your engine in action -->
   <div class="step" id="step-4">
     <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center;">
-      <div style="max-width:400px; width:100%;">
+      <div class="fade-stagger" style="max-width:400px; width:100%;">
         <h2 style="font-size:20px; font-weight:800; margin-bottom:6px; color:var(--text);">Guests book in under 60 seconds</h2>
         <p style="font-size:13px; color:var(--muted); margin-bottom:6px; line-height:1.5;">Here's a real booking on a Marketel engine, start to finish. Yours works exactly the same — watch how fast it is.</p>
         <p style="font-size:12px; color:var(--green); font-weight:600; margin-bottom:16px;">💳 Guests verify their card to prevent no-shows — they're never charged. You collect payment at check-in.</p>
@@ -332,28 +388,38 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 5: Success - dashboard ready -->
+  <!-- STEP 5: Site readiness + dashboard -->
   <div class="step" id="step-5">
-    <div class="form-card" style="text-align:center; padding:32px 24px;">
-      <div style="font-size:36px; margin-bottom:12px;">🚀</div>
-      <h2 style="font-size:22px; font-weight:800; margin-bottom:8px; color:var(--text);">You're all set!</h2>
-      <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.55;">Your booking page is <strong style="color:var(--text);">live in preview mode</strong> — guests can browse it right now. Open your dashboard to take a look, then flip on direct bookings whenever you&apos;re ready.</p>
-      <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px; padding:14px; margin-bottom:20px;">
-        <div style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Your Booking Page</div>
-        <div style="font-family:monospace; font-size:15px; color:#2E7D5B; font-weight:700; word-break:break-all;" id="successDomain"></div>
-        <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Live in preview · share it, test it, make it yours</div>
+    <div class="form-card final-card">
+      <div class="final-panel fade-stagger" id="finalPreparingPanel">
+        <div class="final-logo-wrap"><div class="logo-sprite-bounce"></div></div>
+        <h2>Getting your site ready</h2>
+        <p>We&apos;re building your booking page, setting up Front Desk, and waiting for the secure connection to finish.</p>
+        <div class="final-domain-box">
+          <div class="final-domain-label">Your Booking Page</div>
+          <div class="final-domain-value" id="preparingDomain">Preparing domain…</div>
+        </div>
+        <div class="final-status">
+          <div class="final-status-row"><span class="status-dot">✓</span><span>Booking engine created</span></div>
+          <div class="final-status-row"><span class="status-dot">✓</span><span>Front Desk dashboard prepared</span></div>
+          <div class="final-status-row"><span class="status-dot spin"></span><span>Securing your site connection</span></div>
+        </div>
       </div>
-      <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
-        Go to Your Dashboard →
-      </a>
-      <div id="siteReadyNote" style="display:none; font-size:12px; color:var(--muted); margin-top:12px; line-height:1.5;">
-        <span class="site-ready-spinner" style="display:inline-block; width:12px; height:12px; border:2px solid #bbf7d0; border-top-color:#2E7D5B; border-radius:50%; vertical-align:-2px; margin-right:6px; animation:siteSpin 0.7s linear infinite;"></span>
-        Securing your site&apos;s connection — this can take up to a minute…
+      <div class="final-panel fade-stagger" id="finalReadyPanel" hidden>
+        <div class="final-check">✓</div>
+        <h2>You&apos;re live</h2>
+        <p>Your booking page is ready in preview mode. Open your dashboard to review it, then turn on direct bookings whenever you&apos;re ready.</p>
+        <div class="final-domain-box">
+          <div class="final-domain-label">Your Booking Page</div>
+          <div class="final-domain-value" id="successDomain"></div>
+          <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Live in preview · share it, test it, make it yours</div>
+        </div>
+        <a class="btn btn-primary" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
+          Go to Your Dashboard →
+        </a>
       </div>
     </div>
   </div>
-
-  <style>@keyframes siteSpin { to { transform: rotate(360deg); } }</style>
 
 </div>
 
@@ -375,13 +441,30 @@ function showToast(msg, isError) {
 }
 function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
 
+function restartFadeUp(root) {
+  if (!root) return;
+  root.classList.remove('fade-stagger-active');
+  void root.offsetWidth;
+  root.classList.add('fade-stagger-active');
+}
+
+function animateVisibleStep(stepEl) {
+  if (!stepEl) return;
+  stepEl.querySelectorAll('.fade-stagger').forEach((el) => {
+    if (el.offsetParent !== null || el.id === 'finalPreparingPanel' || el.id === 'finalReadyPanel') restartFadeUp(el);
+  });
+}
+
 function goToStep(n) {
   fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Step' + n + 'Reached', email: hotelData.id || TOKEN }) }).catch(() => {});
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-  document.getElementById('step-' + n).classList.add('active');
+  const nextStep = document.getElementById('step-' + n);
+  nextStep.classList.add('active');
   document.querySelectorAll('.progress-step').forEach((s, i) => {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
+  if (n === 5) updateFinalStepState(true);
+  else animateVisibleStep(nextStep);
   window.scrollTo(0, 0);
 }
 
@@ -454,7 +537,7 @@ async function addRoomAndFinish() {
     
     // Link goes to front desk (their dashboard), not the booking engine
     var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    var dashboardUrl = (isLocal ? window.location.origin : domain) + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
+    var dashboardUrl = (isLocal ? window.location.origin : domain) + '/simple-crm.html?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
     window._dashboardUrl = dashboardUrl;
     document.getElementById('successLink').href = dashboardUrl;
 
@@ -462,6 +545,7 @@ async function addRoomAndFinish() {
     // provisioning. Start polling now (during the quality + video steps) so the
     // owner isn't sent to an "SSL handshake failed" page. Local dev is always ready.
     window._siteReady = isLocal;
+    updateFinalStepState(false);
     if (!isLocal) startSiteReadinessPolling();
 
     // Send welcome email after they reach the dashboard (not during video)
@@ -491,9 +575,7 @@ window._siteReady = window._siteReady || false;
 let _sitePollTimer = null;
 
 function startSiteReadinessPolling() {
-  // Surface the "preparing" state on the dashboard button right away.
-  var link = document.getElementById('successLink');
-  if (link && !window._siteReady) link.textContent = 'Preparing your site…';
+  updateFinalStepState(false);
 
   let attempts = 0;
   const maxAttempts = 60; // ~3 min at 3s intervals
@@ -517,17 +599,32 @@ function startSiteReadinessPolling() {
 function onSiteReady() {
   if (_sitePollTimer) { clearTimeout(_sitePollTimer); _sitePollTimer = null; }
   window._siteReady = true;
+  updateFinalStepState(true);
+}
+
+function updateFinalStepState(animate) {
+  var preparing = document.getElementById('finalPreparingPanel');
+  var ready = document.getElementById('finalReadyPanel');
+  var preparingDomain = document.getElementById('preparingDomain');
+  var successDomain = document.getElementById('successDomain');
   var link = document.getElementById('successLink');
-  if (link) link.textContent = 'Go to Your Dashboard →';
-  var note = document.getElementById('siteReadyNote');
-  if (note) note.style.display = 'none';
+  if (preparingDomain && successDomain && successDomain.textContent) preparingDomain.textContent = successDomain.textContent;
+  if (link && window._dashboardUrl) link.href = window._dashboardUrl;
+  if (window._siteReady) {
+    if (preparing) preparing.hidden = true;
+    if (ready) ready.hidden = false;
+    if (animate) restartFadeUp(ready);
+  } else {
+    if (ready) ready.hidden = true;
+    if (preparing) preparing.hidden = false;
+    if (animate) restartFadeUp(preparing);
+  }
 }
 
 function waitForSiteThenGo() {
   var link = document.getElementById('successLink');
-  if (link) link.textContent = 'Getting your site ready…';
-  var note = document.getElementById('siteReadyNote');
-  if (note) note.style.display = 'block';
+  if (link) link.style.pointerEvents = 'none';
+  updateFinalStepState(true);
 
   const check = setInterval(() => {
     if (window._siteReady) {
@@ -539,7 +636,7 @@ function waitForSiteThenGo() {
   setTimeout(() => { clearInterval(check); window.location.href = window._dashboardUrl; }, 90000);
 }
 
-loadSetup();
+loadSetup().finally(() => animateVisibleStep(document.getElementById('step-1')));
 </script>
 <script src="/marketel-telemetry.js"></script>
 </body>

@@ -228,11 +228,17 @@ const SETTINGS_START = lineAt('// ── SETTINGS TAB');
 const APPS_START = lineAt('// ── APPS PAGE');
 const INIT_START = lineAt('// ── INIT');
 const HELPERS_START = lineAt('// ── HELPERS');
+const FRONTDESK_NUDGE_START = lineAt('// ── DOWNLOAD FRONT DESK');
+const SETTINGS_TOUR_START = lineAt('// ── SETTINGS TOUR GUIDE');
 const TOAST_LINE = lines.findIndex((l) => /^function toast\(/.test(l)) + 1;
 if (TOAST_LINE < 1) throw new Error('function toast not found');
 if (PWA_START < 1) throw new Error('PWA marker not found');
 
-let coreBlock = slice(PWA_START, HELPERS_START - 1) + '\n\n' + slice(TOAST_LINE, SETTINGS_START - 1);
+const frontdeskNudgeBlock = slice(FRONTDESK_NUDGE_START, SETTINGS_TOUR_START - 1);
+
+let coreBlock = slice(PWA_START, HELPERS_START - 1)
+  + '\n\n' + slice(TOAST_LINE, SETTINGS_START - 1)
+  + '\n\n' + frontdeskNudgeBlock;
 coreBlock = coreBlock
   .replace(/^let deferredInstallPrompt = null;\n/m, '')
   .replace(/^let frontdeskInstalled = false;\n/m, '')
@@ -275,7 +281,9 @@ coreBlock = coreBlock
 
 coreBlock = rewriteFd(coreBlock);
 
-const settingsBlock = slice(SETTINGS_START, APPS_START - 1).replace(/^let editRooms = \[\];\n?/m, '');
+const settingsBlock = slice(SETTINGS_START, APPS_START - 1)
+  .replace(frontdeskNudgeBlock, '')
+  .replace(/^let editRooms = \[\];\n?/m, '');
 const appsBlock = slice(APPS_START, INIT_START - 1);
 const initEndLine = lines.findIndex((l, i) => i >= INIT_START - 1 && l.trim() === '</script>');
 if (initEndLine < 0) throw new Error('</script> not found after INIT');

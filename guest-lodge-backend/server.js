@@ -470,6 +470,10 @@ function serveFrontdesk(_req, res) {
     }
 }
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
+app.get('/simple-crm.html', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(FRONTDESK_LEGACY);
+});
 app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'frontdesk', 'assets'), {
     maxAge: '365d',
     immutable: true,
@@ -7477,4 +7481,3 @@ app.listen(PORT, () => {
         setInterval(() => runGuestInstallReminders().catch((e) => console.error('Guest install reminders:', e.message)), REMINDER_INTERVAL_MS);
     }
 });
-
