@@ -7269,6 +7269,12 @@ function startSettingsTour() {
       showStep();
       return;
     }
+    if (s.tab === 'apps' && !(isStandaloneApp() || frontdeskInstalled) && s.target && !s.target.includes('tour-fd-install')) {
+      step++;
+      localStorage.setItem('settingsTourStep', String(step));
+      showStep();
+      return;
+    }
 
     // Dim immediately on highlight steps so there is no blank gap after modal transitions.
     if (!s.customModal) ensureTourBlurOverlay();
@@ -8954,26 +8960,9 @@ function renderAppsView() {
     fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's installed on this device. Turn on alerts so you know when a guest books.</p>
       <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
-    fdCtaHtml = `<div class="apps-device-lock">
-      <div class="apps-device-lock__preview" aria-hidden="true">
-        <div class="apps-device-lock__mock-row"><span></span><strong>New booking alerts</strong></div>
-        <div class="apps-device-lock__mock-card">
-          <div style="height:10px;width:70%;border-radius:999px;background:#d1d5db;margin-bottom:9px;"></div>
-          <div style="height:10px;width:52%;border-radius:999px;background:#e5e7eb;"></div>
-        </div>
-        <div class="apps-device-lock__mock-card apps-device-lock__mock-card--green">
-          <div style="font-size:13px;font-weight:800;color:#166534;margin-bottom:4px;">Installed app mode</div>
-          <div style="font-size:12px;color:#166534;">Booking alerts, quick replies, one tap from your home screen.</div>
-        </div>
-      </div>
-      <div class="apps-device-lock__overlay">
-        <div class="apps-device-lock__icon"><i data-lucide="lock-keyhole" style="width:18px;height:18px;"></i></div>
-        <div class="apps-device-lock__title">Install on your phone to unlock alerts</div>
-        <p>${fdInstallCopy}</p>
-        <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
-        <button type="button" class="apps-video-teaser apps-device-lock__video" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
-      </div>
-    </div>`;
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Install Front Desk to use this phone like your booking command center.</p>
+      <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Install Front Desk</button>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until installed</div>`;
   }
 
   // Icon preview matches the loop tile: uploaded logos use the whole square,
@@ -9119,31 +9108,71 @@ function renderAppsView() {
       </div>
     </div>`;
 
-  // Guest setup remains editable everywhere; owner-device alerts stay locked
-  // until Front Desk is installed/opened as a PWA on the staff phone.
-  const appsMainHtml = `
-    ${guestInstallPreviewHtml}
-    ${loopDiagramHtml}
-    <div class="apps-step-card" id="tour-fd-install-card">
+  const deviceCardHtml = (tourId) => `
+    <div class="apps-step-card"${tourId ? ' id="tour-fd-install-card"' : ''}>
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
       <div class="apps-step-title">${fdInApp ? 'Front Desk — installed' : 'Install Front Desk'}</div>
       ${fdCtaHtml}
-    </div>
-    <div class="apps-step-card" id="tour-guest-icon-section">
+    </div>`;
+  const guestIconCardHtml = (tourId) => `
+    <div class="apps-step-card"${tourId ? ' id="tour-guest-icon-section"' : ''}>
       <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
       ${logoBlockHtml}
-    </div>
+    </div>`;
+  const guestPhonesCardHtml = `
     <div class="apps-step-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Guests can save <strong>${hName}</strong> to their phone — one tap, no app store. Then they can book and message you direct.</p>
       ${checkinActionsHtml}
       ${guestInstallLinkHtml}
-    </div>
-    ${guestBroadcastCardHtml()}`;
+    </div>`;
+  const helpFoldHtml = `
+    <details class="apps-fold" id="appsHelpFold" style="margin-top:8px;">
+      <summary class="apps-fold-summary">
+        <div><div class="apps-fold-title">Help</div><div class="apps-fold-meta">How it works · walkthrough · FAQs</div></div>
+        <span class="apps-fold-chevron" aria-hidden="true">›</span>
+      </summary>
+      <div class="apps-fold-body">
+        ${appsHelpBodyHtml}
+      </div>
+    </details>`;
+  const unlockedToolsHtml = `
+    ${deviceCardHtml(true)}
+    ${guestIconCardHtml(true)}
+    ${guestPhonesCardHtml}
+    ${guestBroadcastCardHtml()}
+    ${helpFoldHtml}`;
+  const lockedPreviewHtml = `
+    ${deviceCardHtml(false)}
+    ${guestIconCardHtml(false)}
+    ${guestPhonesCardHtml}
+    ${guestBroadcastCardHtml()}
+    ${helpFoldHtml}`;
+  const lockedToolsHtml = `
+    <div class="apps-locked-tools" id="tour-fd-install-card">
+      <div class="apps-locked-tools__content" aria-hidden="true">
+        ${lockedPreviewHtml}
+      </div>
+      <div class="apps-locked-tools__overlay">
+        <div class="apps-locked-tools__panel">
+          <div class="apps-locked-tools__icon"><i data-lucide="lock-keyhole" style="width:20px;height:20px;"></i></div>
+          <div class="apps-locked-tools__eyebrow">Phones tools locked</div>
+          <div class="apps-locked-tools__title">Install Front Desk to unlock this tab</div>
+          <p>${fdInstallCopy} Unlocks guest app setup, install links, QR tools, messages, and booking notifications.</p>
+          <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
+          <button type="button" class="apps-video-teaser apps-locked-tools__video" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
+        </div>
+      </div>
+    </div>`;
+
+  const appsMainHtml = `
+    ${guestInstallPreviewHtml}
+    ${loopDiagramHtml}
+    ${fdInApp ? unlockedToolsHtml : lockedToolsHtml}`;
 
   const appsFootnoteHtml = fdInApp
     ? 'Booking alerts live on the <strong>Bookings</strong> tab · installed from your browser'
-    : 'Installs from your browser · no App Store';
+    : 'Install Front Desk to unlock guest-app setup, QR tools, messages, and booking alerts.';
 
   el.innerHTML = `
   <style>
@@ -9162,18 +9191,19 @@ function renderAppsView() {
     .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
     .apps-guest-phone-card { padding:0;overflow:hidden;position:relative; }
     .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
-    .apps-device-lock { position:relative;min-height:284px;border-radius:14px;overflow:hidden;background:#f8faf9;border:1.5px solid var(--border); }
-    .apps-device-lock__preview { position:absolute;inset:0;padding:14px;display:flex;flex-direction:column;gap:10px;filter:blur(4px);opacity:0.58;pointer-events:none;user-select:none; }
-    .apps-device-lock__mock-row { display:flex;align-items:center;gap:8px;font-size:13px;color:#1f2937; }
-    .apps-device-lock__mock-row span { width:10px;height:10px;border-radius:50%;background:#2E7D5B;display:block; }
-    .apps-device-lock__mock-card { border-radius:12px;background:#fff;border:1px solid #e5e7eb;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,0.06); }
-    .apps-device-lock__mock-card--green { background:#f0fdf4;border-color:#bbf7d0; }
-    .apps-device-lock__overlay { position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;background:rgba(255,255,255,0.78);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px); }
-    .apps-device-lock__icon { width:40px;height:40px;border-radius:50%;background:#1a5c3f;color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:10px;box-shadow:0 6px 18px rgba(46,125,91,0.24); }
-    .apps-device-lock__title { font-size:15px;font-weight:800;color:var(--text);line-height:1.3;margin-bottom:6px; }
-    .apps-device-lock__overlay p { font-size:12.5px;color:var(--text-muted);line-height:1.5;margin:0 0 14px;max-width:290px; }
-    .apps-device-lock__overlay > button#tour-fd-install-btn { width:100%;max-width:260px;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px; }
-    .apps-device-lock__video { max-width:260px;margin:0 auto; }
+    .apps-locked-tools { position:relative;min-height:640px;border-radius:18px;overflow:hidden;margin-bottom:14px;background:#f8faf9;border:1.5px solid var(--border);box-shadow:var(--shadow); }
+    .apps-locked-tools__content { filter:blur(5px);opacity:0.46;pointer-events:none;user-select:none;transform:scale(1.01);transform-origin:top center; }
+    .apps-locked-tools__content .apps-step-card,
+    .apps-locked-tools__content .apps-broadcast-card,
+    .apps-locked-tools__content .apps-fold { box-shadow:none;margin-left:10px;margin-right:10px; }
+    .apps-locked-tools__overlay { position:absolute;inset:0;z-index:3;display:flex;align-items:flex-start;justify-content:center;padding:28px 18px;background:linear-gradient(180deg,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.86) 42%,rgba(255,255,255,0.68) 100%);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px); }
+    .apps-locked-tools__panel { width:min(340px,100%);background:#fff;border:1.5px solid #d8e4dc;border-radius:18px;padding:20px 18px;text-align:center;box-shadow:0 18px 48px rgba(26,43,34,0.18); }
+    .apps-locked-tools__icon { width:44px;height:44px;border-radius:50%;background:#1a5c3f;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 8px 22px rgba(46,125,91,0.28); }
+    .apps-locked-tools__eyebrow { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:6px; }
+    .apps-locked-tools__title { font-size:18px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:8px; }
+    .apps-locked-tools__panel p { font-size:13px;color:var(--text-muted);line-height:1.52;margin:0 0 16px; }
+    .apps-locked-tools__panel > button#tour-fd-install-btn { width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px;box-shadow:0 8px 22px rgba(46,125,91,0.24); }
+    .apps-locked-tools__video { margin:0 auto; }
     .apps-icon-card { display:flex;align-items:center;gap:14px; }
     .apps-how-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:22px 0 10px; }
     .apps-how-sub { font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.45; }
@@ -9247,16 +9277,6 @@ function renderAppsView() {
     ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
     <h2 class="apps-headline">Phones</h2>
     ${appsMainHtml}
-
-    <details class="apps-fold" id="appsHelpFold" style="margin-top:8px;">
-      <summary class="apps-fold-summary">
-        <div><div class="apps-fold-title">Help</div><div class="apps-fold-meta">How it works · walkthrough · FAQs</div></div>
-        <span class="apps-fold-chevron" aria-hidden="true">›</span>
-      </summary>
-      <div class="apps-fold-body">
-        ${appsHelpBodyHtml}
-      </div>
-    </details>
 
     <p class="apps-footnote">${appsFootnoteHtml}</p>
 
