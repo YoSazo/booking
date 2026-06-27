@@ -470,9 +470,9 @@ function serveFrontdesk(_req, res) {
     }
 }
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
-app.get('/simple-crm.html', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(FRONTDESK_LEGACY);
+app.get('/simple-crm.html', (req, res) => {
+    const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+    res.redirect(302, '/frontdesk' + query);
 });
 app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'frontdesk', 'assets'), {
     maxAge: '365d',

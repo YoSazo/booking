@@ -537,7 +537,7 @@ async function addRoomAndFinish() {
     
     // Link goes to front desk (their dashboard), not the booking engine
     var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    var dashboardUrl = (isLocal ? window.location.origin : domain) + '/simple-crm.html?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
+    var dashboardUrl = (isLocal ? window.location.origin : domain) + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
     window._dashboardUrl = dashboardUrl;
     document.getElementById('successLink').href = dashboardUrl;
 
