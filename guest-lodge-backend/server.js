@@ -459,7 +459,15 @@ const FRONTDESK_LEGACY = path.join(__dirname, 'simple-crm.html');
 function serveFrontdesk(_req, res) {
     res.setHeader('Cache-Control', 'no-cache');
     const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
-    res.sendFile(file);
+    try {
+        let html = require('fs').readFileSync(file, 'utf8');
+        const stats = require('fs').statSync(file);
+        const version = Math.floor(stats.mtimeMs);
+        html = html.replace(/\/frontdesk\/assets\/([^"']+)/g, '/frontdesk/assets/$1?v=' + version);
+        res.send(html);
+    } catch (e) {
+        res.sendFile(file);
+    }
 }
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
 app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'frontdesk', 'assets'), {
