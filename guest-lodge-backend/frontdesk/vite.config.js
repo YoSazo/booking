@@ -13,10 +13,10 @@ export default defineConfig(({ mode }) => ({
     target: 'es2020',
     rollupOptions: {
       output: {
-        // Stable filenames — no content hashes — so Cloudflare never caches
-        // a 404 for a URL that changes on every rebuild.
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
+        // JS chunks must be content-addressed. The server cache-busts the
+        // generated HTML, so Cloudflare sees fresh URLs for updated modules.
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
           // Keep font files in assets/ but don't rename them
           if (/\.(woff2?|ttf|eot)$/i.test(assetInfo.name || '')) {
