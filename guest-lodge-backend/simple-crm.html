@@ -1929,7 +1929,15 @@
       #app.has-go-live-banner #bookingFilterChips,
       #app.has-go-live-banner #growthPanel {
         grid-row: 2;
-        margin-top: 14px;
+        margin-top: 0;
+      }
+
+      /* Active desktop revenue panel should paint immediately when shown.
+         The banner already consumes the top row, so keeping this flush avoids
+         a phantom gap and prevents the revenue content from being deferred. */
+      #app.has-go-live-banner #revenueView {
+        content-visibility: visible;
+        contain-intrinsic-size: auto;
       }
 
       /* Settings → two-column dashboard. dash-a (preview + header) and
@@ -9289,4 +9297,3 @@ setInterval(refreshCurrentView, 30000);
 </script>
 </body>
 </html>
-
