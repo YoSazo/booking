@@ -2065,11 +2065,7 @@
       #goLiveBanner {
         margin-bottom: 24px !important;
       }
-      #goLiveBanner > div,
-      #goLiveBanner > div > div {
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
-      }
+      #goLiveBanner > div { margin-bottom: 0 !important; }
 
       #app.has-go-live-banner #editView,
       #app.has-go-live-banner #bookingsList,
@@ -3225,11 +3221,11 @@ function goLiveBannerHtml() {
       </div>`;
   }
   return `
-    <div onclick="goLive()" role="button" tabindex="0" style="display:flex;align-items:center;gap:10px;background:#eef6f1;border:1px solid #cfe6da;border-radius:999px;padding:8px 14px;margin-bottom:14px;cursor:pointer;">
+    <div onclick="goLive()" role="button" tabindex="0" style="display:flex;align-items:center;gap:10px;min-height:48px;background:#eef6f1;border:1px solid #cfe6da;border-radius:999px;padding:10px 14px;margin-bottom:14px;cursor:pointer;">
       <span style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;flex-shrink:0;"></span>
-      <span style="font-size:13px;color:#1a5c3f;font-weight:600;">Preview mode</span>
-      <span style="font-size:12px;color:#6b7280;line-height:1.4;">· guests can browse, but can&apos;t book yet</span>
-      <span style="margin-left:auto;white-space:nowrap;font-size:13px;color:#2E7D5B;font-weight:700;">Go live →</span>
+      <span style="display:inline-flex;align-items:center;min-height:24px;font-size:13px;color:#1a5c3f;font-weight:600;line-height:1.3;">Preview mode</span>
+      <span style="display:inline-flex;align-items:center;min-height:24px;font-size:12px;color:#6b7280;line-height:1.35;">· guests can browse, but can&apos;t book yet</span>
+      <span style="display:inline-flex;align-items:center;min-height:24px;margin-left:auto;white-space:nowrap;font-size:13px;color:#2E7D5B;font-weight:700;line-height:1.3;">Go live →</span>
     </div>`;
 }
 
@@ -7124,10 +7120,16 @@ function startSettingsTour() {
       tab: 'settings'
     },
     {
-      target: '#editRoomsCards .booking-card > div:first-child',
+      target: '#editRoomsCards [data-tour-room-card="1"]',
+      highlightSelector: '#editRoomsCards [data-tour-room-card="1"]',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"]',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
       text: 'Add a photo of your room — guests book more when they see one.',
       openAccordion: false,
-      tab: 'settings'
+      tab: 'settings',
+      tooltipAnchor: 'card-top',
+      scrollBlock: 'center',
+      scrollPadBottom: 260
     },
     {
       target: '#tour-rates-card',
@@ -8158,12 +8160,12 @@ function renderEditRoomsCards() {
     cards.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
     return;
   }
-  cards.innerHTML = editRooms.map(r => {
+  cards.innerHTML = editRooms.map((r, idx) => {
     const currentAmenities = (r.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
     const images = (r.images || []).filter(img => img && img.url);
     const roomIdJs = jsStr(r.id);
     return `
-    <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}">
+    <div class="booking-card" style="margin-bottom:14px;" id="edit-card-${r.id}" ${idx === 0 ? 'data-tour-room-card="1"' : ''}>
       <div class="room-edit-grid">
       <div class="room-edit-media">
       <div class="room-edit-photo" data-photo-index="0">
@@ -8929,6 +8931,11 @@ function renderAppsView() {
 
   const fdInApp = isStandaloneApp() || frontdeskInstalled;
   const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+  const fdInstallLabel = fdOnNarrowScreen ? 'Install on this phone' : 'Install Front Desk';
+  const fdInstallCopy = fdOnNarrowScreen
+    ? 'Install Front Desk on this phone to unlock booking alerts and the fast app-style layout.'
+    : 'Open this dashboard on the phone your staff uses, then install Front Desk. Desktop can set up guest tools; booking alerts unlock in the installed phone app.';
 
   const frontdeskInstallItems = [
     { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to install Front Desk', title: 'Install Front Desk on this device',
@@ -8947,9 +8954,26 @@ function renderAppsView() {
     fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's installed on this device. Turn on alerts so you know when a guest books.</p>
       <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
-    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Install this Front Desk on your device like an app. No App Store. Takes about 3 seconds. It can alert you when guests book.</p>
-      <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()" style="width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Install Front Desk</button>
-      <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)" style="margin-top:0;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>`;
+    fdCtaHtml = `<div class="apps-device-lock">
+      <div class="apps-device-lock__preview" aria-hidden="true">
+        <div class="apps-device-lock__mock-row"><span></span><strong>New booking alerts</strong></div>
+        <div class="apps-device-lock__mock-card">
+          <div style="height:10px;width:70%;border-radius:999px;background:#d1d5db;margin-bottom:9px;"></div>
+          <div style="height:10px;width:52%;border-radius:999px;background:#e5e7eb;"></div>
+        </div>
+        <div class="apps-device-lock__mock-card apps-device-lock__mock-card--green">
+          <div style="font-size:13px;font-weight:800;color:#166534;margin-bottom:4px;">Installed app mode</div>
+          <div style="font-size:12px;color:#166534;">Booking alerts, quick replies, one tap from your home screen.</div>
+        </div>
+      </div>
+      <div class="apps-device-lock__overlay">
+        <div class="apps-device-lock__icon"><i data-lucide="lock-keyhole" style="width:18px;height:18px;"></i></div>
+        <div class="apps-device-lock__title">Install on your phone to unlock alerts</div>
+        <p>${fdInstallCopy}</p>
+        <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
+        <button type="button" class="apps-video-teaser apps-device-lock__video" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
+      </div>
+    </div>`;
   }
 
   // Icon preview matches the loop tile: uploaded logos use the whole square,
@@ -9095,7 +9119,8 @@ function renderAppsView() {
       </div>
     </div>`;
 
-  // Show the same Phones tools in the browser and installed app; the install CTA still adapts.
+  // Guest setup remains editable everywhere; owner-device alerts stay locked
+  // until Front Desk is installed/opened as a PWA on the staff phone.
   const appsMainHtml = `
     ${guestInstallPreviewHtml}
     ${loopDiagramHtml}
@@ -9137,6 +9162,18 @@ function renderAppsView() {
     .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
     .apps-guest-phone-card { padding:0;overflow:hidden;position:relative; }
     .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
+    .apps-device-lock { position:relative;min-height:284px;border-radius:14px;overflow:hidden;background:#f8faf9;border:1.5px solid var(--border); }
+    .apps-device-lock__preview { position:absolute;inset:0;padding:14px;display:flex;flex-direction:column;gap:10px;filter:blur(4px);opacity:0.58;pointer-events:none;user-select:none; }
+    .apps-device-lock__mock-row { display:flex;align-items:center;gap:8px;font-size:13px;color:#1f2937; }
+    .apps-device-lock__mock-row span { width:10px;height:10px;border-radius:50%;background:#2E7D5B;display:block; }
+    .apps-device-lock__mock-card { border-radius:12px;background:#fff;border:1px solid #e5e7eb;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,0.06); }
+    .apps-device-lock__mock-card--green { background:#f0fdf4;border-color:#bbf7d0; }
+    .apps-device-lock__overlay { position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;background:rgba(255,255,255,0.78);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px); }
+    .apps-device-lock__icon { width:40px;height:40px;border-radius:50%;background:#1a5c3f;color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:10px;box-shadow:0 6px 18px rgba(46,125,91,0.24); }
+    .apps-device-lock__title { font-size:15px;font-weight:800;color:var(--text);line-height:1.3;margin-bottom:6px; }
+    .apps-device-lock__overlay p { font-size:12.5px;color:var(--text-muted);line-height:1.5;margin:0 0 14px;max-width:290px; }
+    .apps-device-lock__overlay > button#tour-fd-install-btn { width:100%;max-width:260px;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px; }
+    .apps-device-lock__video { max-width:260px;margin:0 auto; }
     .apps-icon-card { display:flex;align-items:center;gap:14px; }
     .apps-how-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:22px 0 10px; }
     .apps-how-sub { font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.45; }
