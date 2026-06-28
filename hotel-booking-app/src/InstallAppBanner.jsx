@@ -46,7 +46,9 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
               Add {hotelName || 'us'} to your home screen
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, lineHeight: 1.4 }}>
-              Book direct in one tap next time — no fees, no app store.
+              {ownerPreview
+                ? 'Install Front Desk on the property phone first. Then guests can save this hotel app, message you, and book direct.'
+                : 'Book direct in one tap next time — no fees, no app store.'}
             </div>
           </div>
         </div>
@@ -60,6 +62,11 @@ function InstallAppBanner({ hotelName, appIconUrl, hotelId, ownerPreview = false
         >
           Install
         </button>
+        {ownerPreview && (
+          <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.45, textAlign: 'center', marginTop: 8 }}>
+            Preview only — guest installs unlock after Front Desk is installed on your phone.
+          </div>
+        )}
       </div>
     </>
   );

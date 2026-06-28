@@ -6,13 +6,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     ? 'http://localhost:3001'
     : ''
 );
+const FALLBACK_ROOM_IMAGE = 'https://suitestay.clickinns.com/kingbedsuitestay.webp';
 
 function PhotoUploadButton({ roomId, onPhotosAdded, hotelId }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
   const handleFiles = async (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploading(true);
     const token = localStorage.getItem('crmToken') || '';
@@ -161,7 +162,7 @@ function RoomEditFields({ room, onRoomUpdate, onRoomDelete, hotelId, onDirty }) 
     };
     window.addEventListener('saveAllRooms', handleSaveAll);
     return () => window.removeEventListener('saveAllRooms', handleSaveAll);
-  });
+  }, [description, hotelId, maxOccupancy, name, room.id, room.roomId, totalUnits]);
 
   const markDirty = (setter) => (e) => { setter(e.target.value); if (onDirty) onDirty(); };
 
@@ -221,11 +222,19 @@ function RoomEditFields({ room, onRoomUpdate, onRoomDelete, hotelId, onDirty }) 
 }
 
 function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded, onRoomUpdate, onRoomDelete, hotelId, onDirty  }) {
-  console.log(`Room: "${room.name}", roomsAvailable:`, roomsAvailable, `Type:`, typeof roomsAvailable)
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showAmenityPicker, setShowAmenityPicker] = useState(false);
   const [localAmenities, setLocalAmenities] = useState(room.amenities || '');
-  console.log('isProcessing in RoomCard:', isProcessing);
+  const imageUrls = Array.isArray(room.imageUrls) && room.imageUrls.filter(Boolean).length
+    ? room.imageUrls.filter(Boolean)
+    : [room.imageUrl || FALLBACK_ROOM_IMAGE];
+  const imageCount = imageUrls.length;
+
+  useEffect(() => {
+    if (currentImageIndex >= imageCount) {
+      setCurrentImageIndex(0);
+    }
+  }, [currentImageIndex, imageCount]);
 
   const displayPayToday = payToday || 0;
   const displayBalanceDue = balanceDue || 0;
@@ -235,12 +244,12 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
   const handlePrevImage = (e) => {
     e.stopPropagation();
-    const newIndex = (currentImageIndex - 1 + room.imageUrls.length) % room.imageUrls.length;
+    const newIndex = (currentImageIndex - 1 + imageCount) % imageCount;
     setCurrentImageIndex(newIndex);
   };
   const handleNextImage = (e) => {
     e.stopPropagation();
-    const newIndex = (currentImageIndex + 1) % room.imageUrls.length;
+    const newIndex = (currentImageIndex + 1) % imageCount;
     setCurrentImageIndex(newIndex);
   };
 
@@ -297,16 +306,16 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     {/* Image Gallery */}
     <div className="room-image-container">
       <img 
-        src={room.imageUrls[currentImageIndex]} 
+        src={imageUrls[currentImageIndex]}
         alt={`${room.name} preview`} 
         className="room-gallery-image"
         loading="lazy"
         decoding="async"
-        onError={(e) => { e.target.onerror = null; e.target.src = 'https://suitestay.clickinns.com/kingbedsuitestay.webp'; }}
+        onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_ROOM_IMAGE; }}
       />
       
       {/* Navigation Arrows - Only show if multiple images */}
-      {room.imageUrls.length > 1 && (
+      {imageCount > 1 && (
         <>
           <button 
             onClick={handlePrevImage}
@@ -323,7 +332,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
 
           {/* Image Dots */}
           <div className="image-dots">
-            {room.imageUrls.map((_, idx) => (
+            {imageUrls.map((_, idx) => (
               <button
                 key={idx}
                 onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }}

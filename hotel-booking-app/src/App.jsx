@@ -48,6 +48,97 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     : ''
 );
 
+function readSessionJson(key, fallback = null) {
+  if (typeof sessionStorage === 'undefined') return fallback;
+
+  try {
+    const rawValue = sessionStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) : fallback;
+  } catch (_error) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (_storageError) {
+      // Storage cleanup is best-effort.
+    }
+    return fallback;
+  }
+}
+
+function writeSessionJson(key, value) {
+  if (typeof sessionStorage === 'undefined') return;
+
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch (_error) {
+    // Session persistence is best-effort; in-memory state still carries the flow.
+  }
+}
+
+function readSessionValue(key, fallback = '') {
+  if (typeof sessionStorage === 'undefined') return fallback;
+
+  try {
+    return sessionStorage.getItem(key) || fallback;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function writeSessionValue(key, value) {
+  if (typeof sessionStorage === 'undefined') return;
+
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (_error) {
+    // Session persistence is best-effort; in-memory state still carries the flow.
+  }
+}
+
+function removeSessionItem(key) {
+  if (typeof sessionStorage === 'undefined') return;
+
+  try {
+    sessionStorage.removeItem(key);
+  } catch (_error) {
+    // Ignore storage cleanup failures.
+  }
+}
+
+function generateReservationCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const cryptoSource = typeof crypto !== 'undefined' ? crypto : null;
+
+  if (cryptoSource?.getRandomValues) {
+    const bytes = new Uint8Array(9);
+    cryptoSource.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => chars[byte % chars.length]).join('');
+  }
+
+  return Array.from({ length: 9 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function toFiniteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getBookingTotals(room, nights, fallbackRates) {
+  const subtotal =
+    toFiniteNumber(room?.subtotal) ??
+    toFiniteNumber(room?.apiSubtotal) ??
+    calculateTieredPrice(nights, fallbackRates);
+  const taxes =
+    toFiniteNumber(room?.taxes) ??
+    toFiniteNumber(room?.apiTaxes) ??
+    subtotal * 0.10;
+  const total =
+    toFiniteNumber(room?.totalRate) ??
+    toFiniteNumber(room?.total) ??
+    subtotal + taxes;
+
+  return { subtotal, taxes, total };
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -189,7 +280,7 @@ function App() {
       document.removeEventListener('visibilitychange', recheck);
       window.removeEventListener('focus', recheck);
     };
-  }, [hotelId, currentHotel?.subscribed]);
+  }, [currentHotel?.subscribed]);
 
   // Set page title per hotel (single deployment serving multiple properties)
   useEffect(() => {
@@ -215,21 +306,19 @@ function App() {
     }
     link.href = manifestHref;
 
-    document.querySelector('meta[name="theme-color"]')?.remove();
-    const themeMeta = document.createElement('meta');
-    themeMeta.name = 'theme-color';
-    themeMeta.content = '#2E7D5B';
-    document.head.appendChild(themeMeta);
+    const upsertMetaTag = (name, content) => {
+      let metaTag = document.querySelector(`meta[name="${name}"]`);
+      if (!metaTag) {
+        metaTag = document.createElement('meta');
+        metaTag.name = name;
+        document.head.appendChild(metaTag);
+      }
+      metaTag.content = content;
+    };
 
-    const iosMeta = document.createElement('meta');
-    iosMeta.name = 'apple-mobile-web-app-capable';
-    iosMeta.content = 'yes';
-    document.head.appendChild(iosMeta);
-
-    const iosTitle = document.createElement('meta');
-    iosTitle.name = 'apple-mobile-web-app-title';
-    iosTitle.content = currentHotel?.name || 'Book Now';
-    document.head.appendChild(iosTitle);
+    upsertMetaTag('theme-color', '#2E7D5B');
+    upsertMetaTag('apple-mobile-web-app-capable', 'yes');
+    upsertMetaTag('apple-mobile-web-app-title', currentHotel?.name || 'Book Now');
 
     const guestIconUrl = `${API_BASE_URL}/api/hotel/${encodeURIComponent(hotelId)}/guest-app-icon.png?s=180`;
     let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
@@ -243,7 +332,7 @@ function App() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/engine-sw.js').catch(() => {});
     }
-  }, [hotelId, currentHotel?.appIconUrl, currentHotel?.name]);
+  }, [currentHotel?.appIconUrl, currentHotel?.name]);
 
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
@@ -268,7 +357,7 @@ function App() {
     }
 
     initialRedirectDone.current = true;
-  }, [location.pathname, navigate, hotelId]);
+  }, [location.pathname, navigate]);
   
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
@@ -278,10 +367,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxData, setLightboxData] = useState(null);
 
-  const [finalBooking, setFinalBooking] = useState(() => JSON.parse(sessionStorage.getItem('finalBooking')) || null);
-  const [guestInfo, setGuestInfo] = useState(() => JSON.parse(sessionStorage.getItem('guestInfo')) || null);
-  const [reservationCode, setReservationCode] = useState(() => sessionStorage.getItem('reservationCode') || '');
-  const [clientSecret, setClientSecret] = useState(() => sessionStorage.getItem('clientSecret') || '');
+  const [finalBooking, setFinalBooking] = useState(() => readSessionJson('finalBooking'));
+  const [guestInfo, setGuestInfo] = useState(() => readSessionJson('guestInfo'));
+  const [reservationCode, setReservationCode] = useState(() => readSessionValue('reservationCode'));
+  const [clientSecret, setClientSecret] = useState(() => readSessionValue('clientSecret'));
 
   useEffect(() => {
     const today = new Date();
@@ -289,7 +378,7 @@ function App() {
     setCheckinDate(today);
     setCheckoutDate(null);
     setAvailableRooms(currentHotel.rooms);
-  }, [hotelId, currentHotel]);
+  }, [currentHotel]);
 
   // IMPORTANT: Avoid preloading entire room galleries on initial load.
   // Preloading every image can easily add 10–20MB to first load and destroy mobile performance.
@@ -313,10 +402,10 @@ function App() {
 
   // Save booking data to sessionStorage whenever it changes
   useEffect(() => {
-    if (finalBooking) sessionStorage.setItem('finalBooking', JSON.stringify(finalBooking));
-    if (guestInfo) sessionStorage.setItem('guestInfo', JSON.stringify(guestInfo));
-    if (reservationCode) sessionStorage.setItem('reservationCode', reservationCode);
-    if (clientSecret) sessionStorage.setItem('clientSecret', clientSecret);
+    if (finalBooking) writeSessionJson('finalBooking', finalBooking);
+    if (guestInfo) writeSessionJson('guestInfo', guestInfo);
+    if (reservationCode) writeSessionValue('reservationCode', reservationCode);
+    if (clientSecret) writeSessionValue('clientSecret', clientSecret);
   }, [finalBooking, guestInfo, reservationCode, clientSecret]);
 
   const checkAvailability = async (start, end) => {
@@ -344,7 +433,6 @@ function App() {
         }),
       });
       const result = await response.json();
-      console.log('🔍 API Response:', result);  // ← ADD THIS
       if (result.success) {
         // Merge PMS availability into your marketing room cards.
         // Cloudbeds: apiRoom.roomName matches currentHotel.rooms[].name
@@ -449,7 +537,7 @@ function App() {
   
   // ✅ Clear any previous booking data when selecting a new room
   setFinalBooking(null);
-  sessionStorage.removeItem('finalBooking');
+  removeSessionItem('finalBooking');
   
   const bookingState = { 
     ...room, 
@@ -461,19 +549,10 @@ function App() {
   };
   setSelectedRoom(bookingState);
   const nights = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
-  const subtotal = room.subtotal || calculateTieredPrice(nights, RATES);
+  const subtotal = toFiniteNumber(room.subtotal) ?? calculateTieredPrice(nights, RATES);
   trackAddToCart({ ...bookingState, subtotal });
 };
 
-
-  const generateReservationCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 9; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
 
   // In App.jsx, update handleConfirmBooking function:
 // In App.jsx, update handleConfirmBooking to go to guest-info first:
@@ -492,11 +571,7 @@ const handleConfirmBooking = async (bookingDetails) => {
     ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
     : 0;
 
-  let subtotal, taxes, total;
-  
-  subtotal = calculateTieredPrice(nights, RATES);
-  taxes = subtotal * 0.10;
-  total = subtotal + taxes;
+  const { subtotal, taxes, total } = getBookingTotals(selectedRoom, nights, RATES);
 
   const ourReservationCode = generateReservationCode();
 
@@ -578,7 +653,12 @@ const handleConfirmBooking = async (bookingDetails) => {
     console.log('🔴 handleCompleteBooking called with:', { formData, paymentIntentId });
     
     // ✅ Get the latest booking details from sessionStorage (in case trial booking modified it)
-    const currentBooking = JSON.parse(sessionStorage.getItem('finalBooking')) || finalBooking;
+    const currentBooking = readSessionJson('finalBooking') || finalBooking;
+    if (!currentBooking) {
+      alert('Booking details are missing. Please restart your reservation.');
+      navigate('/');
+      return;
+    }
     
     // ✅ If this is a Pay Later booking, it's already been created - just navigate to confirmation
     if (currentBooking.bookingType === 'payLater') {
@@ -737,9 +817,9 @@ const handleConfirmBooking = async (bookingDetails) => {
                   setCheckinDate(null);
                   setCheckoutDate(null);
                   setAvailableRooms(currentHotel.rooms);
-                  sessionStorage.removeItem('finalBooking');
-                  sessionStorage.removeItem('clientSecret');
-                  sessionStorage.removeItem('selectedPlan');
+                  removeSessionItem('finalBooking');
+                  removeSessionItem('clientSecret');
+                  removeSessionItem('selectedPlan');
                   navigate('/');
                 }}
                 onComplete={handleCompleteBooking}

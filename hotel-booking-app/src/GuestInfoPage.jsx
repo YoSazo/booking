@@ -142,7 +142,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             checkout: bookingDetails?.checkout || null,
             nights: bookingDetails?.nights || null,
         });
-    }, [hotel, hotelId, bookingDetails]);
+    }, [hotel, bookingDetails]);
 
     const blockedBeaconSent = useRef(false);
     useEffect(() => {
@@ -343,7 +343,7 @@ useEffect(() => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(diagnostics),
   }).catch(() => {});
-}, []);
+}, [apiBaseUrl]);
 
 // Smooth scroll handling for step changes (plan step removed)
 useEffect(() => {
@@ -482,15 +482,18 @@ useEffect(() => {
     document.addEventListener('mouseup', handleMouseUp);
     
     // Add a more specific listener for autocomplete clicks
-    document.addEventListener('click', (event) => {
+    const handleDocumentClick = (event) => {
         if (event.target.closest('.pac-container')) {
             handleAutocompleteClick();
         }
-    });
+    };
+
+    document.addEventListener('click', handleDocumentClick);
 
     return () => {
         document.removeEventListener('mousedown', handleMouseDown);
         document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('click', handleDocumentClick);
     };
 }, []);
 
@@ -963,6 +966,11 @@ const handlePayLaterBooking = async (e) => {
 
     // Process payment based on method
     if (paymentMethod === 'card') {
+        if (!stripe || !elements) {
+            setErrorMessage("Payment form is still loading. Please try again in a moment.");
+            return;
+        }
+
         // ✅ Validate card is filled out FIRST
         const cardNumberElement = elements.getElement(CardNumberElement);
         if (!cardNumberElement || !cardNumberElement._complete) {
@@ -980,8 +988,20 @@ const handlePayLaterBooking = async (e) => {
     setIsProcessing(true);
     setErrorMessage('');
 
-    // Get original booking from sessionStorage
-    const originalBooking = JSON.parse(sessionStorage.getItem('finalBooking'));
+    // Get original booking from sessionStorage, falling back to props if storage is unavailable.
+    let originalBooking = bookingDetails;
+    try {
+        const storedBooking = sessionStorage.getItem('finalBooking');
+        originalBooking = storedBooking ? JSON.parse(storedBooking) : bookingDetails;
+    } catch (_error) {
+        originalBooking = bookingDetails;
+    }
+
+    if (!originalBooking) {
+        setErrorMessage("Booking details are missing. Please return to the room selection step.");
+        setIsProcessing(false);
+        return;
+    }
     
     const payLaterBooking = {
         roomTypeID: originalBooking.roomTypeID,
@@ -2350,8 +2370,7 @@ const handlePayLaterBooking = async (e) => {
       gap: '4px'
     }}>
       <button
-        type={paymentMethod === 'card' ? "submit" : "button"}
-        form={paymentMethod === 'card' ? "main-checkout-form" : undefined}
+        type="button"
         className="btn btn-confirm btn-wider"
         onClick={(e) => handlePayLaterBooking(e)}
         disabled={isPreviewMode || isProcessing || !clientSecret || !stripe || !elements}
@@ -2403,4 +2422,3 @@ function GuestInfoPageWrapper(props) {
 }
 
 export default GuestInfoPageWrapper;
-

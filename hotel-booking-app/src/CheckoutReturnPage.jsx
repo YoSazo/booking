@@ -28,9 +28,15 @@ function CheckoutReturnPage({ onComplete }) {
                 }
                 
                 switch (paymentIntent.status) {
-                case 'succeeded':
+                case 'succeeded': {
                     // Payment was successful! Now, get the user data we saved earlier.
-                    let savedGuestInfo = JSON.parse(sessionStorage.getItem('guestInfo'));
+                    let savedGuestInfo = null;
+                    try {
+                        const storedGuestInfo = sessionStorage.getItem('guestInfo');
+                        savedGuestInfo = storedGuestInfo ? JSON.parse(storedGuestInfo) : null;
+                    } catch (_error) {
+                        savedGuestInfo = null;
+                    }
                     
                     // START FIX 2: Fallback for Express Checkout to ensure required data is present
                     // Check if essential data is missing (common with wallet payments)
@@ -65,6 +71,7 @@ function CheckoutReturnPage({ onComplete }) {
                         console.error("Could not retrieve essential guest info after payment.");
                     }
                     break;
+                }
 
                 case 'processing':
                     setStatus('processing');

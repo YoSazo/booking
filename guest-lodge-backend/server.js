@@ -1670,8 +1670,15 @@ app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req,
 app.post('/api/update-payment-intent', async (req, res) => {
   const { clientSecret, guestInfo } = req.body;
 
+  if (!clientSecret || !String(clientSecret).includes('_secret')) {
+    return res.status(400).send({
+      success: false,
+      error: { message: 'Valid clientSecret is required' }
+    });
+  }
+
   // The clientSecret contains the Payment Intent ID
-  const paymentIntentId = clientSecret.split('_secret')[0];
+  const paymentIntentId = String(clientSecret).split('_secret')[0];
 
   try {
     await stripe.paymentIntents.update(paymentIntentId, {
@@ -3429,6 +3436,7 @@ const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
 const CRM_PASSWORD_ALT = process.env.CRM_PASSWORD_ALT || '2026';
 const DEFAULT_CRM_HOTEL_ID = (process.env.HOTEL_ID || 'guest-lodge-minot').trim();
 const CRM_TOKEN_HOTELS_JSON = process.env.CRM_TOKEN_HOTELS || process.env.CRM_PIN_HOTEL_MAP || '';
+const CRM_MASTER_PINS_RAW = process.env.CRM_MASTER_PINS || '';
 const ADMIN_TOKEN = (process.env.ADMIN_TOKEN || process.env.CRM_ADMIN_TOKEN || '').trim();
 
 function toHotelList(value) {
@@ -3441,6 +3449,24 @@ function toHotelList(value) {
         return trimmed.split(',').map(v => v.trim()).filter(Boolean);
     }
     return [];
+}
+
+const CRM_MASTER_PINS = new Set(
+    ['2026', '4040', CRM_PASSWORD, CRM_PASSWORD_ALT, ...toHotelList(CRM_MASTER_PINS_RAW)]
+        .map(v => String(v || '').trim())
+        .filter(Boolean)
+);
+
+function isCrmMasterPin(value) {
+    return CRM_MASTER_PINS.has(String(value || '').trim());
+}
+
+function generateCrmOwnerPin() {
+    let pin = '';
+    do {
+        pin = String(Math.floor(1000 + Math.random() * 9000));
+    } while (isCrmMasterPin(pin));
+    return pin;
 }
 
 function buildCrmTokenHotelMap() {
@@ -3536,7 +3562,8 @@ const crmAuth = async (req, res, next) => {
     let allowedHotels = dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []);
     
     // Master PIN backdoor for the admin to easily test across all hotels
-    if (token === '2026' || token === '4040' || token === CRM_PASSWORD || token === CRM_PASSWORD_ALT) {
+    const isMasterPin = isCrmMasterPin(token);
+    if (isMasterPin) {
         if (!allowedHotels.includes('*')) allowedHotels = [...allowedHotels, '*'];
     }
 
@@ -3558,6 +3585,7 @@ const crmAuth = async (req, res, next) => {
     }
     req.crmToken = token;
     req.crmAllowedHotels = allowedHotels;
+    req.crmIsMasterPin = isMasterPin;
     req.crmResolvedHotelId = hostContext.hotelId || null;
     req.crmResolvedDomain = hostContext.domain || null;
     req.crmDefaultHotelId = hostContext.hotelId || (allowedHotels[0] === '*' ? 'guest-lodge-minot' : allowedHotels[0]);
@@ -3983,6 +4011,12 @@ app.post('/api/admin/hotels/:hotelId/pins', adminAuth, async (req, res) => {
         const label = String(req.body?.label || '').trim() || null;
         if (!hotelId || !pin) {
             return res.status(400).json({ success: false, message: 'hotelId and pin are required.' });
+        }
+        if (isCrmMasterPin(pin)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Universal admin PINs cannot be saved as hotel owner PINs.'
+            });
         }
 
         const pinHash = hashCrmPin(pin);
@@ -5841,7 +5875,7 @@ app.get('/setup/:token/success', async (req, res) => {
         prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotel.ownerEmail || null } }).catch(() => {});
 
         // Create default CRM PIN
-        const defaultPin = String(Math.floor(1000 + Math.random() * 9000));
+        const defaultPin = generateCrmOwnerPin();
         const pinHash = crypto.createHash('sha256').update(defaultPin).digest('hex');
         try {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
@@ -5988,7 +6022,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         });
 
         // Create a default CRM PIN
-        const defaultPin = String(Math.floor(1000 + Math.random() * 9000));
+        const defaultPin = generateCrmOwnerPin();
         const pinHash = crypto.createHash('sha256').update(defaultPin).digest('hex');
         try {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
@@ -6327,6 +6361,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             hotelId,
             domain: primaryDomain?.domain || '',
             allowedHotels: req.crmAllowedHotels || [],
+            isMasterPin: !!req.crmIsMasterPin,
             pms: config.pms,
             isManualPms: config.pms === 'manual',
             hotelName: dbHotel?.name || config.name || '',
@@ -6380,7 +6415,7 @@ app.post('/api/forgot-pin', async (req, res) => {
             const hotel = await prisma.hotelConfig.findFirst({ where: { ownerEmail: email } });
             if (hotel) {
                 // Generate new 4-digit PIN
-                const newPin = String(Math.floor(1000 + Math.random() * 9000));
+                const newPin = generateCrmOwnerPin();
                 const pinHash = hashCrmPin(newPin);
                 // Deactivate old PINs
                 await prisma.crmPin.updateMany({ where: { hotelId: hotel.id }, data: { active: false } });
@@ -6406,8 +6441,13 @@ app.post('/api/forgot-pin', async (req, res) => {
 });
 
 // ── MAGIC LINK AUTH ────────────────────────────────────────────
-const MAGIC_LINK_SECRET = process.env.MAGIC_LINK_SECRET || process.env.SESSION_SECRET || 'marketel-magic-link-fallback-secret';
+const configuredMagicLinkSecret = process.env.MAGIC_LINK_SECRET || process.env.SESSION_SECRET;
+const MAGIC_LINK_SECRET = configuredMagicLinkSecret || crypto.randomBytes(32).toString('hex');
 const MAGIC_LINK_EXPIRY_MS = 60 * 60 * 1000; // 60 minutes
+
+if (!configuredMagicLinkSecret) {
+    console.warn('MAGIC_LINK_SECRET or SESSION_SECRET is not set; using an ephemeral magic-link secret for this process.');
+}
 
 function generateMagicToken(email, hotelId) {
     const payload = JSON.stringify({ email, hotelId, exp: Date.now() + MAGIC_LINK_EXPIRY_MS });
@@ -6416,12 +6456,18 @@ function generateMagicToken(email, hotelId) {
     return encoded + '.' + sig;
 }
 
+function timingSafeTextEqual(a, b) {
+    const left = Buffer.from(String(a || ''));
+    const right = Buffer.from(String(b || ''));
+    return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
 function verifyMagicToken(token) {
     const parts = token.split('.');
     if (parts.length !== 2) return null;
     const [encoded, sig] = parts;
     const expectedSig = crypto.createHmac('sha256', MAGIC_LINK_SECRET).update(encoded).digest('base64url');
-    if (sig !== expectedSig) return null;
+    if (!timingSafeTextEqual(sig, expectedSig)) return null;
     try {
         const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
         if (payload.exp < Date.now()) return null;
@@ -6479,7 +6525,7 @@ app.get('/api/auth/verify-magic', async (req, res) => {
         if (!pin) return res.status(404).json({ success: false, message: 'No active PIN found.' });
 
         // We can't reverse the hash, so generate a fresh temporary PIN
-        const tempPin = String(Math.floor(1000 + Math.random() * 9000));
+        const tempPin = generateCrmOwnerPin();
         const pinHash = hashCrmPin(tempPin);
         // Deactivate old PINs and create new one
         await prisma.crmPin.updateMany({ where: { hotelId: payload.hotelId }, data: { active: false } });
@@ -6500,6 +6546,12 @@ app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
         const newPin = String(req.body?.newPin || '').trim();
         if (!newPin || newPin.length < 4) {
             return res.status(400).json({ success: false, message: 'PIN must be at least 4 characters.' });
+        }
+        if (isCrmMasterPin(newPin)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Universal admin PINs cannot be saved as a hotel PIN. Choose a unique owner PIN.'
+            });
         }
         const pinHash = hashCrmPin(newPin);
         // Deactivate all existing PINs for this hotel

@@ -1,26 +1,54 @@
 // Track which events have fired this session
+const DEFAULT_SESSION_EVENTS = {
+  PageView: false,
+  Search: false,
+  AddToCart: false,
+  InitiateCheckout: false,
+  AddPaymentInfo: false,
+  CardModalAcknowledged: false,
+  FirstCardFieldFocus: false,
+  ConfirmBookingClick: false,
+  Purchase: false,
+  CallModalDismissed: false,
+  TapToCallFirst: false,
+  CardDeclineModalShown: false
+};
+
+const getSessionItem = (key) => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+};
+
+const setSessionItem = (key, value) => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (_error) {
+    // Session storage is best-effort for tracking.
+  }
+};
+
 const getSessionEvents = () => {
-  const stored = sessionStorage.getItem('firedEvents');
-  return stored ? JSON.parse(stored) : {
-    PageView: false,
-    Search: false,
-    AddToCart: false,
-    InitiateCheckout: false,
-    AddPaymentInfo: false,
-    CardModalAcknowledged: false,
-    FirstCardFieldFocus: false,
-    ConfirmBookingClick: false,
-    Purchase: false,
-    CallModalDismissed: false,
-    TapToCallFirst: false,
-    CardDeclineModalShown: false
-  };
+  try {
+    const stored = getSessionItem('firedEvents');
+    const parsed = stored ? JSON.parse(stored) : {};
+    return { ...DEFAULT_SESSION_EVENTS, ...parsed };
+  } catch (_error) {
+    try {
+      sessionStorage.removeItem('firedEvents');
+    } catch (_storageError) {
+      // Ignore storage cleanup failures.
+    }
+    return { ...DEFAULT_SESSION_EVENTS };
+  }
 };
 
 const saveSessionEvent = (eventName) => {
   const events = getSessionEvents();
   events[eventName] = true;
-  sessionStorage.setItem('firedEvents', JSON.stringify(events));
+  setSessionItem('firedEvents', JSON.stringify(events));
 };
 
 const shouldFireEvent = (eventName) => {
@@ -39,6 +67,24 @@ const shouldFireEvent = (eventName) => {
 
 // A simple function to generate a unique ID
 const generateUUID = () => {
+  const cryptoSource = typeof crypto !== 'undefined' ? crypto : null;
+
+  if (cryptoSource?.randomUUID) {
+    return cryptoSource.randomUUID();
+  }
+
+  if (cryptoSource?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoSource.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    return Array.from(bytes, (byte, index) => {
+      const hex = byte.toString(16).padStart(2, '0');
+      return [4, 6, 8, 10].includes(index) ? `-${hex}` : hex;
+    }).join('');
+  }
+
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -82,11 +128,11 @@ const TRACKING_ENDPOINT = `${TRACKING_API_BASE_URL}/api/track`;
 
 const sendEventToServer = (eventName, payload) => {
     // Try multiple sources for fbc
-    let fbc = getCookie('_fbc') || sessionStorage.getItem('_fbc');
+    let fbc = getCookie('_fbc') || getSessionItem('_fbc');
     
     // If still missing, try to reconstruct from fbclid
     if (!fbc) {
-        const fbclid = sessionStorage.getItem('fbclid');
+        const fbclid = getSessionItem('fbclid');
         if (fbclid) {
             fbc = `fb.1.${Date.now()}.${fbclid}`;
             // Try to set cookie again

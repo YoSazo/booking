@@ -28,7 +28,7 @@ function BookingPage({
   hotelId,
 }) {
   useEffect(() => { trackPageView(); }, []);
-  useEffect(() => { setIsProcessingBooking(false); }, []);
+  useEffect(() => { setIsProcessingBooking(false); }, [setIsProcessingBooking]);
   // Per-hotel funnel: page view (owner's "Get found" metrics). Throttled per session.
   useEffect(() => {
     const id = hotel?.id || hotelId;

@@ -1,17 +1,21 @@
-# Front Desk (modular build)
+# Front Desk
 
-Front Desk is split from `simple-crm.html` into lazy-loaded Vite modules for faster cold start.
+Front Desk is the modular Vite source for the `/frontdesk` app. Edit files in
+`frontdesk/src/`, then build the static assets served by the backend.
 
 ## Structure
 
 | File | Purpose |
 |------|---------|
-| `simple-crm.html` (repo root) | **Edit this** — source of truth for Front Desk logic |
-| `scripts/split-crm.mjs` | Splits the monolith into `src/` modules |
-| `src/core.js` | Boot, login, bookings, availability, revenue (~78 KB) |
-| `src/settings.js` | Settings + room editor (loaded on login, default tab) |
-| `src/apps.js` | Apps tab + tours (**lazy**, ~31 KB) |
-| `public/frontdesk/` | Production build output (served at `/frontdesk`) |
+| `src/main.js` | App entry, fonts, global CSS, core boot |
+| `src/core.js` | Boot, login, bookings, availability, revenue |
+| `src/settings.js` | Settings and room editor |
+| `src/apps.js` | Phones/apps tab and tours, lazy-loaded |
+| `src/state.js` | Shared mutable Front Desk state |
+| `src/utils.js` | Shared helpers |
+| `src/styles/core.css` | Main Front Desk styles |
+| `../public/frontdesk/` | Production build output served at `/frontdesk` |
+| `../simple-crm.html` | Legacy fallback only |
 
 ## Commands
 
@@ -21,25 +25,21 @@ npm run build:frontdesk
 
 # Or from this folder
 npm run build
+npm run dev
 ```
 
 ## Workflow
 
-1. Edit `simple-crm.html` as usual
-2. Run `npm run build:frontdesk`
-3. Deploy backend (built assets in `public/frontdesk/` are committed)
+1. Edit `frontdesk/src/`.
+2. Run `npm run build:frontdesk` from `guest-lodge-backend/`.
+3. Commit both source changes and generated `public/frontdesk/` assets.
 
-`src/` is regenerated on each build — do not edit by hand.
+`simple-crm.html` is no longer the source of truth. The legacy importer is kept
+only as an escape hatch:
 
-## Performance
+```bash
+npm run split:legacy
+```
 
-- **Before:** ~403 KB monolithic HTML, all JS parsed on load
-- **After:** ~8 KB shell + ~79 KB core JS + settings chunk; Apps tab code loads only when opened
-- CSS is external and cacheable via service worker (`frontdesk-sw.js` v3)
-
-### Phase 3
-
-- **Self-hosted fonts** — DM Sans + DM Mono via `@fontsource` (no Google Fonts round trip)
-- **Slimmer bookings API** — `select` only list-card fields (~60% smaller payloads)
-- **Lightweight message badges** — `GET /api/crm/messages/unread-count` on idle; full threads only on Bookings tab
-- **Virtual scrolling** — lists with 25+ bookings render only visible cards
+That command overwrites `frontdesk/src/` from `simple-crm.html`, so use it only
+when intentionally re-importing the old monolith.

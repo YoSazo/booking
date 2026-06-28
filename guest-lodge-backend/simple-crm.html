@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- SOURCE OF TRUTH for Front Desk. Run `npm run build:frontdesk` after edits. -->
+<!-- LEGACY FALLBACK for Front Desk. Edit frontdesk/src and run `npm run build:frontdesk` instead. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -2316,6 +2316,7 @@
 
 <script>
 let token = '';
+let isMasterPin = false;
 let bookings = [];
 let guestMessages = [];
 let messageUnreadCount = 0;
@@ -3619,6 +3620,7 @@ function finishTourHydration() {
 }
 
 async function startCrmApp(verification) {
+  isMasterPin = !!(verification && verification.isMasterPin);
   currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   revenueEnabled = !!(verification && verification.isManualPms);
   revenueCache = {};
@@ -3850,6 +3852,7 @@ function showLogin() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   token = '';
+  isMasterPin = false;
   currentHotelPms = '';
   revenueEnabled = false;
   revenueCache = {};
@@ -6180,12 +6183,14 @@ async function settingsChangePin() {
   const newPin = document.getElementById('settings-new-pin')?.value.trim();
   if (!newPin || newPin.length < 4) { toast('PIN must be at least 4 characters', 'error'); return; }
   try {
-    await api('POST', '/api/crm/change-pin', { newPin });
+    const result = await api('POST', '/api/crm/change-pin', { newPin });
+    if (!result.success) throw new Error(result.message || 'Failed to change PIN');
     token = newPin;
+    isMasterPin = false;
     try { localStorage.setItem('crmToken', token); } catch(e) {}
     toast('PIN updated!', 'success');
     document.getElementById('settings-new-pin').value = '';
-  } catch (e) { toast('Failed to change PIN', 'error'); }
+  } catch (e) { toast(e.message || 'Failed to change PIN', 'error'); }
 }
 
 async function settingsSendSupport() {
@@ -6205,17 +6210,26 @@ function openPreviewSite() {
   window.open(url, '_blank');
 }
 
-function guestBookingEngineUrl() {
+function guestBookingEngineUrl(options = {}) {
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const focusInstall = !!options.focusInstall;
+  let url = '';
   if (isLocal && activeHotelId) {
-    return 'http://localhost:5173/?hotelId=' + encodeURIComponent(activeHotelId);
+    url = 'http://localhost:5173/?hotelId=' + encodeURIComponent(activeHotelId);
+  } else {
+    const domain = activeHotelDomain || '';
+    url = domain ? 'https://' + domain + '/' : '';
   }
-  const domain = activeHotelDomain || '';
-  return domain ? 'https://' + domain + '/' : '';
+
+  if (url && focusInstall) {
+    url += (url.includes('?') ? '&' : '?') + 'scroll=install';
+  }
+
+  return url;
 }
 
-function openGuestBookingEngine() {
-  const url = guestBookingEngineUrl();
+function openGuestBookingEngine(options = {}) {
+  const url = guestBookingEngineUrl(options);
   if (!url) {
     toast('Your booking domain is still setting up.', 'info');
     return;
@@ -8109,10 +8123,10 @@ async function loadEditRooms() {
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
           <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" value="${token}" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+            <input type="text" id="edit-new-pin" value="${isMasterPin ? '' : token}" placeholder="${isMasterPin ? 'Enter a unique hotel PIN' : 'Enter new PIN (min 4 chars)'}" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
           </div>
           <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">You'll need to use the new PIN next time you log in.</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>
         </div>
       </div>
       ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
@@ -8416,13 +8430,15 @@ async function changePin() {
     return;
   }
   try {
-    await api('POST', '/api/crm/change-pin', { newPin });
+    const result = await api('POST', '/api/crm/change-pin', { newPin });
+    if (!result.success) throw new Error(result.message || 'Failed to change PIN');
     token = newPin;
+    isMasterPin = false;
     try { localStorage.setItem('crmToken', token); } catch(e) {}
     toast('PIN updated!', 'success');
     // Keep the new PIN visible in the input
   } catch (e) {
-    toast('Failed to change PIN', 'error');
+    toast(e.message || 'Failed to change PIN', 'error');
   }
 }
 
@@ -8940,8 +8956,8 @@ function renderAppsView() {
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
   const fdInstallLabel = fdOnNarrowScreen ? 'Install on this phone' : 'Install Front Desk';
   const fdInstallCopy = fdOnNarrowScreen
-    ? 'Install Front Desk on this phone to unlock booking alerts and the fast app-style layout.'
-    : 'Open this dashboard on the phone your staff uses, then install Front Desk. Desktop can set up guest tools; booking alerts unlock in the installed phone app.';
+    ? 'Install Front Desk on this phone first. That unlocks the guest install tools and makes sure new booking/message alerts go to the property device.'
+    : 'Open this dashboard on the phone your staff uses, then install Front Desk there. Guest install tools stay locked until a property phone has Front Desk installed.';
 
   const frontdeskInstallItems = [
     { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to install Front Desk', title: 'Install Front Desk on this device',
@@ -8960,9 +8976,9 @@ function renderAppsView() {
     fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's installed on this device. Turn on alerts so you know when a guest books.</p>
       <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
-    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Install Front Desk to use this phone like your booking command center.</p>
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Install Front Desk on the property phone first. That unlocks guest app setup, install links, QR tools, guest messages, and booking alerts.</p>
       <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Install Front Desk</button>
-      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until installed</div>`;
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until Front Desk is installed on a property phone</div>`;
   }
 
   // Icon preview matches the loop tile: uploaded logos use the whole square,
@@ -8989,8 +9005,8 @@ function renderAppsView() {
   const checkinActionsHtml = `
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR</button>
       ${guestInstallUrl !== '#' ? `
-      <button type="button" onclick="openGuestBookingEngine()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
-      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Open your direct booking website to see the Install button. Guests use it to save your hotel to their home screen.</p>` : ''}
+      <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Open your direct booking page at the guest install prompt. Guests use that page to save your hotel app after Front Desk is installed on the property phone.</p>` : ''}
       ${guestInstallUrl === '#' ? '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>' : ''}`;
 
   // Guest install link — promoted out of the Help fold so it's always reachable (§1D.2).
@@ -9054,7 +9070,7 @@ function renderAppsView() {
     <div class="apps-step-card apps-guest-phone-card">
       <div style="padding:16px 18px 14px;">
         <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">What guests see</div>
-        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">This is a static example of the install prompt guests see on your direct booking page.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">This is a static example of the install prompt guests see on your direct booking page. The button is muted here so owners know this is only a preview.</p>
       </div>
       <div style="background:#f8faf9;border-top:1px solid var(--border);padding:14px 18px 18px;">
         <div style="pointer-events:none;user-select:none;">
@@ -9079,12 +9095,17 @@ function renderAppsView() {
               ${iconPreviewHtml}
               <div style="flex:1;min-width:0;">
                 <div style="font-size:14px;font-weight:800;color:#1a1a2e;line-height:1.3;">Add ${hName} to your home screen</div>
-                <div style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">Guests tap this on your booking page to save you like an app.</div>
+                <div style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">Guests see this on your booking page. It stays muted until Front Desk is installed on the property phone.</div>
               </div>
             </div>
-            <div style="width:100%;margin-top:14px;padding:12px 16px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-size:14px;font-weight:800;text-align:center;box-sizing:border-box;">Install</div>
+            <div aria-disabled="true" style="width:100%;margin-top:14px;padding:12px 16px;border-radius:10px;border:none;background:#c5d5cc;color:#fff;font-size:14px;font-weight:800;text-align:center;box-sizing:border-box;opacity:.72;cursor:not-allowed;">Install</div>
+            <div style="font-size:11px;color:#6b7280;line-height:1.45;text-align:center;margin-top:8px;">Preview only — unlock guest installs by installing Front Desk on your phone first.</div>
           </div>
         </div>
+        ${guestInstallUrl !== '#' ? `
+        <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--green);background:#fff;color:var(--green);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-top:14px;">Go to direct booking page</button>
+        <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.55;">Open the real guest page to see where guests will install your hotel app. Install Front Desk on your property phone first so guest installs, messages, QR tools, and booking alerts are ready before guests use it.</p>` : `
+        <p style="font-size:12px;color:var(--text-muted);margin:14px 0 0;line-height:1.55;">Your direct booking domain is still setting up. Once it is ready, you can open the guest page from here.</p>`}
       </div>
     </div>`;
 
@@ -9138,7 +9159,7 @@ function renderAppsView() {
           <div class="apps-locked-tools__icon"><i data-lucide="lock-keyhole" style="width:20px;height:20px;"></i></div>
           <div class="apps-locked-tools__eyebrow">Phones tools locked</div>
           <div class="apps-locked-tools__title">Install Front Desk to unlock this tab</div>
-          <p>${fdInstallCopy} Unlocks guest app setup, install links, QR tools, messages, and booking notifications.</p>
+          <p>${fdInstallCopy} Until then, guest install buttons are muted in previews so setup mode is not confused with a live guest install.</p>
           <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
           <button type="button" class="apps-video-teaser apps-locked-tools__video" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
         </div>

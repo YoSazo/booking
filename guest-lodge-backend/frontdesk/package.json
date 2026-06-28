@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "split": "node scripts/split-crm.mjs",
-    "build": "node scripts/split-crm.mjs && vite build",
+    "build": "vite build",
+    "split:legacy": "node scripts/split-crm.mjs --legacy-import",
     "dev": "vite"
   },
   "devDependencies": {

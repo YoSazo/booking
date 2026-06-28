@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 /**
- * Splits simple-crm.html into Vite source files.
- * Run: node frontdesk/scripts/split-crm.mjs
+ * Legacy importer for simple-crm.html.
+ *
+ * This overwrites frontdesk/src. It is kept only for deliberate re-imports from
+ * the old monolith; normal Front Desk work should edit frontdesk/src directly.
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+if (!process.argv.includes('--legacy-import')) {
+  console.error('Refusing to overwrite frontdesk/src from simple-crm.html.');
+  console.error('Edit frontdesk/src directly, or run `npm run split:legacy` to intentionally re-import the legacy monolith.');
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../..');
@@ -36,6 +44,7 @@ function extractFunctions(code) {
 /** Rewrite bare state identifiers to crm.* (mutable shared state). Never use `fd` as a local var — it used to collide with the old `fd` prefix. */
 const STATE_KEYS = [
   'token', 'bookings', 'guestMessages', 'currentFilter', 'bookingCallFilter', 'manualAvailability', 'manualSelectedRoom',
+  'isMasterPin',
   'availabilityYear', 'availabilityMonth', 'availabilityEditingDay', 'availabilityDaySaving',
   'editingRoomName', 'pendingDeleteRoomName', 'currentHotelPms', 'revenueEnabled', 'hotelSubscribed',
   'revenuePeriod', 'revenueCache', 'revenueLoading', 'revenueError', 'blockedDemand', 'activeHotelId', 'activeHotelName',
@@ -295,6 +304,7 @@ if (!initBlock.includes('bootCrmApp()')) {
 const stateJs = `/** Shared mutable Front Desk state */
 export const crm = {
   token: '',
+  isMasterPin: false,
   bookings: [],
   guestMessages: [],
   currentFilter: 'settings',
