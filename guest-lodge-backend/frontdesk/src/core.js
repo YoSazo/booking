@@ -826,7 +826,7 @@ function blockedDemandLineHtml() {
 
 // D19: the persistent, every-tab surface is a CALM STATUS PILL — not a sales
 // banner. The full gradient CTA card (goLiveInlineCardHtml) is reserved for
-// high-intent moments (Bookings empty state, Your page, Phones). When real
+// high-intent moments (Bookings empty state, Your page, Guest App). When real
 // blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
 // that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
@@ -2514,7 +2514,7 @@ function applyFilter() {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Phones</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest App</div></div>';
     });
     return;
   }

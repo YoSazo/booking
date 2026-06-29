@@ -422,7 +422,7 @@ function renderAppsView() {
       <div class="apps-locked-tools__overlay">
         <div class="apps-locked-tools__panel">
           <div class="apps-locked-tools__icon"><i data-lucide="lock-keyhole" style="width:20px;height:20px;"></i></div>
-          <div class="apps-locked-tools__eyebrow">Phones tools locked</div>
+          <div class="apps-locked-tools__eyebrow">Guest App tools locked</div>
           <div class="apps-locked-tools__title">Install Front Desk to unlock this tab</div>
           <p>${fdInstallCopy} Until then, guest install buttons are muted in previews so setup mode is not confused with a live guest install.</p>
           <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
@@ -541,7 +541,7 @@ function renderAppsView() {
   <div class="apps-page">
 
     ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
-    <h2 class="apps-headline">Phones</h2>
+    <h2 class="apps-headline">Guest App</h2>
     ${appsMainHtml}
 
     <p class="apps-footnote">${appsFootnoteHtml}</p>
@@ -733,7 +733,7 @@ function startAppsTour(opts) {
       src: APPS_SHOWCASE.guestInstallVideo,
       poster: appsCloudinaryImg(APPS_SHOWCASE.guestHome, 400),
       title: 'Guests save your hotel to their phone',
-      caption: `They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> on the Phones tab so they see <strong>${shortName}</strong>.`,
+      caption: `They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> in Guest App so they see <strong>${shortName}</strong>.`,
     },
     {
       type: 'image',
@@ -744,7 +744,7 @@ function startAppsTour(opts) {
     },
     {
       type: 'cta',
-      title: 'On the Phones tab',
+      title: 'In Guest App',
       caption: '',
       ctaHtml: `
         <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;margin-bottom:10px;">
@@ -763,7 +763,7 @@ function startAppsTour(opts) {
             ${iconEl}
             <div>
               <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Your logo on their home screen</div>
-              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of the <strong>Phones</strong> tab. Tap <strong>Help</strong> for the full walkthrough.</p>
+              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of <strong>Guest App</strong>. Tap <strong>Help</strong> for the full walkthrough.</p>
             </div>
           </div>
         </div>`,

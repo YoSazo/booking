@@ -1,4 +1,4 @@
-import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179630/unnamed_lbsctp.jpg",guestHome:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2475_1_jxip3r.png",guestBook:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179611/IMG_2476_1_tqbmgz.png",guestMessagesImg:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2477_1_zgodnn.png",frontdeskMessages:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179656/unnamed_2_qfhkrr.png",guestMessageNotifVideo:"https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_23-43-50_1_z22p4m.mp4",guestInstallVideo:"https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_00-03-19_1_lgdf59.mp4",frontdeskInstallVideo:"https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_19-49-38_1_tc1bzm.mp4"},ue="32px";function y(t,e){return t.replace("/image/upload/","/image/upload/f_auto,q_auto,w_"+(e||400)+"/")}function w(t){return`border-radius:${ue};box-shadow:0 10px 36px rgba(0,0,0,0.22);${t||""}`}function N(t){const e=Math.min(window.devicePixelRatio||1,2),o=Math.round(Math.min(window.screen.width*e,1600));return t.replace("/image/upload/",`/image/upload/f_auto,q_auto:best,w_${o}/`)}let I=[],h=0;function xe(t,e){_(!1),I=t,h=e||0;let o=document.getElementById("appsLightbox");if(!o){o=document.createElement("div"),o.id="appsLightbox",o.style.cssText=["position:fixed;inset:0;z-index:102000;background:#000;","display:flex;flex-direction:column;align-items:center;justify-content:flex-start;","overscroll-behavior:contain;touch-action:pan-y;","padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);"].join(""),document.body.appendChild(o),document.body.style.overflow="hidden",o._keyHandler=i=>{i.key==="ArrowRight"||i.key==="ArrowDown"?z(1):i.key==="ArrowLeft"||i.key==="ArrowUp"?z(-1):i.key==="Escape"&&S()},document.addEventListener("keydown",o._keyHandler);let n=0;o.addEventListener("touchstart",i=>{n=i.changedTouches[0].clientX},{passive:!0}),o.addEventListener("touchend",i=>{const d=i.changedTouches[0].clientX-n;Math.abs(d)>50&&z(d<0?1:-1)},{passive:!0})}document.body.style.overflow="hidden",A()}function S(){const t=document.getElementById("appsLightbox");t&&(document.removeEventListener("keydown",t._keyHandler),t.remove(),document.body.style.overflow="")}function z(t){const e=I.length;e<=1||(h=(h+t+e)%e,A())}function A(){const t=document.getElementById("appsLightbox");if(!t)return;const e=I[h],o=I.length,n=e.type!=="video",i=o>1?`${h+1} / ${o}`:"",d=n?`<img src="${N(e.src)}" alt="${e.alt||""}"
+import{c as u,e as ge}from"./settings-Di_HH3uE.js";const r={homeScreen:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179630/unnamed_lbsctp.jpg",guestHome:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2475_1_jxip3r.png",guestBook:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179611/IMG_2476_1_tqbmgz.png",guestMessagesImg:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179605/IMG_2477_1_zgodnn.png",frontdeskMessages:"https://res.cloudinary.com/dkmr3h5jb/image/upload/v1781179656/unnamed_2_qfhkrr.png",guestMessageNotifVideo:"https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-10-2026_23-43-50_1_z22p4m.mp4",guestInstallVideo:"https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_00-03-19_1_lgdf59.mp4",frontdeskInstallVideo:"https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/ScreenRecording_06-11-2026_19-49-38_1_tc1bzm.mp4"},ue="32px";function y(t,e){return t.replace("/image/upload/","/image/upload/f_auto,q_auto,w_"+(e||400)+"/")}function w(t){return`border-radius:${ue};box-shadow:0 10px 36px rgba(0,0,0,0.22);${t||""}`}function N(t){const e=Math.min(window.devicePixelRatio||1,2),o=Math.round(Math.min(window.screen.width*e,1600));return t.replace("/image/upload/",`/image/upload/f_auto,q_auto:best,w_${o}/`)}let I=[],h=0;function xe(t,e){_(!1),I=t,h=e||0;let o=document.getElementById("appsLightbox");if(!o){o=document.createElement("div"),o.id="appsLightbox",o.style.cssText=["position:fixed;inset:0;z-index:102000;background:#000;","display:flex;flex-direction:column;align-items:center;justify-content:flex-start;","overscroll-behavior:contain;touch-action:pan-y;","padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);"].join(""),document.body.appendChild(o),document.body.style.overflow="hidden",o._keyHandler=i=>{i.key==="ArrowRight"||i.key==="ArrowDown"?z(1):i.key==="ArrowLeft"||i.key==="ArrowUp"?z(-1):i.key==="Escape"&&S()},document.addEventListener("keydown",o._keyHandler);let n=0;o.addEventListener("touchstart",i=>{n=i.changedTouches[0].clientX},{passive:!0}),o.addEventListener("touchend",i=>{const d=i.changedTouches[0].clientX-n;Math.abs(d)>50&&z(d<0?1:-1)},{passive:!0})}document.body.style.overflow="hidden",A()}function S(){const t=document.getElementById("appsLightbox");t&&(document.removeEventListener("keydown",t._keyHandler),t.remove(),document.body.style.overflow="")}function z(t){const e=I.length;e<=1||(h=(h+t+e)%e,A())}function A(){const t=document.getElementById("appsLightbox");if(!t)return;const e=I[h],o=I.length,n=e.type!=="video",i=o>1?`${h+1} / ${o}`:"",d=n?`<img src="${N(e.src)}" alt="${e.alt||""}"
           style="max-width:100%;max-height:calc(100dvh - 160px);width:auto;height:auto;display:block;object-fit:contain;${w()}"
           loading="eager" decoding="async">`:`<video autoplay loop muted playsinline webkit-playsinline
           style="max-width:100%;max-height:calc(100dvh - 160px);width:auto;height:auto;display:block;${w()}"
@@ -79,9 +79,9 @@ import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://
           ${v("Guest texts you, you text back","",l(O),0,!0)}
           ${v("Your app and theirs — side by side","",l(g),0,!1)}
         </div>
-        ${d!=="#"?`<button onclick="window.open('${d}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>`:""}`,M=(u.editRooms||[]).find(c=>c&&(c.name||c.images&&c.images.length))||{},m=(M.images||[]).filter(c=>c&&c.url),ie=m[0]?.url||"https://suitestay.clickinns.com/kingbedsuitestay.webp",ne=M.name||"King Suite",se=m.length>1?`
+        ${d!=="#"?`<button onclick="window.open('${d}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>`:""}`,G=(u.editRooms||[]).find(c=>c&&(c.name||c.images&&c.images.length))||{},m=(G.images||[]).filter(c=>c&&c.url),ie=m[0]?.url||"https://suitestay.clickinns.com/kingbedsuitestay.webp",ne=G.name||"King Suite",se=m.length>1?`
     <div style="position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:5px;padding:5px 7px;border-radius:999px;background:rgba(0,0,0,0.28);">
-      ${m.slice(0,5).map((c,q)=>`<span style="width:${q===0?"20px":"7px"};height:7px;border-radius:999px;background:${q===0?"#fff":"rgba(255,255,255,0.6)"};display:block;"></span>`).join("")}
+      ${m.slice(0,5).map((c,P)=>`<span style="width:${P===0?"20px":"7px"};height:7px;border-radius:999px;background:${P===0?"#fff":"rgba(255,255,255,0.6)"};display:block;"></span>`).join("")}
     </div>`:"",ae=o?`<img src="${o}" alt="" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;">`:`<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${n}</div>`,re=`
     <div class="apps-step-card apps-guest-phone-card">
       <div style="padding:16px 18px 14px;">
@@ -123,22 +123,22 @@ import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://
         <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.55;">Open the real guest page to see where guests will install your hotel app. Install Front Desk on your property phone first so guest installs, messages, QR tools, and booking alerts are ready before guests use it.</p>`:`
         <p style="font-size:12px;color:var(--text-muted);margin:14px 0 0;line-height:1.55;">Your direct booking domain is still setting up. Once it is ready, you can open the guest page from here.</p>`}
       </div>
-    </div>`,D=c=>`
+    </div>`,M=c=>`
     <div class="apps-step-card"${c?' id="tour-fd-install-card"':""}>
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
       <div class="apps-step-title">${b?"Front Desk — installed":"Install Front Desk"}</div>
       ${$}
-    </div>`,G=c=>`
+    </div>`,D=c=>`
     <div class="apps-step-card"${c?' id="tour-guest-icon-section"':""}>
       <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
       ${J}
-    </div>`,P=`
+    </div>`,C=`
     <div class="apps-step-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Guests can save <strong>${e}</strong> to their phone — one tap, no app store. Then they can book and message you direct.</p>
       ${Z}
       ${ee}
-    </div>`,C=`
+    </div>`,q=`
     <details class="apps-fold" id="appsHelpFold" style="margin-top:8px;">
       <summary class="apps-fold-summary">
         <div><div class="apps-fold-title">Help</div><div class="apps-fold-meta">How it works · walkthrough · FAQs</div></div>
@@ -148,24 +148,24 @@ import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://
         ${oe}
       </div>
     </details>`,pe=`
+    ${M(!0)}
     ${D(!0)}
-    ${G(!0)}
-    ${P}
+    ${C}
     ${guestBroadcastCardHtml()}
-    ${C}`,de=`
+    ${q}`,de=`
     <div class="apps-locked-tools" id="tour-fd-install-card">
       <div class="apps-locked-tools__content" aria-hidden="true">
         ${`
+    ${M(!1)}
     ${D(!1)}
-    ${G(!1)}
-    ${P}
+    ${C}
     ${guestBroadcastCardHtml()}
-    ${C}`}
+    ${q}`}
       </div>
       <div class="apps-locked-tools__overlay">
         <div class="apps-locked-tools__panel">
           <div class="apps-locked-tools__icon"><i data-lucide="lock-keyhole" style="width:20px;height:20px;"></i></div>
-          <div class="apps-locked-tools__eyebrow">Phones tools locked</div>
+          <div class="apps-locked-tools__eyebrow">Guest App tools locked</div>
           <div class="apps-locked-tools__title">Install Front Desk to unlock this tab</div>
           <p>${W} Until then, guest install buttons are muted in previews so setup mode is not confused with a live guest install.</p>
           <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${V}</button>
@@ -276,7 +276,7 @@ import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://
   <div class="apps-page">
 
     ${isPwaSimulated()?'<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>':""}
-    <h2 class="apps-headline">Phones</h2>
+    <h2 class="apps-headline">Guest App</h2>
     ${le}
 
     <p class="apps-footnote">${ce}</p>
@@ -299,7 +299,7 @@ import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://
       ${e.caption?`<div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.55;margin-bottom:14px;">${e.caption}</div>`:""}
       <button type="button" id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">${d}</button>
       <div style="display:flex;gap:6px;justify-content:center;">${l}</div>
-    </div>`,document.getElementById("appsTourNextBtn").onclick=()=>{if(n){const g=k;if(_(!0),!g){const p=document.getElementById("appsView");p&&p.scrollIntoView({behavior:"smooth",block:"start"})}}else x++,T()},document.getElementById("appsTourSkipBtn").onclick=()=>_(!0)}function fe(t){const e=t&&t.replay,o=t&&t.chainFromSettingsTour;if(k=!!o,!e&&!o&&localStorage.getItem("appsTourDone")||document.getElementById("appsTourLightbox"))return;const n=u.activeHotelName||"Your Hotel",i=n.length>13?n.slice(0,13)+"…":n,d=n.trim().charAt(0).toUpperCase(),a=u.activeHotelAppIcon||"",l=a?`<div style="width:52px;height:52px;border-radius:14px;background:#fff;padding:8px;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><img src="${a}" alt="${n}" style="width:100%;height:100%;object-fit:contain;"></div>`:`<div style="width:52px;height:52px;border-radius:14px;background:#2E7D5B;color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${d}</div>`;H=[{type:"video",src:r.guestInstallVideo,poster:y(r.guestHome,400),title:"Guests save your hotel to their phone",caption:`They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> on the Phones tab so they see <strong>${i}</strong>.`},{type:"image",src:y(r.guestHome,520),alt:"Guest home screen",title:"What guests see after they install",caption:"Their stay info, direct booking, and a way to message you — all from one icon on their phone."},{type:"cta",title:"On the Phones tab",caption:"",ctaHtml:`
+    </div>`,document.getElementById("appsTourNextBtn").onclick=()=>{if(n){const g=k;if(_(!0),!g){const p=document.getElementById("appsView");p&&p.scrollIntoView({behavior:"smooth",block:"start"})}}else x++,T()},document.getElementById("appsTourSkipBtn").onclick=()=>_(!0)}function fe(t){const e=t&&t.replay,o=t&&t.chainFromSettingsTour;if(k=!!o,!e&&!o&&localStorage.getItem("appsTourDone")||document.getElementById("appsTourLightbox"))return;const n=u.activeHotelName||"Your Hotel",i=n.length>13?n.slice(0,13)+"…":n,d=n.trim().charAt(0).toUpperCase(),a=u.activeHotelAppIcon||"",l=a?`<div style="width:52px;height:52px;border-radius:14px;background:#fff;padding:8px;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><img src="${a}" alt="${n}" style="width:100%;height:100%;object-fit:contain;"></div>`:`<div style="width:52px;height:52px;border-radius:14px;background:#2E7D5B;color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${d}</div>`;H=[{type:"video",src:r.guestInstallVideo,poster:y(r.guestHome,400),title:"Guests save your hotel to their phone",caption:`They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> in Guest App so they see <strong>${i}</strong>.`},{type:"image",src:y(r.guestHome,520),alt:"Guest home screen",title:"What guests see after they install",caption:"Their stay info, direct booking, and a way to message you — all from one icon on their phone."},{type:"cta",title:"In Guest App",caption:"",ctaHtml:`
         <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;margin-bottom:10px;">
           <div style="font-size:11px;font-weight:800;color:#4CAF7D;margin-bottom:4px;">AT CHECK-IN</div>
           <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">📲 Show QR at check-in</div>
@@ -316,7 +316,7 @@ import{c as u,e as ge}from"./settings-DwaOK21z.js";const r={homeScreen:"https://
             ${l}
             <div>
               <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Your logo on their home screen</div>
-              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of the <strong>Phones</strong> tab. Tap <strong>Help</strong> for the full walkthrough.</p>
+              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of <strong>Guest App</strong>. Tap <strong>Help</strong> for the full walkthrough.</p>
             </div>
           </div>
         </div>`}],x=0,S(),_(!1);const s=document.createElement("div");s.id="appsTourLightbox",s.style.cssText=["position:fixed;inset:0;z-index:102001;background:#000;","display:flex;flex-direction:column;","overscroll-behavior:contain;touch-action:pan-y;","padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);"].join("");let g=0;s._swipeStart=p=>{g=p.changedTouches[0].clientX},s._swipeEnd=p=>{const f=p.changedTouches[0].clientX-g;Math.abs(f)>50&&Y(f<0?1:-1)},s.addEventListener("touchstart",s._swipeStart,{passive:!0}),s.addEventListener("touchend",s._swipeEnd,{passive:!0}),document.body.appendChild(s),document.body.style.overflow="hidden",T()}const be={appsCloseLightbox:S,appsCloudinaryFull:N,appsCloudinaryImg:y,appsLbNav:z,appsLbRender:A,appsOpenLightbox:xe,appsPhoneImgStyle:w,appsQuestionRow:v,appsTourClose:_,appsTourNav:Y,appsTourRender:T,appsVideoBadgeHtml:B,detectAppPlatform:he,ensureAppsViewRendered:j,loadGuestInstallStats:E,renderAppsView:R,startAppsTour:fe};function we(){ge(be)}export{be as default,we as install};

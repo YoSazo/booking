@@ -320,7 +320,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="setup-container">
   <div class="setup-header">
     <img src="/marketellogo.svg" alt="Marketel" class="setup-logo">
-    <div class="setup-title">Set up your booking engine</div>
+    <div class="setup-title">Set up your booking page</div>
   </div>
 
   <div class="progress-bar">
@@ -351,7 +351,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Room Name</label>
         <input type="text" id="rmName" placeholder="e.g. King Suite">
       </div>
-      <button class="btn btn-primary" onclick="addRoomAndFinish()">Build My Engine &rarr;</button>
+      <button class="btn btn-primary" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
       <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
     </div>
   </div>
@@ -359,7 +359,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <!-- STEP 3: Quality question -->
   <div class="step" id="step-3">
     <div class="form-card fade-stagger" style="text-align:center;">
-      <h2 style="font-size:18px; margin-bottom:16px;">Why do you want a booking engine?</h2>
+      <h2 style="font-size:18px; margin-bottom:16px;">Why do you want a booking page?</h2>
       <div style="display:flex; flex-direction:column; gap:10px;">
         <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_commissions')">I'm tired of paying OTA commissions</button>
         <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('direct_bookings')">I want guests to book directly from my website / Google listing</button>
@@ -369,12 +369,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 4: Video showcase - see your engine in action -->
+  <!-- STEP 4: Video showcase - see your booking page in action -->
   <div class="step" id="step-4">
     <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center;">
       <div class="fade-stagger" style="max-width:400px; width:100%;">
         <h2 style="font-size:20px; font-weight:800; margin-bottom:6px; color:var(--text);">Guests book in under 60 seconds</h2>
-        <p style="font-size:13px; color:var(--muted); margin-bottom:6px; line-height:1.5;">Here's a real booking on a Marketel engine, start to finish. Yours works exactly the same — watch how fast it is.</p>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:6px; line-height:1.5;">Here's a real booking on a Marketel booking page, start to finish. Yours works exactly the same — watch how fast it is.</p>
         <p style="font-size:12px; color:var(--green); font-weight:600; margin-bottom:16px;">💳 Guests verify their card to prevent no-shows — they're never charged. You collect payment at check-in.</p>
         
         <!-- Video -->
@@ -404,22 +404,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
           <div class="final-domain-value" id="preparingDomain">Preparing domain…</div>
         </div>
         <div class="final-status">
-          <div class="final-status-row"><span class="status-dot">✓</span><span>Booking engine created</span></div>
+          <div class="final-status-row"><span class="status-dot">✓</span><span>Booking page created</span></div>
           <div class="final-status-row"><span class="status-dot">✓</span><span>Front Desk dashboard prepared</span></div>
           <div class="final-status-row"><span class="status-dot spin"></span><span>Securing your site connection</span></div>
         </div>
       </div>
       <div class="final-panel fade-stagger" id="finalReadyPanel" hidden>
         <div class="final-check">✓</div>
-        <h2>You&apos;re live</h2>
-        <p>Your booking page is ready in preview mode. Open your dashboard to review it, then turn on direct bookings whenever you&apos;re ready.</p>
+        <h2>Your preview is live</h2>
+        <p>Your booking page is ready in preview mode. Open Front Desk to review it, then turn on direct bookings whenever you&apos;re ready.</p>
         <div class="final-domain-box">
           <div class="final-domain-label">Your Booking Page</div>
           <div class="final-domain-value" id="successDomain"></div>
-          <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Live in preview · share it, test it, make it yours</div>
+          <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Preview is live · share it, test it, make it yours</div>
         </div>
         <a class="btn btn-primary final-dashboard-cta" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
-          Go to Your Dashboard →
+          Go to Front Desk →
         </a>
       </div>
     </div>
@@ -539,7 +539,7 @@ async function addRoomAndFinish() {
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     
-    // Link goes to front desk (their dashboard), not the booking engine
+    // Link goes to Front Desk, not the public booking page.
     var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     var dashboardUrl = (isLocal ? window.location.origin : domain) + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
     window._dashboardUrl = dashboardUrl;

@@ -2253,7 +2253,7 @@
         Revenue
       </button>
       <button type="button" class="tab" data-nav-filter="apps" onclick="setFilter('apps', this)">
-        Phones
+        Guest App
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;"></div>
@@ -2289,7 +2289,7 @@
     </button>
     <button type="button" class="mobile-nav-item" data-nav-filter="apps">
       <span class="mobile-nav-icon-wrap"><i data-lucide="smartphone"></i></span>
-      <span class="mobile-nav-label">Phones</span>
+      <span class="mobile-nav-label">Guest App</span>
     </button>
   </nav>
 </div>
@@ -3208,7 +3208,7 @@ function blockedDemandLineHtml() {
 
 // D19: the persistent, every-tab surface is a CALM STATUS PILL — not a sales
 // banner. The full gradient CTA card (goLiveInlineCardHtml) is reserved for
-// high-intent moments (Bookings empty state, Your page, Phones). When real
+// high-intent moments (Bookings empty state, Your page, Guest App). When real
 // blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
 // that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
@@ -4895,7 +4895,7 @@ function applyFilter() {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Phones</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest App</div></div>';
     });
     return;
   }
@@ -6279,7 +6279,7 @@ function showOnboardingQuestions() {
 
   const questions = [
     {
-      title: 'Why do you want a booking engine?',
+      title: 'Why do you want a booking page?',
       key: 'why',
       type: 'text',
       placeholder: 'e.g. I want guests to book directly instead of calling me...'
@@ -6473,7 +6473,7 @@ function startPostActivationTabTour() {
     {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Phones</strong> — put your guest booking app on their home screen and send install reminders.',
+      text: '<strong>Guest App</strong> — put your hotel on guests&apos; home screens and send install reminders.',
     },
   ];
 
@@ -6520,7 +6520,7 @@ function startPostActivationTabTour() {
         <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
           <p style="margin:0 0 14px;">${s.text}</p>
-          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Phones' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Guest App' : 'Next tab →'}</button>
           <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
         </div>`;
       document.body.appendChild(tooltip);
@@ -6544,7 +6544,7 @@ window.startPostActivationTabTour = startPostActivationTabTour;
 function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
   const bookingDomain = activeHotelDomain || (activeHotelId ? activeHotelId + '.mktel.co' : '');
-  const unlockedTabs = 'Bookings and Phones';
+  const unlockedTabs = 'Bookings and Guest App';
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -6993,7 +6993,7 @@ function showFinaleMockModal() {
       <div style="padding:24px 20px;text-align:center;">
         <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
         <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">You're all set!</div>
-        <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking engine is live. Here's what to do next:</p>
+        <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking page is live. Here's what to do next:</p>
         <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:16px;">
           <div style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;align-items:flex-start;gap:8px;">
@@ -7010,7 +7010,7 @@ function showFinaleMockModal() {
             </div>
             <div style="display:flex;align-items:flex-start;gap:8px;">
               <span style="font-size:14px;">📲</span>
-              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Later:</strong> open <strong>Phones</strong> for your check-in QR and guest-app tools</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Later:</strong> open <strong>Guest App</strong> for your check-in QR and guest install tools</span>
             </div>
           </div>
         </div>
@@ -7054,7 +7054,7 @@ function showTestDriveModal(bookingUrl) {
       <div style="padding:28px 22px;text-align:center;">
         <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
         <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Go live and start accepting bookings</div>
-        <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your engine is built. Your link is copied. Activate to let guests book.</p>
+        <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your booking page is built. Your link is copied. Activate to let guests book.</p>
         <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:20px;">
           <div style="display:flex;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Your booking page goes live</span></div>
@@ -7167,7 +7167,7 @@ function startSettingsTour() {
     },
     {
       target: '#tour-preview-btn',
-      text: 'Preview your booking engine to see exactly what your guests see.',
+      text: 'Preview your booking page to see exactly what your guests see.',
       openAccordion: false,
       tab: 'settings',
       tooltipPosition: 'below',
@@ -7210,7 +7210,7 @@ function startSettingsTour() {
     },
     {
       target: '#paymentsExplainer',
-      text: 'When guests book through your engine, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
+      text: 'When guests book through your booking page, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
       openAccordion: false,
       tab: 'revenue',
       waitForVisible: true,
@@ -7230,7 +7230,7 @@ function startSettingsTour() {
       highlightSelector: '#tour-guest-icon-section',
       anchorSelector: '#tour-guest-icon-section',
       scrollTarget: '#tour-guest-icon-section',
-      text: 'Set the icon guests see when they save your direct booking page. Guest QR, install link, notifications, and app tools live in this Phones tab.',
+      text: 'Set the icon guests see when they save your direct booking page. Guest QR, install link, notifications, and app tools live in Guest App.',
       openAccordion: false,
       tab: 'apps',
       waitForVisible: true,
@@ -7695,7 +7695,7 @@ function startSettingsTour() {
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your hotel from your booking page or a QR — set that up under <strong>Phones</strong>.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your hotel from your booking page or a QR — set that up under <strong>Guest App</strong>.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
@@ -9157,7 +9157,7 @@ function renderAppsView() {
       <div class="apps-locked-tools__overlay">
         <div class="apps-locked-tools__panel">
           <div class="apps-locked-tools__icon"><i data-lucide="lock-keyhole" style="width:20px;height:20px;"></i></div>
-          <div class="apps-locked-tools__eyebrow">Phones tools locked</div>
+          <div class="apps-locked-tools__eyebrow">Guest App tools locked</div>
           <div class="apps-locked-tools__title">Install Front Desk to unlock this tab</div>
           <p>${fdInstallCopy} Until then, guest install buttons are muted in previews so setup mode is not confused with a live guest install.</p>
           <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
@@ -9276,7 +9276,7 @@ function renderAppsView() {
   <div class="apps-page">
 
     ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
-    <h2 class="apps-headline">Phones</h2>
+    <h2 class="apps-headline">Guest App</h2>
     ${appsMainHtml}
 
     <p class="apps-footnote">${appsFootnoteHtml}</p>
@@ -9468,7 +9468,7 @@ function startAppsTour(opts) {
       src: APPS_SHOWCASE.guestInstallVideo,
       poster: appsCloudinaryImg(APPS_SHOWCASE.guestHome, 400),
       title: 'Guests save your hotel to their phone',
-      caption: `They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> on the Phones tab so they see <strong>${shortName}</strong>.`,
+      caption: `They tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Tap <strong>Change your icon</strong> in Guest App so they see <strong>${shortName}</strong>.`,
     },
     {
       type: 'image',
@@ -9479,7 +9479,7 @@ function startAppsTour(opts) {
     },
     {
       type: 'cta',
-      title: 'On the Phones tab',
+      title: 'In Guest App',
       caption: '',
       ctaHtml: `
         <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px;text-align:left;margin-bottom:10px;">
@@ -9498,7 +9498,7 @@ function startAppsTour(opts) {
             ${iconEl}
             <div>
               <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px;">Your logo on their home screen</div>
-              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of the <strong>Phones</strong> tab. Tap <strong>Help</strong> for the full walkthrough.</p>
+              <p style="font-size:12px;color:rgba(255,255,255,0.65);margin:0;line-height:1.45;">Upload at the top of <strong>Guest App</strong>. Tap <strong>Help</strong> for the full walkthrough.</p>
             </div>
           </div>
         </div>`,

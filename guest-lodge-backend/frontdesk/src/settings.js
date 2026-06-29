@@ -388,7 +388,7 @@ function showOnboardingQuestions() {
 
   const questions = [
     {
-      title: 'Why do you want a booking engine?',
+      title: 'Why do you want a booking page?',
       key: 'why',
       type: 'text',
       placeholder: 'e.g. I want guests to book directly instead of calling me...'
@@ -582,7 +582,7 @@ function startPostActivationTabTour() {
     {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Phones</strong> — put your guest booking app on their home screen and send install reminders.',
+      text: '<strong>Guest App</strong> — put your hotel on guests&apos; home screens and send install reminders.',
     },
   ];
 
@@ -629,7 +629,7 @@ function startPostActivationTabTour() {
         <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
           <p style="margin:0 0 14px;">${s.text}</p>
-          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Phones' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Guest App' : 'Next tab →'}</button>
           <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
         </div>`;
       document.body.appendChild(tooltip);
@@ -653,7 +653,7 @@ window.startPostActivationTabTour = startPostActivationTabTour;
 function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
   const bookingDomain = crm.activeHotelDomain || (crm.activeHotelId ? crm.activeHotelId + '.mktel.co' : '');
-  const unlockedTabs = 'Bookings and Phones';
+  const unlockedTabs = 'Bookings and Guest App';
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -932,7 +932,7 @@ function showFinaleMockModal() {
       <div style="padding:24px 20px;text-align:center;">
         <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
         <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">You're all set!</div>
-        <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking engine is live. Here's what to do next:</p>
+        <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0 0 20px;">Your booking page is live. Here's what to do next:</p>
         <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:16px;">
           <div style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;align-items:flex-start;gap:8px;">
@@ -949,7 +949,7 @@ function showFinaleMockModal() {
             </div>
             <div style="display:flex;align-items:flex-start;gap:8px;">
               <span style="font-size:14px;">📲</span>
-              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Later:</strong> open <strong>Phones</strong> for your check-in QR and guest-app tools</span>
+              <span style="font-size:13px;color:#166534;line-height:1.4;"><strong>Later:</strong> open <strong>Guest App</strong> for your check-in QR and guest install tools</span>
             </div>
           </div>
         </div>
@@ -993,7 +993,7 @@ function showTestDriveModal(bookingUrl) {
       <div style="padding:28px 22px;text-align:center;">
         <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
         <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Go live and start accepting bookings</div>
-        <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your engine is built. Your link is copied. Activate to let guests book.</p>
+        <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0 0 20px;">Your booking page is built. Your link is copied. Activate to let guests book.</p>
         <div style="background:#f0fdf4;border-radius:12px;padding:14px;border:1px solid #bbf7d0;text-align:left;margin-bottom:20px;">
           <div style="display:flex;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:center;gap:8px;"><span style="color:#2E7D5B;font-weight:700;">✓</span><span style="font-size:13px;color:#166534;">Your booking page goes live</span></div>
@@ -1106,7 +1106,7 @@ function startSettingsTour() {
     },
     {
       target: '#tour-preview-btn',
-      text: 'Preview your booking engine to see exactly what your guests see.',
+      text: 'Preview your booking page to see exactly what your guests see.',
       openAccordion: false,
       tab: 'settings',
       tooltipPosition: 'below',
@@ -1149,7 +1149,7 @@ function startSettingsTour() {
     },
     {
       target: '#paymentsExplainer',
-      text: 'When guests book through your engine, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
+      text: 'When guests book through your booking page, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
       openAccordion: false,
       tab: 'revenue',
       waitForVisible: true,
@@ -1169,7 +1169,7 @@ function startSettingsTour() {
       highlightSelector: '#tour-guest-icon-section',
       anchorSelector: '#tour-guest-icon-section',
       scrollTarget: '#tour-guest-icon-section',
-      text: 'Set the icon guests see when they save your direct booking page. Guest QR, install link, notifications, and app tools live in this Phones tab.',
+      text: 'Set the icon guests see when they save your direct booking page. Guest QR, install link, notifications, and app tools live in Guest App.',
       openAccordion: false,
       tab: 'apps',
       waitForVisible: true,
@@ -1634,7 +1634,7 @@ function startSettingsTour() {
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your hotel from your booking page or a QR — set that up under <strong>Phones</strong>.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your hotel from your booking page or a QR — set that up under <strong>Guest App</strong>.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
