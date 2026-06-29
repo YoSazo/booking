@@ -1012,11 +1012,7 @@ function showTestDriveModal(bookingUrl) {
 
   document.getElementById('activateNowBtn').onclick = () => {
     overlay.remove();
-    const goLiveToken = crm.token;
-    fetch('/api/crm/go-live', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-crm-token': goLiveToken }, body: JSON.stringify({ hotelId: crm.activeHotelId }) })
-      .then(r => r.json())
-      .then(data => { if (data.success && data.url) window.location.href = data.url; else toast('Something went wrong. Try again.', 'error'); })
-      .catch(() => toast('Something went wrong. Try again.', 'error'));
+    goLive();
   };
 
   document.getElementById('activateLaterBtn').onclick = () => {
@@ -1082,6 +1078,8 @@ function startSettingsTour() {
       tab: 'settings',
       tooltipAnchor: 'card-top',
       scrollBlock: 'center',
+      scrollPadTop: 180,
+      forceTooltipAboveOnDesktop: true,
       scrollPadBottom: 260
     },
     {
@@ -1511,8 +1509,14 @@ function startSettingsTour() {
         } else {
           const attachY = cardRect.top;
           const spaceAbove = cardRect.top - 16;
-          if (spaceAbove >= estTipHeight + 24) {
-            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - attachY + 10}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
+          const forceAbove = !!s.forceTooltipAbove
+            || !!(s.forceTooltipAboveOnDesktop && window.matchMedia('(min-width: 1024px)').matches);
+          if (spaceAbove >= estTipHeight + 24 || forceAbove) {
+            const top = attachY - estTipHeight - 10;
+            const topCss = top >= 16
+              ? `bottom:${window.innerHeight - attachY + 10}px;`
+              : `top:${Math.max(16, top)}px;`;
+            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;${topCss}max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
             tooltip.innerHTML = `
               ${bodyHtml}
               <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;

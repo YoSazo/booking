@@ -3505,6 +3505,41 @@ function hashCrmPin(pin) {
     return crypto.createHash('sha256').update(String(pin || '').trim()).digest('hex');
 }
 
+const configuredCrmReturnTokenSecret = process.env.CRM_RETURN_TOKEN_SECRET || process.env.SESSION_SECRET || process.env.MAGIC_LINK_SECRET;
+const CRM_RETURN_TOKEN_SECRET = configuredCrmReturnTokenSecret || crypto.randomBytes(32).toString('hex');
+const CRM_RETURN_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // Aligns with Stripe Checkout's default session lifetime.
+
+if (!configuredCrmReturnTokenSecret) {
+    console.warn('CRM_RETURN_TOKEN_SECRET, SESSION_SECRET, or MAGIC_LINK_SECRET is not set; using an ephemeral Front Desk return-token secret for this process.');
+}
+
+function generateCrmReturnToken(hotelId) {
+    const payload = JSON.stringify({
+        purpose: 'frontdesk-return',
+        hotelId: String(hotelId || '').trim(),
+        exp: Date.now() + CRM_RETURN_TOKEN_EXPIRY_MS,
+    });
+    const encoded = Buffer.from(payload).toString('base64url');
+    const sig = crypto.createHmac('sha256', CRM_RETURN_TOKEN_SECRET).update(encoded).digest('base64url');
+    return 'fd_' + encoded + '.' + sig;
+}
+
+function verifyCrmReturnToken(token) {
+    const raw = String(token || '').trim();
+    if (!raw.startsWith('fd_')) return null;
+    const parts = raw.slice(3).split('.');
+    if (parts.length !== 2) return null;
+    const [encoded, sig] = parts;
+    const expectedSig = crypto.createHmac('sha256', CRM_RETURN_TOKEN_SECRET).update(encoded).digest('base64url');
+    if (!timingSafeTextEqual(sig, expectedSig)) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (payload.purpose !== 'frontdesk-return') return null;
+        if (!payload.hotelId || payload.exp < Date.now()) return null;
+        return { hotelId: String(payload.hotelId).trim() };
+    } catch (e) { return null; }
+}
+
 async function getDbAllowedHotelsForToken(token) {
     if (!token || !prisma.crmPin) return [];
     const pinHash = hashCrmPin(token);
@@ -3558,11 +3593,12 @@ function requireScopedHotelId(req, res) {
 
 const crmAuth = async (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
-    const dbAllowedHotels = await getDbAllowedHotelsForToken(token).catch(() => []);
-    let allowedHotels = dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []);
+    const returnAuth = verifyCrmReturnToken(token);
+    const dbAllowedHotels = returnAuth ? [] : await getDbAllowedHotelsForToken(token).catch(() => []);
+    let allowedHotels = returnAuth ? [returnAuth.hotelId] : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
     
     // Master PIN backdoor for the admin to easily test across all hotels
-    const isMasterPin = isCrmMasterPin(token);
+    const isMasterPin = !returnAuth && isCrmMasterPin(token);
     if (isMasterPin) {
         if (!allowedHotels.includes('*')) allowedHotels = [...allowedHotels, '*'];
     }
@@ -3586,6 +3622,7 @@ const crmAuth = async (req, res, next) => {
     req.crmToken = token;
     req.crmAllowedHotels = allowedHotels;
     req.crmIsMasterPin = isMasterPin;
+    req.crmIsReturnToken = !!returnAuth;
     req.crmResolvedHotelId = hostContext.hotelId || null;
     req.crmResolvedDomain = hostContext.domain || null;
     req.crmDefaultHotelId = hostContext.hotelId || (allowedHotels[0] === '*' ? 'guest-lodge-minot' : allowedHotels[0]);
@@ -3826,7 +3863,7 @@ async function resolveCrmHostHotelContext(req) {
         if (explicitHotelId) {
             return {
                 ok: true,
-                hotelId: null,
+                hotelId: explicitHotelId,
                 domain: requestedDomain,
                 source: 'explicit-fallback',
             };
@@ -6579,12 +6616,13 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
+        const returnToken = generateCrmReturnToken(hotelId);
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{ price: subscriptionPriceId, quantity: 1 }],
             customer_email: hotel?.ownerEmail || undefined,
             metadata: { product: 'hotel-go-live', hotelId },
-            success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&token=${encodeURIComponent(req.crmToken || '')}`,
+            success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&returnToken=${encodeURIComponent(returnToken)}`,
             cancel_url: req.headers.referer || baseUrl + '/frontdesk',
         });
         res.json({ success: true, url: session.url });
@@ -6596,8 +6634,12 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
 
 // Go Live success — mark hotel as subscribed
 app.get('/api/crm/go-live-success', async (req, res) => {
-    const hotelId = String(req.query.hotelId || '').trim();
+    const requestedHotelId = String(req.query.hotelId || '').trim();
     const pin = String(req.query.token || '').trim();
+    const returnToken = String(req.query.returnToken || '').trim();
+    const verifiedReturnToken = verifyCrmReturnToken(returnToken);
+    const hotelId = requestedHotelId || verifiedReturnToken?.hotelId || '';
+    const frontdeskReturnToken = verifiedReturnToken?.hotelId === hotelId ? returnToken : '';
 
     // Resolve where to send the owner back to: their own hotel domain, never the
     // backend host (which would default the front desk to Guest Lodge Minot).
@@ -6611,13 +6653,15 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             const domain = primaryDomain?.domain;
             if (domain) {
                 const query = new URLSearchParams({ activated: '1' });
-                if (pin) query.set('pin', pin);
+                if (frontdeskReturnToken) query.set('pin', frontdeskReturnToken);
+                else if (pin) query.set('pin', pin);
                 return `https://${domain}/frontdesk?${query.toString()}`;
             }
         } catch (_) { /* fall through to relative redirect */ }
         // Fallback: stay on the backend host but force the correct hotel context
         const params = new URLSearchParams({ hotelId, activated: '1' });
-        if (pin) params.set('pin', pin);
+        if (frontdeskReturnToken) params.set('pin', frontdeskReturnToken);
+        else if (pin) params.set('pin', pin);
         return `/frontdesk?${params.toString()}`;
     }
 

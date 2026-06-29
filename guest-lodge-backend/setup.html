@@ -127,6 +127,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   display: block;
   margin-top: 24px;
 }
+.final-dashboard-cta.is-loading {
+  cursor: wait;
+  opacity: 0.86;
+  pointer-events: none;
+}
+.final-dashboard-cta.is-loading::after {
+  content: '';
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-left: 9px;
+  border: 2px solid rgba(255,255,255,0.55);
+  border-top-color: #fff;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: spin 0.75s linear infinite;
+}
 .final-status {
   display: grid; gap: 8px; text-align: left; margin: 18px 0 6px;
 }
@@ -555,6 +572,9 @@ async function addRoomAndFinish() {
     // Send welcome email after they reach the dashboard (not during video)
     var successLink = document.getElementById('successLink');
     successLink.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      if (successLink.dataset.opening === '1') return;
+      setSuccessLinkLoading(true);
       if (!successLink.dataset.finalized) {
         successLink.dataset.finalized = '1';
         fetch(API + '/api/setup/' + TOKEN + '/finalize', {
@@ -564,9 +584,10 @@ async function addRoomAndFinish() {
       }
       // Hold navigation until the cert is live, then go automatically.
       if (!window._siteReady) {
-        ev.preventDefault();
         waitForSiteThenGo();
+        return;
       }
+      setTimeout(function() { window.location.href = window._dashboardUrl || successLink.href; }, 80);
     });
 
     goToStep(3);
@@ -628,6 +649,7 @@ function updateFinalStepState(animate) {
 function waitForSiteThenGo() {
   var link = document.getElementById('successLink');
   if (link) link.style.pointerEvents = 'none';
+  setSuccessLinkLoading(true, 'Waiting for secure connection…');
   updateFinalStepState(true);
 
   const check = setInterval(() => {
@@ -638,6 +660,22 @@ function waitForSiteThenGo() {
   }, 800);
   // Safety valve: never trap the owner — go after 90s no matter what.
   setTimeout(() => { clearInterval(check); window.location.href = window._dashboardUrl; }, 90000);
+}
+
+function setSuccessLinkLoading(isLoading, label) {
+  var link = document.getElementById('successLink');
+  if (!link) return;
+  if (!link.dataset.defaultText) link.dataset.defaultText = link.textContent.trim();
+  link.classList.toggle('is-loading', !!isLoading);
+  if (isLoading) {
+    link.dataset.opening = '1';
+    link.textContent = label || 'Opening Front Desk…';
+    link.setAttribute('aria-busy', 'true');
+  } else {
+    delete link.dataset.opening;
+    link.textContent = link.dataset.defaultText;
+    link.removeAttribute('aria-busy');
+  }
 }
 
 loadSetup().finally(() => animateVisibleStep(document.getElementById('step-1')));
