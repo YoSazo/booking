@@ -255,6 +255,9 @@ function renderAppsView() {
   const iconInnerHtml = hotelAppIcon
     ? `<img src="${hotelAppIcon}" alt="Hotel logo" style="width:100%;height:100%;object-fit:contain;">`
     : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:14px;font-size:24px;font-weight:800;">${hotelInitial}</span>`;
+  const iconButtonClick = fdInApp
+    ? "document.getElementById('appsAppIconInput').click()"
+    : "toast('Please install Front Desk first. Then you can change your guest app icon.', 'error')";
   const logoBlockHtml = `
     <div class="apps-icon-card">
       <div id="appsAppIconPreview" style="${iconBoxStyle}">
@@ -263,7 +266,8 @@ function renderAppsView() {
       <div style="flex:1;min-width:0;">
         <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this when they save <strong>${hName}</strong> to their phone.</div>
-        <button type="button" id="tour-guest-icon-btn" onclick="document.getElementById('appsAppIconInput').click()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change icon' : 'Upload icon'}</button>
+        <button type="button" id="tour-guest-icon-btn" onclick="${iconButtonClick}" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change picture' : 'Upload picture'}</button>
+        ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Install Front Desk first to upload this picture.</div>'}
       </div>
     </div>`;
 
@@ -382,7 +386,7 @@ function renderAppsView() {
   const appsMainHtml = `
     ${appsStoryHtml}
     ${loopDiagramHtml}
-    ${fdInApp ? unlockedToolsHtml : ''}`;
+    ${fdInApp ? unlockedToolsHtml : guestIconCardHtml(false)}`;
 
   const appsFootnoteHtml = fdInApp
     ? 'Front Desk is installed. Guests can install your hotel from the direct booking page.'
