@@ -292,7 +292,7 @@ function renderAppsView() {
     ? `<img src="${hotelAppIcon}" alt="" style="width:100%;height:100%;object-fit:contain;">`
     : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:12px;font-size:22px;font-weight:800;">${hotelInitial}</span>`;
   const loopDiagramHtml = `
-    <div class="apps-loop">
+    <div class="apps-loop" id="tour-apps-loop">
       <div class="apps-loop-side">
         <div class="apps-loop-tile apps-loop-tile--fd"><img src="/marketellogo.svg" alt="" style="width:62%;height:62%;object-fit:contain;"></div>
         <div class="apps-loop-name">Front Desk</div>
@@ -309,24 +309,24 @@ function renderAppsView() {
   const appsStoryHtml = `
     <section class="apps-story">
       <div class="apps-story-kicker">Guest App</div>
-      <h2 class="apps-story-title">Your hotel can be on your guest's home screen.</h2>
-      <p class="apps-story-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
+      <h2 class="apps-story-title" id="tour-apps-headline">Your hotel can be on your guest's home screen.</h2>
+      <p class="apps-story-copy" id="tour-apps-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
 
-      <div class="apps-story-line">
+      <div class="apps-story-line" id="tour-apps-first">
         <div class="apps-story-step">First</div>
         <h3 class="apps-story-line-title">Install Front Desk on your property phone.</h3>
         <p>Front Desk is this website saved to your phone. It turns on booking alerts, guest messages, QR tools, and the guest Install button.</p>
         <div class="apps-story-actions">${storyFrontdeskActionHtml}</div>
       </div>
 
-      <div class="apps-story-line">
+      <div class="apps-story-line" id="tour-apps-then">
         <div class="apps-story-step">Then</div>
         <h3 class="apps-story-line-title">Send guests to your direct booking page.</h3>
         <p>When guests are booking, the Install button stays at the bottom of the page. They tap it, and your hotel is on their home screen.</p>
         <div class="apps-story-actions">${storyBookingActionHtml}</div>
       </div>
 
-      <div class="apps-story-line">
+      <div class="apps-story-line" id="tour-apps-after">
         <div class="apps-story-step">After that</div>
         <h3 class="apps-story-line-title">Everything connects.</h3>
         <p>Guests tap your hotel icon to book direct or message you. New bookings and messages come back here in Front Desk.</p>
@@ -354,8 +354,8 @@ function renderAppsView() {
       <div class="apps-step-title">${fdInApp ? 'Front Desk — installed' : 'Install Front Desk'}</div>
       ${fdCtaHtml}
     </div>`;
-  const guestIconCardHtml = (tourId) => `
-    <div class="apps-step-card"${tourId ? ' id="tour-guest-icon-section"' : ''}>
+  const guestIconCardHtml = () => `
+    <div class="apps-step-card" id="tour-guest-icon-section">
       <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
       ${logoBlockHtml}
     </div>`;
@@ -378,7 +378,7 @@ function renderAppsView() {
     </details>`;
   const unlockedToolsHtml = `
     ${deviceCardHtml(true)}
-    ${guestIconCardHtml(true)}
+    ${guestIconCardHtml()}
     ${guestPhonesCardHtml}
     ${guestBroadcastCardHtml()}
     ${helpFoldHtml}`;
@@ -386,7 +386,7 @@ function renderAppsView() {
   const appsMainHtml = `
     ${appsStoryHtml}
     ${loopDiagramHtml}
-    ${fdInApp ? unlockedToolsHtml : guestIconCardHtml(false)}`;
+    ${fdInApp ? unlockedToolsHtml : guestIconCardHtml()}`;
 
   const appsFootnoteHtml = fdInApp
     ? 'Front Desk is installed. Guests can install your hotel from the direct booking page.'
@@ -547,18 +547,33 @@ async function loadGuestInstallStats() {
 }
 
 
-// ── APPS TOUR (fullscreen lightbox) ───────────────────
+// ── APPS TOUR (page pointer walkthrough) ──────────────
 let _appsTourSteps = [];
 let _appsTourIdx = 0;
 let _appsTourChainFromSettings = false;
 
-function appsTourClose(markDone) {
+function appsTourCleanupUi() {
   const lb = document.getElementById('appsTourLightbox');
-  if (lb) {
-    if (lb._swipeStart) lb.removeEventListener('touchstart', lb._swipeStart);
-    if (lb._swipeEnd) lb.removeEventListener('touchend', lb._swipeEnd);
-    lb.remove();
-  }
+  if (lb) lb.remove();
+  const tip = document.getElementById('appsTourTooltip');
+  if (tip) tip.remove();
+  document.querySelectorAll('[data-apps-tour-highlighted]').forEach((el) => {
+    el.style.position = el.dataset.appsTourOrigPosition || '';
+    el.style.zIndex = el.dataset.appsTourOrigZIndex || '';
+    el.style.isolation = el.dataset.appsTourOrigIsolation || '';
+    el.style.boxShadow = el.dataset.appsTourOrigBoxShadow || '';
+    el.style.borderRadius = el.dataset.appsTourOrigBorderRadius || '';
+    el.removeAttribute('data-apps-tour-highlighted');
+    delete el.dataset.appsTourOrigPosition;
+    delete el.dataset.appsTourOrigZIndex;
+    delete el.dataset.appsTourOrigIsolation;
+    delete el.dataset.appsTourOrigBoxShadow;
+    delete el.dataset.appsTourOrigBorderRadius;
+  });
+}
+
+function appsTourClose(markDone) {
+  appsTourCleanupUi();
   document.body.style.overflow = '';
   const wasChain = _appsTourChainFromSettings;
   _appsTourChainFromSettings = false;
@@ -621,256 +636,145 @@ function appsTourActivateFromFinalStep() {
 }
 
 function appsTourRender() {
-  const lb = document.getElementById('appsTourLightbox');
-  if (!lb) return;
   const step = _appsTourSteps[_appsTourIdx];
+  if (!step) {
+    appsTourClose(true);
+    return;
+  }
   const total = _appsTourSteps.length;
   const isLast = _appsTourIdx >= total - 1;
   const counter = `${_appsTourIdx + 1} / ${total}`;
-  const btnLabel = step.primaryLabel || (isLast ? (_appsTourChainFromSettings ? 'Next — you\'re almost done' : 'Got it — show me') : 'Next →');
-  const skipLabel = step.skipLabel || 'Skip';
-  const titleBadge = step.type === 'video' ? appsVideoBadgeHtml('1 min', 'light') : '';
-  const titleSize = step.bigTitle ? '24px' : '20px';
-  const captionSize = step.bigTitle ? '15px' : '14px';
-
-  const dots = Array.from({ length: total }, (_, i) =>
-    `<div style="width:7px;height:7px;border-radius:50%;background:${i === _appsTourIdx ? '#fff' : 'rgba(255,255,255,0.35)'};"></div>`
-  ).join('');
-
-  let mediaHtml = '';
-  if (step.type === 'cta') {
-    mediaHtml = `<div style="width:100%;max-width:360px;padding:0 8px;box-sizing:border-box;">${step.ctaHtml}</div>`;
-  } else if (step.type === 'video') {
-    mediaHtml = `<video autoplay loop muted playsinline webkit-playsinline preload="metadata"
-      style="max-width:100%;max-height:min(50dvh,440px);width:auto;height:auto;display:block;${appsPhoneImgStyle()}"
-      poster="${step.poster || ''}">
-      <source src="${step.src}" type="video/mp4">
-    </video>`;
-  } else {
-    mediaHtml = `<img src="${step.src}" alt="${step.alt || ''}" loading="eager" decoding="async"
-      style="max-width:100%;max-height:min(50dvh,440px);width:auto;height:auto;display:block;object-fit:contain;${appsPhoneImgStyle()}">`;
+  const target = document.querySelector(step.target);
+  if (!target) {
+    _appsTourIdx++;
+    appsTourRender();
+    return;
   }
 
-  lb.innerHTML = `
-    <div style="flex-shrink:0;width:100%;display:flex;align-items:center;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) 16px 10px;box-sizing:border-box;">
-      <div style="font-size:12px;color:rgba(255,255,255,0.55);font-weight:600;">${counter}</div>
-      <button type="button" id="appsTourSkipBtn" style="background:rgba(255,255,255,0.12);border:none;color:rgba(255,255,255,0.8);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:8px 14px;border-radius:20px;">${skipLabel}</button>
-    </div>
-    <div style="flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding:0 16px;box-sizing:border-box;overflow:hidden;">
-      ${mediaHtml}
-    </div>
-    <div style="flex-shrink:0;width:100%;max-width:400px;margin:0 auto;padding:12px 20px max(16px,env(safe-area-inset-bottom));box-sizing:border-box;text-align:center;">
-      <div style="font-size:${titleSize};font-weight:800;color:#fff;line-height:1.22;margin-bottom:8px;display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;">${step.title}${titleBadge}</div>
-      ${step.caption ? `<div style="font-size:${captionSize};color:rgba(255,255,255,0.74);line-height:1.48;margin-bottom:14px;">${step.caption}</div>` : ''}
-      <button type="button" id="appsTourNextBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">${btnLabel}</button>
-      <div style="display:flex;gap:6px;justify-content:center;">${dots}</div>
-    </div>`;
+  appsTourCleanupUi();
+  let lb = document.createElement('div');
+  lb.id = 'appsTourLightbox';
+  lb.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.52);pointer-events:auto;';
+  document.body.appendChild(lb);
 
-  document.getElementById('appsTourNextBtn').onclick = () => {
-    if (isLast && step.activateOnNext) {
-      appsTourActivateFromFinalStep();
-      return;
-    }
-    if (isLast) {
-      const chain = _appsTourChainFromSettings;
-      appsTourClose(true);
-      if (!chain) {
-        const appsEl = document.getElementById('appsView');
-        if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  target.dataset.appsTourOrigPosition = target.style.position || '';
+  target.dataset.appsTourOrigZIndex = target.style.zIndex || '';
+  target.dataset.appsTourOrigIsolation = target.style.isolation || '';
+  target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
+  target.dataset.appsTourOrigBorderRadius = target.style.borderRadius || '';
+  target.style.position = target.style.position || 'relative';
+  target.style.zIndex = '100002';
+  target.style.isolation = 'isolate';
+  target.style.boxShadow = '0 0 0 4px #2E7D5B, 0 14px 38px rgba(0,0,0,0.24)';
+  target.style.borderRadius = target.style.borderRadius || '16px';
+  target.setAttribute('data-apps-tour-highlighted', '1');
+
+  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: step.scrollBlock || 'center' });
+
+  const placeTooltip = () => {
+    const old = document.getElementById('appsTourTooltip');
+    if (old) old.remove();
+    const rect = target.getBoundingClientRect();
+    const maxWidth = Math.min(330, window.innerWidth - 28);
+    const centerX = rect.left + rect.width / 2;
+    const left = Math.max(14, Math.min(centerX - maxWidth / 2, window.innerWidth - maxWidth - 14));
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow > 176
+      ? Math.min(rect.bottom + 12, window.innerHeight - 160)
+      : Math.max(14, rect.top - 178);
+    const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
+    const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
+    const tip = document.createElement('div');
+    tip.id = 'appsTourTooltip';
+    tip.style.cssText = `position:fixed;z-index:100003;left:${left}px;top:${top}px;width:${maxWidth}px;max-width:${maxWidth}px;`;
+    tip.innerHTML = `
+      <div style="background:#111827;color:#fff;border-radius:14px;padding:15px 16px;box-shadow:0 18px 46px rgba(0,0,0,0.32);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <div style="font-size:11px;color:rgba(255,255,255,0.54);font-weight:800;letter-spacing:0.8px;text-transform:uppercase;">${counter}</div>
+          <button type="button" id="appsTourSkipBtn" style="border:none;background:transparent;color:rgba(255,255,255,0.62);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:4px 0;">${secondaryLabel}</button>
+        </div>
+        <div style="font-size:17px;font-weight:800;line-height:1.25;margin-bottom:7px;">${step.title}</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.76);line-height:1.48;margin-bottom:14px;">${step.text}</div>
+        <button type="button" id="appsTourNextBtn" style="width:100%;padding:12px 14px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">${primaryLabel}</button>
+      </div>`;
+    document.body.appendChild(tip);
+
+    document.getElementById('appsTourNextBtn').onclick = () => {
+      if (step.activateOnNext) {
+        appsTourActivateFromFinalStep();
+        return;
       }
-    } else {
+      if (isLast) {
+        appsTourMarkCompleteFromFinalStep();
+        appsTourClose(false);
+        return;
+      }
       _appsTourIdx++;
       appsTourRender();
-    }
+    };
+    document.getElementById('appsTourSkipBtn').onclick = () => {
+      if (isLast) {
+        appsTourMarkCompleteFromFinalStep();
+        appsTourClose(false);
+        return;
+      }
+      appsTourClose(true);
+    };
   };
-  document.getElementById('appsTourSkipBtn').onclick = () => {
-    if (isLast && step.activateOnNext) {
-      appsTourMarkCompleteFromFinalStep();
-      appsTourClose(false);
-      const appsEl = document.getElementById('appsView');
-      if (appsEl) appsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    appsTourClose(true);
-  };
+  setTimeout(placeTooltip, prefersReducedMotion ? 40 : 320);
 }
 
 function startAppsTour(opts) {
   const replay = opts && opts.replay;
   const chainFromSettings = opts && opts.chainFromSettingsTour;
-  _appsTourChainFromSettings = !!chainFromSettings;
   if (!replay && !chainFromSettings && localStorage.getItem('appsTourDone')) return;
-  if (document.getElementById('appsTourLightbox')) return;
+  if (document.getElementById('appsTourLightbox') || document.getElementById('appsTourTooltip')) return;
 
-  const hName = crm.activeHotelName || 'Your Hotel';
-  const shortName = hName.length > 13 ? hName.slice(0, 13) + '…' : hName;
-  const initial = hName.trim().charAt(0).toUpperCase();
-  const iconUrl = crm.activeHotelAppIcon || '';
-  const iconEl = iconUrl
-    ? `<div style="width:52px;height:52px;border-radius:14px;background:#fff;padding:8px;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><img src="${iconUrl}" alt="${hName}" style="width:100%;height:100%;object-fit:contain;"></div>`
-    : `<div style="width:52px;height:52px;border-radius:14px;background:#2E7D5B;color:#fff;font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</div>`;
+  appsCloseLightbox();
+  appsTourClose(false);
+  _appsTourChainFromSettings = !!chainFromSettings;
+
   const hotelIsLive = !!crm.hotelSubscribed;
-  const frontdeskTile = `
-    <div style="width:72px;height:72px;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(0,0,0,0.22);">
-      <img src="/marketellogo.svg" alt="" style="width:46px;height:46px;object-fit:contain;">
-    </div>`;
-  const guestTile = iconUrl
-    ? `<div style="width:72px;height:72px;border-radius:18px;background:#fff;padding:10px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(0,0,0,0.22);"><img src="${iconUrl}" alt="${hName}" style="width:100%;height:100%;object-fit:contain;"></div>`
-    : `<div style="width:72px;height:72px;border-radius:18px;background:#2E7D5B;color:#fff;font-size:31px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(0,0,0,0.22);">${initial}</div>`;
-  const darkCardStyle = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:18px;padding:18px;box-sizing:border-box;';
-  const smallLabelStyle = 'font-size:11px;font-weight:800;color:#4CAF7D;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;';
-  const largeTextStyle = 'font-size:24px;font-weight:800;color:#fff;line-height:1.12;margin:0;';
-  const bodyTextStyle = 'font-size:14px;color:rgba(255,255,255,0.72);line-height:1.5;margin:10px 0 0;';
-  const tourCheckRow = (text) => `
-    <div style="display:flex;align-items:flex-start;gap:10px;">
-      <span style="width:20px;height:20px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</span>
-      <span style="font-size:14px;color:rgba(255,255,255,0.86);line-height:1.4;">${text}</span>
-    </div>`;
-
   _appsTourSteps = [
     {
-      type: 'cta',
-      bigTitle: true,
-      title: 'One simple loop',
-      caption: `Your phone gets Front Desk. Guest phones get <strong>${shortName}</strong>. Bookings and messages come back here.`,
-      ctaHtml: `
-        <div style="${darkCardStyle}text-align:center;">
-          <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:18px;">
-            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-              ${frontdeskTile}
-              <div style="font-size:13px;font-weight:800;color:#fff;">Front Desk</div>
-            </div>
-            <div style="font-size:28px;color:#4CAF7D;font-weight:800;">↔</div>
-            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-              ${guestTile}
-              <div style="font-size:13px;font-weight:800;color:#fff;">${shortName}</div>
-            </div>
-          </div>
-          <p style="${largeTextStyle}">You are on their phone. They book direct.</p>
-        </div>`,
+      target: '#tour-apps-headline',
+      title: 'This is the whole idea.',
+      text: 'Your hotel can live on your guest\'s home screen. That is the value of this page.',
     },
     {
-      type: 'cta',
-      bigTitle: true,
-      title: 'First, install Front Desk',
-      caption: 'Front Desk is this website saved to your property phone. It opens like an app and receives the alerts.',
-      ctaHtml: `
-        <div style="${darkCardStyle}">
-          <div style="${smallLabelStyle}">Owner phone</div>
-          <div style="display:flex;align-items:center;gap:16px;">
-            ${frontdeskTile}
-            <div style="min-width:0;">
-              <p style="${largeTextStyle}">This phone becomes your desk.</p>
-              <p style="${bodyTextStyle}">Bookings, guest messages, QR tools, and app controls live here.</p>
-            </div>
-          </div>
-        </div>`,
+      target: '#tour-apps-first',
+      title: 'First: install Front Desk.',
+      text: 'Front Desk is this website saved to your property phone. This is how you get booking alerts and guest messages.',
     },
     {
-      type: 'cta',
-      bigTitle: true,
-      title: `${shortName} is the guest app`,
-      caption: `This is what guests save to their home screen. You can change the picture after Front Desk is installed.`,
-      ctaHtml: `
-        <div style="${darkCardStyle}">
-          <div style="${smallLabelStyle}">Guest phone</div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            ${iconEl}
-            <div>
-              <div style="font-size:19px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:6px;">Your icon, on their home screen.</div>
-              <p style="font-size:13px;color:rgba(255,255,255,0.68);margin:0;line-height:1.45;">The upload button is visible now. It unlocks after Front Desk is installed.</p>
-            </div>
-          </div>
-        </div>`,
+      target: '#tour-apps-then',
+      title: 'Then: send guests to your booking page.',
+      text: 'When guests are booking, the Install button is at the bottom of the page. They tap it and your hotel is on their phone.',
     },
     {
-      type: 'cta',
-      bigTitle: true,
-      title: 'Guests install from your booking page',
-      caption: 'They book direct. At the bottom of the page, they see Install. One tap puts your hotel on their home screen.',
-      ctaHtml: `
-        <div style="${darkCardStyle}padding:14px;">
-          <div style="background:#fff;border-radius:16px;padding:14px;box-shadow:0 12px 28px rgba(0,0,0,0.22);">
-            <div style="font-size:12px;font-weight:800;color:#1a1a2e;margin-bottom:10px;">${shortName} booking page</div>
-            <div style="height:124px;border-radius:12px;background:linear-gradient(180deg,#eef6f1,#ffffff);border:1px solid #d7eadf;padding:12px;box-sizing:border-box;">
-              <div style="width:80%;height:10px;border-radius:999px;background:#2E7D5B;margin-bottom:10px;"></div>
-              <div style="width:58%;height:8px;border-radius:999px;background:#cfe6da;margin-bottom:18px;"></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div style="height:42px;border-radius:10px;background:#fff;border:1px solid #e5e7eb;"></div>
-                <div style="height:42px;border-radius:10px;background:#fff;border:1px solid #e5e7eb;"></div>
-              </div>
-            </div>
-            <div style="margin-top:10px;border-radius:12px;background:#2E7D5B;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px;">
-              ${iconEl}
-              <div style="min-width:0;">
-                <div style="font-size:14px;font-weight:800;line-height:1.2;">Install ${shortName}</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.78);line-height:1.35;">Add this hotel to your home screen</div>
-              </div>
-            </div>
-          </div>
-        </div>`,
+      target: '#tour-apps-after',
+      title: 'After that, the loop is clear.',
+      text: 'Guests tap your hotel icon to book or message you. New bookings and messages come back here in Front Desk.',
     },
     {
-      type: 'cta',
-      bigTitle: true,
-      title: 'Then everything comes back here',
-      caption: 'Guests tap your hotel icon to book or message. Front Desk tells you when something happens.',
-      ctaHtml: `
-        <div style="${darkCardStyle}">
-          <div style="${smallLabelStyle}">The payoff</div>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            ${tourCheckRow('Guest books direct from your hotel app.')}
-            ${tourCheckRow('Front Desk gets the booking alert.')}
-            ${tourCheckRow('Guest messages you, and you reply from here.')}
-          </div>
-        </div>`,
+      target: '#tour-guest-icon-section',
+      title: 'This is the one setup item.',
+      text: 'Guests see this icon on their home screen. Uploading the picture unlocks after Front Desk is installed.',
     },
     {
-      type: 'cta',
-      bigTitle: true,
-      title: hotelIsLive ? 'Guest App + Front Desk is on' : 'Turn this on for your property',
-      caption: hotelIsLive
-        ? 'Your booking page is active. Guests can book direct, save your hotel, and message you.'
-        : 'Activate once. Your booking page accepts reservations, guests can save your hotel, and Front Desk gets the alerts.',
-      primaryLabel: hotelIsLive ? 'Open Guest App' : 'Activate Guest App + Front Desk — $199/mo',
-      skipLabel: hotelIsLive ? 'Close' : 'Not now',
+      target: '#tour-apps-loop',
+      title: hotelIsLive ? 'This loop is on.' : 'Turn this on for your property.',
+      text: hotelIsLive
+        ? 'Guests can book direct, save your hotel, and message you. Front Desk gets the alerts.'
+        : 'Activate once. Guests can book direct, save your hotel to their home screen, and Front Desk gets the alerts.',
+      primaryLabel: hotelIsLive ? 'Done' : 'Activate Guest App + Front Desk — $199/mo',
+      secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
       activateOnNext: !hotelIsLive,
-      ctaHtml: `
-        <div style="${darkCardStyle}">
-          <div style="${smallLabelStyle}">${hotelIsLive ? 'Live now' : 'Activation'}</div>
-          <p style="${largeTextStyle}">${hotelIsLive ? 'Guests can use the loop now.' : 'This is the full loop, switched on.'}</p>
-          <div style="display:flex;flex-direction:column;gap:11px;margin-top:18px;">
-            ${tourCheckRow('Direct booking page accepts reservations.')}
-            ${tourCheckRow('Guests can save your hotel to their home screen.')}
-            ${tourCheckRow('Front Desk gets booking and message alerts.')}
-            ${hotelIsLive ? '' : tourCheckRow('No OTA commission. Cancel anytime.')}
-          </div>
-        </div>`,
     },
   ];
 
   _appsTourIdx = 0;
-  appsCloseLightbox();
-  appsTourClose(false);
-
-  const lb = document.createElement('div');
-  lb.id = 'appsTourLightbox';
-  lb.style.cssText = [
-    'position:fixed;inset:0;z-index:102001;background:#000;',
-    'display:flex;flex-direction:column;',
-    'overscroll-behavior:contain;touch-action:pan-y;',
-    'padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);',
-  ].join('');
-  let touchStartX = 0;
-  lb._swipeStart = (e) => { touchStartX = e.changedTouches[0].clientX; };
-  lb._swipeEnd = (e) => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 50) appsTourNav(dx < 0 ? 1 : -1);
-  };
-  lb.addEventListener('touchstart', lb._swipeStart, { passive: true });
-  lb.addEventListener('touchend', lb._swipeEnd, { passive: true });
-  document.body.appendChild(lb);
-  document.body.style.overflow = 'hidden';
   appsTourRender();
 }
 

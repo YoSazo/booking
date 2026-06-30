@@ -9028,7 +9028,7 @@ function renderAppsView() {
     ? `<img src="${hotelAppIcon}" alt="" style="width:100%;height:100%;object-fit:contain;">`
     : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:12px;font-size:22px;font-weight:800;">${hotelInitial}</span>`;
   const loopDiagramHtml = `
-    <div class="apps-loop">
+    <div class="apps-loop" id="tour-apps-loop">
       <div class="apps-loop-side">
         <div class="apps-loop-tile apps-loop-tile--fd"><img src="/marketellogo.svg" alt="" style="width:62%;height:62%;object-fit:contain;"></div>
         <div class="apps-loop-name">Front Desk</div>
@@ -9045,24 +9045,24 @@ function renderAppsView() {
   const appsStoryHtml = `
     <section class="apps-story">
       <div class="apps-story-kicker">Guest App</div>
-      <h2 class="apps-story-title">Your hotel can be on your guest's home screen.</h2>
-      <p class="apps-story-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
+      <h2 class="apps-story-title" id="tour-apps-headline">Your hotel can be on your guest's home screen.</h2>
+      <p class="apps-story-copy" id="tour-apps-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
 
-      <div class="apps-story-line">
+      <div class="apps-story-line" id="tour-apps-first">
         <div class="apps-story-step">First</div>
         <h3 class="apps-story-line-title">Install Front Desk on your property phone.</h3>
         <p>Front Desk is this website saved to your phone. It turns on booking alerts, guest messages, QR tools, and the guest Install button.</p>
         <div class="apps-story-actions">${storyFrontdeskActionHtml}</div>
       </div>
 
-      <div class="apps-story-line">
+      <div class="apps-story-line" id="tour-apps-then">
         <div class="apps-story-step">Then</div>
         <h3 class="apps-story-line-title">Send guests to your direct booking page.</h3>
         <p>When guests are booking, the Install button stays at the bottom of the page. They tap it, and your hotel is on their home screen.</p>
         <div class="apps-story-actions">${storyBookingActionHtml}</div>
       </div>
 
-      <div class="apps-story-line">
+      <div class="apps-story-line" id="tour-apps-after">
         <div class="apps-story-step">After that</div>
         <h3 class="apps-story-line-title">Everything connects.</h3>
         <p>Guests tap your hotel icon to book direct or message you. New bookings and messages come back here in Front Desk.</p>
@@ -9090,8 +9090,8 @@ function renderAppsView() {
       <div class="apps-step-title">${fdInApp ? 'Front Desk — installed' : 'Install Front Desk'}</div>
       ${fdCtaHtml}
     </div>`;
-  const guestIconCardHtml = (tourId) => `
-    <div class="apps-step-card"${tourId ? ' id="tour-guest-icon-section"' : ''}>
+  const guestIconCardHtml = () => `
+    <div class="apps-step-card" id="tour-guest-icon-section">
       <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
       ${logoBlockHtml}
     </div>`;
@@ -9114,7 +9114,7 @@ function renderAppsView() {
     </details>`;
   const unlockedToolsHtml = `
     ${deviceCardHtml(true)}
-    ${guestIconCardHtml(true)}
+    ${guestIconCardHtml()}
     ${guestPhonesCardHtml}
     ${guestBroadcastCardHtml()}
     ${helpFoldHtml}`;
@@ -9122,7 +9122,7 @@ function renderAppsView() {
   const appsMainHtml = `
     ${appsStoryHtml}
     ${loopDiagramHtml}
-    ${fdInApp ? unlockedToolsHtml : guestIconCardHtml(false)}`;
+    ${fdInApp ? unlockedToolsHtml : guestIconCardHtml()}`;
 
   const appsFootnoteHtml = fdInApp
     ? 'Front Desk is installed. Guests can install your hotel from the direct booking page.'
@@ -9610,6 +9610,233 @@ function startAppsTour(opts) {
   appsTourRender();
 }
 
+
+// Current Guest App tour: keep the page visible and point at the existing copy.
+function appsTourCleanupUi() {
+  const lb = document.getElementById('appsTourLightbox');
+  if (lb) lb.remove();
+  const tip = document.getElementById('appsTourTooltip');
+  if (tip) tip.remove();
+  document.querySelectorAll('[data-apps-tour-highlighted]').forEach((el) => {
+    el.style.position = el.dataset.appsTourOrigPosition || '';
+    el.style.zIndex = el.dataset.appsTourOrigZIndex || '';
+    el.style.isolation = el.dataset.appsTourOrigIsolation || '';
+    el.style.boxShadow = el.dataset.appsTourOrigBoxShadow || '';
+    el.style.borderRadius = el.dataset.appsTourOrigBorderRadius || '';
+    el.removeAttribute('data-apps-tour-highlighted');
+    delete el.dataset.appsTourOrigPosition;
+    delete el.dataset.appsTourOrigZIndex;
+    delete el.dataset.appsTourOrigIsolation;
+    delete el.dataset.appsTourOrigBoxShadow;
+    delete el.dataset.appsTourOrigBorderRadius;
+  });
+}
+
+function appsTourClose(markDone) {
+  appsTourCleanupUi();
+  document.body.style.overflow = '';
+  const wasChain = _appsTourChainFromSettings;
+  _appsTourChainFromSettings = false;
+  try {
+    const refresh = (typeof ensureAppsViewRendered === 'function')
+      ? ensureAppsViewRendered
+      : window.ensureAppsViewRendered;
+    if (typeof refresh === 'function') refresh(true);
+  } catch (_) {}
+  if (markDone) {
+    localStorage.setItem('appsTourDone', '1');
+    const chainedFromSettings = wasChain
+      || localStorage.getItem('settingsTourStep') === 'handoff'
+      || settingsTourActive;
+    if (chainedFromSettings) {
+      const finale = (typeof showFinaleMockModal === 'function')
+        ? showFinaleMockModal
+        : window.showFinaleMockModal;
+      if (typeof finale === 'function') {
+        finale();
+        return;
+      }
+    }
+  }
+}
+
+function appsTourNav(dir) {
+  const next = _appsTourIdx + dir;
+  if (next < 0 || next >= _appsTourSteps.length) return;
+  _appsTourIdx = next;
+  appsTourRender();
+}
+
+function appsTourMarkCompleteFromFinalStep() {
+  localStorage.setItem('appsTourDone', '1');
+  const chainedFromSettings = _appsTourChainFromSettings
+    || localStorage.getItem('settingsTourStep') === 'handoff'
+    || settingsTourActive;
+  if (chainedFromSettings) {
+    settingsTourActive = false;
+    localStorage.setItem('settingsTourDone', '1');
+    localStorage.removeItem('settingsTourStep');
+    const finish = (typeof finishTourHydration === 'function')
+      ? finishTourHydration
+      : window.finishTourHydration;
+    if (typeof finish === 'function') finish();
+  }
+}
+
+function appsTourActivateFromFinalStep() {
+  appsTourMarkCompleteFromFinalStep();
+  const go = (typeof goLive === 'function') ? goLive : window.goLive;
+  appsTourClose(false);
+  if (typeof go === 'function') {
+    go();
+    return;
+  }
+  const notify = (typeof toast === 'function') ? toast : window.toast;
+  if (typeof notify === 'function') notify('Open Go live to activate your booking page.', 'error');
+}
+
+function appsTourRender() {
+  const step = _appsTourSteps[_appsTourIdx];
+  if (!step) {
+    appsTourClose(true);
+    return;
+  }
+  const total = _appsTourSteps.length;
+  const isLast = _appsTourIdx >= total - 1;
+  const counter = `${_appsTourIdx + 1} / ${total}`;
+  const target = document.querySelector(step.target);
+  if (!target) {
+    _appsTourIdx++;
+    appsTourRender();
+    return;
+  }
+
+  appsTourCleanupUi();
+  const lb = document.createElement('div');
+  lb.id = 'appsTourLightbox';
+  lb.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.52);pointer-events:auto;';
+  document.body.appendChild(lb);
+
+  target.dataset.appsTourOrigPosition = target.style.position || '';
+  target.dataset.appsTourOrigZIndex = target.style.zIndex || '';
+  target.dataset.appsTourOrigIsolation = target.style.isolation || '';
+  target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
+  target.dataset.appsTourOrigBorderRadius = target.style.borderRadius || '';
+  target.style.position = target.style.position || 'relative';
+  target.style.zIndex = '100002';
+  target.style.isolation = 'isolate';
+  target.style.boxShadow = '0 0 0 4px #2E7D5B, 0 14px 38px rgba(0,0,0,0.24)';
+  target.style.borderRadius = target.style.borderRadius || '16px';
+  target.setAttribute('data-apps-tour-highlighted', '1');
+
+  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: step.scrollBlock || 'center' });
+
+  const placeTooltip = () => {
+    const old = document.getElementById('appsTourTooltip');
+    if (old) old.remove();
+    const rect = target.getBoundingClientRect();
+    const maxWidth = Math.min(330, window.innerWidth - 28);
+    const centerX = rect.left + rect.width / 2;
+    const left = Math.max(14, Math.min(centerX - maxWidth / 2, window.innerWidth - maxWidth - 14));
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow > 176
+      ? Math.min(rect.bottom + 12, window.innerHeight - 160)
+      : Math.max(14, rect.top - 178);
+    const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
+    const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
+    const tip = document.createElement('div');
+    tip.id = 'appsTourTooltip';
+    tip.style.cssText = `position:fixed;z-index:100003;left:${left}px;top:${top}px;width:${maxWidth}px;max-width:${maxWidth}px;`;
+    tip.innerHTML = `
+      <div style="background:#111827;color:#fff;border-radius:14px;padding:15px 16px;box-shadow:0 18px 46px rgba(0,0,0,0.32);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <div style="font-size:11px;color:rgba(255,255,255,0.54);font-weight:800;letter-spacing:0.8px;text-transform:uppercase;">${counter}</div>
+          <button type="button" id="appsTourSkipBtn" style="border:none;background:transparent;color:rgba(255,255,255,0.62);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:4px 0;">${secondaryLabel}</button>
+        </div>
+        <div style="font-size:17px;font-weight:800;line-height:1.25;margin-bottom:7px;">${step.title}</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.76);line-height:1.48;margin-bottom:14px;">${step.text}</div>
+        <button type="button" id="appsTourNextBtn" style="width:100%;padding:12px 14px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">${primaryLabel}</button>
+      </div>`;
+    document.body.appendChild(tip);
+
+    document.getElementById('appsTourNextBtn').onclick = () => {
+      if (step.activateOnNext) {
+        appsTourActivateFromFinalStep();
+        return;
+      }
+      if (isLast) {
+        appsTourMarkCompleteFromFinalStep();
+        appsTourClose(false);
+        return;
+      }
+      _appsTourIdx++;
+      appsTourRender();
+    };
+    document.getElementById('appsTourSkipBtn').onclick = () => {
+      if (isLast) {
+        appsTourMarkCompleteFromFinalStep();
+        appsTourClose(false);
+        return;
+      }
+      appsTourClose(true);
+    };
+  };
+  setTimeout(placeTooltip, prefersReducedMotion ? 40 : 320);
+}
+
+function startAppsTour(opts) {
+  const replay = opts && opts.replay;
+  const chainFromSettings = opts && opts.chainFromSettingsTour;
+  if (!replay && !chainFromSettings && localStorage.getItem('appsTourDone')) return;
+  if (document.getElementById('appsTourLightbox') || document.getElementById('appsTourTooltip')) return;
+
+  appsCloseLightbox();
+  appsTourClose(false);
+  _appsTourChainFromSettings = !!chainFromSettings;
+
+  const hotelIsLive = !!hotelSubscribed;
+  _appsTourSteps = [
+    {
+      target: '#tour-apps-headline',
+      title: 'This is the whole idea.',
+      text: 'Your hotel can live on your guest\'s home screen. That is the value of this page.',
+    },
+    {
+      target: '#tour-apps-first',
+      title: 'First: install Front Desk.',
+      text: 'Front Desk is this website saved to your property phone. This is how you get booking alerts and guest messages.',
+    },
+    {
+      target: '#tour-apps-then',
+      title: 'Then: send guests to your booking page.',
+      text: 'When guests are booking, the Install button is at the bottom of the page. They tap it and your hotel is on their phone.',
+    },
+    {
+      target: '#tour-apps-after',
+      title: 'After that, the loop is clear.',
+      text: 'Guests tap your hotel icon to book or message you. New bookings and messages come back here in Front Desk.',
+    },
+    {
+      target: '#tour-guest-icon-section',
+      title: 'This is the one setup item.',
+      text: 'Guests see this icon on their home screen. Uploading the picture unlocks after Front Desk is installed.',
+    },
+    {
+      target: '#tour-apps-loop',
+      title: hotelIsLive ? 'This loop is on.' : 'Turn this on for your property.',
+      text: hotelIsLive
+        ? 'Guests can book direct, save your hotel, and message you. Front Desk gets the alerts.'
+        : 'Activate once. Guests can book direct, save your hotel to their home screen, and Front Desk gets the alerts.',
+      primaryLabel: hotelIsLive ? 'Done' : 'Activate Guest App + Front Desk — $199/mo',
+      secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
+      activateOnNext: !hotelIsLive,
+    },
+  ];
+
+  _appsTourIdx = 0;
+  appsTourRender();
+}
 
 // ── INIT ───────────────────────────────────────────────
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/frontdesk-sw.js').catch(() => {});
