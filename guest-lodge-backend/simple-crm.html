@@ -3636,16 +3636,14 @@ async function startCrmApp(verification) {
   } else {
     try { sessionStorage.removeItem('frontdeskSimulatePwa'); } catch (_) {}
   }
-  const isFirstWelcome = urlParams.has('welcome') && !localStorage.getItem('onboardingDone');
+  const isFirstWelcome = urlParams.has('welcome');
+  if (isFirstWelcome) resetWalkthroughProgress();
 
   if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
     currentFilter = 'settings';
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
     // Keep ?welcome=1 in the URL until the welcome modal is dismissed (refresh-safe).
-    if (urlParams.has('welcome') && localStorage.getItem('onboardingDone')) {
-      cleanUrl.searchParams.delete('welcome');
-    }
     window.history.replaceState({}, '', cleanUrl);
   } else if (urlParams.get('tab') === 'bookings') {
     currentFilter = 'bookings';
@@ -6386,12 +6384,23 @@ function showOnboardingQuestions() {
 }
 
 // ── WELCOME MODAL (after questionnaire) ────────────────────────
-function replayWalkthrough() {
+function resetWalkthroughProgress() {
   ['onboardingDone', 'settingsTourDone', 'settingsTourStep', 'linkCopied', 'ratesChanged', 'appsTourDone', 'postActivationTourDone'].forEach((k) => {
-    localStorage.removeItem(k);
+    try { localStorage.removeItem(k); } catch (_) {}
   });
+}
+
+function replayWalkthrough() {
+  resetWalkthroughProgress();
   const u = new URL(window.location.href);
-  location.href = u.pathname + '?welcome';
+  u.searchParams.set('welcome', '1');
+  u.searchParams.delete('tab');
+  const next = u.pathname + u.search + u.hash;
+  if (next === window.location.pathname + window.location.search + window.location.hash) {
+    window.location.reload();
+    return;
+  }
+  window.location.assign(next);
 }
 
 function showWelcomeModal() {

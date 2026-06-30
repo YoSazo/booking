@@ -4,6 +4,15 @@ import { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessage
 
 let settingsModulePromise = null;
 let appsModulePromise = null;
+const WALKTHROUGH_STORAGE_KEYS = [
+  'onboardingDone',
+  'settingsTourDone',
+  'settingsTourStep',
+  'linkCopied',
+  'ratesChanged',
+  'appsTourDone',
+  'postActivationTourDone',
+];
 
 export function loadSettingsModule() {
   if (!settingsModulePromise) {
@@ -23,6 +32,25 @@ export function loadAppsModule() {
     });
   }
   return appsModulePromise;
+}
+
+function resetWalkthroughProgress() {
+  WALKTHROUGH_STORAGE_KEYS.forEach((k) => {
+    try { localStorage.removeItem(k); } catch (_) {}
+  });
+}
+
+function replayWalkthrough() {
+  resetWalkthroughProgress();
+  const u = new URL(window.location.href);
+  u.searchParams.set('welcome', '1');
+  u.searchParams.delete('tab');
+  const next = u.pathname + u.search + u.hash;
+  if (next === window.location.pathname + window.location.search + window.location.hash) {
+    window.location.reload();
+    return;
+  }
+  window.location.assign(next);
 }
 
 // ── PWA INSTALL / NOTIFICATIONS STATE ──────────────────────────
@@ -1254,16 +1282,14 @@ async function startCrmApp(verification) {
   } else {
     try { sessionStorage.removeItem('frontdeskSimulatePwa'); } catch (_) {}
   }
-  const isFirstWelcome = urlParams.has('welcome') && !localStorage.getItem('onboardingDone');
+  const isFirstWelcome = urlParams.has('welcome');
+  if (isFirstWelcome) resetWalkthroughProgress();
 
   if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
     crm.currentFilter = 'settings';
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
     // Keep ?welcome=1 in the URL until the welcome modal is dismissed (refresh-safe).
-    if (urlParams.has('welcome') && localStorage.getItem('onboardingDone')) {
-      cleanUrl.searchParams.delete('welcome');
-    }
     window.history.replaceState({}, '', cleanUrl);
   } else if (urlParams.get('tab') === 'bookings') {
     crm.currentFilter = 'bookings';
@@ -3825,6 +3851,8 @@ exposeToWindow({
   verifyCrmToken,
   loadSettingsModule,
   loadAppsModule,
+  replayWalkthrough,
+  resetWalkthroughProgress,
 });
 
 // ── INIT ───────────────────────────────────────────────

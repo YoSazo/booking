@@ -500,7 +500,14 @@ function replayWalkthrough() {
     localStorage.removeItem(k);
   });
   const u = new URL(window.location.href);
-  location.href = u.pathname + '?welcome';
+  u.searchParams.set('welcome', '1');
+  u.searchParams.delete('tab');
+  const next = u.pathname + u.search + u.hash;
+  if (next === window.location.pathname + window.location.search + window.location.hash) {
+    window.location.reload();
+    return;
+  }
+  window.location.assign(next);
 }
 
 function showWelcomeModal() {
