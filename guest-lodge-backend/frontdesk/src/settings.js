@@ -1154,27 +1154,11 @@ function startSettingsTour() {
       tooltipPosition: 'above'
     },
     {
-      target: '#tour-fd-install-btn, #tour-fd-installed-badge',
-      text: 'Install Front Desk on this device so it opens like an app and can send booking alerts when supported.',
+      target: '',
+      text: '',
       openAccordion: false,
       tab: 'apps',
-      waitForVisible: true,
-      tooltipPosition: 'below',
-      scrollBlock: 'nearest'
-    },
-    {
-      target: '#tour-guest-icon-section',
-      highlightSelector: '#tour-guest-icon-section',
-      anchorSelector: '#tour-guest-icon-section',
-      scrollTarget: '#tour-guest-icon-section',
-      text: 'Set the icon guests see when they save your direct booking page. Guest QR, install link, notifications, and app tools live in Guest App.',
-      openAccordion: false,
-      tab: 'apps',
-      waitForVisible: true,
-      tooltipPosition: 'above',
-      scrollBlock: 'center',
-      scrollPadBottom: 260,
-      scrollPadTop: 88
+      customModal: 'guestAppsStory'
     }
   ];
 
@@ -1264,6 +1248,10 @@ function startSettingsTour() {
     }
     if (s.customModal === 'finale') {
       showFinaleMockModal();
+      return;
+    }
+    if (s.customModal === 'guestAppsStory') {
+      handoffToGuestAppsTour();
       return;
     }
 
