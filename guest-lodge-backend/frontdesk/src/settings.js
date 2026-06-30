@@ -1085,9 +1085,9 @@ function startSettingsTour() {
       tab: 'settings',
       tooltipAnchor: 'card-top',
       scrollBlock: 'center',
-      scrollPadTop: 180,
-      forceTooltipAboveOnDesktop: true,
-      scrollPadBottom: 260
+      scrollPadTop: 190,
+      scrollPadBottom: 80,
+      forceTooltipAbove: true
     },
     {
       target: '#tour-rates-card',
