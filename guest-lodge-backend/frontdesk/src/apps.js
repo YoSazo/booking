@@ -221,8 +221,8 @@ function renderAppsView() {
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
   const fdInstallLabel = fdOnNarrowScreen ? 'Install on this phone' : 'Install Front Desk';
   const fdInstallCopy = fdOnNarrowScreen
-    ? 'Install Front Desk on this phone first. That unlocks the guest install tools and makes sure new booking/message alerts go to the property device.'
-    : 'Open this dashboard on the phone your staff uses, then install Front Desk there. Guest install tools stay locked until a property phone has Front Desk installed.';
+    ? 'Install Front Desk on this phone first. Front Desk is this website saved to your phone. After that, guests can install your hotel and you can get booking alerts.'
+    : 'Open this dashboard on the phone your staff uses and install Front Desk there. After that, guests can install your hotel, and booking/message alerts go to the property phone.';
 
   const frontdeskInstallItems = [
     { type: 'video', src: APPS_SHOWCASE.frontdeskInstallVideo, poster: APPS_SHOWCASE.frontdeskMessages, alt: 'How to install Front Desk', title: 'Install Front Desk on this device',
@@ -245,6 +245,16 @@ function renderAppsView() {
       <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Install Front Desk</button>
       <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until Front Desk is installed on a property phone</div>`;
   }
+
+  const storyFrontdeskActionHtml = fdInApp
+    ? `<div class="apps-story-status">
+        <span class="apps-story-status-icon">✓</span>
+        <span>Front Desk is installed here. This phone can receive booking and message alerts.</span>
+      </div>`
+    : `<button type="button" class="apps-story-primary" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>`;
+  const storyBookingActionHtml = guestInstallUrl !== '#'
+    ? `<button type="button" class="apps-story-secondary" onclick="openGuestBookingEngine({focusInstall:true})">Go to direct booking page</button>`
+    : `<div class="apps-story-domain-note">Your direct booking domain is still setting up. Once it is ready, guests install from that page.</div>`;
 
   // Icon preview matches the loop tile: uploaded logos use the whole square,
   // while the generated letter icon is full-bleed green edge-to-edge.
@@ -271,7 +281,7 @@ function renderAppsView() {
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR</button>
       ${guestInstallUrl !== '#' ? `
       <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
-      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Open your direct booking page at the guest install prompt. Guests use that page to save your hotel app after Front Desk is installed on the property phone.</p>` : ''}
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Guests use this page to save your hotel to their phone. Scroll to the Install button.</p>` : ''}
       ${guestInstallUrl === '#' ? '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>' : ''}`;
 
   // Guest install link — promoted out of the Help fold so it's always reachable (§1D.2).
@@ -302,6 +312,33 @@ function renderAppsView() {
       </div>
     </div>`;
 
+  const appsStoryHtml = `
+    <section class="apps-story">
+      <div class="apps-story-kicker">Guest App</div>
+      <h2 class="apps-story-title">Your hotel can be on your guest's home screen.</h2>
+      <p class="apps-story-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
+
+      <div class="apps-story-line">
+        <div class="apps-story-step">First</div>
+        <h3 class="apps-story-line-title">Install Front Desk on your property phone.</h3>
+        <p>Front Desk is this website saved to your phone. It turns on booking alerts, guest messages, QR tools, and the guest Install button.</p>
+        <div class="apps-story-actions">${storyFrontdeskActionHtml}</div>
+      </div>
+
+      <div class="apps-story-line">
+        <div class="apps-story-step">Then</div>
+        <h3 class="apps-story-line-title">Send guests to your direct booking page.</h3>
+        <p>When guests scroll down, they see the Install button. They tap it, and your hotel is on their home screen.</p>
+        <div class="apps-story-actions">${storyBookingActionHtml}</div>
+      </div>
+
+      <div class="apps-story-line">
+        <div class="apps-story-step">After that</div>
+        <h3 class="apps-story-line-title">Everything connects.</h3>
+        <p>Guests tap your hotel icon to book direct or message you. New bookings and messages come back here in Front Desk.</p>
+      </div>
+    </section>`;
+
   const appsHelpBodyHtml = `
         <div class="apps-section-divider" style="margin-top:0;padding-top:14px;">How guests add your hotel</div>
         <div style="border-radius:12px;background:#f4f7f9;border:1px solid var(--border);margin:0 0 12px;padding:16px;text-align:center;">
@@ -309,7 +346,6 @@ function renderAppsView() {
         </div>
         <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(guestInstallItems)},0)" style="margin-bottom:12px;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how guests install (1 min)</span></button>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Guests tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Then they can book and message you direct.</p>
-        <button type="button" class="apps-tour-replay" onclick="startAppsTour({replay:true})" style="margin-bottom:14px;">▶ Watch full walkthrough</button>
         <div class="apps-q-list">
           ${appsQuestionRow('What guests see on their phone', '', enc(guestItems), 0, false)}
           ${appsQuestionRow('How guests add your hotel', '', enc(guestInstallItems), 0, true)}
@@ -330,12 +366,17 @@ function renderAppsView() {
   const iconPreviewHtml = hotelAppIcon
     ? `<img src="${hotelAppIcon}" alt="" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;">`
     : `<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${hotelInitial}</div>`;
+  const guestPreviewButtonBg = fdInApp ? 'var(--green)' : '#c5d5cc';
+  const guestPreviewButtonOpacity = fdInApp ? '1' : '.72';
+  const guestPreviewFootnote = fdInApp
+    ? 'This is what guests tap after they scroll down your booking page.'
+    : 'Install Front Desk first to turn this on for guests.';
 
   const guestInstallPreviewHtml = `
     <div class="apps-step-card apps-guest-phone-card">
       <div style="padding:16px 18px 14px;">
-        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">What guests see</div>
-        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">This is a static example of the install prompt guests see on your direct booking page. The button is muted here so owners know this is only a preview.</p>
+        <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">What guests see on your booking page</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0;line-height:1.55;">Room details come first. When guests scroll down, they see the Install button.</p>
       </div>
       <div style="background:#f8faf9;border-top:1px solid var(--border);padding:14px 18px 18px;">
         <div style="pointer-events:none;user-select:none;">
@@ -360,16 +401,16 @@ function renderAppsView() {
               ${iconPreviewHtml}
               <div style="flex:1;min-width:0;">
                 <div style="font-size:14px;font-weight:800;color:#1a1a2e;line-height:1.3;">Add ${hName} to your home screen</div>
-                <div style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">Guests see this on your booking page. It stays muted until Front Desk is installed on the property phone.</div>
+                <div style="font-size:12px;color:#6b7280;margin-top:2px;line-height:1.4;">Guests tap this to save your hotel to their phone.</div>
               </div>
             </div>
-            <div aria-disabled="true" style="width:100%;margin-top:14px;padding:12px 16px;border-radius:10px;border:none;background:#c5d5cc;color:#fff;font-size:14px;font-weight:800;text-align:center;box-sizing:border-box;opacity:.72;cursor:not-allowed;">Install</div>
-            <div style="font-size:11px;color:#6b7280;line-height:1.45;text-align:center;margin-top:8px;">Preview only — unlock guest installs by installing Front Desk on your phone first.</div>
+            <div aria-disabled="true" style="width:100%;margin-top:14px;padding:12px 16px;border-radius:10px;border:none;background:${guestPreviewButtonBg};color:#fff;font-size:14px;font-weight:800;text-align:center;box-sizing:border-box;opacity:${guestPreviewButtonOpacity};">Install</div>
+            <div style="font-size:11px;color:#6b7280;line-height:1.45;text-align:center;margin-top:8px;">${guestPreviewFootnote}</div>
           </div>
         </div>
         ${guestInstallUrl !== '#' ? `
         <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--green);background:#fff;color:var(--green);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-top:14px;">Go to direct booking page</button>
-        <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.55;">Open the real guest page to see where guests will install your hotel app. Install Front Desk on your property phone first so guest installs, messages, QR tools, and booking alerts are ready before guests use it.</p>` : `
+        <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.55;">Open the real guest page. Scroll down to see the same Install button guests use.</p>` : `
         <p style="font-size:12px;color:var(--text-muted);margin:14px 0 0;line-height:1.55;">Your direct booking domain is still setting up. Once it is ready, you can open the guest page from here.</p>`}
       </div>
     </div>`;
@@ -395,7 +436,7 @@ function renderAppsView() {
   const helpFoldHtml = `
     <details class="apps-fold" id="appsHelpFold" style="margin-top:8px;">
       <summary class="apps-fold-summary">
-        <div><div class="apps-fold-title">Help</div><div class="apps-fold-meta">How it works · walkthrough · FAQs</div></div>
+        <div><div class="apps-fold-title">Help</div><div class="apps-fold-meta">Videos · screenshots · FAQs</div></div>
         <span class="apps-fold-chevron" aria-hidden="true">›</span>
       </summary>
       <div class="apps-fold-body">
@@ -422,9 +463,9 @@ function renderAppsView() {
       <div class="apps-locked-tools__overlay">
         <div class="apps-locked-tools__panel">
           <div class="apps-locked-tools__icon"><i data-lucide="lock-keyhole" style="width:20px;height:20px;"></i></div>
-          <div class="apps-locked-tools__eyebrow">Guest App tools locked</div>
-          <div class="apps-locked-tools__title">Install Front Desk to unlock this tab</div>
-          <p>${fdInstallCopy} Until then, guest install buttons are muted in previews so setup mode is not confused with a live guest install.</p>
+          <div class="apps-locked-tools__eyebrow">First step</div>
+          <div class="apps-locked-tools__title">Install Front Desk first</div>
+          <p>${fdInstallCopy}</p>
           <button id="tour-fd-install-btn" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>
           <button type="button" class="apps-video-teaser apps-locked-tools__video" onclick="appsOpenLightbox(${enc(frontdeskInstallItems)},0)"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how (1 min)</span></button>
         </div>
@@ -432,19 +473,37 @@ function renderAppsView() {
     </div>`;
 
   const appsMainHtml = `
+    ${appsStoryHtml}
     ${loopDiagramHtml}
     ${guestInstallPreviewHtml}
     ${fdInApp ? unlockedToolsHtml : lockedToolsHtml}`;
 
   const appsFootnoteHtml = fdInApp
-    ? 'Booking alerts live on the <strong>Bookings</strong> tab · installed from your browser'
-    : 'Install Front Desk to unlock guest-app setup, QR tools, messages, and booking alerts.';
+    ? 'Front Desk is installed. Guests can install your hotel from the direct booking page.'
+    : 'Install Front Desk first. Then guests can install your hotel from the direct booking page.';
 
   el.innerHTML = `
   <style>
     .apps-page { padding:4px 0 28px; }
     .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
     .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
+    .apps-story { margin:0 0 22px;padding:4px 2px 2px; }
+    .apps-story-kicker { font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:10px; }
+    .apps-story-title { font-size:31px;font-weight:800;color:var(--text);line-height:1.08;margin:0 0 14px;letter-spacing:0; }
+    .apps-story-copy { font-size:18px;color:var(--text-soft);line-height:1.45;margin:0 0 20px; }
+    .apps-story-copy strong { color:var(--text);font-weight:800; }
+    .apps-story-line { border-top:1.5px solid var(--border);padding:19px 0 2px; }
+    .apps-story-step { font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px; }
+    .apps-story-line-title { font-size:22px;font-weight:800;color:var(--text);line-height:1.16;margin:0 0 8px;letter-spacing:0; }
+    .apps-story-line p { font-size:16px;color:var(--text-soft);line-height:1.48;margin:0; }
+    .apps-story-actions { display:flex;flex-direction:column;gap:10px;margin-top:14px; }
+    .apps-story-primary,
+    .apps-story-secondary { width:100%;min-height:48px;padding:14px 16px;border-radius:12px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;text-align:center; }
+    .apps-story-primary { border:none;background:var(--green);color:#fff;box-shadow:0 8px 22px rgba(46,125,91,0.24); }
+    .apps-story-secondary { border:1.5px solid var(--green);background:#fff;color:var(--green); }
+    .apps-story-status { display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:13px 14px;color:#166534;font-size:13px;font-weight:700;line-height:1.45; }
+    .apps-story-status-icon { width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:800; }
+    .apps-story-domain-note { border:1px solid var(--border);border-radius:12px;padding:13px 14px;background:#fff;color:var(--text-muted);font-size:13px;line-height:1.45; }
     .apps-loop { display:flex;align-items:flex-start;justify-content:center;gap:14px;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1.5px solid #bbf7d0;border-radius:16px;padding:18px 14px;margin:0 0 16px; }
     .apps-loop-side { flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center; }
     .apps-loop-tile { width:54px;height:54px;border-radius:14px;background:#fff;border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px; }
@@ -513,6 +572,13 @@ function renderAppsView() {
     .apps-fold-body .apps-q-list { margin-top:12px;margin-bottom:0; }
     .apps-fold-body .apps-how-sub { margin-top:12px;margin-bottom:0; }
     @media (min-width: 768px) {
+      .apps-story { padding-top:6px; }
+      .apps-story-title { font-size:38px;max-width:760px; }
+      .apps-story-copy { font-size:19px;max-width:720px; }
+      .apps-story-line { padding-top:22px; }
+      .apps-story-line-title { font-size:25px;max-width:720px; }
+      .apps-story-line p { font-size:17px;max-width:720px; }
+      .apps-story-actions { max-width:360px; }
       .apps-guest-phone-card {
         width:min(390px, 100%);
         margin:0 auto 18px;
@@ -541,7 +607,6 @@ function renderAppsView() {
   <div class="apps-page">
 
     ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
-    <h2 class="apps-headline">Guest App</h2>
     ${appsMainHtml}
 
     <p class="apps-footnote">${appsFootnoteHtml}</p>
