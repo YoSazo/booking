@@ -779,7 +779,9 @@ const handleConfirmBooking = async (bookingDetails) => {
                 isProcessingBooking={isProcessingBooking}
                 setIsProcessingBooking={setIsProcessingBooking}
                 onHotelUpdate={(updates) => setCurrentHotel(prev => ({ ...prev, ...updates }))}
-                hotelId={currentHotel.id || hotelId}              />
+                hotelId={currentHotel.id || hotelId}
+                apiBaseUrl={API_BASE_URL}
+              />
           } />
 
           {/* Guest Dashboard routes */}

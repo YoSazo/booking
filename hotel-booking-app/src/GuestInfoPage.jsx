@@ -6,6 +6,7 @@ import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStri
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick, trackCardDeclineModalShown, trackTapToCallFirst, trackHotelFunnel } from './trackingService.js';
 import LoadingScreen from './LoadingScreen.jsx';
+import InstallAppBanner from './InstallAppBanner.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
 
@@ -1418,6 +1419,8 @@ const handlePayLaterBooking = async (e) => {
     const priceToday = bookingDetails.total / 2;
     const balanceDue = (bookingDetails.total / 2);
     const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
+    const onlineBookingGateActive = !isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4;
+    const showGuestInstallBanner = !onlineBookingGateActive;
 
     const handleDismissWhyCardModal = () => {
         setShowWhyCardModal(false);
@@ -1438,7 +1441,7 @@ const handlePayLaterBooking = async (e) => {
                 hotel hasn't activated online booking, show a clean "opens soon"
                 message and a call-to-book fallback. The blocked attempt is
                 beaconed for the owner's proof-of-demand signal (D19). */}
-            {!isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4 && (
+            {onlineBookingGateActive && (
               <>
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.3)', zIndex: 9998, pointerEvents: 'all' }} />
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
@@ -1592,7 +1595,7 @@ const handlePayLaterBooking = async (e) => {
                 )}
             </div>
             
-            <div className="guest-info-container" style={{ paddingBottom: (!isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4) ? '220px' : '120px', paddingTop: '0' }}>
+            <div className="guest-info-container" style={{ paddingBottom: onlineBookingGateActive ? '220px' : showGuestInstallBanner ? '170px' : '120px', paddingTop: '0' }}>
                 <div className="checkout-progress-bar">
                     <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Review Cart</span>
@@ -2392,6 +2395,19 @@ const handlePayLaterBooking = async (e) => {
   )}
 </div>
             </div>
+
+            {showGuestInstallBanner && (
+              <InstallAppBanner
+                hotelName={hotel?.name}
+                appIconUrl={hotel?.appIconUrl}
+                hotelId={(hotel && hotel.id) || hotelId}
+                ownerPreview={isPreviewMode}
+                sticky
+                bottomOffset={14}
+                touchpoint="checkout"
+                apiBaseUrl={apiBaseUrl}
+              />
+            )}
 
         </>
     );

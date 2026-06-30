@@ -26,6 +26,7 @@ function BookingPage({
   setIsProcessingBooking,
   onHotelUpdate,
   hotelId,
+  apiBaseUrl,
 }) {
   useEffect(() => { trackPageView(); }, []);
   useEffect(() => { setIsProcessingBooking(false); }, [setIsProcessingBooking]);
@@ -67,9 +68,10 @@ function BookingPage({
 
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+  const showInstallBanner = (roomData?.length > 0 || ownerScrollInstall);
 
   return (
-    <div className="container">
+    <div className="container" style={{ paddingBottom: showInstallBanner ? '120px' : undefined }}>
       <header className="header">
         <p className="header-address">{hotel.address}</p>
         <h1>{hotel.name}</h1>
@@ -163,12 +165,16 @@ function BookingPage({
         )}
       </main>
 
-      {(roomData?.length > 0 || ownerScrollInstall) && (
+      {showInstallBanner && (
         <InstallAppBanner
           hotelName={hotel.name}
           appIconUrl={hotel.appIconUrl}
           hotelId={hotelId}
           ownerPreview={ownerScrollInstall}
+          sticky
+          bottomOffset={14}
+          touchpoint={ownerScrollInstall ? 'frontdesk-preview' : 'booking-page'}
+          apiBaseUrl={apiBaseUrl}
         />
       )}
     </div>
