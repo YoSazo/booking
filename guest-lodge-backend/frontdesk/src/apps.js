@@ -829,8 +829,9 @@ function startAppsTour(opts) {
       target: '#tour-guest-icon-section',
       title: 'This is the one setup item.',
       text: 'Guests see this icon on their home screen. Uploading the picture unlocks after Front Desk is installed.',
+      mobileScrollBlock: 'end',
       mobileTooltipAnchor: 'top',
-      mobileTooltipPosition: 'below',
+      mobileTooltipPosition: 'above',
     },
     {
       target: '#tour-apps-loop',
