@@ -635,6 +635,57 @@ function appsTourActivateFromFinalStep() {
   if (typeof notify === 'function') notify('Open Go live to activate your booking page.', 'error');
 }
 
+function showGuestAppActivationModal() {
+  if (crm.hotelSubscribed || document.getElementById('guestAppActivationOverlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'guestAppActivationOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100004;background:rgba(0,0,0,0.68);display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;max-width:360px;width:100%;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 22px 64px rgba(0,0,0,0.32);animation:tourModalSlideUp 0.3s ease;">
+      <div style="padding:26px 22px;text-align:center;">
+        <div style="margin-bottom:12px;display:flex;justify-content:center;"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
+        <div style="font-size:20px;font-weight:800;color:#1a1a2e;line-height:1.2;margin-bottom:8px;">Guest App + Front Desk is ready</div>
+        <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;">You just saw the loop: guests book direct, save your hotel to their phone, and message you. Front Desk gets the alerts.</p>
+        <div style="background:#f0fdf4;border-radius:14px;padding:15px;border:1px solid #bbf7d0;text-align:left;margin-bottom:18px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:flex-start;gap:9px;"><span style="width:20px;height:20px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</span><span style="font-size:13px;color:#166534;line-height:1.4;">Direct booking page accepts reservations</span></div>
+            <div style="display:flex;align-items:flex-start;gap:9px;"><span style="width:20px;height:20px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</span><span style="font-size:13px;color:#166534;line-height:1.4;">Guests install your hotel from the booking page</span></div>
+            <div style="display:flex;align-items:flex-start;gap:9px;"><span style="width:20px;height:20px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</span><span style="font-size:13px;color:#166534;line-height:1.4;">Front Desk gets booking and message alerts</span></div>
+            <div style="display:flex;align-items:flex-start;gap:9px;"><span style="width:20px;height:20px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</span><span style="font-size:13px;color:#166534;line-height:1.4;">No OTA commission. Cancel anytime.</span></div>
+          </div>
+        </div>
+        <button type="button" id="guestAppActivateNowBtn" style="width:100%;padding:15px 18px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;">Activate Guest App + Front Desk — $199/mo</button>
+        <button type="button" id="guestAppActivateLaterBtn" style="background:none;border:none;color:#9ca3af;font-size:12px;font-family:inherit;font-weight:700;cursor:pointer;padding:8px 12px;">Not now</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+  if (!document.getElementById('tourModalAnimStyle')) {
+    const animStyle = document.createElement('style');
+    animStyle.id = 'tourModalAnimStyle';
+    animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
+    document.head.appendChild(animStyle);
+  }
+  if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
+
+  const closeModal = () => {
+    overlay.remove();
+    document.body.style.overflow = '';
+  };
+  document.getElementById('guestAppActivateNowBtn').onclick = () => {
+    closeModal();
+    const go = (typeof goLive === 'function') ? goLive : window.goLive;
+    if (typeof go === 'function') {
+      go();
+      return;
+    }
+    const notify = (typeof toast === 'function') ? toast : window.toast;
+    if (typeof notify === 'function') notify('Open Go live to activate your booking page.', 'error');
+  };
+  document.getElementById('guestAppActivateLaterBtn').onclick = closeModal;
+}
+
 function appsTourRender() {
   const step = _appsTourSteps[_appsTourIdx];
   if (!step) {
@@ -670,7 +721,9 @@ function appsTourRender() {
   target.setAttribute('data-apps-tour-highlighted', '1');
 
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: step.scrollBlock || 'center' });
+  const isNarrowViewport = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+  const scrollBlock = (isNarrowViewport && step.mobileScrollBlock) || step.scrollBlock || 'center';
+  target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: scrollBlock });
 
   const placeTooltip = () => {
     const old = document.getElementById('appsTourTooltip');
@@ -679,17 +732,17 @@ function appsTourRender() {
     const maxWidth = Math.min(330, window.innerWidth - 28);
     const centerX = rect.left + rect.width / 2;
     const left = Math.max(14, Math.min(centerX - maxWidth / 2, window.innerWidth - maxWidth - 14));
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top = spaceBelow > 176
-      ? Math.min(rect.bottom + 12, window.innerHeight - 160)
-      : Math.max(14, rect.top - 178);
+    const anchorEdge = (isNarrowViewport && step.mobileTooltipAnchor) || step.tooltipAnchor || 'bottom';
+    const preferredPosition = (isNarrowViewport && step.mobileTooltipPosition) || step.tooltipPosition || '';
+    const anchorTop = rect.top;
+    const anchorBottom = anchorEdge === 'top' ? rect.top : rect.bottom;
     const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
     const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
     const tip = document.createElement('div');
     tip.id = 'appsTourTooltip';
-    tip.style.cssText = `position:fixed;z-index:100003;left:${left}px;top:${top}px;width:${maxWidth}px;max-width:${maxWidth}px;`;
+    tip.style.cssText = `position:fixed;z-index:100003;left:${left}px;top:14px;width:${maxWidth}px;max-width:${maxWidth}px;visibility:hidden;`;
     tip.innerHTML = `
-      <div style="background:#111827;color:#fff;border-radius:14px;padding:15px 16px;box-shadow:0 18px 46px rgba(0,0,0,0.32);">
+      <div style="background:#111827;color:#fff;border-radius:14px;padding:15px 16px;box-shadow:0 18px 46px rgba(0,0,0,0.32);max-height:calc(100vh - 28px);overflow-y:auto;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
           <div style="font-size:11px;color:rgba(255,255,255,0.54);font-weight:800;letter-spacing:0.8px;text-transform:uppercase;">${counter}</div>
           <button type="button" id="appsTourSkipBtn" style="border:none;background:transparent;color:rgba(255,255,255,0.62);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:4px 0;">${secondaryLabel}</button>
@@ -699,6 +752,20 @@ function appsTourRender() {
         <button type="button" id="appsTourNextBtn" style="width:100%;padding:12px 14px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">${primaryLabel}</button>
       </div>`;
     document.body.appendChild(tip);
+    const gap = 12;
+    const tipHeight = Math.min(tip.offsetHeight || 176, Math.max(120, window.innerHeight - 28));
+    const spaceBelow = window.innerHeight - anchorBottom;
+    const spaceAbove = anchorTop;
+    let placeBelow = preferredPosition === 'below'
+      || (!preferredPosition && spaceBelow >= tipHeight + gap + 14);
+    if (preferredPosition === 'above') placeBelow = false;
+    if (placeBelow && spaceBelow < tipHeight + gap + 14 && spaceAbove > spaceBelow) placeBelow = false;
+    if (!placeBelow && spaceAbove < tipHeight + gap + 14 && spaceBelow > spaceAbove) placeBelow = true;
+    const rawTop = placeBelow ? anchorBottom + gap : anchorTop - tipHeight - gap;
+    const maxTop = Math.max(14, window.innerHeight - tipHeight - 14);
+    const top = Math.max(14, Math.min(rawTop, maxTop));
+    tip.style.top = `${top}px`;
+    tip.style.visibility = 'visible';
 
     document.getElementById('appsTourNextBtn').onclick = () => {
       if (step.activateOnNext) {
@@ -708,6 +775,7 @@ function appsTourRender() {
       if (isLast) {
         appsTourMarkCompleteFromFinalStep();
         appsTourClose(false);
+        if (step.showActivationOnComplete) showGuestAppActivationModal();
         return;
       }
       _appsTourIdx++;
@@ -761,6 +829,8 @@ function startAppsTour(opts) {
       target: '#tour-guest-icon-section',
       title: 'This is the one setup item.',
       text: 'Guests see this icon on their home screen. Uploading the picture unlocks after Front Desk is installed.',
+      mobileTooltipAnchor: 'top',
+      mobileTooltipPosition: 'below',
     },
     {
       target: '#tour-apps-loop',
@@ -768,9 +838,9 @@ function startAppsTour(opts) {
       text: hotelIsLive
         ? 'Guests can book direct, save your hotel, and message you. Front Desk gets the alerts.'
         : 'Activate once. Guests can book direct, save your hotel to their home screen, and Front Desk gets the alerts.',
-      primaryLabel: hotelIsLive ? 'Done' : 'Activate Guest App + Front Desk — $199/mo',
+      primaryLabel: hotelIsLive ? 'Done' : 'Continue to activation',
       secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
-      activateOnNext: !hotelIsLive,
+      showActivationOnComplete: !hotelIsLive,
     },
   ];
 
