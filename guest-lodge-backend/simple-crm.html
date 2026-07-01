@@ -6269,8 +6269,12 @@ function advanceTourIfNeeded() {
     el.style.zIndex = '';
     el.style.isolation = '';
     el.style.boxShadow = '';
+    el.style.outline = el.dataset.tourOrigOutline || '';
+    el.style.outlineOffset = el.dataset.tourOrigOutlineOffset || '';
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
+    delete el.dataset.tourOrigOutline;
+    delete el.dataset.tourOrigOutlineOffset;
   });
   document.body.style.overflow = '';
 }
@@ -6796,8 +6800,12 @@ function cleanupSettingsTourUi() {
     el.style.zIndex = '';
     el.style.isolation = '';
     el.style.boxShadow = '';
+    el.style.outline = el.dataset.tourOrigOutline || '';
+    el.style.outlineOffset = el.dataset.tourOrigOutlineOffset || '';
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
+    delete el.dataset.tourOrigOutline;
+    delete el.dataset.tourOrigOutlineOffset;
   });
   const goLiveBanner = document.getElementById('goLiveBanner');
   if (goLiveBanner && goLiveBanner.dataset.tourHidden) {
@@ -7153,26 +7161,30 @@ function startSettingsTour() {
       customModal: 'homescreen'
     },
     {
-      target: '#edit-hotel-phone',
+      target: '#tour-header-preview-card',
+      highlightSelector: '#tour-header-preview-card',
+      anchorSelector: '#tour-header-preview-card',
+      scrollTarget: '#tour-header-preview-card',
       title: 'Edit your booking page',
       text: 'Tap any field on this page to change it: hotel name, address, phone, room details, photos, and prices. What you edit here is what guests see.',
       openAccordion: false,
       tab: 'settings',
-      scrollToTop: true,
-      forcePageTop: true
+      scrollBlock: 'start',
+      scrollPadTop: 96,
+      scrollPadBottom: 220
     },
     {
       target: '#editRoomsCards [data-tour-room-card="1"]',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"]',
-      anchorSelector: '#editRoomsCards [data-tour-room-card="1"]',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
       title: 'Add room photos',
       text: 'Upload a real room photo here. Guests make faster decisions when they can see the room before they book.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'center',
-      scrollPadTop: 190,
-      scrollPadBottom: 220
+      scrollBlock: 'start',
+      scrollPadTop: 96,
+      scrollPadBottom: 240
     },
     {
       target: '#tour-rates-card',
@@ -7189,13 +7201,16 @@ function startSettingsTour() {
     },
     {
       target: '#tour-preview-btn',
+      highlightSelector: '#tour-preview-btn',
+      anchorSelector: '#tour-preview-btn',
+      scrollTarget: '#tour-preview-btn',
       title: 'Preview and share it',
       text: 'Use Preview to see exactly what guests see. Your booking link and QR code are on this page too, so you can send guests straight here.',
       openAccordion: false,
       tab: 'settings',
-      scrollToTop: true,
-      scrollToTopOnly: true,
-      forcePageTop: true
+      scrollBlock: 'start',
+      scrollPadTop: 96,
+      scrollPadBottom: 240
     },
     {
       target: '#bookingsList',
@@ -7473,10 +7488,14 @@ function startSettingsTour() {
 
       if (!s.noHighlight) {
         if (!highlightEl.dataset.tourOrigPosition) highlightEl.dataset.tourOrigPosition = highlightEl.style.position || '';
+        if (!highlightEl.dataset.tourOrigOutline) highlightEl.dataset.tourOrigOutline = highlightEl.style.outline || '';
+        if (!highlightEl.dataset.tourOrigOutlineOffset) highlightEl.dataset.tourOrigOutlineOffset = highlightEl.style.outlineOffset || '';
         highlightEl.style.position = highlightEl.style.position || 'relative';
         highlightEl.style.zIndex = '99999';
         highlightEl.style.isolation = 'isolate';
-        highlightEl.style.boxShadow = '0 0 0 4px #2E7D5B, 0 0 20px rgba(46,125,91,0.3)';
+        highlightEl.style.boxShadow = 'inset 0 0 0 3px #2E7D5B, 0 0 0 3px #2E7D5B, 0 14px 34px rgba(46,125,91,0.24)';
+        highlightEl.style.outline = '3px solid #2E7D5B';
+        highlightEl.style.outlineOffset = '3px';
         highlightEl.setAttribute('data-tour-highlighted', '1');
       }
 
@@ -7624,6 +7643,12 @@ function startSettingsTour() {
           </div>
         </div>
         <div style="padding:20px 22px 22px;text-align:center;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6B7D72;white-space:nowrap;">1 of ${steps.length}</div>
+            <div style="height:6px;flex:1;border-radius:999px;background:#E6EEE9;overflow:hidden;">
+              <div style="height:100%;width:${Math.round((1 / steps.length) * 100)}%;border-radius:999px;background:#2E7D5B;"></div>
+            </div>
+          </div>
           <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You're on their home screen</div>
           <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">Guests can install <strong>${hName}</strong> as an app — right next to their other apps. No Safari, no searching <span style="text-decoration:line-through;color:#9ca3af;">Booking.com</span> or <span style="text-decoration:line-through;color:#9ca3af;">Airbnb</span>.</p>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
@@ -7944,8 +7969,8 @@ async function loadEditRooms() {
     let html = `
       <div class="settings-dashboard-grid">
       <div class="dash-a">
-      <button id="tour-preview-btn" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px;">Preview Your Site →</button>
-      <div class="booking-card" style="margin-bottom:14px;">
+      <button id="tour-preview-btn" onclick="openPreviewSite()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin:10px 0 14px;scroll-margin-top:96px;">Preview Your Site →</button>
+      <div class="booking-card" id="tour-header-preview-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
           <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
@@ -9556,12 +9581,20 @@ function appsTourCleanupUi() {
     el.style.isolation = el.dataset.appsTourOrigIsolation || '';
     el.style.boxShadow = el.dataset.appsTourOrigBoxShadow || '';
     el.style.borderRadius = el.dataset.appsTourOrigBorderRadius || '';
+    el.style.padding = el.dataset.appsTourOrigPadding || '';
+    el.style.boxSizing = el.dataset.appsTourOrigBoxSizing || '';
+    el.style.outline = el.dataset.appsTourOrigOutline || '';
+    el.style.outlineOffset = el.dataset.appsTourOrigOutlineOffset || '';
     el.removeAttribute('data-apps-tour-highlighted');
     delete el.dataset.appsTourOrigPosition;
     delete el.dataset.appsTourOrigZIndex;
     delete el.dataset.appsTourOrigIsolation;
     delete el.dataset.appsTourOrigBoxShadow;
     delete el.dataset.appsTourOrigBorderRadius;
+    delete el.dataset.appsTourOrigPadding;
+    delete el.dataset.appsTourOrigBoxSizing;
+    delete el.dataset.appsTourOrigOutline;
+    delete el.dataset.appsTourOrigOutlineOffset;
   });
 }
 
@@ -9706,10 +9739,27 @@ function appsTourRender() {
   target.dataset.appsTourOrigIsolation = target.style.isolation || '';
   target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
   target.dataset.appsTourOrigBorderRadius = target.style.borderRadius || '';
+  target.dataset.appsTourOrigPadding = target.style.padding || '';
+  target.dataset.appsTourOrigBoxSizing = target.style.boxSizing || '';
+  target.dataset.appsTourOrigOutline = target.style.outline || '';
+  target.dataset.appsTourOrigOutlineOffset = target.style.outlineOffset || '';
   target.style.position = target.style.position || 'relative';
   target.style.zIndex = '100002';
   target.style.isolation = 'isolate';
-  target.style.boxShadow = '0 0 0 4px #2E7D5B, 0 14px 38px rgba(0,0,0,0.24)';
+  target.style.boxSizing = 'border-box';
+  const targetStyle = window.getComputedStyle ? window.getComputedStyle(target) : null;
+  if (targetStyle) {
+    const padTop = parseFloat(targetStyle.paddingTop) || 0;
+    const padRight = parseFloat(targetStyle.paddingRight) || 0;
+    const padBottom = parseFloat(targetStyle.paddingBottom) || 0;
+    const padLeft = parseFloat(targetStyle.paddingLeft) || 0;
+    if (padTop < 10 || padRight < 12 || padBottom < 10 || padLeft < 12) {
+      target.style.padding = `${Math.max(padTop, 10)}px ${Math.max(padRight, 12)}px ${Math.max(padBottom, 10)}px ${Math.max(padLeft, 12)}px`;
+    }
+  }
+  target.style.boxShadow = '0 14px 38px rgba(0,0,0,0.24)';
+  target.style.outline = '4px solid #2E7D5B';
+  target.style.outlineOffset = '5px';
   target.style.borderRadius = target.style.borderRadius || '16px';
   target.setAttribute('data-apps-tour-highlighted', '1');
 

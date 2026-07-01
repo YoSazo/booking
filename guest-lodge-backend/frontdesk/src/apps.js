@@ -563,12 +563,20 @@ function appsTourCleanupUi() {
     el.style.isolation = el.dataset.appsTourOrigIsolation || '';
     el.style.boxShadow = el.dataset.appsTourOrigBoxShadow || '';
     el.style.borderRadius = el.dataset.appsTourOrigBorderRadius || '';
+    el.style.padding = el.dataset.appsTourOrigPadding || '';
+    el.style.boxSizing = el.dataset.appsTourOrigBoxSizing || '';
+    el.style.outline = el.dataset.appsTourOrigOutline || '';
+    el.style.outlineOffset = el.dataset.appsTourOrigOutlineOffset || '';
     el.removeAttribute('data-apps-tour-highlighted');
     delete el.dataset.appsTourOrigPosition;
     delete el.dataset.appsTourOrigZIndex;
     delete el.dataset.appsTourOrigIsolation;
     delete el.dataset.appsTourOrigBoxShadow;
     delete el.dataset.appsTourOrigBorderRadius;
+    delete el.dataset.appsTourOrigPadding;
+    delete el.dataset.appsTourOrigBoxSizing;
+    delete el.dataset.appsTourOrigOutline;
+    delete el.dataset.appsTourOrigOutlineOffset;
   });
 }
 
@@ -713,10 +721,27 @@ function appsTourRender() {
   target.dataset.appsTourOrigIsolation = target.style.isolation || '';
   target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
   target.dataset.appsTourOrigBorderRadius = target.style.borderRadius || '';
+  target.dataset.appsTourOrigPadding = target.style.padding || '';
+  target.dataset.appsTourOrigBoxSizing = target.style.boxSizing || '';
+  target.dataset.appsTourOrigOutline = target.style.outline || '';
+  target.dataset.appsTourOrigOutlineOffset = target.style.outlineOffset || '';
   target.style.position = target.style.position || 'relative';
   target.style.zIndex = '100002';
   target.style.isolation = 'isolate';
-  target.style.boxShadow = '0 0 0 4px #2E7D5B, 0 14px 38px rgba(0,0,0,0.24)';
+  target.style.boxSizing = 'border-box';
+  const targetStyle = window.getComputedStyle ? window.getComputedStyle(target) : null;
+  if (targetStyle) {
+    const padTop = parseFloat(targetStyle.paddingTop) || 0;
+    const padRight = parseFloat(targetStyle.paddingRight) || 0;
+    const padBottom = parseFloat(targetStyle.paddingBottom) || 0;
+    const padLeft = parseFloat(targetStyle.paddingLeft) || 0;
+    if (padTop < 10 || padRight < 12 || padBottom < 10 || padLeft < 12) {
+      target.style.padding = `${Math.max(padTop, 10)}px ${Math.max(padRight, 12)}px ${Math.max(padBottom, 10)}px ${Math.max(padLeft, 12)}px`;
+    }
+  }
+  target.style.boxShadow = '0 14px 38px rgba(0,0,0,0.24)';
+  target.style.outline = '4px solid #2E7D5B';
+  target.style.outlineOffset = '5px';
   target.style.borderRadius = target.style.borderRadius || '16px';
   target.setAttribute('data-apps-tour-highlighted', '1');
 
