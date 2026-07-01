@@ -360,10 +360,10 @@ function advanceTourIfNeeded() {
   const hasRates = !!localStorage.getItem('ratesChanged');
   const hasLink = !!localStorage.getItem('linkCopied');
 
-  // Steps: 1=header info, 2=photo, 3=room details, 4=rates, 5=preview/share
+  // Steps: 2=room editor, 3=booking link/QR, 4=rates
   if (step === 2 && hasPhoto) localStorage.setItem('settingsTourStep', '3');
+  if (step === 3 && hasLink) localStorage.setItem('settingsTourStep', '4');
   if (step === 4 && hasRates) localStorage.setItem('settingsTourStep', '5');
-  if (step === 5 && hasLink) localStorage.setItem('settingsTourStep', '6');
 
   // Remove active tour tooltip and overlay if stale
   const tooltip = document.getElementById('tourTooltip');
@@ -1090,11 +1090,18 @@ function startSettingsTour() {
 
   const steps = [
     {
-      target: '',
-      text: '',
+      target: '#tour-preview-btn',
+      highlightSelector: '#tour-preview-btn',
+      anchorSelector: '#tour-preview-btn',
+      scrollTarget: '#tour-preview-btn',
+      title: 'Preview your booking page',
+      text: 'Use this button to open your real booking page and see exactly what guests see before you go live.',
       openAccordion: false,
       tab: 'settings',
-      customModal: 'homescreen'
+      scrollToTop: true,
+      scrollToTopOnly: true,
+      forcePageTop: true,
+      scrollBlock: 'start'
     },
     {
       target: '#tour-header-preview-card',
@@ -1105,34 +1112,35 @@ function startSettingsTour() {
       text: 'Tap any field on this page to change it: hotel name, address, phone, room details, photos, and prices. What you edit here is what guests see.',
       openAccordion: false,
       tab: 'settings',
-      scrollToTop: true,
-      scrollBlock: 'start'
-    },
-    {
-      target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder',
-      highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder',
-      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder',
-      title: 'Add room photos',
-      text: 'Upload a real room photo here. Guests make faster decisions when they can see the room before they book.',
-      openAccordion: false,
-      tab: 'settings',
-      scrollBlock: 'center',
+      scrollBlock: 'nearest',
       scrollPadTop: 80,
-      scrollPadBottom: 200
+      scrollPadBottom: 220
     },
     {
-      target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields input[type="text"]',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      target: '#editRoomsCards [data-tour-room-card="1"]',
+      highlightSelector: '#editRoomsCards [data-tour-room-card="1"]',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"]',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
       title: 'Edit room details',
-      text: 'Set the room name, description, and maximum guests. These appear on your booking page.',
+      text: 'This is the room editor. Add photos at the top, then set the room name, description, maximum guests, and units below.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'center',
+      scrollBlock: 'start',
       scrollPadTop: 80,
-      scrollPadBottom: 200
+      scrollPadBottom: 220
+    },
+    {
+      target: '#tour-booking-link-card',
+      highlightSelector: '#tour-booking-link-card',
+      anchorSelector: '#tour-booking-link-card',
+      scrollTarget: '#tour-booking-link-card',
+      title: 'Share your direct link',
+      text: 'Your booking link and QR tools live here. Send guests straight to this page so they book direct.',
+      openAccordion: false,
+      tab: 'settings',
+      scrollBlock: 'start',
+      scrollPadTop: 80,
+      scrollPadBottom: 220
     },
     {
       target: '#tour-rates-card',
@@ -1146,18 +1154,6 @@ function startSettingsTour() {
       tab: 'settings',
       scrollBlock: 'center',
       scrollPadBottom: 260
-    },
-    {
-      target: '#tour-preview-btn',
-      highlightSelector: '#tour-preview-btn',
-      anchorSelector: '#tour-preview-btn',
-      scrollTarget: '#tour-preview-btn',
-      title: 'Preview and share it',
-      text: 'Use Preview to see exactly what guests see. Your booking link and QR code are on this page too, so you can send guests straight here.',
-      openAccordion: false,
-      tab: 'settings',
-      scrollToTop: true,
-      scrollBlock: 'start'
     },
     {
       target: '#bookingsList',
@@ -1413,12 +1409,6 @@ function startSettingsTour() {
       localStorage.setItem('settingsTourStep', String(step));
       showStep();
       return;
-    }
-
-    const goLiveBanner = document.getElementById('goLiveBanner');
-    if (goLiveBanner && s.tab === 'settings') {
-      goLiveBanner.dataset.tourHidden = '1';
-      goLiveBanner.style.display = 'none';
     }
 
     const highlightEl = el;

@@ -935,7 +935,7 @@ async function loadBlockedDemand() {
 function updateGoLiveBanner() {
   const banner = document.getElementById('goLiveBanner');
   if (!banner) return;
-  const shouldShow = !crm.hotelSubscribed && !banner.dataset.tourHidden && !crm.settingsTourActive;
+  const shouldShow = !crm.hotelSubscribed && !banner.dataset.tourHidden;
   banner.style.display = shouldShow ? 'block' : 'none';
   if (shouldShow) banner.innerHTML = goLiveBannerHtml();
   const app = document.getElementById('app');
