@@ -6254,10 +6254,10 @@ function advanceTourIfNeeded() {
   const hasRates = !!localStorage.getItem('ratesChanged');
   const hasLink = !!localStorage.getItem('linkCopied');
 
-  // Steps: 0=header info, 1=photo, 2=rates, 3=copy link
-  if (step === 1 && hasPhoto) localStorage.setItem('settingsTourStep', '2');
-  if (step === 2 && hasRates) localStorage.setItem('settingsTourStep', '3');
-  if (step === 3 && hasLink) localStorage.setItem('settingsTourStep', '4');
+  // Steps: 1=header info, 2=photo, 3=rates, 4=preview/share
+  if (step === 2 && hasPhoto) localStorage.setItem('settingsTourStep', '3');
+  if (step === 3 && hasRates) localStorage.setItem('settingsTourStep', '4');
+  if (step === 4 && hasLink) localStorage.setItem('settingsTourStep', '5');
 
   // Remove active tour tooltip and overlay if stale
   const tooltip = document.getElementById('tourTooltip');
@@ -6774,14 +6774,15 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
 }
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
-function ensureTourBlurOverlay() {
+function ensureTourBlurOverlay(options) {
+  const opts = options || {};
   let overlay = document.getElementById('tourBlurOverlay');
   if (overlay) return overlay;
   overlay = document.createElement('div');
   overlay.id = 'tourBlurOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.48);pointer-events:${opts.blockPointer ? 'auto' : 'none'};`;
   document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
+  if (opts.lockScroll) document.body.style.overflow = 'hidden';
   return overlay;
 }
 
@@ -6899,12 +6900,12 @@ function scrollTourTargetIntoView(el, stepDef) {
 
   const block = stepDef.scrollBlock || 'center';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const behavior = prefersReducedMotion ? 'auto' : 'smooth';
+  const behavior = (settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth';
 
   return new Promise((resolve) => {
     const applyPadding = () => {
       const padTop = stepDef.scrollPadTop ?? 80;
-      const padBottom = stepDef.scrollPadBottom ?? 130;
+      const padBottom = stepDef.scrollPadBottom ?? 220;
       const measure = queryTourSelector(stepDef.anchorSelector)
         || (target && target.isConnected ? target : null)
         || (el && el.isConnected ? el : null);
@@ -7153,66 +7154,48 @@ function startSettingsTour() {
     },
     {
       target: '#edit-hotel-phone',
-      text: 'Tap any field here to edit your hotel info — name, address, phone.',
+      title: 'Edit your booking page',
+      text: 'Tap any field on this page to change it: hotel name, address, phone, room details, photos, and prices. What you edit here is what guests see.',
       openAccordion: false,
-      tab: 'settings'
+      tab: 'settings',
+      scrollToTop: true,
+      forcePageTop: true
     },
     {
       target: '#editRoomsCards [data-tour-room-card="1"]',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"]',
       anchorSelector: '#editRoomsCards [data-tour-room-card="1"]',
       scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
-      text: 'Add a photo of your room — guests book more when they see one.',
+      title: 'Add room photos',
+      text: 'Upload a real room photo here. Guests make faster decisions when they can see the room before they book.',
       openAccordion: false,
       tab: 'settings',
-      tooltipAnchor: 'card-top',
       scrollBlock: 'center',
       scrollPadTop: 190,
-      scrollPadBottom: 80,
-      forceTooltipAbove: true
+      scrollPadBottom: 220
     },
     {
       target: '#tour-rates-card',
       highlightSelector: '#tour-rates-card',
       anchorSelector: '#tour-rates-header',
       scrollTarget: '#tour-rates-card',
-      text: 'You can change your rates here — nightly, weekly, and monthly.',
+      title: 'Set your rates',
+      text: 'Set nightly, weekly, and monthly prices here. Guests book from these rates on your direct booking page.',
       openAccordion: true,
       accordionCard: '#tour-rates-card',
       tab: 'settings',
       scrollBlock: 'center',
-      scrollPadBottom: 280,
-      tooltipAnchor: 'card-bottom'
-    },
-    {
-      target: '#tour-copy-link-btn',
-      text: 'This is your booking URL — the link guests use to book with you directly.',
-      openAccordion: false,
-      tab: 'settings',
-      tooltipPosition: 'below'
+      scrollPadBottom: 260
     },
     {
       target: '#tour-preview-btn',
-      text: 'Preview your booking page to see exactly what your guests see.',
+      title: 'Preview and share it',
+      text: 'Use Preview to see exactly what guests see. Your booking link and QR code are on this page too, so you can send guests straight here.',
       openAccordion: false,
       tab: 'settings',
-      tooltipPosition: 'below',
       scrollToTop: true,
       scrollToTopOnly: true,
       forcePageTop: true
-    },
-    {
-      target: '#tour-pin-card',
-      highlightSelector: '#tour-pin-card',
-      anchorSelector: '#tour-pin-header',
-      scrollTarget: '#tour-pin-card',
-      text: 'This is your login PIN — you\'ll need it to access this dashboard next time. You can change it here anytime.',
-      openAccordion: true,
-      accordionCard: '#tour-pin-card',
-      tab: 'settings',
-      tooltipAnchor: 'card-top',
-      scrollBlock: 'center',
-      scrollPadBottom: 200
     },
     {
       target: '#bookingsList',
@@ -7230,18 +7213,14 @@ function startSettingsTour() {
     },
     {
       target: '.revenue-savings-pill',
-      text: 'See how much revenue your booking page generates and how much you\'re saving vs OTA commissions.',
-      openAccordion: false,
-      tab: 'revenue',
-      waitForVisible: true
-    },
-    {
-      target: '#paymentsExplainer',
-      text: 'When guests book through your booking page, their card is verified but never charged. This prevents no-shows — and you collect payment however you want when they physically check in.',
+      title: 'Track revenue and payment status',
+      text: 'Revenue shows direct bookings and estimated OTA commission savings. Guest cards are verified to reduce no-shows, but you still collect payment at check-in.',
       openAccordion: false,
       tab: 'revenue',
       waitForVisible: true,
-      tooltipPosition: 'above'
+      scrollBlock: 'start',
+      scrollPadTop: 92,
+      scrollPadBottom: 220
     },
     {
       target: '',
@@ -7550,107 +7529,29 @@ function startSettingsTour() {
     const tooltip = document.createElement('div');
     tooltip.id = 'tourTooltip';
 
-    const skipHtml = `<div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>`;
-    const nextLabel = step < steps.length - 1 ? 'Next \u2192' : 'Got it!';
-    const bodyHtml = `
-      <div style="background:#1a1a2e;border-radius:10px;padding:14px 18px;color:white;font-size:13px;line-height:1.5;font-weight:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);">
-        <p style="margin:0 0 12px;">${s.text}</p>
-        <button id="tourNextBtn" style="padding:8px 20px;border-radius:6px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${nextLabel}</button>
-        ${skipHtml}
+    const current = Math.min(step + 1, steps.length);
+    const progress = Math.max(8, Math.min(100, Math.round((current / steps.length) * 100)));
+    const title = s.title || 'Quick setup';
+    const nextLabel = s.primaryLabel || (step < steps.length - 1 ? 'Next' : 'Got it');
+    const backDisabled = step <= 0;
+
+    tooltip.style.cssText = 'position:fixed;z-index:100000;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;pointer-events:none;';
+    tooltip.innerHTML = `
+      <div style="pointer-events:auto;width:100%;max-width:560px;background:#fff;color:#1A2B22;border:1.5px solid #D8E4DC;border-radius:16px;box-shadow:0 18px 50px rgba(26,43,34,0.24);padding:14px 14px 13px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6B7D72;white-space:nowrap;">${current} of ${steps.length}</div>
+          <div style="height:6px;flex:1;border-radius:999px;background:#E6EEE9;overflow:hidden;">
+            <div style="height:100%;width:${progress}%;border-radius:999px;background:#2E7D5B;"></div>
+          </div>
+        </div>
+        <div style="font-size:16px;font-weight:800;line-height:1.25;margin-bottom:5px;">${title}</div>
+        <p style="font-size:13px;color:#4B5D52;line-height:1.45;margin:0 0 12px;">${s.text}</p>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="tourBackBtn" type="button" ${backDisabled ? 'disabled' : ''} style="min-height:40px;padding:9px 12px;border-radius:10px;border:1.5px solid #D8E4DC;background:#fff;color:${backDisabled ? '#A8B5AD' : '#1A2B22'};font-family:inherit;font-size:13px;font-weight:700;cursor:${backDisabled ? 'default' : 'pointer'};">Back</button>
+          <button id="tourSkipBtn" type="button" style="min-height:40px;padding:9px 12px;border:none;background:transparent;color:#6B7D72;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Skip</button>
+          <button id="tourNextBtn" type="button" style="min-height:40px;margin-left:auto;padding:10px 18px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">${nextLabel}</button>
+        </div>
       </div>`;
-
-    if (s.tooltipAnchor === 'card-bottom' || s.tooltipAnchor === 'card-top') {
-      const card = queryTourSelector(s.highlightSelector) || el;
-      const header = queryTourSelector(s.anchorSelector);
-      if (card) {
-        const cardRect = card.getBoundingClientRect();
-        const headerRect = header ? header.getBoundingClientRect() : null;
-        const tooltipMaxWidth = Math.min(280, window.innerWidth - 32);
-        const pointerX = cardRect.left + cardRect.width / 2;
-        const tooltipLeft = Math.max(16, Math.min(pointerX - tooltipMaxWidth / 2, window.innerWidth - tooltipMaxWidth - 16));
-        const arrowLeft = Math.max(20, Math.min(pointerX - tooltipLeft, tooltipMaxWidth - 20));
-        const estTipHeight = 132;
-
-        if (s.tooltipAnchor === 'card-bottom') {
-          const spaceBelow = window.innerHeight - cardRect.bottom;
-          const tooltipTop = Math.min(cardRect.bottom + 12, window.innerHeight - estTipHeight - 16);
-          if (spaceBelow >= estTipHeight + 20) {
-            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${tooltipTop}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-            tooltip.innerHTML = `
-              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
-              ${bodyHtml}`;
-          } else {
-            const attachY = headerRect ? headerRect.top : cardRect.top;
-            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${window.innerHeight - attachY + 10}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-            tooltip.innerHTML = `
-              ${bodyHtml}
-              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
-          }
-        } else {
-          const attachY = cardRect.top;
-          const spaceAbove = cardRect.top - 16;
-          const forceAbove = !!s.forceTooltipAbove
-            || !!(s.forceTooltipAboveOnDesktop && window.matchMedia('(min-width: 1024px)').matches);
-          if (spaceAbove >= estTipHeight + 24 || forceAbove) {
-            const top = attachY - estTipHeight - 10;
-            const topCss = top >= 16
-              ? `bottom:${window.innerHeight - attachY + 10}px;`
-              : `top:${Math.max(16, top)}px;`;
-            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;${topCss}max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-            tooltip.innerHTML = `
-              ${bodyHtml}
-              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
-          } else {
-            const tooltipTop = Math.min(cardRect.top + (headerRect ? headerRect.height : 48) + 12, window.innerHeight - estTipHeight - 16);
-            tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${tooltipTop}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-            tooltip.innerHTML = `
-              <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
-              ${bodyHtml}`;
-          }
-        }
-        document.body.appendChild(tooltip);
-        wireTourTooltipButtons();
-        return;
-      }
-    }
-
-    const rect = measuredRect || tourAnchorRect(s, el);
-
-    if (!rect) {
-      tooltip.style.cssText = 'position:fixed;z-index:100000;left:50%;top:50%;transform:translate(-50%,-50%);max-width:280px;width:calc(100% - 32px);';
-      tooltip.innerHTML = bodyHtml;
-      document.body.appendChild(tooltip);
-      wireTourTooltipButtons();
-      return;
-    }
-
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const tooltipMaxWidth = Math.min(280, window.innerWidth - 32);
-    const elCenterX = rect.left + rect.width / 2;
-    const tooltipLeft = Math.max(16, Math.min(elCenterX - tooltipMaxWidth / 2, window.innerWidth - tooltipMaxWidth - 16));
-    const arrowLeft = Math.max(20, Math.min(elCenterX - tooltipLeft, tooltipMaxWidth - 20));
-
-    let position = s.tooltipPosition || (spaceBelow > 150 ? 'below' : spaceAbove > 150 ? 'above' : 'center');
-    if (position === 'below' && spaceBelow < 130 && spaceAbove > spaceBelow) position = 'above';
-    if (position === 'above' && spaceAbove < 130 && spaceBelow > spaceAbove) position = 'below';
-    if (position === 'below' && rect.bottom + 150 > window.innerHeight) position = 'above';
-
-    if (position === 'below') {
-      const top = Math.min(rect.bottom + 8, window.innerHeight - 24);
-      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;top:${top}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-      tooltip.innerHTML = `
-        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>
-        ${bodyHtml}`;
-    } else if (position === 'above') {
-      tooltip.style.cssText = `position:fixed;z-index:100000;left:${tooltipLeft}px;bottom:${Math.max(16, window.innerHeight - rect.top + 8)}px;max-width:${tooltipMaxWidth}px;width:${tooltipMaxWidth}px;`;
-      tooltip.innerHTML = `
-        ${bodyHtml}
-        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #1a1a2e;margin-left:${arrowLeft - 8}px;"></div>`;
-    } else {
-      tooltip.style.cssText = 'position:fixed;z-index:100000;left:50%;top:50%;transform:translate(-50%,-50%);max-width:280px;width:calc(100% - 32px);';
-      tooltip.innerHTML = bodyHtml;
-    }
     document.body.appendChild(tooltip);
     wireTourTooltipButtons();
   }
@@ -7667,6 +7568,16 @@ function startSettingsTour() {
       };
     }
     if (skipBtn) skipBtn.onclick = () => { skipToFinale(); };
+    const backBtn = document.getElementById('tourBackBtn');
+    if (backBtn) {
+      backBtn.onclick = () => {
+        if (step <= 0) return;
+        cleanupTour();
+        step--;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+      };
+    }
   }
 
   function showHomescreenMockModal() {
