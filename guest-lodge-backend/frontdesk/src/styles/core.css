@@ -944,7 +944,7 @@
     }
     .cal-nav-btn:hover { border-color: var(--green); color: var(--green); }
 
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
     .cal-dow {
       text-align: center;
       font-size: 11px;
@@ -953,8 +953,11 @@
       text-transform: uppercase;
       color: var(--text-muted);
       padding: 3px 0 7px;
+      min-width: 0;
+      overflow: hidden;
     }
     .cal-day {
+      box-sizing: border-box;
       min-height: 54px;
       border-radius: 10px;
       border: 1.5px solid transparent;
@@ -966,6 +969,8 @@
       cursor: pointer;
       transition: all .12s;
       padding: 4px;
+      min-width: 0;
+      overflow: hidden;
     }
     .cal-day:hover { border-color: var(--green); }
     .cal-day.empty { background: transparent; border-color: transparent !important; cursor: default; }
@@ -976,8 +981,8 @@
     .cal-day.partial { background: #FEF3C7; }
     .cal-day.full { background: #FEE2E2; }
     .cal-day.closed { background: #f2f4f3; }
-    .day-num { font-size: 13px; font-weight: 700; line-height: 1; margin-bottom: 3px; }
-    .day-avail { font-size: 11px; font-family: 'DM Mono', monospace; line-height: 1; }
+    .day-num { font-size: 13px; font-weight: 700; line-height: 1; margin-bottom: 3px; max-width: 100%; white-space: nowrap; }
+    .day-avail { font-size: 11px; font-family: 'DM Mono', monospace; line-height: 1; max-width: 100%; white-space: nowrap; }
     .cal-day.open .day-avail { color: var(--green); }
     .cal-day.partial .day-avail { color: #92400E; }
     .cal-day.full .day-avail { color: #991B1B; }
@@ -1425,7 +1430,7 @@
       border-radius: 20px;
       padding: 16px;
     }
-    .availability-card.mobile-cal-card { padding: 16px; }
+    .availability-card.mobile-cal-card { padding: 14px 12px; }
     .cal-header { margin-bottom: 14px; }
     .cal-month-label { font-size: 21px; }
     .cal-nav-btn {
@@ -1435,21 +1440,21 @@
       font-size: 24px;
       background: var(--bg);
     }
-    .cal-grid { gap: 4px; }
+    .cal-grid { gap: 5px; }
     .cal-day {
-      min-height: auto;
-      aspect-ratio: 1;
-      border-radius: 12px;
-      border-width: 2px;
-      padding: 3px;
+      min-height: 44px;
+      aspect-ratio: auto;
+      border-radius: 10px;
+      border-width: 1.5px;
+      padding: 3px 1px;
     }
     .cal-day:active:not(.empty):not(.past) { transform: scale(0.94); }
     .cal-day.open { border-color: var(--green-light); }
     .cal-day.partial { border-color: var(--amber); }
     .cal-day.full { border-color: var(--red); }
     .cal-day.closed { border-color: var(--border); }
-    .day-num { font-size: 15px; }
-    .day-avail { font-size: 11px; font-family: 'DM Sans', sans-serif; font-weight: 700; }
+    .day-num { font-size: 13px; margin-bottom: 2px; }
+    .day-avail { font-size: 10px; font-family: 'DM Sans', sans-serif; font-weight: 700; }
     .availability-sheet-backdrop {
       display: none;
       position: fixed;
@@ -1761,7 +1766,7 @@
       .tab { padding: 8px 12px; font-size: 13px; font-weight: 600; gap: 6px; flex-shrink: 0; white-space: nowrap; }
       .tab-badge { padding: 1px 6px; font-size: 11px; }
       .availability-card { padding: 12px; }
-      .cal-grid { gap: 4px; }
+      .cal-grid { gap: 5px; }
       .cal-day { min-height: 48px; border-radius: 9px; }
       .day-num { font-size: 12px; margin-bottom: 2px; }
       .day-avail { font-size: 10px; }
