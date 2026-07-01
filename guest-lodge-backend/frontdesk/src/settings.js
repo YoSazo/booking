@@ -360,10 +360,10 @@ function advanceTourIfNeeded() {
   const hasRates = !!localStorage.getItem('ratesChanged');
   const hasLink = !!localStorage.getItem('linkCopied');
 
-  // Steps: 1=header info, 2=photo, 3=rates, 4=preview/share
+  // Steps: 1=header info, 2=photo, 3=room details, 4=rates, 5=preview/share
   if (step === 2 && hasPhoto) localStorage.setItem('settingsTourStep', '3');
-  if (step === 3 && hasRates) localStorage.setItem('settingsTourStep', '4');
-  if (step === 4 && hasLink) localStorage.setItem('settingsTourStep', '5');
+  if (step === 4 && hasRates) localStorage.setItem('settingsTourStep', '5');
+  if (step === 5 && hasLink) localStorage.setItem('settingsTourStep', '6');
 
   // Remove active tour tooltip and overlay if stale
   const tooltip = document.getElementById('tourTooltip');
@@ -1062,6 +1062,10 @@ function startSettingsTour() {
     return;
   }
 
+  if (!localStorage.getItem('settingsTourDone')) {
+    localStorage.removeItem('settingsTourStep');
+  }
+
   crm.settingsTourActive = true;
   updateGoLiveBanner();
   seedTourRevenueShell();
@@ -1101,22 +1105,34 @@ function startSettingsTour() {
       text: 'Tap any field on this page to change it: hotel name, address, phone, room details, photos, and prices. What you edit here is what guests see.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'start',
-      scrollPadTop: 96,
-      scrollPadBottom: 220
+      scrollToTop: true,
+      scrollBlock: 'start'
     },
     {
-      target: '#editRoomsCards [data-tour-room-card="1"]',
-      highlightSelector: '#editRoomsCards [data-tour-room-card="1"]',
+      target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder',
+      highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder',
       anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder',
       title: 'Add room photos',
       text: 'Upload a real room photo here. Guests make faster decisions when they can see the room before they book.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'start',
-      scrollPadTop: 96,
-      scrollPadBottom: 240
+      scrollBlock: 'center',
+      scrollPadTop: 80,
+      scrollPadBottom: 200
+    },
+    {
+      target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields input[type="text"]',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      title: 'Edit room details',
+      text: 'Set the room name, description, and maximum guests. These appear on your booking page.',
+      openAccordion: false,
+      tab: 'settings',
+      scrollBlock: 'center',
+      scrollPadTop: 80,
+      scrollPadBottom: 200
     },
     {
       target: '#tour-rates-card',
@@ -1140,9 +1156,8 @@ function startSettingsTour() {
       text: 'Use Preview to see exactly what guests see. Your booking link and QR code are on this page too, so you can send guests straight here.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'start',
-      scrollPadTop: 96,
-      scrollPadBottom: 240
+      scrollToTop: true,
+      scrollBlock: 'start'
     },
     {
       target: '#bookingsList',
@@ -1425,11 +1440,18 @@ function startSettingsTour() {
         highlightEl.style.position = highlightEl.style.position || 'relative';
         highlightEl.style.zIndex = '99999';
         highlightEl.style.isolation = 'isolate';
-        highlightEl.style.boxShadow = 'inset 0 0 0 3px #2E7D5B, 0 0 0 3px #2E7D5B, 0 14px 34px rgba(46,125,91,0.24)';
-        highlightEl.style.outline = '3px solid #2E7D5B';
-        highlightEl.style.outlineOffset = '3px';
+        if (highlightEl.id === 'tour-preview-btn') {
+          highlightEl.style.boxShadow = '0 0 0 4px #fff, 0 0 0 8px #2E7D5B, 0 14px 34px rgba(0,0,0,0.25)';
+          highlightEl.style.outline = '3px solid #fff';
+          highlightEl.style.outlineOffset = '4px';
+        } else {
+          highlightEl.style.boxShadow = 'inset 0 0 0 3px #2E7D5B, 0 0 0 3px #2E7D5B, 0 14px 34px rgba(46,125,91,0.24)';
+          highlightEl.style.outline = '3px solid #2E7D5B';
+          highlightEl.style.outlineOffset = '3px';
+        }
         highlightEl.setAttribute('data-tour-highlighted', '1');
       }
+      document.body.style.overflow = 'hidden';
 
       const placeTooltip = () => {
         const anchor = queryTourSelector(s.anchorSelector);

@@ -567,6 +567,7 @@ function appsTourCleanupUi() {
     el.style.boxSizing = el.dataset.appsTourOrigBoxSizing || '';
     el.style.outline = el.dataset.appsTourOrigOutline || '';
     el.style.outlineOffset = el.dataset.appsTourOrigOutlineOffset || '';
+    el.style.lineHeight = el.dataset.appsTourOrigLineHeight || '';
     el.removeAttribute('data-apps-tour-highlighted');
     delete el.dataset.appsTourOrigPosition;
     delete el.dataset.appsTourOrigZIndex;
@@ -577,6 +578,7 @@ function appsTourCleanupUi() {
     delete el.dataset.appsTourOrigBoxSizing;
     delete el.dataset.appsTourOrigOutline;
     delete el.dataset.appsTourOrigOutlineOffset;
+    delete el.dataset.appsTourOrigLineHeight;
   });
 }
 
@@ -725,20 +727,13 @@ function appsTourRender() {
   target.dataset.appsTourOrigBoxSizing = target.style.boxSizing || '';
   target.dataset.appsTourOrigOutline = target.style.outline || '';
   target.dataset.appsTourOrigOutlineOffset = target.style.outlineOffset || '';
+  target.dataset.appsTourOrigLineHeight = target.style.lineHeight || '';
   target.style.position = target.style.position || 'relative';
   target.style.zIndex = '100002';
   target.style.isolation = 'isolate';
   target.style.boxSizing = 'border-box';
-  const targetStyle = window.getComputedStyle ? window.getComputedStyle(target) : null;
-  if (targetStyle) {
-    const padTop = parseFloat(targetStyle.paddingTop) || 0;
-    const padRight = parseFloat(targetStyle.paddingRight) || 0;
-    const padBottom = parseFloat(targetStyle.paddingBottom) || 0;
-    const padLeft = parseFloat(targetStyle.paddingLeft) || 0;
-    if (padTop < 10 || padRight < 12 || padBottom < 10 || padLeft < 12) {
-      target.style.padding = `${Math.max(padTop, 10)}px ${Math.max(padRight, 12)}px ${Math.max(padBottom, 10)}px ${Math.max(padLeft, 12)}px`;
-    }
-  }
+  target.style.padding = '16px 18px';
+  target.style.lineHeight = '1.6';
   target.style.boxShadow = '0 14px 38px rgba(0,0,0,0.24)';
   target.style.outline = '4px solid #2E7D5B';
   target.style.outlineOffset = '5px';
