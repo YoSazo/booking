@@ -6874,6 +6874,19 @@ function tourAnchorRect(stepDef, highlightEl) {
   return tourElementRect(highlightEl, true);
 }
 
+function forceTourPageTop(behavior) {
+  const scrollBehavior = behavior || 'auto';
+  try { window.scrollTo({ top: 0, left: 0, behavior: scrollBehavior }); } catch (_) {}
+  const scrollingEl = document.scrollingElement || document.documentElement;
+  if (scrollingEl) scrollingEl.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  ['#editView', '#settingsView', '#app .container'].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.scrollTop = 0;
+  });
+}
+
 function scrollTourTargetIntoView(el, stepDef) {
   const scrollSel = stepDef.scrollTarget || stepDef.accordionCard;
   const target = (scrollSel ? queryTourSelector(scrollSel) : null) || el;
@@ -6881,7 +6894,7 @@ function scrollTourTargetIntoView(el, stepDef) {
 
   const block = stepDef.scrollBlock || 'center';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const behavior = (settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth';
+  const behavior = prefersReducedMotion ? 'auto' : 'smooth';
 
   return new Promise((resolve) => {
     const applyPadding = () => {
@@ -6908,11 +6921,12 @@ function scrollTourTargetIntoView(el, stepDef) {
     };
 
     if (stepDef.scrollToTop) {
-      window.scrollTo({ top: 0, left: 0, behavior });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      forceTourPageTop(behavior);
       if (stepDef.scrollToTopOnly) {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (stepDef.forcePageTop) forceTourPageTop('auto');
+          resolve();
+        }));
         return;
       }
       if (behavior === 'auto') {
@@ -7179,7 +7193,8 @@ function startSettingsTour() {
       tab: 'settings',
       tooltipPosition: 'below',
       scrollToTop: true,
-      scrollToTopOnly: true
+      scrollToTopOnly: true,
+      forcePageTop: true
     },
     {
       target: '#tour-pin-card',
@@ -7463,6 +7478,7 @@ function startSettingsTour() {
     const highlightEl = el;
     ensureTourBlurOverlay();
     void scrollTourTargetIntoView(highlightEl, s).then(() => {
+      if (s.forcePageTop) forceTourPageTop('auto');
       if (!highlightEl.isConnected) {
         step++;
         localStorage.setItem('settingsTourStep', String(step));
@@ -7502,6 +7518,7 @@ function startSettingsTour() {
 
       const positionAfterLayout = (attempt = 0) => {
         requestAnimationFrame(() => {
+          if (s.forcePageTop) forceTourPageTop('auto');
           if (s.tooltipAnchor) {
             placeTooltip();
             return;
@@ -9783,7 +9800,17 @@ function appsTourRender() {
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isNarrowViewport = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
   const scrollBlock = (isNarrowViewport && step.mobileScrollBlock) || step.scrollBlock || 'center';
-  target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: scrollBlock });
+  const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+  if (isNarrowViewport && step.mobileScrollToBottom) {
+    const scrollHeight = Math.max(
+      document.documentElement ? document.documentElement.scrollHeight : 0,
+      document.body ? document.body.scrollHeight : 0
+    );
+    window.scrollTo({ top: scrollHeight, behavior: scrollBehavior });
+    setTimeout(() => { window.scrollTo({ top: scrollHeight, behavior: 'auto' }); }, scrollBehavior === 'smooth' ? 520 : 0);
+  } else {
+    target.scrollIntoView({ behavior: scrollBehavior, block: scrollBlock });
+  }
 
   const placeTooltip = () => {
     const old = document.getElementById('appsTourTooltip');
@@ -9850,7 +9877,10 @@ function appsTourRender() {
       appsTourClose(true);
     };
   };
-  setTimeout(placeTooltip, prefersReducedMotion ? 40 : 320);
+  const tooltipDelay = isNarrowViewport && step.mobileScrollToBottom
+    ? (prefersReducedMotion ? 80 : 680)
+    : (prefersReducedMotion ? 40 : 320);
+  setTimeout(placeTooltip, tooltipDelay);
 }
 
 function startAppsTour(opts) {
@@ -9889,6 +9919,7 @@ function startAppsTour(opts) {
       target: '#tour-guest-icon-section',
       title: 'This is the one setup item.',
       text: 'Guests see this icon on their home screen. Uploading the picture unlocks after Front Desk is installed.',
+      mobileScrollToBottom: true,
       mobileScrollBlock: 'end',
       mobileTooltipAnchor: 'top',
       mobileTooltipPosition: 'above',

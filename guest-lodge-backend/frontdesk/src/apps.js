@@ -723,7 +723,17 @@ function appsTourRender() {
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isNarrowViewport = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
   const scrollBlock = (isNarrowViewport && step.mobileScrollBlock) || step.scrollBlock || 'center';
-  target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: scrollBlock });
+  const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+  if (isNarrowViewport && step.mobileScrollToBottom) {
+    const scrollHeight = Math.max(
+      document.documentElement ? document.documentElement.scrollHeight : 0,
+      document.body ? document.body.scrollHeight : 0
+    );
+    window.scrollTo({ top: scrollHeight, behavior: scrollBehavior });
+    setTimeout(() => { window.scrollTo({ top: scrollHeight, behavior: 'auto' }); }, scrollBehavior === 'smooth' ? 520 : 0);
+  } else {
+    target.scrollIntoView({ behavior: scrollBehavior, block: scrollBlock });
+  }
 
   const placeTooltip = () => {
     const old = document.getElementById('appsTourTooltip');
@@ -790,7 +800,10 @@ function appsTourRender() {
       appsTourClose(true);
     };
   };
-  setTimeout(placeTooltip, prefersReducedMotion ? 40 : 320);
+  const tooltipDelay = isNarrowViewport && step.mobileScrollToBottom
+    ? (prefersReducedMotion ? 80 : 680)
+    : (prefersReducedMotion ? 40 : 320);
+  setTimeout(placeTooltip, tooltipDelay);
 }
 
 function startAppsTour(opts) {
@@ -829,6 +842,7 @@ function startAppsTour(opts) {
       target: '#tour-guest-icon-section',
       title: 'This is the one setup item.',
       text: 'Guests see this icon on their home screen. Uploading the picture unlocks after Front Desk is installed.',
+      mobileScrollToBottom: true,
       mobileScrollBlock: 'end',
       mobileTooltipAnchor: 'top',
       mobileTooltipPosition: 'above',

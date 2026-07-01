@@ -811,6 +811,19 @@ function tourAnchorRect(stepDef, highlightEl) {
   return tourElementRect(highlightEl, true);
 }
 
+function forceTourPageTop(behavior) {
+  const scrollBehavior = behavior || 'auto';
+  try { window.scrollTo({ top: 0, left: 0, behavior: scrollBehavior }); } catch (_) {}
+  const scrollingEl = document.scrollingElement || document.documentElement;
+  if (scrollingEl) scrollingEl.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  ['#editView', '#settingsView', '#app .container'].forEach((sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.scrollTop = 0;
+  });
+}
+
 function scrollTourTargetIntoView(el, stepDef) {
   const scrollSel = stepDef.scrollTarget || stepDef.accordionCard;
   const target = (scrollSel ? queryTourSelector(scrollSel) : null) || el;
@@ -818,7 +831,7 @@ function scrollTourTargetIntoView(el, stepDef) {
 
   const block = stepDef.scrollBlock || 'center';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const behavior = (crm.settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth';
+  const behavior = prefersReducedMotion ? 'auto' : 'smooth';
 
   return new Promise((resolve) => {
     const applyPadding = () => {
@@ -845,11 +858,12 @@ function scrollTourTargetIntoView(el, stepDef) {
     };
 
     if (stepDef.scrollToTop) {
-      window.scrollTo({ top: 0, left: 0, behavior });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      forceTourPageTop(behavior);
       if (stepDef.scrollToTopOnly) {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (stepDef.forcePageTop) forceTourPageTop('auto');
+          resolve();
+        }));
         return;
       }
       if (behavior === 'auto') {
@@ -1116,7 +1130,8 @@ function startSettingsTour() {
       tab: 'settings',
       tooltipPosition: 'below',
       scrollToTop: true,
-      scrollToTopOnly: true
+      scrollToTopOnly: true,
+      forcePageTop: true
     },
     {
       target: '#tour-pin-card',
@@ -1400,6 +1415,7 @@ function startSettingsTour() {
     const highlightEl = el;
     ensureTourBlurOverlay();
     void scrollTourTargetIntoView(highlightEl, s).then(() => {
+      if (s.forcePageTop) forceTourPageTop('auto');
       if (!highlightEl.isConnected) {
         step++;
         localStorage.setItem('settingsTourStep', String(step));
@@ -1439,6 +1455,7 @@ function startSettingsTour() {
 
       const positionAfterLayout = (attempt = 0) => {
         requestAnimationFrame(() => {
+          if (s.forcePageTop) forceTourPageTop('auto');
           if (s.tooltipAnchor) {
             placeTooltip();
             return;
