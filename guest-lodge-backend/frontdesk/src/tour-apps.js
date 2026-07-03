@@ -43,8 +43,6 @@ function ensureAppsTourStyles() {
   style.id = 'frontdeskAppsTourStyle';
   style.textContent = `
     #appsTourLightbox {
-      -webkit-backdrop-filter: blur(2px);
-      backdrop-filter: blur(2px);
       animation: appsTourOverlayIn 0.18s ease-out;
     }
     #appsTourTooltip {
@@ -315,7 +313,7 @@ function showGuestAppActivationModal() {
 
   const overlay = document.createElement('div');
   overlay.id = 'guestAppActivationOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:100004;background:rgba(17,24,39,0.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100004;background:rgba(17,24,39,0.52);display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;';
   overlay.innerHTML = `
     <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:390px;width:100%;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:appsTourPanelIn 0.22s ease-out;">
       <div style="padding:26px 22px 22px;">
@@ -387,7 +385,7 @@ function appsTourRender() {
   appsTourCleanupUi();
   let lb = document.createElement('div');
   lb.id = 'appsTourLightbox';
-  lb.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(17,24,39,0.52);pointer-events:auto;';
+  lb.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(17,24,39,0.36);pointer-events:auto;';
   document.body.appendChild(lb);
 
   target.dataset.appsTourOrigPosition = target.style.position || '';
