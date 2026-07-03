@@ -315,9 +315,11 @@ function renderAppsView() {
 
   const appsStoryHtml = `
     <section class="apps-story">
-      <div class="apps-story-kicker">Guest App</div>
-      <h2 class="apps-story-title" id="tour-apps-headline">Your hotel can be on your guest's home screen.</h2>
-      <p class="apps-story-copy" id="tour-apps-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
+      <div id="tour-apps-intro">
+        <div class="apps-story-kicker">Guest App</div>
+        <h2 class="apps-story-title" id="tour-apps-headline">Your hotel can be on your guest's home screen.</h2>
+        <p class="apps-story-copy" id="tour-apps-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your hotel appears on their phone like an app.</p>
+      </div>
 
       <div class="apps-story-line" id="tour-apps-first">
         <div class="apps-story-step">First</div>

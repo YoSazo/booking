@@ -258,6 +258,8 @@ function createAppsTourSpotlightClone(source) {
   stripAppsTourCloneIds(clone);
   copyAppsTourCloneComputedStyles(source, clone);
   syncAppsTourCloneFormValues(source, clone);
+  if (!source.dataset.appsTourOrigVisibility) source.dataset.appsTourOrigVisibility = source.style.visibility || '';
+  source.style.visibility = 'hidden';
   clone.setAttribute('data-apps-tour-spotlight-clone', '1');
   clone.setAttribute('aria-hidden', 'true');
   clone.style.position = 'fixed';
@@ -296,6 +298,7 @@ function appsTourCleanupUi() {
     el.style.outline = el.dataset.appsTourOrigOutline || '';
     el.style.outlineOffset = el.dataset.appsTourOrigOutlineOffset || '';
     el.style.transition = el.dataset.appsTourOrigTransition || '';
+    el.style.visibility = el.dataset.appsTourOrigVisibility || '';
     el.removeAttribute('data-apps-tour-highlighted');
     delete el.dataset.appsTourOrigPosition;
     delete el.dataset.appsTourOrigZIndex;
@@ -304,6 +307,7 @@ function appsTourCleanupUi() {
     delete el.dataset.appsTourOrigOutline;
     delete el.dataset.appsTourOrigOutlineOffset;
     delete el.dataset.appsTourOrigTransition;
+    delete el.dataset.appsTourOrigVisibility;
   });
 }
 
@@ -596,7 +600,7 @@ function startAppsTour(opts) {
   const hotelIsLive = !!crm.hotelSubscribed;
   _appsTourSteps = [
     {
-      target: '#tour-apps-headline',
+      target: '#tour-apps-intro',
       kicker: 'The loop',
       title: 'Your hotel becomes the app.',
       text: 'Guests book from your direct page, save your hotel to their phone, then come back with one tap to book or message you.',
