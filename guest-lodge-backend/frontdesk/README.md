@@ -11,11 +11,13 @@ Front Desk is the modular Vite source for the `/frontdesk` app. Edit files in
 | `src/core.js` | Boot, login, bookings, availability, revenue |
 | `src/settings.js` | Settings and room editor |
 | `src/apps.js` | Phones/apps tab and tours, lazy-loaded |
+| `src/tour-settings.js` | Settings walkthrough logic |
+| `src/tour-apps.js` | Guest App walkthrough logic |
 | `src/state.js` | Shared mutable Front Desk state |
 | `src/utils.js` | Shared helpers |
 | `src/styles/core.css` | Main Front Desk styles |
 | `../public/frontdesk/` | Production build output served at `/frontdesk` |
-| `../simple-crm.html` | Legacy fallback only |
+| `../simple-crm.html` | Generated fallback shell from the latest build |
 
 ## Commands
 
@@ -32,14 +34,13 @@ npm run dev
 
 1. Edit `frontdesk/src/`.
 2. Run `npm run build:frontdesk` from `guest-lodge-backend/`.
-3. Commit both source changes and generated `public/frontdesk/` assets.
+3. Commit source changes plus generated `public/frontdesk/` assets and `simple-crm.html`.
 
-`simple-crm.html` is no longer the source of truth. The legacy importer is kept
-only as an escape hatch:
+`simple-crm.html` is not editable source code anymore. It is generated from the
+built `/frontdesk` app so there is one source of truth.
+
+The old legacy importer is retired. Running this command now fails on purpose:
 
 ```bash
 npm run split:legacy
 ```
-
-That command overwrites `frontdesk/src/` from `simple-crm.html`, so use it only
-when intentionally re-importing the old monolith.
