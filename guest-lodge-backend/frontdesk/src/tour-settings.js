@@ -39,6 +39,8 @@ function ensureTourPolishStyles() {
   style.id = 'frontdeskTourPolishStyle';
   style.textContent = `
     #tourBlurOverlay {
+      -webkit-backdrop-filter: blur(2.5px);
+      backdrop-filter: blur(2.5px);
       animation: tourOverlayFade 0.18s ease-out;
     }
     #tourTooltip {
@@ -224,7 +226,7 @@ function ensureTourBlurOverlay(options) {
   if (overlay) return overlay;
   overlay = document.createElement('div');
   overlay.id = 'tourBlurOverlay';
-  overlay.style.cssText = `position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.36);pointer-events:${opts.blockPointer ? 'auto' : 'none'};`;
+  overlay.style.cssText = `position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.22);pointer-events:${opts.blockPointer ? 'auto' : 'none'};`;
   document.body.appendChild(overlay);
   if (opts.lockScroll) document.body.style.overflow = 'hidden';
   return overlay;
@@ -465,7 +467,7 @@ function showFinaleMockModal() {
   crm.settingsTourActive = false;
   updateGoLiveBanner();
   const blurOverlay = ensureTourBlurOverlay({ blockPointer: true, lockScroll: true });
-  blurOverlay.style.background = 'rgba(17,24,39,0.52)';
+  blurOverlay.style.background = 'rgba(17,24,39,0.42)';
 
   const modal = document.createElement('div');
   modal.id = 'tourTooltip';
@@ -532,7 +534,7 @@ function showTestDriveModal(bookingUrl) {
   ensureTourPolishStyles();
   const overlay = document.createElement('div');
   overlay.id = 'testDriveOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(17,24,39,0.52);display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:24px 16px;';
   overlay.innerHTML = `
     <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:tourPanelIn 0.22s ease-out;">
       <div style="padding:26px 22px 22px;">
@@ -974,15 +976,9 @@ function startSettingsTour() {
         highlightEl.style.zIndex = '99999';
         highlightEl.style.isolation = 'isolate';
         highlightEl.style.transition = 'box-shadow 0.18s ease, outline 0.18s ease';
-        if (highlightEl.id === 'tour-preview-btn') {
-          highlightEl.style.boxShadow = '0 0 0 4px #fff, 0 0 0 8px rgba(46,125,91,0.95), 0 18px 42px rgba(0,0,0,0.26)';
-          highlightEl.style.outline = '2px solid #fff';
-          highlightEl.style.outlineOffset = '4px';
-        } else {
-          highlightEl.style.boxShadow = '0 0 0 4px #fff, 0 0 0 8px rgba(46,125,91,0.92), 0 18px 42px rgba(26,43,34,0.22)';
-          highlightEl.style.outline = '2px solid #fff';
-          highlightEl.style.outlineOffset = '4px';
-        }
+        highlightEl.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.92), 0 18px 46px rgba(26,43,34,0.22)';
+        highlightEl.style.outline = '1px solid rgba(255,255,255,0.82)';
+        highlightEl.style.outlineOffset = '2px';
         highlightEl.setAttribute('data-tour-highlighted', '1');
       }
       document.body.style.overflow = 'hidden';
@@ -1123,7 +1119,7 @@ function startSettingsTour() {
     // Dark overlay
     const blurOverlay = document.createElement('div');
     blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.48);';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);';
     document.body.appendChild(blurOverlay);
     document.body.style.overflow = 'hidden';
 
@@ -1200,7 +1196,7 @@ function startSettingsTour() {
     // Dark overlay
     const blurOverlay = document.createElement('div');
     blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.48);';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);';
     document.body.appendChild(blurOverlay);
     document.body.style.overflow = 'hidden';
 
@@ -1357,7 +1353,7 @@ function startSettingsTour() {
     // Dark overlay
     const blurOverlay = document.createElement('div');
     blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.48);';
+    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);';
     document.body.appendChild(blurOverlay);
     document.body.style.overflow = 'hidden';
 
