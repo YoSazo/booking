@@ -7188,12 +7188,12 @@ function startSettingsTour() {
       target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder, #editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
       anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
       title: 'Add room photos',
       text: 'Tap + Add Photos to upload a real room photo. Guests make faster decisions when they can see the room before they book.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'start',
+      scrollBlock: 'center',
       scrollPadTop: 80,
       scrollPadBottom: 220
     },
@@ -7201,12 +7201,12 @@ function startSettingsTour() {
       target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
       title: 'Edit room details',
       text: 'Then edit the room name, description, maximum guests, amenities, and units. These details show on your booking page.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'start',
+      scrollBlock: 'center',
       scrollPadTop: 80,
       scrollPadBottom: 220
     },
@@ -9605,23 +9605,15 @@ function appsTourCleanupUi() {
     el.style.zIndex = el.dataset.appsTourOrigZIndex || '';
     el.style.isolation = el.dataset.appsTourOrigIsolation || '';
     el.style.boxShadow = el.dataset.appsTourOrigBoxShadow || '';
-    el.style.borderRadius = el.dataset.appsTourOrigBorderRadius || '';
-    el.style.padding = el.dataset.appsTourOrigPadding || '';
-    el.style.boxSizing = el.dataset.appsTourOrigBoxSizing || '';
     el.style.outline = el.dataset.appsTourOrigOutline || '';
     el.style.outlineOffset = el.dataset.appsTourOrigOutlineOffset || '';
-    el.style.lineHeight = el.dataset.appsTourOrigLineHeight || '';
     el.removeAttribute('data-apps-tour-highlighted');
     delete el.dataset.appsTourOrigPosition;
     delete el.dataset.appsTourOrigZIndex;
     delete el.dataset.appsTourOrigIsolation;
     delete el.dataset.appsTourOrigBoxShadow;
-    delete el.dataset.appsTourOrigBorderRadius;
-    delete el.dataset.appsTourOrigPadding;
-    delete el.dataset.appsTourOrigBoxSizing;
     delete el.dataset.appsTourOrigOutline;
     delete el.dataset.appsTourOrigOutlineOffset;
-    delete el.dataset.appsTourOrigLineHeight;
   });
 }
 
@@ -9765,22 +9757,14 @@ function appsTourRender() {
   target.dataset.appsTourOrigZIndex = target.style.zIndex || '';
   target.dataset.appsTourOrigIsolation = target.style.isolation || '';
   target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
-  target.dataset.appsTourOrigBorderRadius = target.style.borderRadius || '';
-  target.dataset.appsTourOrigPadding = target.style.padding || '';
-  target.dataset.appsTourOrigBoxSizing = target.style.boxSizing || '';
   target.dataset.appsTourOrigOutline = target.style.outline || '';
   target.dataset.appsTourOrigOutlineOffset = target.style.outlineOffset || '';
-  target.dataset.appsTourOrigLineHeight = target.style.lineHeight || '';
   target.style.position = target.style.position || 'relative';
   target.style.zIndex = '100002';
   target.style.isolation = 'isolate';
-  target.style.boxSizing = 'border-box';
-  target.style.padding = '16px 18px';
-  target.style.lineHeight = '1.6';
   target.style.boxShadow = '0 14px 38px rgba(0,0,0,0.24)';
   target.style.outline = '4px solid #2E7D5B';
   target.style.outlineOffset = '5px';
-  target.style.borderRadius = target.style.borderRadius || '16px';
   target.setAttribute('data-apps-tour-highlighted', '1');
 
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
