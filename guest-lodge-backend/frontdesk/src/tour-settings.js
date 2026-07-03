@@ -721,15 +721,15 @@ function startSettingsTour() {
     {
       target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"]',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields button[onclick^="saveEditRoom"]',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields button[onclick^="saveEditRoom"]',
       title: 'Edit room details',
       text: 'Room name, description, guest count, amenities, and units all show on the booking page. Keep this short and accurate.',
       openAccordion: false,
       tab: 'settings',
       scrollBlock: 'center',
       scrollPadTop: 80,
-      scrollPadBottom: 220
+      scrollPadBottom: 330
     },
     {
       target: '#tour-booking-link-card',
