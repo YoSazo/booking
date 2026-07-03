@@ -217,6 +217,66 @@ function installAppsTourKeyboard(actions) {
   document.addEventListener('keydown', _appsTourKeyHandler);
 }
 
+function stripAppsTourCloneIds(root) {
+  root.removeAttribute('id');
+  root.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+}
+
+function syncAppsTourCloneFormValues(source, clone) {
+  const sourceFields = source.querySelectorAll('input, textarea, select');
+  const cloneFields = clone.querySelectorAll('input, textarea, select');
+  sourceFields.forEach((field, idx) => {
+    const cloneField = cloneFields[idx];
+    if (!cloneField) return;
+    if (field.type === 'checkbox' || field.type === 'radio') {
+      cloneField.checked = field.checked;
+    } else {
+      cloneField.value = field.value;
+    }
+  });
+}
+
+function copyAppsTourCloneComputedStyles(source, clone) {
+  const computed = getComputedStyle(source);
+  for (const property of computed) {
+    clone.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+  }
+  const sourceChildren = source.children;
+  const cloneChildren = clone.children;
+  for (let i = 0; i < sourceChildren.length; i += 1) {
+    if (cloneChildren[i]) copyAppsTourCloneComputedStyles(sourceChildren[i], cloneChildren[i]);
+  }
+}
+
+function createAppsTourSpotlightClone(source) {
+  if (!source || !source.isConnected) return null;
+  document.querySelectorAll('[data-apps-tour-spotlight-clone]').forEach((el) => el.remove());
+  const rect = source.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return null;
+
+  const clone = source.cloneNode(true);
+  stripAppsTourCloneIds(clone);
+  copyAppsTourCloneComputedStyles(source, clone);
+  syncAppsTourCloneFormValues(source, clone);
+  clone.setAttribute('data-apps-tour-spotlight-clone', '1');
+  clone.setAttribute('aria-hidden', 'true');
+  clone.style.position = 'fixed';
+  clone.style.left = `${rect.left}px`;
+  clone.style.top = `${rect.top}px`;
+  clone.style.width = `${rect.width}px`;
+  clone.style.height = `${rect.height}px`;
+  clone.style.margin = '0';
+  clone.style.maxWidth = 'none';
+  clone.style.zIndex = '100002';
+  clone.style.pointerEvents = 'none';
+  clone.style.transform = 'none';
+  clone.style.boxShadow = '0 18px 46px rgba(26,43,34,0.24)';
+  clone.style.outline = '1px solid rgba(255,255,255,0.82)';
+  clone.style.outlineOffset = '2px';
+  document.body.appendChild(clone);
+  return clone;
+}
+
 function appsTourCleanupUi() {
   clearAppsTourKeyboard();
   if (_appsTourTooltipTimer) {
@@ -227,6 +287,7 @@ function appsTourCleanupUi() {
   if (lb) lb.remove();
   const tip = document.getElementById('appsTourTooltip');
   if (tip) tip.remove();
+  document.querySelectorAll('[data-apps-tour-spotlight-clone]').forEach((el) => el.remove());
   document.querySelectorAll('[data-apps-tour-highlighted]').forEach((el) => {
     el.style.position = el.dataset.appsTourOrigPosition || '';
     el.style.zIndex = el.dataset.appsTourOrigZIndex || '';
@@ -424,6 +485,7 @@ function appsTourRender() {
   const placeTooltip = () => {
     const old = document.getElementById('appsTourTooltip');
     if (old) old.remove();
+    createAppsTourSpotlightClone(target);
     const rect = target.getBoundingClientRect();
     const maxWidth = Math.min(isNarrowViewport ? window.innerWidth - 24 : 370, window.innerWidth - 28);
     const centerX = rect.left + rect.width / 2;

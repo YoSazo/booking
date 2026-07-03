@@ -232,12 +232,73 @@ function ensureTourBlurOverlay(options) {
   return overlay;
 }
 
+function stripTourCloneIds(root) {
+  root.removeAttribute('id');
+  root.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+}
+
+function syncTourCloneFormValues(source, clone) {
+  const sourceFields = source.querySelectorAll('input, textarea, select');
+  const cloneFields = clone.querySelectorAll('input, textarea, select');
+  sourceFields.forEach((field, idx) => {
+    const cloneField = cloneFields[idx];
+    if (!cloneField) return;
+    if (field.type === 'checkbox' || field.type === 'radio') {
+      cloneField.checked = field.checked;
+    } else {
+      cloneField.value = field.value;
+    }
+  });
+}
+
+function copyTourCloneComputedStyles(source, clone) {
+  const computed = getComputedStyle(source);
+  for (const property of computed) {
+    clone.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+  }
+  const sourceChildren = source.children;
+  const cloneChildren = clone.children;
+  for (let i = 0; i < sourceChildren.length; i += 1) {
+    if (cloneChildren[i]) copyTourCloneComputedStyles(sourceChildren[i], cloneChildren[i]);
+  }
+}
+
+function createSettingsTourSpotlightClone(source) {
+  if (!source || !source.isConnected) return null;
+  document.querySelectorAll('[data-tour-spotlight-clone]').forEach((el) => el.remove());
+  const rect = source.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return null;
+
+  const clone = source.cloneNode(true);
+  stripTourCloneIds(clone);
+  copyTourCloneComputedStyles(source, clone);
+  syncTourCloneFormValues(source, clone);
+  clone.setAttribute('data-tour-spotlight-clone', '1');
+  clone.setAttribute('aria-hidden', 'true');
+  clone.style.position = 'fixed';
+  clone.style.left = `${rect.left}px`;
+  clone.style.top = `${rect.top}px`;
+  clone.style.width = `${rect.width}px`;
+  clone.style.height = `${rect.height}px`;
+  clone.style.margin = '0';
+  clone.style.maxWidth = 'none';
+  clone.style.zIndex = '99999';
+  clone.style.pointerEvents = 'none';
+  clone.style.transform = 'none';
+  clone.style.boxShadow = '0 18px 46px rgba(26,43,34,0.24)';
+  clone.style.outline = '1px solid rgba(255,255,255,0.82)';
+  clone.style.outlineOffset = '2px';
+  document.body.appendChild(clone);
+  return clone;
+}
+
 function cleanupSettingsTourUi() {
   clearSettingsTourKeyboard();
   const prev = document.getElementById('tourTooltip');
   if (prev) prev.remove();
   const prevOverlay = document.getElementById('tourBlurOverlay');
   if (prevOverlay) prevOverlay.remove();
+  document.querySelectorAll('[data-tour-spotlight-clone]').forEach((el) => el.remove());
   document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
     el.style.position = el.dataset.tourOrigPosition || '';
     el.style.zIndex = el.dataset.tourOrigZIndex || '';
@@ -980,6 +1041,7 @@ function startSettingsTour() {
         highlightEl.style.outline = '1px solid rgba(255,255,255,0.82)';
         highlightEl.style.outlineOffset = '2px';
         highlightEl.setAttribute('data-tour-highlighted', '1');
+        createSettingsTourSpotlightClone(highlightEl);
       }
       document.body.style.overflow = 'hidden';
 
