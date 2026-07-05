@@ -6716,6 +6716,15 @@ app.get('/api/crm/go-live-success', async (req, res) => {
     if (!frontdeskReturnToken && stripeVerifiedHotelId && stripeVerifiedHotelId === hotelId) {
         frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotelId).catch(() => '');
     }
+    if (hotelId && !frontdeskReturnToken && !pin) {
+        console.warn('go-live-success redirect missing Front Desk return auth:', {
+            hotelId,
+            hasCheckoutSessionId: !!checkoutSessionId,
+            stripeVerified: !!stripeVerifiedHotelId,
+            hasReturnToken: !!returnToken,
+            returnTokenVerified: !!verifiedReturnToken,
+        });
+    }
 
     // Resolve where to send the owner back to: their own hotel domain, never the
     // backend host (which would default the front desk to Guest Lodge Minot).
@@ -6729,14 +6738,19 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             const domain = primaryDomain?.domain;
             if (domain) {
                 const query = new URLSearchParams({ activated: '1' });
-                if (frontdeskReturnToken) query.set('returnToken', frontdeskReturnToken);
-                else if (pin) query.set('pin', pin);
+                if (frontdeskReturnToken) {
+                    query.set('returnToken', frontdeskReturnToken);
+                    query.set('pin', frontdeskReturnToken);
+                } else if (pin) query.set('pin', pin);
                 return `https://${domain}/frontdesk?${query.toString()}`;
             }
         } catch (_) { /* fall through to relative redirect */ }
         // Fallback: stay on the backend host but force the correct hotel context
         const params = new URLSearchParams({ hotelId, activated: '1' });
-        if (frontdeskReturnToken) params.set('returnToken', frontdeskReturnToken);
+        if (frontdeskReturnToken) {
+            params.set('returnToken', frontdeskReturnToken);
+            params.set('pin', frontdeskReturnToken);
+        }
         else if (pin) params.set('pin', pin);
         return `/frontdesk?${params.toString()}`;
     }
