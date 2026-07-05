@@ -361,7 +361,7 @@ function fadeOutSettingsTourStepUi() {
 
   if (tooltip) tooltip.style.pointerEvents = 'none';
   fading.forEach((el) => {
-    el.style.transition = 'opacity 0.12s ease, transform 0.12s ease';
+    el.style.transition = 'opacity 0.07s ease, transform 0.07s ease';
     el.style.opacity = '1';
   });
 
@@ -376,7 +376,7 @@ function fadeOutSettingsTourStepUi() {
     setTimeout(() => {
       cleanupSettingsTourUi({ keepOverlay: true });
       resolve();
-    }, 135);
+    }, 85);
   });
 }
 
@@ -388,7 +388,7 @@ function fadeInSettingsTourStepUi(tooltip) {
   ].filter(Boolean);
 
   elements.forEach((el) => {
-    el.style.transition = 'opacity 0.16s ease, transform 0.16s ease';
+    el.style.transition = 'opacity 0.1s ease, transform 0.1s ease';
     el.style.opacity = '0';
     if (el.id === 'tourTooltip') el.style.transform = 'translateY(4px)';
   });
@@ -561,11 +561,29 @@ function scrollTourTargetIntoView(el, stepDef, options) {
 
   const block = stepDef.scrollBlock || 'center';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const behavior = opts.smooth && !prefersReducedMotion
+  let behavior = opts.smooth && !prefersReducedMotion
     ? 'smooth'
     : ((crm.settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth');
 
   return new Promise((resolve) => {
+    const shouldUseQuickPlacement = () => {
+      if (!opts.smooth || !target || stepDef.forceSmoothScroll) return false;
+      const measure = queryTourSelector(stepDef.anchorSelector)
+        || (target && target.isConnected ? target : null)
+        || (el && el.isConnected ? el : null);
+      if (!measure) return true;
+      const rect = measure.getBoundingClientRect();
+      const padTop = stepDef.scrollPadTop ?? 80;
+      const padBottom = stepDef.scrollPadBottom ?? 220;
+      const topOverflow = Math.max(0, padTop - rect.top);
+      const bottomOverflow = Math.max(0, rect.bottom - (window.innerHeight - padBottom));
+      return Math.max(topOverflow, bottomOverflow) <= (stepDef.quickScrollThreshold ?? 180);
+    };
+
+    if (shouldUseQuickPlacement()) {
+      behavior = 'auto';
+    }
+
     const applyPadding = () => {
       const padTop = stepDef.scrollPadTop ?? 80;
       const padBottom = stepDef.scrollPadBottom ?? 220;
