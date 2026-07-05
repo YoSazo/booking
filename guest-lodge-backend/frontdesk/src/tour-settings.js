@@ -265,7 +265,7 @@ function copyTourCloneComputedStyles(source, clone) {
   }
 }
 
-function createSettingsTourSpotlightClone(source) {
+function createSettingsTourSpotlightClone(source, stepDef) {
   if (!source || !source.isConnected) return null;
   document.querySelectorAll('[data-tour-spotlight-clone]').forEach((el) => el.remove());
   const rect = source.getBoundingClientRect();
@@ -287,9 +287,16 @@ function createSettingsTourSpotlightClone(source) {
   clone.style.zIndex = '99999';
   clone.style.pointerEvents = 'none';
   clone.style.transform = 'none';
-  clone.style.boxShadow = '0 18px 46px rgba(26,43,34,0.24)';
-  clone.style.outline = '1px solid rgba(255,255,255,0.82)';
-  clone.style.outlineOffset = '2px';
+  clone.style.boxShadow = stepDef?.spotlightBoxShadow ?? '0 18px 46px rgba(26,43,34,0.24)';
+  clone.style.outline = stepDef?.spotlightOutline ?? '1px solid rgba(255,255,255,0.82)';
+  clone.style.outlineOffset = stepDef?.spotlightOutlineOffset ?? '2px';
+  if (stepDef?.spotlightBackground) {
+    clone.style.background = stepDef.spotlightBackground;
+    clone.style.backgroundColor = stepDef.spotlightBackground;
+  }
+  if (stepDef?.spotlightBorderRadius) {
+    clone.style.borderRadius = stepDef.spotlightBorderRadius;
+  }
   document.body.appendChild(clone);
   return clone;
 }
@@ -309,6 +316,9 @@ function cleanupSettingsTourUi() {
     el.style.outline = el.dataset.tourOrigOutline || '';
     el.style.outlineOffset = el.dataset.tourOrigOutlineOffset || '';
     el.style.transition = el.dataset.tourOrigTransition || '';
+    el.style.background = el.dataset.tourOrigBackground || '';
+    el.style.backgroundColor = el.dataset.tourOrigBackgroundColor || '';
+    el.style.borderRadius = el.dataset.tourOrigBorderRadius || '';
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
     delete el.dataset.tourOrigZIndex;
@@ -317,6 +327,9 @@ function cleanupSettingsTourUi() {
     delete el.dataset.tourOrigOutline;
     delete el.dataset.tourOrigOutlineOffset;
     delete el.dataset.tourOrigTransition;
+    delete el.dataset.tourOrigBackground;
+    delete el.dataset.tourOrigBackgroundColor;
+    delete el.dataset.tourOrigBorderRadius;
   });
   const goLiveBanner = document.getElementById('goLiveBanner');
   if (goLiveBanner && goLiveBanner.dataset.tourHidden) {
@@ -804,7 +817,13 @@ function startSettingsTour() {
       scrollPadTop: 80,
       scrollPadBottom: 220,
       tooltipPosition: 'below',
-      tooltipGap: 8
+      tooltipGap: 8,
+      spotlightBackground: '#fff',
+      spotlightBorderRadius: '0 0 20px 20px',
+      spotlightBoxShadow: 'none',
+      spotlightOutline: 'none',
+      spotlightOutlineOffset: '0',
+      fitPadTop: 108
     },
     {
       target: '#tour-booking-link-card',
@@ -1110,6 +1129,9 @@ function startSettingsTour() {
         if (!highlightEl.dataset.tourOrigOutline) highlightEl.dataset.tourOrigOutline = highlightEl.style.outline || '';
         if (!highlightEl.dataset.tourOrigOutlineOffset) highlightEl.dataset.tourOrigOutlineOffset = highlightEl.style.outlineOffset || '';
         if (!highlightEl.dataset.tourOrigTransition) highlightEl.dataset.tourOrigTransition = highlightEl.style.transition || '';
+        if (!highlightEl.dataset.tourOrigBackground) highlightEl.dataset.tourOrigBackground = highlightEl.style.background || '';
+        if (!highlightEl.dataset.tourOrigBackgroundColor) highlightEl.dataset.tourOrigBackgroundColor = highlightEl.style.backgroundColor || '';
+        if (!highlightEl.dataset.tourOrigBorderRadius) highlightEl.dataset.tourOrigBorderRadius = highlightEl.style.borderRadius || '';
         highlightEl.style.position = highlightEl.style.position || 'relative';
         highlightEl.style.zIndex = '99999';
         highlightEl.style.isolation = 'isolate';
@@ -1117,8 +1139,24 @@ function startSettingsTour() {
         highlightEl.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.92), 0 18px 46px rgba(26,43,34,0.22)';
         highlightEl.style.outline = '1px solid rgba(255,255,255,0.82)';
         highlightEl.style.outlineOffset = '2px';
+        if (s.spotlightBoxShadow != null) {
+          highlightEl.style.boxShadow = s.spotlightBoxShadow;
+        }
+        if (s.spotlightOutline != null) {
+          highlightEl.style.outline = s.spotlightOutline;
+        }
+        if (s.spotlightOutlineOffset != null) {
+          highlightEl.style.outlineOffset = s.spotlightOutlineOffset;
+        }
+        if (s.spotlightBackground) {
+          highlightEl.style.background = s.spotlightBackground;
+          highlightEl.style.backgroundColor = s.spotlightBackground;
+        }
+        if (s.spotlightBorderRadius) {
+          highlightEl.style.borderRadius = s.spotlightBorderRadius;
+        }
         highlightEl.setAttribute('data-tour-highlighted', '1');
-        createSettingsTourSpotlightClone(highlightEl);
+        createSettingsTourSpotlightClone(highlightEl, s);
       }
       document.body.style.overflow = 'hidden';
 
@@ -1203,7 +1241,7 @@ function startSettingsTour() {
     let finalRect = measuredRect;
     if (measuredRect && measuredRect.width >= 2 && measuredRect.height >= 2) {
       finalRect = fitTourTargetAndTooltip(el, s, tooltip, preferredPosition) || measuredRect;
-      if (!s.noHighlight) createSettingsTourSpotlightClone(el);
+      if (!s.noHighlight) createSettingsTourSpotlightClone(el, s);
       const width = Math.min(380, window.innerWidth - 28);
       tooltip.style.setProperty('--tour-width', `${width}px`);
       tooltip.style.left = '0';
