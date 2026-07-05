@@ -139,17 +139,36 @@ try {
   if (_urlPin && !_urlPin.startsWith('fd_')) {
     crm.token = _urlPin;
     localStorage.setItem('crmToken', crm.token);
-  } else if (_stripeReturnToken && (!crm.token || String(crm.token).startsWith('fd_'))) {
+    _cleanUrl.searchParams.delete('pin');
+    _cleanUrl.searchParams.delete('returnToken');
+    window.history.replaceState({}, '', _cleanUrl);
+  } else if (_stripeReturnToken) {
+    crm.frontdeskReturnTokenPending = true;
     crm.token = _stripeReturnToken;
     localStorage.setItem('crmToken', crm.token);
-  }
-
-  if (_urlPin || _returnToken) {
-    _cleanUrl.searchParams.delete('pin');
+  } else if (_returnToken) {
     _cleanUrl.searchParams.delete('returnToken');
     window.history.replaceState({}, '', _cleanUrl);
   }
 } catch(e) {}
+
+function cleanFrontdeskReturnAuthParams() {
+  try {
+    const cleanUrl = new URL(window.location);
+    const pinParam = String(cleanUrl.searchParams.get('pin') || '').trim();
+    let changed = false;
+    if (pinParam.startsWith('fd_')) {
+      cleanUrl.searchParams.delete('pin');
+      changed = true;
+    }
+    if (cleanUrl.searchParams.has('returnToken')) {
+      cleanUrl.searchParams.delete('returnToken');
+      changed = true;
+    }
+    if (changed) window.history.replaceState({}, '', cleanUrl);
+    crm.frontdeskReturnTokenPending = false;
+  } catch (e) {}
+}
 
 // Auto-login from ?magic= token (magic link email)
 try {
@@ -1286,6 +1305,7 @@ async function startCrmApp(verification) {
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
+  cleanFrontdeskReturnAuthParams();
 
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('pwa') === '1') {

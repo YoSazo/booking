@@ -3513,31 +3513,88 @@ if (!configuredCrmReturnTokenSecret) {
     console.warn('CRM_RETURN_TOKEN_SECRET, SESSION_SECRET, or MAGIC_LINK_SECRET is not set; using an ephemeral Front Desk return-token secret for this process.');
 }
 
-function generateCrmReturnToken(hotelId) {
+function getCrmReturnSigningSecret(hotelSecret = '') {
+    const scopedHotelSecret = String(hotelSecret || '').trim();
+    if (scopedHotelSecret) {
+        return configuredCrmReturnTokenSecret
+            ? `${configuredCrmReturnTokenSecret}:${scopedHotelSecret}`
+            : scopedHotelSecret;
+    }
+    return CRM_RETURN_TOKEN_SECRET;
+}
+
+function signCrmReturnPayload(encoded, hotelSecret = '') {
+    return crypto.createHmac('sha256', getCrmReturnSigningSecret(hotelSecret)).update(encoded).digest('base64url');
+}
+
+async function ensureCrmReturnHotelSecret(hotelId, currentSetupToken = '') {
+    const existing = String(currentSetupToken || '').trim();
+    if (existing) return existing;
+    if (!hotelId || !prisma.hotelConfig) return '';
+
+    const newSetupToken = crypto.randomBytes(16).toString('hex');
+    try {
+        const updated = await withRetry(() => prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: { setupToken: newSetupToken },
+            select: { setupToken: true },
+        }));
+        return updated?.setupToken || newSetupToken;
+    } catch (_) {
+        const fresh = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { setupToken: true },
+        })).catch(() => null);
+        return String(fresh?.setupToken || '').trim();
+    }
+}
+
+function generateCrmReturnToken(hotelId, hotelSecret = '') {
     const payload = JSON.stringify({
         purpose: 'frontdesk-return',
         hotelId: String(hotelId || '').trim(),
         exp: Date.now() + CRM_RETURN_TOKEN_EXPIRY_MS,
     });
     const encoded = Buffer.from(payload).toString('base64url');
-    const sig = crypto.createHmac('sha256', CRM_RETURN_TOKEN_SECRET).update(encoded).digest('base64url');
+    const sig = signCrmReturnPayload(encoded, hotelSecret);
     return 'fd_' + encoded + '.' + sig;
 }
 
-function verifyCrmReturnToken(token) {
+async function generateCrmReturnTokenForHotel(hotelId, currentSetupToken = '') {
+    const hotelSecret = await ensureCrmReturnHotelSecret(hotelId, currentSetupToken);
+    return generateCrmReturnToken(hotelId, hotelSecret);
+}
+
+async function verifyCrmReturnToken(token) {
     const raw = String(token || '').trim();
     if (!raw.startsWith('fd_')) return null;
     const parts = raw.slice(3).split('.');
     if (parts.length !== 2) return null;
     const [encoded, sig] = parts;
-    const expectedSig = crypto.createHmac('sha256', CRM_RETURN_TOKEN_SECRET).update(encoded).digest('base64url');
-    if (!timingSafeTextEqual(sig, expectedSig)) return null;
+    let payload;
     try {
-        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
         if (payload.purpose !== 'frontdesk-return') return null;
         if (!payload.hotelId || payload.exp < Date.now()) return null;
-        return { hotelId: String(payload.hotelId).trim() };
     } catch (e) { return null; }
+
+    const hotelId = String(payload.hotelId || '').trim();
+    const candidateHotelSecrets = [];
+    if (prisma.hotelConfig) {
+        const hotel = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { setupToken: true },
+        })).catch(() => null);
+        if (hotel?.setupToken) candidateHotelSecrets.push(hotel.setupToken);
+    }
+    candidateHotelSecrets.push('');
+
+    for (const hotelSecret of candidateHotelSecrets) {
+        const expectedSig = signCrmReturnPayload(encoded, hotelSecret);
+        if (!timingSafeTextEqual(sig, expectedSig)) continue;
+        return { hotelId: String(payload.hotelId).trim() };
+    }
+    return null;
 }
 
 async function getDbAllowedHotelsForToken(token) {
@@ -3593,7 +3650,7 @@ function requireScopedHotelId(req, res) {
 
 const crmAuth = async (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
-    const returnAuth = verifyCrmReturnToken(token);
+    const returnAuth = await verifyCrmReturnToken(token);
     const dbAllowedHotels = returnAuth ? [] : await getDbAllowedHotelsForToken(token).catch(() => []);
     let allowedHotels = returnAuth ? [returnAuth.hotelId] : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
     
@@ -6616,13 +6673,13 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
-        const returnToken = generateCrmReturnToken(hotelId);
+        const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{ price: subscriptionPriceId, quantity: 1 }],
             customer_email: hotel?.ownerEmail || undefined,
             metadata: { product: 'hotel-go-live', hotelId },
-            success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&returnToken=${encodeURIComponent(returnToken)}`,
+            success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}`,
             cancel_url: req.headers.referer || baseUrl + '/frontdesk',
         });
         res.json({ success: true, url: session.url });
@@ -6636,10 +6693,29 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
 app.get('/api/crm/go-live-success', async (req, res) => {
     const requestedHotelId = String(req.query.hotelId || '').trim();
     const pin = String(req.query.token || '').trim();
+    const checkoutSessionId = String(req.query.session_id || '').trim();
     const returnToken = String(req.query.returnToken || '').trim();
-    const verifiedReturnToken = verifyCrmReturnToken(returnToken);
-    const hotelId = requestedHotelId || verifiedReturnToken?.hotelId || '';
-    const frontdeskReturnToken = verifiedReturnToken?.hotelId === hotelId ? returnToken : '';
+    const verifiedReturnToken = await verifyCrmReturnToken(returnToken);
+    let stripeVerifiedHotelId = '';
+
+    if (checkoutSessionId && marketelStripe) {
+        try {
+            const checkoutSession = await marketelStripe.checkout.sessions.retrieve(checkoutSessionId);
+            const metadataHotelId = String(checkoutSession?.metadata?.hotelId || '').trim();
+            const paymentComplete = checkoutSession?.payment_status === 'paid'
+                || checkoutSession?.status === 'complete'
+                || !!checkoutSession?.subscription;
+            if (metadataHotelId && paymentComplete) stripeVerifiedHotelId = metadataHotelId;
+        } catch (e) {
+            console.warn('go-live-success checkout verification failed:', e.message);
+        }
+    }
+
+    const hotelId = stripeVerifiedHotelId || requestedHotelId || verifiedReturnToken?.hotelId || '';
+    let frontdeskReturnToken = verifiedReturnToken?.hotelId === hotelId ? returnToken : '';
+    if (!frontdeskReturnToken && stripeVerifiedHotelId && stripeVerifiedHotelId === hotelId) {
+        frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotelId).catch(() => '');
+    }
 
     // Resolve where to send the owner back to: their own hotel domain, never the
     // backend host (which would default the front desk to Guest Lodge Minot).
