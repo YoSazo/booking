@@ -127,15 +127,26 @@ function updateFrontdeskManifestLink() {
 }
 try { crm.token = localStorage.getItem('crmToken') || ''; } catch(e) {}
 
-// Auto-login from ?pin= URL param (coming from setup wizard)
+// Auto-login from URL auth params. Setup can pass a real ?pin=, while Stripe
+// returns with a signed fd_ token that is only a short-lived Front Desk session.
 try {
-  const _urlPin = new URLSearchParams(window.location.search).get('pin');
-  if (_urlPin) {
+  const _params = new URLSearchParams(window.location.search);
+  const _urlPin = String(_params.get('pin') || '').trim();
+  const _returnToken = String(_params.get('returnToken') || '').trim();
+  const _stripeReturnToken = _returnToken.startsWith('fd_') ? _returnToken : (_urlPin.startsWith('fd_') ? _urlPin : '');
+  const _cleanUrl = new URL(window.location);
+
+  if (_urlPin && !_urlPin.startsWith('fd_')) {
     crm.token = _urlPin;
     localStorage.setItem('crmToken', crm.token);
-    // Clean URL but keep hotelId if present
-    const _cleanUrl = new URL(window.location);
+  } else if (_stripeReturnToken && (!crm.token || String(crm.token).startsWith('fd_'))) {
+    crm.token = _stripeReturnToken;
+    localStorage.setItem('crmToken', crm.token);
+  }
+
+  if (_urlPin || _returnToken) {
     _cleanUrl.searchParams.delete('pin');
+    _cleanUrl.searchParams.delete('returnToken');
     window.history.replaceState({}, '', _cleanUrl);
   }
 } catch(e) {}
