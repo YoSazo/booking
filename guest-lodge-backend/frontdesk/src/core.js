@@ -125,7 +125,49 @@ function updateFrontdeskManifestLink() {
     if (titleMeta) titleMeta.content = crm.activeHotelName || 'Front Desk';
   } catch (_) {}
 }
+const FRONTDESK_AUTH_BUILD = 'stripe-return-bridge-2026-07-05';
+function getFrontdeskCookie(name) {
+  try {
+    const prefix = `${name}=`;
+    const parts = String(document.cookie || '').split(';');
+    for (const part of parts) {
+      const clean = part.trim();
+      if (clean.startsWith(prefix)) return decodeURIComponent(clean.slice(prefix.length));
+    }
+  } catch (e) {}
+  return '';
+}
+function frontdeskTokenKind(token) {
+  const clean = String(token || '');
+  if (!clean) return 'none';
+  return clean.startsWith('fd_') ? 'return-token' : 'pin';
+}
+function frontdeskAuthDebugEnabled() {
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    return params.has('activated') || params.has('returnToken') || params.has('pin') || params.has('authReturn') ||
+      sessionStorage.getItem('frontdeskAuthDebug') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+function logFrontdeskAuth(event, data = {}, level = 'info') {
+  if (!frontdeskAuthDebugEnabled()) return;
+  try {
+    const fn = level === 'warn' ? console.warn : console.info;
+    fn.call(console, `[FrontDesk auth] ${event}`, {
+      build: FRONTDESK_AUTH_BUILD,
+      ...data,
+    });
+  } catch (e) {}
+}
 try { crm.token = localStorage.getItem('crmToken') || ''; } catch(e) {}
+try {
+  const cookieToken = getFrontdeskCookie('frontdeskReturnToken');
+  if (!crm.token && cookieToken && cookieToken.startsWith('fd_')) {
+    crm.token = cookieToken;
+  }
+} catch (e) {}
 
 // Auto-login from URL auth params. Setup can pass a real ?pin=, while Stripe
 // returns with a signed fd_ token that is only a short-lived Front Desk session.
@@ -135,6 +177,15 @@ try {
   const _returnToken = String(_params.get('returnToken') || '').trim();
   const _stripeReturnToken = _returnToken.startsWith('fd_') ? _returnToken : (_urlPin.startsWith('fd_') ? _urlPin : '');
   const _cleanUrl = new URL(window.location);
+  logFrontdeskAuth('url-auth-start', {
+    hasStoredToken: !!crm.token,
+    storedTokenKind: frontdeskTokenKind(crm.token),
+    hasPinParam: !!_urlPin,
+    pinParamKind: frontdeskTokenKind(_urlPin),
+    hasReturnTokenParam: !!_returnToken,
+    returnTokenParamKind: frontdeskTokenKind(_returnToken),
+    selectedUrlTokenKind: frontdeskTokenKind(_stripeReturnToken),
+  });
 
   if (_urlPin && !_urlPin.startsWith('fd_')) {
     crm.token = _urlPin;
@@ -150,6 +201,11 @@ try {
     _cleanUrl.searchParams.delete('returnToken');
     window.history.replaceState({}, '', _cleanUrl);
   }
+  logFrontdeskAuth('url-auth-complete', {
+    hasToken: !!crm.token,
+    tokenKind: frontdeskTokenKind(crm.token),
+    returnTokenPending: !!crm.frontdeskReturnTokenPending,
+  });
 } catch(e) {}
 
 function cleanFrontdeskReturnAuthParams() {
@@ -861,10 +917,24 @@ function bindAvailabilityUiEvents() {
 // ── LOGIN ──────────────────────────────────────────────
 async function verifyCrmToken(pin) {
   if (!crm.activeHotelId) throw new Error('Hotel context is not ready yet.');
+  logFrontdeskAuth('verify-start', {
+    hotelId: crm.activeHotelId,
+    tokenKind: frontdeskTokenKind(pin),
+    tokenLength: String(pin || '').length,
+  });
   const res = await fetch(`/api/crm/verify?hotelId=${encodeURIComponent(crm.activeHotelId)}`, {
     headers: { 'x-crm-token': pin }
   });
   const json = await res.json().catch(() => ({}));
+  logFrontdeskAuth('verify-response', {
+    hotelId: crm.activeHotelId,
+    status: res.status,
+    ok: res.ok,
+    success: !!json.success,
+    message: json.message || json.error || '',
+    verifiedHotelId: json.hotelId || '',
+    subscribed: !!json.subscribed,
+  }, (!res.ok || !json.success) ? 'warn' : 'info');
   if (!res.ok || !json.success) {
     throw new Error(json.message || (res.status === 401 ? 'Wrong PIN' : 'Could not verify access'));
   }
@@ -1296,6 +1366,7 @@ function finishTourHydration() {
 }
 
 async function startCrmApp(verification) {
+  crm.lastAuthError = '';
   crm.isMasterPin = !!(verification && verification.isMasterPin);
   crm.currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   crm.revenueEnabled = !!(verification && verification.isManualPms);
@@ -1523,6 +1594,13 @@ async function api(method, path, body) {
 }
 
 function showLogin() {
+  logFrontdeskAuth('show-login', {
+    activeHotelId: crm.activeHotelId || '',
+    hadToken: !!crm.token,
+    tokenKind: frontdeskTokenKind(crm.token),
+    returnTokenPending: !!crm.frontdeskReturnTokenPending,
+    lastAuthError: crm.lastAuthError || '',
+  }, 'warn');
   document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
@@ -1560,6 +1638,7 @@ async function bootCrmApp() {
         await startCrmApp(verification);
         return;
       } catch (e) {
+        crm.lastAuthError = e && e.message ? e.message : 'verify failed';
         showLogin();
         return;
       }
@@ -1574,6 +1653,7 @@ async function bootCrmApp() {
           await startCrmApp(verification);
           return;
         } catch (verifyError) {
+          crm.lastAuthError = verifyError && verifyError.message ? verifyError.message : 'legacy verify failed';
           showLogin();
           return;
         }

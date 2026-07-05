@@ -469,6 +469,29 @@ function serveFrontdesk(_req, res) {
         res.sendFile(file);
     }
 }
+
+function frontdeskReturnHtml({ token = '', activated = false } = {}) {
+    const cleanToken = String(token || '').trim();
+    const nextPath = activated ? '/frontdesk?activated=1' : '/frontdesk';
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening Front Desk...</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f5;color:#1a2b22}.box{text-align:center;padding:24px}.mark{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:4px solid #d8e4dc;border-top-color:#2E7D5B;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.title{font-size:15px;font-weight:800}.sub{margin-top:6px;font-size:12px;color:#66756c}</style></head><body><div class="box"><div class="mark"></div><div class="title">Opening Front Desk</div><div class="sub">Finishing activation...</div></div><script>!function(){var token=${JSON.stringify(cleanToken)};var next=${JSON.stringify(nextPath)};try{console.info("[FrontDesk return] bridge loaded",{hasToken:!!token,tokenKind:token&&token.indexOf("fd_")===0?"return-token":token?"pin":"none"});}catch(e){}try{if(token){localStorage.setItem("crmToken",token);document.cookie="frontdeskReturnToken="+encodeURIComponent(token)+"; path=/; max-age=86400; SameSite=Lax; Secure";}}catch(e){try{console.warn("[FrontDesk return] token storage failed",e&&e.message?e.message:e);}catch(_){}}location.replace(next);}();</script></body></html>`;
+}
+
+function redactFrontdeskAuthUrl(url) {
+    return String(url || '').replace(/([?&](?:returnToken|pin)=)[^&]+/g, '$1[redacted]');
+}
+
+app.get('/frontdesk-return', (req, res) => {
+    const token = String(req.query.pin || req.query.returnToken || '').trim();
+    const activated = String(req.query.activated || '') === '1';
+    res.setHeader('Cache-Control', 'no-store');
+    console.log('frontdesk-return bridge served:', {
+        host: req.get('host'),
+        hasToken: !!token,
+        tokenKind: token.startsWith('fd_') ? 'return-token' : (token ? 'pin' : 'none'),
+        activated,
+    });
+    res.send(frontdeskReturnHtml({ token, activated }));
+});
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
 app.get('/simple-crm.html', (req, res) => {
     const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
@@ -3469,6 +3492,10 @@ function generateCrmOwnerPin() {
     return pin;
 }
 
+function generateCrmActivationReturnPin() {
+    return 'activate_' + crypto.randomBytes(12).toString('hex');
+}
+
 function buildCrmTokenHotelMap() {
     const map = {};
 
@@ -3563,6 +3590,27 @@ function generateCrmReturnToken(hotelId, hotelSecret = '') {
 async function generateCrmReturnTokenForHotel(hotelId, currentSetupToken = '') {
     const hotelSecret = await ensureCrmReturnHotelSecret(hotelId, currentSetupToken);
     return generateCrmReturnToken(hotelId, hotelSecret);
+}
+
+async function createCrmActivationReturnPin(hotelId) {
+    const cleanHotelId = String(hotelId || '').trim();
+    if (!cleanHotelId || !prisma.crmPin) return '';
+
+    const activationPin = generateCrmActivationReturnPin();
+    const pinHash = hashCrmPin(activationPin);
+    await withRetry(() => prisma.crmPin.updateMany({
+        where: { hotelId: cleanHotelId, label: 'Activation return' },
+        data: { active: false },
+    })).catch(() => {});
+    await withRetry(() => prisma.crmPin.create({
+        data: {
+            hotelId: cleanHotelId,
+            pinHash,
+            label: 'Activation return',
+            active: true,
+        },
+    }));
+    return activationPin;
 }
 
 async function verifyCrmReturnToken(token) {
@@ -6674,6 +6722,13 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
+        console.log('crm:go-live checkout session creating:', {
+            hotelId,
+            host: req.get('host'),
+            baseUrl,
+            hasReturnToken: !!returnToken,
+            returnTokenKind: returnToken.startsWith('fd_') ? 'return-token' : (returnToken ? 'other' : 'none'),
+        });
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{ price: subscriptionPriceId, quantity: 1 }],
@@ -6681,6 +6736,12 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
             metadata: { product: 'hotel-go-live', hotelId },
             success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}`,
             cancel_url: req.headers.referer || baseUrl + '/frontdesk',
+        });
+        console.log('crm:go-live checkout session created:', {
+            hotelId,
+            sessionId: session?.id || '',
+            successUrlHasSessionPlaceholder: true,
+            successUrlHasReturnToken: true,
         });
         res.json({ success: true, url: session.url });
     } catch (e) {
@@ -6716,7 +6777,27 @@ app.get('/api/crm/go-live-success', async (req, res) => {
     if (!frontdeskReturnToken && stripeVerifiedHotelId && stripeVerifiedHotelId === hotelId) {
         frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotelId).catch(() => '');
     }
-    if (hotelId && !frontdeskReturnToken && !pin) {
+    const returnAuthVerified = !!stripeVerifiedHotelId || !!verifiedReturnToken;
+    const frontdeskActivationPin = (hotelId && returnAuthVerified)
+        ? await createCrmActivationReturnPin(hotelId).catch((e) => {
+            console.log('go-live-success activation pin create failed:', { hotelId, message: e.message });
+            return '';
+        })
+        : '';
+    console.log('go-live-success auth resolution:', {
+        requestedHotelId,
+        hotelId,
+        hasCheckoutSessionId: !!checkoutSessionId,
+        stripeVerifiedHotelId: stripeVerifiedHotelId || '',
+        hasIncomingReturnToken: !!returnToken,
+        incomingReturnTokenVerified: !!verifiedReturnToken,
+        generatedFrontdeskReturnToken: !!frontdeskReturnToken && frontdeskReturnToken !== returnToken,
+        hasFrontdeskReturnToken: !!frontdeskReturnToken,
+        hasFrontdeskActivationPin: !!frontdeskActivationPin,
+        returnAuthVerified,
+        hasPinFallback: !!pin,
+    });
+    if (hotelId && !frontdeskReturnToken && !frontdeskActivationPin && !pin) {
         console.warn('go-live-success redirect missing Front Desk return auth:', {
             hotelId,
             hasCheckoutSessionId: !!checkoutSessionId,
@@ -6740,19 +6821,76 @@ app.get('/api/crm/go-live-success', async (req, res) => {
                 const query = new URLSearchParams({ activated: '1' });
                 if (frontdeskReturnToken) {
                     query.set('returnToken', frontdeskReturnToken);
-                    query.set('pin', frontdeskReturnToken);
+                    query.set('pin', frontdeskActivationPin || frontdeskReturnToken);
+                    const target = `https://${domain}/frontdesk-return?${query.toString()}`;
+                    console.log('go-live-success redirect target:', {
+                        hotelId,
+                        target: redactFrontdeskAuthUrl(target),
+                        usesBridge: true,
+                        hasFrontdeskReturnToken: true,
+                        hasFrontdeskActivationPin: !!frontdeskActivationPin,
+                    });
+                    return target;
+                } else if (frontdeskActivationPin) {
+                    query.set('pin', frontdeskActivationPin);
+                    const target = `https://${domain}/frontdesk-return?${query.toString()}`;
+                    console.log('go-live-success redirect target:', {
+                        hotelId,
+                        target: redactFrontdeskAuthUrl(target),
+                        usesBridge: true,
+                        hasFrontdeskReturnToken: false,
+                        hasFrontdeskActivationPin: true,
+                    });
+                    return target;
                 } else if (pin) query.set('pin', pin);
-                return `https://${domain}/frontdesk?${query.toString()}`;
+                const target = `https://${domain}/frontdesk?${query.toString()}`;
+                console.log('go-live-success redirect target:', {
+                    hotelId,
+                    target: redactFrontdeskAuthUrl(target),
+                    usesBridge: false,
+                    hasFrontdeskReturnToken: false,
+                    hasFrontdeskActivationPin: false,
+                });
+                return target;
             }
         } catch (_) { /* fall through to relative redirect */ }
         // Fallback: stay on the backend host but force the correct hotel context
         const params = new URLSearchParams({ hotelId, activated: '1' });
         if (frontdeskReturnToken) {
             params.set('returnToken', frontdeskReturnToken);
-            params.set('pin', frontdeskReturnToken);
+            params.set('pin', frontdeskActivationPin || frontdeskReturnToken);
+            const target = `/frontdesk-return?${params.toString()}`;
+            console.log('go-live-success redirect target:', {
+                hotelId,
+                target: redactFrontdeskAuthUrl(target),
+                usesBridge: true,
+                hasFrontdeskReturnToken: true,
+                hasFrontdeskActivationPin: !!frontdeskActivationPin,
+            });
+            return target;
+        }
+        else if (frontdeskActivationPin) {
+            params.set('pin', frontdeskActivationPin);
+            const target = `/frontdesk-return?${params.toString()}`;
+            console.log('go-live-success redirect target:', {
+                hotelId,
+                target: redactFrontdeskAuthUrl(target),
+                usesBridge: true,
+                hasFrontdeskReturnToken: false,
+                hasFrontdeskActivationPin: true,
+            });
+            return target;
         }
         else if (pin) params.set('pin', pin);
-        return `/frontdesk?${params.toString()}`;
+        const target = `/frontdesk?${params.toString()}`;
+        console.log('go-live-success redirect target:', {
+            hotelId,
+            target: redactFrontdeskAuthUrl(target),
+            usesBridge: false,
+            hasFrontdeskReturnToken: false,
+            hasFrontdeskActivationPin: false,
+        });
+        return target;
     }
 
     try {
