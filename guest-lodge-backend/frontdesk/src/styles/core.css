@@ -1042,8 +1042,8 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(8, 15, 20, 0.38);
-      z-index: 240;
+      background: rgba(8, 15, 20, 0.52);
+      z-index: 10020;
       align-items: center;
       justify-content: center;
       padding: 14px;
@@ -1056,6 +1056,8 @@
       border: 1.5px solid var(--border);
       box-shadow: var(--shadow-lg);
       padding: 18px;
+      max-height: calc(100dvh - 96px);
+      overflow-y: auto;
     }
     .rooms-modal h3 { font-size: 15px; margin-bottom: 10px; }
     .rooms-modal input {
@@ -1582,6 +1584,7 @@
     .rooms-modal {
       width: 100%;
       max-width: 430px;
+      max-height: calc(100dvh - 94px);
       border-radius: 28px 28px 0 0;
       border: 0;
       padding: 24px 20px max(34px, env(safe-area-inset-bottom));

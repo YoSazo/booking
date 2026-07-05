@@ -311,6 +311,47 @@ function appsTourCleanupUi() {
   });
 }
 
+function appsTourScrollParent(el) {
+  let node = el && el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = getComputedStyle(node);
+    const overflowY = style.overflowY || style.overflow;
+    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 1) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function appsTourScrollBy(el, delta) {
+  if (!delta) return;
+  const scroller = appsTourScrollParent(el);
+  if (scroller) {
+    scroller.scrollTop += delta;
+    return;
+  }
+  window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+}
+
+function applyAppsTourScrollPadding(target, step, isNarrowViewport) {
+  if (!target || !target.isConnected) return;
+  const padTop = (isNarrowViewport ? step.mobileScrollPadTop : step.scrollPadTop);
+  const padBottom = (isNarrowViewport ? step.mobileScrollPadBottom : step.scrollPadBottom);
+  if (padTop == null && padBottom == null) return;
+
+  let rect = target.getBoundingClientRect();
+  const topPad = padTop ?? 80;
+  const bottomPad = padBottom ?? 220;
+  if (rect.top < topPad) {
+    appsTourScrollBy(target, rect.top - topPad);
+    rect = target.getBoundingClientRect();
+  }
+  if (rect.bottom > window.innerHeight - bottomPad) {
+    appsTourScrollBy(target, rect.bottom - window.innerHeight + bottomPad);
+  }
+}
+
 function appsTourClose(markDone) {
   appsTourCleanupUi();
   document.body.style.overflow = '';
@@ -584,7 +625,10 @@ function appsTourRender() {
   const tooltipDelay = isNarrowViewport && step.mobileScrollToBottom
     ? (prefersReducedMotion ? 80 : 680)
     : (prefersReducedMotion ? 40 : 320);
-  _appsTourTooltipTimer = setTimeout(placeTooltip, tooltipDelay);
+  _appsTourTooltipTimer = setTimeout(() => {
+    applyAppsTourScrollPadding(target, step, isNarrowViewport);
+    requestAnimationFrame(placeTooltip);
+  }, tooltipDelay);
 }
 
 function startAppsTour(opts) {
@@ -610,12 +654,28 @@ function startAppsTour(opts) {
       kicker: 'Front Desk',
       title: 'Install this on the property phone.',
       text: 'Front Desk is this dashboard saved like an app. It is where booking alerts, guest messages, QR tools, and setup controls live.',
+      scrollBlock: 'center',
+      tooltipAnchor: 'top',
+      tooltipPosition: 'above',
+      mobileScrollBlock: 'center',
+      mobileScrollPadTop: 260,
+      mobileScrollPadBottom: 180,
+      mobileTooltipAnchor: 'top',
+      mobileTooltipPosition: 'above',
     },
     {
       target: '#tour-apps-then',
       kicker: 'Guest path',
       title: 'Send guests to your direct page.',
       text: 'The Install button sits on the booking page. Guests tap it once, and your hotel icon lands on their home screen.',
+      scrollBlock: 'center',
+      tooltipAnchor: 'top',
+      tooltipPosition: 'above',
+      mobileScrollBlock: 'center',
+      mobileScrollPadTop: 260,
+      mobileScrollPadBottom: 180,
+      mobileTooltipAnchor: 'top',
+      mobileTooltipPosition: 'above',
     },
     {
       target: '#tour-apps-after',
@@ -643,6 +703,8 @@ function startAppsTour(opts) {
       primaryLabel: hotelIsLive ? 'Done' : 'Continue to activation',
       secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
       showActivationOnComplete: !hotelIsLive,
+      mobileScrollBlock: 'center',
+      mobileScrollPadBottom: 300,
     },
   ];
 

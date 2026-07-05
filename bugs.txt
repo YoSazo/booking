@@ -1,0 +1,15 @@
+the second tour modal, "Edit your booking page" the modal itself is touching the save button in the Header preview
+which is what its showcasing, so scroll a little bit further down so the header preview is in the space that is open above
+the tour modal entirely, so it isn't touching it in anyway
+
+edit room details is another thing that is sorta weird, the modal is sorta blurred out so everything looks weird, I mean the
+text and everything is readable its just sorta glossy don't know how to explain it, and the position is weird it goes into
+the top where the Marketel logo and Marketel name and front desk is at the top banner
+
+your booking link is perfect, rates everything else, just these 2 ^ that have problems
+
+Now going onto guest app, the 2/6 the instal lfront desk on your property phone, this one is fine, but the position is weird
+the tour modal is on top of the cta that installs front desk, so perhaps position it higher, when showcasing it, same with
+the 3/6 send guests to your direct page. the go to direct booking page, completely hidden, or not completely like 50% hidden
+by the tour modal, the everything connects 4/6 is fine, 5/6 is fine, 6/6 position the what its showcasing the loop design
+a little higher

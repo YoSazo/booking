@@ -39,8 +39,8 @@ function ensureTourPolishStyles() {
   style.id = 'frontdeskTourPolishStyle';
   style.textContent = `
     #tourBlurOverlay {
-      -webkit-backdrop-filter: blur(2.5px);
-      backdrop-filter: blur(2.5px);
+      -webkit-backdrop-filter: blur(1.25px);
+      backdrop-filter: blur(1.25px);
       animation: tourOverlayFade 0.18s ease-out;
     }
     #tourTooltip {
@@ -397,6 +397,29 @@ function tourAnchorRect(stepDef, highlightEl) {
   return tourElementRect(highlightEl, true);
 }
 
+function tourScrollParent(el) {
+  let node = el && el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = getComputedStyle(node);
+    const overflowY = style.overflowY || style.overflow;
+    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 1) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function scrollTourBy(el, delta) {
+  if (!delta) return;
+  const scroller = tourScrollParent(el);
+  if (scroller) {
+    scroller.scrollTop += delta;
+    return;
+  }
+  window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+}
+
 function forceTourPageTop(behavior) {
   const scrollBehavior = behavior || 'auto';
   try { window.scrollTo({ top: 0, left: 0, behavior: scrollBehavior }); } catch (_) {}
@@ -430,10 +453,13 @@ function scrollTourTargetIntoView(el, stepDef) {
         resolve();
         return;
       }
-      const rect = measure.getBoundingClientRect();
-      if (rect.top < padTop) window.scrollBy({ top: rect.top - padTop, left: 0, behavior: 'auto' });
+      let rect = measure.getBoundingClientRect();
+      if (rect.top < padTop) {
+        scrollTourBy(measure, rect.top - padTop);
+        rect = measure.getBoundingClientRect();
+      }
       if (rect.bottom > window.innerHeight - padBottom) {
-        window.scrollBy({ top: rect.bottom - window.innerHeight + padBottom, left: 0, behavior: 'auto' });
+        scrollTourBy(measure, rect.bottom - window.innerHeight + padBottom);
       }
       requestAnimationFrame(() => requestAnimationFrame(resolve));
     };
@@ -703,7 +729,9 @@ function startSettingsTour() {
       tab: 'settings',
       scrollBlock: 'nearest',
       scrollPadTop: 80,
-      scrollPadBottom: 220
+      scrollPadBottom: 360,
+      tooltipPosition: 'below',
+      tooltipGap: 22
     },
     {
       target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-photo-placeholder, #editRoomsCards [data-tour-room-card="1"] .room-edit-photo',
@@ -729,7 +757,9 @@ function startSettingsTour() {
       tab: 'settings',
       scrollBlock: 'center',
       scrollPadTop: 80,
-      scrollPadBottom: 330
+      scrollPadBottom: 390,
+      tooltipPosition: 'below',
+      tooltipGap: 22
     },
     {
       target: '#tour-booking-link-card',
@@ -1122,7 +1152,8 @@ function startSettingsTour() {
     document.body.appendChild(tooltip);
 
     const isNarrow = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
-    if (!isNarrow && measuredRect && measuredRect.width >= 2 && measuredRect.height >= 2) {
+    const canFloatOnNarrow = isNarrow && !!s.mobileTooltipPosition;
+    if ((!isNarrow || canFloatOnNarrow) && measuredRect && measuredRect.width >= 2 && measuredRect.height >= 2) {
       const width = Math.min(380, window.innerWidth - 28);
       tooltip.style.setProperty('--tour-width', `${width}px`);
       tooltip.style.left = '0';
@@ -1131,16 +1162,23 @@ function startSettingsTour() {
       tooltip.style.width = `${width}px`;
       tooltip.classList.add('tour-tooltip-floating');
       const height = Math.min(tooltip.offsetHeight || 190, Math.max(140, window.innerHeight - 28));
-      const gap = 14;
+      const gap = s.tooltipGap ?? 14;
       const centerX = measuredRect.left + measuredRect.width / 2;
       const left = Math.max(14, Math.min(centerX - width / 2, window.innerWidth - width - 14));
       const spaceBelow = window.innerHeight - measuredRect.bottom;
       const spaceAbove = measuredRect.top;
-      const placeBelow = spaceBelow >= height + gap || spaceBelow >= spaceAbove;
+      const preferredPosition = (isNarrow && s.mobileTooltipPosition) || s.tooltipPosition || '';
+      const placeBelow = preferredPosition === 'below'
+        ? true
+        : preferredPosition === 'above'
+          ? false
+          : (spaceBelow >= height + gap || spaceBelow >= spaceAbove);
       const rawTop = placeBelow ? measuredRect.bottom + gap : measuredRect.top - height - gap;
       const top = Math.max(14, Math.min(rawTop, window.innerHeight - height - 14));
       tooltip.style.setProperty('--tour-left', `${left}px`);
       tooltip.style.setProperty('--tour-top', `${top}px`);
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
     }
 
     wireTourTooltipButtons();
