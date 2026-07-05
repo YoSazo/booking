@@ -301,12 +301,13 @@ function createSettingsTourSpotlightClone(source, stepDef) {
   return clone;
 }
 
-function cleanupSettingsTourUi() {
+function cleanupSettingsTourUi(options) {
+  const opts = options || {};
   clearSettingsTourKeyboard();
   const prev = document.getElementById('tourTooltip');
   if (prev) prev.remove();
   const prevOverlay = document.getElementById('tourBlurOverlay');
-  if (prevOverlay) prevOverlay.remove();
+  if (prevOverlay && !opts.keepOverlay) prevOverlay.remove();
   document.querySelectorAll('[data-tour-spotlight-clone]').forEach((el) => el.remove());
   document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
     el.style.position = el.dataset.tourOrigPosition || '';
@@ -336,7 +337,7 @@ function cleanupSettingsTourUi() {
     delete goLiveBanner.dataset.tourHidden;
     if (typeof updateGoLiveBanner === 'function') updateGoLiveBanner();
   }
-  document.body.style.overflow = '';
+  if (!opts.keepOverlay) document.body.style.overflow = '';
 }
 
 function openTourAccordion(el, stepDef) {
@@ -491,14 +492,17 @@ function forceTourPageTop(behavior) {
   });
 }
 
-function scrollTourTargetIntoView(el, stepDef) {
+function scrollTourTargetIntoView(el, stepDef, options) {
+  const opts = options || {};
   const scrollSel = stepDef.scrollTarget || stepDef.accordionCard;
   const target = (scrollSel ? queryTourSelector(scrollSel) : null) || el;
   if (!target && !stepDef.scrollToTop) return Promise.resolve();
 
   const block = stepDef.scrollBlock || 'center';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const behavior = (crm.settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth';
+  const behavior = opts.smooth && !prefersReducedMotion
+    ? 'smooth'
+    : ((crm.settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth');
 
   return new Promise((resolve) => {
     const applyPadding = () => {
@@ -893,8 +897,8 @@ function startSettingsTour() {
     localStorage.removeItem('settingsTourStep');
   }
 
-  function cleanupTour() {
-    cleanupSettingsTourUi();
+  function cleanupTour(options) {
+    cleanupSettingsTourUi(options);
   }
 
   function skipToFinale() {
@@ -903,18 +907,29 @@ function startSettingsTour() {
     showFinaleMockModal();
   }
 
-  function scheduleTourStepContent(stepDef) {
-    if (stepDef.customModal) {
-      showStepContent(stepDef);
-      return;
-    }
-    requestAnimationFrame(() => showStepContent(stepDef));
+  function shouldKeepUiForStepTransition(fromStep, toStep) {
+    if (!fromStep || !toStep) return false;
+    if (fromStep.customModal || toStep.customModal) return false;
+    if (fromStep.tab !== toStep.tab) return false;
+    if (!fromStep.target || !toStep.target) return false;
+    return true;
   }
 
-  function showStep() {
-    cleanupTour();
+  function scheduleTourStepContent(stepDef, options) {
+    if (stepDef.customModal) {
+      showStepContent(stepDef, options);
+      return;
+    }
+    requestAnimationFrame(() => showStepContent(stepDef, options));
+  }
+
+  function showStep(options) {
+    const opts = options || {};
+    if (!opts.keepCurrentUi) cleanupTour();
+    else document.body.style.overflow = '';
 
     if (step >= steps.length) {
+      cleanupTour();
       localStorage.removeItem('settingsTourStep');
       showFinaleMockModal();
       return;
@@ -949,33 +964,39 @@ function startSettingsTour() {
           : window.ensureAppsViewRendered;
         if (typeof renderApps === 'function') renderApps(true);
       }
-      scheduleTourStepContent(s);
+      scheduleTourStepContent(s, opts);
       return;
     }
-    scheduleTourStepContent(s);
+    scheduleTourStepContent(s, opts);
   }
 
-  function showStepContent(s) {
+  function showStepContent(s, options) {
+    const opts = options || {};
     // Home-screen install pitch — shown first so they immediately get the value
     if (s.customModal === 'homescreen') {
+      if (opts.keepCurrentUi) cleanupTour();
       showHomescreenMockModal();
       return;
     }
     // Custom modal for bookings tab — show a mock booking card example
     if (s.customModal === true || s.customModal === 'bookings') {
+      if (opts.keepCurrentUi) cleanupTour();
       showBookingsMockModal();
       return;
     }
     // Custom modal for availability tab — multi-page walkthrough
     if (s.customModal === 'availability') {
+      if (opts.keepCurrentUi) cleanupTour();
       showAvailabilityMockModal();
       return;
     }
     if (s.customModal === 'finale') {
+      if (opts.keepCurrentUi) cleanupTour();
       showFinaleMockModal();
       return;
     }
     if (s.customModal === 'guestAppsStory') {
+      if (opts.keepCurrentUi) cleanupTour();
       handoffToGuestAppsTour();
       return;
     }
@@ -1003,7 +1024,7 @@ function startSettingsTour() {
         if (el) {
           if (s.openAccordion) openTourAccordion(el, s);
           if (s.openAccordion || el.offsetParent !== null) {
-            showStepForElement(el, s);
+            showStepForElement(el, s, opts);
             return;
           }
         }
@@ -1092,10 +1113,11 @@ function startSettingsTour() {
       pollForTarget();
     }
 
-    resolveTourTarget(s, (el) => showStepForElement(el, s));
+    resolveTourTarget(s, (el) => showStepForElement(el, s, opts));
   }
 
-  function showStepForElement(el, s) {
+  function showStepForElement(el, s, options) {
+    const opts = options || {};
     openTourAccordion(el, s);
     el = resolveTourHighlightEl(el, s);
     if (!el || !el.isConnected) {
@@ -1111,7 +1133,7 @@ function startSettingsTour() {
 
     const highlightEl = el;
     ensureTourBlurOverlay();
-    void scrollTourTargetIntoView(highlightEl, s).then(() => {
+    void scrollTourTargetIntoView(highlightEl, s, { smooth: !!opts.keepCurrentUi }).then(() => {
       if (s.forcePageTop) forceTourPageTop('auto');
       if (!highlightEl.isConnected) {
         step++;
@@ -1120,6 +1142,11 @@ function startSettingsTour() {
         return;
       }
       openTourAccordion(highlightEl, s);
+
+      if (opts.keepCurrentUi) {
+        cleanupTour({ keepOverlay: true });
+        ensureTourBlurOverlay();
+      }
 
       if (!s.noHighlight) {
         if (!highlightEl.dataset.tourOrigPosition) highlightEl.dataset.tourOrigPosition = highlightEl.style.position || '';
@@ -1271,19 +1298,25 @@ function startSettingsTour() {
   function wireTourTooltipButtons() {
     const nextBtn = document.getElementById('tourNextBtn');
     const skipBtn = document.getElementById('tourSkipBtn');
-    const nextAction = () => {
-      cleanupTour();
-      step++;
+    const moveToStep = (nextStep) => {
+      if (nextStep < 0) return;
+      const keepCurrentUi = shouldKeepUiForStepTransition(steps[step], steps[nextStep]);
+      if (!keepCurrentUi) cleanupTour();
+      else {
+        const activePanel = document.querySelector('#tourTooltip .tour-panel');
+        if (activePanel) activePanel.style.pointerEvents = 'none';
+      }
+      step = nextStep;
       localStorage.setItem('settingsTourStep', String(step));
-      showStep();
+      showStep({ keepCurrentUi });
+    };
+    const nextAction = () => {
+      moveToStep(step + 1);
     };
     const skipAction = () => { skipToFinale(); };
     const backAction = () => {
       if (step <= 0) return;
-      cleanupTour();
-      step--;
-      localStorage.setItem('settingsTourStep', String(step));
-      showStep();
+      moveToStep(step - 1);
     };
     if (nextBtn) {
       nextBtn.onclick = nextAction;
