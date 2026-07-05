@@ -320,6 +320,7 @@ function cleanupSettingsTourUi(options) {
     el.style.background = el.dataset.tourOrigBackground || '';
     el.style.backgroundColor = el.dataset.tourOrigBackgroundColor || '';
     el.style.borderRadius = el.dataset.tourOrigBorderRadius || '';
+    el.style.opacity = el.dataset.tourOrigOpacity || '';
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
     delete el.dataset.tourOrigZIndex;
@@ -331,6 +332,7 @@ function cleanupSettingsTourUi(options) {
     delete el.dataset.tourOrigBackground;
     delete el.dataset.tourOrigBackgroundColor;
     delete el.dataset.tourOrigBorderRadius;
+    delete el.dataset.tourOrigOpacity;
   });
   const goLiveBanner = document.getElementById('goLiveBanner');
   if (goLiveBanner && goLiveBanner.dataset.tourHidden) {
@@ -338,6 +340,65 @@ function cleanupSettingsTourUi(options) {
     if (typeof updateGoLiveBanner === 'function') updateGoLiveBanner();
   }
   if (!opts.keepOverlay) document.body.style.overflow = '';
+}
+
+function fadeOutSettingsTourStepUi() {
+  const tooltip = document.getElementById('tourTooltip');
+  const clones = Array.from(document.querySelectorAll('[data-tour-spotlight-clone]'));
+  const highlighted = Array.from(document.querySelectorAll('[data-tour-highlighted]'));
+  const fading = [tooltip, ...clones, ...highlighted].filter(Boolean);
+  if (!fading.length && !highlighted.length) {
+    cleanupSettingsTourUi({ keepOverlay: true });
+    return Promise.resolve();
+  }
+
+  clearSettingsTourKeyboard();
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) {
+    cleanupSettingsTourUi({ keepOverlay: true });
+    return Promise.resolve();
+  }
+
+  if (tooltip) tooltip.style.pointerEvents = 'none';
+  fading.forEach((el) => {
+    el.style.transition = 'opacity 0.12s ease, transform 0.12s ease';
+    el.style.opacity = '1';
+  });
+
+  requestAnimationFrame(() => {
+    fading.forEach((el) => {
+      el.style.opacity = '0';
+      if (el.id === 'tourTooltip') el.style.transform = 'translateY(4px)';
+    });
+  });
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      cleanupSettingsTourUi({ keepOverlay: true });
+      resolve();
+    }, 135);
+  });
+}
+
+function fadeInSettingsTourStepUi(tooltip) {
+  const elements = [
+    tooltip,
+    ...document.querySelectorAll('[data-tour-spotlight-clone]'),
+    ...document.querySelectorAll('[data-tour-highlighted]')
+  ].filter(Boolean);
+
+  elements.forEach((el) => {
+    el.style.transition = 'opacity 0.16s ease, transform 0.16s ease';
+    el.style.opacity = '0';
+    if (el.id === 'tourTooltip') el.style.transform = 'translateY(4px)';
+  });
+
+  requestAnimationFrame(() => {
+    elements.forEach((el) => {
+      el.style.opacity = '1';
+      if (el.id === 'tourTooltip') el.style.transform = 'translateY(0)';
+    });
+  });
 }
 
 function openTourAccordion(el, stepDef) {
@@ -1159,6 +1220,7 @@ function startSettingsTour() {
         if (!highlightEl.dataset.tourOrigBackground) highlightEl.dataset.tourOrigBackground = highlightEl.style.background || '';
         if (!highlightEl.dataset.tourOrigBackgroundColor) highlightEl.dataset.tourOrigBackgroundColor = highlightEl.style.backgroundColor || '';
         if (!highlightEl.dataset.tourOrigBorderRadius) highlightEl.dataset.tourOrigBorderRadius = highlightEl.style.borderRadius || '';
+        if (!highlightEl.dataset.tourOrigOpacity) highlightEl.dataset.tourOrigOpacity = highlightEl.style.opacity || '';
         highlightEl.style.position = highlightEl.style.position || 'relative';
         highlightEl.style.zIndex = '99999';
         highlightEl.style.isolation = 'isolate';
@@ -1182,6 +1244,9 @@ function startSettingsTour() {
         if (s.spotlightBorderRadius) {
           highlightEl.style.borderRadius = s.spotlightBorderRadius;
         }
+        if (opts.keepCurrentUi) {
+          highlightEl.style.opacity = '0';
+        }
         highlightEl.setAttribute('data-tour-highlighted', '1');
         createSettingsTourSpotlightClone(highlightEl, s);
       }
@@ -1192,14 +1257,14 @@ function startSettingsTour() {
         const tipTarget = anchor || highlightEl;
         if (s.freezeTooltip) {
           const rect = tipTarget && tipTarget.isConnected ? tipTarget.getBoundingClientRect() : null;
-          positionTooltip(tipTarget, s, rect && rect.width >= 2 ? rect : null);
+          positionTooltip(tipTarget, s, rect && rect.width >= 2 ? rect : null, { fadeIn: !!opts.keepCurrentUi });
           return;
         }
         const liveEl = resolveLiveTourElement(highlightEl, s);
         let tipEl = liveEl ? resolveTourHighlightEl(liveEl, s) : highlightEl;
         openTourAccordion(tipEl, s);
         const rect = s.tooltipAnchor ? null : tourAnchorRect(s, tipEl);
-        positionTooltip(tipEl || highlightEl, s, rect);
+        positionTooltip(tipEl || highlightEl, s, rect, { fadeIn: !!opts.keepCurrentUi });
       };
 
       if (s.freezeTooltip) {
@@ -1222,14 +1287,15 @@ function startSettingsTour() {
             requestAnimationFrame(() => positionAfterLayout(attempt + 1));
             return;
           }
-          positionTooltip(tipEl || highlightEl, s, rect);
+          positionTooltip(tipEl || highlightEl, s, rect, { fadeIn: !!opts.keepCurrentUi });
         });
       };
       positionAfterLayout(0);
     });
   }
 
-  function positionTooltip(el, s, measuredRect) {
+  function positionTooltip(el, s, measuredRect, options) {
+    const opts = options || {};
     const prev = document.getElementById('tourTooltip');
     if (prev) prev.remove();
 
@@ -1292,6 +1358,7 @@ function startSettingsTour() {
     }
 
     tooltip.style.visibility = 'visible';
+    if (opts.fadeIn) fadeInSettingsTourStepUi(tooltip);
     wireTourTooltipButtons();
   }
 
@@ -1301,14 +1368,17 @@ function startSettingsTour() {
     const moveToStep = (nextStep) => {
       if (nextStep < 0) return;
       const keepCurrentUi = shouldKeepUiForStepTransition(steps[step], steps[nextStep]);
-      if (!keepCurrentUi) cleanupTour();
-      else {
-        const activePanel = document.querySelector('#tourTooltip .tour-panel');
-        if (activePanel) activePanel.style.pointerEvents = 'none';
+      const finishMove = () => {
+        step = nextStep;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep({ keepCurrentUi });
+      };
+      if (!keepCurrentUi) {
+        cleanupTour();
+        finishMove();
+        return;
       }
-      step = nextStep;
-      localStorage.setItem('settingsTourStep', String(step));
-      showStep({ keepCurrentUi });
+      void fadeOutSettingsTourStepUi().then(finishMove);
     };
     const nextAction = () => {
       moveToStep(step + 1);
