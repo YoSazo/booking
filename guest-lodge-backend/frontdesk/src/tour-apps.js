@@ -334,22 +334,45 @@ function appsTourScrollBy(el, delta) {
   window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
 }
 
-function applyAppsTourScrollPadding(target, step, isNarrowViewport) {
-  if (!target || !target.isConnected) return;
-  const padTop = (isNarrowViewport ? step.mobileScrollPadTop : step.scrollPadTop);
-  const padBottom = (isNarrowViewport ? step.mobileScrollPadBottom : step.scrollPadBottom);
-  if (padTop == null && padBottom == null) return;
+function appsTourPlacementForStep(step, isNarrowViewport) {
+  return (isNarrowViewport && step.mobileTooltipPosition) || step.tooltipPosition || '';
+}
+
+function fitAppsTourTargetAndTooltip(target, step, tooltip, placement, isNarrowViewport) {
+  if (!target || !target.isConnected || !tooltip) return target?.getBoundingClientRect() || null;
+  const panel = tooltip.querySelector('.apps-tour-panel');
+  const tipHeight = Math.min(
+    (panel && panel.offsetHeight) || tooltip.offsetHeight || 190,
+    Math.max(130, window.innerHeight - 28)
+  );
+  const gap = step.tooltipGap ?? 8;
+  const topLimit = (isNarrowViewport ? step.mobileFitPadTop : step.fitPadTop) ?? 14;
+  const bottomLimit = window.innerHeight - ((isNarrowViewport ? step.mobileFitPadBottom : step.fitPadBottom) ?? 14);
 
   let rect = target.getBoundingClientRect();
-  const topPad = padTop ?? 80;
-  const bottomPad = padBottom ?? 220;
-  if (rect.top < topPad) {
-    appsTourScrollBy(target, rect.top - topPad);
+  if (rect.width < 2 || rect.height < 2) return rect;
+
+  for (let i = 0; i < 3; i += 1) {
+    const availableHeight = Math.max(120, bottomLimit - topLimit);
+    const canFitPair = rect.height + gap + tipHeight <= availableHeight;
+    let delta = 0;
+
+    if (placement === 'above') {
+      const topOverflow = rect.top - gap - tipHeight - topLimit;
+      if (topOverflow < 0) delta = topOverflow;
+      if (canFitPair && rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
+    } else {
+      const bottomOverflow = rect.bottom + gap + tipHeight - bottomLimit;
+      if (bottomOverflow > 0) delta = bottomOverflow;
+      if (canFitPair && rect.top < topLimit) delta = rect.top - topLimit;
+    }
+
+    if (Math.abs(delta) < 1) break;
+    appsTourScrollBy(target, delta);
     rect = target.getBoundingClientRect();
   }
-  if (rect.bottom > window.innerHeight - bottomPad) {
-    appsTourScrollBy(target, rect.bottom - window.innerHeight + bottomPad);
-  }
+
+  return rect;
 }
 
 function appsTourClose(markDone) {
@@ -530,22 +553,15 @@ function appsTourRender() {
   const placeTooltip = () => {
     const old = document.getElementById('appsTourTooltip');
     if (old) old.remove();
-    createAppsTourSpotlightClone(target);
-    const rect = target.getBoundingClientRect();
     const maxWidth = Math.min(isNarrowViewport ? window.innerWidth - 24 : 370, window.innerWidth - 28);
-    const centerX = rect.left + rect.width / 2;
-    const left = Math.max(14, Math.min(centerX - maxWidth / 2, window.innerWidth - maxWidth - 14));
-    const anchorEdge = (isNarrowViewport && step.mobileTooltipAnchor) || step.tooltipAnchor || 'bottom';
-    const preferredPosition = (isNarrowViewport && step.mobileTooltipPosition) || step.tooltipPosition || '';
-    const anchorTop = rect.top;
-    const anchorBottom = anchorEdge === 'top' ? rect.top : rect.bottom;
+    const preferredPosition = appsTourPlacementForStep(step, isNarrowViewport);
     const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
     const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
     const backDisabled = _appsTourIdx <= 0;
     const kicker = step.kicker || 'Guest App';
     const tip = document.createElement('div');
     tip.id = 'appsTourTooltip';
-    tip.style.cssText = `position:fixed;z-index:100003;left:${left}px;top:14px;width:${maxWidth}px;max-width:${maxWidth}px;visibility:hidden;`;
+    tip.style.cssText = `position:fixed;z-index:100003;left:12px;top:14px;width:${maxWidth}px;max-width:${maxWidth}px;visibility:hidden;`;
     tip.innerHTML = `
       <div class="apps-tour-panel" role="dialog" aria-live="polite" aria-label="${escapeAppsTourHtml(step.title)}">
         <div class="apps-tour-progress">
@@ -566,6 +582,7 @@ function appsTourRender() {
     document.body.appendChild(tip);
 
     if (isNarrowViewport && !preferredPosition) {
+      createAppsTourSpotlightClone(target);
       tip.style.left = '12px';
       tip.style.right = '12px';
       tip.style.width = 'auto';
@@ -573,18 +590,24 @@ function appsTourRender() {
       tip.style.top = 'auto';
       tip.style.bottom = 'calc(14px + env(safe-area-inset-bottom,0px))';
     } else {
-      const gap = 14;
-      const tipHeight = Math.min(tip.offsetHeight || 190, Math.max(130, window.innerHeight - 28));
-      const spaceBelow = window.innerHeight - anchorBottom;
-      const spaceAbove = anchorTop;
-      let placeBelow = preferredPosition === 'below'
-        || (!preferredPosition && spaceBelow >= tipHeight + gap + 14);
-      if (preferredPosition === 'above') placeBelow = false;
-      if (placeBelow && spaceBelow < tipHeight + gap + 14 && spaceAbove > spaceBelow) placeBelow = false;
-      if (!placeBelow && spaceAbove < tipHeight + gap + 14 && spaceBelow > spaceAbove) placeBelow = true;
-      const rawTop = placeBelow ? anchorBottom + gap : anchorTop - tipHeight - gap;
-      const maxTop = Math.max(14, window.innerHeight - tipHeight - 14);
-      const top = Math.max(14, Math.min(rawTop, maxTop));
+      const placement = preferredPosition || 'below';
+      const rect = fitAppsTourTargetAndTooltip(target, step, tip, placement, isNarrowViewport)
+        || target.getBoundingClientRect();
+      createAppsTourSpotlightClone(target);
+
+      const panel = tip.querySelector('.apps-tour-panel');
+      const tipHeight = Math.min((panel && panel.offsetHeight) || tip.offsetHeight || 190, Math.max(130, window.innerHeight - 28));
+      const gap = step.tooltipGap ?? 8;
+      const centerX = rect.left + rect.width / 2;
+      const left = Math.max(14, Math.min(centerX - maxWidth / 2, window.innerWidth - maxWidth - 14));
+      const placeBelow = placement !== 'above';
+      const rawTop = placeBelow ? rect.bottom + gap : rect.top - tipHeight - gap;
+      const top = Math.max(14, Math.min(rawTop, window.innerHeight - tipHeight - 14));
+      tip.style.left = `${left}px`;
+      tip.style.right = 'auto';
+      tip.style.bottom = 'auto';
+      tip.style.width = `${maxWidth}px`;
+      tip.style.maxWidth = `${maxWidth}px`;
       tip.style.top = `${top}px`;
     }
     tip.style.visibility = 'visible';
@@ -626,7 +649,6 @@ function appsTourRender() {
     ? (prefersReducedMotion ? 80 : 680)
     : (prefersReducedMotion ? 40 : 320);
   _appsTourTooltipTimer = setTimeout(() => {
-    applyAppsTourScrollPadding(target, step, isNarrowViewport);
     requestAnimationFrame(placeTooltip);
   }, tooltipDelay);
 }
@@ -655,13 +677,10 @@ function startAppsTour(opts) {
       title: 'Install this on the property phone.',
       text: 'Front Desk is this dashboard saved like an app. It is where booking alerts, guest messages, QR tools, and setup controls live.',
       scrollBlock: 'center',
-      tooltipAnchor: 'top',
-      tooltipPosition: 'above',
+      tooltipPosition: 'below',
+      tooltipGap: 8,
       mobileScrollBlock: 'center',
-      mobileScrollPadTop: 260,
-      mobileScrollPadBottom: 180,
-      mobileTooltipAnchor: 'top',
-      mobileTooltipPosition: 'above',
+      mobileTooltipPosition: 'below',
     },
     {
       target: '#tour-apps-then',
@@ -669,13 +688,10 @@ function startAppsTour(opts) {
       title: 'Send guests to your direct page.',
       text: 'The Install button sits on the booking page. Guests tap it once, and your hotel icon lands on their home screen.',
       scrollBlock: 'center',
-      tooltipAnchor: 'top',
-      tooltipPosition: 'above',
+      tooltipPosition: 'below',
+      tooltipGap: 8,
       mobileScrollBlock: 'center',
-      mobileScrollPadTop: 260,
-      mobileScrollPadBottom: 180,
-      mobileTooltipAnchor: 'top',
-      mobileTooltipPosition: 'above',
+      mobileTooltipPosition: 'below',
     },
     {
       target: '#tour-apps-after',
@@ -704,7 +720,9 @@ function startAppsTour(opts) {
       secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
       showActivationOnComplete: !hotelIsLive,
       mobileScrollBlock: 'center',
-      mobileScrollPadBottom: 300,
+      tooltipPosition: 'below',
+      tooltipGap: 8,
+      mobileTooltipPosition: 'below',
     },
   ];
 

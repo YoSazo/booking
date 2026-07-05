@@ -51,6 +51,8 @@ function ensureTourPolishStyles() {
       pointer-events: auto;
       width: 100%;
       max-width: 560px;
+      max-height: calc(100dvh - 28px);
+      overflow-y: auto;
       background: #fff;
       color: #1A2B22;
       border: 1.5px solid #D8E4DC;
@@ -420,6 +422,49 @@ function scrollTourBy(el, delta) {
   window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
 }
 
+function tourPlacementForStep(stepDef, isNarrow) {
+  return (isNarrow && stepDef.mobileTooltipPosition) || stepDef.tooltipPosition || 'below';
+}
+
+function fitTourTargetAndTooltip(el, stepDef, tooltip, placement) {
+  if (!el || !el.isConnected || !tooltip) return tourAnchorRect(stepDef, el);
+  const panel = tooltip.querySelector('.tour-panel');
+  const tipHeight = Math.min(
+    (panel && panel.offsetHeight) || tooltip.offsetHeight || 190,
+    Math.max(140, window.innerHeight - 28)
+  );
+  const gap = stepDef.tooltipGap ?? 8;
+  const topLimit = stepDef.fitPadTop ?? stepDef.scrollPadTop ?? 72;
+  const bottomLimit = window.innerHeight - (stepDef.fitPadBottom ?? 14);
+
+  const measure = () => tourAnchorRect(stepDef, el) || tourElementRect(el, true);
+  let rect = measure();
+  if (!rect) return null;
+
+  for (let i = 0; i < 3; i += 1) {
+    const availableHeight = Math.max(120, bottomLimit - topLimit);
+    const canFitPair = rect.height + gap + tipHeight <= availableHeight;
+    let delta = 0;
+
+    if (placement === 'above') {
+      const topOverflow = rect.top - gap - tipHeight - topLimit;
+      if (topOverflow < 0) delta = topOverflow;
+      if (canFitPair && rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
+    } else {
+      const bottomOverflow = rect.bottom + gap + tipHeight - bottomLimit;
+      if (bottomOverflow > 0) delta = bottomOverflow;
+      if (canFitPair && rect.top < topLimit) delta = rect.top - topLimit;
+    }
+
+    if (Math.abs(delta) < 1) break;
+    scrollTourBy(el, delta);
+    rect = measure();
+    if (!rect) return null;
+  }
+
+  return rect;
+}
+
 function forceTourPageTop(behavior) {
   const scrollBehavior = behavior || 'auto';
   try { window.scrollTo({ top: 0, left: 0, behavior: scrollBehavior }); } catch (_) {}
@@ -749,17 +794,17 @@ function startSettingsTour() {
     {
       target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields button[onclick^="saveEditRoom"]',
-      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields button[onclick^="saveEditRoom"]',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       title: 'Edit room details',
       text: 'Room name, description, guest count, amenities, and units all show on the booking page. Keep this short and accurate.',
       openAccordion: false,
       tab: 'settings',
       scrollBlock: 'center',
       scrollPadTop: 80,
-      scrollPadBottom: 390,
+      scrollPadBottom: 220,
       tooltipPosition: 'below',
-      tooltipGap: 22
+      tooltipGap: 8
     },
     {
       target: '#tour-booking-link-card',
@@ -777,7 +822,7 @@ function startSettingsTour() {
     {
       target: '#tour-rates-card',
       highlightSelector: '#tour-rates-card',
-      anchorSelector: '#tour-rates-header',
+      anchorSelector: '#tour-rates-card',
       scrollTarget: '#tour-rates-card',
       title: 'Set your rates',
       text: 'Set nightly, weekly, and monthly prices before you share the link. Guests book from these rates on your direct page.',
@@ -785,7 +830,9 @@ function startSettingsTour() {
       accordionCard: '#tour-rates-card',
       tab: 'settings',
       scrollBlock: 'center',
-      scrollPadBottom: 260
+      scrollPadBottom: 220,
+      tooltipPosition: 'below',
+      tooltipGap: 8
     },
     {
       target: '#bookingsList',
@@ -1132,7 +1179,7 @@ function startSettingsTour() {
     const nextLabel = s.primaryLabel || (step < steps.length - 1 ? 'Next' : 'Got it');
     const backDisabled = step <= 0;
 
-    tooltip.style.cssText = 'position:fixed;z-index:100000;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;pointer-events:none;';
+    tooltip.style.cssText = 'position:fixed;z-index:100000;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;pointer-events:none;visibility:hidden;';
     tooltip.innerHTML = `
       <div class="tour-panel" role="dialog" aria-live="polite" aria-label="${title}">
         <div class="tour-progress-row">
@@ -1152,28 +1199,26 @@ function startSettingsTour() {
     document.body.appendChild(tooltip);
 
     const isNarrow = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
-    const canFloatOnNarrow = isNarrow && !!s.mobileTooltipPosition;
-    if ((!isNarrow || canFloatOnNarrow) && measuredRect && measuredRect.width >= 2 && measuredRect.height >= 2) {
+    const preferredPosition = tourPlacementForStep(s, isNarrow);
+    let finalRect = measuredRect;
+    if (measuredRect && measuredRect.width >= 2 && measuredRect.height >= 2) {
+      finalRect = fitTourTargetAndTooltip(el, s, tooltip, preferredPosition) || measuredRect;
+      if (!s.noHighlight) createSettingsTourSpotlightClone(el);
       const width = Math.min(380, window.innerWidth - 28);
       tooltip.style.setProperty('--tour-width', `${width}px`);
       tooltip.style.left = '0';
       tooltip.style.right = 'auto';
       tooltip.style.bottom = 'auto';
       tooltip.style.width = `${width}px`;
+      tooltip.style.justifyContent = 'flex-start';
       tooltip.classList.add('tour-tooltip-floating');
-      const height = Math.min(tooltip.offsetHeight || 190, Math.max(140, window.innerHeight - 28));
-      const gap = s.tooltipGap ?? 14;
-      const centerX = measuredRect.left + measuredRect.width / 2;
+      const panel = tooltip.querySelector('.tour-panel');
+      const height = Math.min((panel && panel.offsetHeight) || tooltip.offsetHeight || 190, Math.max(140, window.innerHeight - 28));
+      const gap = s.tooltipGap ?? 8;
+      const centerX = finalRect.left + finalRect.width / 2;
       const left = Math.max(14, Math.min(centerX - width / 2, window.innerWidth - width - 14));
-      const spaceBelow = window.innerHeight - measuredRect.bottom;
-      const spaceAbove = measuredRect.top;
-      const preferredPosition = (isNarrow && s.mobileTooltipPosition) || s.tooltipPosition || '';
-      const placeBelow = preferredPosition === 'below'
-        ? true
-        : preferredPosition === 'above'
-          ? false
-          : (spaceBelow >= height + gap || spaceBelow >= spaceAbove);
-      const rawTop = placeBelow ? measuredRect.bottom + gap : measuredRect.top - height - gap;
+      const placeBelow = preferredPosition !== 'above';
+      const rawTop = placeBelow ? finalRect.bottom + gap : finalRect.top - height - gap;
       const top = Math.max(14, Math.min(rawTop, window.innerHeight - height - 14));
       tooltip.style.setProperty('--tour-left', `${left}px`);
       tooltip.style.setProperty('--tour-top', `${top}px`);
@@ -1181,6 +1226,7 @@ function startSettingsTour() {
       tooltip.style.top = `${top}px`;
     }
 
+    tooltip.style.visibility = 'visible';
     wireTourTooltipButtons();
   }
 
