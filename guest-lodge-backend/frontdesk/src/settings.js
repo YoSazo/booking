@@ -387,15 +387,32 @@ function advanceTourIfNeeded() {
   if (overlay) overlay.remove();
   document.querySelectorAll('[data-tour-highlighted]').forEach(el => {
     el.style.position = el.dataset.tourOrigPosition || '';
-    el.style.zIndex = '';
-    el.style.isolation = '';
-    el.style.boxShadow = '';
+    el.style.zIndex = el.dataset.tourOrigZIndex || '';
+    el.style.isolation = el.dataset.tourOrigIsolation || '';
+    el.style.boxShadow = el.dataset.tourOrigBoxShadow || '';
     el.style.outline = el.dataset.tourOrigOutline || '';
     el.style.outlineOffset = el.dataset.tourOrigOutlineOffset || '';
+    el.style.transition = el.dataset.tourOrigTransition || '';
+    el.style.borderRadius = el.dataset.tourOrigBorderRadius || '';
+    el.style.opacity = el.dataset.tourOrigOpacity || '';
+    const origBg = el.dataset.tourOrigBackground || '';
+    const origBgColor = el.dataset.tourOrigBackgroundColor || '';
+    if (origBgColor) el.style.backgroundColor = origBgColor;
+    else el.style.removeProperty('background-color');
+    if (origBg) el.style.background = origBg;
+    else el.style.removeProperty('background');
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
+    delete el.dataset.tourOrigZIndex;
+    delete el.dataset.tourOrigIsolation;
+    delete el.dataset.tourOrigBoxShadow;
     delete el.dataset.tourOrigOutline;
     delete el.dataset.tourOrigOutlineOffset;
+    delete el.dataset.tourOrigTransition;
+    delete el.dataset.tourOrigBackground;
+    delete el.dataset.tourOrigBackgroundColor;
+    delete el.dataset.tourOrigBorderRadius;
+    delete el.dataset.tourOrigOpacity;
   });
   document.body.style.overflow = '';
 }
@@ -424,7 +441,7 @@ function showOnboardingQuestions() {
       ]
     },
     {
-      title: 'How many rooms do you have?',
+      title: 'How many bookable rooms or units do you offer?',
       key: 'roomCount',
       type: 'choice',
       options: [
@@ -553,7 +570,7 @@ function showWelcomeModal() {
   function renderWelcomeStep() {
     overlay.innerHTML = `
       <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
-        <div style="font-size:32px;margin-bottom:12px;">🏨</div>
+        <div style="font-size:32px;margin-bottom:12px;">🏡</div>
         <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
         <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">This is where you:<br><br>
           <strong>Set up</strong> your booking page<br>
@@ -608,7 +625,7 @@ function startPostActivationTabTour() {
     {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Guest App</strong> — put your hotel on guests&apos; home screens and send install reminders.',
+      text: '<strong>Guest App</strong> — put your property on guests&apos; home screens and send install reminders.',
     },
   ];
 
@@ -775,7 +792,7 @@ async function loadEditRooms() {
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
           <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
             <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Hotel Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Property Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
           </div>
@@ -882,7 +899,7 @@ async function loadEditRooms() {
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
           <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique hotel PIN' : 'Enter new PIN (min 4 chars)'}" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+            <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 4 chars)'}" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
           </div>
           <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>
@@ -1161,7 +1178,7 @@ async function saveHotelInfo() {
   const cancellationPolicy = document.getElementById('edit-hotel-policy')?.value.trim();
   try {
     await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone, cancellationPolicy });
-    toast('Hotel info saved!', 'success');
+    toast('Property info saved!', 'success');
   } catch (e) {
     toast('Failed to save', 'error');
   }
@@ -1393,7 +1410,7 @@ function restoreAppIconPreview() {
     return;
   }
   // Letter icon: full-bleed green edge-to-edge, no white inner frame.
-  const initial = (crm.activeHotelName || 'H').trim().charAt(0).toUpperCase() || '🏨';
+  const initial = (crm.activeHotelName || 'P').trim().charAt(0).toUpperCase() || '🏡';
   el.style.background = 'transparent';
   el.style.border = 'none';
   el.style.padding = '0';

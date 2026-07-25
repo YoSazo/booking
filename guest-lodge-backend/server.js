@@ -5249,28 +5249,65 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
 app.post('/api/funnel/onboarding', async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true });
     try {
-        const { eventName, email, userAgent, ip, referrer, contentName } = req.body;
+        const { eventName, email, userAgent, ip, referrer, contentName, eventId, setupToken } = req.body;
         if (!eventName) return res.status(400).json({ success: false });
+
+        let trackedEmail = email || null;
+        let trackedHotelId = 'marketel-onboarding';
+        let setupHotel = null;
+        if (setupToken) {
+            setupHotel = await prisma.hotelConfig.findUnique({
+                where: { setupToken },
+                select: { id: true, ownerEmail: true },
+            });
+            if (!setupHotel) {
+                return res.status(404).json({ success: false, message: 'Invalid setup token' });
+            }
+            trackedHotelId = setupHotel.id;
+            trackedEmail = setupHotel.ownerEmail || null;
+        }
+
+        if (eventName === 'Lead') {
+            const qualifiedAnswers = new Set(['ota_commissions', 'direct_bookings']);
+            if (!setupHotel || !qualifiedAnswers.has(contentName)) {
+                return res.status(400).json({ success: false, message: 'Invalid qualified lead' });
+            }
+
+            // A setup can qualify only once. The browser also uses a stable
+            // event_id, while this protects the database and CAPI from replays.
+            const existingLead = await prisma.funnelEvent.findFirst({
+                where: { hotelId: trackedHotelId, eventName: 'Lead' },
+                select: { id: true },
+            });
+            if (existingLead) {
+                return res.json({ success: true, duplicate: true });
+            }
+        }
+
         await prisma.funnelEvent.create({
             data: {
-                hotelId: 'marketel-onboarding',
+                hotelId: trackedHotelId,
                 eventName,
-                guestEmail: email || null,
+                eventId: eventId || null,
+                guestEmail: trackedEmail,
                 userAgent: userAgent || req.headers['user-agent'] || null,
                 ipAddress: ip || req.ip || req.socket?.remoteAddress || null,
                 contentName: contentName || referrer || null,
             },
         });
-        // Fire CAPI for Qualead events
-        if (eventName === 'Qualead') {
-            const { fbp: qFbp, fbc: qFbc } = getMetaCookies(req);
-            sendMarketelCAPI('Qualead', {
-                email: email || '',
+
+        // Match the browser's standard Lead event and event_id. Meta uses the
+        // pair to deduplicate Pixel and Conversions API copies of the same lead.
+        if (eventName === 'Lead') {
+            const { fbp: leadFbp, fbc: leadFbc } = getMetaCookies(req);
+            sendMarketelCAPI('Lead', {
+                email: trackedEmail || '',
                 ip: req.ip,
                 userAgent: req.headers['user-agent'],
                 sourceUrl: req.headers.referer || '',
-                fbp: qFbp,
-                fbc: qFbc,
+                fbp: leadFbp,
+                fbc: leadFbc,
+                eventId: eventId || undefined,
             });
         }
         res.json({ success: true });
@@ -5621,16 +5658,6 @@ app.post('/api/setup/start', async (req, res) => {
         });
 
         console.log(`✅ Free setup started: ${hotelSlug}, token: ${setupToken}, email: ${email}`);
-        // Meta CAPI: Lead event
-        const { fbp: cookieFbp, fbc: cookieFbc } = getMetaCookies(req);
-        sendMarketelCAPI('Lead', {
-            email,
-            userAgent: req.headers['user-agent'],
-            ip: req.ip || req.socket?.remoteAddress,
-            sourceUrl: req.headers.referer || req.headers.origin || '',
-            fbp: req.body.fbp || cookieFbp,
-            fbc: req.body.fbc || cookieFbc,
-        });
         res.json({ success: true, setupUrl: '/setup/' + setupToken, token: setupToken });
     } catch (e) {
         console.error('Start setup error:', e.message);

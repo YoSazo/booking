@@ -42,6 +42,7 @@ function ensureTourPolishStyles() {
       -webkit-backdrop-filter: blur(1.25px);
       backdrop-filter: blur(1.25px);
       animation: tourOverlayFade 0.18s ease-out;
+      transition: background 0.25s ease;
     }
     #tourTooltip {
       box-sizing: border-box;
@@ -164,6 +165,14 @@ function ensureTourPolishStyles() {
         margin-left: 0;
       }
     }
+    @keyframes tourPanelOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(10px) scale(0.98); }
+    }
+    @keyframes tourPageIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     @keyframes tourOverlayFade {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -176,6 +185,9 @@ function ensureTourPolishStyles() {
       #tourBlurOverlay,
       .tour-panel {
         animation: none !important;
+      }
+      #tourBlurOverlay {
+        transition: none !important;
       }
       .tour-progress-fill {
         transition: none !important;
@@ -225,13 +237,33 @@ function ensureTourBlurOverlay(options) {
   ensureTourPolishStyles();
   const opts = options || {};
   let overlay = document.getElementById('tourBlurOverlay');
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = 'tourBlurOverlay';
-  overlay.style.cssText = `position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.22);pointer-events:${opts.blockPointer ? 'auto' : 'none'};`;
-  document.body.appendChild(overlay);
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'tourBlurOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;';
+    document.body.appendChild(overlay);
+  }
+  // Normalize mode on every call so a persistent overlay can morph between
+  // highlight steps (light dim, click-through) and modal steps (dark dim,
+  // pointer-blocking) with the CSS background transition instead of a flash.
+  overlay.style.background = opts.dim || 'rgba(17,24,39,0.22)';
+  overlay.style.pointerEvents = opts.blockPointer ? 'auto' : 'none';
   if (opts.lockScroll) document.body.style.overflow = 'hidden';
   return overlay;
+}
+
+const TOUR_MODAL_DIM = 'rgba(17,24,39,0.42)';
+
+// Animates the current tour modal/tooltip panel out (keeps the dim overlay up)
+// and resolves when it is safe to render the next step's UI.
+function transitionOutTourModal() {
+  const tooltip = document.getElementById('tourTooltip');
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!tooltip || prefersReducedMotion) return Promise.resolve();
+  tooltip.style.pointerEvents = 'none';
+  const panel = tooltip.firstElementChild;
+  if (panel) panel.style.animation = 'tourPanelOut 0.16s ease-in forwards';
+  return new Promise((resolve) => setTimeout(resolve, 150));
 }
 
 function stripTourCloneIds(root) {
@@ -317,10 +349,17 @@ function cleanupSettingsTourUi(options) {
     el.style.outline = el.dataset.tourOrigOutline || '';
     el.style.outlineOffset = el.dataset.tourOrigOutlineOffset || '';
     el.style.transition = el.dataset.tourOrigTransition || '';
-    el.style.background = el.dataset.tourOrigBackground || '';
-    el.style.backgroundColor = el.dataset.tourOrigBackgroundColor || '';
     el.style.borderRadius = el.dataset.tourOrigBorderRadius || '';
     el.style.opacity = el.dataset.tourOrigOpacity || '';
+    // Restore backgroundColor first, then the background shorthand last.
+    // Clearing backgroundColor AFTER setting background wipes shorthand values
+    // like `background:var(--green)` on the Preview Your Site button.
+    const origBg = el.dataset.tourOrigBackground || '';
+    const origBgColor = el.dataset.tourOrigBackgroundColor || '';
+    if (origBgColor) el.style.backgroundColor = origBgColor;
+    else el.style.removeProperty('background-color');
+    if (origBg) el.style.background = origBg;
+    else el.style.removeProperty('background');
     el.removeAttribute('data-tour-highlighted');
     delete el.dataset.tourOrigPosition;
     delete el.dataset.tourOrigZIndex;
@@ -690,12 +729,11 @@ function handoffToGuestAppsTour() {
 }
 
 function showFinaleMockModal() {
-  cleanupSettingsTourUi();
+  cleanupSettingsTourUi({ keepOverlay: true });
   ensureTourPolishStyles();
   crm.settingsTourActive = false;
   updateGoLiveBanner();
-  const blurOverlay = ensureTourBlurOverlay({ blockPointer: true, lockScroll: true });
-  blurOverlay.style.background = 'rgba(17,24,39,0.42)';
+  ensureTourBlurOverlay({ blockPointer: true, lockScroll: true, dim: TOUR_MODAL_DIM });
 
   const modal = document.createElement('div');
   modal.id = 'tourTooltip';
@@ -747,14 +785,16 @@ function showFinaleMockModal() {
     const domain = crm.activeHotelDomain || (crm.activeHotelId + '.mktel.co');
     const url = 'https://' + domain;
     navigator.clipboard.writeText(url).catch(() => {});
-    cleanupSettingsTourUi();
-    crm.settingsTourActive = false;
-    localStorage.setItem('settingsTourDone', '1');
-    localStorage.setItem('linkCopied', '1');
-    localStorage.removeItem('settingsTourStep');
-    toast('Booking link copied!', 'success');
-    finishTourHydration();
-    showTestDriveModal(url);
+    void transitionOutTourModal().then(() => {
+      cleanupSettingsTourUi();
+      crm.settingsTourActive = false;
+      localStorage.setItem('settingsTourDone', '1');
+      localStorage.setItem('linkCopied', '1');
+      localStorage.removeItem('settingsTourStep');
+      toast('Booking link copied!', 'success');
+      finishTourHydration();
+      showTestDriveModal(url);
+    });
   };
 }
 
@@ -865,7 +905,7 @@ function startSettingsTour() {
       anchorSelector: '#tour-header-preview-card',
       scrollTarget: '#tour-header-preview-card',
       title: 'Edit your booking page',
-      text: 'This page is the source of truth for your guest site. Update the hotel name, address, phone, policy, rooms, photos, and prices here.',
+      text: 'This page is the source of truth for your guest site. Update the property name, address, phone, policy, rooms, photos, and prices here.',
       openAccordion: false,
       tab: 'settings',
       scrollBlock: 'nearest',
@@ -981,9 +1021,11 @@ function startSettingsTour() {
   }
 
   function skipToFinale() {
-    cleanupTour();
-    localStorage.removeItem('settingsTourStep');
-    showFinaleMockModal();
+    void transitionOutTourModal().then(() => {
+      cleanupTour({ keepOverlay: true });
+      localStorage.removeItem('settingsTourStep');
+      showFinaleMockModal();
+    });
   }
 
   function shouldKeepUiForStepTransition(fromStep, toStep) {
@@ -1004,11 +1046,13 @@ function startSettingsTour() {
 
   function showStep(options) {
     const opts = options || {};
-    if (!opts.keepCurrentUi) cleanupTour();
-    else document.body.style.overflow = '';
+    // Keep the dim overlay alive between steps — modal/tooltip swaps happen on
+    // top of a steady backdrop instead of flashing it off and on.
+    if (!opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
+    document.body.style.overflow = '';
 
     if (step >= steps.length) {
-      cleanupTour();
+      cleanupTour({ keepOverlay: true });
       localStorage.removeItem('settingsTourStep');
       showFinaleMockModal();
       return;
@@ -1053,29 +1097,29 @@ function startSettingsTour() {
     const opts = options || {};
     // Home-screen install pitch — shown first so they immediately get the value
     if (s.customModal === 'homescreen') {
-      if (opts.keepCurrentUi) cleanupTour();
+      if (opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
       showHomescreenMockModal();
       return;
     }
     // Custom modal for bookings tab — show a mock booking card example
     if (s.customModal === true || s.customModal === 'bookings') {
-      if (opts.keepCurrentUi) cleanupTour();
+      if (opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
       showBookingsMockModal();
       return;
     }
     // Custom modal for availability tab — multi-page walkthrough
     if (s.customModal === 'availability') {
-      if (opts.keepCurrentUi) cleanupTour();
+      if (opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
       showAvailabilityMockModal();
       return;
     }
     if (s.customModal === 'finale') {
-      if (opts.keepCurrentUi) cleanupTour();
+      if (opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
       showFinaleMockModal();
       return;
     }
     if (s.customModal === 'guestAppsStory') {
-      if (opts.keepCurrentUi) cleanupTour();
+      if (opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
       handoffToGuestAppsTour();
       return;
     }
@@ -1391,11 +1435,8 @@ function startSettingsTour() {
         localStorage.setItem('settingsTourStep', String(step));
         showStep({ keepCurrentUi });
       };
-      if (!keepCurrentUi) {
-        cleanupTour();
-        finishMove();
-        return;
-      }
+      // Always fade the current step UI out (overlay stays) — even across
+      // tabs/modals — so there is never a hard cut between steps.
       void fadeOutSettingsTourStepUi().then(finishMove);
     };
     const nextAction = () => {
@@ -1421,14 +1462,9 @@ function startSettingsTour() {
     ensureTourPolishStyles();
     if (typeof invokeLoadEditRooms === 'function') void invokeLoadEditRooms();
 
-    // Dark overlay
-    const blurOverlay = document.createElement('div');
-    blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);';
-    document.body.appendChild(blurOverlay);
-    document.body.style.overflow = 'hidden';
+    ensureTourBlurOverlay({ blockPointer: true, lockScroll: true, dim: TOUR_MODAL_DIM });
 
-    const hName = crm.activeHotelName || 'Your Hotel';
+    const hName = crm.activeHotelName || 'Your Property';
     const initial = hName.trim().charAt(0).toUpperCase();
     const shortName = hName.length > 10 ? hName.slice(0, 10) : hName;
 
@@ -1473,7 +1509,7 @@ function startSettingsTour() {
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your hotel from your booking page or a QR — set that up under <strong>Guest App</strong>.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your property from your booking page or a QR — set that up under <strong>Guest App</strong>.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
@@ -1488,22 +1524,19 @@ function startSettingsTour() {
     }
 
     document.getElementById('tourNextBtn').onclick = () => {
-      cleanupTour();
-      step++;
-      localStorage.setItem('settingsTourStep', String(step));
-      showStep();
+      void transitionOutTourModal().then(() => {
+        cleanupTour({ keepOverlay: true });
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+      });
     };
     document.getElementById('tourSkipBtn').onclick = () => { skipToFinale(); };
   }
 
   function showAvailabilityMockModal() {
     ensureTourPolishStyles();
-    // Dark overlay
-    const blurOverlay = document.createElement('div');
-    blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);';
-    document.body.appendChild(blurOverlay);
-    document.body.style.overflow = 'hidden';
+    ensureTourBlurOverlay({ blockPointer: true, lockScroll: true, dim: TOUR_MODAL_DIM });
 
     let modalPage = 0;
     const pages = [
@@ -1607,15 +1640,22 @@ function startSettingsTour() {
     modal.id = 'tourTooltip';
     modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
 
+    let hasRenderedPage = false;
     function renderModalPage() {
       const isLast = modalPage >= pages.length - 1;
       const btnLabel = isLast ? 'Next \u2014 Revenue \u2192' : 'Next \u2192';
+      // Panel slides in once; page swaps only crossfade the content so the
+      // whole modal doesn't re-animate on every inner page.
+      const panelAnim = hasRenderedPage ? 'none' : 'tourPanelIn 0.22s ease-out';
+      const pageAnim = hasRenderedPage ? 'tourPageIn 0.18s ease-out' : 'none';
       modal.innerHTML = `
-        <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:tourPanelIn 0.22s ease-out;">
-          ${pages[modalPage]}
+        <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:${panelAnim};">
+          <div style="animation:${pageAnim};">
+            ${pages[modalPage]}
+          </div>
           <div style="padding:4px 18px 6px;text-align:center;">
             <div style="display:flex;justify-content:center;gap:6px;margin-bottom:10px;">
-              ${pages.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === modalPage ? '#2E7D5B' : '#D8E4DC'};"></div>`).join('')}
+              ${pages.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === modalPage ? '#2E7D5B' : '#D8E4DC'};transition:background 0.2s ease;"></div>`).join('')}
             </div>
           </div>
           <div style="padding:0 18px 20px;text-align:center;">
@@ -1623,16 +1663,19 @@ function startSettingsTour() {
             <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(0,0,0,0.35);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
           </div>
         </div>`;
+      hasRenderedPage = true;
 
       document.getElementById('tourNextBtn').onclick = () => {
         if (modalPage < pages.length - 1) {
           modalPage++;
           renderModalPage();
         } else {
-          cleanupTour();
-          step++;
-          localStorage.setItem('settingsTourStep', String(step));
-          showStep();
+          void transitionOutTourModal().then(() => {
+            cleanupTour({ keepOverlay: true });
+            step++;
+            localStorage.setItem('settingsTourStep', String(step));
+            showStep();
+          });
         }
       };
 
@@ -1655,12 +1698,7 @@ function startSettingsTour() {
 
   function showBookingsMockModal() {
     ensureTourPolishStyles();
-    // Dark overlay
-    const blurOverlay = document.createElement('div');
-    blurOverlay.id = 'tourBlurOverlay';
-    blurOverlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);';
-    document.body.appendChild(blurOverlay);
-    document.body.style.overflow = 'hidden';
+    ensureTourBlurOverlay({ blockPointer: true, lockScroll: true, dim: TOUR_MODAL_DIM });
 
     const modal = document.createElement('div');
     modal.id = 'tourTooltip';
@@ -1730,10 +1768,12 @@ function startSettingsTour() {
     }
 
     document.getElementById('tourNextBtn').onclick = () => {
-      cleanupTour();
-      step++;
-      localStorage.setItem('settingsTourStep', String(step));
-      showStep();
+      void transitionOutTourModal().then(() => {
+        cleanupTour({ keepOverlay: true });
+        step++;
+        localStorage.setItem('settingsTourStep', String(step));
+        showStep();
+      });
     };
 
     document.getElementById('tourSkipBtn').onclick = () => {

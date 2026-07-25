@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Bell, Building2, CheckCircle2, Share, SquarePlus, X } from 'lucide-react';
+import { MessageCircle, Bell, Building2, CheckCircle2, Ellipsis, Share, SquarePlus, X } from 'lucide-react';
 
 export const BRAND = '#2E7D5B';
 export const IOS_SHARE_BLUE = '#007aff';
@@ -44,6 +44,18 @@ export function isIos() {
   if (typeof navigator === 'undefined') return false;
   return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/**
+ * iOS 26+ Safari hides Share behind the "⋯" menu (Compact layout, the default)
+ * and tucks Add to Home Screen behind "View More" — so the install flow needs
+ * different instructions. Apple froze the OS version in the UA, but Safari
+ * still reports its real major version via the "Version/26.x" token.
+ */
+export function isIos26Plus() {
+  if (!isIos()) return false;
+  const m = navigator.userAgent.match(/Version\/(\d+)/);
+  return !!m && parseInt(m[1], 10) >= 26;
 }
 
 export function isAndroid() {
@@ -154,6 +166,43 @@ export function InstallBenefits() {
 
 /** Matches Front Desk showIosInstallSheet() step copy + lucide share / square-plus icons. */
 export function IosInstallSteps() {
+  if (isIos26Plus()) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={stepBadgeStyle}>1</span>
+          <div style={stepTextStyle}>
+            Tap the
+            <Ellipsis size={18} color="#374151" strokeWidth={2.5} aria-hidden />
+            button in the bottom right
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={stepBadgeStyle}>2</span>
+          <div style={stepTextStyle}>
+            Tap <strong>Share</strong>
+            <Share size={18} color={IOS_SHARE_BLUE} strokeWidth={2} aria-hidden />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={stepBadgeStyle}>3</span>
+          <div style={stepTextStyle}>
+            Tap <strong>View More</strong>, then <strong>Add to Home Screen</strong>
+            <SquarePlus size={18} color={BRAND} strokeWidth={2} aria-hidden />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={stepBadgeStyle}>4</span>
+          <div style={{ ...stepTextStyle, display: 'block' }}>
+            Tap <strong>Add</strong> — done! It&apos;s on your home screen.
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4, paddingLeft: 38 }}>
+          Already see the Share button in Safari&apos;s bar? Skip step 1.
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -218,6 +267,10 @@ export function IosInstallSheet({
   openUrl,
 }) {
   const sheetTitle = title || `Install ${hotelName || 'our app'}`;
+  // iOS 26: pin the instructions to the TOP of the screen. The Safari menus
+  // and share sheet slide up over the bottom half, so a top-pinned card stays
+  // visible the whole time the guest is following the steps.
+  const pinTop = isIos26Plus();
 
   return (
     <div
@@ -229,7 +282,7 @@ export function IosInstallSheet({
         backdropFilter: 'blur(2px)',
         WebkitBackdropFilter: 'blur(2px)',
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: pinTop ? 'flex-start' : 'flex-end',
         justifyContent: 'center',
       }}
     >
@@ -239,9 +292,11 @@ export function IosInstallSheet({
           background: '#fff',
           width: '100%',
           maxWidth: 440,
-          borderRadius: '20px 20px 0 0',
-          padding: '24px 22px 32px',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.2)',
+          borderRadius: pinTop ? '0 0 20px 20px' : '20px 20px 0 0',
+          padding: pinTop
+            ? 'calc(18px + env(safe-area-inset-top, 0px)) 22px 22px'
+            : '24px 22px 32px',
+          boxShadow: pinTop ? '0 8px 40px rgba(0,0,0,0.2)' : '0 -8px 40px rgba(0,0,0,0.2)',
         }}
       >
         <button
@@ -308,6 +363,23 @@ export function IosInstallSheet({
         ) : null}
 
         <IosInstallSteps />
+        {pinTop ? (
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 12,
+              fontWeight: 600,
+              color: BRAND,
+              background: INSTALL_THEME.greenPale,
+              border: `1px solid ${INSTALL_THEME.border}`,
+              borderRadius: 10,
+              padding: '9px 12px',
+              textAlign: 'center',
+            }}
+          >
+            These steps stay on screen while you do it — go ahead.
+          </div>
+        ) : null}
       </div>
     </div>
   );

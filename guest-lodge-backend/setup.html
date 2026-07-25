@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marketel &mdash; Set Up Your Hotel</title>
+<title>Marketel &mdash; Set Up Your Property</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -348,25 +348,25 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-5"></div>
   </div>
 
-  <!-- STEP 1: Hotel Name -->
+  <!-- STEP 1: Property Name -->
   <div class="step active" id="step-1">
     <div class="form-card fade-stagger">
-      <h2>Your hotel</h2>
+      <h2>Your property</h2>
       <div class="field">
-        <label>Hotel Name</label>
-        <input type="text" id="hotelName" placeholder="e.g. Sunset Inn">
+        <label>Property Name</label>
+        <input type="text" id="hotelName" placeholder="e.g. Sunset Inn or Lakeview Cabin">
       </div>
       <button class="btn btn-primary" onclick="saveStep1()">Next &rarr;</button>
     </div>
   </div>
 
-  <!-- STEP 2: Add first room -->
+  <!-- STEP 2: Add first bookable room or unit -->
   <div class="step" id="step-2">
     <div class="form-card fade-stagger">
-      <h2>Add your first room</h2>
+      <h2>Add your first room or unit</h2>
       <div class="field">
-        <label>Room Name</label>
-        <input type="text" id="rmName" placeholder="e.g. King Suite">
+        <label>Room or Unit Name</label>
+        <input type="text" id="rmName" placeholder="e.g. King Suite or Lakeview Cabin">
       </div>
       <button class="btn btn-primary" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
       <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
@@ -453,6 +453,7 @@ const API = '';
 let hotelData = {};
 let rooms = [];
 let pendingFile = null;
+let qualifiedLeadTracked = false;
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -477,7 +478,11 @@ function animateVisibleStep(stepEl) {
 }
 
 function goToStep(n) {
-  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Step' + n + 'Reached', email: hotelData.id || TOKEN }) }).catch(() => {});
+  fetch('/api/funnel/onboarding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventName: 'Step' + n + 'Reached', setupToken: TOKEN }),
+  }).catch(() => {});
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   const nextStep = document.getElementById('step-' + n);
   nextStep.classList.add('active');
@@ -490,14 +495,36 @@ function goToStep(n) {
 }
 
 function answerQualityQ(answer) {
-  // Fire Qualead event for gold answers (browser-side)
-  if (answer === 'ota_commissions' || answer === 'direct_bookings') {
-    if (typeof fbq !== 'undefined') fbq('trackCustom', 'Qualead', { answer: answer });
-    // CAPI (server-side)
-    fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'Qualead', email: hotelData.id || TOKEN, contentName: answer }) }).catch(() => {});
+  const isQualifiedLead = answer === 'ota_commissions' || answer === 'direct_bookings';
+  if (isQualifiedLead && !qualifiedLeadTracked) {
+    qualifiedLeadTracked = true;
+    // Keep this ID stable for the setup so repeat clicks/reloads do not create
+    // additional leads, and share it with CAPI for browser/server deduplication.
+    const eventId = 'marketel-lead.' + (hotelData.id || TOKEN);
+    if (typeof fbq === 'function') {
+      fbq('track', 'Lead', { content_name: answer }, { eventID: eventId });
+    }
+    fetch('/api/funnel/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName: 'Lead',
+        eventId,
+        setupToken: TOKEN,
+        contentName: answer,
+      }),
+    }).catch(() => {});
   }
   // Track all answers
-  fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'QualityAnswer', email: hotelData.id || TOKEN, contentName: answer }) }).catch(() => {});
+  fetch('/api/funnel/onboarding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      eventName: 'QualityAnswer',
+      setupToken: TOKEN,
+      contentName: answer,
+    }),
+  }).catch(() => {});
   goToStep(4);
 }
 
@@ -517,7 +544,7 @@ async function loadSetup() {
 // Step 1: Save hotl info
 async function saveStep1() {
   const name = document.getElementById('hotelName').value.trim();
-  if (!name) { showToast('Enter your hotel name', true); return; }
+  if (!name) { showToast('Enter your property name', true); return; }
 
   showLoading(true);
   try {
@@ -534,7 +561,7 @@ async function saveStep1() {
 // Step 2: Rooms
 async function addRoomAndFinish() {
   const name = document.getElementById('rmName').value.trim();
-  if (!name) { showToast('Enter a room name', true); return; }
+  if (!name) { showToast('Enter a room or unit name', true); return; }
 
   showLoading(true);
   try {
@@ -553,7 +580,7 @@ async function addRoomAndFinish() {
 
     // Show success
     console.log('Complete response:', completeData);
-    const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
+    const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-property').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     
     // Link goes to Front Desk, not the public booking page.

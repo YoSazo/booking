@@ -75,6 +75,15 @@ function isIosDevice() {
   return /iphone|ipad|ipod/i.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
+// iOS 26+ Safari hides Share behind the "⋯" menu (Compact layout is the
+// default) and tucks Add to Home Screen behind "View More". Apple froze the OS
+// version in the UA, but Safari still reports its real major version via the
+// "Version/26.x" token.
+function isIos26Plus() {
+  if (!isIosDevice()) return false;
+  const m = (navigator.userAgent || '').match(/Version\/(\d+)/);
+  return !!m && parseInt(m[1], 10) >= 26;
+}
 function isStandaloneApp() {
   try {
     const qs = new URLSearchParams(window.location.search);
@@ -369,7 +378,7 @@ function showBootState({ title, message, debug = '', showRetry = false } = {}) {
   document.getElementById('bootScreen').style.display = 'flex';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'none';
-  document.getElementById('bootTitle').textContent = title || 'Connecting to hotel...';
+  document.getElementById('bootTitle').textContent = title || 'Connecting to property...';
   document.getElementById('bootMessage').textContent = message || 'Checking this domain and loading front desk context.';
   const debugEl = document.getElementById('bootDebug');
   debugEl.textContent = debug || '';
@@ -386,17 +395,17 @@ function showHotelContextError(error) {
   const status = Number(error && error.status) || 0;
   const host = getDetectedHostname() || 'unknown';
   const domain = (error && error.domain) ? String(error.domain) : '';
-  const message = (error && error.message) ? String(error.message) : 'Could not load hotel context.';
+  const message = (error && error.message) ? String(error.message) : 'Could not load property context.';
   const debug = formatContextDebugLines([
     `Detected host: ${host}`,
     domain && domain !== host ? `Resolved domain: ${domain}` : '',
-    crm.activeHotelId ? `Hotel ID: ${crm.activeHotelId}` : '',
+    crm.activeHotelId ? `Property ID: ${crm.activeHotelId}` : '',
   ]);
 
   if (!status) {
     showBootState({
       title: 'Network error',
-      message: 'Could not reach the server to resolve this hotel. Check the network connection and try again.',
+      message: 'Could not reach the server to resolve this property. Check the network connection and try again.',
       debug,
       showRetry: true,
     });
@@ -404,9 +413,9 @@ function showHotelContextError(error) {
   }
 
   showBootState({
-    title: status === 404 ? 'Hotel not linked'
-      : status === 403 ? 'Hotel inactive'
-      : 'Hotel context error',
+    title: status === 404 ? 'Property not linked'
+      : status === 403 ? 'Property inactive'
+      : 'Property context error',
     message,
     debug,
     showRetry: true,
@@ -417,7 +426,7 @@ async function loadHotelContext() {
   const res = await fetch(buildHotelContextUrl(), { headers: { 'Accept': 'application/json' } });
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.success) {
-    const err = new Error(json.message || `Failed to load hotel context (${res.status})`);
+    const err = new Error(json.message || `Failed to load property context (${res.status})`);
     err.status = res.status;
     err.domain = (json && json.domain) || getDetectedHostname();
     throw err;
@@ -426,7 +435,7 @@ async function loadHotelContext() {
   const data = json.data || {};
   const config = data.config || {};
   if (!data.hotelId) {
-    const err = new Error('Hotel context response is missing hotelId.');
+    const err = new Error('Property context response is missing hotelId.');
     err.status = 500;
     throw err;
   }
@@ -916,7 +925,7 @@ function bindAvailabilityUiEvents() {
 
 // ── LOGIN ──────────────────────────────────────────────
 async function verifyCrmToken(pin) {
-  if (!crm.activeHotelId) throw new Error('Hotel context is not ready yet.');
+  if (!crm.activeHotelId) throw new Error('Property context is not ready yet.');
   logFrontdeskAuth('verify-start', {
     hotelId: crm.activeHotelId,
     tokenKind: frontdeskTokenKind(pin),
@@ -1290,7 +1299,7 @@ function renderGrowthPanel() {
   const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="showCheckinQrOverlay()">Show QR</button>`;
 
   const gbpStep = step('gbp', 'Biggest lever', 'Add your link to Google', 'Most guests find motels on Google Maps. Paste your booking link into your Google Business Profile so they book direct instead of through an OTA.', openGoogleBtn + linkBoxHtml);
-  const qrStep = step('qr', '', 'Show a QR at the front desk', 'Walk-ins and repeat guests can scan it to save your hotel and book direct next time. Print it or show it on check-in.', qrBtn);
+  const qrStep = step('qr', '', 'Share a QR at check-in', 'Guests can scan it to save your property and book direct next time. Print it or show it during check-in.', qrBtn);
   const textStep = step('textLink', '', 'Text it to past guests', 'Repeat guests are your cheapest bookings. Text them your link so they skip Booking.com next time.', textBtn);
 
   const checklistCard = `
@@ -1518,7 +1527,7 @@ async function doLogin() {
   const err = document.getElementById('loginError');
   const btn = document.getElementById('signInBtn');
   err.textContent = '';
-  if (!crm.activeHotelId) { err.textContent = 'Hotel context is still loading'; return; }
+  if (!crm.activeHotelId) { err.textContent = 'Property context is still loading'; return; }
   if (!pin) { err.textContent = 'Please enter PIN'; return; }
 
   const prevLabel = btn ? btn.textContent : 'Sign In';
@@ -1575,7 +1584,7 @@ async function sendMagicLink() {
 
 // ── API ────────────────────────────────────────────────
 async function api(method, path, body) {
-  if (!crm.activeHotelId) throw new Error('Hotel context is not loaded.');
+  if (!crm.activeHotelId) throw new Error('Property context is not loaded.');
   const url = new URL(path, window.location.origin);
   if (!url.searchParams.get('hotelId')) {
     url.searchParams.set('hotelId', crm.activeHotelId);
@@ -1624,7 +1633,7 @@ async function bootCrmApp() {
   crm.activeHotelContext = null;
   updateHotelChrome();
   showBootState({
-    title: 'Connecting to hotel...',
+    title: 'Connecting to property...',
     message: 'Checking this domain and loading front desk context.',
     debug: formatContextDebugLines([`Detected host: ${getDetectedHostname() || 'unknown'}`]),
     showRetry: false,
@@ -2530,7 +2539,7 @@ function applyGuestBroadcastAudienceUi() {
 }
 
 function guestBroadcastCardHtml() {
-  const hName = (crm.activeHotelName || 'Your Hotel').replace(/"/g, '&quot;');
+  const hName = (crm.activeHotelName || 'Your Property').replace(/"/g, '&quot;');
   return `<div id="guestBroadcastCard" style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:16px 18px;">
     <div style="font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:4px;">📣 Notify all guests at once</div>
     <p style="font-size:12px;color:#6b7280;margin:0 0 10px;line-height:1.45;">Push a sale, event, or check-in reminder to everyone who installed your guest app.</p>
@@ -3426,8 +3435,8 @@ function promptUploadLogoBeforeQr(preselectedCode) {
   overlay.innerHTML = `
     <div style="background:white;border-radius:20px;padding:24px 22px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="font-size:28px;margin-bottom:10px;">🖼️</div>
-      <h2 style="font-size:17px;font-weight:800;color:#1a1a2e;margin:0 0 8px;line-height:1.35;">Upload your hotel logo first?</h2>
-      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${crm.activeHotelName || 'your hotel'}</strong> to their phone. Takes 5 seconds.</p>
+      <h2 style="font-size:17px;font-weight:800;color:#1a1a2e;margin:0 0 8px;line-height:1.35;">Upload your property logo first?</h2>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${crm.activeHotelName || 'your property'}</strong> to their phone. Takes 5 seconds.</p>
       <input type="file" id="logoGateFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
       <button type="button" id="logoGateUploadBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Upload logo</button>
       <button type="button" id="logoGateSkipBtn" style="width:100%;padding:10px;border:none;background:transparent;color:#9ca3af;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Show QR without logo</button>
@@ -3454,7 +3463,7 @@ function promptUploadLogoBeforeQr(preselectedCode) {
 }
 
 function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
-  const hName = crm.activeHotelName || 'Your Hotel';
+  const hName = crm.activeHotelName || 'Your Property';
   const domain = crm.activeHotelDomain || '';
   if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
   if (!skipLogoGate && !preselectedCode && !crm.activeHotelAppIcon) {
@@ -3560,7 +3569,7 @@ function closeCheckinQrOverlay() {
 }
 
 function prefillGuestInstallBroadcast() {
-  const hName = crm.activeHotelName || 'Your Hotel';
+  const hName = crm.activeHotelName || 'Your Property';
   const domain = crm.activeHotelDomain || '';
   const installUrl = domain ? 'https://' + domain + '/install' : '';
   const titleEl = document.getElementById('guest-broadcast-title');
@@ -3770,28 +3779,46 @@ function showNotifPromptModal() {
 }
 
 // Reusable themed iOS "Add to Home Screen" instruction sheet.
+// On iOS 26+ the card pins to the TOP of the screen: Safari's "⋯" menu and the
+// share sheet slide up over the bottom half, so a top-pinned card stays visible
+// the whole time the user is following the steps.
 function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
   const existing = document.getElementById('iosInstallSheet');
   if (existing) existing.remove();
+  const ios26 = isIos26Plus();
   const overlay = document.createElement('div');
   overlay.id = 'iosInstallSheet';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);display:flex;align-items:${ios26 ? 'flex-start' : 'flex-end'};justify-content:center;`;
   const iconTile = iconUrl
     ? `<img src="${iconUrl}" alt="" style="width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0;">`
     : `<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${(crm.activeHotelName || 'B').trim().charAt(0).toUpperCase()}</div>`;
+  const stepBadge = (n) => `<span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${n}</span>`;
+  const stepRow = (n, inner) => `<div style="display:flex;align-items:center;gap:12px;">${stepBadge(n)}<div style="font-size:14px;color:#374151;line-height:1.4;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">${inner}</div></div>`;
+  const stepsHtml = ios26
+    ? `
+        ${stepRow(1, `Tap the <i data-lucide="ellipsis" style="width:18px;height:18px;color:#374151;vertical-align:middle;"></i> button in the bottom right`)}
+        ${stepRow(2, `Tap <strong>Share</strong> <i data-lucide="share" style="width:18px;height:18px;color:#007aff;vertical-align:middle;"></i>`)}
+        ${stepRow(3, `Tap <strong>View More</strong>, then <strong>Add to Home Screen</strong> <i data-lucide="square-plus" style="width:18px;height:18px;color:#2E7D5B;vertical-align:middle;"></i>`)}
+        ${stepRow(4, `Tap <strong>Add</strong> — done! It's on your home screen.`)}
+        <div style="font-size:12px;color:#6b7280;line-height:1.4;padding-left:38px;">Already see the Share button in Safari's bar? Skip step 1.</div>
+        <div style="margin-top:2px;font-size:12px;font-weight:600;color:#2E7D5B;background:#E8F5EE;border:1px solid #D8E4DC;border-radius:10px;padding:9px 12px;text-align:center;">These steps stay on screen while you do it — go ahead.</div>`
+    : `
+        ${stepRow(1, `Tap the <strong>Share</strong> button <i data-lucide="share" style="width:18px;height:18px;color:#007aff;vertical-align:middle;"></i> in Safari's bar`)}
+        ${stepRow(2, `Scroll down and tap <strong>Add to Home Screen</strong> <i data-lucide="square-plus" style="width:18px;height:18px;color:#2E7D5B;vertical-align:middle;"></i>`)}
+        ${stepRow(3, `Tap <strong>Add</strong> — done! It's on your home screen.`)}`;
+  const cardStyle = ios26
+    ? 'position:relative;background:#fff;width:100%;max-width:440px;border-radius:0 0 20px 20px;padding:calc(18px + env(safe-area-inset-top,0px)) 22px 22px;box-shadow:0 8px 40px rgba(0,0,0,0.2);'
+    : 'position:relative;background:#fff;width:100%;max-width:440px;border-radius:20px 20px 0 0;padding:24px 22px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.2);';
   overlay.innerHTML = `
-    <div id="iosInstallSheetCard" style="position:relative;background:#fff;width:100%;max-width:440px;border-radius:20px 20px 0 0;padding:24px 22px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.2);">
-      <button type="button" id="iosInstallSheetClose" aria-label="Close" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;color:#6b7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-size:20px;line-height:1;font-family:inherit;">×</button>
+    <div id="iosInstallSheetCard" style="${cardStyle}">
+      <button type="button" id="iosInstallSheetClose" aria-label="Close" style="position:absolute;top:${ios26 ? 'calc(14px + env(safe-area-inset-top,0px))' : '14px'};right:14px;width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;color:#6b7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-size:20px;line-height:1;font-family:inherit;">×</button>
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-right:36px;">
         ${iconTile}
         <div><div style="font-size:16px;font-weight:800;color:#1a1a2e;">${title || 'Install app'}</div>
         <div style="font-size:12px;color:#6b7280;margin-top:2px;">${subtitle || ''}</div></div>
       </div>
       ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;margin-bottom:16px;padding:12px;border-radius:11px;border:1.5px solid #2E7D5B;background:none;color:#2E7D5B;font-size:14px;font-weight:700;">Open booking page →</a>` : ''}
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span><div style="font-size:14px;color:#374151;line-height:1.4;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">Tap the <strong>Share</strong> button <i data-lucide="share" style="width:18px;height:18px;color:#007aff;vertical-align:middle;"></i> in Safari's bar</div></div>
-        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span><div style="font-size:14px;color:#374151;line-height:1.4;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">Scroll down and tap <strong>Add to Home Screen</strong> <i data-lucide="square-plus" style="width:18px;height:18px;color:#2E7D5B;vertical-align:middle;"></i></div></div>
-        <div style="display:flex;align-items:center;gap:12px;"><span style="width:26px;height:26px;border-radius:50%;background:#f0fdf4;color:#2E7D5B;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span><div style="font-size:14px;color:#374151;line-height:1.4;">Tap <strong>Add</strong> — done! It's on your home screen.</div></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">${stepsHtml}
       </div>
     </div>`;
   document.body.appendChild(overlay);

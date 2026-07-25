@@ -248,8 +248,9 @@ function copyAppsTourCloneComputedStyles(source, clone) {
   }
 }
 
-function createAppsTourSpotlightClone(source) {
+function createAppsTourSpotlightClone(source, stepDef) {
   if (!source || !source.isConnected) return null;
+  if (stepDef?.noHighlight) return null;
   document.querySelectorAll('[data-apps-tour-spotlight-clone]').forEach((el) => el.remove());
   const rect = source.getBoundingClientRect();
   if (rect.width < 2 || rect.height < 2) return null;
@@ -272,21 +273,32 @@ function createAppsTourSpotlightClone(source) {
   clone.style.zIndex = '100002';
   clone.style.pointerEvents = 'none';
   clone.style.transform = 'none';
-  clone.style.boxShadow = '0 18px 46px rgba(26,43,34,0.24)';
-  clone.style.outline = '1px solid rgba(255,255,255,0.82)';
-  clone.style.outlineOffset = '2px';
+  // Focus is the content itself over the dim overlay — no square ring/outline.
+  clone.style.boxShadow = stepDef?.spotlightBoxShadow ?? 'none';
+  clone.style.outline = stepDef?.spotlightOutline ?? 'none';
+  clone.style.outlineOffset = stepDef?.spotlightOutlineOffset ?? '0';
+  // Story-line steps use a top border as a section separator; hide it in the
+  // spotlight so it doesn't read as a floating weird line.
+  if (source.classList.contains('apps-story-line') || stepDef?.hideSpotlightBorder) {
+    clone.style.border = 'none';
+    clone.style.borderTop = 'none';
+    clone.style.borderTopWidth = '0';
+    clone.style.paddingTop = '0';
+  }
   document.body.appendChild(clone);
   return clone;
 }
 
-function appsTourCleanupUi() {
+function appsTourCleanupUi(options) {
+  const opts = options || {};
   clearAppsTourKeyboard();
   if (_appsTourTooltipTimer) {
     clearTimeout(_appsTourTooltipTimer);
     _appsTourTooltipTimer = null;
   }
   const lb = document.getElementById('appsTourLightbox');
-  if (lb) lb.remove();
+  // keepLightbox: persist the dim between steps so it doesn't flash off/on.
+  if (lb && !opts.keepLightbox) lb.remove();
   const tip = document.getElementById('appsTourTooltip');
   if (tip) tip.remove();
   document.querySelectorAll('[data-apps-tour-spotlight-clone]').forEach((el) => el.remove());
@@ -299,6 +311,12 @@ function appsTourCleanupUi() {
     el.style.outlineOffset = el.dataset.appsTourOrigOutlineOffset || '';
     el.style.transition = el.dataset.appsTourOrigTransition || '';
     el.style.visibility = el.dataset.appsTourOrigVisibility || '';
+    if (el.dataset.appsTourOrigBorderTop != null) {
+      el.style.borderTop = el.dataset.appsTourOrigBorderTop;
+      el.style.paddingTop = el.dataset.appsTourOrigPaddingTop || '';
+      delete el.dataset.appsTourOrigBorderTop;
+      delete el.dataset.appsTourOrigPaddingTop;
+    }
     el.removeAttribute('data-apps-tour-highlighted');
     delete el.dataset.appsTourOrigPosition;
     delete el.dataset.appsTourOrigZIndex;
@@ -455,11 +473,11 @@ function showGuestAppActivationModal() {
             <div style="font-size:20px;font-weight:850;color:#1A2B22;line-height:1.18;">Guest App + Front Desk is ready.</div>
           </div>
         </div>
-        <p style="font-size:13px;color:#4B5D52;line-height:1.58;margin:0 0 18px;">You just walked through the loop: guests book direct, save your hotel to their phone, and message you. Front Desk receives the alerts.</p>
+        <p style="font-size:13px;color:#4B5D52;line-height:1.58;margin:0 0 18px;">You just walked through the loop: guests book direct, save your property to their phone, and message you. Front Desk receives the alerts.</p>
         <div style="background:#F4F8F5;border-radius:14px;padding:15px;border:1.5px solid #D8E4DC;text-align:left;margin-bottom:18px;">
           <div style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Direct booking page accepts reservations</span></div>
-            <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Guests save your hotel from the booking page</span></div>
+            <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Guests save your property from the booking page</span></div>
             <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Front Desk receives booking and message alerts</span></div>
             <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">No OTA commission. Cancel anytime.</span></div>
           </div>
@@ -513,27 +531,40 @@ function appsTourRender() {
     return;
   }
 
-  appsTourCleanupUi();
-  let lb = document.createElement('div');
-  lb.id = 'appsTourLightbox';
-  lb.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(17,24,39,0.22);pointer-events:auto;';
-  document.body.appendChild(lb);
+  appsTourCleanupUi({ keepLightbox: true });
+  let lb = document.getElementById('appsTourLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'appsTourLightbox';
+    // Stronger dim so the elevated step content (text/card) reads as the focus.
+    lb.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(17,24,39,0.42);pointer-events:auto;';
+    document.body.appendChild(lb);
+  }
 
-  target.dataset.appsTourOrigPosition = target.style.position || '';
-  target.dataset.appsTourOrigZIndex = target.style.zIndex || '';
-  target.dataset.appsTourOrigIsolation = target.style.isolation || '';
-  target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
-  target.dataset.appsTourOrigOutline = target.style.outline || '';
-  target.dataset.appsTourOrigOutlineOffset = target.style.outlineOffset || '';
-  target.dataset.appsTourOrigTransition = target.style.transition || '';
-  target.style.position = target.style.position || 'relative';
-  target.style.zIndex = '100002';
-  target.style.isolation = 'isolate';
-  target.style.transition = 'box-shadow 0.18s ease, outline 0.18s ease';
-  target.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.92), 0 18px 46px rgba(26,43,34,0.22)';
-  target.style.outline = '1px solid rgba(255,255,255,0.82)';
-  target.style.outlineOffset = '2px';
-  target.setAttribute('data-apps-tour-highlighted', '1');
+  if (!step.noHighlight) {
+    target.dataset.appsTourOrigPosition = target.style.position || '';
+    target.dataset.appsTourOrigZIndex = target.style.zIndex || '';
+    target.dataset.appsTourOrigIsolation = target.style.isolation || '';
+    target.dataset.appsTourOrigBoxShadow = target.style.boxShadow || '';
+    target.dataset.appsTourOrigOutline = target.style.outline || '';
+    target.dataset.appsTourOrigOutlineOffset = target.style.outlineOffset || '';
+    target.dataset.appsTourOrigTransition = target.style.transition || '';
+    target.style.position = target.style.position || 'relative';
+    target.style.zIndex = '100002';
+    target.style.isolation = 'isolate';
+    target.style.transition = 'box-shadow 0.18s ease, outline 0.18s ease';
+    // Content punches through the dim — no bounding-box outline.
+    target.style.boxShadow = step.spotlightBoxShadow ?? 'none';
+    target.style.outline = step.spotlightOutline ?? 'none';
+    target.style.outlineOffset = step.spotlightOutlineOffset ?? '0';
+    if (target.classList.contains('apps-story-line') || step.hideSpotlightBorder) {
+      target.dataset.appsTourOrigBorderTop = target.style.borderTop || '';
+      target.dataset.appsTourOrigPaddingTop = target.style.paddingTop || '';
+      target.style.borderTop = 'none';
+      target.style.paddingTop = '0';
+    }
+    target.setAttribute('data-apps-tour-highlighted', '1');
+  }
 
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isNarrowViewport = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
@@ -582,7 +613,7 @@ function appsTourRender() {
     document.body.appendChild(tip);
 
     if (isNarrowViewport && !preferredPosition) {
-      createAppsTourSpotlightClone(target);
+      createAppsTourSpotlightClone(target, step);
       tip.style.left = '12px';
       tip.style.right = '12px';
       tip.style.width = 'auto';
@@ -593,7 +624,7 @@ function appsTourRender() {
       const placement = preferredPosition || 'below';
       const rect = fitAppsTourTargetAndTooltip(target, step, tip, placement, isNarrowViewport)
         || target.getBoundingClientRect();
-      createAppsTourSpotlightClone(target);
+      createAppsTourSpotlightClone(target, step);
 
       const panel = tip.querySelector('.apps-tour-panel');
       const tipHeight = Math.min((panel && panel.offsetHeight) || tip.offsetHeight || 190, Math.max(130, window.innerHeight - 28));
@@ -668,14 +699,14 @@ function startAppsTour(opts) {
     {
       target: '#tour-apps-intro',
       kicker: 'The loop',
-      title: 'Your hotel becomes the app.',
-      text: 'Guests book from your direct page, save your hotel to their phone, then come back with one tap to book or message you.',
+      title: 'Your property becomes the app.',
+      text: 'Guests book direct, save your property to their phone, and come back with one tap.',
     },
     {
       target: '#tour-apps-first',
-      kicker: 'Front Desk',
-      title: 'Install this on the property phone.',
-      text: 'Front Desk is this dashboard saved like an app. It is where booking alerts, guest messages, QR tools, and setup controls live.',
+      kicker: 'Your side',
+      title: 'Front Desk lives on this phone.',
+      text: 'This dashboard, saved like an app. Booking alerts, guest messages, and QR tools land here.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
@@ -684,9 +715,9 @@ function startAppsTour(opts) {
     },
     {
       target: '#tour-apps-then',
-      kicker: 'Guest path',
-      title: 'Send guests to your direct page.',
-      text: 'The Install button sits on the booking page. Guests tap it once, and your hotel icon lands on their home screen.',
+      kicker: 'Their side',
+      title: 'Guests install from your booking page.',
+      text: 'One tap on Install and your icon is on their home screen.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
@@ -694,16 +725,10 @@ function startAppsTour(opts) {
       mobileTooltipPosition: 'below',
     },
     {
-      target: '#tour-apps-after',
-      kicker: 'Return visits',
-      title: 'Now the loop is easy to remember.',
-      text: 'Guests tap your icon to book direct or message you. New bookings and messages come back to Front Desk.',
-    },
-    {
       target: '#tour-guest-icon-section',
       kicker: 'One setup item',
-      title: 'Make the icon feel like your hotel.',
-      text: 'Use a real logo or clear property image. Guests see this square every time they save your hotel to their phone.',
+      title: 'Make the icon feel like your property.',
+      text: 'A real logo or a clear photo. Guests see this square every time.',
       mobileScrollToBottom: true,
       mobileScrollBlock: 'end',
       mobileTooltipAnchor: 'top',
@@ -714,8 +739,8 @@ function startAppsTour(opts) {
       kicker: hotelIsLive ? 'Live loop' : 'Activation',
       title: hotelIsLive ? 'This loop is on.' : 'Turn this on for your property.',
       text: hotelIsLive
-        ? 'Guests can book direct, save your hotel, and message you. Front Desk gets the alerts.'
-        : 'Activation turns on direct booking, guest installs, messages, and Front Desk alerts as one simple loop.',
+        ? 'Guests book, save your property, and message you. Front Desk gets the alerts.'
+        : 'One activation turns it all on: direct booking, guest installs, messages, and alerts.',
       primaryLabel: hotelIsLive ? 'Done' : 'Continue to activation',
       secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
       showActivationOnComplete: !hotelIsLive,
