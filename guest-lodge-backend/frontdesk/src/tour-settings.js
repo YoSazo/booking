@@ -1704,10 +1704,10 @@ function startSettingsTour() {
     let hasRenderedPage = false;
     const pages = [
       `
-        <div style="padding:20px 18px 0;text-align:center;">
-          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Bookings</div>
-          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">When a guest books, it appears here</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 14px;">The room is held immediately while Front Desk gives you time to review it.</p>
+          <div style="padding:20px 18px 0;text-align:center;">
+            <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Bookings</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">A guest books. We hold the room.</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 14px;">No one else can book it online while you decide.</p>
         </div>
         <div style="padding:0 14px 14px;">
           <div style="background:white;border:2px solid #D8E4DC;border-radius:16px;overflow:hidden;box-shadow:0 8px 22px rgba(26,43,34,0.07);">
@@ -1740,7 +1740,7 @@ function startSettingsTour() {
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:10px 11px;">
-                <div style="font-size:11px;color:#9A3412;line-height:1.4;"><strong>Room held.</strong><br>Removed from future availability.</div>
+                <div style="font-size:11px;color:#9A3412;line-height:1.4;"><strong>Room held.</strong><br>No one else can book it online.</div>
                 <div style="font-size:18px;">🔒</div>
               </div>
             </div>
@@ -1749,8 +1749,8 @@ function startSettingsTour() {
       `
         <div style="padding:20px 18px 0;text-align:center;">
           <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Double-booking protection</div>
-          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">Already sold the room somewhere else?</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Front Desk puts the decision on your phone before the booking locks in.</p>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">Why put Front Desk on your phone?</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Bookings can arrive while you’re away. A phone notification gives you time to confirm the room is still free.</p>
         </div>
         <div style="padding:0 14px 14px;">
           <div style="width:238px;margin:0 auto 12px;background:#18231E;border-radius:26px;padding:10px;box-shadow:0 14px 30px rgba(26,43,34,0.22);">
@@ -1784,42 +1784,56 @@ function startSettingsTour() {
               <div style="font-size:10px;color:#4B5D52;line-height:1.35;margin-top:2px;">Room freed · hold voided</div>
             </div>
           </div>
-          <p style="font-size:10px;color:#9CA3AF;line-height:1.4;text-align:center;margin:9px 8px 0;">Install Front Desk and enable alerts to review bookings from your phone.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:11px;padding:9px;text-align:center;">
+              <div style="font-size:9px;font-weight:850;color:#991B1B;text-transform:uppercase;margin-bottom:3px;">Without alerts</div>
+              <div style="font-size:10px;color:#4B5D52;line-height:1.35;">The booking confirms automatically</div>
+            </div>
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:9px;text-align:center;">
+              <div style="font-size:9px;font-weight:850;color:#166534;text-transform:uppercase;margin-bottom:3px;">With alerts</div>
+              <div style="font-size:10px;color:#4B5D52;line-height:1.35;">You can confirm or tap Room taken</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:9px;background:#E8F5EE;border:1.5px solid #A7D9BE;border-radius:12px;padding:11px 12px;margin-top:10px;text-align:left;">
+            <div style="font-size:19px;line-height:1;">📲</div>
+            <div>
+              <div style="font-size:11px;font-weight:850;color:#166534;margin-bottom:2px;">No App Store needed</div>
+              <div style="font-size:10px;color:#4B5D52;line-height:1.45;">It takes 3 quick steps to put Front Desk on your phone. We’ll show you exactly how under <strong>Guest App</strong> later in this tour.</div>
+            </div>
+          </div>
         </div>`,
       `
         <div style="padding:20px 18px 0;text-align:center;">
-          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#B91C1C;margin-bottom:5px;">Backup safety net</div>
-          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">And if something changes later…</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Front Desk checks your room-nights and surfaces a clash before it stays hidden.</p>
+          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#B91C1C;margin-bottom:5px;">Plans changed?</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">What if a walk-in takes the room later?</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Open the online booking and tap <strong>Cancel this booking</strong>.</p>
         </div>
         <div style="padding:0 14px 14px;">
-          <div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:14px;padding:13px;">
-            <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;">
-              <div style="font-size:20px;line-height:1;">⚠️</div>
+          <div style="background:#fff;border:1.5px solid #D8E4DC;border-radius:14px;padding:13px;box-shadow:0 8px 22px rgba(26,43,34,0.07);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:9px;margin-bottom:10px;">
               <div>
-                <div style="font-size:13px;font-weight:850;color:#7F1D1D;">Double-booking detected</div>
-                <div style="font-size:10px;color:#991B1B;margin-top:2px;">King Room · Jun 15 · 2 bookings for 1 room</div>
+                <div style="font-size:14px;font-weight:850;color:#1A2B22;">Sarah Johnson</div>
+                <div style="font-size:10px;color:#6B7280;margin-top:2px;">Booked online · King Room · Tomorrow</div>
+              </div>
+              <div style="font-size:13px;font-weight:850;color:#2E7D5B;">$284</div>
+            </div>
+            <div style="background:#F8FAF9;border-radius:10px;padding:10px 11px;margin-bottom:9px;">
+              <div style="font-size:9px;color:#6B7280;font-weight:750;text-transform:uppercase;margin-bottom:4px;">Why are you cancelling?</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:750;color:#1A2B22;">
+                <span>The room was already taken</span><span style="color:#9CA3AF;">▾</span>
               </div>
             </div>
-            <div style="background:white;border-radius:10px;padding:10px 11px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <div>
-                <div style="font-size:12px;font-weight:800;color:#1A2B22;">Sarah Johnson</div>
-                <div style="font-size:10px;color:#6B7280;margin-top:2px;">Booked online · $284</div>
-              </div>
-              <div style="font-size:10px;font-weight:800;color:#2E7D5B;background:#F0FDF4;border-radius:999px;padding:4px 8px;">ONLINE</div>
-            </div>
-            <div style="background:white;border-radius:10px;padding:10px 11px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <div>
-                <div style="font-size:12px;font-weight:800;color:#1A2B22;">Mike Davis</div>
-                <div style="font-size:10px;color:#6B7280;margin-top:2px;">Added at the desk · $110</div>
-              </div>
-              <div style="font-size:10px;font-weight:800;color:#92400E;background:#FEF3C7;border-radius:999px;padding:4px 8px;">FRONT DESK</div>
-            </div>
-            <div style="margin-top:10px;background:#B91C1C;color:#fff;border-radius:10px;padding:10px;text-align:center;font-size:11px;font-weight:800;">Resolve the online booking</div>
+            <div style="background:#B91C1C;color:#fff;border-radius:10px;padding:10px;text-align:center;font-size:11px;font-weight:800;">Cancel the booking</div>
           </div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;color:#4B5D52;font-size:10px;line-height:1.35;text-align:center;">
-            <span style="color:#2E7D5B;font-weight:900;">✓</span>
-            <span>Cancel it, return the inventory, void the hold, and notify the guest.</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:10px;text-align:center;">
+              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">✓</div>
+              <div style="font-size:10px;font-weight:800;color:#166534;">Guest is emailed</div>
+            </div>
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:10px;text-align:center;">
+              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">$1</div>
+              <div style="font-size:10px;font-weight:800;color:#166534;">Card hold released</div>
+            </div>
           </div>
         </div>`,
     ];
@@ -1831,8 +1845,8 @@ function startSettingsTour() {
     const renderModalPage = () => {
       const isLast = modalPage >= pages.length - 1;
       const buttonLabel = modalPage === 0
-        ? 'Next — How you’re protected →'
-        : (modalPage === 1 ? 'Next — The backup safety net →' : 'Next — Availability →');
+        ? 'Next — Phone alerts →'
+        : (modalPage === 1 ? 'Next — If plans change →' : 'Next — Availability →');
       const panelAnim = hasRenderedPage ? 'none' : 'tourPanelIn 0.22s ease-out';
       const pageAnim = hasRenderedPage ? 'tourPageIn 0.18s ease-out' : 'none';
 

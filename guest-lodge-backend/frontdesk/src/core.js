@@ -3416,21 +3416,21 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function enableNotifications() {
-  if (!crm.token) { toast('Sign in first', 'error'); return; }
+  if (!crm.token) { toast('Sign in first', 'error'); return false; }
   if (typeof Notification === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     toast('Notifications not supported on this device', 'error');
-    return;
+    return false;
   }
   try {
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') {
       setNotificationButtonState(false);
       toast('Notifications blocked', 'error');
-      return;
+      return false;
     }
     const keyRes = await fetch('/api/push/vapid-public');
     const keyData = await keyRes.json().catch(() => ({}));
-    if (!keyData.publicKey) { toast('Push not configured', 'error'); return; }
+    if (!keyData.publicKey) { toast('Push not configured', 'error'); return false; }
     // Register from /frontdesk-sw.js (a dedicated path) and race `ready` against a
     // timeout so a failed SW load surfaces an error instead of hanging forever.
     try { await navigator.serviceWorker.register('/frontdesk-sw.js'); } catch (_) {}
@@ -3454,9 +3454,11 @@ async function enableNotifications() {
     });
     toast('Notifications enabled', 'success');
     setNotificationButtonState(true);
+    return true;
   } catch(e) {
     setNotificationButtonState(false);
     toast('Failed: ' + (e.message || e), 'error');
+    return false;
   }
 }
 
@@ -4018,6 +4020,33 @@ async function toggleAppNotifications() {
   refreshAppsInstallSection();
 }
 
+async function enableBookingProtection() {
+  let approval = await loadBookingApprovalSettings();
+  const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  const reachable = !!(approval && approval.devices > 0);
+  if (!granted || !reachable) {
+    const notificationsEnabled = await enableNotifications();
+    if (!notificationsEnabled) return false;
+    approval = await loadBookingApprovalSettings();
+  }
+
+  if (approval && approval.supported && approval.pushConfigured && !approval.enabled) {
+    try {
+      const res = await api('POST', '/api/crm/booking-approval', { enabled: true });
+      if (res && res.success) {
+        crm.bookingApproval = { ...approval, enabled: true };
+        toast(`Booking protection is on — ${approval.windowMinutes || 20} minutes to decide.`, 'success');
+      }
+    } catch (e) {
+      toast((e && e.message) || 'Notifications are on, but booking review could not be enabled.', 'error');
+      refreshAppsInstallSection();
+      return false;
+    }
+  }
+  refreshAppsInstallSection();
+  return true;
+}
+
 // First-launch nudge inside the INSTALLED app. Installing a PWA never asks for
 // notifications on its own — permission is a separate, gesture-driven step (iOS
 // flat-out ignores requestPermission unless it comes from a tap). So the first
@@ -4044,17 +4073,15 @@ function showNotifPromptModal() {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="font-size:34px;margin-bottom:10px;">🔔</div>
-      <h2 style="font-size:19px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">Turn on booking alerts?</h2>
-      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 20px;">Get a notification the moment a guest books — even when the app is closed.</p>
-      <button id="notifPromptEnable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Enable notifications</button>
+      <h2 style="font-size:19px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">Turn on booking protection?</h2>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 20px;">New bookings will reach this phone before they confirm, even when Front Desk is closed.</p>
+      <button id="notifPromptEnable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Turn on booking protection</button>
       <button id="notifPromptLater" style="width:100%;padding:12px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Not now</button>
     </div>`;
   document.body.appendChild(overlay);
   document.getElementById('notifPromptEnable').onclick = async () => {
     overlay.remove();
-    await enableNotifications();   // runs inside this tap → gesture requirement satisfied
-    await loadBookingApprovalSettings();
-    refreshAppsInstallSection();
+    await enableBookingProtection();   // runs inside this tap → gesture requirement satisfied
   };
   document.getElementById('notifPromptLater').onclick = () => overlay.remove();
 }
@@ -4151,6 +4178,7 @@ exposeToWindow({
   deleteRoomType,
   doLogin,
   enableNotifications,
+  enableBookingProtection,
   ensureAvailabilityUi,
   ensureBookingsVirtualScroll,
   ensureGrowthStyles,

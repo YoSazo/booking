@@ -229,7 +229,7 @@ function renderAppsView() {
   const fdInApp = isStandaloneApp() || crm.frontdeskInstalled;
   const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
-  const fdInstallLabel = fdOnNarrowScreen ? 'Install on this phone' : 'Install Front Desk';
+  const fdInstallLabel = fdOnNarrowScreen ? 'Put Front Desk on this phone' : 'Put Front Desk on my phone';
   const approval = crm.bookingApproval;
   const canReviewBookings = !!(approval && approval.supported && approval.pushConfigured);
   const approvalMinutes = (approval && approval.windowMinutes) || 20;
@@ -253,11 +253,11 @@ function renderAppsView() {
       <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Booking alerts can reach this phone — even if Front Desk is closed.</div>${reviewControl}</div>
     </div>`;
   } else if (fdInApp) {
-    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's installed on this device. Turn on alerts so you know when a guest books.</p>
-      <button onclick="toggleAppNotifications()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
+    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">Front Desk is on this device. Turn on booking protection so new reservations reach your phone before they confirm.</p>
+      <button onclick="enableBookingProtection()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking protection</button></div>`;
   } else {
-    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Install Front Desk on your phone first. That unlocks guest app setup, install links, QR tools, guest messages, and booking alerts.</p>
-      <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Install Front Desk</button>
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Put Front Desk on this phone first. There is no App Store — follow 3 quick steps and it appears on your home screen like an app.</p>
+      <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Put Front Desk on this phone</button>
       <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until Front Desk is installed on your phone</div>`;
   }
 
@@ -341,8 +341,8 @@ function renderAppsView() {
 
       <div class="apps-story-line" id="tour-apps-first">
         <div class="apps-story-step">First</div>
-        <h3 class="apps-story-line-title">Install Front Desk on your phone.</h3>
-        <p>Front Desk is this website saved to your phone. It turns on booking alerts, guest messages, QR tools, and the guest Install button.</p>
+        <h3 class="apps-story-line-title">Put Front Desk on your phone.</h3>
+        <p>No App Store. Tap the button below, follow 3 quick steps, and Front Desk appears on your home screen. Then new bookings can reach you even when Front Desk is closed — a normal browser tab cannot reliably do that.</p>
         <div class="apps-story-actions">${storyFrontdeskActionHtml}</div>
       </div>
 
