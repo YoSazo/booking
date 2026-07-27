@@ -52,8 +52,27 @@ function scheduleDeferredMessagesLoad() {
   else setTimeout(run, 600);
 }
 
+// Mirrors DEAD_BOOKING_STATUSES in server.js. 'pending' is NOT dead — a booking
+// awaiting owner approval still holds its room.
+const DEAD_BOOKING_STATUSES = ['cancelled', 'canceled', 'released'];
+
+function isDeadBooking(booking) {
+  if (!booking) return true;
+  return DEAD_BOOKING_STATUSES.includes(String(booking.status || '').trim().toLowerCase());
+}
+
+function isPendingApproval(booking) {
+  return String(booking?.status || '').trim().toLowerCase() === 'pending';
+}
+
 export function exposeToWindow(obj) {
   Object.assign(window, obj);
 }
 
-export { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad };
+export {
+  ensureLucideLoaded,
+  isDeadBooking,
+  isPendingApproval,
+  optimizeRoomPhotoForUpload,
+  scheduleDeferredMessagesLoad,
+};

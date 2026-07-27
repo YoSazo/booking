@@ -1,6 +1,6 @@
 import { crm } from './state.js';
 
-import { ensureLucideLoaded, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
+import { ensureLucideLoaded, isDeadBooking, isPendingApproval, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 
 let settingsModulePromise = null;
 let appsModulePromise = null;
@@ -66,6 +66,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', () => {
   crm.frontdeskInstalled = true;
   crm.deferredInstallPrompt = null;
+  try { reportFrontdeskInstalled(); } catch (_) {}
   try { refreshFrontdeskInstallCard(); } catch (_) {}
   try { window.refreshAppsInstallSection?.(); } catch (_) {}
 });
@@ -1203,12 +1204,14 @@ function applyBookingsSubview() {
 
 async function loadGrowthData() {
   try {
-    const [funnel, checklist] = await Promise.all([
+    const [funnel, checklist, approval] = await Promise.all([
       api('GET', `/api/crm/growth-funnel?period=${encodeURIComponent(crm.growthPeriod)}`).catch(() => null),
       api('GET', '/api/crm/growth-checklist').catch(() => null),
+      api('GET', '/api/crm/booking-approval').catch(() => null),
     ]);
     if (funnel && funnel.success) crm.growthFunnel = funnel;
     if (checklist && checklist.success) crm.growthChecklist = checklist.checklist || {};
+    if (approval && approval.success) crm.bookingApproval = approval.data || null;
     renderBookingsSubtabs();
     if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'growth') renderGrowthPanel();
   } catch (e) { /* non-fatal */ }
@@ -1309,7 +1312,79 @@ function renderGrowthPanel() {
       ${gbpStep}${qrStep}${textStep}
     </div>`;
 
-  el.innerHTML = `<div class="growth-wrap">${funnelCard}${checklistCard}</div>`;
+  el.innerHTML = `<div class="growth-wrap">${funnelCard}${bookingReviewCardHtml()}${checklistCard}</div>`;
+}
+
+// Derived, never self-reported: the tick follows a real push subscription, so it
+// can't be checked off by a hotel we have no way to reach.
+function bookingReviewCardHtml() {
+  const a = crm.bookingApproval;
+  if (!a || !a.supported || !a.pushConfigured) return '';
+
+  const reachable = (a.devices || 0) > 0;
+  const missed = a.missedReviews || 0;
+  const mins = a.windowMinutes || 20;
+  const checkMark = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  let statusLine;
+  if (a.enabled && reachable) {
+    statusLine = `<div class="growth-insight">On. New bookings wait ${mins} minutes for you before they lock in.</div>`;
+  } else if (reachable) {
+    statusLine = `<div class="growth-insight">Alerts reach this device — switch booking review on to start using the window.</div>`;
+  } else if (missed > 0) {
+    statusLine = `<div class="growth-insight warn">${missed} booking${missed > 1 ? 's' : ''} confirmed in the last 30 days without your review. Nothing could alert you.</div>`;
+  } else {
+    statusLine = `<div class="growth-insight warn">No device can receive alerts, so every booking confirms itself instantly.</div>`;
+  }
+
+  const actionsHtml = reachable
+    ? `<button type="button" class="growth-btn ${a.enabled ? 'growth-btn-ghost' : 'growth-btn-primary'}" onclick="toggleBookingApproval()">${a.enabled ? 'Turn off booking review' : `Turn on ${mins}-minute review`}</button>`
+    : `<button type="button" class="growth-btn growth-btn-primary" onclick="handleInstallFrontdesk()">Install Front Desk</button>`;
+
+  const iosNote = reachable
+    ? ''
+    : `<div class="growth-step-desc" style="margin-top:8px;">On iPhone this only works once Front Desk is on your Home Screen — alerts can't reach a browser tab.</div>`;
+
+  return `
+    <div class="growth-card">
+      <div class="growth-card-title">Review bookings before they lock in</div>
+      <div class="growth-card-sub">Sold the room on Airbnb an hour ago? Release it straight from the notification. Ignore it and the booking confirms itself — you only step in when it matters.</div>
+      ${statusLine}
+      <div class="growth-step">
+        <button type="button" class="growth-step-check ${reachable ? 'done' : ''}" aria-label="${reachable ? 'Alerts reach this device' : 'Alerts cannot reach you yet'}" title="${reachable ? 'Alerts reach this device' : 'Install Front Desk to enable this'}" disabled style="cursor:default;">${reachable ? checkMark : ''}</button>
+        <div class="growth-step-body">
+          <div class="growth-step-title">Front Desk installed with alerts on</div>
+          <div class="growth-step-desc">${reachable ? `${a.devices} device${a.devices > 1 ? 's' : ''} can receive booking alerts.` : 'Booking review needs somewhere to send the Confirm / Release prompt.'}</div>
+          <div class="growth-step-actions">${actionsHtml}</div>
+          ${iosNote}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function toggleBookingApproval() {
+  const a = crm.bookingApproval;
+  if (!a) return;
+  const next = !a.enabled;
+  try {
+    const res = await api('POST', '/api/crm/booking-approval', { enabled: next });
+    if (res && res.success) {
+      crm.bookingApproval = { ...a, enabled: next };
+      toast(next ? `Booking review on — ${a.windowMinutes || 20} minutes to decide.` : 'Booking review off.', 'success');
+      renderGrowthPanel();
+    }
+  } catch (e) {
+    toast((e && e.message) || 'Could not save — try again', 'error');
+  }
+}
+
+// Server-side install signal, mirroring the guest install funnel. Lets the growth
+// checklist and the no-alerts nudge reason about adoption without a browser flag.
+function reportFrontdeskInstalled() {
+  if (!crm.token) return;
+  if (crm.frontdeskInstallReported) return;
+  crm.frontdeskInstallReported = true;
+  api('POST', '/api/crm/frontdesk-install-event', { installed: true }).catch(() => {});
 }
 
 function seedTourRevenueShell() {
@@ -1518,6 +1593,10 @@ async function startCrmApp(verification) {
     }
   }
 
+  // Running standalone is the only trustworthy install signal on iOS, where
+  // 'appinstalled' never fires — record it every launch, server-side dedupes.
+  if (isStandaloneApp()) reportFrontdeskInstalled();
+
   // First time opening the INSTALLED app → offer to turn on booking alerts.
   maybePromptInstalledNotifications();
 }
@@ -1639,6 +1718,10 @@ async function bootCrmApp() {
     showRetry: false,
   });
 
+  // Runs before the auth gate on purpose: the approval token proves itself, so a
+  // notification tap can be answered without stopping to enter a PIN.
+  maybeShowBookingApprovalCard().catch(() => {});
+
   try {
     await loadHotelContext();
     if (crm.token) {
@@ -1697,6 +1780,7 @@ async function loadBookings(opts = {}) {
     }
     // Render based on current filter
     applyFilter();
+    loadBookingConflicts();
     if (opts.deferMessages) scheduleDeferredMessagesLoad();
     else loadMessages();
   } catch(e) {
@@ -2052,6 +2136,7 @@ function bookingCardHtml(b) {
   localPhoneDigits = localPhoneDigits.slice(0, 10);
   const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
   const noteBtnClass = crm.currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
+  const guestLabel = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'this guest';
   const payChip = isDeclined
     ? '<div class="declined-chip">⚠️ Card declined</div>'
     : `<div class="pay-chip" title="Guest&apos;s card was verified only (small hold may apply). Collect $${Number(b.grandTotal).toFixed(2)} at check-in — nothing charged online.">💳 Collect at check-in</div>`;
@@ -2069,6 +2154,7 @@ function bookingCardHtml(b) {
         <div class="card-meta">
           <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
           <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
+          ${pendingApprovalPillHtml(b)}
           ${payChip}
         </div>
         <div class="card-dates">
@@ -2103,6 +2189,9 @@ function bookingCardHtml(b) {
           ${phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`}
           <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
         </div>
+        ${isDeclined ? '' : `<div style="margin-top:8px;text-align:right;">
+          <button type="button" onclick="promptCancelBooking('${b.id}', ${esc(JSON.stringify(guestLabel))})" style="padding:6px 10px;border-radius:8px;border:none;background:none;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">Cancel this booking</button>
+        </div>`}
       </div>
     </div>`;
 }
@@ -2852,6 +2941,7 @@ function bookingsByRoomDate() {
   const counts = {};
   for (const b of crm.bookings) {
     if (b.paymentDeclined) continue;
+    if (isDeadBooking(b)) continue;
     const roomName = String(b.roomName || '').trim();
     if (!roomName) continue;
     const ci = toIsoDate(b.checkinDate);
@@ -3484,6 +3574,7 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
 
   const arrivals = (crm.bookings || []).filter(function(b) {
     if (b.paymentDeclined) return false;
+    if (isDeadBooking(b)) return false;
     if (!b.checkinDate) return false;
     const ci = new Date(b.checkinDate);
     ci.setHours(0, 0, 0, 0);
@@ -3639,6 +3730,283 @@ function toast(msg, type = '') {
 }
 
 
+// ── DOUBLE-BOOKING CONFLICTS ───────────────────────────────────
+// A room-night with more live bookings than units is an unambiguous clash — it
+// happens when a walk-in gets written over a room an online guest already holds.
+// Surfaced at the top of Bookings because by the time this is true, the approval
+// window has usually long closed and nothing else will flag it.
+
+async function loadBookingConflicts() {
+  if (!crm.token) return;
+  try {
+    const res = await api('GET', '/api/crm/conflicts');
+    crm.bookingConflicts = (res && res.success) ? (res.conflicts || []) : [];
+  } catch (_) {
+    crm.bookingConflicts = [];
+  }
+  renderConflictBanner();
+}
+
+function conflictDateLabel(iso) {
+  try {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  } catch (_) { return iso; }
+}
+
+function conflictBannerHtml() {
+  const conflicts = crm.bookingConflicts || [];
+  if (!conflicts.length) return '';
+
+  const rows = conflicts.slice(0, 6).map((c) => {
+    const guests = c.bookings.map((b) => {
+      const walkIn = b.bookingType === 'manual';
+      const money = Number(b.grandTotal || 0).toFixed(2);
+      const label = walkIn ? 'added at the desk' : 'booked online';
+      const action = walkIn
+        ? ''
+        : `<button type="button" onclick="promptCancelBooking('${b.id}', ${esc(JSON.stringify(b.guestName || 'this guest'))})" style="padding:7px 12px;border-radius:9px;border:1.5px solid #dc2626;background:none;color:#dc2626;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Cancel this one</button>`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(0,0,0,0.06);">
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:#1a1a2e;">${esc(b.guestName)}</div>
+            <div style="font-size:11px;color:#6b7280;">${label} · $${money}${b.guestPhone ? ` · ${esc(b.guestPhone)}` : ''}</div>
+          </div>
+          ${action}
+        </div>`;
+    }).join('');
+
+    const why = c.closed
+      ? `You marked this room closed for this night, but ${c.booked} booking${c.booked !== 1 ? 's are' : ' is'} still on it`
+      : `${c.booked} bookings for ${c.units} room${c.units !== 1 ? 's' : ''}`;
+
+    return `<div style="background:#fff;border-radius:10px;padding:12px 14px;margin-top:10px;">
+        <div style="font-size:13px;font-weight:800;color:#7f1d1d;">${esc(c.roomName)} · ${conflictDateLabel(c.date)}</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">${why}</div>
+        ${guests}
+      </div>`;
+  }).join('');
+
+  const more = conflicts.length > 6
+    ? `<div style="font-size:11px;color:#7f1d1d;margin-top:8px;">+ ${conflicts.length - 6} more night${conflicts.length - 6 !== 1 ? 's' : ''} affected.</div>`
+    : '';
+
+  return `<div id="conflictBanner" style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:800;color:#7f1d1d;margin-bottom:4px;">⚠️ Double-booked ${conflicts.length === 1 ? 'room' : 'rooms'}</div>
+      <div style="font-size:12px;color:#7f1d1d;line-height:1.5;">More bookings than rooms on the nights below. Cancel the online booking to free the room and void the guest's card hold — they'll get an email explaining.</div>
+      ${rows}${more}
+    </div>`;
+}
+
+function renderConflictBanner() {
+  const existing = document.getElementById('conflictBanner');
+  const html = conflictBannerHtml();
+  if (existing) {
+    if (html) existing.outerHTML = html;
+    else existing.remove();
+    return;
+  }
+  if (!html) return;
+  const list = document.getElementById('bookingsList');
+  if (list && list.parentNode) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    list.parentNode.insertBefore(wrap.firstElementChild, list);
+  }
+}
+
+function promptCancelBooking(bookingId, guestName) {
+  const existing = document.getElementById('cancelBookingOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cancelBookingOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100005;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:24px 22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="font-size:30px;text-align:center;margin-bottom:6px;">🚫</div>
+      <h2 style="font-size:18px;font-weight:800;color:#1a1a2e;margin:0 0 8px;text-align:center;">Cancel ${esc(guestName)}'s booking?</h2>
+      <p style="font-size:12px;color:#6b7280;line-height:1.55;margin:0 0 16px;text-align:center;">The room goes back on sale, the $1 card hold is voided, and they get an email explaining. This can't be undone.</p>
+      <label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Reason (the guest sees this)</label>
+      <select id="cancelBookingReason" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #e5e7eb;font-family:inherit;font-size:13px;margin-bottom:16px;background:#fff;color:#1a1a2e;">
+        <option value="The room was already taken">The room was already taken</option>
+        <option value="The room is out of service">The room is out of service</option>
+        <option value="Double booking on our side">Double booking on our side</option>
+        <option value="">No reason given</option>
+      </select>
+      <button type="button" id="cancelBookingGo" style="width:100%;padding:14px;border-radius:12px;border:none;background:#dc2626;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Cancel the booking</button>
+      <button type="button" id="cancelBookingBack" style="width:100%;padding:11px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Keep it</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById('cancelBookingBack').onclick = () => overlay.remove();
+  document.getElementById('cancelBookingGo').onclick = async () => {
+    const go = document.getElementById('cancelBookingGo');
+    const reason = document.getElementById('cancelBookingReason').value;
+    go.disabled = true;
+    go.textContent = 'Cancelling…';
+    try {
+      const res = await api('POST', '/api/crm/bookings/cancel', { id: bookingId, reason });
+      if (res && res.success) {
+        toast(res.alreadyCancelled ? 'That booking was already cancelled.' : 'Cancelled — the room is back on sale.', 'success');
+        overlay.remove();
+        await loadBookings();
+        await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
+      } else {
+        toast((res && res.message) || 'Could not cancel that booking.', 'error');
+        go.disabled = false;
+        go.textContent = 'Cancel the booking';
+      }
+    } catch (e) {
+      toast('Could not cancel that booking.', 'error');
+      go.disabled = false;
+      go.textContent = 'Cancel the booking';
+    }
+  };
+}
+
+// ── BOOKING APPROVAL ───────────────────────────────────────────
+// A new booking waits a few minutes before it locks in, so the owner can release
+// a room they already sold on an OTA. The push carries Confirm / Release buttons,
+// but iOS doesn't reliably render those — tapping the notification body lands
+// here instead, which is the path that always works. The token in the URL is
+// self-authenticating, so this card also works before the owner enters their PIN.
+
+function approvalMinutesLeft(pendingUntil) {
+  const due = new Date(pendingUntil || 0).getTime();
+  if (!due) return 0;
+  return Math.max(0, Math.round((due - Date.now()) / 60000));
+}
+
+function pendingApprovalPillHtml(b) {
+  if (!isPendingApproval(b)) return '';
+  const mins = approvalMinutesLeft(b.pendingUntil);
+  const label = mins > 0 ? `auto-confirms in ${mins} min` : 'confirming now';
+  return `<div class="meta-chip" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;" title="Waiting on your review. Do nothing and it confirms itself.">⏳ ${label}</div>`;
+}
+
+function getApprovalTokenFromUrl() {
+  try {
+    return String(new URLSearchParams(window.location.search).get('approve') || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+function stripApprovalTokenFromUrl() {
+  try {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('approve');
+    window.history.replaceState({}, '', cleanUrl);
+  } catch (_) {}
+}
+
+async function maybeShowBookingApprovalCard() {
+  const token = getApprovalTokenFromUrl();
+  if (!token) return;
+  stripApprovalTokenFromUrl();
+
+  let booking = null;
+  try {
+    const res = await fetch('/api/booking-approval/peek?token=' + encodeURIComponent(token));
+    const body = await res.json().catch(() => ({}));
+    if (body && body.success && body.data) booking = body.data;
+    else {
+      toast(body && body.message ? body.message : 'That approval link has expired.', 'error');
+      return;
+    }
+  } catch (_) {
+    toast('Could not load that booking.', 'error');
+    return;
+  }
+
+  if (String(booking.status || '').toLowerCase() !== 'pending') {
+    const decided = String(booking.status || '').toLowerCase() === 'released' ? 'released' : 'confirmed';
+    toast(`That booking was already ${decided}.`, 'info');
+    return;
+  }
+  showBookingApprovalModal(token, booking);
+}
+
+function showBookingApprovalModal(token, booking) {
+  const existing = document.getElementById('bookingApprovalOverlay');
+  if (existing) existing.remove();
+
+  const fmt = (d) => {
+    try {
+      return new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    } catch (_) { return '—'; }
+  };
+  const mins = approvalMinutesLeft(booking.pendingUntil);
+  const total = Number(booking.grandTotal || 0).toFixed(2);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bookingApprovalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100004;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:24px 22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:32px;margin-bottom:6px;">🛏</div>
+        <h2 style="font-size:18px;font-weight:800;color:#1a1a2e;margin:0 0 6px;">Keep this booking?</h2>
+        <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:0;">
+          ${mins > 0
+            ? `Do nothing and it confirms itself in <strong>${mins} min</strong>. Release it only if the room is already gone.`
+            : 'This is about to confirm itself. Release it only if the room is already gone.'}
+        </p>
+      </div>
+      <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
+        <div style="font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:2px;">${esc(booking.guestName || 'Guest')}</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">${esc(booking.guestPhone || '')}</div>
+        <div style="font-size:13px;color:#374151;line-height:1.7;">
+          <div>🛏 ${esc(booking.roomName || 'Room')}</div>
+          <div>📅 ${fmt(booking.checkinDate)} → ${fmt(booking.checkoutDate)}</div>
+          <div>🌙 ${booking.nights} night${booking.nights !== 1 ? 's' : ''} · $${total}</div>
+        </div>
+      </div>
+      <button type="button" id="bookingApprovalConfirm" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Confirm booking</button>
+      <button type="button" id="bookingApprovalRelease" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid #dc2626;background:none;color:#dc2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Release the room</button>
+      <button type="button" id="bookingApprovalLater" style="width:100%;padding:11px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Decide later</button>
+      <p style="font-size:11px;color:#9ca3af;line-height:1.5;margin:10px 0 0;text-align:center;">Releasing voids the $1 card hold and emails the guest that you couldn't take it.</p>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const buttons = ['bookingApprovalConfirm', 'bookingApprovalRelease', 'bookingApprovalLater']
+    .map((id) => document.getElementById(id));
+  const setBusy = (busy) => buttons.forEach((btn) => { if (btn) btn.disabled = busy; });
+
+  const decide = async (action) => {
+    setBusy(true);
+    const ok = await submitBookingApproval(token, action);
+    setBusy(false);
+    if (ok) overlay.remove();
+  };
+
+  document.getElementById('bookingApprovalConfirm').onclick = () => decide('confirm');
+  document.getElementById('bookingApprovalRelease').onclick = () => decide('release');
+  document.getElementById('bookingApprovalLater').onclick = () => overlay.remove();
+}
+
+async function submitBookingApproval(token, action) {
+  try {
+    const res = await fetch('/api/booking-approval/act', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, action }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!body || body.success !== true) {
+      toast(body && body.message ? body.message : 'Could not apply that.', 'error');
+      return false;
+    }
+    if (body.alreadyDecided) toast(`Already ${body.status || 'decided'}.`, 'info');
+    else if (action === 'release') toast('Released — the room is back on sale.', 'success');
+    else toast('Confirmed — the guest has been emailed.', 'success');
+    if (crm.token) loadBookings().catch(() => {});
+    return true;
+  } catch (_) {
+    toast('Could not apply that.', 'error');
+    return false;
+  }
+}
+
 // ── DOWNLOAD FRONT DESK (Bookings tab nudge) ───────────────────
 // Owner-facing: install THIS front desk to the home screen to receive booking
 // notifications. Deliberately framed around alerts + "Front Desk" so it never
@@ -3654,21 +4022,27 @@ function bookingsFrontdeskNudgeHtml() {
 function frontdeskInstallCardHtml() {
   const installed = isStandaloneApp() || crm.frontdeskInstalled;
   const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  const mins = (crm.bookingApproval && crm.bookingApproval.windowMinutes) || 20;
+  const missed = (crm.bookingApproval && crm.bookingApproval.missedReviews) || 0;
   let inner;
   if (installed && pushSupported()) {
     inner = granted
-      ? `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">You're all set — you'll get an alert on this device every time a guest books.</p>
+      ? `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">You're all set — every new booking reaches this device, with Confirm and Release right on the notification.</p>
          <button onclick="toggleAppNotifications()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Send a test notification</button>`
-      : `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">You're in the app. Turn on alerts to get a notification the moment a guest books — even when it's closed.</p>
+      : `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">You're in the app. Turn on alerts and you'll get <strong>${mins} minutes</strong> to release a room you already sold elsewhere — before the booking locks in.</p>
          <button onclick="toggleAppNotifications()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Turn on notifications</button>`;
   } else if (installed && !pushSupported()) {
-    inner = `<p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">Front Desk is installed for quick one-tap access. (This device can't show push notifications.)</p>`;
+    inner = `<p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.5;">Front Desk is installed for quick one-tap access. (This device can't show push notifications, so bookings confirm instantly.)</p>`;
   } else {
-    inner = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">Install <strong>Front Desk</strong> on this device so booking alerts can reach you when supported. Takes 3 seconds.</p>
-       <button onclick="handleInstallFrontdesk()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Install Front Desk</button>`;
+    const lead = missed > 0
+      ? `<strong>${missed} booking${missed > 1 ? 's' : ''}</strong> confirmed in the last 30 days with no way to reach you.`
+      : `Right now every booking confirms the instant a guest hits pay.`;
+    inner = `<p style="font-size:12px;color:var(--text-muted);margin:0 0 14px;line-height:1.5;">${lead} Install <strong>Front Desk</strong> on this device and you get <strong>${mins} minutes</strong> to review each one — one tap to release a room you already sold on an OTA.</p>
+       <button onclick="handleInstallFrontdesk()" style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Install Front Desk</button>
+       ${isIosDevice() ? `<p style="font-size:11px;color:var(--text-muted);margin:10px 0 0;line-height:1.5;">On iPhone, alerts only work once it's on your Home Screen — a Safari tab can't receive them.</p>` : ''}`;
   }
   return `<div class="booking-card" id="frontdeskInstallCard" style="margin-bottom:14px;"><div style="padding:18px;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">🔔 Get booking alerts</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">🔔 Review bookings before they lock in</div>
       <div style="display:flex;align-items:center;gap:16px;">
         <div style="width:68px;height:68px;border-radius:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.12);background:#fff;padding:10px;box-sizing:border-box;">
           <img src="/marketellogo.svg" alt="Front Desk app" style="width:100%;height:100%;object-fit:contain;">
@@ -3701,9 +4075,13 @@ function refreshAppsInstallSection() {
 
 function handleInstallFrontdesk() {
   if (isIosDevice()) {
+    const mins = (crm.bookingApproval && crm.bookingApproval.windowMinutes) || 20;
     showIosInstallSheet({
       title: (crm.activeHotelName ? crm.activeHotelName + ' ' : '') + 'Front Desk',
       subtitle: 'Add it to your home screen — takes 3 seconds.',
+      // iOS is the whole reason this step is mandatory rather than optional:
+      // web push simply does not exist for a Safari tab.
+      alertsNote: `<strong>iPhone needs this step.</strong> Booking alerts — and the ${mins} minutes they buy you to release a room — only work from the Home Screen app, never from a Safari tab.`,
     });
     return;
   }
@@ -3782,7 +4160,7 @@ function showNotifPromptModal() {
 // On iOS 26+ the card pins to the TOP of the screen: Safari's "⋯" menu and the
 // share sheet slide up over the bottom half, so a top-pinned card stays visible
 // the whole time the user is following the steps.
-function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
+function showIosInstallSheet({ title, subtitle, iconUrl, openUrl, alertsNote } = {}) {
   const existing = document.getElementById('iosInstallSheet');
   if (existing) existing.remove();
   const ios26 = isIos26Plus();
@@ -3818,6 +4196,7 @@ function showIosInstallSheet({ title, subtitle, iconUrl, openUrl } = {}) {
         <div style="font-size:12px;color:#6b7280;margin-top:2px;">${subtitle || ''}</div></div>
       </div>
       ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;margin-bottom:16px;padding:12px;border-radius:11px;border:1.5px solid #2E7D5B;background:none;color:#2E7D5B;font-size:14px;font-weight:700;">Open booking page →</a>` : ''}
+      ${alertsNote ? `<div style="margin-bottom:16px;font-size:12px;color:#92400E;background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;padding:10px 12px;line-height:1.5;">${alertsNote}</div>` : ''}
       <div style="display:flex;flex-direction:column;gap:12px;">${stepsHtml}
       </div>
     </div>`;
@@ -3842,9 +4221,20 @@ exposeToWindow({
   bindAvailabilityUiEvents,
   blockedDemandLineHtml,
   bookingCardHtml,
+  bookingReviewCardHtml,
   bookingsByRoomDate,
   bookingsFrontdeskNudgeHtml,
   bootCrmApp,
+  conflictBannerHtml,
+  loadBookingConflicts,
+  maybeShowBookingApprovalCard,
+  pendingApprovalPillHtml,
+  promptCancelBooking,
+  renderConflictBanner,
+  reportFrontdeskInstalled,
+  showBookingApprovalModal,
+  submitBookingApproval,
+  toggleBookingApproval,
   buildGuestInstallUrlForQr,
   buildHotelContextUrl,
   buildMessageThreads,

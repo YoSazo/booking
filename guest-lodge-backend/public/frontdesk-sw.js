@@ -12,20 +12,22 @@ self.addEventListener('push', function(event) {
         }
     }
 
+    // Server-supplied actions/tag win; everything else keeps the historical
+    // defaults so the older notification types render exactly as before.
+    const actions = Array.isArray(data.actions)
+        ? data.actions
+        : [{ action: 'view', title: '👀 View Booking' }];
+
     const options = {
         body: data.body,
         icon: data.icon || '/icon-192.png',
         badge: data.badge || '/icon-192.png',
-        requireInteraction: true, // Stays until clicked! 🔥
-        renotify: true,
-        tag: 'booking-notification',
-        vibrate: [200, 100, 200, 100, 200], // Stronger vibration pattern
-        actions: [
-            {
-                action: 'view',
-                title: '👀 View Booking'
-            }
-        ],
+        requireInteraction: data.requireInteraction !== false, // Stays until clicked! 🔥
+        renotify: data.renotify !== false,
+        // Per-booking tags let an approval prompt replace itself once decided.
+        tag: data.tag || 'booking-notification',
+        vibrate: data.vibrate || [200, 100, 200, 100, 200], // Stronger vibration pattern
+        actions: actions,
         data: Object.assign({ url: data.url || '/frontdesk' }, data.data || {})
     };
 
@@ -33,6 +35,56 @@ self.addEventListener('push', function(event) {
         self.registration.showNotification(data.title, options)
     );
 });
+
+// Apply an approval decision straight from the notification, then report back in
+// place of the prompt so the owner sees the outcome without opening the app.
+function applyApprovalFromNotification(action, payload) {
+    var token = (payload && payload.token) || '';
+    if (!token) {
+        return self.registration.showNotification('Approval link missing', {
+            body: 'Open Front Desk to confirm or release this booking.',
+            icon: '/apple-touch-icon.png',
+            data: { url: '/frontdesk?tab=bookings' }
+        });
+    }
+
+    return fetch('/api/booking-approval/act', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token, action: action })
+    }).then(function(res) {
+        return res.json().catch(function() { return {}; });
+    }).then(function(body) {
+        if (!body || body.success !== true) {
+            throw new Error((body && body.message) || 'failed');
+        }
+        var released = action === 'release';
+        var title = body.alreadyDecided
+            ? 'Already decided'
+            : (released ? 'Booking released 🚫' : 'Booking confirmed ✓');
+        var detail = [body.roomName, body.guestName].filter(Boolean).join(' · ');
+        var body2 = body.alreadyDecided
+            ? 'This booking was already ' + (body.status || 'decided') + '.'
+            : (released
+                ? (detail ? detail + ' — room is back on sale.' : 'Room is back on sale.')
+                : (detail ? detail + ' — guest has been emailed.' : 'Guest has been emailed.'));
+
+        return self.registration.showNotification(title, {
+            body: body2,
+            icon: '/apple-touch-icon.png',
+            requireInteraction: false,
+            data: { url: '/frontdesk?tab=bookings' }
+        });
+    }).catch(function() {
+        // Never leave the owner guessing — surface a retry path into the app.
+        return self.registration.showNotification("Couldn't apply that", {
+            body: 'Tap to open Front Desk and decide there.',
+            icon: '/apple-touch-icon.png',
+            requireInteraction: true,
+            data: { url: '/frontdesk?approve=' + encodeURIComponent(token) }
+        });
+    });
+}
 
 self.addEventListener('notificationclick', function(event) {
     console.log('[Service Worker] Notification click Received. Action:', event.action);
@@ -43,6 +95,14 @@ self.addEventListener('notificationclick', function(event) {
     if (event.action === 'dismiss') {
         // Just close the notification, do nothing else
         console.log('[Service Worker] Notification dismissed by user');
+        return;
+    }
+
+    // Approval buttons act in place. Tapping the notification body instead falls
+    // through to the deep link below, which is the path that always works —
+    // iOS does not reliably render action buttons for web push.
+    if (event.action === 'confirm' || event.action === 'release') {
+        event.waitUntil(applyApprovalFromNotification(event.action, event.notification.data || {}));
         return;
     }
     
@@ -56,6 +116,19 @@ self.addEventListener('notificationclick', function(event) {
                 const client = clientList[i];
                 if (client.url.includes(urlToOpen) && 'focus' in client) {
                     return client.focus();
+                }
+            }
+            // Deep links carry a one-off query string that no open tab will ever
+            // match, so steer an existing Front Desk window to it rather than
+            // stacking up duplicate windows.
+            for (let i = 0; i < clientList.length; i++) {
+                const client = clientList[i];
+                if (client.url.indexOf('/frontdesk') !== -1 && 'navigate' in client) {
+                    return client.navigate(urlToOpen).then(function(navigated) {
+                        return navigated && 'focus' in navigated ? navigated.focus() : null;
+                    }).catch(function() {
+                        return 'focus' in client ? client.focus() : null;
+                    });
                 }
             }
             // If not, open a new window/tab
