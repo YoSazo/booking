@@ -620,7 +620,7 @@ function startPostActivationTabTour() {
     {
       tab: 'bookings',
       navFilter: 'bookings',
-      text: '<strong>Bookings</strong> — live reservations land here. You\'ll get a push alert for each new one.',
+      text: '<strong>Bookings</strong> — live reservations land here. Once phone setup is complete, new bookings can alert you even when Front Desk is closed.',
     },
     {
       tab: 'bookings',
@@ -630,7 +630,7 @@ function startPostActivationTabTour() {
     {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Guest App</strong> — put your property on guests&apos; home screens and send install reminders.',
+      text: '<strong>Last step: set up your phone.</strong> No App Store needed. Follow the 3 steps here, then turn on booking protection so new reservations can reach you.',
     },
   ];
 
@@ -677,7 +677,7 @@ function startPostActivationTabTour() {
         <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
           <p style="margin:0 0 14px;">${s.text}</p>
-          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Got it — open Guest App' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Set up this phone' : 'Next tab →'}</button>
           <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
         </div>`;
       document.body.appendChild(tooltip);
@@ -717,7 +717,7 @@ function showActivatedModal() {
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>New bookings appear in Bookings</strong> — you'll get a notification for each one.</span>
+          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>Next, set up your phone</strong> — no App Store needed. Then booking alerts can reach you when Front Desk is closed.</span>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
           <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>

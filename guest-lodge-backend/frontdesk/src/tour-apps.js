@@ -22,14 +22,6 @@ function goLive(...args) {
   return windowFn('goLive')?.(...args);
 }
 
-function handleInstallFrontdesk(...args) {
-  return windowFn('handleInstallFrontdesk')?.(...args);
-}
-
-function enableBookingProtection(...args) {
-  return windowFn('enableBookingProtection')?.(...args);
-}
-
 function toast(...args) {
   return windowFn('toast')?.(...args);
 }
@@ -464,107 +456,6 @@ function appsTourActivateFromFinalStep() {
   if (typeof notify === 'function') notify('Open Go live to activate your booking page.', 'error');
 }
 
-function showGuestAppActivationModal() {
-  if (crm.hotelSubscribed || document.getElementById('guestAppActivationOverlay')) return;
-  ensureAppsTourStyles();
-
-  const frontdeskInstalled = !!crm.frontdeskInstalled
-    || !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
-    || window.navigator.standalone === true;
-  const notificationsOn = typeof Notification !== 'undefined' && Notification.permission === 'granted';
-  const reviewSupported = !!(crm.bookingApproval && crm.bookingApproval.supported && crm.bookingApproval.pushConfigured);
-  const bookingReviewOn = !reviewSupported || crm.bookingApproval.enabled === true;
-  let phoneSetupHtml;
-  if (!frontdeskInstalled) {
-    phoneSetupHtml = `
-      <div style="background:#E8F5EE;border:1.5px solid #A7D9BE;border-radius:14px;padding:14px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:850;color:#166534;margin-bottom:4px;">First, put Front Desk on this phone</div>
-        <p style="font-size:12px;color:#4B5D52;line-height:1.5;margin:0 0 11px;">No App Store. Follow 3 quick steps and it appears on your home screen. Then booking alerts can reach you like a normal app.</p>
-        <button type="button" id="guestAppInstallNowBtn" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:13px;font-weight:850;cursor:pointer;">Put Front Desk on my phone</button>
-      </div>`;
-  } else if (!notificationsOn || !bookingReviewOn) {
-    phoneSetupHtml = `
-      <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:14px;padding:14px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:850;color:#9A3412;margin-bottom:4px;">One last phone step</div>
-        <p style="font-size:12px;color:#4B5D52;line-height:1.5;margin:0 0 11px;">Front Desk is on your phone. Turn on booking protection so new reservations reach you before they confirm.</p>
-        <button type="button" id="guestAppNotificationsBtn" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:13px;font-weight:850;cursor:pointer;">Turn on booking protection</button>
-      </div>`;
-  } else {
-    phoneSetupHtml = `
-      <div style="display:flex;align-items:center;gap:10px;background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:14px;padding:13px 14px;margin-bottom:16px;">
-        <span style="width:25px;height:25px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:850;flex-shrink:0;">✓</span>
-        <div><div style="font-size:13px;font-weight:850;color:#166534;">Front Desk is ready on this phone</div><div style="font-size:11px;color:#4B5D52;margin-top:2px;">New booking notifications can reach you.</div></div>
-      </div>`;
-  }
-
-  const overlay = document.createElement('div');
-  overlay.id = 'guestAppActivationOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:100004;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;';
-  overlay.innerHTML = `
-    <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:390px;width:100%;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:appsTourPanelIn 0.22s ease-out;">
-      <div style="padding:26px 22px 22px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <div style="width:42px;height:42px;border-radius:14px;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="rocket" style="width:22px;height:22px;"></i></div>
-          <div>
-            <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:3px;">Everything together</div>
-            <div style="font-size:20px;font-weight:850;color:#1A2B22;line-height:1.18;">Turn it all on for $199/month.</div>
-          </div>
-        </div>
-        <p style="font-size:13px;color:#4B5D52;line-height:1.58;margin:0 0 16px;">One subscription activates your direct booking page, guest app, messages, and Front Desk booking alerts.</p>
-        ${phoneSetupHtml}
-        <div style="background:#F4F8F5;border-radius:14px;padding:15px;border:1.5px solid #D8E4DC;text-align:left;margin-bottom:18px;">
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Guests can book direct in under 60 seconds</span></div>
-            <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Your property can live on their home screen</span></div>
-            <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">Booking alerts help you avoid selling the same room twice</span></div>
-            <div style="display:flex;align-items:flex-start;gap:10px;"><span style="width:21px;height:21px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:850;flex-shrink:0;">✓</span><span style="font-size:13px;color:#1A2B22;line-height:1.45;">No OTA commission. Cancel anytime.</span></div>
-          </div>
-        </div>
-        <button type="button" id="guestAppActivateNowBtn" style="width:100%;padding:15px 18px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:850;cursor:pointer;margin-bottom:8px;box-shadow:0 8px 20px rgba(46,125,91,0.22);">$199/month — Activate everything</button>
-        <button type="button" id="guestAppActivateLaterBtn" style="width:100%;background:none;border:none;color:#6B7D72;font-size:12px;font-family:inherit;font-weight:750;cursor:pointer;padding:8px 12px;">Keep inactive for now</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
-  if (!document.getElementById('tourModalAnimStyle')) {
-    const animStyle = document.createElement('style');
-    animStyle.id = 'tourModalAnimStyle';
-    animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
-    document.head.appendChild(animStyle);
-  }
-  if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
-
-  const closeModal = () => {
-    overlay.remove();
-    document.body.style.overflow = '';
-  };
-  document.getElementById('guestAppActivateNowBtn').onclick = () => {
-    closeModal();
-    const go = (typeof goLive === 'function') ? goLive : window.goLive;
-    if (typeof go === 'function') {
-      go();
-      return;
-    }
-    const notify = (typeof toast === 'function') ? toast : window.toast;
-    if (typeof notify === 'function') notify('Open Go live to activate your booking page.', 'error');
-  };
-  document.getElementById('guestAppActivateLaterBtn').onclick = closeModal;
-  const installBtn = document.getElementById('guestAppInstallNowBtn');
-  if (installBtn) {
-    installBtn.onclick = () => {
-      closeModal();
-      handleInstallFrontdesk();
-    };
-  }
-  const notificationsBtn = document.getElementById('guestAppNotificationsBtn');
-  if (notificationsBtn) {
-    notificationsBtn.onclick = () => {
-      closeModal();
-      enableBookingProtection();
-    };
-  }
-}
-
 function appsTourRender() {
   ensureAppsTourStyles();
   const step = _appsTourSteps[_appsTourIdx];
@@ -703,7 +594,6 @@ function appsTourRender() {
       if (isLast) {
         appsTourMarkCompleteFromFinalStep();
         appsTourClose(false);
-        if (step.showActivationOnComplete) showGuestAppActivationModal();
         return;
       }
       _appsTourIdx++;
@@ -793,9 +683,9 @@ function startAppsTour(opts) {
       text: hotelIsLive
         ? 'Guests book, save your property, and message you. Front Desk gets the alerts.'
         : 'For $199/month, guests can book direct, save your property, and message you — while Front Desk receives the alerts.',
-      primaryLabel: hotelIsLive ? 'Done' : 'See $199 activation',
-      secondaryLabel: hotelIsLive ? 'Close' : 'Not now',
-      showActivationOnComplete: !hotelIsLive,
+      primaryLabel: hotelIsLive ? 'Done' : 'Activate everything — $199/month',
+      secondaryLabel: hotelIsLive ? 'Close' : 'Keep exploring',
+      activateOnNext: !hotelIsLive,
       mobileScrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
