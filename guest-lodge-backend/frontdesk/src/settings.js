@@ -10,6 +10,7 @@ import {
   resolveLiveTourElement,
   resolveTourHighlightEl,
   scrollTourTargetIntoView,
+  showBookingProtectionModal,
   showFinaleMockModal,
   showTestDriveModal,
   startSettingsTour,
@@ -621,6 +622,11 @@ function startPostActivationTabTour() {
       tab: 'bookings',
       navFilter: 'bookings',
       text: '<strong>Bookings</strong> — live reservations land here. You\'ll get a push alert for each new one.',
+    },
+    {
+      tab: 'bookings',
+      navFilter: 'bookings',
+      text: '<strong>Booking review</strong> — turn it on here and new bookings wait for your OK before locking in, so a room you\'ve already given away never gets sold twice.',
     },
     {
       tab: 'apps',
@@ -1568,6 +1574,7 @@ const _settingsExports = {
   settingsSendSupport,
   settingsUploadPhoto,
   showActivatedModal,
+  showBookingProtectionModal,
   showEditRoomPhoto,
   showFinaleMockModal,
   showGoLiveOverlay,

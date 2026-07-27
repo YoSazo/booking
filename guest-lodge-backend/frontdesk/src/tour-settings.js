@@ -793,8 +793,74 @@ function showFinaleMockModal() {
       localStorage.removeItem('settingsTourStep');
       toast('Booking link copied!', 'success');
       finishTourHydration();
-      showTestDriveModal(url);
+      showBookingProtectionModal(url);
     });
+  };
+}
+
+// Sits between the finale and the price. Overselling is the thing owners have
+// actually been burned by, but it's invisible in a product demo — nothing to
+// point at until it goes wrong — so it gets shown deliberately before we ask
+// for money rather than left to be discovered later.
+function showBookingProtectionModal(bookingUrl) {
+  ensureTourPolishStyles();
+  const overlay = document.createElement('div');
+  overlay.id = 'bookingProtectionOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+
+  const row = (text) => `<div style="display:flex;align-items:flex-start;gap:10px;">
+      <span style="color:#2E7D5B;font-weight:850;flex-shrink:0;line-height:1.45;">✓</span>
+      <span style="font-size:13px;color:#1A2B22;line-height:1.45;">${text}</span>
+    </div>`;
+
+  overlay.innerHTML = `
+    <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;max-height:calc(100dvh - 40px);overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:tourPanelIn 0.22s ease-out;">
+      <div style="padding:24px 22px 22px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="width:42px;height:42px;border-radius:14px;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="shield-check" style="width:22px;height:22px;"></i></div>
+          <div>
+            <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:3px;">Included</div>
+            <div style="font-size:20px;font-weight:850;color:#1A2B22;line-height:1.18;">Every booking waits for your OK.</div>
+          </div>
+        </div>
+
+        <p style="font-size:13px;color:#4B5D52;line-height:1.55;margin:0 0 16px;">Someone walks in and takes your last room. Ten minutes later that room books online. Normally you find out when the guest arrives — here your phone asks you first.</p>
+
+        <div style="background:#1A2B22;border-radius:15px;padding:14px 15px;margin-bottom:16px;box-shadow:0 10px 26px rgba(26,43,34,0.22);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+            <div style="width:20px;height:20px;border-radius:6px;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:850;flex-shrink:0;">M</div>
+            <span style="font-size:10px;font-weight:800;letter-spacing:.05em;color:rgba(255,255,255,0.55);">FRONT DESK · now</span>
+          </div>
+          <div style="font-size:13.5px;font-weight:800;color:#fff;line-height:1.3;margin-bottom:2px;">New booking — Studio 1</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.68);line-height:1.4;">John Smith · tonight · 1 night · $110</div>
+          <div style="display:flex;gap:7px;margin-top:11px;">
+            <div style="flex:1;text-align:center;padding:8px 6px;border-radius:9px;background:rgba(255,255,255,0.14);font-size:12px;font-weight:800;color:#fff;">Confirm</div>
+            <div style="flex:1;text-align:center;padding:8px 6px;border-radius:9px;background:rgba(255,255,255,0.14);font-size:12px;font-weight:800;color:#fff;">Release</div>
+          </div>
+        </div>
+
+        <div style="background:#F4F8F5;border-radius:14px;padding:14px;border:1.5px solid #D8E4DC;text-align:left;margin-bottom:14px;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${row('<strong>Release it</strong> and the room goes straight back on sale — the guest is emailed and their card hold is voided for you.')}
+            ${row('<strong>Ignore it</strong> and the booking confirms itself. You only step in when something has changed.')}
+            ${row('<strong>Already confirmed?</strong> You can still cancel, and any room that ends up double-booked is flagged in Bookings.')}
+          </div>
+        </div>
+
+        <p style="font-size:12.5px;color:#1A2B22;font-weight:750;line-height:1.5;margin:0 0 16px;text-align:center;">You'll always know before your guest does.</p>
+
+        <button id="bookingProtectionNext" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:850;cursor:pointer;box-shadow:0 8px 20px rgba(46,125,91,0.22);">Continue</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+  if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
+
+  document.getElementById('bookingProtectionNext').onclick = () => {
+    overlay.remove();
+    document.body.style.overflow = '';
+    showTestDriveModal(bookingUrl);
   };
 }
 
@@ -819,6 +885,8 @@ function showTestDriveModal(bookingUrl) {
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Booking page accepts reservations</span></div>
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Card verification helps reduce no-shows</span></div>
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Front Desk shows new bookings</span></div>
+            <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Review bookings before they lock in</span></div>
+            <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Double-booked rooms flagged for you</span></div>
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">No OTA commission</span></div>
           </div>
         </div>
@@ -1793,6 +1861,7 @@ export {
   resolveLiveTourElement,
   resolveTourHighlightEl,
   scrollTourTargetIntoView,
+  showBookingProtectionModal,
   showFinaleMockModal,
   showTestDriveModal,
   startSettingsTour,

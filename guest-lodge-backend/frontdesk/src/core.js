@@ -1200,6 +1200,7 @@ function applyBookingsSubview() {
     if (!crm.guestMessages.length) loadMessages(); else renderMessages();
     renderBookings(crm.bookings);
   }
+  renderBookingsNotices();
 }
 
 async function loadGrowthData() {
@@ -1214,6 +1215,7 @@ async function loadGrowthData() {
     if (approval && approval.success) crm.bookingApproval = approval.data || null;
     renderBookingsSubtabs();
     if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'growth') renderGrowthPanel();
+    else renderBookingsNotices();
   } catch (e) { /* non-fatal */ }
 }
 
@@ -1372,6 +1374,7 @@ async function toggleBookingApproval() {
       crm.bookingApproval = { ...a, enabled: next };
       toast(next ? `Booking review on — ${a.windowMinutes || 20} minutes to decide.` : 'Booking review off.', 'success');
       renderGrowthPanel();
+      renderBookingsNotices();
     }
   } catch (e) {
     toast((e && e.message) || 'Could not save — try again', 'error');
@@ -3744,7 +3747,7 @@ async function loadBookingConflicts() {
   } catch (_) {
     crm.bookingConflicts = [];
   }
-  renderConflictBanner();
+  renderBookingsNotices();
 }
 
 function conflictDateLabel(iso) {
@@ -3796,21 +3799,68 @@ function conflictBannerHtml() {
     </div>`;
 }
 
-function renderConflictBanner() {
-  const existing = document.getElementById('conflictBanner');
-  const html = conflictBannerHtml();
-  if (existing) {
-    if (html) existing.outerHTML = html;
-    else existing.remove();
+// Booking review is the feature owners buy this for, but with it switched off
+// there is nothing on screen to hint it exists — the Get found subtab is too far
+// out of the way for that. So it gets prompted where bookings actually land, and
+// the prompt disappears the moment it's turned on.
+const REVIEW_PROMPT_SNOOZE_KEY = 'bookingReviewPromptSnoozedUntil';
+
+function bookingReviewPromptHtml() {
+  const a = crm.bookingApproval;
+  if (!a || !a.supported || !a.pushConfigured || a.enabled) return '';
+
+  const snoozedUntil = Number(localStorage.getItem(REVIEW_PROMPT_SNOOZE_KEY) || 0);
+  if (snoozedUntil && Date.now() < snoozedUntil) return '';
+
+  const reachable = (a.devices || 0) > 0;
+  const mins = a.windowMinutes || 20;
+  const missed = a.missedReviews || 0;
+
+  const body = reachable
+    ? `Bookings confirm the moment they arrive. Turn on review and each one waits ${mins} minutes for your OK first — so a room you've already given away never gets sold twice.`
+    : `No device can receive booking alerts yet, so every booking confirms itself instantly.${missed > 0 ? ` ${missed} booking${missed > 1 ? 's' : ''} in the last 30 days went through without your review.` : ''}`;
+
+  const action = reachable
+    ? `<button type="button" onclick="toggleBookingApproval()" style="flex:1;padding:11px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Turn on ${mins}-minute review</button>`
+    : `<button type="button" onclick="handleInstallFrontdesk()" style="flex:1;padding:11px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Install Front Desk</button>`;
+
+  return `<div id="bookingReviewPrompt" style="background:#F4F8F5;border:1.5px solid #D8E4DC;border-radius:14px;padding:15px;margin-bottom:14px;">
+      <div style="font-size:13.5px;font-weight:850;color:#1A2B22;margin-bottom:5px;">Review bookings before they lock in</div>
+      <div style="font-size:12px;color:#4B5D52;line-height:1.55;margin-bottom:12px;">${body}</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${action}
+        <button type="button" onclick="snoozeBookingReviewPrompt()" style="padding:11px 12px;border-radius:10px;border:none;background:none;color:#6B7D72;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Not now</button>
+      </div>
+    </div>`;
+}
+
+function snoozeBookingReviewPrompt() {
+  localStorage.setItem(REVIEW_PROMPT_SNOOZE_KEY, String(Date.now() + 7 * 86400000));
+  renderBookingsNotices();
+}
+
+// Single host above the bookings list so the conflict banner and the review
+// prompt can't fight over insertion order.
+function renderBookingsNotices() {
+  const list = document.getElementById('bookingsList');
+  if (!list || !list.parentNode) return;
+
+  let host = document.getElementById('bookingsNotices');
+  const suppressed = crm.currentFilter !== 'bookings'
+    || crm.bookingsSubview === 'growth'
+    || crm.settingsTourActive;
+  const html = suppressed ? '' : conflictBannerHtml() + bookingReviewPromptHtml();
+
+  if (!html) {
+    if (host) host.remove();
     return;
   }
-  if (!html) return;
-  const list = document.getElementById('bookingsList');
-  if (list && list.parentNode) {
-    const wrap = document.createElement('div');
-    wrap.innerHTML = html;
-    list.parentNode.insertBefore(wrap.firstElementChild, list);
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'bookingsNotices';
+    list.parentNode.insertBefore(host, list);
   }
+  host.innerHTML = html;
 }
 
 function promptCancelBooking(bookingId, guestName) {
@@ -4225,13 +4275,15 @@ exposeToWindow({
   bookingsByRoomDate,
   bookingsFrontdeskNudgeHtml,
   bootCrmApp,
+  bookingReviewPromptHtml,
   conflictBannerHtml,
   loadBookingConflicts,
   maybeShowBookingApprovalCard,
   pendingApprovalPillHtml,
   promptCancelBooking,
-  renderConflictBanner,
+  renderBookingsNotices,
   reportFrontdeskInstalled,
+  snoozeBookingReviewPrompt,
   showBookingApprovalModal,
   submitBookingApproval,
   toggleBookingApproval,
