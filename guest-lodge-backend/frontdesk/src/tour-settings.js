@@ -793,74 +793,8 @@ function showFinaleMockModal() {
       localStorage.removeItem('settingsTourStep');
       toast('Booking link copied!', 'success');
       finishTourHydration();
-      showBookingProtectionModal(url);
+      showTestDriveModal(url);
     });
-  };
-}
-
-// Sits between the finale and the price. Overselling is the thing owners have
-// actually been burned by, but it's invisible in a product demo — nothing to
-// point at until it goes wrong — so it gets shown deliberately before we ask
-// for money rather than left to be discovered later.
-function showBookingProtectionModal(bookingUrl) {
-  ensureTourPolishStyles();
-  const overlay = document.createElement('div');
-  overlay.id = 'bookingProtectionOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(17,24,39,0.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:24px 16px;';
-
-  const row = (text) => `<div style="display:flex;align-items:flex-start;gap:10px;">
-      <span style="color:#2E7D5B;font-weight:850;flex-shrink:0;line-height:1.45;">✓</span>
-      <span style="font-size:13px;color:#1A2B22;line-height:1.45;">${text}</span>
-    </div>`;
-
-  overlay.innerHTML = `
-    <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;max-height:calc(100dvh - 40px);overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:tourPanelIn 0.22s ease-out;">
-      <div style="padding:24px 22px 22px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <div style="width:42px;height:42px;border-radius:14px;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="shield-check" style="width:22px;height:22px;"></i></div>
-          <div>
-            <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:3px;">Included</div>
-            <div style="font-size:20px;font-weight:850;color:#1A2B22;line-height:1.18;">Every booking waits for your OK.</div>
-          </div>
-        </div>
-
-        <p style="font-size:13px;color:#4B5D52;line-height:1.55;margin:0 0 16px;">Someone walks in and takes your last room. Ten minutes later that room books online. Normally you find out when the guest arrives — here your phone asks you first.</p>
-
-        <div style="background:#1A2B22;border-radius:15px;padding:14px 15px;margin-bottom:16px;box-shadow:0 10px 26px rgba(26,43,34,0.22);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
-            <div style="width:20px;height:20px;border-radius:6px;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:850;flex-shrink:0;">M</div>
-            <span style="font-size:10px;font-weight:800;letter-spacing:.05em;color:rgba(255,255,255,0.55);">FRONT DESK · now</span>
-          </div>
-          <div style="font-size:13.5px;font-weight:800;color:#fff;line-height:1.3;margin-bottom:2px;">New booking — Studio 1</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.68);line-height:1.4;">John Smith · tonight · 1 night · $110</div>
-          <div style="display:flex;gap:7px;margin-top:11px;">
-            <div style="flex:1;text-align:center;padding:8px 6px;border-radius:9px;background:rgba(255,255,255,0.14);font-size:12px;font-weight:800;color:#fff;">Confirm</div>
-            <div style="flex:1;text-align:center;padding:8px 6px;border-radius:9px;background:rgba(255,255,255,0.14);font-size:12px;font-weight:800;color:#fff;">Release</div>
-          </div>
-        </div>
-
-        <div style="background:#F4F8F5;border-radius:14px;padding:14px;border:1.5px solid #D8E4DC;text-align:left;margin-bottom:14px;">
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            ${row('<strong>Release it</strong> and the room goes straight back on sale — the guest is emailed and their card hold is voided for you.')}
-            ${row('<strong>Ignore it</strong> and the booking confirms itself. You only step in when something has changed.')}
-            ${row('<strong>Already confirmed?</strong> You can still cancel, and any room that ends up double-booked is flagged in Bookings.')}
-          </div>
-        </div>
-
-        <p style="font-size:12.5px;color:#1A2B22;font-weight:750;line-height:1.5;margin:0 0 16px;text-align:center;">You'll always know before your guest does.</p>
-
-        <button id="bookingProtectionNext" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:850;cursor:pointer;box-shadow:0 8px 20px rgba(46,125,91,0.22);">Continue</button>
-      </div>
-    </div>`;
-
-  document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
-  if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
-
-  document.getElementById('bookingProtectionNext').onclick = () => {
-    overlay.remove();
-    document.body.style.overflow = '';
-    showTestDriveModal(bookingUrl);
   };
 }
 
@@ -885,8 +819,6 @@ function showTestDriveModal(bookingUrl) {
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Booking page accepts reservations</span></div>
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Card verification helps reduce no-shows</span></div>
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Front Desk shows new bookings</span></div>
-            <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Review bookings before they lock in</span></div>
-            <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Double-booked rooms flagged for you</span></div>
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">No OTA commission</span></div>
           </div>
         </div>
@@ -1768,85 +1700,185 @@ function startSettingsTour() {
     ensureTourPolishStyles();
     ensureTourBlurOverlay({ blockPointer: true, lockScroll: true, dim: TOUR_MODAL_DIM });
 
-    const modal = document.createElement('div');
-    modal.id = 'tourTooltip';
-    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
-    modal.innerHTML = `
-      <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:tourPanelIn 0.22s ease-out;">
-        <div style="padding:20px 18px 0;">
-          <div style="text-align:center;margin-bottom:16px;">
-            <div style="font-size:15px;font-weight:700;color:#1a1a2e;">When a guest books, it looks like this</div>
-          </div>
+    let modalPage = 0;
+    let hasRenderedPage = false;
+    const pages = [
+      `
+        <div style="padding:20px 18px 0;text-align:center;">
+          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Bookings</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">When a guest books, it appears here</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 14px;">The room is held immediately while Front Desk gives you time to review it.</p>
         </div>
-        <!-- Mock booking card -->
         <div style="padding:0 14px 14px;">
-          <div style="background:white;border:2px solid #D8E4DC;border-radius:16px;overflow:hidden;">
-            <div style="height:5px;background:#2E7D5B;"></div>
-            <div style="padding:16px;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+          <div style="background:white;border:2px solid #D8E4DC;border-radius:16px;overflow:hidden;box-shadow:0 8px 22px rgba(26,43,34,0.07);">
+            <div style="height:5px;background:#F59E0B;"></div>
+            <div style="padding:15px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
                 <div>
-                  <div style="font-size:16px;font-weight:700;color:#1a1a2e;">Sarah Johnson</div>
-                  <div style="font-size:11px;color:#6b7280;margin-top:2px;">2 minutes ago</div>
+                  <div style="font-size:16px;font-weight:750;color:#1a1a2e;">Sarah Johnson</div>
+                  <div style="font-size:11px;color:#6b7280;margin-top:2px;">Just now</div>
                 </div>
-                <div style="font-size:18px;font-weight:700;color:#2E7D5B;">$284.00</div>
+                <div style="font-size:18px;font-weight:750;color:#2E7D5B;">$284.00</div>
               </div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
-                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">🛏 King Room</span>
-                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">🌙 3 nights</span>
-                <span style="background:#eff6ff;color:#1e40af;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">💳 Collect at check-in</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+                <span style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;font-size:11px;font-weight:750;padding:4px 9px;border-radius:20px;">⏳ Auto-confirms in 20 min</span>
+                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">🛏 King Room</span>
+                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">🌙 3 nights</span>
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px;background:#f8faf9;border-radius:10px;margin-bottom:14px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;padding:10px;background:#f8faf9;border-radius:10px;margin-bottom:12px;">
                 <div style="text-align:center;">
-                  <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;">Check-in</div>
-                  <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-top:2px;">Jun 15</div>
-                </div>
-                <div style="text-align:center;">
-                  <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;">Check-out</div>
-                  <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-top:2px;">Jun 18</div>
+                  <div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;">Check-in</div>
+                  <div style="font-size:12px;font-weight:750;color:#1a1a2e;margin-top:2px;">Jun 15</div>
                 </div>
                 <div style="text-align:center;">
-                  <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;">Guests</div>
-                  <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-top:2px;">2</div>
+                  <div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;">Check-out</div>
+                  <div style="font-size:12px;font-weight:750;color:#1a1a2e;margin-top:2px;">Jun 18</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;">Guests</div>
+                  <div style="font-size:12px;font-weight:750;color:#1a1a2e;margin-top:2px;">2</div>
                 </div>
               </div>
-              <div style="margin-bottom:14px;">
-                <div style="font-size:12px;color:#6b7280;">(555) 867-5309</div>
-                <div style="font-size:12px;color:#6b7280;">sarah.j@email.com</div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div style="padding:10px;border-radius:10px;background:#2E7D5B;color:white;font-size:13px;font-weight:700;text-align:center;">📞 Call Now</div>
-                <div style="padding:10px;border-radius:10px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:700;text-align:center;">📝 Add Note</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:10px 11px;">
+                <div style="font-size:11px;color:#9A3412;line-height:1.4;"><strong>Room held.</strong><br>Removed from future availability.</div>
+                <div style="font-size:18px;">🔒</div>
               </div>
             </div>
           </div>
+        </div>`,
+      `
+        <div style="padding:20px 18px 0;text-align:center;">
+          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Double-booking protection</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">Already sold the room somewhere else?</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Front Desk puts the decision on your phone before the booking locks in.</p>
         </div>
-        <div style="padding:0 18px 20px;text-align:center;">
-          <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Next — Availability \u2192</button>
-          <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(0,0,0,0.35);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
+        <div style="padding:0 14px 14px;">
+          <div style="width:238px;margin:0 auto 12px;background:#18231E;border-radius:26px;padding:10px;box-shadow:0 14px 30px rgba(26,43,34,0.22);">
+            <div style="background:#F7F9F8;border-radius:19px;padding:13px 13px 12px;text-align:left;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <div style="width:28px;height:28px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.09);">
+                  <img src="/marketellogo.svg" alt="" style="width:20px;height:20px;object-fit:contain;">
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:850;letter-spacing:.03em;color:#2E7D5B;">FRONT DESK</div>
+                  <div style="font-size:9px;color:#9CA3AF;">now</div>
+                </div>
+              </div>
+              <div style="font-size:13px;font-weight:800;color:#1A2B22;margin-bottom:3px;">New booking — confirm or release</div>
+              <div style="font-size:11px;color:#4B5D52;line-height:1.45;margin-bottom:11px;">Jun 15–18 · King Room<br>Sarah Johnson · auto-confirms in 20 min</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+                <div style="background:#2E7D5B;color:white;border-radius:9px;padding:9px 5px;text-align:center;font-size:11px;font-weight:800;">✓ Confirm</div>
+                <div style="background:#fff;color:#B91C1C;border:1.5px solid #FCA5A5;border-radius:9px;padding:8px 5px;text-align:center;font-size:11px;font-weight:800;">Room taken</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:10px;text-align:center;">
+              <div style="font-size:18px;margin-bottom:3px;">✓</div>
+              <div style="font-size:11px;font-weight:800;color:#166534;">Confirm</div>
+              <div style="font-size:10px;color:#4B5D52;line-height:1.35;margin-top:2px;">Guest is emailed</div>
+            </div>
+            <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:10px;text-align:center;">
+              <div style="font-size:18px;margin-bottom:3px;">↩</div>
+              <div style="font-size:11px;font-weight:800;color:#9A3412;">Room taken</div>
+              <div style="font-size:10px;color:#4B5D52;line-height:1.35;margin-top:2px;">Room freed · hold voided</div>
+            </div>
+          </div>
+          <p style="font-size:10px;color:#9CA3AF;line-height:1.4;text-align:center;margin:9px 8px 0;">Install Front Desk and enable alerts to review bookings from your phone.</p>
+        </div>`,
+      `
+        <div style="padding:20px 18px 0;text-align:center;">
+          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#B91C1C;margin-bottom:5px;">Backup safety net</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">And if something changes later…</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Front Desk checks your room-nights and surfaces a clash before it stays hidden.</p>
         </div>
-      </div>`;
-    document.body.appendChild(modal);
+        <div style="padding:0 14px 14px;">
+          <div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:14px;padding:13px;">
+            <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;">
+              <div style="font-size:20px;line-height:1;">⚠️</div>
+              <div>
+                <div style="font-size:13px;font-weight:850;color:#7F1D1D;">Double-booking detected</div>
+                <div style="font-size:10px;color:#991B1B;margin-top:2px;">King Room · Jun 15 · 2 bookings for 1 room</div>
+              </div>
+            </div>
+            <div style="background:white;border-radius:10px;padding:10px 11px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div>
+                <div style="font-size:12px;font-weight:800;color:#1A2B22;">Sarah Johnson</div>
+                <div style="font-size:10px;color:#6B7280;margin-top:2px;">Booked online · $284</div>
+              </div>
+              <div style="font-size:10px;font-weight:800;color:#2E7D5B;background:#F0FDF4;border-radius:999px;padding:4px 8px;">ONLINE</div>
+            </div>
+            <div style="background:white;border-radius:10px;padding:10px 11px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div>
+                <div style="font-size:12px;font-weight:800;color:#1A2B22;">Mike Davis</div>
+                <div style="font-size:10px;color:#6B7280;margin-top:2px;">Added at the desk · $110</div>
+              </div>
+              <div style="font-size:10px;font-weight:800;color:#92400E;background:#FEF3C7;border-radius:999px;padding:4px 8px;">FRONT DESK</div>
+            </div>
+            <div style="margin-top:10px;background:#B91C1C;color:#fff;border-radius:10px;padding:10px;text-align:center;font-size:11px;font-weight:800;">Resolve the online booking</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;color:#4B5D52;font-size:10px;line-height:1.35;text-align:center;">
+            <span style="color:#2E7D5B;font-weight:900;">✓</span>
+            <span>Cancel it, return the inventory, void the hold, and notify the guest.</span>
+          </div>
+        </div>`,
+    ];
 
-    // Add slide-up animation
+    const modal = document.createElement('div');
+    modal.id = 'tourTooltip';
+    modal.style.cssText = 'position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;';
+
+    const renderModalPage = () => {
+      const isLast = modalPage >= pages.length - 1;
+      const buttonLabel = modalPage === 0
+        ? 'Next — How you’re protected →'
+        : (modalPage === 1 ? 'Next — The backup safety net →' : 'Next — Availability →');
+      const panelAnim = hasRenderedPage ? 'none' : 'tourPanelIn 0.22s ease-out';
+      const pageAnim = hasRenderedPage ? 'tourPageIn 0.18s ease-out' : 'none';
+
+      modal.innerHTML = `
+        <div style="background:white;border:1.5px solid #D8E4DC;border-radius:18px;max-width:380px;width:100%;max-height:86vh;overflow-y:auto;box-shadow:0 24px 64px rgba(26,43,34,0.28);animation:${panelAnim};">
+          <div style="animation:${pageAnim};">${pages[modalPage]}</div>
+          <div style="padding:2px 18px 7px;text-align:center;">
+            <div style="display:flex;justify-content:center;gap:6px;">
+              ${pages.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === modalPage ? '#2E7D5B' : '#D8E4DC'};transition:background 0.2s ease;"></div>`).join('')}
+            </div>
+          </div>
+          <div style="padding:0 18px 20px;text-align:center;">
+            <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:750;cursor:pointer;">${buttonLabel}</button>
+            <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:rgba(0,0,0,0.35);font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
+          </div>
+        </div>`;
+      hasRenderedPage = true;
+
+      document.getElementById('tourNextBtn').onclick = () => {
+        if (!isLast) {
+          modalPage++;
+          renderModalPage();
+          return;
+        }
+        void transitionOutTourModal().then(() => {
+          cleanupTour({ keepOverlay: true });
+          step++;
+          localStorage.setItem('settingsTourStep', String(step));
+          showStep();
+        });
+      };
+
+      document.getElementById('tourSkipBtn').onclick = () => {
+        skipToFinale();
+      };
+    };
+
+    document.body.appendChild(modal);
+    renderModalPage();
+
     if (!document.getElementById('tourModalAnimStyle')) {
       const animStyle = document.createElement('style');
       animStyle.id = 'tourModalAnimStyle';
       animStyle.textContent = '@keyframes tourModalSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}';
       document.head.appendChild(animStyle);
     }
-
-    document.getElementById('tourNextBtn').onclick = () => {
-      void transitionOutTourModal().then(() => {
-        cleanupTour({ keepOverlay: true });
-        step++;
-        localStorage.setItem('settingsTourStep', String(step));
-        showStep();
-      });
-    };
-
-    document.getElementById('tourSkipBtn').onclick = () => {
-      skipToFinale();
-    };
   }
 
   showStep();
@@ -1861,7 +1893,6 @@ export {
   resolveLiveTourElement,
   resolveTourHighlightEl,
   scrollTourTargetIntoView,
-  showBookingProtectionModal,
   showFinaleMockModal,
   showTestDriveModal,
   startSettingsTour,

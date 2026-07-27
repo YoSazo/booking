@@ -174,6 +174,9 @@ function detectAppPlatform() {
 function ensureAppsViewRendered(force) {
   const el = document.getElementById('appsView');
   if (!el) return;
+  if (crm.bookingApproval === null && typeof window.loadBookingApprovalSettings === 'function') {
+    window.loadBookingApprovalSettings({ refreshApps: true });
+  }
   const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '');
   if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
     renderAppsView();
@@ -227,12 +230,27 @@ function renderAppsView() {
   const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
   const fdInstallLabel = fdOnNarrowScreen ? 'Install on this phone' : 'Install Front Desk';
+  const approval = crm.bookingApproval;
+  const canReviewBookings = !!(approval && approval.supported && approval.pushConfigured);
+  const approvalMinutes = (approval && approval.windowMinutes) || 20;
+  const approvalStatusLine = approval && approval.enabled
+    ? `${approvalMinutes} minutes to confirm or release`
+    : 'Bookings confirm immediately';
 
   let fdCtaHtml;
   if (fdInApp && fdGranted) {
+    const reviewControl = canReviewBookings
+      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #bbf7d0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-size:12px;font-weight:800;color:#166534;">Booking review: ${approval.enabled ? 'On' : 'Off'}</div>
+            <div style="font-size:11px;color:#4B5D52;margin-top:2px;">${approvalStatusLine}</div>
+          </div>
+          <button type="button" onclick="toggleBookingApproval()" style="flex-shrink:0;padding:8px 11px;border-radius:9px;border:1px solid ${approval.enabled ? '#86EFAC' : '#2E7D5B'};background:${approval.enabled ? '#fff' : '#2E7D5B'};color:${approval.enabled ? '#166534' : '#fff'};font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">${approval.enabled ? 'Turn off' : 'Turn on'}</button>
+        </div>`
+      : '';
     fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
       <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
-      <div><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">You'll get booking alerts when supported — even if this is closed.</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Booking alerts can reach this phone — even if Front Desk is closed.</div>${reviewControl}</div>
     </div>`;
   } else if (fdInApp) {
     fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">It's installed on this device. Turn on alerts so you know when a guest books.</p>
