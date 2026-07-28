@@ -988,7 +988,7 @@ function renderEditRoomsCards() {
       ${images.length > 1 ? `<div class="room-edit-thumbs">` + images.map((img, idx) => `<div class="room-edit-thumb-wrap"><button type="button" class="room-edit-thumb ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="showEditRoomPhoto('${roomIdJs}', ${idx})"><img src="${esc(img.url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"></button><button type="button" onclick="event.stopPropagation();deleteEditImage('${roomIdJs}','${jsStr(img.id)}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       </div>
       <div class="room-edit-fields" style="padding:18px;">
-        <div style="margin-bottom:12px;">
+        <div data-tour-room-details-anchor="1" style="margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Room Name</div>
           <input type="text" value="${r.name}" id="edit-name-${r.id}" style="width:100%;font-size:18px;font-weight:700;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;">
         </div>

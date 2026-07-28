@@ -1,5 +1,9 @@
-require('dotenv').config();
 const path = require('path');
+require('dotenv').config();
+require('dotenv').config({
+    path: path.join(__dirname, '.env.local'),
+    override: true,
+});
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -339,15 +343,77 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 
 const app = express();
 
+const LOCAL_API_PROXY_URL = String(process.env.LOCAL_API_PROXY_URL || '').replace(/\/$/, '');
+
+function proxyLocalApiRequest(req, res, next) {
+    if (!LOCAL_API_PROXY_URL || !req.originalUrl.startsWith('/api/')) return next();
+
+    let target;
+    try {
+        target = new URL(req.originalUrl, `${LOCAL_API_PROXY_URL}/`);
+    } catch (_) {
+        return res.status(500).json({ success: false, message: 'Invalid local API proxy configuration.' });
+    }
+
+    const transport = target.protocol === 'https:' ? https : http;
+    const headers = { ...req.headers, host: target.host };
+    const proxyRequest = transport.request(target, {
+        method: req.method,
+        headers,
+    }, (proxyResponse) => {
+        res.status(proxyResponse.statusCode || 502);
+        Object.entries(proxyResponse.headers).forEach(([key, value]) => {
+            if (value !== undefined) res.setHeader(key, value);
+        });
+        proxyResponse.pipe(res);
+    });
+
+    proxyRequest.on('error', (error) => {
+        if (!res.headersSent) {
+            res.status(502).json({ success: false, message: `Local API proxy failed: ${error.message}` });
+        } else {
+            res.destroy(error);
+        }
+    });
+    req.pipe(proxyRequest);
+}
+
+app.use(proxyLocalApiRequest);
+
 function getPrismaDatasourceUrl() {
     const base = process.env.DATABASE_URL || '';
     if (!base) return base;
     const isLocalDb = /localhost|127\.0\.0\.1/i.test(base);
     const connectionLimit = process.env.PRISMA_CONNECTION_LIMIT || (isLocalDb ? '10' : '1');
     const poolTimeout = process.env.PRISMA_POOL_TIMEOUT || '20';
-    const parts = [`connection_limit=${connectionLimit}`, `pool_timeout=${poolTimeout}`];
-    if (!isLocalDb && connectionLimit === '1') parts.unshift('pgbouncer=true');
-    return base + (base.includes('?') ? '&' : '?') + parts.join('&');
+    const connectTimeout = process.env.PRISMA_CONNECT_TIMEOUT || '15';
+
+    try {
+        const url = new URL(base);
+        if (!url.searchParams.has('connection_limit')) {
+            url.searchParams.set('connection_limit', connectionLimit);
+        }
+        if (!url.searchParams.has('pool_timeout')) {
+            url.searchParams.set('pool_timeout', poolTimeout);
+        }
+        if (!isLocalDb && !url.searchParams.has('connect_timeout')) {
+            // Neon may need a few seconds to wake an idle compute. Prisma's
+            // default timeout can expire first and surface a misleading P1001.
+            url.searchParams.set('connect_timeout', connectTimeout);
+        }
+        if (!isLocalDb && connectionLimit === '1' && !url.searchParams.has('pgbouncer')) {
+            url.searchParams.set('pgbouncer', 'true');
+        }
+        return url.toString();
+    } catch (_) {
+        const parts = [
+            `connection_limit=${connectionLimit}`,
+            `pool_timeout=${poolTimeout}`,
+            `connect_timeout=${connectTimeout}`,
+        ];
+        if (!isLocalDb && connectionLimit === '1') parts.unshift('pgbouncer=true');
+        return base + (base.includes('?') ? '&' : '?') + parts.join('&');
+    }
 }
 
 const prisma = new PrismaClient({
@@ -636,6 +702,19 @@ const HOTEL_DOMAIN_CACHE_TTL_MS = 30 * 1000;
 const hotelConfigCache = new Map();
 const hotelDomainCache = new Map();
 
+function isPrismaConnectionError(error) {
+    const message = String(error?.message || error || '');
+    return error?.code === 'P1001'
+        || message.includes('Can\'t reach database server')
+        || message.includes('Engine is not yet connected')
+        || message.includes('Timed out fetching a new connection from the connection pool');
+}
+
+function isStaticOnlyHotelId(hotelId) {
+    const key = String(hotelId || '').trim();
+    return !!hotelConfig[key] && process.env.PREFER_DB_HOTEL_CONFIG !== 'true';
+}
+
 function normalizeHotelConfig(input = {}) {
     const normalized = {
         ...input,
@@ -655,14 +734,17 @@ async function getDbHotelConfig(hotelId) {
     if (!prisma.hotelConfig) return null;
     const key = String(hotelId || '').trim();
     if (!key) return null;
+    if (isStaticOnlyHotelId(key)) return null;
 
     const cached = hotelConfigCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-    let row = await withRetry(() => prisma.hotelConfig.findUnique({
-        where: { id: key },
-        include: { domains: true },
-    }));
+    let row = null;
+    try {
+        row = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: key },
+            include: { domains: true },
+        }));
 
     // Fallback: resolve by domain if direct ID lookup fails
     // e.g. "john-s-inn" → look up "john-s-inn.mktel.co" in HotelDomain
@@ -678,6 +760,18 @@ async function getDbHotelConfig(hotelId) {
                 include: { domains: true },
             }));
         }
+    }
+
+    } catch (error) {
+        if (!isPrismaConnectionError(error)) throw error;
+        console.warn(`DB unavailable while loading hotel config for ${key}; falling back to static config if present.`);
+        if (!hotelConfig[key]) {
+            const unavailable = new Error('Hotel database is temporarily unavailable. Please retry in a moment.');
+            unavailable.code = 'DATABASE_UNAVAILABLE';
+            unavailable.status = 503;
+            throw unavailable;
+        }
+        return null;
     }
 
     const config = row
@@ -3851,16 +3945,26 @@ function getRequestContextDomain(req, { preferQueryDomain = true } = {}) {
 async function getHotelOverrideStatus(hotelId) {
     const cleanHotelId = String(hotelId || '').trim();
     if (!cleanHotelId) return { status: 'invalid' };
+    if (isStaticOnlyHotelId(cleanHotelId)) {
+        return { status: 'ok', hotelId: cleanHotelId, source: 'static' };
+    }
 
+    let databaseUnavailable = false;
     if (prisma.hotelConfig) {
-        const row = await withRetry(() => prisma.hotelConfig.findUnique({
-            where: { id: cleanHotelId },
-            select: { id: true, active: true },
-        }));
-        if (row) {
-            return row.active
-                ? { status: 'ok', hotelId: cleanHotelId, source: 'db' }
-                : { status: 'inactive', hotelId: cleanHotelId, source: 'db' };
+        try {
+            const row = await withRetry(() => prisma.hotelConfig.findUnique({
+                where: { id: cleanHotelId },
+                select: { id: true, active: true },
+            }));
+            if (row) {
+                return row.active
+                    ? { status: 'ok', hotelId: cleanHotelId, source: 'db' }
+                    : { status: 'inactive', hotelId: cleanHotelId, source: 'db' };
+            }
+        } catch (error) {
+            if (!isPrismaConnectionError(error)) throw error;
+            databaseUnavailable = true;
+            console.warn(`DB unavailable while checking hotel override ${cleanHotelId}; falling back to static config if present.`);
         }
     }
 
@@ -3868,7 +3972,9 @@ async function getHotelOverrideStatus(hotelId) {
         getStaticHotelConfig(cleanHotelId);
         return { status: 'ok', hotelId: cleanHotelId, source: 'static' };
     } catch (err) {
-        return { status: 'invalid' };
+        return databaseUnavailable
+            ? { status: 'unavailable', hotelId: cleanHotelId, source: 'db' }
+            : { status: 'invalid' };
     }
 }
 
@@ -3926,6 +4032,15 @@ async function resolveHotelContextRequest(req) {
                 ok: false,
                 status: 403,
                 message: `Hotel override is inactive: ${explicitHotelId}`,
+                domain: requestedDomain,
+                hotelId: explicitHotelId,
+            };
+        }
+        if (override.status === 'unavailable') {
+            return {
+                ok: false,
+                status: 503,
+                message: 'Hotel database is temporarily unavailable. Please retry in a moment.',
                 domain: requestedDomain,
                 hotelId: explicitHotelId,
             };
@@ -4039,7 +4154,8 @@ app.get('/api/hotel-context', async (req, res) => {
         const hotelId = context.hotelId;
 
         const config = await resolveHotelConfig(hotelId);
-        const manualRooms = (config.pms === 'manual' && prisma.manualRoom)
+        const shouldUseStaticConfigOnly = config.source === 'static' && process.env.PREFER_DB_HOTEL_CONFIG !== 'true';
+        const manualRooms = (!shouldUseStaticConfigOnly && config.pms === 'manual' && prisma.manualRoom)
             ? await withRetry(() => prisma.manualRoom.findMany({
                 where: { hotelId },
                 orderBy: { name: 'asc' },
@@ -4057,7 +4173,7 @@ app.get('/api/hotel-context', async (req, res) => {
             },
         });
     } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
+        res.status(e.status || 500).json({ success: false, message: e.message });
     }
 });
 
@@ -4407,6 +4523,9 @@ app.get('/api/crm/blocked-demand', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, periodDays: 30, total: 0, today: 0, recent: [] });
+        }
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const sinceToday = new Date(); sinceToday.setHours(0, 0, 0, 0);
         const [total, today, recent] = await Promise.all([
@@ -4525,6 +4644,21 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({
+                success: true,
+                data: {
+                    enabled: false,
+                    windowMinutes: resolveApprovalWindowMinutes(null),
+                    supported: true,
+                    pushConfigured: !!VAPID_PRIVATE,
+                    devices: 0,
+                    installedAt: null,
+                    missedReviews: 0,
+                    pendingNow: 0,
+                },
+            });
+        }
 
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const [hotel, devices, missedReviews, pendingNow] = await Promise.all([
@@ -7371,8 +7505,17 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Missing authorized hotel context.' });
         }
         const config = await resolveHotelConfig(hotelId);
-        const dbHotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true, theme: true, appIconUrl: true, subscribed: true } });
-        const primaryDomain = await prisma.hotelDomain.findFirst({ where: { hotelId, isPrimary: true }, select: { domain: true } });
+        const shouldUseStaticConfigOnly = config.source === 'static' && process.env.PREFER_DB_HOTEL_CONFIG !== 'true';
+        const dbHotel = shouldUseStaticConfigOnly ? null : await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true, theme: true, appIconUrl: true, subscribed: true } })
+            .catch(error => {
+                if (!isPrismaConnectionError(error)) throw error;
+                return null;
+            });
+        const primaryDomain = shouldUseStaticConfigOnly ? null : await prisma.hotelDomain.findFirst({ where: { hotelId, isPrimary: true }, select: { domain: true } })
+            .catch(error => {
+                if (!isPrismaConnectionError(error)) throw error;
+                return null;
+            });
         res.json({
             success: true,
             hotelId,
@@ -7925,6 +8068,9 @@ app.get('/api/crm/manual-availability', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, data: { rooms: [], availability: {} } });
+        }
         const rooms = await getManualRooms(hotelId);
         const payload = formatManualAvailabilityPayload(rooms);
         res.json({ success: true, data: payload });
@@ -8129,6 +8275,9 @@ app.get('/api/crm/rooms', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, rooms: [], rates: null });
+        }
         const rooms = await withRetry(() => prisma.room.findMany({
             where: { hotelId },
             include: { images: { orderBy: { sortOrder: 'asc' } } },
@@ -8323,6 +8472,9 @@ app.get('/api/crm/bookings', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, data: [] });
+        }
         const bookings = await withRetry(() => prisma.booking.findMany({
             select: CRM_BOOKING_LIST_SELECT,
             orderBy: { checkinDate: 'asc' },
@@ -8531,6 +8683,9 @@ app.get('/api/crm/messages/unread-count', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, unread: 0 });
+        }
         const unread = await withRetry(() => prisma.guestMessage.count({
             where: {
                 hotelId,
@@ -8551,6 +8706,9 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, messages: [], unread: 0 });
+        }
         const rows = await withRetry(() => prisma.guestMessage.findMany({
             where: { hotelId, createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) } },
             orderBy: { createdAt: 'desc' },

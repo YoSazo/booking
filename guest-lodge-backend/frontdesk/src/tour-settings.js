@@ -1,4 +1,5 @@
 import { crm } from './state.js';
+import { createAdaptiveTourLayout, createTourSpotlightClone } from './tour-layout.js';
 
 function windowFn(name) {
   return typeof window !== 'undefined' && typeof window[name] === 'function'
@@ -32,6 +33,8 @@ function goLive(...args) {
 
 // ── SETTINGS TOUR GUIDE ────────────────────────────────────────
 let _settingsTourKeyHandler = null;
+let _settingsTourLayout = null;
+let _settingsTourSpotlight = null;
 
 function ensureTourPolishStyles() {
   if (document.getElementById('frontdeskTourPolishStyle')) return;
@@ -143,26 +146,50 @@ function ensureTourPolishStyles() {
       font-weight: 850;
       box-shadow: 0 8px 20px rgba(46,125,91,0.22);
     }
-    @media (min-width: 768px) {
-      #tourTooltip.tour-tooltip-floating {
-        left: var(--tour-left);
-        top: var(--tour-top);
-        width: var(--tour-width);
-        right: auto;
-        bottom: auto;
-        justify-content: flex-start;
-      }
-      #tourTooltip.tour-tooltip-floating .tour-panel {
-        max-width: none;
-      }
-    }
     @media (max-width: 420px) {
+      .tour-panel {
+        border-radius: 16px;
+        padding: 13px;
+      }
+      .tour-title {
+        font-size: 16px;
+      }
+      .tour-copy {
+        font-size: 12.5px;
+        line-height: 1.42;
+      }
       .tour-actions {
         flex-wrap: wrap;
       }
       .tour-btn-primary {
         flex: 1 0 100%;
         margin-left: 0;
+      }
+    }
+    @media (max-height: 680px) {
+      .tour-panel {
+        max-height: calc(100dvh - 20px);
+        padding: 12px;
+        border-radius: 16px;
+      }
+      .tour-progress-row {
+        margin-bottom: 8px;
+      }
+      .tour-title {
+        font-size: 16px;
+        margin-bottom: 5px;
+      }
+      .tour-copy {
+        font-size: 12.5px;
+        line-height: 1.38;
+        margin-bottom: 10px;
+      }
+      .tour-btn {
+        min-height: 38px;
+        padding: 8px 11px;
+      }
+      .tour-btn-primary {
+        padding: 9px 16px;
       }
     }
     @keyframes tourPanelOut {
@@ -266,76 +293,34 @@ function transitionOutTourModal() {
   return new Promise((resolve) => setTimeout(resolve, 150));
 }
 
-function stripTourCloneIds(root) {
-  root.removeAttribute('id');
-  root.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-}
-
-function syncTourCloneFormValues(source, clone) {
-  const sourceFields = source.querySelectorAll('input, textarea, select');
-  const cloneFields = clone.querySelectorAll('input, textarea, select');
-  sourceFields.forEach((field, idx) => {
-    const cloneField = cloneFields[idx];
-    if (!cloneField) return;
-    if (field.type === 'checkbox' || field.type === 'radio') {
-      cloneField.checked = field.checked;
-    } else {
-      cloneField.value = field.value;
-    }
-  });
-}
-
-function copyTourCloneComputedStyles(source, clone) {
-  const computed = getComputedStyle(source);
-  for (const property of computed) {
-    clone.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
-  }
-  const sourceChildren = source.children;
-  const cloneChildren = clone.children;
-  for (let i = 0; i < sourceChildren.length; i += 1) {
-    if (cloneChildren[i]) copyTourCloneComputedStyles(sourceChildren[i], cloneChildren[i]);
-  }
-}
-
 function createSettingsTourSpotlightClone(source, stepDef) {
-  if (!source || !source.isConnected) return null;
-  document.querySelectorAll('[data-tour-spotlight-clone]').forEach((el) => el.remove());
-  const rect = source.getBoundingClientRect();
-  if (rect.width < 2 || rect.height < 2) return null;
-
-  const clone = source.cloneNode(true);
-  stripTourCloneIds(clone);
-  copyTourCloneComputedStyles(source, clone);
-  syncTourCloneFormValues(source, clone);
-  clone.setAttribute('data-tour-spotlight-clone', '1');
-  clone.setAttribute('aria-hidden', 'true');
-  clone.style.position = 'fixed';
-  clone.style.left = `${rect.left}px`;
-  clone.style.top = `${rect.top}px`;
-  clone.style.width = `${rect.width}px`;
-  clone.style.height = `${rect.height}px`;
-  clone.style.margin = '0';
-  clone.style.maxWidth = 'none';
-  clone.style.zIndex = '99999';
-  clone.style.pointerEvents = 'none';
-  clone.style.transform = 'none';
-  clone.style.boxShadow = stepDef?.spotlightBoxShadow ?? '0 18px 46px rgba(26,43,34,0.24)';
-  clone.style.outline = stepDef?.spotlightOutline ?? '1px solid rgba(255,255,255,0.82)';
-  clone.style.outlineOffset = stepDef?.spotlightOutlineOffset ?? '2px';
-  if (stepDef?.spotlightBackground) {
-    clone.style.background = stepDef.spotlightBackground;
-    clone.style.backgroundColor = stepDef.spotlightBackground;
-  }
-  if (stepDef?.spotlightBorderRadius) {
-    clone.style.borderRadius = stepDef.spotlightBorderRadius;
-  }
-  document.body.appendChild(clone);
-  return clone;
+  _settingsTourSpotlight?.destroy();
+  _settingsTourSpotlight = createTourSpotlightClone(source, {
+    attribute: 'data-tour-spotlight-clone',
+    zIndex: 99999,
+    prepareClone(clone) {
+      clone.style.boxShadow = stepDef?.spotlightBoxShadow ?? '0 18px 46px rgba(26,43,34,0.24)';
+      clone.style.outline = stepDef?.spotlightOutline ?? '1px solid rgba(255,255,255,0.82)';
+      clone.style.outlineOffset = stepDef?.spotlightOutlineOffset ?? '2px';
+      if (stepDef?.spotlightBackground) {
+        clone.style.background = stepDef.spotlightBackground;
+        clone.style.backgroundColor = stepDef.spotlightBackground;
+      }
+      if (stepDef?.spotlightBorderRadius) {
+        clone.style.borderRadius = stepDef.spotlightBorderRadius;
+      }
+    },
+  });
+  return _settingsTourSpotlight?.element || null;
 }
 
 function cleanupSettingsTourUi(options) {
   const opts = options || {};
   clearSettingsTourKeyboard();
+  _settingsTourLayout?.destroy();
+  _settingsTourLayout = null;
+  _settingsTourSpotlight?.destroy();
+  _settingsTourSpotlight = null;
   const prev = document.getElementById('tourTooltip');
   if (prev) prev.remove();
   const prevOverlay = document.getElementById('tourBlurOverlay');
@@ -513,70 +498,15 @@ function tourAnchorRect(stepDef, highlightEl) {
   return tourElementRect(highlightEl, true);
 }
 
-function tourScrollParent(el) {
-  let node = el && el.parentElement;
-  while (node && node !== document.body && node !== document.documentElement) {
-    const style = getComputedStyle(node);
-    const overflowY = style.overflowY || style.overflow;
-    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 1) {
-      return node;
-    }
-    node = node.parentElement;
+function tourTooltipAnchorRect(stepDef, highlightEl) {
+  const selector = stepDef.tooltipAnchorSelector
+    || stepDef.anchorSelector;
+  const anchor = queryTourSelector(selector);
+  if (anchor) {
+    const r = tourElementRect(anchor, true);
+    if (r) return r;
   }
-  return null;
-}
-
-function scrollTourBy(el, delta) {
-  if (!delta) return;
-  const scroller = tourScrollParent(el);
-  if (scroller) {
-    scroller.scrollTop += delta;
-    return;
-  }
-  window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
-}
-
-function tourPlacementForStep(stepDef, isNarrow) {
-  return (isNarrow && stepDef.mobileTooltipPosition) || stepDef.tooltipPosition || 'below';
-}
-
-function fitTourTargetAndTooltip(el, stepDef, tooltip, placement) {
-  if (!el || !el.isConnected || !tooltip) return tourAnchorRect(stepDef, el);
-  const panel = tooltip.querySelector('.tour-panel');
-  const tipHeight = Math.min(
-    (panel && panel.offsetHeight) || tooltip.offsetHeight || 190,
-    Math.max(140, window.innerHeight - 28)
-  );
-  const gap = stepDef.tooltipGap ?? 8;
-  const topLimit = stepDef.fitPadTop ?? stepDef.scrollPadTop ?? 72;
-  const bottomLimit = window.innerHeight - (stepDef.fitPadBottom ?? 14);
-
-  const measure = () => tourAnchorRect(stepDef, el) || tourElementRect(el, true);
-  let rect = measure();
-  if (!rect) return null;
-
-  for (let i = 0; i < 3; i += 1) {
-    const availableHeight = Math.max(120, bottomLimit - topLimit);
-    const canFitPair = rect.height + gap + tipHeight <= availableHeight;
-    let delta = 0;
-
-    if (placement === 'above') {
-      const topOverflow = rect.top - gap - tipHeight - topLimit;
-      if (topOverflow < 0) delta = topOverflow;
-      if (canFitPair && rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
-    } else {
-      const bottomOverflow = rect.bottom + gap + tipHeight - bottomLimit;
-      if (bottomOverflow > 0) delta = bottomOverflow;
-      if (canFitPair && rect.top < topLimit) delta = rect.top - topLimit;
-    }
-
-    if (Math.abs(delta) < 1) break;
-    scrollTourBy(el, delta);
-    rect = measure();
-    if (!rect) return null;
-  }
-
-  return rect;
+  return tourAnchorRect(stepDef, highlightEl);
 }
 
 function forceTourPageTop(behavior) {
@@ -598,57 +528,13 @@ function scrollTourTargetIntoView(el, stepDef, options) {
   const target = (scrollSel ? queryTourSelector(scrollSel) : null) || el;
   if (!target && !stepDef.scrollToTop) return Promise.resolve();
 
-  const block = stepDef.scrollBlock || 'center';
+  const block = stepDef.scrollBlock || 'nearest';
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let behavior = opts.smooth && !prefersReducedMotion
+  const behavior = opts.smooth && !prefersReducedMotion
     ? 'smooth'
     : ((crm.settingsTourActive || prefersReducedMotion) ? 'auto' : 'smooth');
 
   return new Promise((resolve) => {
-    const shouldUseQuickPlacement = () => {
-      if (!opts.smooth || !target || stepDef.forceSmoothScroll) return false;
-      const measure = queryTourSelector(stepDef.anchorSelector)
-        || (target && target.isConnected ? target : null)
-        || (el && el.isConnected ? el : null);
-      if (!measure) return true;
-      const rect = measure.getBoundingClientRect();
-      const padTop = stepDef.scrollPadTop ?? 80;
-      const padBottom = stepDef.scrollPadBottom ?? 220;
-      const topOverflow = Math.max(0, padTop - rect.top);
-      const bottomOverflow = Math.max(0, rect.bottom - (window.innerHeight - padBottom));
-      return Math.max(topOverflow, bottomOverflow) <= (stepDef.quickScrollThreshold ?? 180);
-    };
-
-    if (shouldUseQuickPlacement()) {
-      behavior = 'auto';
-    }
-
-    const applyPadding = () => {
-      const padTop = stepDef.scrollPadTop ?? 80;
-      const padBottom = stepDef.scrollPadBottom ?? 220;
-      const measure = queryTourSelector(stepDef.anchorSelector)
-        || (target && target.isConnected ? target : null)
-        || (el && el.isConnected ? el : null);
-      if (!measure) {
-        resolve();
-        return;
-      }
-      let rect = measure.getBoundingClientRect();
-      if (rect.top < padTop) {
-        scrollTourBy(measure, rect.top - padTop);
-        rect = measure.getBoundingClientRect();
-      }
-      if (rect.bottom > window.innerHeight - padBottom) {
-        scrollTourBy(measure, rect.bottom - window.innerHeight + padBottom);
-      }
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
-    };
-
-    const scrollTargetIntoPlace = () => {
-      if (target) target.scrollIntoView({ behavior: stepDef.scrollToTop ? 'auto' : behavior, block, inline: 'nearest' });
-      applyPadding();
-    };
-
     if (stepDef.scrollToTop) {
       forceTourPageTop(behavior);
       if (stepDef.scrollToTopOnly) {
@@ -658,22 +544,6 @@ function scrollTourTargetIntoView(el, stepDef, options) {
         }));
         return;
       }
-      if (behavior === 'auto') {
-        scrollTargetIntoPlace();
-        return;
-      }
-      let settled = false;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        window.removeEventListener('scrollend', onScrollEnd);
-        clearTimeout(fallbackTimer);
-        scrollTargetIntoPlace();
-      };
-      const onScrollEnd = () => finish();
-      if ('onscrollend' in window) window.addEventListener('scrollend', onScrollEnd, { once: true });
-      const fallbackTimer = setTimeout(finish, 520);
-      return;
     }
 
     if (!target) {
@@ -682,9 +552,8 @@ function scrollTourTargetIntoView(el, stepDef, options) {
     }
 
     target.scrollIntoView({ behavior, block, inline: 'nearest' });
-
     if (behavior === 'auto') {
-      applyPadding();
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
       return;
     }
 
@@ -694,11 +563,11 @@ function scrollTourTargetIntoView(el, stepDef, options) {
       settled = true;
       window.removeEventListener('scrollend', onScrollEnd);
       clearTimeout(fallbackTimer);
-      applyPadding();
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
     };
     const onScrollEnd = () => finish();
     if ('onscrollend' in window) window.addEventListener('scrollend', onScrollEnd, { once: true });
-    const fallbackTimer = setTimeout(finish, 620);
+    const fallbackTimer = setTimeout(finish, 520);
   });
 }
 
@@ -909,8 +778,6 @@ function startSettingsTour() {
       openAccordion: false,
       tab: 'settings',
       scrollBlock: 'nearest',
-      scrollPadTop: 80,
-      scrollPadBottom: 360,
       tooltipPosition: 'below',
       tooltipGap: 22
     },
@@ -923,30 +790,26 @@ function startSettingsTour() {
       text: 'Use real room photos. A clear first photo makes the page feel legitimate and helps guests decide faster.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'center',
-      scrollPadTop: 80,
-      scrollPadBottom: 220
+      scrollBlock: 'center'
     },
     {
       target: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       highlightSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
-      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
+      anchorSelector: '#editRoomsCards [data-tour-room-card="1"] [data-tour-room-details-anchor="1"]',
+      tooltipAnchorSelector: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       scrollTarget: '#editRoomsCards [data-tour-room-card="1"] .room-edit-fields',
       title: 'Edit room details',
       text: 'Room name, description, guest count, amenities, and units all show on the booking page. Keep this short and accurate.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'center',
-      scrollPadTop: 80,
-      scrollPadBottom: 220,
-      tooltipPosition: 'below',
-      tooltipGap: 8,
+      scrollBlock: 'start',
+      tooltipPosition: 'auto',
+      tooltipGap: 10,
       spotlightBackground: '#fff',
-      spotlightBorderRadius: '0 0 20px 20px',
+      spotlightBorderRadius: '12px',
       spotlightBoxShadow: 'none',
       spotlightOutline: 'none',
-      spotlightOutlineOffset: '0',
-      fitPadTop: 108
+      spotlightOutlineOffset: '0'
     },
     {
       target: '#tour-booking-link-card',
@@ -957,9 +820,7 @@ function startSettingsTour() {
       text: 'This is the link to send guests, add to your website, and place on Google Business Profile. QR tools live here too.',
       openAccordion: false,
       tab: 'settings',
-      scrollBlock: 'start',
-      scrollPadTop: 80,
-      scrollPadBottom: 220
+      scrollBlock: 'start'
     },
     {
       target: '#tour-rates-card',
@@ -972,7 +833,6 @@ function startSettingsTour() {
       accordionCard: '#tour-rates-card',
       tab: 'settings',
       scrollBlock: 'center',
-      scrollPadBottom: 220,
       tooltipPosition: 'below',
       tooltipGap: 8
     },
@@ -997,9 +857,7 @@ function startSettingsTour() {
       openAccordion: false,
       tab: 'revenue',
       waitForVisible: true,
-      scrollBlock: 'start',
-      scrollPadTop: 92,
-      scrollPadBottom: 220
+      scrollBlock: 'start'
     },
     {
       target: '',
@@ -1310,9 +1168,8 @@ function startSettingsTour() {
           highlightEl.style.opacity = '0';
         }
         highlightEl.setAttribute('data-tour-highlighted', '1');
-        createSettingsTourSpotlightClone(highlightEl, s);
       }
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = '';
 
       const placeTooltip = () => {
         const anchor = queryTourSelector(s.anchorSelector);
@@ -1325,7 +1182,7 @@ function startSettingsTour() {
         const liveEl = resolveLiveTourElement(highlightEl, s);
         let tipEl = liveEl ? resolveTourHighlightEl(liveEl, s) : highlightEl;
         openTourAccordion(tipEl, s);
-        const rect = s.tooltipAnchor ? null : tourAnchorRect(s, tipEl);
+        const rect = s.tooltipAnchor ? null : tourTooltipAnchorRect(s, tipEl);
         positionTooltip(tipEl || highlightEl, s, rect, { fadeIn: !!opts.keepCurrentUi });
       };
 
@@ -1344,7 +1201,7 @@ function startSettingsTour() {
           const liveEl = resolveLiveTourElement(highlightEl, s);
           let tipEl = liveEl ? resolveTourHighlightEl(liveEl, s) : highlightEl;
           openTourAccordion(tipEl, s);
-          const rect = tourAnchorRect(s, tipEl);
+          const rect = tourTooltipAnchorRect(s, tipEl);
           if (!rect && attempt < 4) {
             requestAnimationFrame(() => positionAfterLayout(attempt + 1));
             return;
@@ -1391,33 +1248,24 @@ function startSettingsTour() {
       </div>`;
     document.body.appendChild(tooltip);
 
-    const isNarrow = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
-    const preferredPosition = tourPlacementForStep(s, isNarrow);
-    let finalRect = measuredRect;
-    if (measuredRect && measuredRect.width >= 2 && measuredRect.height >= 2) {
-      finalRect = fitTourTargetAndTooltip(el, s, tooltip, preferredPosition) || measuredRect;
-      if (!s.noHighlight) createSettingsTourSpotlightClone(el, s);
-      const width = Math.min(380, window.innerWidth - 28);
-      tooltip.style.setProperty('--tour-width', `${width}px`);
-      tooltip.style.left = '0';
-      tooltip.style.right = 'auto';
-      tooltip.style.bottom = 'auto';
-      tooltip.style.width = `${width}px`;
-      tooltip.style.justifyContent = 'flex-start';
-      tooltip.classList.add('tour-tooltip-floating');
-      const panel = tooltip.querySelector('.tour-panel');
-      const height = Math.min((panel && panel.offsetHeight) || tooltip.offsetHeight || 190, Math.max(140, window.innerHeight - 28));
-      const gap = s.tooltipGap ?? 8;
-      const centerX = finalRect.left + finalRect.width / 2;
-      const left = Math.max(14, Math.min(centerX - width / 2, window.innerWidth - width - 14));
-      const placeBelow = preferredPosition !== 'above';
-      const rawTop = placeBelow ? finalRect.bottom + gap : finalRect.top - height - gap;
-      const top = Math.max(14, Math.min(rawTop, window.innerHeight - height - 14));
-      tooltip.style.setProperty('--tour-left', `${left}px`);
-      tooltip.style.setProperty('--tour-top', `${top}px`);
-      tooltip.style.left = `${left}px`;
-      tooltip.style.top = `${top}px`;
-    }
+    const panel = tooltip.querySelector('.tour-panel');
+    const tooltipAnchor = queryTourSelector(s.tooltipAnchorSelector || s.anchorSelector) || el;
+    if (!s.noHighlight) createSettingsTourSpotlightClone(el, s);
+    _settingsTourLayout?.destroy();
+    _settingsTourLayout = createAdaptiveTourLayout({
+      tooltip,
+      panel,
+      target: el,
+      anchor: tooltipAnchor,
+      spotlight: _settingsTourSpotlight,
+      options: {
+        preferredPlacement: s.tooltipPosition || 'auto',
+        maxWidth: 380,
+        gap: s.tooltipGap ?? 10,
+        autoScroll: s.autoScroll !== false,
+        avoidBottomSelectors: ['.mobile-bottom-nav', '#previewSiteBar'],
+      },
+    });
 
     tooltip.style.visibility = 'visible';
     if (opts.fadeIn) fadeInSettingsTourStepUi(tooltip);

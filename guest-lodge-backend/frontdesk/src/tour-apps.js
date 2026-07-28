@@ -1,4 +1,5 @@
 import { crm } from './state.js';
+import { createAdaptiveTourLayout, createTourSpotlightClone } from './tour-layout.js';
 
 function windowFn(name) {
   return typeof window !== 'undefined' && typeof window[name] === 'function'
@@ -36,6 +37,8 @@ let _appsTourIdx = 0;
 let _appsTourChainFromSettings = false;
 let _appsTourKeyHandler = null;
 let _appsTourTooltipTimer = null;
+let _appsTourLayout = null;
+let _appsTourSpotlight = null;
 
 function ensureAppsTourStyles() {
   if (document.getElementById('frontdeskAppsTourStyle')) return;
@@ -217,81 +220,36 @@ function installAppsTourKeyboard(actions) {
   document.addEventListener('keydown', _appsTourKeyHandler);
 }
 
-function stripAppsTourCloneIds(root) {
-  root.removeAttribute('id');
-  root.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-}
-
-function syncAppsTourCloneFormValues(source, clone) {
-  const sourceFields = source.querySelectorAll('input, textarea, select');
-  const cloneFields = clone.querySelectorAll('input, textarea, select');
-  sourceFields.forEach((field, idx) => {
-    const cloneField = cloneFields[idx];
-    if (!cloneField) return;
-    if (field.type === 'checkbox' || field.type === 'radio') {
-      cloneField.checked = field.checked;
-    } else {
-      cloneField.value = field.value;
-    }
-  });
-}
-
-function copyAppsTourCloneComputedStyles(source, clone) {
-  const computed = getComputedStyle(source);
-  for (const property of computed) {
-    clone.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
-  }
-  const sourceChildren = source.children;
-  const cloneChildren = clone.children;
-  for (let i = 0; i < sourceChildren.length; i += 1) {
-    if (cloneChildren[i]) copyAppsTourCloneComputedStyles(sourceChildren[i], cloneChildren[i]);
-  }
-}
-
 function createAppsTourSpotlightClone(source, stepDef) {
-  if (!source || !source.isConnected) return null;
-  if (stepDef?.noHighlight) return null;
-  document.querySelectorAll('[data-apps-tour-spotlight-clone]').forEach((el) => el.remove());
-  const rect = source.getBoundingClientRect();
-  if (rect.width < 2 || rect.height < 2) return null;
-
-  const clone = source.cloneNode(true);
-  stripAppsTourCloneIds(clone);
-  copyAppsTourCloneComputedStyles(source, clone);
-  syncAppsTourCloneFormValues(source, clone);
+  if (!source || !source.isConnected || stepDef?.noHighlight) return null;
   if (!source.dataset.appsTourOrigVisibility) source.dataset.appsTourOrigVisibility = source.style.visibility || '';
-  source.style.visibility = 'hidden';
-  clone.setAttribute('data-apps-tour-spotlight-clone', '1');
-  clone.setAttribute('aria-hidden', 'true');
-  clone.style.position = 'fixed';
-  clone.style.left = `${rect.left}px`;
-  clone.style.top = `${rect.top}px`;
-  clone.style.width = `${rect.width}px`;
-  clone.style.height = `${rect.height}px`;
-  clone.style.margin = '0';
-  clone.style.maxWidth = 'none';
-  clone.style.zIndex = '100002';
-  clone.style.pointerEvents = 'none';
-  clone.style.transform = 'none';
-  // Focus is the content itself over the dim overlay — no square ring/outline.
-  clone.style.boxShadow = stepDef?.spotlightBoxShadow ?? 'none';
-  clone.style.outline = stepDef?.spotlightOutline ?? 'none';
-  clone.style.outlineOffset = stepDef?.spotlightOutlineOffset ?? '0';
-  // Story-line steps use a top border as a section separator; hide it in the
-  // spotlight so it doesn't read as a floating weird line.
-  if (source.classList.contains('apps-story-line') || stepDef?.hideSpotlightBorder) {
-    clone.style.border = 'none';
-    clone.style.borderTop = 'none';
-    clone.style.borderTopWidth = '0';
-    clone.style.paddingTop = '0';
-  }
-  document.body.appendChild(clone);
-  return clone;
+  _appsTourSpotlight?.destroy();
+  _appsTourSpotlight = createTourSpotlightClone(source, {
+    attribute: 'data-apps-tour-spotlight-clone',
+    zIndex: 100002,
+    hideSource: true,
+    prepareClone(clone) {
+      clone.style.boxShadow = stepDef?.spotlightBoxShadow ?? 'none';
+      clone.style.outline = stepDef?.spotlightOutline ?? 'none';
+      clone.style.outlineOffset = stepDef?.spotlightOutlineOffset ?? '0';
+      if (source.classList.contains('apps-story-line') || stepDef?.hideSpotlightBorder) {
+        clone.style.border = 'none';
+        clone.style.borderTop = 'none';
+        clone.style.borderTopWidth = '0';
+        clone.style.paddingTop = '0';
+      }
+    },
+  });
+  return _appsTourSpotlight?.element || null;
 }
 
 function appsTourCleanupUi(options) {
   const opts = options || {};
   clearAppsTourKeyboard();
+  _appsTourLayout?.destroy();
+  _appsTourLayout = null;
+  _appsTourSpotlight?.destroy();
+  _appsTourSpotlight = null;
   if (_appsTourTooltipTimer) {
     clearTimeout(_appsTourTooltipTimer);
     _appsTourTooltipTimer = null;
@@ -327,70 +285,6 @@ function appsTourCleanupUi(options) {
     delete el.dataset.appsTourOrigTransition;
     delete el.dataset.appsTourOrigVisibility;
   });
-}
-
-function appsTourScrollParent(el) {
-  let node = el && el.parentElement;
-  while (node && node !== document.body && node !== document.documentElement) {
-    const style = getComputedStyle(node);
-    const overflowY = style.overflowY || style.overflow;
-    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 1) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
-}
-
-function appsTourScrollBy(el, delta) {
-  if (!delta) return;
-  const scroller = appsTourScrollParent(el);
-  if (scroller) {
-    scroller.scrollTop += delta;
-    return;
-  }
-  window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
-}
-
-function appsTourPlacementForStep(step, isNarrowViewport) {
-  return (isNarrowViewport && step.mobileTooltipPosition) || step.tooltipPosition || '';
-}
-
-function fitAppsTourTargetAndTooltip(target, step, tooltip, placement, isNarrowViewport) {
-  if (!target || !target.isConnected || !tooltip) return target?.getBoundingClientRect() || null;
-  const panel = tooltip.querySelector('.apps-tour-panel');
-  const tipHeight = Math.min(
-    (panel && panel.offsetHeight) || tooltip.offsetHeight || 190,
-    Math.max(130, window.innerHeight - 28)
-  );
-  const gap = step.tooltipGap ?? 8;
-  const topLimit = (isNarrowViewport ? step.mobileFitPadTop : step.fitPadTop) ?? 14;
-  const bottomLimit = window.innerHeight - ((isNarrowViewport ? step.mobileFitPadBottom : step.fitPadBottom) ?? 14);
-
-  let rect = target.getBoundingClientRect();
-  if (rect.width < 2 || rect.height < 2) return rect;
-
-  for (let i = 0; i < 3; i += 1) {
-    const availableHeight = Math.max(120, bottomLimit - topLimit);
-    const canFitPair = rect.height + gap + tipHeight <= availableHeight;
-    let delta = 0;
-
-    if (placement === 'above') {
-      const topOverflow = rect.top - gap - tipHeight - topLimit;
-      if (topOverflow < 0) delta = topOverflow;
-      if (canFitPair && rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
-    } else {
-      const bottomOverflow = rect.bottom + gap + tipHeight - bottomLimit;
-      if (bottomOverflow > 0) delta = bottomOverflow;
-      if (canFitPair && rect.top < topLimit) delta = rect.top - topLimit;
-    }
-
-    if (Math.abs(delta) < 1) break;
-    appsTourScrollBy(target, delta);
-    rect = target.getBoundingClientRect();
-  }
-
-  return rect;
 }
 
 function appsTourClose(markDone) {
@@ -510,25 +404,14 @@ function appsTourRender() {
   }
 
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const isNarrowViewport = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
-  const scrollBlock = (isNarrowViewport && step.mobileScrollBlock) || step.scrollBlock || 'center';
+  const scrollBlock = step.scrollBlock || 'nearest';
   const scrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
-  if (isNarrowViewport && step.mobileScrollToBottom) {
-    const scrollHeight = Math.max(
-      document.documentElement ? document.documentElement.scrollHeight : 0,
-      document.body ? document.body.scrollHeight : 0
-    );
-    window.scrollTo({ top: scrollHeight, behavior: scrollBehavior });
-    setTimeout(() => { window.scrollTo({ top: scrollHeight, behavior: 'auto' }); }, scrollBehavior === 'smooth' ? 520 : 0);
-  } else {
-    target.scrollIntoView({ behavior: scrollBehavior, block: scrollBlock });
-  }
+  target.scrollIntoView({ behavior: scrollBehavior, block: scrollBlock });
 
   const placeTooltip = () => {
     const old = document.getElementById('appsTourTooltip');
     if (old) old.remove();
-    const maxWidth = Math.min(isNarrowViewport ? window.innerWidth - 24 : 370, window.innerWidth - 28);
-    const preferredPosition = appsTourPlacementForStep(step, isNarrowViewport);
+    const maxWidth = Math.min(370, window.innerWidth - 28);
     const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
     const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
     const backDisabled = _appsTourIdx <= 0;
@@ -555,35 +438,23 @@ function appsTourRender() {
       </div>`;
     document.body.appendChild(tip);
 
-    if (isNarrowViewport && !preferredPosition) {
-      createAppsTourSpotlightClone(target, step);
-      tip.style.left = '12px';
-      tip.style.right = '12px';
-      tip.style.width = 'auto';
-      tip.style.maxWidth = 'none';
-      tip.style.top = 'auto';
-      tip.style.bottom = 'calc(14px + env(safe-area-inset-bottom,0px))';
-    } else {
-      const placement = preferredPosition || 'below';
-      const rect = fitAppsTourTargetAndTooltip(target, step, tip, placement, isNarrowViewport)
-        || target.getBoundingClientRect();
-      createAppsTourSpotlightClone(target, step);
-
-      const panel = tip.querySelector('.apps-tour-panel');
-      const tipHeight = Math.min((panel && panel.offsetHeight) || tip.offsetHeight || 190, Math.max(130, window.innerHeight - 28));
-      const gap = step.tooltipGap ?? 8;
-      const centerX = rect.left + rect.width / 2;
-      const left = Math.max(14, Math.min(centerX - maxWidth / 2, window.innerWidth - maxWidth - 14));
-      const placeBelow = placement !== 'above';
-      const rawTop = placeBelow ? rect.bottom + gap : rect.top - tipHeight - gap;
-      const top = Math.max(14, Math.min(rawTop, window.innerHeight - tipHeight - 14));
-      tip.style.left = `${left}px`;
-      tip.style.right = 'auto';
-      tip.style.bottom = 'auto';
-      tip.style.width = `${maxWidth}px`;
-      tip.style.maxWidth = `${maxWidth}px`;
-      tip.style.top = `${top}px`;
-    }
+    createAppsTourSpotlightClone(target, step);
+    const panel = tip.querySelector('.apps-tour-panel');
+    _appsTourLayout?.destroy();
+    _appsTourLayout = createAdaptiveTourLayout({
+      tooltip: tip,
+      panel,
+      target,
+      anchor: target,
+      spotlight: _appsTourSpotlight,
+      options: {
+        preferredPlacement: step.tooltipPosition || 'auto',
+        maxWidth,
+        gap: step.tooltipGap ?? 10,
+        autoScroll: true,
+        avoidBottomSelectors: ['.mobile-bottom-nav', '#previewSiteBar'],
+      },
+    });
     tip.style.visibility = 'visible';
 
     const nextAction = () => {
@@ -618,9 +489,7 @@ function appsTourRender() {
     if (backBtn) backBtn.onclick = backAction;
     installAppsTourKeyboard({ onNext: nextAction, onBack: backAction, onSkip: skipAction });
   };
-  const tooltipDelay = isNarrowViewport && step.mobileScrollToBottom
-    ? (prefersReducedMotion ? 80 : 680)
-    : (prefersReducedMotion ? 40 : 320);
+  const tooltipDelay = prefersReducedMotion ? 40 : 320;
   _appsTourTooltipTimer = setTimeout(() => {
     requestAnimationFrame(placeTooltip);
   }, tooltipDelay);
@@ -652,8 +521,6 @@ function startAppsTour(opts) {
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
-      mobileScrollBlock: 'center',
-      mobileTooltipPosition: 'below',
     },
     {
       target: '#tour-apps-then',
@@ -663,18 +530,15 @@ function startAppsTour(opts) {
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
-      mobileScrollBlock: 'center',
-      mobileTooltipPosition: 'below',
     },
     {
       target: '#tour-guest-icon-section',
       kicker: 'One setup item',
       title: 'Make the icon feel like your property.',
       text: 'A real logo or a clear photo. Guests see this square every time.',
-      mobileScrollToBottom: true,
-      mobileScrollBlock: 'end',
-      mobileTooltipAnchor: 'top',
-      mobileTooltipPosition: 'above',
+      scrollBlock: 'start',
+      tooltipPosition: 'auto',
+      tooltipGap: 10,
     },
     {
       target: '#tour-apps-loop',
@@ -686,10 +550,8 @@ function startAppsTour(opts) {
       primaryLabel: hotelIsLive ? 'Done' : 'Activate everything — $199/month',
       secondaryLabel: hotelIsLive ? 'Close' : 'Keep exploring',
       activateOnNext: !hotelIsLive,
-      mobileScrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
-      mobileTooltipPosition: 'below',
     },
   ];
 
