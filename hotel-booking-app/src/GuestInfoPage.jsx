@@ -1480,7 +1480,7 @@ const handlePayLaterBooking = async (e) => {
                   </h2>
                   
                   <p className="why-card-modal-sheet__subtitle">
-                    Enter your card details below to hold your room. We place a <strong>$1 verification hold — released immediately</strong> — <strong>to prevent fake bookings</strong> and secure your reservation.
+                    Enter your card details below to hold your room. We place a <strong>temporary $1 verification hold</strong> — <strong>to prevent fake bookings</strong> and secure your reservation. It is released if the booking is cancelled or when the front desk closes out the hold.
                   </p>
 
                   <div className="why-card-modal-sheet__checks">
@@ -2229,7 +2229,7 @@ const handlePayLaterBooking = async (e) => {
                   <ShieldCheck size={22} style={{ color: '#2E7D5B', flexShrink: 0, marginTop: '1px' }} />
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a2e', marginBottom: '2px' }}>$0 charged today</div>
-                    <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>$1 verification only — released instantly</div>
+                    <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>$1 temporary authorization hold</div>
                     <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>You pay <strong>${bookingDetails.total.toFixed(2)}</strong> at check-in</div>
                   </div>
                 </div>

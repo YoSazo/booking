@@ -841,7 +841,7 @@ function startSettingsTour() {
       text: '',
       openAccordion: false,
       tab: 'bookings',
-      customModal: true
+      customModal: 'bookings'
     },
     {
       target: '#availabilityCalendarWrap',
@@ -959,8 +959,7 @@ function startSettingsTour() {
       showHomescreenMockModal();
       return;
     }
-    // Custom modal for bookings tab — show a mock booking card example
-    if (s.customModal === true || s.customModal === 'bookings') {
+    if (s.customModal === 'bookings') {
       if (opts.keepCurrentUi) cleanupTour({ keepOverlay: true });
       showBookingsMockModal();
       return;
@@ -1554,11 +1553,11 @@ function startSettingsTour() {
       `
           <div style="padding:20px 18px 0;text-align:center;">
             <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Bookings</div>
-          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">A guest books. We hold the room.</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 14px;">No one else can book it online while you decide.</p>
+            <div style="font-size:17px;font-weight:800;color:#1a1a2e;">A guest books. You see everything.</div>
+            <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 14px;">The guest is confirmed immediately. The booking stays marked until you verify the room.</p>
         </div>
         <div style="padding:0 14px 14px;">
-          <div style="background:white;border:2px solid #D8E4DC;border-radius:16px;overflow:hidden;box-shadow:0 8px 22px rgba(26,43,34,0.07);">
+          <div style="background:white;border:1px solid #D8E4DC;border-radius:16px;overflow:hidden;box-shadow:0 8px 22px rgba(26,43,34,0.07);">
             <div style="height:5px;background:#F59E0B;"></div>
             <div style="padding:15px;">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
@@ -1569,7 +1568,7 @@ function startSettingsTour() {
                 <div style="font-size:18px;font-weight:750;color:#2E7D5B;">$284.00</div>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-                <span style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;font-size:11px;font-weight:750;padding:4px 9px;border-radius:20px;">⏳ Auto-confirms in 20 min</span>
+                  <span style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;font-size:11px;font-weight:750;padding:4px 9px;border-radius:20px;">● Needs verification</span>
                 <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">🛏 King Room</span>
                 <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">🌙 3 nights</span>
               </div>
@@ -1588,76 +1587,51 @@ function startSettingsTour() {
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:10px 11px;">
-                <div style="font-size:11px;color:#9A3412;line-height:1.4;"><strong>Room held.</strong><br>No one else can book it online.</div>
-                <div style="font-size:18px;">🔒</div>
+                  <div style="font-size:11px;color:#9A3412;line-height:1.4;"><strong>Already confirmed.</strong><br>Check your other calendars, then verify.</div>
+                  <div style="font-size:18px;">✓</div>
               </div>
             </div>
           </div>
         </div>`,
       `
         <div style="padding:20px 18px 0;text-align:center;">
-          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Double-booking protection</div>
-          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">Why put Front Desk on your phone?</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Bookings can arrive while you’re away. A phone notification gives you time to confirm the room is still free.</p>
+          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Booking alerts</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">See the important details immediately.</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 15px;">The notification shows the room, stay, guest, and amount. Tap it to open the confirmed booking.</p>
         </div>
         <div style="padding:0 14px 14px;">
-          <div style="width:238px;margin:0 auto 12px;background:#18231E;border-radius:26px;padding:10px;box-shadow:0 14px 30px rgba(26,43,34,0.22);">
-            <div style="background:#F7F9F8;border-radius:19px;padding:13px 13px 12px;text-align:left;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                <div style="width:28px;height:28px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.09);">
-                  <img src="/marketellogo.svg" alt="" style="width:20px;height:20px;object-fit:contain;">
+          <div style="max-width:318px;margin:0 auto 14px;padding:60px 10px 16px;border-radius:31px;background:linear-gradient(155deg,#B5C8C0 0%,#DCE5E1 48%,#AFC2BA 100%);box-shadow:0 12px 28px rgba(26,43,34,.15);">
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;background:rgba(247,247,249,.94);border:.5px solid rgba(255,255,255,.78);border-radius:19px;padding:11px 13px 12px;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.11);backdrop-filter:blur(18px);">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+                <div style="width:23px;height:23px;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                  <img src="/marketellogo.svg" alt="" style="width:18px;height:18px;object-fit:contain;">
                 </div>
-                <div>
-                  <div style="font-size:10px;font-weight:850;letter-spacing:.03em;color:#2E7D5B;">FRONT DESK</div>
-                  <div style="font-size:9px;color:#9CA3AF;">now</div>
-                </div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:.02em;color:#737477;">FRONT DESK</div>
+                <div style="margin-left:auto;font-size:10px;color:#8E8E93;">now</div>
               </div>
-              <div style="font-size:13px;font-weight:800;color:#1A2B22;margin-bottom:3px;">New booking — confirm or release</div>
-              <div style="font-size:11px;color:#4B5D52;line-height:1.45;margin-bottom:11px;">Jun 15–18 · King Room<br>Sarah Johnson · auto-confirms in 20 min</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                <div style="background:#2E7D5B;color:white;border-radius:9px;padding:9px 5px;text-align:center;font-size:11px;font-weight:800;">✓ Confirm</div>
-                <div style="background:#fff;color:#B91C1C;border:1.5px solid #FCA5A5;border-radius:9px;padding:8px 5px;text-align:center;font-size:11px;font-weight:800;">Room taken</div>
-              </div>
+              <div style="font-size:13px;font-weight:650;color:#111114;line-height:1.25;margin-bottom:2px;">New confirmed booking</div>
+              <div style="font-size:12px;color:#2C2C2E;line-height:1.38;">King Room · Jun 15–18<br>Sarah Johnson · $284 due at check-in</div>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:10px;text-align:center;">
-              <div style="font-size:18px;margin-bottom:3px;">✓</div>
-              <div style="font-size:11px;font-weight:800;color:#166534;">Confirm</div>
-              <div style="font-size:10px;color:#4B5D52;line-height:1.35;margin-top:2px;">Guest is emailed</div>
-            </div>
-            <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:10px;text-align:center;">
-              <div style="font-size:18px;margin-bottom:3px;">↩</div>
-              <div style="font-size:11px;font-weight:800;color:#9A3412;">Room taken</div>
-              <div style="font-size:10px;color:#4B5D52;line-height:1.35;margin-top:2px;">Room freed · hold voided</div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:11px;padding:9px;text-align:center;">
-              <div style="font-size:9px;font-weight:850;color:#991B1B;text-transform:uppercase;margin-bottom:3px;">Without alerts</div>
-              <div style="font-size:10px;color:#4B5D52;line-height:1.35;">The booking confirms automatically</div>
-            </div>
-            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:9px;text-align:center;">
-              <div style="font-size:9px;font-weight:850;color:#166534;text-transform:uppercase;margin-bottom:3px;">With alerts</div>
-              <div style="font-size:10px;color:#4B5D52;line-height:1.35;">You can confirm or tap Room taken</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:9px;background:#E8F5EE;border:1.5px solid #A7D9BE;border-radius:12px;padding:11px 12px;margin-top:10px;text-align:left;">
-            <div style="font-size:19px;line-height:1;">📲</div>
-            <div>
-              <div style="font-size:11px;font-weight:850;color:#166534;margin-bottom:2px;">No App Store needed</div>
-              <div style="font-size:10px;color:#4B5D52;line-height:1.45;">It takes 3 quick steps to put Front Desk on your phone. We’ll show you exactly how under <strong>Guest App</strong> later in this tour.</div>
-            </div>
+          <div style="display:flex;align-items:center;gap:9px;padding:11px 12px;background:#F8FAF9;border:1px solid #E1E9E4;border-radius:12px;text-align:left;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;">→</div>
+            <div style="font-size:11px;color:#4B5D52;line-height:1.45;"><strong style="color:#1A2B22;">Tap to review.</strong> The booking opens with the full details and your next action.</div>
           </div>
         </div>`,
       `
         <div style="padding:20px 18px 0;text-align:center;">
-          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#B91C1C;margin-bottom:5px;">Plans changed?</div>
-          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">What if a walk-in takes the room later?</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Open the online booking and tap <strong>Cancel this booking</strong>.</p>
+          <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Stay ahead of conflicts</div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a2e;">Remind, review, then correct availability.</div>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Choose how often to be reminded until you check. If a walk-in or another channel already took the room, cancel this booking and update Availability.</p>
         </div>
         <div style="padding:0 14px 14px;">
-          <div style="background:#fff;border:1.5px solid #D8E4DC;border-radius:14px;padding:13px;box-shadow:0 8px 22px rgba(26,43,34,0.07);">
+          <div style="background:#F8FAF9;border:1px solid #E1E9E4;border-radius:13px;padding:11px 12px;margin-bottom:9px;">
+            <div style="font-size:9px;color:#6B7280;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">If I have not reviewed it</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #D8E4DC;border-radius:9px;padding:9px 10px;font-size:11px;font-weight:750;color:#1A2B22;">
+              <span>Remind every 15 minutes · up to 3 times</span><span style="color:#9CA3AF;">▾</span>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #D8E4DC;border-radius:14px;padding:13px;box-shadow:0 6px 18px rgba(26,43,34,0.06);">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:9px;margin-bottom:10px;">
               <div>
                 <div style="font-size:14px;font-weight:850;color:#1A2B22;">Sarah Johnson</div>
@@ -1671,16 +1645,27 @@ function startSettingsTour() {
                 <span>The room was already taken</span><span style="color:#9CA3AF;">▾</span>
               </div>
             </div>
-            <div style="background:#B91C1C;color:#fff;border-radius:10px;padding:10px;text-align:center;font-size:11px;font-weight:800;">Cancel the booking</div>
+            <div style="background:#B91C1C;color:#fff;border-radius:10px;padding:10px;text-align:center;font-size:11px;font-weight:800;">Room changed? Cancel this booking</div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:10px;text-align:center;">
-              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">✓</div>
-              <div style="font-size:10px;font-weight:800;color:#166534;">Guest is emailed</div>
+          <div style="background:#F8FAF9;border:1px solid #E1E9E4;border-radius:13px;padding:11px;margin-top:9px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-size:10px;font-weight:850;color:#1A2B22;">Then update Availability</div><div style="font-size:9px;color:#2E7D5B;font-weight:800;">Jun 15–17</div></div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;">
+              ${['13','14','15','16','17','18','19'].map((day, i) => `<div style="aspect-ratio:1;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;${i >= 2 && i <= 4 ? 'background:#FEE2E2;color:#B91C1C;border:1px solid #FCA5A5;text-decoration:line-through;' : 'background:#fff;color:#7B8C82;border:1px solid #E5ECE8;'}">${day}</div>`).join('')}
             </div>
-            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:10px;text-align:center;">
-              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">$1</div>
-              <div style="font-size:10px;font-weight:800;color:#166534;">Card hold released</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #D8E4DC;border-radius:9px;padding:8px 9px;font-size:10px;font-weight:750;color:#1A2B22;"><span>0 rooms available</span><span style="color:#9CA3AF;">▾</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px;">
+            <div style="background:#F0FDF4;border:1px solid #D7EBDD;border-radius:11px;padding:10px;text-align:center;">
+              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">✓</div>
+              <div style="font-size:10px;font-weight:800;color:#166534;">You checked it</div>
+            </div>
+            <div style="background:#F0FDF4;border:1px solid #D7EBDD;border-radius:11px;padding:10px;text-align:center;">
+              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">↩</div>
+              <div style="font-size:10px;font-weight:800;color:#166534;">Cancel if needed</div>
+            </div>
+            <div style="background:#F0FDF4;border:1px solid #D7EBDD;border-radius:11px;padding:10px;text-align:center;">
+              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">▦</div>
+              <div style="font-size:10px;font-weight:800;color:#166534;">Dates stop selling</div>
             </div>
           </div>
         </div>`,
@@ -1694,7 +1679,7 @@ function startSettingsTour() {
       const isLast = modalPage >= pages.length - 1;
       const buttonLabel = modalPage === 0
         ? 'Next — Phone alerts →'
-        : (modalPage === 1 ? 'Next — If plans change →' : 'Next — Availability →');
+        : (modalPage === 1 ? 'Next — Avoid conflicts →' : 'Next — Availability →');
       const panelAnim = hasRenderedPage ? 'none' : 'tourPanelIn 0.22s ease-out';
       const pageAnim = hasRenderedPage ? 'tourPageIn 0.18s ease-out' : 'none';
 

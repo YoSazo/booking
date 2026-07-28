@@ -1,6 +1,6 @@
 import { crm } from './state.js';
 
-import { ensureLucideLoaded, isDeadBooking, isPendingApproval, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
+import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 
 let settingsModulePromise = null;
 let appsModulePromise = null;
@@ -56,7 +56,6 @@ function replayWalkthrough() {
 // ── PWA INSTALL / NOTIFICATIONS STATE ──────────────────────────
 // Captured as early as possible so the "Install Front Desk" button can fire the
 // browser's native install prompt on Android/desktop.
-let guestPushSubscriberCount = 0;
 const GUEST_BROADCAST_DEMO_VIDEO = 'https://res.cloudinary.com/dkmr3h5jb/video/upload/f_mp4,q_auto/v1781196304/ScreenRecording_06-11-2026_19-41-56_1_kjgudg.mp4';
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -1210,22 +1209,10 @@ async function loadGrowthData() {
     ]);
     if (funnel && funnel.success) crm.growthFunnel = funnel;
     if (checklist && checklist.success) crm.growthChecklist = checklist.checklist || {};
-    await loadBookingApprovalSettings();
     renderBookingsSubtabs();
     if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'growth') renderGrowthPanel();
     else renderBookingsNotices();
   } catch (e) { /* non-fatal */ }
-}
-
-async function loadBookingApprovalSettings(options = {}) {
-  try {
-    const approval = await api('GET', '/api/crm/booking-approval');
-    if (approval && approval.success) crm.bookingApproval = approval.data || null;
-  } catch (_) {
-    return null;
-  }
-  if (options.refreshApps) refreshAppsInstallSection();
-  return crm.bookingApproval;
 }
 
 function setGrowthPeriod(p) {
@@ -1324,23 +1311,6 @@ function renderGrowthPanel() {
     </div>`;
 
   el.innerHTML = `<div class="growth-wrap">${funnelCard}${checklistCard}</div>`;
-}
-
-async function toggleBookingApproval() {
-  const a = crm.bookingApproval;
-  if (!a) return;
-  const next = !a.enabled;
-  try {
-    const res = await api('POST', '/api/crm/booking-approval', { enabled: next });
-    if (res && res.success) {
-      crm.bookingApproval = { ...a, enabled: next };
-      toast(next ? `Booking review on — ${a.windowMinutes || 20} minutes to decide.` : 'Booking review off.', 'success');
-      renderBookingsNotices();
-      refreshAppsInstallSection();
-    }
-  } catch (e) {
-    toast((e && e.message) || 'Could not save — try again', 'error');
-  }
 }
 
 // Server-side install signal, mirroring the guest install funnel. Lets the growth
@@ -1685,6 +1655,7 @@ async function bootCrmApp() {
 
   // Runs before the auth gate on purpose: the approval token proves itself, so a
   // notification tap can be answered without stopping to enter a PIN.
+  maybeShowBookingReviewCard().catch(() => {});
   maybeShowBookingApprovalCard().catch(() => {});
 
   try {
@@ -2100,6 +2071,12 @@ function bookingCardHtml(b) {
   const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
   const noteBtnClass = crm.currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
   const guestLabel = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'this guest';
+  const reviewStatus = String(b.ownerReviewStatus || '').toLowerCase();
+  const reviewChip = reviewStatus === 'unreviewed'
+    ? '<div class="meta-chip" style="background:#FFF7ED;color:#9A3412;border-color:#FED7AA;">● Verify room</div>'
+    : (reviewStatus === 'available'
+      ? '<div class="meta-chip" style="background:#F0FDF4;color:#166534;border-color:#BBF7D0;">✓ Room verified</div>'
+      : '');
   const payChip = isDeclined
     ? '<div class="declined-chip">⚠️ Card declined</div>'
     : `<div class="pay-chip" title="Guest&apos;s card was verified only (small hold may apply). Collect $${Number(b.grandTotal).toFixed(2)} at check-in — nothing charged online.">💳 Collect at check-in</div>`;
@@ -2117,7 +2094,7 @@ function bookingCardHtml(b) {
         <div class="card-meta">
           <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
           <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
-          ${pendingApprovalPillHtml(b)}
+          ${reviewChip}
           ${payChip}
         </div>
         <div class="card-dates">
@@ -2149,7 +2126,9 @@ function bookingCardHtml(b) {
         </div>
         ` : ''}
         <div class="card-footer">
-          ${phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`}
+          ${reviewStatus === 'unreviewed'
+            ? `<button class="btn btn-confirm" type="button" onclick="openBookingReviewFromCard('${b.id}')">Verify room</button>`
+            : (phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`)}
           <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
         </div>
         ${isDeclined ? '' : `<div style="margin-top:8px;text-align:right;">
@@ -2563,7 +2542,7 @@ window.refreshRatesInputs = refreshRatesInputs;
 function applyGuestBroadcastAudienceUi() {
   const audience = document.getElementById('guest-broadcast-audience');
   const btn = document.getElementById('guest-broadcast-btn');
-  const count = guestPushSubscriberCount || 0;
+  const count = crm.guestPushSubscriberCount || 0;
   if (audience) {
     audience.textContent = count === 0
       ? 'No guests have notifications on yet — show your QR at check-in first.'
@@ -3642,7 +3621,7 @@ function prefillGuestInstallBroadcast() {
 }
 
 async function sendGuestBroadcast() {
-  if (!guestPushSubscriberCount) {
+  if (!crm.guestPushSubscriberCount) {
     toast('No guests have notifications on yet — show your QR at check-in first', 'error');
     return;
   }
@@ -3815,6 +3794,9 @@ function promptCancelBooking(bookingId, guestName) {
         overlay.remove();
         await loadBookings();
         await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
+        if (!res.alreadyCancelled && res.calendarCorrection) {
+          showAvailabilityCorrectionModal(res.calendarCorrection);
+        }
       } else {
         toast((res && res.message) || 'Could not cancel that booking.', 'error');
         go.disabled = false;
@@ -3839,13 +3821,6 @@ function approvalMinutesLeft(pendingUntil) {
   const due = new Date(pendingUntil || 0).getTime();
   if (!due) return 0;
   return Math.max(0, Math.round((due - Date.now()) / 60000));
-}
-
-function pendingApprovalPillHtml(b) {
-  if (!isPendingApproval(b)) return '';
-  const mins = approvalMinutesLeft(b.pendingUntil);
-  const label = mins > 0 ? `auto-confirms in ${mins} min` : 'confirming now';
-  return `<div class="meta-chip" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;" title="Waiting on your review. Do nothing and it confirms itself.">⏳ ${label}</div>`;
 }
 
 function getApprovalTokenFromUrl() {
@@ -3972,6 +3947,238 @@ async function submitBookingApproval(token, action) {
   }
 }
 
+// ── CONFIRMED BOOKING REVIEW ───────────────────────────────────
+// The guest is already confirmed. This follow-up keeps the booking visible until
+// the owner verifies the room, and lets a signed notification link cancel safely
+// without making the owner enter a PIN first.
+
+function getBookingReviewTokenFromUrl() {
+  try {
+    return String(new URLSearchParams(window.location.search).get('review') || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+function stripBookingReviewTokenFromUrl() {
+  try {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('review');
+    window.history.replaceState({}, '', cleanUrl);
+  } catch (_) {}
+}
+
+function bookingReviewDateLabel(value) {
+  try {
+    return new Date(value).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+    });
+  } catch (_) {
+    return '—';
+  }
+}
+
+async function maybeShowBookingReviewCard() {
+  const token = getBookingReviewTokenFromUrl();
+  if (!token) return;
+  stripBookingReviewTokenFromUrl();
+  try {
+    const res = await fetch('/api/booking-review/peek?token=' + encodeURIComponent(token));
+    const body = await res.json().catch(() => ({}));
+    if (!body?.success || !body.data) {
+      toast(body?.message || 'That booking link has expired.', 'error');
+      return;
+    }
+    showBookingReviewModal(token, body.data);
+  } catch (_) {
+    toast('Could not load that booking.', 'error');
+  }
+}
+
+async function openBookingReviewFromCard(bookingId) {
+  try {
+    const body = await api('GET', `/api/crm/bookings/${encodeURIComponent(bookingId)}/review-token`);
+    if (!body?.success || !body.token || !body.data) {
+      toast(body?.message || 'Could not open that booking.', 'error');
+      return;
+    }
+    showBookingReviewModal(body.token, body.data);
+  } catch (_) {
+    toast('Could not open that booking.', 'error');
+  }
+}
+
+function showBookingReviewModal(token, booking) {
+  document.getElementById('bookingReviewOverlay')?.remove();
+  const total = Number(booking.grandTotal || 0).toFixed(2);
+  const paidNow = Number(booking.amountPaidNow || 0);
+  const isDead = ['cancelled', 'canceled', 'released'].includes(String(booking.status || '').toLowerCase());
+  const alreadyAvailable = String(booking.reviewStatus || '').toLowerCase() === 'available';
+  const overlay = document.createElement('div');
+  overlay.id = 'bookingReviewOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100006;background:rgba(15,23,20,.58);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));box-sizing:border-box;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border:1.5px solid #D8E4DC;border-radius:22px;padding:22px 20px;max-width:390px;width:100%;max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 24px 70px rgba(15,35,26,.28);box-sizing:border-box;">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:16px;">
+        <div style="width:42px;height:42px;border-radius:13px;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;">✓</div>
+        <div>
+          <div style="font-size:11px;font-weight:850;color:#2E7D5B;text-transform:uppercase;letter-spacing:.07em;">Confirmed booking</div>
+          <h2 style="font-size:20px;font-weight:850;color:#1A2B22;margin:2px 0 0;">Verify the room</h2>
+        </div>
+      </div>
+      <p style="font-size:13px;color:#5D6E64;line-height:1.55;margin:0 0 15px;">The guest is already confirmed. Check your notebook and other booking sites, then mark whether this room is available.</p>
+      <div style="background:#F7F9F8;border:1px solid #E1E9E4;border-radius:15px;padding:15px;margin-bottom:16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:11px;">
+          <div style="min-width:0;">
+            <div style="font-size:16px;font-weight:850;color:#1A2B22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(booking.guestName || 'Guest')}</div>
+            <div style="font-size:12px;color:#6B7D72;margin-top:2px;">${esc(booking.guestPhone || booking.guestEmail || '')}</div>
+          </div>
+          <div style="font-size:16px;font-weight:850;color:#2E7D5B;white-space:nowrap;">$${total}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="background:#fff;border-radius:10px;padding:9px 10px;"><div style="font-size:9px;text-transform:uppercase;font-weight:800;color:#7B8C82;">Check-in</div><div style="font-size:12px;font-weight:750;color:#1A2B22;margin-top:2px;">${bookingReviewDateLabel(booking.checkinDate)}</div></div>
+          <div style="background:#fff;border-radius:10px;padding:9px 10px;"><div style="font-size:9px;text-transform:uppercase;font-weight:800;color:#7B8C82;">Check-out</div><div style="font-size:12px;font-weight:750;color:#1A2B22;margin-top:2px;">${bookingReviewDateLabel(booking.checkoutDate)}</div></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:#33443A;">
+          <strong>🛏 ${esc(booking.roomName || 'Room')}</strong>
+          <span>${paidNow > 0 ? 'Paid online' : 'Collect at check-in'}</span>
+        </div>
+      </div>
+      ${isDead
+        ? '<div style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:12px;padding:12px 14px;font-size:13px;font-weight:700;text-align:center;">This booking has already been cancelled.</div>'
+        : (alreadyAvailable
+          ? '<div style="background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;border-radius:12px;padding:12px 14px;font-size:13px;font-weight:700;text-align:center;">Room availability has been verified.</div>'
+          : `<button type="button" id="bookingReviewAvailable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:9px;">Room Is Available</button>
+             <button type="button" id="bookingReviewCancel" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid #DC2626;background:#fff;color:#B91C1C;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Room Is Taken — Cancel Booking</button>
+             <p style="font-size:10.5px;color:#8A9990;line-height:1.45;margin:9px 3px 0;text-align:center;">Cancelling emails the guest and releases their card hold or refunds any captured payment.</p>`)}
+      <button type="button" id="bookingReviewLater" style="width:100%;padding:11px;border:none;background:none;color:#7B8C82;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;margin-top:5px;">${isDead || alreadyAvailable ? 'Close' : 'Review later'}</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const setBusy = (busy) => {
+    ['bookingReviewAvailable', 'bookingReviewCancel', 'bookingReviewLater'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = busy;
+    });
+  };
+  document.getElementById('bookingReviewLater').onclick = () => overlay.remove();
+  const availableBtn = document.getElementById('bookingReviewAvailable');
+  if (availableBtn) {
+    availableBtn.onclick = async () => {
+      setBusy(true);
+      const result = await submitBookingReview(token, 'available');
+      setBusy(false);
+      if (result?.success) {
+        overlay.remove();
+        toast('Room verified — reminders stopped.', 'success');
+        if (crm.token) loadBookings().catch(() => {});
+      }
+    };
+  }
+  const cancelBtn = document.getElementById('bookingReviewCancel');
+  if (cancelBtn) {
+    cancelBtn.onclick = async () => {
+      setBusy(true);
+      cancelBtn.textContent = 'Cancelling…';
+      const result = await submitBookingReview(token, 'cancel');
+      setBusy(false);
+      if (result?.success) {
+        overlay.remove();
+        toast('Booking cancelled — the guest has been emailed.', 'success');
+        if (crm.token) loadBookings().catch(() => {});
+        if (result.calendarCorrection) {
+          showAvailabilityCorrectionModal(result.calendarCorrection, { token });
+        }
+      } else {
+        cancelBtn.textContent = 'Room Is Taken — Cancel Booking';
+      }
+    };
+  }
+}
+
+async function submitBookingReview(token, action) {
+  try {
+    const res = await fetch('/api/booking-review/act', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, action }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!body?.success) {
+      toast(body?.message || 'Could not update that booking.', 'error');
+      return null;
+    }
+    return body;
+  } catch (_) {
+    toast('Could not update that booking.', 'error');
+    return null;
+  }
+}
+
+function showAvailabilityCorrectionModal(correction, options = {}) {
+  if (!correction?.roomName || !correction?.checkinDate || !correction?.checkoutDate) return;
+  document.getElementById('availabilityCorrectionOverlay')?.remove();
+  const totalUnits = Math.max(1, parseInt(correction.totalUnits, 10) || 1);
+  const choices = Array.from({ length: totalUnits + 1 }, (_, value) =>
+    `<option value="${value}"${value === 0 ? ' selected' : ''}>${value} room${value === 1 ? '' : 's'} available</option>`
+  ).join('');
+  const overlay = document.createElement('div');
+  overlay.id = 'availabilityCorrectionOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100007;background:rgba(15,23,20,.58);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border:1.5px solid #D8E4DC;border-radius:22px;padding:22px 20px;max-width:390px;width:100%;max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 24px 70px rgba(15,35,26,.28);box-sizing:border-box;">
+      <div style="font-size:11px;font-weight:850;color:#B45309;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Fix the calendar</div>
+      <h2 style="font-size:20px;font-weight:850;color:#1A2B22;margin:0 0 7px;">Stop this happening again</h2>
+      <p style="font-size:13px;color:#5D6E64;line-height:1.55;margin:0 0 15px;">Set Marketel’s remaining availability for <strong>${esc(correction.roomName)}</strong> during this stay.</p>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;background:#F7F9F8;border:1px solid #E1E9E4;border-radius:13px;padding:13px;margin-bottom:14px;">
+        <div style="background:#fff;border:1px solid #D8E4DC;border-radius:9px;padding:7px 9px;text-align:center;"><div style="font-size:9px;font-weight:800;color:#7B8C82;text-transform:uppercase;">From</div><div style="font-size:12px;font-weight:800;color:#1A2B22;">${bookingReviewDateLabel(correction.checkinDate)}</div></div>
+        <div style="color:#2E7D5B;font-weight:900;">→</div>
+        <div style="background:#fff;border:1px solid #D8E4DC;border-radius:9px;padding:7px 9px;text-align:center;"><div style="font-size:9px;font-weight:800;color:#7B8C82;text-transform:uppercase;">Until</div><div style="font-size:12px;font-weight:800;color:#1A2B22;">${bookingReviewDateLabel(correction.checkoutDate)}</div></div>
+      </div>
+      <label for="availabilityCorrectionUnits" style="display:block;font-size:11px;font-weight:800;color:#52645A;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Remaining online availability</label>
+      <select id="availabilityCorrectionUnits" style="width:100%;padding:13px 12px;border:1.5px solid #D8E4DC;border-radius:11px;background:#fff;color:#1A2B22;font-family:inherit;font-size:14px;font-weight:700;margin-bottom:11px;">${choices}</select>
+      <button type="button" id="availabilityCorrectionSave" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Update These Dates</button>
+      <button type="button" id="availabilityCorrectionLater" style="width:100%;padding:11px;border:none;background:none;color:#7B8C82;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;margin-top:5px;">Not now</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('availabilityCorrectionLater').onclick = () => overlay.remove();
+  document.getElementById('availabilityCorrectionSave').onclick = async () => {
+    const save = document.getElementById('availabilityCorrectionSave');
+    const availableUnits = Math.max(0, parseInt(document.getElementById('availabilityCorrectionUnits').value, 10) || 0);
+    save.disabled = true;
+    save.textContent = 'Updating…';
+    try {
+      let body;
+      if (options.token) {
+        const res = await fetch('/api/booking-review/block-dates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: options.token, availableUnits }),
+        });
+        body = await res.json().catch(() => ({}));
+      } else {
+        const lastNight = new Date(correction.checkoutDate);
+        lastNight.setUTCDate(lastNight.getUTCDate() - 1);
+        body = await api('POST', '/api/crm/manual-availability/range', {
+          roomName: correction.roomName,
+          startDate: new Date(correction.checkinDate).toISOString().slice(0, 10),
+          endDate: lastNight.toISOString().slice(0, 10),
+          availableUnits,
+          closed: availableUnits === 0,
+        });
+      }
+      if (!body?.success) throw new Error(body?.message || 'Could not update those dates.');
+      overlay.remove();
+      toast('Availability updated for those dates.', 'success');
+      if (crm.token) loadManualAvailability({ silent: true }).catch(() => {});
+    } catch (e) {
+      toast(e?.message || 'Could not update those dates.', 'error');
+      save.disabled = false;
+      save.textContent = 'Update These Dates';
+    }
+  };
+}
+
 function refreshAppsInstallSection() {
   const fn = (typeof ensureAppsViewRendered === 'function')
     ? ensureAppsViewRendered
@@ -3981,13 +4188,12 @@ function refreshAppsInstallSection() {
 
 function handleInstallFrontdesk() {
   if (isIosDevice()) {
-    const mins = (crm.bookingApproval && crm.bookingApproval.windowMinutes) || 20;
     showIosInstallSheet({
       title: (crm.activeHotelName ? crm.activeHotelName + ' ' : '') + 'Front Desk',
       subtitle: 'Add it to your home screen — takes 3 seconds.',
       // iOS is the whole reason this step is mandatory rather than optional:
       // web push simply does not exist for a Safari tab.
-      alertsNote: `<strong>iPhone needs this step.</strong> Booking alerts — and the ${mins} minutes they buy you to release a room — only work from the Home Screen app, never from a Safari tab.`,
+      alertsNote: '<strong>iPhone needs this step.</strong> Confirmed-booking and guest-message alerts only work from the Home Screen app, never from a Safari tab.',
     });
     return;
   }
@@ -4016,32 +4222,14 @@ async function toggleAppNotifications() {
     return;
   }
   await enableNotifications();
-  await loadBookingApprovalSettings();
   refreshAppsInstallSection();
 }
 
-async function enableBookingProtection() {
-  let approval = await loadBookingApprovalSettings();
+async function enableBookingAlerts() {
   const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
-  const reachable = !!(approval && approval.devices > 0);
-  if (!granted || !reachable) {
+  if (!granted) {
     const notificationsEnabled = await enableNotifications();
     if (!notificationsEnabled) return false;
-    approval = await loadBookingApprovalSettings();
-  }
-
-  if (approval && approval.supported && approval.pushConfigured && !approval.enabled) {
-    try {
-      const res = await api('POST', '/api/crm/booking-approval', { enabled: true });
-      if (res && res.success) {
-        crm.bookingApproval = { ...approval, enabled: true };
-        toast(`Booking protection is on — ${approval.windowMinutes || 20} minutes to decide.`, 'success');
-      }
-    } catch (e) {
-      toast((e && e.message) || 'Notifications are on, but booking review could not be enabled.', 'error');
-      refreshAppsInstallSection();
-      return false;
-    }
   }
   refreshAppsInstallSection();
   return true;
@@ -4073,15 +4261,15 @@ function showNotifPromptModal() {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="font-size:34px;margin-bottom:10px;">🔔</div>
-      <h2 style="font-size:19px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">Turn on booking protection?</h2>
-      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 20px;">New bookings will reach this phone before they confirm, even when Front Desk is closed.</p>
-      <button id="notifPromptEnable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Turn on booking protection</button>
+      <h2 style="font-size:19px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">Turn on booking alerts?</h2>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 20px;">Confirmed bookings and guest messages will reach this phone, even when Front Desk is closed.</p>
+      <button id="notifPromptEnable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Turn on booking alerts</button>
       <button id="notifPromptLater" style="width:100%;padding:12px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Not now</button>
     </div>`;
   document.body.appendChild(overlay);
   document.getElementById('notifPromptEnable').onclick = async () => {
     overlay.remove();
-    await enableBookingProtection();   // runs inside this tap → gesture requirement satisfied
+    await enableBookingAlerts();   // runs inside this tap → gesture requirement satisfied
   };
   document.getElementById('notifPromptLater').onclick = () => overlay.remove();
 }
@@ -4156,13 +4344,16 @@ exposeToWindow({
   conflictBannerHtml,
   loadBookingConflicts,
   maybeShowBookingApprovalCard,
-  pendingApprovalPillHtml,
+  maybeShowBookingReviewCard,
+  openBookingReviewFromCard,
   promptCancelBooking,
   renderBookingsNotices,
   reportFrontdeskInstalled,
   showBookingApprovalModal,
+  showBookingReviewModal,
+  showAvailabilityCorrectionModal,
   submitBookingApproval,
-  toggleBookingApproval,
+  submitBookingReview,
   buildGuestInstallUrlForQr,
   buildHotelContextUrl,
   buildMessageThreads,
@@ -4178,7 +4369,7 @@ exposeToWindow({
   deleteRoomType,
   doLogin,
   enableNotifications,
-  enableBookingProtection,
+  enableBookingAlerts,
   ensureAvailabilityUi,
   ensureBookingsVirtualScroll,
   ensureGrowthStyles,
@@ -4210,7 +4401,6 @@ exposeToWindow({
   isStandaloneApp,
   jsStr,
   loadBlockedDemand,
-  loadBookingApprovalSettings,
   loadBookings,
   loadGrowthData,
   loadHotelContext,

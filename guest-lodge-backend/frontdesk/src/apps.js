@@ -174,9 +174,6 @@ function detectAppPlatform() {
 function ensureAppsViewRendered(force) {
   const el = document.getElementById('appsView');
   if (!el) return;
-  if (crm.bookingApproval === null && typeof window.loadBookingApprovalSettings === 'function') {
-    window.loadBookingApprovalSettings({ refreshApps: true });
-  }
   const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '');
   if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
     renderAppsView();
@@ -226,35 +223,34 @@ function renderAppsView() {
       caption: 'They get your reply on their phone — like a text from you.' },
   ];
 
-  const fdInApp = isStandaloneApp() || crm.frontdeskInstalled;
+  // Booking alerts are a current-device capability. A server-side install event
+  // from another phone must not unlock them in an ordinary browser tab.
+  const fdInApp = isStandaloneApp();
   const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
   const fdInstallLabel = fdOnNarrowScreen ? 'Put Front Desk on this phone' : 'Put Front Desk on my phone';
-  const approval = crm.bookingApproval;
-  const canReviewBookings = !!(approval && approval.supported && approval.pushConfigured);
-  const approvalMinutes = (approval && approval.windowMinutes) || 20;
-  const approvalStatusLine = approval && approval.enabled
-    ? `${approvalMinutes} minutes to confirm or release`
-    : 'Bookings confirm immediately';
+  const reminderMinutes = Number(crm.bookingReviewSettings?.reminderMinutes ?? 15);
+  const reminderSettingsHtml = `
+    <div id="bookingReviewReminderSetting" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <label for="bookingReviewReminderSelect" style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${fdInApp ? 'var(--green)' : '#8B938E'};margin-bottom:6px;">If you have not verified a booking</label>
+      <select id="bookingReviewReminderSelect" onchange="saveBookingReviewReminderSetting(this)" ${fdInApp ? '' : 'disabled aria-disabled="true"'} style="width:100%;padding:12px 11px;border:1px solid ${fdInApp ? 'var(--border)' : '#D7DBD8'};border-radius:11px;background:${fdInApp ? '#fff' : '#E7E9E7'};color:${fdInApp ? 'var(--text)' : '#8B938E'};font-family:inherit;font-size:13px;font-weight:700;box-sizing:border-box;cursor:${fdInApp ? 'pointer' : 'not-allowed'};">
+        <option value="15"${reminderMinutes === 15 ? ' selected' : ''}>Remind every 15 minutes · up to 3 times</option>
+        <option value="30"${reminderMinutes === 30 ? ' selected' : ''}>Remind every 30 minutes · up to 3 times</option>
+        <option value="60"${reminderMinutes === 60 ? ' selected' : ''}>Remind every 1 hour · up to 3 times</option>
+        <option value="0"${reminderMinutes === 0 ? ' selected' : ''}>Send the first notification only</option>
+      </select>
+      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Front Desk to unlock this setting.'}</div>
+    </div>`;
 
   let fdCtaHtml;
   if (fdInApp && fdGranted) {
-    const reviewControl = canReviewBookings
-      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #bbf7d0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <div style="font-size:12px;font-weight:800;color:#166534;">Booking review: ${approval.enabled ? 'On' : 'Off'}</div>
-            <div style="font-size:11px;color:#4B5D52;margin-top:2px;">${approvalStatusLine}</div>
-          </div>
-          <button type="button" onclick="toggleBookingApproval()" style="flex-shrink:0;padding:8px 11px;border-radius:9px;border:1px solid ${approval.enabled ? '#86EFAC' : '#2E7D5B'};background:${approval.enabled ? '#fff' : '#2E7D5B'};color:${approval.enabled ? '#166534' : '#fff'};font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">${approval.enabled ? 'Turn off' : 'Turn on'}</button>
-        </div>`
-      : '';
     fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
       <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Booking alerts can reach this phone — even if Front Desk is closed.</div>${reviewControl}</div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Booking and message alerts can reach this phone — even if Front Desk is closed.</div></div>
     </div>`;
   } else if (fdInApp) {
-    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">Front Desk is on this device. Turn on booking protection so new reservations reach your phone before they confirm.</p>
-      <button onclick="enableBookingProtection()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking protection</button></div>`;
+    fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">Front Desk is on this device. Turn on alerts so confirmed bookings and guest messages reach your phone.</p>
+      <button onclick="enableBookingAlerts()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
     fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Put Front Desk on this phone first. There is no App Store — follow 3 quick steps and it appears on your home screen like an app.</p>
       <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Put Front Desk on this phone</button>
@@ -380,6 +376,21 @@ function renderAppsView() {
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
       <div class="apps-step-title">${fdInApp ? 'Front Desk — installed' : 'Install Front Desk'}</div>
       ${fdCtaHtml}
+      ${reminderSettingsHtml}
+    </div>`;
+  const reminderCardHtml = `
+    <div class="apps-step-card" id="tour-fd-reminder-card" style="background:#F3F4F3;border-color:#D7DBD8;box-shadow:none;">
+      <div style="display:flex;align-items:flex-start;gap:11px;">
+        <div style="width:34px;height:34px;border-radius:10px;background:#E1E4E2;color:#737B76;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🔒</div>
+        <div style="flex:1;min-width:0;">
+          <div class="apps-section-divider" style="margin:0 0 5px;padding:0;border-top:none;color:#737B76;">Booking alerts</div>
+          <div class="apps-step-title" style="color:#555D58;">Help prevent double bookings</div>
+          <p style="font-size:12px;color:#737B76;line-height:1.5;margin:0;">Repeated alerts keep a new booking in front of you until you verify the room against walk-ins and other booking channels.</p>
+        </div>
+      </div>
+      ${reminderSettingsHtml}
+      <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;margin-top:14px;padding:13px 15px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Download Front Desk to unlock alerts</button>
+      <div style="font-size:11px;color:#737B76;line-height:1.45;text-align:center;margin-top:8px;">Booking notifications require the installed Front Desk on this device.</div>
     </div>`;
   const guestIconCardHtml = () => `
     <div class="apps-step-card" id="tour-guest-icon-section">
@@ -413,7 +424,7 @@ function renderAppsView() {
   const appsMainHtml = `
     ${appsStoryHtml}
     ${loopDiagramHtml}
-    ${fdInApp ? unlockedToolsHtml : guestIconCardHtml()}`;
+    ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
 
   const appsFootnoteHtml = fdInApp
     ? 'Front Desk is installed. Guests can install your property from the direct booking page.'
@@ -516,6 +527,40 @@ function renderAppsView() {
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
   loadGuestInstallStats();
+  loadBookingReviewSettings();
+}
+
+async function loadBookingReviewSettings() {
+  try {
+    const data = await api('GET', '/api/crm/booking-review-settings');
+    if (!data?.success || !data.data) return;
+    crm.bookingReviewSettings = data.data;
+    const select = document.getElementById('bookingReviewReminderSelect');
+    if (select) select.value = String(data.data.reminderMinutes);
+  } catch (_) {}
+}
+
+async function saveBookingReviewReminderSetting(select) {
+  const previous = String(crm.bookingReviewSettings?.reminderMinutes ?? 15);
+  const reminderMinutes = parseInt(select?.value, 10);
+  if (![0, 15, 30, 60].includes(reminderMinutes)) return;
+  if (select) select.disabled = true;
+  try {
+    const data = await api('POST', '/api/crm/booking-review-settings', { reminderMinutes });
+    if (!data?.success) throw new Error(data?.message || 'Could not save reminder timing.');
+    crm.bookingReviewSettings = data.data;
+    toast(
+      reminderMinutes === 0
+        ? 'Booking reminders off — the first alert will still arrive.'
+        : `Booking reminders set for every ${reminderMinutes === 60 ? 'hour' : reminderMinutes + ' minutes'}.`,
+      'success'
+    );
+  } catch (e) {
+    if (select) select.value = previous;
+    toast(e?.message || 'Could not save reminder timing.', 'error');
+  } finally {
+    if (select) select.disabled = false;
+  }
 }
 
 async function loadGuestInstallStats() {
@@ -523,7 +568,7 @@ async function loadGuestInstallStats() {
   try {
     const data = await api('GET', '/api/crm/guest-install-stats');
     if (!data.success) throw new Error(data.message || 'Failed');
-    guestPushSubscriberCount = data.guestPushSubscribers ?? 0;
+    crm.guestPushSubscriberCount = data.guestPushSubscribers ?? 0;
     applyGuestBroadcastAudienceUi();
     if (!el) return;
     const t = data.totals || {};
@@ -564,7 +609,7 @@ async function loadGuestInstallStats() {
       + '</div>'
       + (rowHtml ? '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">By touchpoint</div>' + rowHtml : '');
   } catch (e) {
-    guestPushSubscriberCount = 0;
+    crm.guestPushSubscriberCount = 0;
     applyGuestBroadcastAudienceUi();
     if (el) {
       el.style.display = 'none';
@@ -587,8 +632,10 @@ const _appsExports = {
   appsVideoBadgeHtml,
   detectAppPlatform,
   ensureAppsViewRendered,
+  loadBookingReviewSettings,
   loadGuestInstallStats,
   renderAppsView,
+  saveBookingReviewReminderSetting,
   startAppsTour,
 };
 

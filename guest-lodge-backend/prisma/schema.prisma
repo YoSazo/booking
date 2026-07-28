@@ -60,8 +60,22 @@ model Booking {
   cancelledAt        DateTime?
   cancellationReason String?
 
+  // Immediate-confirmation follow-up. Online bookings are confirmed first, then
+  // remain visible in Front Desk until the owner verifies room availability.
+  ownerReviewStatus         String?   // unreviewed | available | cancelled
+  ownerReviewRequestedAt    DateTime?
+  ownerReviewedAt           DateTime?
+  ownerReviewReminderCount  Int       @default(0)
+  ownerReviewNextReminderAt DateTime?
+
+  // Manual-availability dates whose explicit remaining-unit counters were
+  // decremented by this booking. Stored as a JSON array so cancellation can
+  // restore exactly those counters without touching legacy bookings.
+  inventoryOverrideDates String?
+
   @@index([status, pendingUntil])
   @@index([hotelId, status, checkinDate])
+  @@index([ownerReviewStatus, ownerReviewNextReminderAt])
 }
 
 model GuestInstallEvent {
@@ -195,6 +209,10 @@ model HotelConfig {
   bookingApprovalEnabled       Boolean   @default(false)
   bookingApprovalWindowMinutes Int       @default(20)
   frontdeskInstalledAt         DateTime?
+
+  // Follow-up reminders for confirmed online bookings. Zero means the first
+  // notification only; otherwise Front Desk sends at most three reminders.
+  bookingReviewReminderMinutes Int       @default(15)
 
   domains       HotelDomain[]
   crmPins       CrmPin[]

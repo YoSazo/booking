@@ -34,7 +34,7 @@ function getStayMoney(bookingDetails) {
   }
   if (bookingType === 'payLater') {
     return { paidToday: 0, total, dueAtCheckin: total, holdNote: true,
-      note: 'Card verified with a $1 hold (released immediately). Pay at the front desk when you check in.', tone: 'info' };
+      note: 'Card verified with a temporary $1 authorization hold. Pay at the front desk when you check in.', tone: 'info' };
   }
   // standard / full / default — split deposit
   return { paidToday: total / 2, total, dueAtCheckin: total / 2, tone: 'good' };
@@ -162,9 +162,9 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               </div>
             </div>
 
-            <h2 className="confirmation-call-title">We&apos;ll call to confirm</h2>
+            <h2 className="confirmation-call-title">Your booking is confirmed</h2>
             <p className="confirmation-call-subtitle">
-              A team member will call you <strong>within the next few minutes</strong> to confirm your arrival details and answer any questions.
+              A team member may call you <strong>within the next few minutes</strong> to go over arrival details and answer any questions.
             </p>
 
             <div className="confirmation-call-info-rows">
@@ -189,7 +189,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
                   <CheckCircle2 size={16} />
                 </div>
                 <div className="confirmation-call-info-text">
-                  <strong>Your room is reserved</strong> — no action needed on your end
+                  <strong>Your room is confirmed</strong> — no action needed on your end
                 </div>
               </div>
               <div className="confirmation-call-info-row">
@@ -197,7 +197,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
                   <Smartphone size={16} />
                 </div>
                 <div className="confirmation-call-info-text">
-                  Expect a call to <strong>your phone</strong> from our front desk soon
+                  The front desk may call <strong>your phone</strong> if they need any stay details
                 </div>
               </div>
               <div className="confirmation-call-info-row">
@@ -218,7 +218,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
                 handleDismissCallModal();
               }}
             >
-              Got It — I&apos;ll Watch for the Call
+              Got it
             </button>
           </div>
         </div>
@@ -270,7 +270,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               {stayMoney.holdNote && (
                 <div className="detail-row">
                   <span className="detail-label">$1 hold</span>
-                  <span className="detail-value" style={{ color: '#6b7280' }}>released immediately</span>
+                  <span className="detail-value" style={{ color: '#6b7280' }}>temporary authorization</span>
                 </div>
               )}
               {stayMoney.dueAtCheckin != null && (

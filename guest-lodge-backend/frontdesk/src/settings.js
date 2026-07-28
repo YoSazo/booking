@@ -623,14 +623,9 @@ function startPostActivationTabTour() {
       text: '<strong>Bookings</strong> — live reservations land here. Once phone setup is complete, new bookings can alert you even when Front Desk is closed.',
     },
     {
-      tab: 'bookings',
-      navFilter: 'bookings',
-      text: '<strong>Booking review</strong> — turn it on here and new bookings wait for your OK before locking in, so a room you\'ve already given away never gets sold twice.',
-    },
-    {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Last step: set up your phone.</strong> No App Store needed. Follow the 3 steps here, then turn on booking protection so new reservations can reach you.',
+      text: '<strong>Last step: set up your phone.</strong> No App Store needed. Follow the 3 steps here, then turn on booking alerts so confirmed reservations and guest messages can reach you.',
     },
   ];
 

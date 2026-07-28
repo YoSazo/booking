@@ -1355,6 +1355,136 @@ async function createManualBooking(hotelId, bookingDetails) {
     };
 }
 
+class ManualInventoryUnavailableError extends Error {
+    constructor(message = 'That room was just booked for one of those nights.') {
+        super(message);
+        this.name = 'ManualInventoryUnavailableError';
+        this.code = 'MANUAL_INVENTORY_UNAVAILABLE';
+    }
+}
+
+function parseInventoryOverrideDates(value) {
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed)
+            ? [...new Set(parsed.map(normalizeIsoDate).filter(Boolean))]
+            : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function manualBookingStayDates(checkin, checkout) {
+    const start = normalizeIsoDate(checkin);
+    const end = normalizeIsoDate(checkout);
+    if (!start || !end || end <= start) return [];
+    const lastNight = new Date(new Date(`${end}T00:00:00.000Z`).getTime() - 86400000)
+        .toISOString()
+        .slice(0, 10);
+    return enumerateDatesInclusive(start, lastNight, 180);
+}
+
+// The public availability lookup is only a snapshot. Re-check and reserve the
+// final unit in one database transaction immediately before confirming. The
+// advisory lock works across Node processes, so two simultaneous checkouts for
+// the same room cannot both pass the last-unit check.
+async function createManualBookingRecordWithInventory(hotelId, bookingData) {
+    const roomName = String(bookingData?.roomName || '').trim();
+    const stayDates = manualBookingStayDates(bookingData?.checkinDate, bookingData?.checkoutDate);
+    if (!hotelId || !roomName || !stayDates.length) {
+        throw new ManualInventoryUnavailableError('Those stay dates are no longer available.');
+    }
+
+    return prisma.$transaction(async (tx) => {
+        // This function returns PostgreSQL `void`, which Prisma cannot deserialize
+        // through $queryRaw. Execute it for its locking side effect instead.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext(${roomName}))`;
+
+        // A browser retry after a slow response must return the booking it
+        // already created instead of consuming a second room.
+        if (bookingData.stripePaymentIntentId) {
+            const existing = await tx.booking.findUnique({
+                where: { stripePaymentIntentId: bookingData.stripePaymentIntentId },
+            });
+            if (existing) return { booking: existing, created: false };
+        }
+
+        const room = await tx.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId, name: roomName } },
+            include: {
+                overrides: {
+                    where: { date: { in: stayDates } },
+                },
+            },
+        });
+        if (!room || room.totalUnits < 1) {
+            throw new ManualInventoryUnavailableError();
+        }
+
+        const checkinDate = new Date(`${stayDates[0]}T00:00:00.000Z`);
+        const checkoutDate = new Date(
+            new Date(`${stayDates[stayDates.length - 1]}T00:00:00.000Z`).getTime() + 86400000
+        );
+        const overlapping = await tx.booking.findMany({
+            where: {
+                hotelId,
+                roomName,
+                checkinDate: { lt: checkoutDate },
+                checkoutDate: { gt: checkinDate },
+                status: ACTIVE_BOOKING_STATUS_FILTER,
+            },
+            select: { checkinDate: true, checkoutDate: true },
+        });
+
+        const bookedByDate = {};
+        for (const booking of overlapping) {
+            for (const day of manualBookingStayDates(booking.checkinDate, booking.checkoutDate)) {
+                bookedByDate[day] = (bookedByDate[day] || 0) + 1;
+            }
+        }
+
+        const overrideByDate = Object.fromEntries((room.overrides || []).map((override) => [override.date, override]));
+        const consumedOverrideDates = [];
+        for (const day of stayDates) {
+            const override = overrideByDate[day];
+            if (override?.closed) throw new ManualInventoryUnavailableError();
+            if (override && override.availableUnits !== null) {
+                if (override.availableUnits < 1) throw new ManualInventoryUnavailableError();
+                consumedOverrideDates.push(day);
+            } else if ((bookedByDate[day] || 0) >= room.totalUnits) {
+                throw new ManualInventoryUnavailableError();
+            }
+        }
+
+        // Explicit overrides represent remaining sellable units. Decrement only
+        // after every night has passed validation, while the room lock is held.
+        for (const day of consumedOverrideDates) {
+            const override = overrideByDate[day];
+            const updated = await tx.manualOverride.updateMany({
+                where: {
+                    id: override.id,
+                    closed: false,
+                    availableUnits: { gt: 0 },
+                },
+                data: { availableUnits: { decrement: 1 } },
+            });
+            if (updated.count !== 1) throw new ManualInventoryUnavailableError();
+        }
+
+        const booking = await tx.booking.create({
+            data: {
+                ...bookingData,
+                status: 'confirmed',
+                inventoryOverrideDates: consumedOverrideDates.length
+                    ? JSON.stringify(consumedOverrideDates)
+                    : null,
+            },
+        });
+        return { booking, created: true };
+    }, { maxWait: 5000, timeout: 15000 });
+}
+
 const MANUAL_REVENUE_PERIODS = new Set(['today', '7d', '30d', '90d', 'all']);
 
 function buildManualRevenueWindow(period, referenceIso, earliestIso = '', latestIso = '') {
@@ -1935,7 +2065,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
 
             // Save to DB if possible (but don't fail booking if DB is down)
             try {
-                await prisma.booking.create({
+                const savedBooking = await prisma.booking.create({
                     data: {
                         stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode,
@@ -1960,7 +2090,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         holdCapturedAt: holdStatus === 'captured' ? new Date() : null
                     }
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
+                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
                 notifyGuestBookingConfirmed({
                     req,
                     hotelId: hotelValidation.hotelId,
@@ -1984,58 +2114,65 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
             const pmsResponse = await createManualBooking(hotelValidation.hotelId, bookingDetails);
 
             try {
-                // A held booking still occupies the room; only the guest email and
-                // the owner's "new booking" ping wait for the decision.
-                const approvalPlan = await resolveBookingApprovalPlan(config);
-                const booking = await prisma.booking.create({
-                    data: {
-                        stripePaymentIntentId: paymentIntentId,
-                        ourReservationCode: bookingDetails.reservationCode,
-                        pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelValidation.hotelId,
-                        roomName: bookingDetails.name || bookingDetails.roomName,
-                        bookingType: 'payLater',
-                        checkinDate: new Date(bookingDetails.checkin),
-                        checkoutDate: new Date(bookingDetails.checkout),
-                        nights: bookingDetails.nights,
-                        guestFirstName: guestInfo.firstName,
-                        guestLastName: guestInfo.lastName,
-                        guestEmail: guestInfo.email,
-                        guestPhone: guestInfo.phone,
-                        subtotal: bookingDetails.subtotal,
-                        taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total,
-                        amountPaidNow: 0,
-                        preAuthHoldAmount: 1.00,
-                        holdStatus: holdStatus,
-                        noShowFeePaid: holdStatus === 'captured',
-                        holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
-                        ...bookingApprovalCreateFields(approvalPlan),
-                    }
+                const outcome = await createManualBookingRecordWithInventory(hotelValidation.hotelId, {
+                    stripePaymentIntentId: paymentIntentId,
+                    ourReservationCode: bookingDetails.reservationCode || pmsResponse.reservationID,
+                    pmsConfirmationCode: pmsResponse.reservationID,
+                    hotelId: hotelValidation.hotelId,
+                    roomName: bookingDetails.name || bookingDetails.roomName,
+                    bookingType: 'payLater',
+                    checkinDate: new Date(bookingDetails.checkin),
+                    checkoutDate: new Date(bookingDetails.checkout),
+                    nights: bookingDetails.nights,
+                    guestFirstName: guestInfo.firstName,
+                    guestLastName: guestInfo.lastName,
+                    guestEmail: guestInfo.email,
+                    guestPhone: guestInfo.phone,
+                    subtotal: bookingDetails.subtotal,
+                    taxesAndFees: bookingDetails.taxes,
+                    grandTotal: bookingDetails.total,
+                    amountPaidNow: 0,
+                    preAuthHoldAmount: 1.00,
+                    holdStatus: holdStatus,
+                    noShowFeePaid: holdStatus === 'captured',
+                    holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
                 });
 
-                if (approvalPlan.hold) {
-                    notifyBookingNeedsApproval(booking).catch(() => {});
-                } else {
-                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
+                // Checkout is the confirmation. Push the owner an informational
+                // alert and email the guest immediately; cancellation remains
+                // available from the normal booking card if plans later change.
+                if (outcome.created) {
+                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
                     notifyGuestBookingConfirmed({
                         req,
                         hotelId: hotelValidation.hotelId,
                         guestInfo,
                         bookingDetails,
-                        reservationCode: pmsResponse.reservationID,
+                        reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
                     });
-                    handleBookingCreatedWithoutHold(booking, approvalPlan);
                 }
-            } catch (dbError) {
-                console.error("Failed to save pay-later booking to database:", dbError);
-            }
 
-            return res.json({
-                success: true,
-                message: 'Reservation created successfully. $1.00 hold placed on card.',
-                reservationCode: pmsResponse.reservationID
-            });
+                return res.json({
+                    success: true,
+                    message: 'Reservation confirmed. $1.00 hold placed on card.',
+                    reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
+                });
+            } catch (dbError) {
+                console.error("Failed to confirm manual pay-later booking:", dbError);
+                if (paymentIntent.status === 'requires_capture') {
+                    await stripe.paymentIntents.cancel(paymentIntentId).catch((cancelError) => {
+                        console.error('Failed to release hold after booking failure:', cancelError.message);
+                    });
+                }
+                const unavailable = dbError?.code === 'MANUAL_INVENTORY_UNAVAILABLE';
+                return res.status(unavailable ? 409 : 503).json({
+                    success: false,
+                    message: unavailable
+                        ? 'That room was just booked for one of those nights. Your $1 hold was released—please choose another room or dates.'
+                        : 'We could not confirm the reservation. Your $1 hold was released—please try again.',
+                    code: unavailable ? 'ROOM_JUST_BOOKED' : 'BOOKING_CONFIRMATION_FAILED',
+                });
+            }
         }
 
         // Cloudbeds pay-later flow
@@ -2092,7 +2229,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
             
             while (!dbSaveSuccess && retries > 0) {
                 try {
-                    await prisma.booking.create({
+                    const savedBooking = await prisma.booking.create({
                         data: {
                             stripePaymentIntentId: paymentIntentId,
                             ourReservationCode: bookingDetails.reservationCode,
@@ -2118,7 +2255,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         }
                     });
                     dbSaveSuccess = true;
-                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
+                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
                     notifyGuestBookingConfirmed({
                         req,
                         hotelId: hotelValidation.hotelId,
@@ -2605,7 +2742,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
             if (pmsResponse.data.success) {
                 console.log('✅ Backup booking created in Cloudbeds via webhook:', pmsResponse.data.reservationID);
 
-                await prisma.booking.create({
+                const savedBooking = await prisma.booking.create({
                     data: {
                         stripePaymentIntentId: paymentIntent.id,
                         ourReservationCode: bookingDetails.reservationCode,
@@ -2630,7 +2767,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 // 3. Send push notification
                 const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
                 const roomName = bookingDetails.roomName || bookingDetails.name;
-                triggerBookingNotifications(hotelId, guestName, roomName, bookingDetails.total, bookingDetails.checkin);
+                triggerBookingNotifications(hotelId, guestName, roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
 
                 // 4. Fire purchase event via Meta CAPI since the webhook did the work.
                 sendToMetaCAPI('Purchase', {
@@ -3338,36 +3475,56 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
         if (pmsResponse.success) {
             // Save to database
             try {
-                await prisma.booking.create({
-                    data: {
-                        stripePaymentIntentId: paymentIntentId,
-                        ourReservationCode: bookingDetails.reservationCode,
-                        pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelValidation.hotelId,
-                        roomName: bookingDetails.name || bookingDetails.roomName,
-                        bookingType: bookingDetails.bookingType || 'standard',
-                        checkinDate: new Date(bookingDetails.checkin),
-                        checkoutDate: new Date(bookingDetails.checkout),
-                        nights: bookingDetails.nights,
-                        guestFirstName: guestInfo.firstName,
-                        guestLastName: guestInfo.lastName,
-                        guestEmail: guestInfo.email,
-                        guestPhone: guestInfo.phone,
-                        subtotal: bookingDetails.subtotal,
-                        taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total
-                    }
-                });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email);
-                notifyGuestBookingConfirmed({
-                    req,
+                const bookingData = {
+                    stripePaymentIntentId: paymentIntentId,
+                    ourReservationCode: bookingDetails.reservationCode || pmsResponse.reservationID,
+                    pmsConfirmationCode: pmsResponse.reservationID,
                     hotelId: hotelValidation.hotelId,
-                    guestInfo,
-                    bookingDetails,
-                    reservationCode: pmsResponse.reservationID,
-                });
+                    roomName: bookingDetails.name || bookingDetails.roomName,
+                    bookingType: bookingDetails.bookingType || 'standard',
+                    checkinDate: new Date(bookingDetails.checkin),
+                    checkoutDate: new Date(bookingDetails.checkout),
+                    nights: bookingDetails.nights,
+                    guestFirstName: guestInfo.firstName,
+                    guestLastName: guestInfo.lastName,
+                    guestEmail: guestInfo.email,
+                    guestPhone: guestInfo.phone,
+                    subtotal: bookingDetails.subtotal,
+                    taxesAndFees: bookingDetails.taxes,
+                    grandTotal: bookingDetails.total,
+                };
+                const outcome = config.pms === 'manual'
+                    ? await createManualBookingRecordWithInventory(hotelValidation.hotelId, bookingData)
+                    : { booking: await prisma.booking.create({ data: bookingData }), created: true };
+
+                if (outcome.created) {
+                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
+                    notifyGuestBookingConfirmed({
+                        req,
+                        hotelId: hotelValidation.hotelId,
+                        guestInfo,
+                        bookingDetails,
+                        reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
+                    });
+                }
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
+                if (config.pms === 'manual') {
+                    await stripe.refunds.create(
+                        { payment_intent: paymentIntentId },
+                        { idempotencyKey: `manual-inventory-failure-${paymentIntentId}` }
+                    ).catch((refundError) => {
+                        console.error('Failed to refund payment after booking failure:', refundError.message);
+                    });
+                    const unavailable = dbError?.code === 'MANUAL_INVENTORY_UNAVAILABLE';
+                    return res.status(unavailable ? 409 : 503).json({
+                        success: false,
+                        message: unavailable
+                            ? 'That room was just booked for one of those nights. Your payment was refunded—please choose another room or dates.'
+                            : 'We could not confirm the reservation. Your payment was refunded—please try again.',
+                        code: unavailable ? 'ROOM_JUST_BOOKED' : 'BOOKING_CONFIRMATION_FAILED',
+                    });
+                }
             }
         }
         
@@ -4734,6 +4891,68 @@ app.post('/api/crm/booking-approval', crmAuth, async (req, res) => {
     }
 });
 
+app.get('/api/crm/booking-review-settings', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({
+                success: true,
+                data: { reminderMinutes: 15, maxReminders: BOOKING_REVIEW_MAX_REMINDERS },
+            });
+        }
+        const hotel = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { bookingReviewReminderMinutes: true },
+        }));
+        res.json({
+            success: true,
+            data: {
+                reminderMinutes: resolveBookingReviewReminderMinutes(hotel?.bookingReviewReminderMinutes),
+                maxReminders: BOOKING_REVIEW_MAX_REMINDERS,
+            },
+        });
+    } catch (e) {
+        console.error('crm/booking-review-settings GET:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load reminder settings.' });
+    }
+});
+
+app.post('/api/crm/booking-review-settings', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const requested = parseInt(req.body?.reminderMinutes, 10);
+        if (!BOOKING_REVIEW_ALLOWED_INTERVALS.has(requested)) {
+            return res.status(400).json({ success: false, message: 'Choose once, 15 minutes, 30 minutes, or 1 hour.' });
+        }
+        await withRetry(() => prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: { bookingReviewReminderMinutes: requested },
+        }));
+        hotelConfigCache.delete(hotelId);
+
+        // Apply the new cadence to outstanding reviews immediately.
+        const now = new Date();
+        await prisma.booking.updateMany({
+            where: { hotelId, ownerReviewStatus: 'unreviewed', status: ACTIVE_BOOKING_STATUS_FILTER },
+            data: {
+                ownerReviewReminderCount: 0,
+                ownerReviewNextReminderAt: requested > 0
+                    ? new Date(now.getTime() + requested * 60 * 1000)
+                    : null,
+            },
+        });
+        res.json({
+            success: true,
+            data: { reminderMinutes: requested, maxReminders: BOOKING_REVIEW_MAX_REMINDERS },
+        });
+    } catch (e) {
+        console.error('crm/booking-review-settings POST:', e.message);
+        res.status(500).json({ success: false, message: 'Could not save reminder settings.' });
+    }
+});
+
 // CRM: guest install funnel stats (last 30 days).
 app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
     try {
@@ -4919,12 +5138,148 @@ async function sendPushToHotel(hotelId, payloadObj, opts = {}, label = 'push') {
 }
 
 const MONTHLY_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+const BOOKING_REVIEW_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const BOOKING_REVIEW_SWEEP_INTERVAL_MS = 60 * 1000;
+const BOOKING_REVIEW_MAX_REMINDERS = 3;
+const BOOKING_REVIEW_ALLOWED_INTERVALS = new Set([0, 15, 30, 60]);
+
+function resolveBookingReviewReminderMinutes(value) {
+    const parsed = parseInt(value, 10);
+    return BOOKING_REVIEW_ALLOWED_INTERVALS.has(parsed) ? parsed : 15;
+}
+
+function signBookingReviewToken({ bookingId, hotelId }) {
+    const payload = JSON.stringify({
+        purpose: 'booking-review',
+        bookingId: String(bookingId || '').trim(),
+        hotelId: String(hotelId || '').trim(),
+        exp: Date.now() + BOOKING_REVIEW_TOKEN_EXPIRY_MS,
+    });
+    const encoded = Buffer.from(payload).toString('base64url');
+    return 'br_' + encoded + '.' + signBookingActionPayload(encoded);
+}
+
+function verifyBookingReviewToken(token) {
+    const raw = String(token || '').trim();
+    if (!raw.startsWith('br_')) return null;
+    const parts = raw.slice(3).split('.');
+    if (parts.length !== 2) return null;
+    const [encoded, sig] = parts;
+    if (!timingSafeTextEqual(sig, signBookingActionPayload(encoded))) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (payload.purpose !== 'booking-review') return null;
+        if (!payload.bookingId || !payload.hotelId) return null;
+        if (!(Number(payload.exp) > Date.now())) return null;
+        return { bookingId: String(payload.bookingId), hotelId: String(payload.hotelId) };
+    } catch (_) {
+        return null;
+    }
+}
+
+function formatBookingReviewStay(checkin, checkout) {
+    try {
+        const options = { month: 'short', day: 'numeric', timeZone: 'UTC' };
+        const start = new Date(checkin).toLocaleDateString('en-US', options);
+        const end = new Date(checkout).toLocaleDateString('en-US', options);
+        return `${start}–${end}`;
+    } catch (_) {
+        return '';
+    }
+}
+
+async function bookingReviewPublicData(booking) {
+    if (!booking) return null;
+    let totalUnits = 1;
+    try {
+        const room = await prisma.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId: booking.hotelId, name: booking.roomName } },
+            select: { totalUnits: true },
+        });
+        if (room?.totalUnits) totalUnits = Math.max(1, parseInt(room.totalUnits, 10) || 1);
+    } catch (_) {}
+    return {
+        id: booking.id,
+        status: booking.status,
+        reviewStatus: booking.ownerReviewStatus || null,
+        reviewedAt: booking.ownerReviewedAt || null,
+        roomName: booking.roomName,
+        checkinDate: booking.checkinDate,
+        checkoutDate: booking.checkoutDate,
+        nights: booking.nights,
+        guestName: [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'Guest',
+        guestPhone: booking.guestPhone || '',
+        guestEmail: booking.guestEmail || '',
+        grandTotal: booking.grandTotal,
+        amountPaidNow: booking.amountPaidNow || 0,
+        totalUnits,
+    };
+}
+
+async function armConfirmedBookingReview(bookingId, hotelId) {
+    if (!bookingId || !hotelId) return null;
+    const hotel = await prisma.hotelConfig.findUnique({
+        where: { id: hotelId },
+        select: { bookingReviewReminderMinutes: true },
+    }).catch(() => null);
+    const reminderMinutes = resolveBookingReviewReminderMinutes(hotel?.bookingReviewReminderMinutes);
+    const now = new Date();
+    const nextReminder = reminderMinutes > 0
+        ? new Date(now.getTime() + reminderMinutes * 60 * 1000)
+        : null;
+
+    await prisma.booking.updateMany({
+        where: {
+            id: bookingId,
+            hotelId,
+            status: ACTIVE_BOOKING_STATUS_FILTER,
+            bookingType: { not: 'manual' },
+        },
+        data: {
+            ownerReviewStatus: 'unreviewed',
+            ownerReviewRequestedAt: now,
+            ownerReviewedAt: null,
+            ownerReviewReminderCount: 0,
+            ownerReviewNextReminderAt: nextReminder,
+        },
+    });
+    return prisma.booking.findFirst({ where: { id: bookingId, hotelId } });
+}
+
+async function sendBookingReviewPush(booking, { reminderNumber = 0 } = {}) {
+    if (!booking?.hotelId || !booking?.id) return 0;
+    const token = signBookingReviewToken({ bookingId: booking.id, hotelId: booking.hotelId });
+    const stay = formatBookingReviewStay(booking.checkinDate, booking.checkoutDate);
+    const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'Guest';
+    const amount = Number(booking.grandTotal || 0).toFixed(2);
+    const paid = Number(booking.amountPaidNow || 0);
+    const priceLine = paid > 0 ? `$${amount} total` : `$${amount} due at check-in`;
+    const reminderPrefix = reminderNumber > 0 ? `Reminder ${reminderNumber}/${BOOKING_REVIEW_MAX_REMINDERS}: ` : '';
+    const title = reminderNumber > 0
+        ? `${reminderPrefix}verify this booking`
+        : 'New confirmed booking';
+
+    return sendPushToHotel(booking.hotelId, {
+        title,
+        body: `${booking.roomName} · ${stay}\n${guestName} · ${priceLine}`,
+        url: `/frontdesk?review=${encodeURIComponent(token)}`,
+        icon: '/apple-touch-icon.png',
+        tag: `booking-review-${booking.id}`,
+        requireInteraction: true,
+        renotify: true,
+        actions: [{ action: 'view', title: 'Review room' }],
+        data: { type: 'booking_review', bookingId: booking.id, token },
+    }, {
+        TTL: reminderNumber > 0 ? 60 * 60 : 10 * 60,
+        urgency: 'high',
+    }, reminderNumber > 0 ? 'bookingReviewReminder' : 'notifyNewBooking');
+}
 
 // Notify the owner of a new booking. The copy adapts to context so the alert is
 // genuinely useful at a glance: first sale of the day, a big-ticket booking, a
 // returning guest, or a same-day arrival each get their own framing. Also fires a
 // separate 🏆 milestone alert when the hotel crosses a monthly bookings threshold.
-async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '') {
+async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '', bookingId = '') {
     if (!VAPID_PRIVATE || !hotelId) { console.log(`🔕 [push] new booking skipped (vapid=${!!VAPID_PRIVATE}, hotel=${hotelId})`); return; }
     try {
         const amount = (grandTotal !== undefined && grandTotal !== null) ? Number(grandTotal) : null;
@@ -4972,9 +5327,18 @@ async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checki
         if (arrivesToday) bodyText += ' · arrives today ⚡';
         if (!bodyText) bodyText = 'A new booking just came in.';
 
-        const sent = await sendPushToHotel(hotelId, {
-            title, body: bodyText, url: '/frontdesk', icon: '/apple-touch-icon.png',
-        }, { TTL: 60 }, 'notifyNewBooking');
+        const reviewBooking = bookingId
+            ? await prisma.booking.findFirst({ where: { id: bookingId, hotelId } }).catch(() => null)
+            : null;
+        const sent = reviewBooking
+            ? await sendBookingReviewPush(reviewBooking)
+            : await sendPushToHotel(hotelId, {
+                title,
+                body: bodyText,
+                url: '/frontdesk?tab=bookings',
+                icon: '/apple-touch-icon.png',
+                tag: bookingId ? `booking-review-${bookingId}` : undefined,
+            }, { TTL: 60 }, 'notifyNewBooking');
         console.log(`🔔 [push] new booking hotel=${hotelId} sent=${sent} "${title}"`);
 
         // Monthly milestone — fires once, exactly when the count lands on a threshold.
@@ -5122,8 +5486,19 @@ async function maybeNotifyRoomSoldOutToday(hotelId, roomName, referenceIso = '')
     }
 }
 
-function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '') {
-    notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso, guestEmail).catch(() => {});
+function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '', bookingId = '') {
+    const run = async () => {
+        let armedBookingId = '';
+        if (bookingId) {
+            const armed = await armConfirmedBookingReview(bookingId, hotelId).catch((e) => {
+                console.error('armConfirmedBookingReview:', e.message);
+                return null;
+            });
+            armedBookingId = armed?.id || bookingId;
+        }
+        await notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso, guestEmail, armedBookingId);
+    };
+    run().catch(() => {});
     maybeNotifyRoomSoldOutToday(hotelId, roomName, checkinIso).catch(() => {});
 }
 
@@ -5338,16 +5713,20 @@ async function notifyBookingApprovalResolved(booking, outcome) {
     }
 }
 
-// Void the $1 pre-authorization when the owner turns a booking away. Distinct
-// from /api/release-hold, which means "guest checked in, stop holding".
+// Release an uncaptured authorization or refund a captured payment when the
+// owner turns a confirmed booking away. Idempotency protects repeat taps.
 async function voidBookingHold(booking) {
     if (!booking?.stripePaymentIntentId) return;
-    if (String(booking.holdStatus || '').toLowerCase() !== 'active') return;
     try {
         const intent = await stripe.paymentIntents.retrieve(booking.stripePaymentIntentId);
         const cancellable = ['requires_capture', 'requires_confirmation', 'requires_payment_method', 'requires_action'];
         if (cancellable.includes(String(intent.status || ''))) {
             await stripe.paymentIntents.cancel(booking.stripePaymentIntentId);
+        } else if (String(intent.status || '') === 'succeeded' && Number(intent.amount_received || 0) > 0) {
+            await stripe.refunds.create(
+                { payment_intent: booking.stripePaymentIntentId, reason: 'requested_by_customer' },
+                { idempotencyKey: `owner-cancel-refund-${booking.id}` }
+            );
         }
         await withRetry(() => prisma.booking.update({
             where: { id: booking.id },
@@ -5643,7 +6022,7 @@ async function sendBookingCancelledEmail(booking, reason) {
 
         // This guest already received a "Reservation confirmed" email, so the copy
         // has to acknowledge that directly rather than pretend it never happened.
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#7f1d1d;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Your reservation was cancelled</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${escapeXml(guestName)},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">We're sorry — ${hotelName} has had to cancel your reservation for <strong>${escapeXml(booking.roomName)}</strong>${stay ? ` (${stay})` : ''}, confirmation <strong>${escapeXml(code)}</strong>. We know you'd already had a confirmation from us, and we're sorry for the trouble this causes.</p>${reasonLine}<p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>You have not been charged.</strong> The temporary $1 authorisation on your card has been voided and will drop off your statement.</p>${contactLine}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#7f1d1d;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Your reservation was cancelled</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${escapeXml(guestName)},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">We're sorry — ${hotelName} has had to cancel your reservation for <strong>${escapeXml(booking.roomName)}</strong>${stay ? ` (${stay})` : ''}, confirmation <strong>${escapeXml(code)}</strong>. We know you'd already had a confirmation from us, and we're sorry for the trouble this causes.</p>${reasonLine}<p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>Your payment has been handled automatically.</strong> Any temporary card authorisation has been released, and any captured online payment has been submitted for refund.</p>${contactLine}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
 
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
@@ -5669,31 +6048,254 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
         return { ok: true, code: 'already_cancelled', status: booking.status, booking };
     }
 
-    const result = await withRetry(() => prisma.booking.updateMany({
-        where: { id: booking.id, status: { notIn: DEAD_BOOKING_STATUSES } },
-        data: {
-            status: 'cancelled',
-            cancelledAt: new Date(),
-            cancellationReason: String(reason || '').trim().slice(0, 500) || null,
-            // A pending booking cancelled this way never got its approval decision,
-            // so record that the owner is the one who ended it.
-            ...(String(booking.status).toLowerCase() === 'pending'
-                ? { approvalOutcome: 'owner_released', approvalDecidedAt: new Date() }
-                : {}),
-        },
-    }));
+    const result = await withRetry(() => prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext(${booking.roomName}))`;
+        const updated = await tx.booking.updateMany({
+            where: { id: booking.id, status: { notIn: DEAD_BOOKING_STATUSES } },
+            data: {
+                status: 'cancelled',
+                cancelledAt: new Date(),
+                cancellationReason: String(reason || '').trim().slice(0, 500) || null,
+                ownerReviewStatus: 'cancelled',
+                ownerReviewedAt: new Date(),
+                ownerReviewNextReminderAt: null,
+                // Legacy pending rows can still be cancelled safely while the old
+                // approval links age out.
+                ...(String(booking.status).toLowerCase() === 'pending'
+                    ? { approvalOutcome: 'owner_released', approvalDecidedAt: new Date() }
+                    : {}),
+            },
+        });
+
+        // Only the winning cancellation restores inventory. Legacy bookings have
+        // no marker, so their manually maintained overrides are left untouched.
+        const overrideDates = parseInventoryOverrideDates(booking.inventoryOverrideDates);
+        if (updated.count === 1 && overrideDates.length) {
+            const room = await tx.manualRoom.findUnique({
+                where: { hotelId_name: { hotelId, name: booking.roomName } },
+                select: { id: true },
+            });
+            if (room) {
+                await tx.manualOverride.updateMany({
+                    where: {
+                        roomId: room.id,
+                        date: { in: overrideDates },
+                        availableUnits: { not: null },
+                    },
+                    data: { availableUnits: { increment: 1 } },
+                });
+            }
+        }
+        return updated;
+    }, { maxWait: 5000, timeout: 15000 }));
     if (result.count !== 1) {
         const fresh = await prisma.booking.findUnique({ where: { id: booking.id } }).catch(() => null);
         return { ok: true, code: 'already_cancelled', status: fresh?.status || booking.status, booking: fresh || booking };
     }
 
-    const cancelled = { ...booking, status: 'cancelled' };
+    const cancelled = {
+        ...booking,
+        status: 'cancelled',
+        ownerReviewStatus: 'cancelled',
+        ownerReviewedAt: new Date(),
+        ownerReviewNextReminderAt: null,
+    };
     await voidBookingHold(cancelled);
     sendBookingCancelledEmail(cancelled, reason).catch(() => {});
     console.log(`🚫 [cancel] booking=${booking.id} hotel=${hotelId} was=${booking.status} reason=${reason || 'none'}`);
 
     return { ok: true, code: 'cancelled', status: 'cancelled', booking: cancelled };
 }
+
+async function buildBookingAvailabilityCorrection(booking) {
+    if (!booking?.hotelId || !booking?.roomName) return null;
+    const room = await prisma.manualRoom.findUnique({
+        where: { hotelId_name: { hotelId: booking.hotelId, name: booking.roomName } },
+        select: { totalUnits: true },
+    }).catch(() => null);
+    if (!room) return null;
+    return {
+        roomName: booking.roomName,
+        checkinDate: booking.checkinDate,
+        checkoutDate: booking.checkoutDate,
+        totalUnits: Math.max(1, parseInt(room.totalUnits, 10) || 1),
+    };
+}
+
+async function runBookingReviewReminderSweep() {
+    if (!prisma.booking) return { sent: 0 };
+    const now = new Date();
+    const due = await prisma.booking.findMany({
+        where: {
+            ownerReviewStatus: 'unreviewed',
+            ownerReviewNextReminderAt: { lte: now },
+            ownerReviewReminderCount: { lt: BOOKING_REVIEW_MAX_REMINDERS },
+            status: ACTIVE_BOOKING_STATUS_FILTER,
+        },
+        orderBy: { ownerReviewNextReminderAt: 'asc' },
+        take: 100,
+    }).catch((e) => {
+        console.error('booking review reminder query:', e.message);
+        return [];
+    });
+
+    let sent = 0;
+    for (const booking of due) {
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: booking.hotelId },
+            select: { bookingReviewReminderMinutes: true },
+        }).catch(() => null);
+        const intervalMinutes = resolveBookingReviewReminderMinutes(hotel?.bookingReviewReminderMinutes);
+        if (intervalMinutes <= 0) {
+            await prisma.booking.updateMany({
+                where: { id: booking.id, ownerReviewStatus: 'unreviewed' },
+                data: { ownerReviewNextReminderAt: null },
+            }).catch(() => {});
+            continue;
+        }
+
+        const reminderNumber = Math.min(
+            BOOKING_REVIEW_MAX_REMINDERS,
+            Math.max(0, booking.ownerReviewReminderCount || 0) + 1
+        );
+        const nextReminder = reminderNumber >= BOOKING_REVIEW_MAX_REMINDERS
+            ? null
+            : new Date(now.getTime() + intervalMinutes * 60 * 1000);
+        const claimed = await prisma.booking.updateMany({
+            where: {
+                id: booking.id,
+                ownerReviewStatus: 'unreviewed',
+                ownerReviewNextReminderAt: { lte: now },
+                ownerReviewReminderCount: booking.ownerReviewReminderCount || 0,
+            },
+            data: {
+                ownerReviewReminderCount: reminderNumber,
+                ownerReviewNextReminderAt: nextReminder,
+            },
+        }).catch(() => ({ count: 0 }));
+        if (claimed.count !== 1) continue;
+
+        const delivered = await sendBookingReviewPush(booking, { reminderNumber }).catch(() => 0);
+        if (delivered > 0) sent += 1;
+    }
+    if (sent) console.log(`🔔 [booking-review] sent ${sent} reminder(s)`);
+    return { sent };
+}
+
+app.get('/api/booking-review/peek', async (req, res) => {
+    try {
+        const claim = verifyBookingReviewToken(String(req.query?.token || '').trim());
+        if (!claim) return res.status(401).json({ success: false, message: 'This booking link has expired.' });
+        const booking = await prisma.booking.findUnique({ where: { id: claim.bookingId } }).catch(() => null);
+        if (!booking || booking.hotelId !== claim.hotelId) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+        res.json({ success: true, data: await bookingReviewPublicData(booking) });
+    } catch (e) {
+        console.error('booking-review/peek:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load that booking.' });
+    }
+});
+
+app.post('/api/booking-review/act', async (req, res) => {
+    try {
+        const token = String(req.body?.token || '').trim();
+        const action = String(req.body?.action || '').trim().toLowerCase();
+        if (!['available', 'cancel'].includes(action)) {
+            return res.status(400).json({ success: false, message: 'action must be available or cancel.' });
+        }
+        const claim = verifyBookingReviewToken(token);
+        if (!claim) return res.status(401).json({ success: false, message: 'This booking link has expired.' });
+        const booking = await prisma.booking.findUnique({ where: { id: claim.bookingId } }).catch(() => null);
+        if (!booking || booking.hotelId !== claim.hotelId) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+
+        if (action === 'available') {
+            if (!isDeadBookingStatus(booking.status)) {
+                await prisma.booking.update({
+                    where: { id: booking.id },
+                    data: {
+                        ownerReviewStatus: 'available',
+                        ownerReviewedAt: new Date(),
+                        ownerReviewNextReminderAt: null,
+                    },
+                });
+            }
+            return res.json({
+                success: true,
+                status: isDeadBookingStatus(booking.status) ? booking.status : 'confirmed',
+                reviewStatus: isDeadBookingStatus(booking.status) ? 'cancelled' : 'available',
+            });
+        }
+
+        const outcome = await cancelBookingByOwner(
+            booking.id,
+            booking.hotelId,
+            String(req.body?.reason || 'Room was already taken')
+        );
+        if (!outcome.ok) return res.status(404).json({ success: false, message: 'Booking not found.' });
+        res.json({
+            success: true,
+            status: outcome.status,
+            alreadyCancelled: outcome.code === 'already_cancelled',
+            calendarCorrection: await buildBookingAvailabilityCorrection(outcome.booking),
+        });
+    } catch (e) {
+        console.error('booking-review/act:', e.message);
+        res.status(500).json({ success: false, message: 'Could not apply that decision.' });
+    }
+});
+
+app.post('/api/booking-review/block-dates', async (req, res) => {
+    try {
+        const claim = verifyBookingReviewToken(String(req.body?.token || '').trim());
+        if (!claim) return res.status(401).json({ success: false, message: 'This booking link has expired.' });
+        const booking = await prisma.booking.findUnique({ where: { id: claim.bookingId } }).catch(() => null);
+        if (!booking || booking.hotelId !== claim.hotelId) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+        if (!isDeadBookingStatus(booking.status)) {
+            return res.status(409).json({ success: false, message: 'Cancel the booking before changing these dates.' });
+        }
+        const room = await prisma.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId: booking.hotelId, name: booking.roomName } },
+        }).catch(() => null);
+        if (!room) return res.status(400).json({ success: false, message: 'Room type not found.' });
+
+        const availableUnits = Math.min(
+            Math.max(0, parseInt(req.body?.availableUnits, 10) || 0),
+            Math.max(0, room.totalUnits)
+        );
+        const dates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+        await prisma.$transaction(dates.map((date) => prisma.manualOverride.upsert({
+            where: { roomId_date: { roomId: room.id, date } },
+            update: { availableUnits, closed: availableUnits === 0 },
+            create: { roomId: room.id, date, availableUnits, closed: availableUnits === 0 },
+        })));
+        maybeNotifyRoomSoldOutToday(booking.hotelId, booking.roomName).catch(() => {});
+        res.json({ success: true, affectedDays: dates.length, availableUnits });
+    } catch (e) {
+        console.error('booking-review/block-dates:', e.message);
+        res.status(500).json({ success: false, message: 'Could not update those dates.' });
+    }
+});
+
+app.get('/api/crm/bookings/:id/review-token', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const booking = await prisma.booking.findFirst({
+            where: { id: String(req.params.id || ''), hotelId },
+        });
+        if (!booking) return res.status(404).json({ success: false, message: 'Booking not found.' });
+        const token = signBookingReviewToken({ bookingId: booking.id, hotelId });
+        res.json({ success: true, token, data: await bookingReviewPublicData(booking) });
+    } catch (e) {
+        console.error('booking review token:', e.message);
+        res.status(500).json({ success: false, message: 'Could not open that booking.' });
+    }
+});
 
 app.post('/api/crm/bookings/cancel', crmAuth, async (req, res) => {
     try {
@@ -5710,6 +6312,7 @@ app.post('/api/crm/bookings/cancel', crmAuth, async (req, res) => {
             cancelled: outcome.code === 'cancelled',
             alreadyCancelled: outcome.code === 'already_cancelled',
             status: outcome.status,
+            calendarCorrection: await buildBookingAvailabilityCorrection(outcome.booking),
         });
     } catch (e) {
         console.error('crm/bookings/cancel:', e.message);
@@ -8461,11 +9064,16 @@ const CRM_BOOKING_LIST_SELECT = {
     checkoutDate: true,
     nights: true,
     grandTotal: true,
+    bookingType: true,
     callStatus: true,
     notes: true,
     status: true,
     pendingUntil: true,
     approvalOutcome: true,
+    ownerReviewStatus: true,
+    ownerReviewedAt: true,
+    ownerReviewReminderCount: true,
+    ownerReviewNextReminderAt: true,
 };
 
 app.get('/api/crm/bookings', crmAuth, async (req, res) => {
@@ -8859,5 +9467,12 @@ app.listen(PORT, () => {
         const sweep = () => runBookingApprovalSweep().catch((e) => console.error('Booking approval sweep:', e.message));
         setTimeout(sweep, 15_000);
         setInterval(sweep, BOOKING_APPROVAL_SWEEP_INTERVAL_MS);
+    }
+
+    if (process.env.ENABLE_BOOKING_REVIEW_REMINDERS !== 'false') {
+        const reviewSweep = () => runBookingReviewReminderSweep()
+            .catch((e) => console.error('Booking review reminder sweep:', e.message));
+        setTimeout(reviewSweep, 20_000);
+        setInterval(reviewSweep, BOOKING_REVIEW_SWEEP_INTERVAL_MS);
     }
 });
