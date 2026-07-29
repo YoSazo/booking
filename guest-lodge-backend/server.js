@@ -7,8 +7,10 @@ require('dotenv').config({
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const compression = require('compression');
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
+const fs = require('fs');
 
 if (!process.env.STRIPE_SECRET_KEY) {
     console.warn('⚠️  STRIPE_SECRET_KEY missing — add it to guest-lodge-backend/.env (payment routes will fail until then)');
@@ -87,7 +89,7 @@ async function sendWelcomeEmail(toEmail, hotelName, pin, domain) {
         return;
     }
     try {
-        let html = require('fs').readFileSync(path.join(__dirname, 'email-templates', 'welcome.html'), 'utf8');
+        let html = fs.readFileSync(path.join(__dirname, 'email-templates', 'welcome.html'), 'utf8');
         html = html.replace(/\{\{DOMAIN\}\}/g, domain);
         html = html.replace(/\{\{PIN\}\}/g, pin);
 
@@ -267,6 +269,27 @@ async function runGuestInstallReminders() {
         },
         take: 50,
     }).catch(() => []);
+    const hotelIds = [...new Set(bookings.map((booking) => booking.hotelId).filter(Boolean))];
+    const [hotels, domains] = hotelIds.length
+        ? await Promise.all([
+            prisma.hotelConfig.findMany({
+                where: { id: { in: hotelIds } },
+                select: { id: true, name: true, phone: true },
+            }).catch(() => []),
+            prisma.hotelDomain.findMany({
+                where: { hotelId: { in: hotelIds } },
+                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+                select: { hotelId: true, domain: true },
+            }).catch(() => []),
+        ])
+        : [[], []];
+    const hotelsById = new Map(hotels.map((hotel) => [hotel.id, hotel]));
+    const domainsByHotelId = new Map();
+    for (const domain of domains) {
+        if (!domainsByHotelId.has(domain.hotelId)) {
+            domainsByHotelId.set(domain.hotelId, domain.domain);
+        }
+    }
 
     let sent = 0;
     let skipped = 0;
@@ -281,15 +304,9 @@ async function runGuestInstallReminders() {
             continue;
         }
 
-        const hotel = await prisma.hotelConfig.findUnique({
-            where: { id: b.hotelId },
-            select: { name: true, phone: true },
-        }).catch(() => null);
-        const domain = await prisma.hotelDomain.findFirst({
-            where: { hotelId: b.hotelId },
-            orderBy: { isPrimary: 'desc' },
-        }).catch(() => null);
-        const base = domain?.domain ? `https://${domain.domain}` : '';
+        const hotel = hotelsById.get(b.hotelId);
+        const domain = domainsByHotelId.get(b.hotelId);
+        const base = domain ? `https://${domain}` : '';
         if (!base) { skipped++; continue; }
 
         const installUrl = `${base}/install?code=${encodeURIComponent(code)}&ref=checkin-reminder`;
@@ -319,8 +336,6 @@ async function runGuestInstallReminders() {
 }
 
 // Web Push configuration
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:notifications@example.com';
 
 // Meta Ads / Facebook Marketing API config
@@ -342,6 +357,7 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 }
 
 const app = express();
+app.use(compression());
 
 const LOCAL_API_PROXY_URL = String(process.env.LOCAL_API_PROXY_URL || '').replace(/\/$/, '');
 
@@ -513,8 +529,9 @@ const corsOptions = {
 
 
 
-// Webhook needs raw body
+// Stripe webhooks need their untouched raw body for signature verification.
 app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
+app.use('/api/marketel-stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
 
 // Front Desk must be registered BEFORE express.static(public) — otherwise static
@@ -522,16 +539,23 @@ app.use(cors(corsOptions));
 // which on Vercel hotel domains falls through to the booking-engine SPA.
 const FRONTDESK_BUILT = path.join(__dirname, 'public', 'frontdesk', 'index.html');
 const FRONTDESK_LEGACY = path.join(__dirname, 'simple-crm.html');
+let cachedFrontdeskHtml = '';
+
 function serveFrontdesk(_req, res) {
     res.setHeader('Cache-Control', 'no-cache');
-    const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
     try {
-        let html = require('fs').readFileSync(file, 'utf8');
-        const stats = require('fs').statSync(file);
+        if (process.env.NODE_ENV === 'production' && cachedFrontdeskHtml) {
+            return res.type('html').send(cachedFrontdeskHtml);
+        }
+        const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
+        let html = fs.readFileSync(file, 'utf8');
+        const stats = fs.statSync(file);
         const version = Math.floor(stats.mtimeMs);
         html = html.replace(/\/frontdesk\/assets\/([^"']+)/g, '/frontdesk/assets/$1?v=' + version);
+        if (process.env.NODE_ENV === 'production') cachedFrontdeskHtml = html;
         res.send(html);
     } catch (e) {
+        const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
         res.sendFile(file);
     }
 }
@@ -586,14 +610,8 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
-app.use((req, res, next) => {
-    if (req.originalUrl.startsWith('/api/stripe-webhook')) {
-        next();
-    } else {
-        express.json()(req, res, next);
-    }
-});
-
+// Webhook requests already have a Buffer body from express.raw above. Express
+// detects that parsed body and skips JSON parsing, so one global parser is enough.
 app.use(express.json());
 app.use(express.text());
 app.set('trust proxy', true);
@@ -818,10 +836,6 @@ async function resolveHotelConfig(hotelId) {
         });
     }
 }
-
-// Legacy mapping for backwards compatibility (will be removed)
-const roomIDMapping = hotelConfig['suite-stay'].roomIDMapping;
-const PROPERTY_ID = hotelConfig['suite-stay'].propertyId;
 
 const getBestRatePlan = (nights) => {
     if (nights >= 28) {
@@ -1073,6 +1087,9 @@ async function getActiveHotelValidation(hotelId) {
     if (override.status === 'inactive') {
         return { ok: false, status: 403, message: `Hotel is inactive: ${cleanHotelId}` };
     }
+    if (override.status === 'unsubscribed') {
+        return { ok: false, status: 402, message: 'Online bookings are not activated for this property.' };
+    }
     // Fallback: resolve via domain (e.g. "john-hotel" → "john-hotel.mktel.co" → real ID)
     if (prisma.hotelDomain) {
         const domainGuess = cleanHotelId + '.mktel.co';
@@ -1081,11 +1098,18 @@ async function getActiveHotelValidation(hotelId) {
             domainRecord = await prisma.hotelDomain.findFirst({ where: { domain: cleanHotelId + '.bookmarketel.com' } }).catch(() => null);
         }
         if (domainRecord) {
-            const row = await prisma.hotelConfig.findUnique({ where: { id: domainRecord.hotelId }, select: { id: true, active: true } }).catch(() => null);
+            const row = await prisma.hotelConfig.findUnique({
+                where: { id: domainRecord.hotelId },
+                select: { id: true, active: true, subscribed: true, setupToken: true },
+            }).catch(() => null);
             if (row) {
-                return row.active
-                    ? { ok: true, hotelId: row.id }
-                    : { ok: false, status: 403, message: `Hotel is inactive: ${row.id}` };
+                if (!row.active) {
+                    return { ok: false, status: 403, message: `Hotel is inactive: ${row.id}` };
+                }
+                if (row.setupToken && !row.subscribed) {
+                    return { ok: false, status: 402, message: 'Online bookings are not activated for this property.' };
+                }
+                return { ok: true, hotelId: row.id };
             }
         }
     }
@@ -1899,6 +1923,7 @@ const completePayLaterRateLimit = createRouteRateLimiter('complete-pay-later-boo
 const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1000, max: 12 });
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 25 });
+const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
 
 app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
     const { amount, bookingDetails, guestInfo, hotelId, preview } = req.body;
@@ -4020,11 +4045,21 @@ const crmAuth = async (req, res, next) => {
     next();
 };
 
+function suppliedAdminToken(req) {
+    const direct = String(req.headers['x-admin-token'] || '').trim();
+    if (direct) return direct;
+    const authorization = String(req.headers.authorization || '').trim();
+    if (/^Bearer\s+/i.test(authorization)) {
+        return authorization.replace(/^Bearer\s+/i, '').trim();
+    }
+    return '';
+}
+
 const adminAuth = (req, res, next) => {
     if (!ADMIN_TOKEN) {
         return res.status(503).json({ success: false, message: 'Admin API is disabled. Set ADMIN_TOKEN.' });
     }
-    const token = String(req.headers['x-admin-token'] || '').trim();
+    const token = suppliedAdminToken(req);
     if (!token || token !== ADMIN_TOKEN) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
@@ -4111,12 +4146,18 @@ async function getHotelOverrideStatus(hotelId) {
         try {
             const row = await withRetry(() => prisma.hotelConfig.findUnique({
                 where: { id: cleanHotelId },
-                select: { id: true, active: true },
+                select: { id: true, active: true, subscribed: true, setupToken: true },
             }));
             if (row) {
-                return row.active
-                    ? { status: 'ok', hotelId: cleanHotelId, source: 'db' }
-                    : { status: 'inactive', hotelId: cleanHotelId, source: 'db' };
+                if (!row.active) {
+                    return { status: 'inactive', hotelId: cleanHotelId, source: 'db' };
+                }
+                // Self-serve properties may be previewed before payment, but
+                // their public booking/payment APIs remain subscription-gated.
+                if (row.setupToken && !row.subscribed) {
+                    return { status: 'unsubscribed', hotelId: cleanHotelId, source: 'db' };
+                }
+                return { status: 'ok', hotelId: cleanHotelId, source: 'db' };
             }
         } catch (error) {
             if (!isPrismaConnectionError(error)) throw error;
@@ -4202,7 +4243,7 @@ async function resolveHotelContextRequest(req) {
                 hotelId: explicitHotelId,
             };
         }
-        if (override.status !== 'ok') {
+        if (override.status !== 'ok' && override.status !== 'unsubscribed') {
             return {
                 ok: false,
                 status: 400,
@@ -6138,14 +6179,23 @@ async function runBookingReviewReminderSweep() {
         console.error('booking review reminder query:', e.message);
         return [];
     });
+    const hotelIds = [...new Set(due.map((booking) => booking.hotelId).filter(Boolean))];
+    const hotelReminderSettings = hotelIds.length
+        ? await prisma.hotelConfig.findMany({
+            where: { id: { in: hotelIds } },
+            select: { id: true, bookingReviewReminderMinutes: true },
+        }).catch(() => [])
+        : [];
+    const reminderMinutesByHotelId = new Map(hotelReminderSettings.map((hotel) => [
+        hotel.id,
+        hotel.bookingReviewReminderMinutes,
+    ]));
 
     let sent = 0;
     for (const booking of due) {
-        const hotel = await prisma.hotelConfig.findUnique({
-            where: { id: booking.hotelId },
-            select: { bookingReviewReminderMinutes: true },
-        }).catch(() => null);
-        const intervalMinutes = resolveBookingReviewReminderMinutes(hotel?.bookingReviewReminderMinutes);
+        const intervalMinutes = resolveBookingReviewReminderMinutes(
+            reminderMinutesByHotelId.get(booking.hotelId)
+        );
         if (intervalMinutes <= 0) {
             await prisma.booking.updateMany({
                 where: { id: booking.id, ownerReviewStatus: 'unreviewed' },
@@ -6830,16 +6880,50 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
     }
 });
 
+const MARKETEL_ONBOARDING_EVENT_NAMES = [
+    'LandingPageView',
+    'SetupStarted',
+    'Step1Reached',
+    'Step2Reached',
+    'Step3Reached',
+    'Step4Reached',
+    'Step5Reached',
+    'QualityAnswer',
+    'Lead',
+    'SetupCompleted',
+    'FrontDeskOpened',
+    'GoLiveClicked',
+    'CheckoutStarted',
+    'PaymentSucceeded',
+    'SubscriptionStatusChanged',
+];
+const MARKETEL_PUBLIC_ONBOARDING_EVENTS = new Set([
+    'LandingPageView',
+    'SetupStarted',
+    'Step1Reached',
+    'Step2Reached',
+    'Step3Reached',
+    'Step4Reached',
+    'Step5Reached',
+    'QualityAnswer',
+    'Lead',
+]);
+
 // Onboarding funnel tracking (landing page + setup wizard)
-app.post('/api/funnel/onboarding', async (req, res) => {
+app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true });
     try {
-        const { eventName, email, userAgent, ip, referrer, contentName, eventId, setupToken } = req.body;
-        if (!eventName) return res.status(400).json({ success: false });
+        const { eventName, referrer, contentName, eventId, setupToken } = req.body || {};
+        if (!MARKETEL_PUBLIC_ONBOARDING_EVENTS.has(eventName)) {
+            return res.status(400).json({ success: false, message: 'Invalid onboarding event' });
+        }
 
-        let trackedEmail = email || null;
+        let trackedEmail = null;
         let trackedHotelId = 'marketel-onboarding';
         let setupHotel = null;
+        if (eventName !== 'LandingPageView' && !setupToken) {
+            return res.status(400).json({ success: false, message: 'Setup token required' });
+        }
         if (setupToken) {
             setupHotel = await prisma.hotelConfig.findUnique({
                 where: { setupToken },
@@ -6850,6 +6934,13 @@ app.post('/api/funnel/onboarding', async (req, res) => {
             }
             trackedHotelId = setupHotel.id;
             trackedEmail = setupHotel.ownerEmail || null;
+        }
+
+        if (eventName === 'QualityAnswer') {
+            const allowedAnswers = new Set(['ota_commissions', 'direct_bookings', 'professional', 'other']);
+            if (!setupHotel || !allowedAnswers.has(contentName)) {
+                return res.status(400).json({ success: false, message: 'Invalid quality answer' });
+            }
         }
 
         if (eventName === 'Lead') {
@@ -6869,15 +6960,17 @@ app.post('/api/funnel/onboarding', async (req, res) => {
             }
         }
 
+        const cleanEventId = String(eventId || '').trim().slice(0, 160) || null;
+        const cleanContentName = String(contentName || referrer || '').trim().slice(0, 500) || null;
         await prisma.funnelEvent.create({
             data: {
                 hotelId: trackedHotelId,
                 eventName,
-                eventId: eventId || null,
+                eventId: cleanEventId,
                 guestEmail: trackedEmail,
-                userAgent: userAgent || req.headers['user-agent'] || null,
-                ipAddress: ip || req.ip || req.socket?.remoteAddress || null,
-                contentName: contentName || referrer || null,
+                userAgent: req.headers['user-agent'] || null,
+                ipAddress: req.ip || req.socket?.remoteAddress || null,
+                contentName: cleanContentName,
             },
         });
 
@@ -6892,7 +6985,7 @@ app.post('/api/funnel/onboarding', async (req, res) => {
                 sourceUrl: req.headers.referer || '',
                 fbp: leadFbp,
                 fbc: leadFbc,
-                eventId: eventId || undefined,
+                eventId: cleanEventId || undefined,
             });
         }
         res.json({ success: true });
@@ -6902,8 +6995,8 @@ app.post('/api/funnel/onboarding', async (req, res) => {
     }
 });
 
-// Funnel dashboard API (no auth required)
-app.get('/api/funnel', async (req, res) => {
+// Funnel dashboard API (admin only; contains contact and device data)
+app.get('/api/funnel', adminAuth, async (req, res) => {
     try {
         let since, until;
 
@@ -6924,8 +7017,11 @@ app.get('/api/funnel', async (req, res) => {
         // Filter by source: 'onboarding' shows marketel funnel, default shows booking engine
         const source = req.query.source || 'all';
         const where = { createdAt: { gte: since, lte: until } };
-        if (source === 'onboarding') where.hotelId = 'marketel-onboarding';
-        else if (source === 'bookings') where.hotelId = { not: 'marketel-onboarding' };
+        if (source === 'onboarding') {
+            where.eventName = { in: MARKETEL_ONBOARDING_EVENT_NAMES };
+        } else if (source === 'bookings') {
+            where.eventName = { notIn: MARKETEL_ONBOARDING_EVENT_NAMES };
+        }
 
         const events = await withRetry(() => prisma.funnelEvent.findMany({
             where,
@@ -6962,7 +7058,7 @@ app.get('/api/funnel', async (req, res) => {
 });
 
 // Delete a funnel event
-app.delete('/api/funnel/events', async (req, res) => {
+app.delete('/api/funnel/events', adminAuth, async (req, res) => {
     try {
         const { eventId, timestamp } = req.body;
         if (!eventId && !timestamp) {
@@ -6989,18 +7085,18 @@ app.delete('/api/funnel/events', async (req, res) => {
 });
 
 // Funnel tracking toggle
-app.get('/api/funnel/tracking', (req, res) => {
+app.get('/api/funnel/tracking', adminAuth, (req, res) => {
     res.json({ enabled: funnelTrackingEnabled });
 });
 
-app.post('/api/funnel/tracking', (req, res) => {
+app.post('/api/funnel/tracking', adminAuth, (req, res) => {
     funnelTrackingEnabled = req.body.enabled !== false;
     console.log(`Funnel tracking ${funnelTrackingEnabled ? 'enabled' : 'paused'}`);
     res.json({ success: true, enabled: funnelTrackingEnabled });
 });
 
-// Meta Ads insights for funnel dashboard (no auth required)
-app.get('/api/meta-insights', async (req, res) => {
+// Meta Ads insights for funnel dashboard (admin only)
+app.get('/api/meta-insights', adminAuth, async (req, res) => {
     try {
         if (!META_AD_ACCOUNT_ID || !META_ACCESS_TOKEN) {
             return res.json({
@@ -7194,7 +7290,7 @@ app.get('/api/meta-insights', async (req, res) => {
     }
 });
 
-// Serve funnel dashboard HTML (login handled client-side, API requires crmAuth)
+// Serve the dashboard shell; its data/control APIs require ADMIN_TOKEN.
 app.get('/funnel', (req, res) => {
     res.sendFile(path.join(__dirname, 'funnel.html'));
 });
@@ -7375,7 +7471,6 @@ app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
 
 // Upload room image
 const multer = require('multer');
-const fs = require('fs');
 const { optimizeRoomImageBuffer } = require('./lib/optimizeRoomImage');
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
@@ -7500,37 +7595,120 @@ const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY)
     : null;
 const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_Uls6PKBuIH3dFL';
+const MARKETEL_MONTHLY_PRICE_USD = 199;
+const MARKETEL_STRIPE_KEY_MODE = process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_live_')
+    ? 'live'
+    : process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_test_')
+        ? 'test'
+        : 'unknown';
+const MARKETEL_ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
+if (process.env.NODE_ENV === 'production' && MARKETEL_STRIPE_KEY_MODE !== 'live') {
+    console.error('❌ Marketel checkout disabled: production requires STRIPE_MARKETEL_SECRET_KEY in live mode.');
+}
+
+function marketelSubscriptionHasAccess(status) {
+    return MARKETEL_ACTIVE_SUBSCRIPTION_STATUSES.has(String(status || '').trim().toLowerCase());
+}
+
+function stripeObjectId(value) {
+    if (!value) return '';
+    return typeof value === 'string' ? value : String(value.id || '');
+}
+
+function stripePeriodEnd(subscription) {
+    const raw = Number(subscription?.current_period_end || 0);
+    return raw > 0 ? new Date(raw * 1000) : null;
+}
 
 async function getMarketelSubscriptionPrice() {
     if (!marketelStripe) throw new Error('Payment not configured');
+    if (process.env.NODE_ENV === 'production' && !process.env.STRIPE_MARKETEL_WEBHOOK_SECRET) {
+        throw new Error('Marketel Stripe webhook is not configured');
+    }
+    if (
+        process.env.NODE_ENV === 'production'
+        && !process.env.STRIPE_MARKETEL_PRICE_ID
+        && !process.env.STRIPE_MARKETEL_PRODUCT_ID
+    ) {
+        throw new Error('Live Marketel Stripe price or product is not configured');
+    }
+    let price;
     if (process.env.STRIPE_MARKETEL_PRICE_ID) {
-        const price = await marketelStripe.prices.retrieve(process.env.STRIPE_MARKETEL_PRICE_ID);
-        return { id: price.id, amountUsd: (price.unit_amount || 0) / 100 };
-    }
-    const product = await marketelStripe.products.retrieve(MARKETEL_SUBSCRIPTION_PRODUCT_ID, {
-        expand: ['default_price'],
-    });
-    let price = product.default_price;
-    if (!price) {
-        const prices = await marketelStripe.prices.list({
-            product: MARKETEL_SUBSCRIPTION_PRODUCT_ID,
-            active: true,
-            type: 'recurring',
-            limit: 1,
+        price = await marketelStripe.prices.retrieve(process.env.STRIPE_MARKETEL_PRICE_ID);
+    } else {
+        const product = await marketelStripe.products.retrieve(MARKETEL_SUBSCRIPTION_PRODUCT_ID, {
+            expand: ['default_price'],
         });
-        if (!prices.data.length) throw new Error('No active subscription price for Marketel product');
-        price = prices.data[0];
-    } else if (typeof price === 'string') {
-        price = await marketelStripe.prices.retrieve(price);
+        price = product.default_price;
+        if (!price) {
+            const prices = await marketelStripe.prices.list({
+                product: MARKETEL_SUBSCRIPTION_PRODUCT_ID,
+                active: true,
+                type: 'recurring',
+                limit: 1,
+            });
+            if (!prices.data.length) throw new Error('No active subscription price for Marketel product');
+            price = prices.data[0];
+        } else if (typeof price === 'string') {
+            price = await marketelStripe.prices.retrieve(price);
+        }
     }
-    return { id: price.id, amountUsd: (price.unit_amount || 0) / 100 };
+
+    const amountUsd = (price?.unit_amount || 0) / 100;
+    if (!price?.active) throw new Error('Marketel subscription price is inactive');
+    if (price.currency !== 'usd') throw new Error('Marketel subscription price must use USD');
+    if (price.recurring?.interval !== 'month' || price.recurring?.interval_count !== 1) {
+        throw new Error('Marketel subscription price must recur monthly');
+    }
+    if (amountUsd !== MARKETEL_MONTHLY_PRICE_USD) {
+        throw new Error(`Marketel subscription price must be $${MARKETEL_MONTHLY_PRICE_USD}/month`);
+    }
+    if (process.env.NODE_ENV === 'production' && (!price.livemode || MARKETEL_STRIPE_KEY_MODE !== 'live')) {
+        throw new Error('Live Marketel Stripe billing is not configured');
+    }
+    return {
+        id: price.id,
+        amountUsd,
+        livemode: !!price.livemode,
+        interval: price.recurring.interval,
+    };
 }
+
+app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
+    if (!marketelStripe) {
+        return res.status(503).json({
+            success: false,
+            configured: false,
+            keyMode: MARKETEL_STRIPE_KEY_MODE,
+            message: 'STRIPE_MARKETEL_SECRET_KEY is not configured',
+        });
+    }
+    try {
+        const price = await getMarketelSubscriptionPrice();
+        res.json({
+            success: true,
+            configured: true,
+            keyMode: MARKETEL_STRIPE_KEY_MODE,
+            webhookConfigured: !!process.env.STRIPE_MARKETEL_WEBHOOK_SECRET,
+            price,
+        });
+    } catch (e) {
+        res.status(503).json({
+            success: false,
+            configured: true,
+            keyMode: MARKETEL_STRIPE_KEY_MODE,
+            webhookConfigured: !!process.env.STRIPE_MARKETEL_WEBHOOK_SECRET,
+            message: e.message,
+        });
+    }
+});
 
 app.post('/api/setup/:token/checkout', async (req, res) => {
     try {
         if (!marketelStripe) return res.status(503).json({ error: 'Payment not configured' });
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        if (hotel.subscribed) return res.status(409).json({ error: 'This property is already activated' });
 
         // Meta CAPI: CustomizeProduct (they clicked Go Live)
         const { fbp: cpFbp, fbc: cpFbc } = getMetaCookies(req);
@@ -7548,17 +7726,27 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
 
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
+            client_reference_id: hotel.id,
             line_items: [{
                 price: subscriptionPriceId,
                 quantity: 1,
             }],
-            customer_email: hotel.ownerEmail || undefined,
+            ...(hotel.marketelStripeCustomerId
+                ? { customer: hotel.marketelStripeCustomerId }
+                : { customer_email: hotel.ownerEmail || undefined }),
             metadata: {
                 product: 'hotel-onboarding',
                 hotelId: hotel.id,
                 setupToken: req.params.token,
             },
-            success_url: `${baseUrl}/setup/${req.params.token}/success`,
+            subscription_data: {
+                metadata: {
+                    product: 'hotel-onboarding',
+                    hotelId: hotel.id,
+                    setupToken: req.params.token,
+                },
+            },
+            success_url: `${baseUrl}/setup/${req.params.token}/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/setup/${req.params.token}`,
         });
 
@@ -7600,33 +7788,50 @@ app.get('/setup/:token/success', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.redirect('/');
+        const checkoutSessionId = String(req.query.session_id || '').trim();
+        if (!checkoutSessionId || !marketelStripe) {
+            return res.redirect(`/setup/${encodeURIComponent(req.params.token)}?payment=unverified`);
+        }
+
+        const checkoutSession = await marketelStripe.checkout.sessions.retrieve(checkoutSessionId, {
+            expand: ['subscription'],
+        });
+        const subscription = typeof checkoutSession.subscription === 'object'
+            ? checkoutSession.subscription
+            : null;
+        const metadataMatches = checkoutSession.metadata?.product === 'hotel-onboarding'
+            && checkoutSession.metadata?.hotelId === hotel.id
+            && checkoutSession.metadata?.setupToken === req.params.token;
+        const paymentVerified = checkoutSession.mode === 'subscription'
+            && checkoutSession.status === 'complete'
+            && checkoutSession.payment_status === 'paid'
+            && subscription
+            && marketelSubscriptionHasAccess(subscription.status);
+        if (!metadataMatches || !paymentVerified) {
+            return res.redirect(`/setup/${encodeURIComponent(req.params.token)}?payment=unverified`);
+        }
 
         // Mark complete and activate
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
-            data: { setupComplete: true, active: true },
+            data: {
+                setupComplete: true,
+                subscribed: true,
+                active: true,
+                marketelStripeCustomerId: stripeObjectId(checkoutSession.customer) || null,
+                marketelStripeSubscriptionId: stripeObjectId(subscription) || null,
+                marketelSubscriptionStatus: subscription.status || null,
+                marketelCurrentPeriodEnd: stripePeriodEnd(subscription),
+            },
         });
 
-        // Meta CAPI: Subscribe (payment confirmed)
-        const { fbp: subFbp, fbc: subFbc } = getMetaCookies(req);
-        let subscriptionAmountUsd = 199;
-        try {
-            subscriptionAmountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
-        } catch (_) { /* use fallback */ }
-        sendMarketelCAPI('Subscribe', {
-            email: hotel.ownerEmail,
-            phone: hotel.ownerPhone,
-            userAgent: req.headers['user-agent'],
-            ip: req.ip || req.socket?.remoteAddress,
-            sourceUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
-            fbp: subFbp,
-            fbc: subFbc,
-            value: subscriptionAmountUsd,
-            currency: 'USD',
+        await recordMarketelPaymentSuccess({
+            hotelId: hotel.id,
+            checkoutSession,
+            req,
         });
-
-        // Track payment success in funnel DB
-        prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotel.ownerEmail || null } }).catch(() => {});
+        const subscriptionAmountUsd = MARKETEL_MONTHLY_PRICE_USD;
+        const subscriptionEventId = `marketel-subscribe.${checkoutSession.id}`;
 
         // Create default CRM PIN
         const defaultPin = generateCrmOwnerPin();
@@ -7659,7 +7864,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Don't send welcome email here — wait until they submit their contact info via /finalize
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:${subscriptionAmountUsd},currency:'USD'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:${subscriptionAmountUsd},currency:'USD'},{eventID:'${subscriptionEventId}'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');
@@ -7785,7 +7990,17 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         // Welcome email sent via /finalize call from the client
 
         // Track funnel event
-        prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'SetupCompleted', guestEmail: hotel.ownerEmail || null } }).catch(() => {});
+        prisma.funnelEvent.findFirst({
+            where: { hotelId: hotel.id, eventName: 'SetupCompleted' },
+            select: { id: true },
+        }).then((existing) => existing || prisma.funnelEvent.create({
+            data: {
+                hotelId: hotel.id,
+                eventName: 'SetupCompleted',
+                eventId: `marketel-setup.${hotel.id}`,
+                guestEmail: hotel.ownerEmail || null,
+            },
+        })).catch(() => {});
 
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
         res.json({ success: true, bookingUrl: 'https://' + assignedDomain, frontdeskUrl: 'https://' + assignedDomain + '/frontdesk', crmPin: defaultPin });
@@ -8109,7 +8324,21 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
         }
         const config = await resolveHotelConfig(hotelId);
         const shouldUseStaticConfigOnly = config.source === 'static' && process.env.PREFER_DB_HOTEL_CONFIG !== 'true';
-        const dbHotel = shouldUseStaticConfigOnly ? null : await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, subtitle: true, address: true, phone: true, cancellationPolicy: true, theme: true, appIconUrl: true, subscribed: true } })
+        const dbHotel = shouldUseStaticConfigOnly ? null : await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: {
+                name: true,
+                subtitle: true,
+                address: true,
+                phone: true,
+                cancellationPolicy: true,
+                theme: true,
+                appIconUrl: true,
+                subscribed: true,
+                setupToken: true,
+                ownerEmail: true,
+            },
+        })
             .catch(error => {
                 if (!isPrismaConnectionError(error)) throw error;
                 return null;
@@ -8119,6 +8348,22 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 if (!isPrismaConnectionError(error)) throw error;
                 return null;
             });
+        if (dbHotel?.setupToken) {
+            const opened = await prisma.funnelEvent.findFirst({
+                where: { hotelId, eventName: 'FrontDeskOpened' },
+                select: { id: true },
+            }).catch(() => null);
+            if (!opened) {
+                await prisma.funnelEvent.create({
+                    data: {
+                        hotelId,
+                        eventName: 'FrontDeskOpened',
+                        eventId: `marketel-frontdesk.${hotelId}`,
+                        guestEmail: dbHotel.ownerEmail || null,
+                    },
+                }).catch(() => {});
+            }
+        }
         res.json({
             success: true,
             hotelId,
@@ -8332,17 +8577,238 @@ app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
     }
 });
 
+async function resolveMarketelSubscriptionHotelId({ hotelId, subscriptionId, customerId } = {}) {
+    const metadataHotelId = String(hotelId || '').trim();
+    if (metadataHotelId) {
+        const exists = await prisma.hotelConfig.findUnique({
+            where: { id: metadataHotelId },
+            select: { id: true },
+        }).catch(() => null);
+        if (exists) return exists.id;
+    }
+
+    const lookup = [];
+    if (subscriptionId) lookup.push({ marketelStripeSubscriptionId: subscriptionId });
+    if (customerId) lookup.push({ marketelStripeCustomerId: customerId });
+    if (!lookup.length) return '';
+    const hotel = await prisma.hotelConfig.findFirst({
+        where: { OR: lookup },
+        select: { id: true },
+    }).catch(() => null);
+    return hotel?.id || '';
+}
+
+async function syncMarketelSubscription(subscription, { forcedStatus = '' } = {}) {
+    if (!subscription) return { hotelId: '', subscribed: false, status: '' };
+    const subscriptionId = stripeObjectId(subscription);
+    const customerId = stripeObjectId(subscription.customer);
+    const status = String(forcedStatus || subscription.status || '').trim().toLowerCase();
+    const hotelId = await resolveMarketelSubscriptionHotelId({
+        hotelId: subscription.metadata?.hotelId,
+        subscriptionId,
+        customerId,
+    });
+    if (!hotelId) {
+        console.warn('Marketel subscription event could not be matched to a property:', {
+            subscriptionId,
+            customerId,
+            status,
+        });
+        return { hotelId: '', subscribed: false, status };
+    }
+
+    const subscribed = marketelSubscriptionHasAccess(status);
+    const previous = await prisma.hotelConfig.findUnique({
+        where: { id: hotelId },
+        select: { marketelSubscriptionStatus: true, ownerEmail: true },
+    });
+    await prisma.hotelConfig.update({
+        where: { id: hotelId },
+        data: {
+            subscribed,
+            marketelStripeCustomerId: customerId || undefined,
+            marketelStripeSubscriptionId: subscriptionId || undefined,
+            marketelSubscriptionStatus: status || null,
+            marketelCurrentPeriodEnd: stripePeriodEnd(subscription),
+            ...(subscribed ? { setupComplete: true, active: true } : {}),
+        },
+    });
+    if (previous?.marketelSubscriptionStatus !== status) {
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: 'SubscriptionStatusChanged',
+                eventId: `marketel-subscription-status.${subscriptionId}.${status}.${Date.now()}`,
+                guestEmail: previous?.ownerEmail || null,
+                contentName: status,
+            },
+        }).catch(() => {});
+    }
+    console.log(`Marketel subscription synchronized: ${hotelId} status=${status} access=${subscribed}`);
+    return { hotelId, subscribed, status };
+}
+
+async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = null }) {
+    if (!hotelId || !checkoutSession?.id) return;
+    const eventId = `marketel-subscribe.${checkoutSession.id}`;
+    let amountUsd = MARKETEL_MONTHLY_PRICE_USD;
+    try {
+        amountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
+    } catch (_) { /* checkout itself already validates the configured price */ }
+
+    const hotel = await prisma.hotelConfig.findUnique({
+        where: { id: hotelId },
+        select: { ownerEmail: true, ownerPhone: true },
+    }).catch(() => null);
+    const existing = await prisma.funnelEvent.findFirst({
+        where: { eventName: 'PaymentSucceeded', eventId },
+        select: { id: true },
+    }).catch(() => null);
+    if (!existing) {
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: 'PaymentSucceeded',
+                eventId,
+                guestEmail: hotel?.ownerEmail || null,
+                guestPhone: hotel?.ownerPhone || null,
+                value: amountUsd,
+                currency: 'USD',
+                contentName: 'marketel-monthly',
+            },
+        }).catch((e) => console.error('Payment funnel tracking failed:', e.message));
+    }
+
+    // The webhook guarantees delivery if the owner closes Stripe. The browser
+    // redirect sends the same event ID again with browser identifiers; Meta
+    // deduplicates the pair.
+    if (!existing || req) {
+        const { fbp, fbc } = req ? getMetaCookies(req) : { fbp: '', fbc: '' };
+        sendMarketelCAPI('Subscribe', {
+            email: hotel?.ownerEmail || '',
+            phone: hotel?.ownerPhone || '',
+            ip: req?.ip || '',
+            userAgent: req?.headers?.['user-agent'] || '',
+            sourceUrl: req
+                ? `${req.protocol}://${req.get('host')}${req.originalUrl}`
+                : process.env.BACKEND_URL || 'https://mktel.co',
+            fbp,
+            fbc,
+            value: amountUsd,
+            currency: 'USD',
+            eventId,
+        });
+    }
+}
+
+function invoiceSubscriptionId(invoice) {
+    return stripeObjectId(
+        invoice?.subscription
+        || invoice?.parent?.subscription_details?.subscription
+    );
+}
+
+// Subscription billing is a separate Stripe account from guest card holds.
+app.post('/api/marketel-stripe-webhook', async (req, res) => {
+    if (!marketelStripe || !process.env.STRIPE_MARKETEL_WEBHOOK_SECRET) {
+        return res.status(503).send('Marketel Stripe webhook is not configured');
+    }
+
+    let event;
+    try {
+        event = marketelStripe.webhooks.constructEvent(
+            req.body,
+            req.headers['stripe-signature'],
+            process.env.STRIPE_MARKETEL_WEBHOOK_SECRET
+        );
+    } catch (e) {
+        console.error('Marketel Stripe webhook signature failed:', e.message);
+        return res.status(400).send(`Webhook Error: ${e.message}`);
+    }
+
+    try {
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const supportedProduct = ['hotel-go-live', 'hotel-onboarding'].includes(session.metadata?.product);
+            if (supportedProduct && session.mode === 'subscription' && session.payment_status === 'paid') {
+                const subscriptionId = stripeObjectId(session.subscription);
+                if (subscriptionId) {
+                    const subscription = await marketelStripe.subscriptions.retrieve(subscriptionId);
+                    const synced = await syncMarketelSubscription(subscription);
+                    if (synced.subscribed) {
+                        await recordMarketelPaymentSuccess({
+                            hotelId: synced.hotelId,
+                            checkoutSession: session,
+                        });
+                    }
+                }
+            }
+        } else if (
+            event.type === 'customer.subscription.created'
+            || event.type === 'customer.subscription.updated'
+            || event.type === 'customer.subscription.deleted'
+        ) {
+            await syncMarketelSubscription(event.data.object);
+        } else if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') {
+            const subscriptionId = invoiceSubscriptionId(event.data.object);
+            if (subscriptionId) {
+                const subscription = await marketelStripe.subscriptions.retrieve(subscriptionId);
+                await syncMarketelSubscription(subscription, {
+                    forcedStatus: event.type === 'invoice.payment_failed' ? 'past_due' : '',
+                });
+            }
+        }
+        res.json({ received: true });
+    } catch (e) {
+        console.error(`Marketel Stripe webhook ${event.type} failed:`, e.message);
+        res.status(500).send('Webhook processing failed');
+    }
+});
+
 // Go Live — create Stripe checkout for subscription (from front desk)
 app.post('/api/crm/go-live', crmAuth, async (req, res) => {
     try {
-        if (!marketelStripe) return res.json({ success: false, message: 'Payment not configured' });
+        if (!marketelStripe) return res.status(503).json({ success: false, message: 'Payment not configured' });
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { ownerEmail: true, name: true, setupToken: true } });
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: {
+                ownerEmail: true,
+                ownerPhone: true,
+                name: true,
+                setupToken: true,
+                subscribed: true,
+                marketelStripeCustomerId: true,
+            },
+        });
+        if (!hotel) return res.status(404).json({ success: false, message: 'Property not found' });
+        if (hotel.subscribed) {
+            return res.status(409).json({ success: false, message: 'This property is already activated.' });
+        }
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
+        const { id: subscriptionPriceId, amountUsd } = await getMarketelSubscriptionPrice();
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
+        const primaryDomain = await prisma.hotelDomain.findFirst({
+            where: { hotelId, isPrimary: true },
+            select: { domain: true },
+        }).catch(() => null);
+        const cancelUrl = primaryDomain?.domain
+            ? `https://${primaryDomain.domain}/frontdesk`
+            : `${baseUrl}/frontdesk`;
+        const clickEventId = `marketel-go-live.${hotelId}.${Date.now()}`;
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: 'GoLiveClicked',
+                eventId: clickEventId,
+                guestEmail: hotel.ownerEmail || null,
+                guestPhone: hotel.ownerPhone || null,
+                value: amountUsd,
+                currency: 'USD',
+            },
+        }).catch(() => {});
         console.log('crm:go-live checkout session creating:', {
             hotelId,
             host: req.get('host'),
@@ -8352,11 +8818,42 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         });
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
+            client_reference_id: hotelId,
             line_items: [{ price: subscriptionPriceId, quantity: 1 }],
-            customer_email: hotel?.ownerEmail || undefined,
+            ...(hotel.marketelStripeCustomerId
+                ? { customer: hotel.marketelStripeCustomerId }
+                : { customer_email: hotel.ownerEmail || undefined }),
             metadata: { product: 'hotel-go-live', hotelId },
-            success_url: `${baseUrl}/api/crm/go-live-success?hotelId=${hotelId}&session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}`,
-            cancel_url: req.headers.referer || baseUrl + '/frontdesk',
+            subscription_data: {
+                metadata: { product: 'hotel-go-live', hotelId },
+            },
+            success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}`,
+            cancel_url: cancelUrl,
+        });
+        const checkoutEventId = `marketel-checkout.${session.id}`;
+        await prisma.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: 'CheckoutStarted',
+                eventId: checkoutEventId,
+                guestEmail: hotel.ownerEmail || null,
+                guestPhone: hotel.ownerPhone || null,
+                value: amountUsd,
+                currency: 'USD',
+            },
+        }).catch(() => {});
+        const { fbp, fbc } = getMetaCookies(req);
+        sendMarketelCAPI('InitiateCheckout', {
+            email: hotel.ownerEmail || '',
+            phone: hotel.ownerPhone || '',
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+            sourceUrl: req.headers.referer || '',
+            fbp,
+            fbc,
+            value: amountUsd,
+            currency: 'USD',
+            eventId: checkoutEventId,
         });
         console.log('crm:go-live checkout session created:', {
             hotelId,
@@ -8367,33 +8864,52 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         res.json({ success: true, url: session.url });
     } catch (e) {
         console.error('crm:go-live error:', e.message);
-        res.json({ success: false, message: 'Failed to create checkout' });
+        const configError = /not configured|must be|inactive/i.test(e.message);
+        res.status(configError ? 503 : 500).json({
+            success: false,
+            message: configError ? e.message : 'Failed to create checkout',
+        });
     }
 });
 
 // Go Live success — mark hotel as subscribed
 app.get('/api/crm/go-live-success', async (req, res) => {
-    const requestedHotelId = String(req.query.hotelId || '').trim();
-    const pin = String(req.query.token || '').trim();
     const checkoutSessionId = String(req.query.session_id || '').trim();
     const returnToken = String(req.query.returnToken || '').trim();
     const verifiedReturnToken = await verifyCrmReturnToken(returnToken);
     let stripeVerifiedHotelId = '';
+    let verifiedCheckoutSession = null;
+    let verifiedSubscription = null;
 
     if (checkoutSessionId && marketelStripe) {
         try {
-            const checkoutSession = await marketelStripe.checkout.sessions.retrieve(checkoutSessionId);
+            const checkoutSession = await marketelStripe.checkout.sessions.retrieve(checkoutSessionId, {
+                expand: ['subscription'],
+            });
+            const subscription = typeof checkoutSession.subscription === 'object'
+                ? checkoutSession.subscription
+                : null;
             const metadataHotelId = String(checkoutSession?.metadata?.hotelId || '').trim();
-            const paymentComplete = checkoutSession?.payment_status === 'paid'
-                || checkoutSession?.status === 'complete'
-                || !!checkoutSession?.subscription;
-            if (metadataHotelId && paymentComplete) stripeVerifiedHotelId = metadataHotelId;
+            const paymentComplete = checkoutSession?.metadata?.product === 'hotel-go-live'
+                && checkoutSession?.mode === 'subscription'
+                && checkoutSession?.payment_status === 'paid'
+                && checkoutSession?.status === 'complete'
+                && subscription
+                && marketelSubscriptionHasAccess(subscription.status)
+                && subscription.metadata?.hotelId === metadataHotelId;
+            if (metadataHotelId && paymentComplete) {
+                stripeVerifiedHotelId = metadataHotelId;
+                verifiedCheckoutSession = checkoutSession;
+                verifiedSubscription = subscription;
+            }
         } catch (e) {
             console.warn('go-live-success checkout verification failed:', e.message);
         }
     }
 
-    const hotelId = stripeVerifiedHotelId || requestedHotelId || verifiedReturnToken?.hotelId || '';
+    // A signed return token may identify where to send the owner, but only the
+    // paid Stripe Checkout session is allowed to grant subscription access.
+    const hotelId = stripeVerifiedHotelId || verifiedReturnToken?.hotelId || '';
     let frontdeskReturnToken = verifiedReturnToken?.hotelId === hotelId ? returnToken : '';
     if (!frontdeskReturnToken && stripeVerifiedHotelId && stripeVerifiedHotelId === hotelId) {
         frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotelId).catch(() => '');
@@ -8406,7 +8922,6 @@ app.get('/api/crm/go-live-success', async (req, res) => {
         })
         : '';
     console.log('go-live-success auth resolution:', {
-        requestedHotelId,
         hotelId,
         hasCheckoutSessionId: !!checkoutSessionId,
         stripeVerifiedHotelId: stripeVerifiedHotelId || '',
@@ -8416,9 +8931,8 @@ app.get('/api/crm/go-live-success', async (req, res) => {
         hasFrontdeskReturnToken: !!frontdeskReturnToken,
         hasFrontdeskActivationPin: !!frontdeskActivationPin,
         returnAuthVerified,
-        hasPinFallback: !!pin,
     });
-    if (hotelId && !frontdeskReturnToken && !frontdeskActivationPin && !pin) {
+    if (hotelId && !frontdeskReturnToken && !frontdeskActivationPin) {
         console.warn('go-live-success redirect missing Front Desk return auth:', {
             hotelId,
             hasCheckoutSessionId: !!checkoutSessionId,
@@ -8431,7 +8945,10 @@ app.get('/api/crm/go-live-success', async (req, res) => {
     // Resolve where to send the owner back to: their own hotel domain, never the
     // backend host (which would default the front desk to Guest Lodge Minot).
     async function buildFrontdeskRedirect() {
-        if (!hotelId) return '/frontdesk?activated=1';
+        const activationParams = stripeVerifiedHotelId
+            ? { activated: '1' }
+            : { activation_error: '1' };
+        if (!hotelId) return '/frontdesk?activation_error=1';
         try {
             const primaryDomain = await prisma.hotelDomain.findFirst({
                 where: { hotelId, isPrimary: true },
@@ -8439,7 +8956,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             });
             const domain = primaryDomain?.domain;
             if (domain) {
-                const query = new URLSearchParams({ activated: '1' });
+                const query = new URLSearchParams(activationParams);
                 if (frontdeskReturnToken) {
                     query.set('returnToken', frontdeskReturnToken);
                     query.set('pin', frontdeskActivationPin || frontdeskReturnToken);
@@ -8463,7 +8980,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
                         hasFrontdeskActivationPin: true,
                     });
                     return target;
-                } else if (pin) query.set('pin', pin);
+                }
                 const target = `https://${domain}/frontdesk?${query.toString()}`;
                 console.log('go-live-success redirect target:', {
                     hotelId,
@@ -8476,7 +8993,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             }
         } catch (_) { /* fall through to relative redirect */ }
         // Fallback: stay on the backend host but force the correct hotel context
-        const params = new URLSearchParams({ hotelId, activated: '1' });
+        const params = new URLSearchParams({ hotelId, ...activationParams });
         if (frontdeskReturnToken) {
             params.set('returnToken', frontdeskReturnToken);
             params.set('pin', frontdeskActivationPin || frontdeskReturnToken);
@@ -8502,7 +9019,6 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             });
             return target;
         }
-        else if (pin) params.set('pin', pin);
         const target = `/frontdesk?${params.toString()}`;
         console.log('go-live-success redirect target:', {
             hotelId,
@@ -8515,19 +9031,17 @@ app.get('/api/crm/go-live-success', async (req, res) => {
     }
 
     try {
-        if (hotelId) {
-            await prisma.hotelConfig.update({
-                where: { id: hotelId },
-                data: { setupComplete: true, subscribed: true, active: true },
+        if (stripeVerifiedHotelId && verifiedCheckoutSession && verifiedSubscription) {
+            const synced = await syncMarketelSubscription(verifiedSubscription);
+            if (!synced.subscribed || synced.hotelId !== stripeVerifiedHotelId) {
+                throw new Error('Paid subscription could not be matched to this property');
+            }
+            await recordMarketelPaymentSuccess({
+                hotelId: stripeVerifiedHotelId,
+                checkoutSession: verifiedCheckoutSession,
+                req,
             });
-            console.log(`✅ Hotel subscribed: ${hotelId}`);
-            // Track
-            prisma.funnelEvent.create({ data: { hotelId: 'marketel-onboarding', eventName: 'PaymentSucceeded', guestEmail: hotelId } }).catch(() => {});
-            let subscriptionAmountUsd = 199;
-            try {
-                subscriptionAmountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
-            } catch (_) { /* use fallback */ }
-            sendMarketelCAPI('Subscribe', { ip: req.ip, userAgent: req.headers['user-agent'], sourceUrl: req.headers.referer || '', value: subscriptionAmountUsd, currency: 'USD' });
+            console.log(`✅ Hotel subscribed: ${stripeVerifiedHotelId}`);
         }
         res.redirect(await buildFrontdeskRedirect());
     } catch (e) {
@@ -8544,16 +9058,27 @@ app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
         }
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { ownerEmail: true } });
-        if (!hotel?.ownerEmail) {
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { ownerEmail: true, marketelStripeCustomerId: true },
+        });
+        if (!hotel?.ownerEmail && !hotel?.marketelStripeCustomerId) {
             return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
         }
-        // Find customer by email
-        const customers = await marketelStripe.customers.list({ email: hotel.ownerEmail, limit: 1 });
-        if (!customers.data.length) {
+        let customerId = hotel.marketelStripeCustomerId || '';
+        if (!customerId && hotel.ownerEmail) {
+            const customers = await marketelStripe.customers.list({ email: hotel.ownerEmail, limit: 1 });
+            customerId = customers.data[0]?.id || '';
+            if (customerId) {
+                await prisma.hotelConfig.update({
+                    where: { id: hotelId },
+                    data: { marketelStripeCustomerId: customerId },
+                }).catch(() => {});
+            }
+        }
+        if (!customerId) {
             return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
         }
-        const customerId = customers.data[0].id;
         const session = await marketelStripe.billingPortal.sessions.create({
             customer: customerId,
             return_url: req.headers.referer || '/',

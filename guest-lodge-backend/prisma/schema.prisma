@@ -189,6 +189,10 @@ model HotelConfig {
   setupComplete   Boolean   @default(false)
   subscribed      Boolean   @default(false)
   stripeAccountId String?
+  marketelStripeCustomerId     String?   @unique
+  marketelStripeSubscriptionId String?   @unique
+  marketelSubscriptionStatus   String?
+  marketelCurrentPeriodEnd     DateTime?
   ownerEmail      String?
   ownerPhone      String?
 

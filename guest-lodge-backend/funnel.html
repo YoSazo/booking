@@ -606,6 +606,11 @@
       <div class="stat-label">Setup Started</div>
     </div>
     <div class="stat-card">
+      <div class="stat-icon">🎯</div>
+      <div class="stat-value" id="stat-leads">0</div>
+      <div class="stat-label">Qualified Leads</div>
+    </div>
+    <div class="stat-card">
       <div class="stat-icon">🏨</div>
       <div class="stat-value" id="stat-step4">0</div>
       <div class="stat-label">Setup Done</div>
@@ -613,7 +618,7 @@
     <div class="stat-card">
       <div class="stat-icon">🖱</div>
       <div class="stat-value" id="stat-cta">0</div>
-      <div class="stat-label">Hit Gate</div>
+      <div class="stat-label">Activation Clicks</div>
     </div>
     <div class="stat-card">
       <div class="stat-icon">✅</div>
@@ -629,7 +634,10 @@
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
   <button class="filter-btn" data-filter="LandingPageView" onclick="setFilter('LandingPageView')">Landing</button>
   <button class="filter-btn" data-filter="SetupStarted" onclick="setFilter('SetupStarted')">Started</button>
+  <button class="filter-btn" data-filter="Lead" onclick="setFilter('Lead')">Qualified</button>
   <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
+  <button class="filter-btn" data-filter="GoLiveClicked" onclick="setFilter('GoLiveClicked')">Activation</button>
+  <button class="filter-btn" data-filter="CheckoutStarted" onclick="setFilter('CheckoutStarted')">Checkout</button>
   <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
 </div>
 
@@ -654,6 +662,24 @@ let allEvents = [];
 let allCounts = {};
 let currentFilter = 'all';
 let currentView = 'overview';
+let adminToken = sessionStorage.getItem('marketelAdminToken') || '';
+
+async function adminFetch(url, options = {}, allowRetry = true) {
+  if (!adminToken) {
+    adminToken = (window.prompt('Enter the Marketel admin token') || '').trim();
+    if (!adminToken) throw new Error('Admin token required');
+    sessionStorage.setItem('marketelAdminToken', adminToken);
+  }
+  const headers = new Headers(options.headers || {});
+  headers.set('x-admin-token', adminToken);
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401 && allowRetry) {
+    sessionStorage.removeItem('marketelAdminToken');
+    adminToken = '';
+    return adminFetch(url, options, false);
+  }
+  return response;
+}
 
 // Tracking toggle
 let trackingEnabled = true;
@@ -667,7 +693,7 @@ function toggleTracking() {
   label.textContent = trackingEnabled ? 'Tracking' : 'Paused';
 
   // Tell the server
-  fetch('/api/funnel/tracking', {
+  adminFetch('/api/funnel/tracking', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled: trackingEnabled }),
@@ -677,7 +703,7 @@ function toggleTracking() {
 // Check tracking state on load
 (async function checkTrackingState() {
   try {
-    const res = await fetch('/api/funnel/tracking');
+    const res = await adminFetch('/api/funnel/tracking');
     const data = await res.json();
     trackingEnabled = data.enabled !== false;
     const toggle = document.getElementById('trackingToggle');
@@ -879,8 +905,8 @@ function showDetail(index) {
     .filter(r => r.value && r.value !== '—')
     .map(r => `
       <div class="detail-row">
-        <div class="detail-label">${r.label}</div>
-        <div class="detail-value${r.mono ? ' mono' : ''}">${r.value}</div>
+        <div class="detail-label">${escapeHtml(r.label)}</div>
+        <div class="detail-value${r.mono ? ' mono' : ''}">${escapeHtml(r.value)}</div>
       </div>
     `).join('');
 
@@ -900,10 +926,16 @@ const ICONS = {
   Step1Reached: '1️⃣',
   Step2Reached: '2️⃣',
   Step3Reached: '3️⃣',
+  Step4Reached: '4️⃣',
+  Step5Reached: '5️⃣',
+  QualityAnswer: '💬',
+  Lead: '🎯',
   SetupCompleted: '🏨',
   PaymentCTAClicked: '🖱',
   GoLiveClicked: '🖱',
+  CheckoutStarted: '💳',
   PaymentSucceeded: '✅',
+  SubscriptionStatusChanged: '🔄',
 };
 
 const TYPE_LABELS = {
@@ -912,11 +944,26 @@ const TYPE_LABELS = {
   Step1Reached: 'Step 1',
   Step2Reached: 'Step 2',
   Step3Reached: 'Setup Done',
+  Step4Reached: 'Demo Reached',
+  Step5Reached: 'Preview Ready',
+  QualityAnswer: 'Quality Answer',
+  Lead: 'Qualified Lead',
   SetupCompleted: 'Setup Completed',
   PaymentCTAClicked: 'Hit Gate',
-  GoLiveClicked: 'Go Live Clicked',
-  PaymentSucceeded: 'Paid $149',
+  GoLiveClicked: 'Activation Clicked',
+  CheckoutStarted: 'Stripe Checkout',
+  PaymentSucceeded: 'Paid $199',
+  SubscriptionStatusChanged: 'Subscription Status',
 };
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 function formatTime(ts) {
   const d = new Date(ts);
@@ -944,11 +991,15 @@ function renderEvents() {
 
   // Update overview stats
   const paid = allCounts.PaymentSucceeded || 0;
-  document.getElementById('stat-revenue').textContent = '$' + (paid * 149);
+  const revenue = allEvents
+    .filter(e => e.event_name === 'PaymentSucceeded')
+    .reduce((sum, e) => sum + (Number(e.value) || 199), 0);
+  document.getElementById('stat-revenue').textContent = '$' + revenue.toLocaleString('en-US', { maximumFractionDigits: 2 });
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
   document.getElementById('stat-started').textContent = allCounts.SetupStarted || 0;
+  document.getElementById('stat-leads').textContent = allCounts.Lead || 0;
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
-  document.getElementById('stat-cta').textContent = (allCounts.PaymentCTAClicked || 0) + (allCounts.GoLiveClicked || 0);
+  document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
   document.getElementById('stat-paid').textContent = paid;
 
   if (filtered.length === 0) {
@@ -965,12 +1016,12 @@ function renderEvents() {
     const guestName = ((e.guest_first_name || '') + ' ' + (e.guest_last_name || '')).trim();
     
     let detailParts = [];
-    if (e.guest_email) detailParts.push('<span>' + e.guest_email + '</span>');
-    if (e.guest_phone) detailParts.push('<span>' + e.guest_phone + '</span>');
-    if (e.content_name) detailParts.push('<span>' + e.content_name + '</span>');
-    if (e.nights) detailParts.push('<span>' + e.nights + ' night' + (e.nights > 1 ? 's' : '') + '</span>');
-    if (e.checkin_date) detailParts.push('<span>Check-in: ' + e.checkin_date + '</span>');
-    if (e.value) detailParts.push('<span class="event-price">$' + e.value.toFixed(2) + '</span>');
+    if (e.guest_email) detailParts.push('<span>' + escapeHtml(e.guest_email) + '</span>');
+    if (e.guest_phone) detailParts.push('<span>' + escapeHtml(e.guest_phone) + '</span>');
+    if (e.content_name) detailParts.push('<span>' + escapeHtml(e.content_name) + '</span>');
+    if (e.nights) detailParts.push('<span>' + escapeHtml(e.nights) + ' night' + (e.nights > 1 ? 's' : '') + '</span>');
+    if (e.checkin_date) detailParts.push('<span>Check-in: ' + escapeHtml(e.checkin_date) + '</span>');
+    if (e.value) detailParts.push('<span class="event-price">$' + Number(e.value).toFixed(2) + '</span>');
 
     return `
       <div class="event-card" id="event-${e.event_id || ''}" onclick="showDetail(${idx})" style="cursor:pointer;">
@@ -979,7 +1030,7 @@ function renderEvents() {
           <div class="event-top">
             <span class="event-type ${typeClass}">${label}</span>
           </div>
-          ${guestName ? `<div class="event-guest">${guestName}</div>` : ''}
+          ${guestName ? `<div class="event-guest">${escapeHtml(guestName)}</div>` : ''}
           ${detailParts.length ? `<div class="event-details">${detailParts.join('')}</div>` : ''}
         </div>
         <div class="event-right">
@@ -994,7 +1045,7 @@ function renderEvents() {
 async function deleteEvent(eventId, timestamp) {
   if (!confirm('Delete this event?')) return;
   try {
-    const res = await fetch('/api/funnel/events', {
+    const res = await adminFetch('/api/funnel/events', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId, timestamp }),
@@ -1003,8 +1054,8 @@ async function deleteEvent(eventId, timestamp) {
       // Remove from local array and re-render
       allEvents = allEvents.filter(e => !(e.event_id === eventId && e.timestamp === timestamp));
       // Recount
-      allCounts = { PageView: 0, Search: 0, AddToCart: 0, InitiateCheckout: 0, AddPaymentInfo: 0, Purchase: 0 };
-      allEvents.forEach(e => { if (allCounts[e.event_name] !== undefined) allCounts[e.event_name]++; });
+      allCounts = {};
+      allEvents.forEach(e => { allCounts[e.event_name] = (allCounts[e.event_name] || 0) + 1; });
       renderEvents();
     }
   } catch (e) {
@@ -1017,7 +1068,7 @@ async function loadEvents() {
   const from = fmtDate(calStart);
   const to = fmtDate(calEnd);
   try {
-    const res = await fetch('/api/funnel?from=' + from + '&to=' + to + '&source=onboarding');
+    const res = await adminFetch('/api/funnel?from=' + from + '&to=' + to + '&source=onboarding');
     if (!res.ok) throw new Error('Failed to load');
     const data = await res.json();
     allEvents = data.recent || [];

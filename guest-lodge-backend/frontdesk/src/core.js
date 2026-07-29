@@ -589,7 +589,7 @@ function syncRevenueUi() {
             </div>
             <div style="margin-top:14px;padding:14px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;" id="paymentsExplainer">
               <div style="font-size:13px;font-weight:600;color:#166534;margin-bottom:6px;">🔒 How payments work</div>
-              <p style="font-size:12px;color:#15803d;margin:0;line-height:1.6;">Guests are <strong>never charged</strong> when they book. We securely verify their card to prevent no-shows — then <strong>you collect payment at check-in</strong> however you prefer (cash, card, Venmo, etc).</p>
+              <p style="font-size:12px;color:#15803d;margin:0;line-height:1.6;">A temporary <strong>$1 card hold</strong> helps prevent fake bookings. Guests are not charged for their stay online — <strong>you collect payment at check-in</strong> however you prefer (cash, card, Venmo, etc).</p>
             </div>
           </div>
         </div>
@@ -1487,21 +1487,31 @@ async function startCrmApp(verification) {
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('activated');
     window.history.replaceState({}, '', cleanUrl);
-    crm.hotelSubscribed = true;
-    updateGoLiveBanner();
-    const _goLiveBanner = document.getElementById('goLiveBanner');
-    if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
-    const openActivatedModal = () => {
-      const fn = (typeof showActivatedModal === 'function')
-        ? showActivatedModal
-        : (typeof window.showActivatedModal === 'function' ? window.showActivatedModal : null);
-      if (fn) fn();
-    };
-    if (typeof loadSettingsModule === 'function') {
-      loadSettingsModule().then(openActivatedModal).catch(openActivatedModal);
+    if (crm.hotelSubscribed) {
+      updateGoLiveBanner();
+      const _goLiveBanner = document.getElementById('goLiveBanner');
+      if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
+      const openActivatedModal = () => {
+        const fn = (typeof showActivatedModal === 'function')
+          ? showActivatedModal
+          : (typeof window.showActivatedModal === 'function' ? window.showActivatedModal : null);
+        if (fn) fn();
+      };
+      if (typeof loadSettingsModule === 'function') {
+        loadSettingsModule().then(openActivatedModal).catch(openActivatedModal);
+      } else {
+        openActivatedModal();
+      }
     } else {
-      openActivatedModal();
+      toast('Stripe has not confirmed this subscription yet. Refresh in a moment or contact support.', 'error');
     }
+  }
+
+  if (urlParams.get('activation_error') === '1') {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('activation_error');
+    window.history.replaceState({}, '', cleanUrl);
+    toast('We could not verify the Stripe payment. Nothing was activated or charged twice.', 'error');
   }
 
   if (!isFirstWelcome) {

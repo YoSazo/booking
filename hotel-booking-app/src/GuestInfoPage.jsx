@@ -13,6 +13,21 @@ import getHotelId from './utils/getHotelId';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 // Strategy 3: preload Stripe JS early (on checkout entry) but avoid mounting heavy payment UI until Step 4.
 const hotelId = getHotelId();
+const GOOGLE_MAPS_LIBRARIES = ['places'];
+const STRIPE_ELEMENTS_OPTIONS = {
+    fonts: [{ cssSrc: '/fonts/inter.css' }],
+    appearance: {
+        theme: 'stripe',
+        variables: {
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSizeBase: '16px',
+            colorPrimary: '#3a9b73',
+            colorDanger: '#dc2626',
+            spacingUnit: '4px',
+            borderRadius: '8px',
+        },
+    },
+};
 
 
 
@@ -106,11 +121,9 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const location = useLocation();
     const navigate = useNavigate();
     const [formErrors, setFormErrors] = useState({});
-    // const [clientSecret, setClientSecret] = useState('');
     const [autocomplete, setAutocomplete] = useState(null);
     const [isAddressSelected, setIsAddressSelected] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isProcessingTrial, setIsProcessingTrial] = useState(false);
     const [showLoadingScreen, setShowLoadingScreen] = useState(false);
     const [showWhyCardModal, setShowWhyCardModal] = useState(false);
     const [whyCardModalDismissed, setWhyCardModalDismissed] = useState(false);
@@ -747,192 +760,14 @@ useEffect(() => {
         isInteractingWithAutocomplete.current = false;
     }, 500);
 };
-    // Main submit handler for FULL PAYMENT (handles both card and wallet)
-    const handleCardSubmit = async (e) => {
-        // Prevent accidental double-submits (double-click, Enter key, rerenders)
+    // All bookings use the current pay-later authorization flow.
+    const handleCardSubmit = (e) => {
         if (isProcessing) {
-            console.log('Payment already processing, ignoring duplicate submit');
             e?.preventDefault();
             return;
         }
-        e.preventDefault();
-        
-        // Always use pay later handler (Reserve for $0)
-        handlePayLaterBooking(e);
-        return;
-        
-        setHasAttemptedSubmit(true); // Signal that a payment attempt has been made
-
-        // For CARD payment, validate card fields FIRST
-        if (paymentMethod === 'card') {
-            if (!stripe || !elements || !elements.getElement(CardNumberElement)) {
-                setErrorMessage("Payment components are not ready. Please refresh the page.");
-                return;
-            }
-            
-            // Validate card is filled out
-            const cardNumberElement = elements.getElement(CardNumberElement);
-            if (!cardNumberElement || !cardNumberElement._complete) {
-                setErrorMessage("Please fill out your card information before proceeding.");
-                return;
-            }
-        }
-
-        // Validate billing address for BOTH card and wallet payments (checked AFTER card info)
-        if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-            setErrorMessage("Please fill out your billing address before proceeding.");
-            return;
-        }
-
-        setIsProcessing(true);
-        // Only show loading screen for CARD payments, not wallet (wallet has its own modal)
-        if (paymentMethod === 'card') {
-            setShowLoadingScreen(true);
-        }
-        setErrorMessage(''); // Clear previous errors before a new attempt
-        sessionStorage.setItem('finalBooking', JSON.stringify(bookingDetails));
-        sessionStorage.setItem('guestInfo', JSON.stringify(formData));
-
-        try {
-            const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
-            });
-            const updateData = await updateRes.json();
-            if (!updateData.success) {
-                throw new Error('Failed to update payment details.');
-            }
-        } catch (updateError) {
-            setErrorMessage(updateError.message || "Could not save guest info. Please try again.");
-            setIsProcessing(false);
-            if (paymentMethod === 'card') {
-                setShowLoadingScreen(false);
-            }
-            return;
-        }
-
-        // Process based on payment method
-        if (paymentMethod === 'card') {
-            // CARD PAYMENT
-            const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: {
-                    card: elements.getElement(CardNumberElement),
-                    billing_details: {
-                        name: `${formData.firstName} ${formData.lastName}`,
-                        email: formData.email,
-                        phone: formData.phone,
-                        address: {
-                            line1: formData.address,
-                            city: formData.city,
-                            state: formData.state,
-                            postal_code: formData.zip,
-                            country: 'US',
-                        },
-                    },
-                },
-            });
-
-            if (error) {
-                // If the PaymentIntent already succeeded, treat as success (prevents Stripe double-confirm error)
-                if (error.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') {
-                    console.log('Payment already succeeded, proceeding to booking...');
-                    onComplete(formData, error.payment_intent.id);
-                    return;
-                }
-
-                setErrorMessage(error.message || "An unexpected error occurred.");
-                setIsProcessing(false);
-                setShowLoadingScreen(false);
-            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-                onComplete(formData, paymentIntent.id);
-            }
-        } else if (paymentMethod === 'klarna') {
-            // KLARNA PAYMENT (Redirects from this page)
-            const { error } = await stripe.confirmKlarnaPayment(clientSecret, {
-                payment_method: {
-                    billing_details: {
-                        name: `${formData.firstName} ${formData.lastName}`,
-                        email: formData.email,
-                        phone: formData.phone,
-                        address: {
-                            line1: formData.address,
-                            city: formData.city,
-                            state: formData.state,
-                            postal_code: formData.zip,
-                            country: 'US',
-                        },
-                    },
-                },
-                return_url: `${window.location.origin}/checkout/return`
-            });
-
-            if (error) {
-                setErrorMessage(error.message || "An error occurred connecting to Klarna.");
-                setIsProcessing(false);
-                setShowLoadingScreen(false);
-            }
-            // If successful, Stripe automatically redirects the user to Klarna
-        } else if (paymentMethod === 'wallet') {
-            // WALLET PAYMENT
-            const fullAmountInCents = Math.round((bookingDetails.total / 2) * 100);
-            
-            const fullPaymentRequest = stripe.paymentRequest({
-                country: 'US',
-                currency: 'usd',
-                total: { label: 'Booking Payment', amount: fullAmountInCents },
-                requestPayerName: true,
-                requestPayerEmail: true,
-            });
-
-            // Set up payment method handler
-            fullPaymentRequest.on('paymentmethod', async (ev) => {
-                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-                    clientSecret, 
-                    { payment_method: ev.paymentMethod.id }, 
-                    { handleActions: false }
-                );
-                
-                if (confirmError) {
-                    if (confirmError.code === 'payment_intent_unexpected_state' && confirmError.payment_intent?.status === 'succeeded') {
-                        console.log('Wallet payment already succeeded, proceeding to booking...');
-                        ev.complete('success');
-                        onComplete(formData, confirmError.payment_intent.id);
-                        return;
-                    }
-
-                    ev.complete('fail');
-                    setErrorMessage(confirmError.message);
-                    setIsProcessing(false);
-                    setShowLoadingScreen(false);
-                    return;
-                }
-                
-                ev.complete('success');
-                onComplete(formData, paymentIntent.id);
-            });
-
-            // Show payment request
-            const canMakePayment = await fullPaymentRequest.canMakePayment();
-            
-            if (!canMakePayment) {
-                setErrorMessage("Digital wallet is not available. Please use card payment.");
-                setIsProcessing(false);
-                setShowLoadingScreen(false);
-                return;
-            }
-
-            try {
-                await fullPaymentRequest.show();
-            } catch (error) {
-                console.log('Payment cancelled:', error);
-                setErrorMessage("Payment cancelled");
-                setIsProcessing(false);
-                setShowLoadingScreen(false);
-            }
-        }
+        return handlePayLaterBooking(e);
     };
-
 
 // Detect Stripe card/decline errors (for payment-declined leads)
 // Includes "live mode + test card" (e.g. 4242... with live keys) so you can test the CRM view
@@ -948,7 +783,7 @@ const isCardDeclineError = (err) => {
 // NEW: Handle "Pay Later" booking with pre-authorization hold
 const handlePayLaterBooking = async (e) => {
     // Prevent accidental double-submits
-    if (isProcessing || isProcessingTrial) {
+    if (isProcessing) {
         console.log('Payment already processing, ignoring duplicate submit');
         e?.preventDefault();
         return;
@@ -1342,57 +1177,6 @@ const handlePayLaterBooking = async (e) => {
     }
 };
 
-    // Click handler for WALLET PAYMENTS
-    const handleWalletPayment = () => {
-    setHasAttemptedSubmit(true);
-
-    if (!formData.address || !formData.city || !formData.state || !formData.zip) {
-        setErrorMessage("Please fill out your billing address before proceeding.");
-        return;
-    }
-
-    setIsProcessing(true);
-    setErrorMessage('');
-
-    if (!paymentRequest) {
-        setErrorMessage("Digital wallet is not available. Please select another payment method.");
-        setIsProcessing(false);
-        return;
-    }
-
-    // CRITICAL: Call .show() IMMEDIATELY in the click handler (synchronously)
-    // This must happen BEFORE any async operations for Apple Pay to work
-    const showPromise = paymentRequest.show();
-    
-    // Now handle the promise
-    showPromise
-        .then(async (paymentResponse) => {
-            // Payment sheet opened successfully
-            // Now do the async update
-            try {
-                const updateRes = await fetch(`${apiBaseUrl}/api/update-payment-intent`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ clientSecret: clientSecret, guestInfo: formData }),
-                });
-                const updateData = await updateRes.json();
-                if (!updateData.success) {
-                    throw new Error('Failed to update payment details.');
-                }
-            } catch (updateError) {
-                console.error('Failed to update payment intent:', updateError);
-                // Payment sheet is still open, so this error won't show to user
-                // The paymentmethod event handler will handle the actual payment
-            }
-        })
-        .catch((error) => {
-            // User cancelled or payment sheet failed to open
-            console.log('Payment sheet cancelled or failed:', error);
-            setErrorMessage(error.message || "Payment cancelled or failed to open.");
-            setIsProcessing(false);
-        });
-};
-
     const getWalletLogoInfo = () => {
         if (walletType === 'Apple Pay') return { src: '/apple.svg', alt: 'Apple Pay', className: 'apple-pay-logo' };
         if (walletType === 'Google Pay') return { src: '/google.svg', alt: 'Google Pay', className: 'google-pay-logo' };
@@ -1416,9 +1200,6 @@ const handlePayLaterBooking = async (e) => {
         return 'Confirm Reservation - $0 Today';
     };
     
-    const priceToday = bookingDetails.total / 2;
-    const balanceDue = (bookingDetails.total / 2);
-    const stripeOptions = { clientSecret, appearance: { theme: 'stripe' }, locale: 'en' };
     const onlineBookingGateActive = !isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4;
     const showGuestInstallBanner = !onlineBookingGateActive;
 
@@ -1480,13 +1261,13 @@ const handlePayLaterBooking = async (e) => {
                   </h2>
                   
                   <p className="why-card-modal-sheet__subtitle">
-                    Enter your card details below to hold your room. We place a <strong>temporary $1 verification hold</strong> — <strong>to prevent fake bookings</strong> and secure your reservation. It is released if the booking is cancelled or when the front desk closes out the hold.
+                    Enter your card details below to hold your room. We place a <strong>temporary $1 verification hold</strong> — not a payment for your stay — <strong>to prevent fake bookings</strong> and secure your reservation. It is released if the booking is cancelled or when the front desk closes out the hold.
                   </p>
 
                   <div className="why-card-modal-sheet__checks">
                     <div className="why-card-modal-sheet__check-item">
                       <CheckCircle2 size={18} strokeWidth={2.5} />
-                      <span><strong>$0 charged today</strong></span>
+                      <span><strong>$0 stay payment today</strong></span>
                     </div>
                     <div className="why-card-modal-sheet__check-item">
                       <CheckCircle2 size={18} strokeWidth={2.5} />
@@ -1939,7 +1720,6 @@ const handlePayLaterBooking = async (e) => {
               setHasAttemptedSubmit(false);
               setErrorMessage('');
               setIsProcessing(false);
-              setIsProcessingTrial(false);
             }}
           >
             <img src="/credit.svg" alt="Card" className="credit-card-logo" /> 
@@ -1954,7 +1734,6 @@ const handlePayLaterBooking = async (e) => {
               setHasAttemptedSubmit(false);
               setErrorMessage('');
               setIsProcessing(false);
-              setIsProcessingTrial(false);
             }}
           >
             <img src={getWalletLogoInfo().src} alt={getWalletLogoInfo().alt} className={getWalletLogoInfo().className} style={{ margin: '0' }} />
@@ -1972,7 +1751,6 @@ const handlePayLaterBooking = async (e) => {
               setHasAttemptedSubmit(false);
               setErrorMessage('');
               setIsProcessing(false);
-              setIsProcessingTrial(false);
             }}
           >
             <img src="/credit.svg" alt="Card" className="credit-card-logo" /> 
@@ -2079,7 +1857,7 @@ const handlePayLaterBooking = async (e) => {
             <div className="card-field-wrapper">
               <label>Billing Address</label>
               <div style={{ width: '100%', maxWidth: '100%' }}>
-              <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} libraries={['places']}>
+              <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                 <input 
                   type="text" 
@@ -2228,7 +2006,7 @@ const handlePayLaterBooking = async (e) => {
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '14px 16px', background: '#eef6f1', border: '1px solid #cfe6da', borderRadius: '12px' }}>
                   <ShieldCheck size={22} style={{ color: '#2E7D5B', flexShrink: 0, marginTop: '1px' }} />
                   <div>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a2e', marginBottom: '2px' }}>$0 charged today</div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a2e', marginBottom: '2px' }}>$0 stay payment today</div>
                     <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>$1 temporary authorization hold</div>
                     <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>You pay <strong>${bookingDetails.total.toFixed(2)}</strong> at check-in</div>
                   </div>
@@ -2389,7 +2167,7 @@ const handlePayLaterBooking = async (e) => {
         fontSize: '13px',
         fontWeight: '600'
       }}>
-        $0 charged today • $1.00 verification only
+        $0 stay payment today • temporary $1 verification hold
       </div>
     </div>
   )}
@@ -2415,23 +2193,8 @@ const handlePayLaterBooking = async (e) => {
 
 // The wrapper provides the Stripe context to the entire page.
 function GuestInfoPageWrapper(props) {
-    const elementsOptions = {
-        fonts: [{ cssSrc: '/fonts/inter.css' }],
-        appearance: {
-            theme: 'stripe',
-            variables: {
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontSizeBase: '16px',
-                colorPrimary: '#3a9b73',
-                colorDanger: '#dc2626',
-                spacingUnit: '4px',
-                borderRadius: '8px',
-            },
-        },
-    };
-
     return (
-        <Elements stripe={stripePromise} options={elementsOptions}>
+        <Elements stripe={stripePromise} options={STRIPE_ELEMENTS_OPTIONS}>
             <GuestInfoPage {...props} />
         </Elements>
     );

@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 function ImageLightbox({ images, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
-  const [allLoaded, setAllLoaded] = useState(false);
-  const [loadedCount, setLoadedCount] = useState(0);
-  const [loadedImages, setLoadedImages] = useState({}); // Track which images have loaded
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const currentImage = images[currentIndex] || images[0] || '';
 
-  // Do not preload the entire gallery up-front.
-  // Preloading 8–12 large images can add 10–20MB and delay initial page interactivity.
-  // Instead, show immediately and rely on browser caching + natural loading as users navigate.
   useEffect(() => {
-    setAllLoaded(true);
-  }, [images]);
+    setImageLoaded(false);
+  }, [currentImage]);
 
-  // Handle individual image load
-  const handleImageLoad = (index) => {
-    setLoadedImages(prev => ({ ...prev, [index]: true }));
-  };
+  // A hidden <img> for every photo still downloads every source. Preload only
+  // the most likely next photo so navigation stays quick without fetching the
+  // entire gallery.
+  useEffect(() => {
+    if (images.length < 2) return;
+    const nextImage = new Image();
+    nextImage.src = images[(currentIndex + 1) % images.length];
+  }, [currentIndex, images]);
 
-  const goToPrevious = () => {
-    const isFirstImage = currentIndex === 0;
-    const newIndex = isFirstImage ? images.length - 1 : currentIndex - 1;
-    setCurrentIndex(newIndex);
-  };
+  const goToPrevious = useCallback(() => {
+    setCurrentIndex((index) => (
+      index === 0 ? images.length - 1 : index - 1
+    ));
+  }, [images.length]);
 
-  const goToNext = () => {
-    const isLastImage = currentIndex === images.length - 1;
-    const newIndex = isLastImage ? 0 : currentIndex + 1;
-    setCurrentIndex(newIndex);
-  };
+  const goToNext = useCallback(() => {
+    setCurrentIndex((index) => (
+      index === images.length - 1 ? 0 : index + 1
+    ));
+  }, [images.length]);
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -40,7 +40,7 @@ function ImageLightbox({ images, startIndex, onClose }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentIndex]);
+  }, [goToNext, goToPrevious, onClose]);
 
   return (
     <div className="lightbox-overlay" onClick={onClose}>
@@ -52,7 +52,7 @@ function ImageLightbox({ images, startIndex, onClose }) {
           </svg>
         </button>
         
-        {allLoaded ? (
+        {currentImage ? (
           <>
             <button className="lightbox-nav-btn prev" onClick={goToPrevious}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -61,25 +61,19 @@ function ImageLightbox({ images, startIndex, onClose }) {
             </button>
             
             <div className="lightbox-image-container">
-              {/* Shimmer placeholder - shows when current image hasn't loaded */}
-              {!loadedImages[currentIndex] && (
+              {!imageLoaded && (
                 <div className="lightbox-shimmer">
                   <div className="shimmer-animation"></div>
                 </div>
               )}
-              {images.map((src, index) => (
-                <img
-                  key={index}
-                  src={src}
-                  alt={`Room image ${index + 1}`}
-                  className="lightbox-image"
-                  onLoad={() => handleImageLoad(index)}
-                  style={{
-                    display: index === currentIndex ? 'block' : 'none',
-                    opacity: loadedImages[index] ? 1 : 0
-                  }}
-                />
-              ))}
+              <img
+                src={currentImage}
+                alt={`Room image ${currentIndex + 1}`}
+                className="lightbox-image"
+                decoding="async"
+                onLoad={() => setImageLoaded(true)}
+                style={{ opacity: imageLoaded ? 1 : 0 }}
+              />
             </div>
 
             <button className="lightbox-nav-btn next" onClick={goToNext}>
@@ -93,7 +87,7 @@ function ImageLightbox({ images, startIndex, onClose }) {
         ) : (
           <div className="lightbox-loader">
             <div style={{ color: '#fff', fontSize: '18px', textAlign: 'center' }}>
-              Loading images... {loadedCount} / {images.length}
+              No photos available.
             </div>
           </div>
         )}
