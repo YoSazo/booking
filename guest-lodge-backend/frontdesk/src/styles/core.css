@@ -2320,3 +2320,135 @@
       font-size: 18px;
       font-weight: 800;
     }
+
+    /* Constrained, real Your Page editor used inside the onboarding reveal.
+       Saves still use the normal APIs; global navigation and secondary setup
+       paths stay out of the way until the owner activates. */
+    html.frontdesk-editor-preview,
+    body.frontdesk-editor-preview {
+      min-height: 100%;
+      background: #f4f7f4;
+    }
+    .frontdesk-editor-preview #app > .header,
+    .frontdesk-editor-preview #app > .mobile-bottom-nav,
+    .frontdesk-editor-preview .tabs-container,
+    .frontdesk-editor-preview #goLiveBanner,
+    .frontdesk-editor-preview #previewSiteBar,
+    .frontdesk-editor-preview #tour-preview-btn,
+    .frontdesk-editor-preview #tour-go-live-card,
+    .frontdesk-editor-preview #tour-two-room-card,
+    .frontdesk-editor-preview #edit-add-room-btn,
+    .frontdesk-editor-preview .room-edit-delete-btn {
+      display: none !important;
+    }
+    .frontdesk-editor-preview #app .container {
+      display: block !important;
+      width: 100%;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px clamp(12px, 3vw, 28px) 44px !important;
+    }
+    .frontdesk-editor-preview #editView {
+      display: block !important;
+      margin-top: 0 !important;
+      padding-bottom: 0 !important;
+      content-visibility: visible;
+    }
+    .frontdesk-editor-preview #embeddedEditorNotice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border: 1px solid #cfe2d6;
+      border-radius: 15px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(28, 67, 45, 0.07);
+    }
+    .frontdesk-editor-preview #embeddedEditorNotice > div:first-child {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+    .frontdesk-editor-preview #embeddedEditorNotice strong {
+      color: var(--text);
+      font-size: 14px;
+    }
+    .frontdesk-editor-preview #embeddedEditorNotice > div:first-child span {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .frontdesk-editor-preview .embedded-editor-locked {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 6px;
+    }
+    .frontdesk-editor-preview .embedded-editor-locked span {
+      padding: 6px 9px;
+      color: #929c96;
+      border: 1px solid #e1e6e3;
+      border-radius: 999px;
+      background: #f4f6f5;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .frontdesk-editor-preview .embedded-editor-locked small {
+      color: #8a958e;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .frontdesk-editor-preview .settings-dashboard-grid {
+      display: grid !important;
+      grid-template-columns: minmax(290px, 360px) minmax(0, 1fr) !important;
+      column-gap: 20px;
+      align-items: start;
+    }
+    .frontdesk-editor-preview .settings-dashboard-grid > .dash-a {
+      display: block !important;
+      grid-column: 1 !important;
+      grid-row: 1 !important;
+    }
+    .frontdesk-editor-preview .settings-dashboard-grid > .dash-b {
+      display: block !important;
+      grid-column: 2 !important;
+      grid-row: 1 / span 2 !important;
+    }
+    .frontdesk-editor-preview .settings-dashboard-grid > .dash-c {
+      display: block !important;
+      grid-column: 1 !important;
+      grid-row: 2 !important;
+    }
+    .frontdesk-editor-preview .dash-c > .booking-card:not(#tour-rates-card),
+    .frontdesk-editor-preview #editRoomsCards > .booking-card:not(:first-child) {
+      display: none !important;
+    }
+    .frontdesk-editor-preview #tour-rates-card {
+      display: block !important;
+    }
+    .frontdesk-editor-preview .room-edit-grid > .room-edit-media .room-edit-photo {
+      height: clamp(220px, 32vw, 330px);
+      min-height: 220px;
+    }
+
+    @media (max-width: 760px) {
+      .frontdesk-editor-preview #embeddedEditorNotice {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .frontdesk-editor-preview .embedded-editor-locked {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .frontdesk-editor-preview .settings-dashboard-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+      .frontdesk-editor-preview .settings-dashboard-grid > .dash-a,
+      .frontdesk-editor-preview .settings-dashboard-grid > .dash-b,
+      .frontdesk-editor-preview .settings-dashboard-grid > .dash-c {
+        grid-column: 1 !important;
+        grid-row: auto !important;
+      }
+    }

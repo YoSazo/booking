@@ -864,12 +864,26 @@ function jsStr(s) {
 }
 
 function guestBookingEngineUrl(options = {}) {
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const host = window.location.hostname;
+  const isLocal = host === 'localhost'
+    || host === '127.0.0.1'
+    || host === '0.0.0.0'
+    || host === '::1'
+    || host.endsWith('.local')
+    || /^10\./.test(host)
+    || /^192\.168\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
   const focusInstall = !!options.focusInstall;
   let url = '';
 
   if (isLocal && crm.activeHotelId) {
-    url = 'http://localhost:5173/?hotelId=' + encodeURIComponent(crm.activeHotelId);
+    const localUrl = new URL(window.location.href);
+    localUrl.port = '5173';
+    localUrl.pathname = '/';
+    localUrl.search = '';
+    localUrl.hash = '';
+    localUrl.searchParams.set('hotelId', crm.activeHotelId);
+    url = localUrl.toString();
   } else {
     const domain = crm.activeHotelDomain || '';
     url = domain ? 'https://' + domain + '/' : '';
@@ -1802,6 +1816,45 @@ function finishTourHydration() {
   void hydrateCrmAfterTour();
 }
 
+function installEmbeddedEditorPreview() {
+  document.documentElement.classList.add('frontdesk-editor-preview');
+  document.body.classList.add('frontdesk-editor-preview');
+  const editView = document.getElementById('editView');
+  if (editView && !document.getElementById('embeddedEditorNotice')) {
+    editView.insertAdjacentHTML('afterbegin', `
+      <div id="embeddedEditorNotice">
+        <div>
+          <strong>This is your real editor.</strong>
+          <span>Change your property details, first room, photo or price here. Every save is real.</span>
+        </div>
+        <div class="embedded-editor-locked" aria-label="Available after activation">
+          <span>Bookings</span><span>Availability</span><span>Assistant</span>
+          <small>waiting after activation</small>
+        </div>
+      </div>
+    `);
+  }
+
+  const finishEditorLayout = () => {
+    const ratesCard = document.getElementById('tour-rates-card');
+    const ratesBody = ratesCard?.querySelector('.accordion-body');
+    const ratesArrow = ratesCard?.querySelector('.accordion-arrow');
+    if (!ratesCard || !ratesBody) return false;
+    ratesBody.style.display = 'block';
+    if (ratesArrow) ratesArrow.style.transform = 'rotate(90deg)';
+    return true;
+  };
+
+  if (finishEditorLayout()) return;
+  const list = document.getElementById('editRoomsList');
+  if (!list || typeof MutationObserver === 'undefined') return;
+  const observer = new MutationObserver(() => {
+    if (finishEditorLayout()) observer.disconnect();
+  });
+  observer.observe(list, { childList: true, subtree: true });
+  window.setTimeout(() => observer.disconnect(), 15000);
+}
+
 async function startCrmApp(verification) {
   crm.lastAuthError = '';
   crm.isMasterPin = !!(verification && verification.isMasterPin);
@@ -1819,6 +1872,9 @@ async function startCrmApp(verification) {
   cleanFrontdeskReturnAuthParams();
 
   const urlParams = new URLSearchParams(window.location.search);
+  const isEmbeddedEditorPreview = urlParams.get('previewEditor') === '1';
+  document.documentElement.classList.toggle('frontdesk-editor-preview', isEmbeddedEditorPreview);
+  document.body.classList.toggle('frontdesk-editor-preview', isEmbeddedEditorPreview);
   if (urlParams.get('pwa') === '1') {
     try { sessionStorage.setItem('frontdeskSimulatePwa', '1'); } catch (_) {}
   } else {
@@ -1828,13 +1884,15 @@ async function startCrmApp(verification) {
   const revealRequest = urlParams.get('reveal');
   let hasPendingValueReveal = false;
   try { hasPendingValueReveal = localStorage.getItem('marketelValueRevealPendingV1') === '1'; } catch (_) {}
-  const shouldShowValueReveal = revealRequest === '1'
-    || revealRequest === 'checkout'
-    || (!(verification && verification.subscribed) && hasPendingValueReveal);
+  const shouldShowValueReveal = !isEmbeddedEditorPreview && (
+    revealRequest === '1'
+      || revealRequest === 'checkout'
+      || (!(verification && verification.subscribed) && hasPendingValueReveal)
+  );
   const revealStartAt = revealRequest === 'checkout' ? 3 : (revealRequest === '1' ? 0 : undefined);
   if (isFirstWelcome) resetWalkthroughProgress();
 
-  if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
+  if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
     crm.currentFilter = 'settings';
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
@@ -1873,7 +1931,7 @@ async function startCrmApp(verification) {
   document.getElementById('loginScreen').style.display = 'none';
   hideNativePropertyScreen();
   document.getElementById('app').style.display = 'block';
-  setNativeShellVisible(true);
+  if (!isEmbeddedEditorPreview) setNativeShellVisible(true);
 
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
@@ -1893,17 +1951,24 @@ async function startCrmApp(verification) {
   requestAnimationFrame(realignActiveTab);
   setTimeout(realignActiveTab, 120);
 
-  initMobileBottomNav();
-  updateMobileRevenueNavVisibility();
-  syncMobileNavActive(crm.currentFilter);
-  syncNativeShellState();
-  void refreshNativeProperties();
-  ensureLucideLoaded().then(() => {
-    refreshMobileBottomNavIcons();
-    requestAnimationFrame(refreshMobileBottomNavIcons);
-  }).catch(() => {});
+  if (!isEmbeddedEditorPreview) {
+    initMobileBottomNav();
+    updateMobileRevenueNavVisibility();
+    syncMobileNavActive(crm.currentFilter);
+    syncNativeShellState();
+    void refreshNativeProperties();
+    ensureLucideLoaded().then(() => {
+      refreshMobileBottomNavIcons();
+      requestAnimationFrame(refreshMobileBottomNavIcons);
+    }).catch(() => {});
+  }
 
-  if (shouldShowValueReveal) {
+  if (isEmbeddedEditorPreview) {
+    if (typeof loadSettingsModule === 'function') await loadSettingsModule();
+    crm.currentFilter = 'settings';
+    applyFilter();
+    installEmbeddedEditorPreview();
+  } else if (shouldShowValueReveal) {
     try {
       if (typeof loadSettingsModule === 'function') await loadSettingsModule();
       const revealModule = await loadRevealModule();
@@ -1967,7 +2032,7 @@ async function startCrmApp(verification) {
     toast('We could not verify the Stripe payment. Nothing was activated or charged twice.', 'error');
   }
 
-  if (!isFirstWelcome) {
+  if (!isEmbeddedEditorPreview && !isFirstWelcome) {
     if (!localStorage.getItem('onboardingDone')) localStorage.setItem('onboardingDone', '1');
     // Don't mark tour done if a step is in progress (e.g. refresh mid-walkthrough).
     if (!localStorage.getItem('settingsTourDone') && !localStorage.getItem('settingsTourStep')) {
@@ -1993,10 +2058,10 @@ async function startCrmApp(verification) {
 
   // Running standalone is the only trustworthy install signal on iOS, where
   // 'appinstalled' never fires — record it every launch, server-side dedupes.
-  if (isStandaloneApp()) reportFrontdeskInstalled();
+  if (!isEmbeddedEditorPreview && isStandaloneApp()) reportFrontdeskInstalled();
 
   // First time opening the INSTALLED app → offer to turn on booking alerts.
-  maybePromptInstalledNotifications();
+  if (!isEmbeddedEditorPreview) maybePromptInstalledNotifications();
 }
 
 async function doLogin() {

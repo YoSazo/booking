@@ -6,14 +6,23 @@ const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
 
 let currentStep = 0;
-let engineMode = 'guest';
+let livePreviewMode = 'guest';
+let homeScreenInstalled = false;
 let revealData = { rooms: [], rates: null };
 let dataPromise = null;
-let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0 };
+let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
 let bookingPageTimer = 0;
 
 function isLocalFrontdesk() {
-  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const host = window.location.hostname;
+  return host === 'localhost'
+    || host === '127.0.0.1'
+    || host === '0.0.0.0'
+    || host === '::1'
+    || host.endsWith('.local')
+    || /^10\./.test(host)
+    || /^192\.168\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
 }
 
 function esc(value) {
@@ -58,10 +67,34 @@ function nightlyRate() {
 }
 
 function bookingUrl() {
-  if (typeof window.guestBookingEngineUrl === 'function') {
-    return window.guestBookingEngineUrl() || '';
+  if (isLocalFrontdesk() && crm.activeHotelId) {
+    const url = new URL(window.location.href);
+    url.port = '5173';
+    url.pathname = '/';
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('hotelId', crm.activeHotelId);
+    return url.toString();
   }
-  return crm.activeHotelDomain ? `https://${crm.activeHotelDomain}/` : '';
+  const domain = bookingPageState.domain || crm.activeHotelDomain || '';
+  return domain ? `https://${domain}/` : '';
+}
+
+function frontdeskEditorUrl() {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  if (crm.activeHotelId) url.searchParams.set('hotelId', crm.activeHotelId);
+  url.searchParams.set('previewEditor', '1');
+  return url.toString();
+}
+
+function appIconHtml(className = '') {
+  const appImage = crm.activeHotelAppIcon || firstRoomImage();
+  const initial = propertyName().trim().charAt(0).toUpperCase() || 'M';
+  return appImage
+    ? `<img class="${className}" src="${esc(appImage)}" alt="">`
+    : `<span class="${className}">${esc(initial)}</span>`;
 }
 
 function persistStep() {
@@ -112,38 +145,6 @@ function roomPhotoHtml(className = '') {
   return `<div class="${className} mvr-photo-placeholder"><span>${esc((firstRoom().name || 'R').trim().charAt(0).toUpperCase())}</span></div>`;
 }
 
-function fallbackGuestPreviewHtml() {
-  const room = firstRoom();
-  return `<div class="mvr-fallback-site">
-    <div class="mvr-fallback-hero">
-      ${roomPhotoHtml('mvr-fallback-photo')}
-      <div class="mvr-fallback-brand">${esc(propertyName())}</div>
-      <div class="mvr-fallback-sub">Book your stay directly</div>
-    </div>
-    <div class="mvr-fallback-search"><span>Check in</span><span>Check out</span><button>Search</button></div>
-    <div class="mvr-fallback-room">
-      <div><strong>${esc(room.name || 'Your room')}</strong><small>${Math.max(1, Number(room.totalUnits) || 1)} available</small></div>
-      <strong>${money(nightlyRate())}<small>/night</small></strong>
-    </div>
-  </div>`;
-}
-
-function guestPhoneHtml() {
-  const url = bookingPageState.ready ? bookingUrl() : '';
-  return `<div class="mvr-phone mvr-booking-phone">
-    <div class="mvr-phone-speaker"></div>
-    <div class="mvr-browser-bar">
-      <span class="mvr-browser-lock">●</span>
-      <span>${esc(crm.activeHotelDomain || 'your-property.mktel.co')}</span>
-    </div>
-    <div class="mvr-phone-screen">
-      ${url
-        ? `<iframe title="${esc(propertyName())} booking page" src="${esc(url)}" loading="eager" sandbox="allow-scripts allow-same-origin"></iframe>`
-        : fallbackGuestPreviewHtml()}
-    </div>
-  </div>`;
-}
-
 function bookingPageStatusHtml() {
   if (bookingPageState.ready) {
     return `<div class="mvr-page-status is-ready"><span>✓</span>${bookingPageState.reason === 'local'
@@ -158,33 +159,25 @@ function bookingPageStatusHtml() {
     : 'Your personalized preview is ready while the live page finishes publishing.'}</div>`;
 }
 
-function editPreviewHtml() {
+function bookingPreviewCardHtml() {
   const room = firstRoom();
-  return `<div class="mvr-editor-window">
-    <div class="mvr-editor-top">
-      <div class="mvr-mini-mark">M</div>
-      <div><strong>Front Desk</strong><span>Your page</span></div>
-      <span class="mvr-saved-pill">Saved</span>
+  return `<button type="button" class="mvr-booking-preview-card" id="mvrExpandPreview">
+    <div class="mvr-booking-preview-hero">
+      ${roomPhotoHtml('mvr-booking-preview-photo')}
+      <span class="mvr-live-pill"><i></i> Direct booking page</span>
+      <div class="mvr-booking-preview-title">
+        <small>Book direct with</small>
+        <strong>${esc(propertyName())}</strong>
+      </div>
     </div>
-    <div class="mvr-editor-note">Everything here controls what guests see.</div>
-    <div class="mvr-editor-field">
-      <span>Property name</span>
-      <strong>${esc(propertyName())}</strong>
+    <div class="mvr-booking-preview-body">
+      <div>
+        <span>${esc(room.name || 'Your room')}</span>
+        <small>${Math.max(1, Number(room.totalUnits) || 1)} available · from ${money(nightlyRate())}/night</small>
+      </div>
+      <b>Open live preview <span>↗</span></b>
     </div>
-    <div class="mvr-editor-room">
-      ${roomPhotoHtml('mvr-editor-photo')}
-      <div><span>Room or unit</span><strong>${esc(room.name || 'Your room')}</strong></div>
-      <button type="button" tabindex="-1">Edit</button>
-    </div>
-    <div class="mvr-editor-grid">
-      <div><span>Nightly rate</span><strong>${money(nightlyRate())}</strong></div>
-      <div><span>Units</span><strong>${Math.max(1, Number(room.totalUnits) || 1)}</strong></div>
-    </div>
-    <div class="mvr-edit-sync">
-      <span class="mvr-sync-pulse"></span>
-      Changes update your guest page
-    </div>
-  </div>`;
+  </button>`;
 }
 
 function bookingRevealHtml() {
@@ -195,50 +188,65 @@ function bookingRevealHtml() {
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
         <span>And it is completely yours.</span>
-        Change rooms, photos, rates, policies and property details anytime from Front Desk.
+        Open the live preview to see what guests see, then switch to the real editor to change your details, first room, photo and price.
       </div>
-      <div class="mvr-segmented" role="tablist" aria-label="Booking page and editor preview">
-        <button type="button" data-engine-mode="guest" class="${engineMode === 'guest' ? 'is-active' : ''}">Guest view</button>
-        <button type="button" data-engine-mode="edit" class="${engineMode === 'edit' ? 'is-active' : ''}">Edit view</button>
-      </div>
-      ${engineMode === 'guest' ? bookingPageStatusHtml() : ''}
-      ${engineMode === 'guest' && bookingPageState.ready && bookingUrl() ? '<button type="button" class="mvr-text-action" id="mvrExpandPreview">Open the full live preview ↗</button>' : ''}
+      ${bookingPageStatusHtml()}
     </div>
     <div class="mvr-visual mvr-visual-booking">
-      ${engineMode === 'guest' ? guestPhoneHtml() : editPreviewHtml()}
-      <div class="mvr-proof-chip">${engineMode === 'guest' ? 'What guests see' : 'What you control'}</div>
+      ${bookingPreviewCardHtml()}
     </div>
   </section>`;
 }
 
+function phoneIconSvg() {
+  return `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <defs><linearGradient id="mvrPhoneGreen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#62e46f"/><stop offset="1" stop-color="#08a837"/></linearGradient></defs>
+    <rect width="64" height="64" rx="14" fill="url(#mvrPhoneGreen)"/>
+    <path fill="#fff" d="M20.1 14.8c1.7-1 4.2-.5 5.2 1.3l4.2 7.4c.8 1.5.6 3.3-.6 4.5l-3 3c2.1 4.5 5.7 8.1 10.2 10.2l3-3c1.2-1.2 3-1.5 4.5-.6l7.4 4.2c1.8 1 2.4 3.5 1.3 5.2l-2.2 3.5c-1.7 2.8-5.1 4.2-8.3 3.4-15.7-3.7-28-16-31.7-31.7-.8-3.2.6-6.6 3.4-8.3l3.6-2.1z"/>
+  </svg>`;
+}
+
+function safariIconSvg() {
+  return `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <rect width="64" height="64" rx="14" fill="#fff"/>
+    <circle cx="32" cy="32" r="25" fill="#40b8ed"/>
+    <circle cx="32" cy="32" r="20.5" fill="none" stroke="#fff" stroke-width="1.5" opacity=".9"/>
+    <g stroke="#fff" stroke-width="1.3" opacity=".9">
+      <path d="M32 9v5M32 50v5M9 32h5M50 32h5M15.7 15.7l3.5 3.5M44.8 44.8l3.5 3.5M48.3 15.7l-3.5 3.5M19.2 44.8l-3.5 3.5"/>
+    </g>
+    <path d="M37.3 26.7 27.7 30l-4 9.1 9.6-3.3 4-9.1z" fill="#fff"/>
+    <path d="m37.3 26.7-4 9.1-3.2-3.2 7.2-5.9z" fill="#ef3d52"/>
+  </svg>`;
+}
+
 function guestAppRevealHtml() {
-  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'M');
-  const appImage = crm.activeHotelAppIcon || firstRoomImage();
-  const appIcon = appImage
-    ? `<img src="${esc(appImage)}" alt="">`
-    : `<span>${initial}</span>`;
   return `<section class="mvr-stage mvr-stage-app">
     <div class="mvr-copy">
       <div class="mvr-eyebrow">2 · Your guest app</div>
       <h1>Stay on your guests’ Home Screens.</h1>
       <p>Guests can save <strong>${esc(propertyName())}</strong> while they are on your booking page, then reopen it whenever they want to book direct again.</p>
       <div class="mvr-callout">
-        <strong>No App Store search.</strong>
-        They scan your QR code or tap Add to Home Screen from the booking page.
+        <strong>No App Store search or account.</strong>
+        They tap Install on your booking page. Your property appears beside the apps they already use.
       </div>
     </div>
-    <div class="mvr-visual mvr-home-visual">
-      <div class="mvr-home-phone">
-        <div class="mvr-home-status"><span>9:41</span><span>● ●</span></div>
-        <div class="mvr-home-grid">
-          <div class="mvr-home-app faded"><span>☀</span><small>Weather</small></div>
-          <div class="mvr-home-app faded"><span>✉</span><small>Mail</small></div>
-          <div class="mvr-home-app mvr-property-app"><div>${appIcon}</div><small>${esc(propertyName())}</small></div>
-          <div class="mvr-home-app faded"><span>⌁</span><small>Maps</small></div>
+    <div class="mvr-visual mvr-install-visual ${homeScreenInstalled ? 'is-installed' : ''}">
+      <div class="mvr-install-card">
+        <div class="mvr-install-property-icon">${appIconHtml()}</div>
+        <div>
+          <strong>Add ${esc(propertyName())} to your Home Screen</strong>
+          <span>Book direct in one tap next time.</span>
         </div>
-        <div class="mvr-home-dock"><span>☎</span><span>◉</span><span>▣</span></div>
+        <button type="button" id="mvrInstallDemo">${homeScreenInstalled ? 'Installed ✓' : 'Install'}</button>
       </div>
-      <div class="mvr-qr-card"><div class="mvr-qr-pattern">▦</div><span>Scan once</span><strong>Book direct again</strong></div>
+      <div class="mvr-install-arrow"><span>${homeScreenInstalled ? 'Now on their phone' : 'Tap Install'}</span><b>↓</b></div>
+      <div class="mvr-ios-crop">
+        <div class="mvr-ios-dock">
+          <div class="mvr-dock-icon mvr-dock-property">${appIconHtml()}</div>
+          <div class="mvr-dock-icon">${phoneIconSvg()}</div>
+          <div class="mvr-dock-icon">${safariIconSvg()}</div>
+        </div>
+      </div>
     </div>
   </section>`;
 }
@@ -337,17 +345,40 @@ function renderReveal() {
 
 function showExpandedPreview() {
   const url = bookingUrl();
-  if (!bookingPageState.ready || !url || document.getElementById('mvrLivePreview')) return;
+  if (!url || document.getElementById('mvrLivePreview')) return;
+  livePreviewMode = 'guest';
   const modal = document.createElement('div');
   modal.id = 'mvrLivePreview';
   modal.className = 'mvr-live-preview';
   modal.innerHTML = `<div class="mvr-live-toolbar">
     <button type="button" id="mvrClosePreview">← Back to overview</button>
-    <div><strong>${esc(propertyName())}</strong><span>${esc(crm.activeHotelDomain || '')}</span></div>
+    <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span>Live preview · changes in Edit save for real</span></div>
+    <div class="mvr-live-switch" role="tablist" aria-label="Guest page and editor">
+      <button type="button" data-live-preview-mode="guest" class="is-active">Guest booking page</button>
+      <button type="button" data-live-preview-mode="edit">Edit in Front Desk</button>
+    </div>
   </div>
-  <iframe title="${esc(propertyName())} full booking-page preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin"></iframe>`;
+  <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   document.getElementById('mvrClosePreview')?.addEventListener('click', () => modal.remove());
+  modal.querySelectorAll('[data-live-preview-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextMode = button.dataset.livePreviewMode === 'edit' ? 'edit' : 'guest';
+      if (nextMode === livePreviewMode) return;
+      livePreviewMode = nextMode;
+      modal.querySelectorAll('[data-live-preview-mode]').forEach((item) => {
+        item.classList.toggle('is-active', item.dataset.livePreviewMode === livePreviewMode);
+      });
+      const iframe = modal.querySelector('iframe');
+      if (iframe) {
+        iframe.title = livePreviewMode === 'edit'
+          ? `${propertyName()} Front Desk editor`
+          : `${propertyName()} booking-page preview`;
+        iframe.src = livePreviewMode === 'edit' ? frontdeskEditorUrl() : bookingUrl();
+      }
+      if (livePreviewMode === 'edit') trackReveal('BookingEngineEditPreviewViewed');
+    });
+  });
   trackReveal('BookingEngineFullPreviewOpened');
 }
 
@@ -410,12 +441,11 @@ function bindRevealEvents() {
   document.getElementById('mvrBack')?.addEventListener('click', () => moveToStep(currentStep - 1));
   document.getElementById('mvrExpandPreview')?.addEventListener('click', showExpandedPreview);
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
-  document.querySelectorAll('[data-engine-mode]').forEach((button) => {
-    button.addEventListener('click', () => {
-      engineMode = button.dataset.engineMode === 'edit' ? 'edit' : 'guest';
-      if (engineMode === 'edit') trackReveal('BookingEngineEditPreviewViewed');
-      renderReveal();
-    });
+  document.getElementById('mvrInstallDemo')?.addEventListener('click', () => {
+    if (homeScreenInstalled) return;
+    homeScreenInstalled = true;
+    trackReveal('GuestAppInstallDemoClicked');
+    renderReveal();
   });
 }
 
@@ -446,6 +476,7 @@ async function checkBookingPageStatus() {
       checking: false,
       reason: 'local',
       attempts: 1,
+      domain: '',
     };
     if (currentStep === 0 && !document.getElementById('mvrLivePreview')) renderReveal();
     return;
@@ -459,6 +490,7 @@ async function checkBookingPageStatus() {
       checking: false,
       reason: String(result?.reason || ''),
       attempts: bookingPageState.attempts,
+      domain: String(result?.domain || ''),
     };
   } catch (_) {
     bookingPageState.checking = false;
@@ -481,8 +513,9 @@ export function showMarketelValueReveal(options = {}) {
     ? Math.max(0, Math.min(3, requestedStep))
     : Math.max(0, Math.min(3, Number.isFinite(storedStep) ? storedStep : 0));
   if (crm.hotelSubscribed && currentStep === 3) currentStep = 0;
-  engineMode = 'guest';
-  bookingPageState = { ready: false, checking: true, reason: '', attempts: 0 };
+  livePreviewMode = 'guest';
+  homeScreenInstalled = false;
+  bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
 

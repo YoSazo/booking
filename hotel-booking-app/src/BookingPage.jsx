@@ -168,7 +168,7 @@ function BookingPage({
       {showInstallBanner && (
         <InstallAppBanner
           hotelName={hotel.name}
-          appIconUrl={hotel.appIconUrl}
+          appIconUrl={hotel.appIconUrl || roomData?.[0]?.images?.[0]?.url || roomData?.[0]?.imageUrl}
           hotelId={hotelId}
           ownerPreview={ownerScrollInstall}
           sticky
