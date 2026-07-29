@@ -1,0 +1,20 @@
+{
+  "name": "marketel-frontdesk-ios",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private iOS dogfood build for Marketel Front Desk.",
+  "scripts": {
+    "sync": "npx cap sync ios",
+    "open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.4.2",
+    "@capacitor/ios": "8.4.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

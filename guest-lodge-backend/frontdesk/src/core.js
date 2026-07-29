@@ -74,6 +74,16 @@ function isIosDevice() {
   return /iphone|ipad|ipod/i.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
+function isNativeFrontdeskApp() {
+  try {
+    const nativeParam = new URLSearchParams(window.location.search || '').get('native');
+    if (nativeParam === 'ios' || nativeParam === 'android') return true;
+    return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' &&
+      window.Capacitor.isNativePlatform());
+  } catch (_) {
+    return false;
+  }
+}
 // iOS 26+ Safari hides Share behind the "⋯" menu (Compact layout is the
 // default) and tucks Add to Home Screen behind "View More". Apple froze the OS
 // version in the UA, but Safari still reports its real major version via the
@@ -86,6 +96,7 @@ function isIos26Plus() {
 function isStandaloneApp() {
   try {
     const qs = new URLSearchParams(window.location.search);
+    if (isNativeFrontdeskApp()) return true;
     if (qs.get('pwa') === '1') return true;
     if (qs.get('pwa') === '0') return false;
     if (sessionStorage.getItem('frontdeskSimulatePwa') === '1') return true;
@@ -4407,6 +4418,7 @@ exposeToWindow({
   invokeLoadEditRooms,
   isEditPageDomReady,
   isIosDevice,
+  isNativeFrontdeskApp,
   isPwaSimulated,
   isStandaloneApp,
   jsStr,

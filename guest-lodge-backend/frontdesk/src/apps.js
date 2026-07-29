@@ -226,24 +226,32 @@ function renderAppsView() {
   // Booking alerts are a current-device capability. A server-side install event
   // from another phone must not unlock them in an ordinary browser tab.
   const fdInApp = isStandaloneApp();
-  const fdGranted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  const fdNativeTest = isNativeFrontdeskApp();
+  const fdAlertsAvailable = fdInApp && !fdNativeTest;
+  const fdGranted = fdAlertsAvailable &&
+    (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
   const fdInstallLabel = fdOnNarrowScreen ? 'Put Front Desk on this phone' : 'Put Front Desk on my phone';
   const reminderMinutes = Number(crm.bookingReviewSettings?.reminderMinutes ?? 15);
   const reminderSettingsHtml = `
     <div id="bookingReviewReminderSetting" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-      <label for="bookingReviewReminderSelect" style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${fdInApp ? 'var(--green)' : '#8B938E'};margin-bottom:6px;">If you have not verified a booking</label>
-      <select id="bookingReviewReminderSelect" onchange="saveBookingReviewReminderSetting(this)" ${fdInApp ? '' : 'disabled aria-disabled="true"'} style="width:100%;padding:12px 11px;border:1px solid ${fdInApp ? 'var(--border)' : '#D7DBD8'};border-radius:11px;background:${fdInApp ? '#fff' : '#E7E9E7'};color:${fdInApp ? 'var(--text)' : '#8B938E'};font-family:inherit;font-size:13px;font-weight:700;box-sizing:border-box;cursor:${fdInApp ? 'pointer' : 'not-allowed'};">
+      <label for="bookingReviewReminderSelect" style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${fdAlertsAvailable ? 'var(--green)' : '#8B938E'};margin-bottom:6px;">If you have not verified a booking</label>
+      <select id="bookingReviewReminderSelect" onchange="saveBookingReviewReminderSetting(this)" ${fdAlertsAvailable ? '' : 'disabled aria-disabled="true"'} style="width:100%;padding:12px 11px;border:1px solid ${fdAlertsAvailable ? 'var(--border)' : '#D7DBD8'};border-radius:11px;background:${fdAlertsAvailable ? '#fff' : '#E7E9E7'};color:${fdAlertsAvailable ? 'var(--text)' : '#8B938E'};font-family:inherit;font-size:13px;font-weight:700;box-sizing:border-box;cursor:${fdAlertsAvailable ? 'pointer' : 'not-allowed'};">
         <option value="15"${reminderMinutes === 15 ? ' selected' : ''}>Remind every 15 minutes · up to 3 times</option>
         <option value="30"${reminderMinutes === 30 ? ' selected' : ''}>Remind every 30 minutes · up to 3 times</option>
         <option value="60"${reminderMinutes === 60 ? ' selected' : ''}>Remind every 1 hour · up to 3 times</option>
         <option value="0"${reminderMinutes === 0 ? ' selected' : ''}>Send the first notification only</option>
       </select>
-      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Front Desk to unlock this setting.'}</div>
+      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdNativeTest ? 'Native booking alerts will unlock after APNs is connected.' : (fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Front Desk to unlock this setting.')}</div>
     </div>`;
 
   let fdCtaHtml;
-  if (fdInApp && fdGranted) {
+  if (fdNativeTest) {
+    fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Private iPhone test installed</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Use this build to test Front Desk on your phone. Native booking alerts are the next iOS step.</div></div>
+    </div>`;
+  } else if (fdInApp && fdGranted) {
     fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
       <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
       <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Installed on this device</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Booking and message alerts can reach this phone — even if Front Desk is closed.</div></div>
@@ -257,7 +265,12 @@ function renderAppsView() {
       <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until Front Desk is installed on your phone</div>`;
   }
 
-  const storyFrontdeskActionHtml = fdInApp
+  const storyFrontdeskActionHtml = fdNativeTest
+    ? `<div class="apps-story-status">
+        <span class="apps-story-status-icon">✓</span>
+        <span>Private Front Desk test is installed here. Native booking alerts are not connected in this first build.</span>
+      </div>`
+    : fdInApp
     ? `<div class="apps-story-status">
         <span class="apps-story-status-icon">✓</span>
         <span>Front Desk is installed here. This phone can receive booking and message alerts.</span>

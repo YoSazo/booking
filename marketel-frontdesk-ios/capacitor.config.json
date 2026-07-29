@@ -1,0 +1,15 @@
+{
+  "appId": "com.bookmarketel.frontdesk",
+  "appName": "Marketel Front Desk",
+  "webDir": "www",
+  "server": {
+    "url": "https://guest-lodge-backend.onrender.com/frontdesk?native=ios",
+    "cleartext": false,
+    "errorPath": "offline.html"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "backgroundColor": "#EEF2EFFF"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Marketel Test Builds",
+  "subtitle": "Private dogfood builds for Marketel Front Desk",
+  "description": "Install the current Marketel Front Desk iPhone test build through AltStore Classic.",
+  "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
+  "website": "https://bookmarketel.com",
+  "tintColor": "2E7D5B",
+  "featuredApps": ["com.bookmarketel.frontdesk"],
+  "apps": [
+    {
+      "name": "Marketel Front Desk",
+      "bundleIdentifier": "com.bookmarketel.frontdesk",
+      "developerName": "Marketel",
+      "subtitle": "Run your property from your phone.",
+      "localizedDescription": "A private iPhone dogfood build of Marketel Front Desk. It connects to the live Front Desk over Wi-Fi or cellular. Native APNs booking alerts are not included in this first build.",
+      "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
+      "tintColor": "2E7D5B",
+      "category": "utilities",
+      "versions": [
+        {
+          "version": "1.0",
+          "buildVersion": "1",
+          "date": "2026-07-28",
+          "localizedDescription": "First private iPhone dogfood build.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.1.0/Marketel-Front-Desk.ipa",
+          "size": 5000000,
+          "minOSVersion": "15.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSCameraUsageDescription": "Front Desk uses the camera when you choose to add a property or room photo.",
+          "NSPhotoLibraryUsageDescription": "Front Desk uses your photo library when you choose a property or room photo."
+        }
+      }
+    }
+  ],
+  "news": []
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#EEF2EF">
+    <title>Front Desk is offline</title>
+    <style>
+      :root {
+        color: #17231d;
+        background: #eef2ef;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: min(320px, calc(100vw - 48px));
+        text-align: center;
+      }
+
+      img {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+      }
+
+      h1 {
+        margin: 18px 0 8px;
+        font-size: 22px;
+      }
+
+      p {
+        margin: 0 0 20px;
+        color: #607067;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      button {
+        width: 100%;
+        padding: 14px 18px;
+        border: 0;
+        border-radius: 12px;
+        color: white;
+        background: #2e7d5b;
+        font: inherit;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="marketel-icon.png" alt="">
+      <h1>Front Desk could not connect</h1>
+      <p>Check your internet connection, then try again.</p>
+      <button type="button" onclick="window.location.href='https://guest-lodge-backend.onrender.com/frontdesk?native=ios'">Try again</button>
+    </main>
+  </body>
+</html>
