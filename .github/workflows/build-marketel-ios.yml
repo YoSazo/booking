@@ -92,6 +92,6 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               marketel-frontdesk-ios/ios/output/Marketel-Front-Desk.ipa \
               --title "Marketel Front Desk iOS ${GITHUB_REF_NAME#ios-v}" \
-              --notes "Private AltStore dogfood build with four native tabs, Revenue inside Bookings, property switching, and Front Desk Assistant access from the native menu. The hosted Assistant supports verified SMS booking alerts and availability updates once Twilio is configured; native APNs booking alerts are not included yet." \
+              --notes "Private AltStore dogfood build with a capsule-shaped stable Liquid Glass header, an instant shell-safe Front Desk Assistant sheet, and a native prefilled Apple contact form for Marketel Front Desk. Verified SMS booking alerts activate once Twilio is configured; native APNs booking alerts are not included yet." \
               --prerelease
           fi

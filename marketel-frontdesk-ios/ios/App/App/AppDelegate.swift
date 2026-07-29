@@ -1,6 +1,8 @@
 import UIKit
 import Capacitor
 import WebKit
+import Contacts
+import ContactsUI
 
 /// Compact vector version of the Marketel mark. Keeping it native means the
 /// header stays sharp at every display scale without shipping another asset.
@@ -64,10 +66,11 @@ private final class MarketelMarkView: UIView {
 /// owns top-level navigation so iOS 26 can render the real Liquid Glass tab
 /// and navigation treatments, while older iOS versions receive the standard
 /// system appearance automatically.
-final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler {
+final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler, CNContactViewControllerDelegate {
     private let statusBarBackdrop = UIView()
     private let topBar = UIVisualEffectView()
     private let tabBar = UITabBar()
+    private let menuButton = UIButton(type: .system)
     private let propertyHeaderControl = UIControl()
     private let propertyNameLabel = UILabel()
     private let yourPageTabItem = UITabBarItem(
@@ -87,6 +90,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     )
     private var bookingTabItem: UITabBarItem?
     private var shellVisible = false
+    private var shellSuppressedByModal = false
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -122,6 +126,15 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             width: bounds.width - 16,
             height: 64
         )
+        // The menu sits visually inside the glass header but outside its view
+        // hierarchy. iOS can then animate the context menu's source button
+        // without snapshotting or blanking the entire glass banner.
+        menuButton.frame = CGRect(
+            x: topBar.frame.maxX - 48,
+            y: topBar.frame.minY + 10,
+            width: 40,
+            height: 44
+        )
 
         let measuredTabHeight = tabBar.sizeThatFits(
             CGSize(width: bounds.width, height: bounds.height)
@@ -136,6 +149,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         view.bringSubviewToFront(statusBarBackdrop)
         view.bringSubviewToFront(topBar)
+        view.bringSubviewToFront(menuButton)
         view.bringSubviewToFront(tabBar)
     }
 
@@ -159,11 +173,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 alpha: 0.12
             )
             topBar.effect = glass
+            topBar.cornerConfiguration = .capsule()
         } else {
             topBar.effect = UIBlurEffect(style: .systemThinMaterial)
-            topBar.layer.cornerRadius = 22
-            topBar.clipsToBounds = true
+            topBar.layer.cornerRadius = 32
+            topBar.layer.cornerCurve = .continuous
         }
+        topBar.clipsToBounds = true
         topBar.isUserInteractionEnabled = true
 
         let logo = MarketelMarkView()
@@ -266,7 +282,6 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("signout")
         }
-        let menuButton = UIButton(type: .system)
         var menuConfiguration = UIButton.Configuration.plain()
         menuConfiguration.image = UIImage(systemName: "ellipsis")
         menuConfiguration.baseForegroundColor = .label
@@ -274,9 +289,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuButton.configuration = menuConfiguration
         menuButton.menu = UIMenu(children: [assistantAction, refreshAction, tourAction, switchAction, signOutAction])
         menuButton.showsMenuAsPrimaryAction = true
+        menuButton.changesSelectionAsPrimaryAction = false
+        menuButton.automaticallyUpdatesConfiguration = false
         menuButton.accessibilityLabel = "Front Desk menu"
 
-        let actions = UIStackView(arrangedSubviews: [qrButton, menuButton])
+        // Reserve the trailing space inside the header for the independently
+        // hosted menu button.
+        let menuSlot = UIView()
+        let actions = UIStackView(arrangedSubviews: [qrButton, menuSlot])
         actions.axis = .horizontal
         actions.alignment = .center
         actions.spacing = 2
@@ -293,8 +313,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         NSLayoutConstraint.activate([
             qrButton.widthAnchor.constraint(equalToConstant: 40),
             qrButton.heightAnchor.constraint(equalToConstant: 44),
-            menuButton.widthAnchor.constraint(equalToConstant: 40),
-            menuButton.heightAnchor.constraint(equalToConstant: 44),
+            menuSlot.widthAnchor.constraint(equalToConstant: 40),
+            menuSlot.heightAnchor.constraint(equalToConstant: 44),
             headerRow.leadingAnchor.constraint(equalTo: topBar.contentView.leadingAnchor, constant: 14),
             headerRow.trailingAnchor.constraint(equalTo: topBar.contentView.trailingAnchor, constant: -8),
             headerRow.topAnchor.constraint(equalTo: topBar.contentView.topAnchor, constant: 6),
@@ -302,6 +322,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ])
 
         view.addSubview(topBar)
+        view.addSubview(menuButton)
     }
 
     private func configureTabBar() {
@@ -378,30 +399,86 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         }
     }
 
-    private func setShellVisible(_ visible: Bool, animated: Bool) {
-        shellVisible = visible
-        let changes = {
-            self.statusBarBackdrop.alpha = visible ? 1 : 0
-            self.topBar.alpha = visible ? 1 : 0
-            self.tabBar.alpha = visible ? 1 : 0
+    private func marketelContactImage() -> UIImage {
+        let size = CGSize(width: 512, height: 512)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            UIColor(
+                red: 238 / 255,
+                green: 242 / 255,
+                blue: 239 / 255,
+                alpha: 1
+            ).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+
+            let mark = MarketelMarkView(
+                frame: CGRect(x: 142, y: 134, width: 228, height: 244)
+            )
+            mark.backgroundColor = .clear
+            mark.layer.render(in: context.cgContext)
         }
-        statusBarBackdrop.isHidden = false
-        topBar.isHidden = false
-        tabBar.isHidden = false
-        topBar.isUserInteractionEnabled = visible
-        tabBar.isUserInteractionEnabled = visible
-        if animated {
-            UIView.animate(withDuration: 0.2, animations: changes) { _ in
-                self.statusBarBackdrop.isHidden = !visible
-                self.topBar.isHidden = !visible
-                self.tabBar.isHidden = !visible
-            }
+    }
+
+    private func presentMarketelContact(phone rawPhone: String) {
+        let digits = rawPhone.filter(\.isNumber)
+        let phone = (10...15).contains(digits.count) ? rawPhone : "1231231234"
+
+        let contact = CNMutableContact()
+        contact.contactType = .person
+        contact.givenName = "Marketel"
+        contact.familyName = "Front Desk"
+        contact.organizationName = "Marketel"
+        contact.imageData = marketelContactImage().pngData()
+        contact.phoneNumbers = [
+            CNLabeledValue(
+                label: CNLabelPhoneNumberMobile,
+                value: CNPhoneNumber(stringValue: phone)
+            )
+        ]
+
+        let controller = CNContactViewController(forNewContact: contact)
+        controller.delegate = self
+        controller.allowsEditing = true
+        controller.allowsActions = false
+
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.modalPresentationStyle = .formSheet
+        navigationController.navigationBar.tintColor = UIColor(
+            red: 46 / 255,
+            green: 125 / 255,
+            blue: 91 / 255,
+            alpha: 1
+        )
+        present(navigationController, animated: true)
+    }
+
+    func contactViewController(
+        _ viewController: CNContactViewController,
+        didCompleteWith contact: CNContact?
+    ) {
+        if let navigationController = viewController.navigationController {
+            navigationController.dismiss(animated: true)
         } else {
-            changes()
-            statusBarBackdrop.isHidden = !visible
-            topBar.isHidden = !visible
-            tabBar.isHidden = !visible
+            viewController.dismiss(animated: true)
         }
+    }
+
+    private func setShellVisible(_ visible: Bool, animated _: Bool) {
+        shellVisible = visible
+        // UIVisualEffectView should not be faded through partial alpha: doing
+        // that forces an offscreen render and briefly exposes an empty white
+        // material after a context menu closes. Swap visibility atomically.
+        statusBarBackdrop.alpha = 1
+        topBar.alpha = 1
+        menuButton.alpha = 1
+        tabBar.alpha = 1
+        statusBarBackdrop.isHidden = !visible
+        topBar.isHidden = !visible
+        menuButton.isHidden = !visible
+        tabBar.isHidden = !visible
+        topBar.isUserInteractionEnabled = visible
+        menuButton.isUserInteractionEnabled = visible
+        tabBar.isUserInteractionEnabled = visible
     }
 
     func userContentController(
@@ -416,12 +493,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         switch type {
         case "visibility":
-            setShellVisible(payload["visible"] as? Bool ?? false, animated: shellVisible)
+            let visible = payload["visible"] as? Bool ?? false
+            shellSuppressedByModal = !visible
+            setShellVisible(visible, animated: shellVisible)
         case "state":
             updatePropertyName(payload["hotelName"] as? String ?? "Front Desk")
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
-            setShellVisible(payload["visible"] as? Bool ?? true, animated: shellVisible)
+            let requestedVisible = payload["visible"] as? Bool ?? true
+            setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
+        case "saveContact":
+            presentMarketelContact(phone: payload["phone"] as? String ?? "1231231234")
         default:
             break
         }

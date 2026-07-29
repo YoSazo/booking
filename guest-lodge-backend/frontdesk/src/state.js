@@ -25,6 +25,7 @@ export const crm = {
   bookingsSubview: 'bookings',
   assistantData: null,
   assistantLoading: false,
+  assistantError: '',
   launchStatus: null,
   growthFunnel: null,
   growthChecklist: {},

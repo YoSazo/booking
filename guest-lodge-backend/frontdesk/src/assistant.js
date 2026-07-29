@@ -3,6 +3,8 @@ import { exposeToWindow } from './utils.js';
 
 let installed = false;
 let loadPromise = null;
+const ASSISTANT_LOAD_TIMEOUT_MS = 12000;
+const ASSISTANT_TEST_PHONE = '1231231234';
 
 function api(method, path, body) {
   if (typeof window.api !== 'function') return Promise.reject(new Error('Front Desk is not ready.'));
@@ -11,6 +13,27 @@ function api(method, path, body) {
 
 function toast(message, kind = 'info') {
   if (typeof window.toast === 'function') window.toast(message, kind);
+}
+
+function setNativeShellForAssistant(visible) {
+  if (typeof window.setNativeShellVisible === 'function') {
+    window.setNativeShellVisible(visible);
+    return;
+  }
+  try {
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({
+      type: 'visibility',
+      visible: !!visible,
+    });
+  } catch (_) {}
+}
+
+function withTimeout(promise, milliseconds, message) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function esc(value) {
@@ -154,13 +177,24 @@ export async function loadFrontDeskAssistant({ force = false } = {}) {
   if (loadPromise && !force) return loadPromise;
   const requestedHotelId = crm.activeHotelId;
   crm.assistantLoading = true;
+  crm.assistantError = '';
   renderFrontDeskAssistantCard();
-  loadPromise = api('GET', '/api/crm/frontdesk-assistant')
+  loadPromise = withTimeout(
+    api('GET', '/api/crm/frontdesk-assistant'),
+    ASSISTANT_LOAD_TIMEOUT_MS,
+    'Front Desk Assistant took too long to respond. Tap retry.'
+  )
     .then((result) => {
       if (!result?.success) throw new Error(result?.message || 'Could not load Front Desk Assistant.');
       if (crm.activeHotelId !== requestedHotelId) return null;
       crm.assistantData = result.data;
       return result.data;
+    })
+    .catch((error) => {
+      if (crm.activeHotelId === requestedHotelId) {
+        crm.assistantError = error?.message || 'Could not load Front Desk Assistant.';
+      }
+      throw error;
     })
     .finally(() => {
       crm.assistantLoading = false;
@@ -181,15 +215,16 @@ export function renderFrontDeskAssistantCard() {
   panel.style.display = visible ? 'block' : 'none';
   if (!visible) return;
   if (!crm.assistantData) {
+    const loadFailed = !!crm.assistantError && !crm.assistantLoading;
     panel.innerHTML = `<div class="fda-card is-off">
       <div class="fda-card-row">
         <div class="fda-card-icon">💬</div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk Assistant</div>
-          <div class="fda-card-title">${crm.assistantLoading ? 'Connecting your assistant…' : 'Tell Front Desk when a room is taken'}</div>
-          <div class="fda-card-sub">It updates availability for you and helps prevent outside bookings from colliding.</div>
+          <div class="fda-card-title">${crm.assistantLoading ? 'Connecting your assistant…' : (loadFailed ? 'Assistant could not connect' : 'Tell Front Desk when a room is taken')}</div>
+          <div class="fda-card-sub">${loadFailed ? esc(crm.assistantError) : 'It updates availability for you and helps prevent outside bookings from colliding.'}</div>
         </div>
-        <button type="button" class="fda-card-btn" onclick="openFrontDeskAssistant()">Open</button>
+        <button type="button" class="fda-card-btn" onclick="openFrontDeskAssistant()">${loadFailed ? 'Retry' : 'Open'}</button>
       </div>
     </div>`;
     if (!crm.assistantLoading) loadFrontDeskAssistant().catch(() => {});
@@ -266,6 +301,13 @@ function activityHtml() {
 function sheetBodyHtml() {
   const data = crm.assistantData;
   if (!data) {
+    if (crm.assistantError && !crm.assistantLoading) {
+      return `<div class="fda-section">
+        <div class="fda-section-title">Assistant could not connect</div>
+        <div class="fda-section-sub">${esc(crm.assistantError)}</div>
+        <button type="button" class="fda-btn primary full" onclick="retryFrontDeskAssistant()">Retry</button>
+      </div>`;
+    }
     return '<div class="fda-section"><div class="loading"><div class="logo-sprite-bounce"></div> Opening assistant…</div></div>';
   }
   const config = data.config || {};
@@ -276,6 +318,7 @@ function sheetBodyHtml() {
   const canAdd = recipients.length < recipientLimit;
   const settingsDisabled = subscribed ? '' : 'disabled';
   const zone = config.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
+  const isNativeApp = typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
   const systemNote = capabilities.smsConfigured
     ? ''
     : `<div class="fda-section fda-lock"><div class="fda-section-title">Messaging is being connected</div><div class="fda-section-sub" style="margin:0;">The interface is ready, but Marketel's texting number still needs its server credentials before it can send.</div></div>`;
@@ -320,7 +363,7 @@ function sheetBodyHtml() {
       </div>
       <div class="fda-field"><label for="assistant-person-phone">Mobile number</label><input id="assistant-person-phone" type="tel" autocomplete="tel" placeholder="(701) 555-0123"></div>
       <button type="button" class="fda-btn secondary full" onclick="addAssistantRecipient()" ${subscribed && capabilities.smsConfigured ? '' : 'disabled'}>Send verification code</button>` : ''}
-      ${capabilities.assistantPhone ? `<button type="button" class="fda-icon-btn" style="margin-top:10px;" onclick="saveAssistantContact()">Save “Marketel Front Desk” to contacts</button>` : ''}
+      ${capabilities.assistantPhone || isNativeApp ? `<button type="button" class="fda-icon-btn" style="margin-top:10px;" onclick="saveAssistantContact()">Save “Marketel Front Desk” to contacts</button>` : ''}
       <div class="fda-note">Verification confirms consent and prevents a mistyped number from texting someone else. Reply STOP anytime to disconnect.</div>
     </div>
 
@@ -375,6 +418,9 @@ function renderSheet() {
 }
 
 export function openFrontDeskAssistant() {
+  // Hide native chrome before any lazy rendering or network work so it can
+  // never sit above the web sheet.
+  setNativeShellForAssistant(false);
   ensureStyles();
   let overlay = document.getElementById('frontDeskAssistantOverlay');
   if (!overlay) {
@@ -388,17 +434,28 @@ export function openFrontDeskAssistant() {
     document.body.appendChild(overlay);
   }
   document.body.style.overflow = 'hidden';
-  if (typeof window.setNativeShellVisible === 'function') window.setNativeShellVisible(false);
   renderSheet();
-  loadFrontDeskAssistant({ force: true }).catch((error) => {
-    toast(error.message || 'Could not load Front Desk Assistant.', 'error');
-  });
+  requestAnimationFrame(() => setNativeShellForAssistant(false));
+
+  if (crm.assistantData) {
+    // Cached settings render immediately. Refresh activity in the background
+    // without replacing the sheet with a loader.
+    loadFrontDeskAssistant({ force: true }).catch(() => {});
+  } else {
+    loadFrontDeskAssistant().catch(() => {});
+  }
 }
 
 export function closeFrontDeskAssistant() {
   document.getElementById('frontDeskAssistantOverlay')?.remove();
   document.body.style.overflow = '';
-  if (typeof window.setNativeShellVisible === 'function') window.setNativeShellVisible(true);
+  setNativeShellForAssistant(true);
+}
+
+export function retryFrontDeskAssistant() {
+  crm.assistantError = '';
+  renderSheet();
+  loadFrontDeskAssistant({ force: true }).catch(() => {});
 }
 
 function applyResult(result, successMessage) {
@@ -502,8 +559,22 @@ export async function runAssistantCheckNow() {
 }
 
 export function saveAssistantContact() {
-  const phone = crm.assistantData?.capabilities?.assistantPhone;
-  if (!phone) return toast('The Front Desk number is not available yet.', 'error');
+  const phone = crm.assistantData?.capabilities?.assistantPhone || ASSISTANT_TEST_PHONE;
+  try {
+    const nativeHandler = window.webkit?.messageHandlers?.marketelShell;
+    if (nativeHandler && typeof nativeHandler.postMessage === 'function') {
+      nativeHandler.postMessage({
+        type: 'saveContact',
+        name: 'Marketel Front Desk',
+        phone,
+      });
+      return;
+    }
+  } catch (_) {}
+
+  if (!crm.assistantData?.capabilities?.assistantPhone) {
+    return toast('The Front Desk number is not available yet.', 'error');
+  }
   const vcard = [
     'BEGIN:VCARD',
     'VERSION:3.0',
@@ -544,6 +615,7 @@ const exportsForWindow = {
   openFrontDeskAssistant,
   removeAssistantRecipient,
   renderFrontDeskAssistantCard,
+  retryFrontDeskAssistant,
   resendAssistantCode,
   runAssistantCheckNow,
   saveAssistantContact,

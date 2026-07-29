@@ -7,10 +7,11 @@ The test build loads:
 
 `https://guest-lodge-backend.onrender.com/frontdesk?native=ios`
 
-Version 2.3 keeps the native shell to four primary tabs, moves Revenue inside
+Version 2.4 keeps the native shell to four primary tabs, moves Revenue inside
 Bookings, and adds Front Desk Assistant to the native menu. The Assistant can
 text verified owners or staff about bookings and availability once the backend
-Twilio configuration is active. On iOS 26 the standard UIKit navigation
+Twilio configuration is active, and the native app can open a prefilled Apple
+contact sheet for the Marketel number. On iOS 26 the standard UIKit navigation
 receives the system Liquid Glass appearance automatically.
 
 It does not replace the existing PWA and does not yet register for native APNs

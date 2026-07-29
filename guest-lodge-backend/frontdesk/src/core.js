@@ -622,7 +622,11 @@ function marketelNativeAction(action) {
   else if (action === 'refresh') refreshCurrentView();
   else if (action === 'tour') replayWalkthrough();
   else if (action === 'assistant') {
+    // Dismiss native chrome before the lazy Assistant chunk is fetched. This
+    // keeps the tab bar and header from ever covering its modal.
+    setNativeShellVisible(false);
     loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
+      setNativeShellVisible(true);
       toast('Could not open Front Desk Assistant.', 'error');
     });
   }
@@ -1796,6 +1800,7 @@ async function startCrmApp(verification) {
   crm.revenueError = '';
   crm.assistantData = null;
   crm.assistantLoading = false;
+  crm.assistantError = '';
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
@@ -2062,6 +2067,7 @@ function showLogin() {
   crm.revenueError = '';
   crm.assistantData = null;
   crm.assistantLoading = false;
+  crm.assistantError = '';
   syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
 }

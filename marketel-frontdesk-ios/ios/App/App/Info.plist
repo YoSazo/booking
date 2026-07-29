@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Front Desk uses the camera when you choose to add a property or room photo.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Front Desk lets you save the Marketel messaging number as a contact.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Front Desk uses your photo library when you choose a property or room photo.</string>
 	<key>UILaunchStoryboardName</key>
