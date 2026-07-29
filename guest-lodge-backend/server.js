@@ -32,7 +32,7 @@ const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
 
 async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId } = {}) {
-    if (!MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
+    if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
     try {
         const userData = {};
         if (email) userData.em = [crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex')];
@@ -74,7 +74,9 @@ function getMetaCookies(req) {
 }
 
 // Email transporter (Brevo SMTP)
-const emailTransporter = (process.env.BREVO_SMTP_HOST && (process.env.BREVO_SMTP_KEY || process.env.BREVO_SMTP))
+const emailTransporter = (process.env.ENABLE_OUTBOUND_EMAIL !== 'false'
+    && process.env.BREVO_SMTP_HOST
+    && (process.env.BREVO_SMTP_KEY || process.env.BREVO_SMTP))
     ? nodemailer.createTransport({
         host: process.env.BREVO_SMTP_HOST,
         port: parseInt(process.env.BREVO_SMTP_PORT) || 587,
@@ -1934,7 +1936,7 @@ async function sendToMetaCAPI(eventName, eventData) {
 const FUNNEL_EVENTS = ['PageView', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'CardModalAcknowledged', 'ConfirmBookingClick', 'Purchase', 'CallModalDismissed', 'TapToCallFirst', 'CardDeclineModalShown'];
 const funnelStore = [];
 const FUNNEL_MAX = 500;
-let funnelTrackingEnabled = true;
+let funnelTrackingEnabled = process.env.ENABLE_FUNNEL_TRACKING !== 'false';
 
 function pushFunnelEvent(event_name, eventData) {
     if (!FUNNEL_EVENTS.includes(event_name)) return;
@@ -4943,6 +4945,7 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'ActivationCtaClicked',
 ]);
 app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
+    if (!funnelTrackingEnabled) return res.json({ success: true, local: true });
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
@@ -6827,20 +6830,22 @@ const sendEveningRecaps = () => forEachSubscribedHotel('evening recap', sendHote
 
 let lastDigestDate = '';
 let lastRecapDate = '';
-setInterval(() => {
-    try {
-        const hour = getReportingHour();
-        const today = getReportingTodayIso();
-        if (hour === DIGEST_HOUR && lastDigestDate !== today) {
-            lastDigestDate = today;
-            sendDailyDigests().catch((e) => console.error('morning digest:', e.message));
-        }
-        if (hour === RECAP_HOUR && lastRecapDate !== today) {
-            lastRecapDate = today;
-            sendEveningRecaps().catch((e) => console.error('evening recap:', e.message));
-        }
-    } catch (_) {}
-}, 5 * 60 * 1000);
+if (process.env.ENABLE_SCHEDULED_PUSH_DIGESTS !== 'false') {
+    setInterval(() => {
+        try {
+            const hour = getReportingHour();
+            const today = getReportingTodayIso();
+            if (hour === DIGEST_HOUR && lastDigestDate !== today) {
+                lastDigestDate = today;
+                sendDailyDigests().catch((e) => console.error('morning digest:', e.message));
+            }
+            if (hour === RECAP_HOUR && lastRecapDate !== today) {
+                lastRecapDate = today;
+                sendEveningRecaps().catch((e) => console.error('evening recap:', e.message));
+            }
+        } catch (_) {}
+    }, 5 * 60 * 1000);
+}
 
 // Support for old notifyPurchase is removed to prevent double notifications
 
@@ -8046,7 +8051,7 @@ app.get('/setup/:token/success', async (req, res) => {
         // Auto-add subdomain to Vercel
         const vercelToken = process.env.VERCEL_TOKEN;
         const vercelProjectId = process.env.VERCEL_PROJECT_ID;
-        if (vercelToken && vercelProjectId) {
+        if (process.env.ENABLE_VERCEL_PROVISIONING !== 'false' && vercelToken && vercelProjectId) {
             try {
                 await axios.post(
                     `https://api.vercel.com/v10/projects/${vercelProjectId}/domains`,
@@ -8094,7 +8099,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             // Add to Vercel via API
             const vercelToken = process.env.VERCEL_TOKEN;
             const vercelProjectId = process.env.VERCEL_PROJECT_ID;
-            if (vercelToken && vercelProjectId) {
+            if (process.env.ENABLE_VERCEL_PROVISIONING !== 'false' && vercelToken && vercelProjectId) {
                 try {
                     const vercelRes = await axios.post(
                         `https://api.vercel.com/v10/projects/${vercelProjectId}/domains`,
@@ -8164,7 +8169,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         // Add to Vercel
         const vercelToken = process.env.VERCEL_TOKEN;
         const vercelProjectId = process.env.VERCEL_PROJECT_ID;
-        if (vercelToken && vercelProjectId) {
+        if (process.env.ENABLE_VERCEL_PROVISIONING !== 'false' && vercelToken && vercelProjectId) {
             try {
                 await axios.post(`https://api.vercel.com/v10/projects/${vercelProjectId}/domains`, { name: assignedDomain }, { headers: { Authorization: `Bearer ${vercelToken}`, 'Content-Type': 'application/json' } });
                 console.log(`✅ Vercel domain added: ${assignedDomain}`);
@@ -8188,18 +8193,20 @@ app.post('/api/setup/:token/complete', async (req, res) => {
 
         // Welcome email sent via /finalize call from the client
 
-        // Track funnel event
-        prisma.funnelEvent.findFirst({
-            where: { hotelId: hotel.id, eventName: 'SetupCompleted' },
-            select: { id: true },
-        }).then((existing) => existing || prisma.funnelEvent.create({
-            data: {
-                hotelId: hotel.id,
-                eventName: 'SetupCompleted',
-                eventId: `marketel-setup.${hotel.id}`,
-                guestEmail: hotel.ownerEmail || null,
-            },
-        })).catch(() => {});
+        // Keep local development runs out of production funnel reporting.
+        if (funnelTrackingEnabled) {
+            prisma.funnelEvent.findFirst({
+                where: { hotelId: hotel.id, eventName: 'SetupCompleted' },
+                select: { id: true },
+            }).then((existing) => existing || prisma.funnelEvent.create({
+                data: {
+                    hotelId: hotel.id,
+                    eventName: 'SetupCompleted',
+                    eventId: `marketel-setup.${hotel.id}`,
+                    guestEmail: hotel.ownerEmail || null,
+                },
+            })).catch(() => {});
+        }
 
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
         res.json({ success: true, bookingUrl: 'https://' + assignedDomain, frontdeskUrl: 'https://' + assignedDomain + '/frontdesk', crmPin: defaultPin });

@@ -12,6 +12,10 @@ let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0 };
 let bookingPageTimer = 0;
 
+function isLocalFrontdesk() {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -142,7 +146,9 @@ function guestPhoneHtml() {
 
 function bookingPageStatusHtml() {
   if (bookingPageState.ready) {
-    return '<div class="mvr-page-status is-ready"><span>✓</span>Your live guest page is online</div>';
+    return `<div class="mvr-page-status is-ready"><span>✓</span>${bookingPageState.reason === 'local'
+      ? 'Local guest preview connected'
+      : 'Your live guest page is online'}</div>`;
   }
   if (bookingPageState.reason === 'deployment-disabled') {
     return '<div class="mvr-page-status is-attention"><span>!</span>Your live page deployment needs to be re-enabled. Your saved setup is safe.</div>';
@@ -434,6 +440,16 @@ async function loadRevealData() {
 
 async function checkBookingPageStatus() {
   if (typeof window.api !== 'function' || !document.getElementById('marketelValueReveal')) return;
+  if (isLocalFrontdesk()) {
+    bookingPageState = {
+      ready: !!bookingUrl(),
+      checking: false,
+      reason: 'local',
+      attempts: 1,
+    };
+    if (currentStep === 0 && !document.getElementById('mvrLivePreview')) renderReveal();
+    return;
+  }
   bookingPageState.checking = true;
   bookingPageState.attempts += 1;
   try {
