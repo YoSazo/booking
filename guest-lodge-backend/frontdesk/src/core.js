@@ -5,6 +5,7 @@ import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, schedule
 let settingsModulePromise = null;
 let appsModulePromise = null;
 let assistantModulePromise = null;
+let revealModulePromise = null;
 const WALKTHROUGH_STORAGE_KEYS = [
   'onboardingDone',
   'settingsTourDone',
@@ -45,6 +46,16 @@ export function loadAssistantModule() {
   return assistantModulePromise;
 }
 
+export function loadRevealModule() {
+  if (!revealModulePromise) {
+    revealModulePromise = import('./reveal.js').then((m) => {
+      m.install();
+      return m;
+    });
+  }
+  return revealModulePromise;
+}
+
 function resetWalkthroughProgress() {
   WALKTHROUGH_STORAGE_KEYS.forEach((k) => {
     try { localStorage.removeItem(k); } catch (_) {}
@@ -55,6 +66,7 @@ function replayWalkthrough() {
   resetWalkthroughProgress();
   const u = new URL(window.location.href);
   u.searchParams.set('welcome', '1');
+  u.searchParams.set('reveal', '1');
   u.searchParams.delete('tab');
   const next = u.pathname + u.search + u.hash;
   if (next === window.location.pathname + window.location.search + window.location.hash) {
@@ -1813,6 +1825,13 @@ async function startCrmApp(verification) {
     try { sessionStorage.removeItem('frontdeskSimulatePwa'); } catch (_) {}
   }
   const isFirstWelcome = urlParams.has('welcome');
+  const revealRequest = urlParams.get('reveal');
+  let hasPendingValueReveal = false;
+  try { hasPendingValueReveal = localStorage.getItem('marketelValueRevealPendingV1') === '1'; } catch (_) {}
+  const shouldShowValueReveal = revealRequest === '1'
+    || revealRequest === 'checkout'
+    || (!(verification && verification.subscribed) && hasPendingValueReveal);
+  const revealStartAt = revealRequest === 'checkout' ? 3 : (revealRequest === '1' ? 0 : undefined);
   if (isFirstWelcome) resetWalkthroughProgress();
 
   if (urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
@@ -1858,6 +1877,12 @@ async function startCrmApp(verification) {
 
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
+  if (crm.hotelSubscribed) {
+    try {
+      localStorage.removeItem('marketelValueRevealPendingV1');
+      localStorage.removeItem('marketelValueRevealStepV1');
+    } catch (_) {}
+  }
   updateGoLiveBanner();
   if (!crm.hotelSubscribed) loadBlockedDemand();
 
@@ -1878,7 +1903,16 @@ async function startCrmApp(verification) {
     requestAnimationFrame(refreshMobileBottomNavIcons);
   }).catch(() => {});
 
-  if (isFirstWelcome) {
+  if (shouldShowValueReveal) {
+    try {
+      if (typeof loadSettingsModule === 'function') await loadSettingsModule();
+      const revealModule = await loadRevealModule();
+      revealModule.showMarketelValueReveal({ startAt: revealStartAt });
+    } catch (error) {
+      console.error('Marketel value reveal failed:', error);
+      if (isFirstWelcome) showWelcomeModal();
+    }
+  } else if (isFirstWelcome) {
     showWelcomeModal();
   } else {
     cleanupSettingsTourUi();
@@ -4940,6 +4974,7 @@ exposeToWindow({
   verifyCrmToken,
   loadSettingsModule,
   loadAppsModule,
+  loadRevealModule,
   replayWalkthrough,
   resetWalkthroughProgress,
 });

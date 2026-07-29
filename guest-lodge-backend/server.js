@@ -563,9 +563,39 @@ function serveFrontdesk(_req, res) {
     }
 }
 
-function frontdeskReturnHtml({ token = '', activated = false } = {}) {
+function marketelFrontdeskOrigin(req, preferredOrigin = '') {
+    const candidates = [
+        preferredOrigin,
+        req?.get?.('origin'),
+        process.env.MARKETEL_FRONTDESK_ORIGIN,
+        process.env.NODE_ENV === 'production' ? 'https://bookmarketel.com' : '',
+        req ? `${req.protocol}://${req.get('host')}` : '',
+    ];
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        try {
+            const parsed = new URL(candidate);
+            const hostname = parsed.hostname.toLowerCase();
+            const requestHostname = String(req?.hostname || '').toLowerCase();
+            const isMarketel = hostname === 'bookmarketel.com' || hostname.endsWith('.bookmarketel.com');
+            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+            const isBackendHost = hostname.endsWith('.onrender.com')
+                && requestHostname
+                && hostname === requestHostname;
+            if (parsed.protocol === 'https:' && (isMarketel || isBackendHost)) return parsed.origin;
+            if (parsed.protocol === 'http:' && isLocal) return parsed.origin;
+        } catch (_) { /* try the next trusted candidate */ }
+    }
+    return 'https://bookmarketel.com';
+}
+
+function frontdeskReturnHtml({ token = '', activated = false, reveal = '' } = {}) {
     const cleanToken = String(token || '').trim();
-    const nextPath = activated ? '/frontdesk?activated=1' : '/frontdesk';
+    const nextPath = activated
+        ? '/frontdesk?activated=1'
+        : reveal === 'checkout'
+            ? '/frontdesk?welcome=1&reveal=checkout'
+            : '/frontdesk';
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening Front Desk...</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f5;color:#1a2b22}.box{text-align:center;padding:24px}.mark{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:4px solid #d8e4dc;border-top-color:#2E7D5B;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.title{font-size:15px;font-weight:800}.sub{margin-top:6px;font-size:12px;color:#66756c}</style></head><body><div class="box"><div class="mark"></div><div class="title">Opening Front Desk</div><div class="sub">Finishing activation...</div></div><script>!function(){var token=${JSON.stringify(cleanToken)};var next=${JSON.stringify(nextPath)};try{console.info("[FrontDesk return] bridge loaded",{hasToken:!!token,tokenKind:token&&token.indexOf("fd_")===0?"return-token":token?"pin":"none"});}catch(e){}try{if(token){localStorage.setItem("crmToken",token);document.cookie="frontdeskReturnToken="+encodeURIComponent(token)+"; path=/; max-age=86400; SameSite=Lax; Secure";}}catch(e){try{console.warn("[FrontDesk return] token storage failed",e&&e.message?e.message:e);}catch(_){}}location.replace(next);}();</script></body></html>`;
 }
 
@@ -576,14 +606,16 @@ function redactFrontdeskAuthUrl(url) {
 app.get('/frontdesk-return', (req, res) => {
     const token = String(req.query.pin || req.query.returnToken || '').trim();
     const activated = String(req.query.activated || '') === '1';
+    const reveal = String(req.query.reveal || '').trim() === 'checkout' ? 'checkout' : '';
     res.setHeader('Cache-Control', 'no-store');
     console.log('frontdesk-return bridge served:', {
         host: req.get('host'),
         hasToken: !!token,
         tokenKind: token.startsWith('fd_') ? 'return-token' : (token ? 'pin' : 'none'),
         activated,
+        reveal,
     });
-    res.send(frontdeskReturnHtml({ token, activated }));
+    res.send(frontdeskReturnHtml({ token, activated, reveal }));
 });
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
 app.get('/simple-crm.html', (req, res) => {
@@ -4897,6 +4929,95 @@ app.post('/api/crm/frontdesk-install-event', crmAuth, async (req, res) => {
     }
 });
 
+// CRM: the short pre-activation value reveal. These milestones make it
+// possible to tell whether owners understand each core value before checkout
+// without treating ordinary clicks as Meta Leads.
+const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
+    'ValueRevealStarted',
+    'BookingEngineRevealViewed',
+    'BookingEngineEditPreviewViewed',
+    'BookingEngineFullPreviewOpened',
+    'GuestAppRevealViewed',
+    'AssistantRevealViewed',
+    'ActivationOfferViewed',
+    'ActivationCtaClicked',
+]);
+app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const eventName = String(req.body?.eventName || '').trim();
+        const contentName = String(req.body?.contentName || '').trim().slice(0, 120);
+        if (!MARKETEL_VALUE_REVEAL_EVENTS.has(eventName)) {
+            return res.status(400).json({ success: false, message: 'Unknown reveal event.' });
+        }
+        const existing = await prisma.funnelEvent.findFirst({
+            where: { hotelId, eventName },
+            select: { id: true },
+        });
+        if (!existing) {
+            await prisma.funnelEvent.create({
+                data: {
+                    hotelId,
+                    eventName,
+                    eventId: `marketel-reveal.${hotelId}.${eventName}`,
+                    contentName: contentName || null,
+                    userAgent: req.headers['user-agent'] || null,
+                    ipAddress: req.ip || req.socket?.remoteAddress || null,
+                },
+            });
+        }
+        res.json({ success: true });
+    } catch (e) {
+        console.error('value-reveal-event:', e.message);
+        res.status(500).json({ success: false, message: 'Could not record reveal event.' });
+    }
+});
+
+// The reveal uses the real guest page only after the edge confirms it is
+// available. Until then it renders a personalized local preview, avoiding a
+// DNS/TLS/Vercel error page inside the owner's first impression.
+app.get('/api/crm/booking-page-status', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const domainRow = await prisma.hotelDomain.findFirst({
+            where: { hotelId },
+            orderBy: { isPrimary: 'desc' },
+            select: { domain: true },
+        });
+        const domain = String(domainRow?.domain || '').trim();
+        if (!domain) {
+            res.set('Cache-Control', 'no-store');
+            return res.json({ success: true, ready: false, domain: '', status: 0, reason: 'no-domain' });
+        }
+
+        let status = 0;
+        let reason = '';
+        let ready = false;
+        try {
+            const probe = await axios.get(`https://${domain}/`, {
+                timeout: 7000,
+                maxRedirects: 0,
+                validateStatus: () => true,
+                headers: { 'User-Agent': 'Marketel-BookingPageCheck/1.0' },
+            });
+            status = Number(probe.status) || 0;
+            const edgeError = String(probe.headers?.['x-vercel-error'] || '').toUpperCase();
+            const deploymentDisabled = status === 402 || edgeError.includes('DEPLOYMENT_DISABLED');
+            ready = status >= 200 && status < 400 && !deploymentDisabled;
+            reason = deploymentDisabled ? 'deployment-disabled' : (ready ? '' : `http-${status}`);
+        } catch (_) {
+            reason = 'unreachable';
+        }
+        res.set('Cache-Control', 'no-store');
+        res.json({ success: true, ready, domain, status, reason });
+    } catch (e) {
+        res.set('Cache-Control', 'no-store');
+        res.json({ success: true, ready: false, domain: '', status: 0, reason: 'unreachable' });
+    }
+});
+
 // CRM: approval settings plus the loss-aversion number — bookings that locked in
 // with nobody to alert.
 app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
@@ -8114,9 +8235,13 @@ app.get('/api/setup/:token/site-status', async (req, res) => {
                 headers: { 'User-Agent': 'Marketel-SiteCheck/1.0' },
             });
             status = probe.status;
-            // 2xx–4xx => the TLS handshake completed and the edge is serving.
-            // 5xx (esp. Cloudflare 520–526) or a thrown error => not ready yet.
-            ready = status >= 200 && status < 500;
+            const edgeError = String(probe.headers?.['x-vercel-error'] || '').toUpperCase();
+            // A Vercel 402 means the deployment is disabled, not that the
+            // owner's guest page is ready to show.
+            ready = status >= 200
+                && status < 400
+                && status !== 402
+                && !edgeError.includes('DEPLOYMENT_DISABLED');
         } catch (e) {
             ready = false; // TLS handshake / DNS not propagated yet
         }
@@ -9013,15 +9138,14 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         }
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+        const frontdeskOrigin = marketelFrontdeskOrigin(req);
         const { id: subscriptionPriceId, amountUsd } = await getMarketelSubscriptionPrice();
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
-        const primaryDomain = await prisma.hotelDomain.findFirst({
-            where: { hotelId, isPrimary: true },
-            select: { domain: true },
-        }).catch(() => null);
-        const cancelUrl = primaryDomain?.domain
-            ? `https://${primaryDomain.domain}/frontdesk`
-            : `${baseUrl}/frontdesk`;
+        const cancelParams = new URLSearchParams({
+            returnToken,
+            reveal: 'checkout',
+        });
+        const cancelUrl = `${frontdeskOrigin}/frontdesk-return?${cancelParams.toString()}`;
         const clickEventId = `marketel-go-live.${hotelId}.${Date.now()}`;
         await prisma.funnelEvent.create({
             data: {
@@ -9052,7 +9176,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
             subscription_data: {
                 metadata: { product: 'hotel-go-live', hotelId },
             },
-            success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}`,
+            success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}&frontdeskOrigin=${encodeURIComponent(frontdeskOrigin)}`,
             cancel_url: cancelUrl,
         });
         const checkoutEventId = `marketel-checkout.${session.id}`;
@@ -9101,6 +9225,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
 app.get('/api/crm/go-live-success', async (req, res) => {
     const checkoutSessionId = String(req.query.session_id || '').trim();
     const returnToken = String(req.query.returnToken || '').trim();
+    const frontdeskOrigin = marketelFrontdeskOrigin(req, String(req.query.frontdeskOrigin || '').trim());
     const verifiedReturnToken = await verifyCrmReturnToken(returnToken);
     let stripeVerifiedHotelId = '';
     let verifiedCheckoutSession = null;
@@ -9167,62 +9292,18 @@ app.get('/api/crm/go-live-success', async (req, res) => {
         });
     }
 
-    // Resolve where to send the owner back to: their own hotel domain, never the
-    // backend host (which would default the front desk to Guest Lodge Minot).
+    // Return to Marketel's stable owner-facing origin. Property domains are for
+    // guests and can still be provisioning when the owner completes payment.
     async function buildFrontdeskRedirect() {
         const activationParams = stripeVerifiedHotelId
             ? { activated: '1' }
             : { activation_error: '1' };
-        if (!hotelId) return '/frontdesk?activation_error=1';
-        try {
-            const primaryDomain = await prisma.hotelDomain.findFirst({
-                where: { hotelId, isPrimary: true },
-                select: { domain: true },
-            });
-            const domain = primaryDomain?.domain;
-            if (domain) {
-                const query = new URLSearchParams(activationParams);
-                if (frontdeskReturnToken) {
-                    query.set('returnToken', frontdeskReturnToken);
-                    query.set('pin', frontdeskActivationPin || frontdeskReturnToken);
-                    const target = `https://${domain}/frontdesk-return?${query.toString()}`;
-                    console.log('go-live-success redirect target:', {
-                        hotelId,
-                        target: redactFrontdeskAuthUrl(target),
-                        usesBridge: true,
-                        hasFrontdeskReturnToken: true,
-                        hasFrontdeskActivationPin: !!frontdeskActivationPin,
-                    });
-                    return target;
-                } else if (frontdeskActivationPin) {
-                    query.set('pin', frontdeskActivationPin);
-                    const target = `https://${domain}/frontdesk-return?${query.toString()}`;
-                    console.log('go-live-success redirect target:', {
-                        hotelId,
-                        target: redactFrontdeskAuthUrl(target),
-                        usesBridge: true,
-                        hasFrontdeskReturnToken: false,
-                        hasFrontdeskActivationPin: true,
-                    });
-                    return target;
-                }
-                const target = `https://${domain}/frontdesk?${query.toString()}`;
-                console.log('go-live-success redirect target:', {
-                    hotelId,
-                    target: redactFrontdeskAuthUrl(target),
-                    usesBridge: false,
-                    hasFrontdeskReturnToken: false,
-                    hasFrontdeskActivationPin: false,
-                });
-                return target;
-            }
-        } catch (_) { /* fall through to relative redirect */ }
-        // Fallback: stay on the backend host but force the correct hotel context
+        if (!hotelId) return `${frontdeskOrigin}/frontdesk?activation_error=1`;
         const params = new URLSearchParams({ hotelId, ...activationParams });
         if (frontdeskReturnToken) {
             params.set('returnToken', frontdeskReturnToken);
             params.set('pin', frontdeskActivationPin || frontdeskReturnToken);
-            const target = `/frontdesk-return?${params.toString()}`;
+            const target = `${frontdeskOrigin}/frontdesk-return?${params.toString()}`;
             console.log('go-live-success redirect target:', {
                 hotelId,
                 target: redactFrontdeskAuthUrl(target),
@@ -9234,7 +9315,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
         }
         else if (frontdeskActivationPin) {
             params.set('pin', frontdeskActivationPin);
-            const target = `/frontdesk-return?${params.toString()}`;
+            const target = `${frontdeskOrigin}/frontdesk-return?${params.toString()}`;
             console.log('go-live-success redirect target:', {
                 hotelId,
                 target: redactFrontdeskAuthUrl(target),
@@ -9244,7 +9325,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             });
             return target;
         }
-        const target = `/frontdesk?${params.toString()}`;
+        const target = `${frontdeskOrigin}/frontdesk?${params.toString()}`;
         console.log('go-live-success redirect target:', {
             hotelId,
             target: redactFrontdeskAuthUrl(target),

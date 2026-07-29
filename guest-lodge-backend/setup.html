@@ -55,6 +55,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: 10px; font-family: inherit; font-size: 16px; outline: none;
 }
 .field input:focus { border-color: var(--green); }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .btn {
   width: 100%; padding: 14px; border-radius: 10px; font-family: inherit;
@@ -89,8 +90,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .upload-area:hover { border-color: var(--green); }
 .upload-area p { font-size: 13px; color: var(--muted); }
-.upload-preview { margin-top: 8px; }
-.upload-preview img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; margin: 4px; }
+.upload-area.has-photo { border-style: solid; border-color: #b9dcc9; background: #f2faf5; }
+.upload-preview { display: none; margin: 0 auto 10px; }
+.upload-preview.has-photo { display: block; }
+.upload-preview img { width: 88px; height: 70px; border-radius: 10px; object-fit: cover; }
+.upload-title { font-size: 13px; color: var(--text); font-weight: 700; margin-bottom: 3px; }
 
 /* Final ready card */
 .final-card { text-align: center; padding: 32px 24px; overflow: hidden; }
@@ -325,6 +329,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .loading-overlay.show { display: flex; }
 .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 430px) {
+  .field-grid { grid-template-columns: 1fr; gap: 0; }
+  .setup-container { padding-left: 16px; padding-right: 16px; }
+}
 </style>
 <!-- Meta Pixel Code -->
 <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');</script>
@@ -345,7 +353,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="progress-step" id="prog-2"></div>
     <div class="progress-step" id="prog-3"></div>
     <div class="progress-step" id="prog-4"></div>
-    <div class="progress-step" id="prog-5"></div>
   </div>
 
   <!-- STEP 1: Property Name -->
@@ -368,6 +375,25 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Room or Unit Name</label>
         <input type="text" id="rmName" placeholder="e.g. King Suite or Lakeview Cabin">
       </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>How many like this?</label>
+          <input type="number" id="rmUnits" min="1" max="999" inputmode="numeric" value="1">
+        </div>
+        <div class="field">
+          <label>Starting nightly price</label>
+          <input type="number" id="rmNightly" min="1" max="100000" step="1" inputmode="decimal" value="99">
+        </div>
+      </div>
+      <div class="field">
+        <label>One photo <span style="font-weight:500;color:var(--muted);">(optional)</span></label>
+        <div class="upload-area" id="setupPhotoArea" onclick="document.getElementById('setupRoomPhoto').click()">
+          <input type="file" id="setupRoomPhoto" accept="image/jpeg,image/png,image/webp" hidden onchange="previewSetupPhoto(this)">
+          <div class="upload-preview" id="setupPhotoPreview"></div>
+          <div class="upload-title" id="setupPhotoTitle">Add a room photo</div>
+          <p id="setupPhotoHint">It makes your personalized preview feel like yours. You can add the rest later.</p>
+        </div>
+      </div>
       <button class="btn btn-primary" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
       <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
     </div>
@@ -386,36 +412,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </div>
   </div>
 
-  <!-- STEP 4: Video showcase - see your booking page in action -->
+  <!-- STEP 4: Site readiness + handoff to the personalized reveal -->
   <div class="step" id="step-4">
-    <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center;">
-      <div class="fade-stagger" style="max-width:400px; width:100%;">
-        <h2 style="font-size:20px; font-weight:800; margin-bottom:6px; color:var(--text);">Guests book in under 60 seconds</h2>
-        <p style="font-size:13px; color:var(--muted); margin-bottom:6px; line-height:1.5;">Here's a real booking on a Marketel booking page, start to finish. Yours works exactly the same — watch how fast it is.</p>
-        <p style="font-size:12px; color:var(--green); font-weight:600; margin-bottom:16px;">💳 A temporary $1 card hold helps prevent fake bookings. Guests pay for their stay at check-in.</p>
-        
-        <!-- Video -->
-        <div style="border-radius:16px; overflow:hidden; border:2px solid var(--border); margin-bottom:24px; background:#000; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-          <video id="enginePreviewVideo" autoplay muted playsinline style="width:100%; display:block; border-radius:14px;"
-            poster="">
-            <source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/v1779970440/0528_2_ctwqtk.mp4" id="engineVideoSrc" type="video/mp4">
-          </video>
-        </div>
-
-        <button id="videoNextBtn" class="btn btn-primary" style="font-size:16px; padding:16px;" onclick="goToStep(5)">
-          Continue →
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- STEP 5: Site readiness + dashboard -->
-  <div class="step" id="step-5">
     <div class="form-card final-card">
       <div class="final-panel fade-stagger" id="finalPreparingPanel">
         <div class="final-logo-wrap"><div class="logo-sprite-bounce"></div></div>
-        <h2>Getting your site ready</h2>
-        <p>We&apos;re building your booking page, setting up Front Desk, and waiting for the secure connection to finish.</p>
+        <h2>Building Marketel for you</h2>
+        <p>We&apos;re creating your booking page, guest app and Front Desk, then securing the connection.</p>
         <div class="final-domain-box">
           <div class="final-domain-label">Your Booking Page</div>
           <div class="final-domain-value" id="preparingDomain">Preparing domain…</div>
@@ -423,20 +426,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <div class="final-status">
           <div class="final-status-row"><span class="status-dot">✓</span><span>Booking page created</span></div>
           <div class="final-status-row"><span class="status-dot">✓</span><span>Front Desk dashboard prepared</span></div>
-          <div class="final-status-row"><span class="status-dot spin"></span><span>Securing your site connection</span></div>
+          <div class="final-status-row"><span class="status-dot">✓</span><span>Personalized preview prepared</span></div>
         </div>
       </div>
       <div class="final-panel fade-stagger" id="finalReadyPanel" hidden>
         <div class="final-check">✓</div>
-        <h2>Your preview is live</h2>
-        <p>Your booking page is ready in preview mode. Open Front Desk to review it, then turn on direct bookings whenever you&apos;re ready.</p>
+        <h2>Your Marketel is ready</h2>
+        <p>Now see the direct booking page, guest app and Front Desk we created for your property.</p>
         <div class="final-domain-box">
           <div class="final-domain-label">Your Booking Page</div>
           <div class="final-domain-value" id="successDomain"></div>
-          <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Preview is live · share it, test it, make it yours</div>
+          <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Personalized preview ready</div>
         </div>
         <a class="btn btn-primary final-dashboard-cta" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
-          Go to Front Desk →
+          See what you built →
         </a>
       </div>
     </div>
@@ -489,7 +492,7 @@ function goToStep(n) {
   document.querySelectorAll('.progress-step').forEach((s, i) => {
     s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
   });
-  if (n === 5) updateFinalStepState(true);
+  if (n === 4) updateFinalStepState(true);
   else animateVisibleStep(nextStep);
   window.scrollTo(0, 0);
 }
@@ -536,12 +539,73 @@ async function loadSetup() {
     if (!res.ok) return;
     const data = await res.json();
     hotelData = data.hotel || {};
+    hotelData.rates = data.rates || null;
     rooms = data.rooms || [];
     if (hotelData.name) document.getElementById('hotelName').value = hotelData.name;
+    const firstRoom = rooms[0];
+    if (firstRoom) {
+      document.getElementById('rmName').value = firstRoom.name || '';
+      document.getElementById('rmUnits').value = Math.max(1, Number(firstRoom.totalUnits) || 1);
+      const firstImage = firstRoom.images && firstRoom.images[0];
+      if (firstImage?.url) renderSetupPhoto(firstImage.url, 'Current room photo');
+    }
+    if (data.rates?.nightly) document.getElementById('rmNightly').value = Number(data.rates.nightly) || 99;
   } catch (e) {}
 }
 
-// Step 1: Save hotl info
+function renderSetupPhoto(url, label) {
+  const preview = document.getElementById('setupPhotoPreview');
+  const area = document.getElementById('setupPhotoArea');
+  const title = document.getElementById('setupPhotoTitle');
+  const hint = document.getElementById('setupPhotoHint');
+  if (!preview || !area) return;
+  preview.innerHTML = '<img src="' + String(url).replace(/"/g, '&quot;') + '" alt="Room preview">';
+  preview.classList.add('has-photo');
+  area.classList.add('has-photo');
+  if (title) title.textContent = label || 'Photo selected';
+  if (hint) hint.textContent = 'Tap here if you want to choose a different photo.';
+}
+
+async function prepareSetupPhoto(file) {
+  if (!file || !file.type.startsWith('image/')) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxW = 1600;
+    const maxH = 1200;
+    const scale = Math.min(1, maxW / bitmap.width, maxH / bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Photo conversion failed')), 'image/webp', 0.82);
+    });
+    return new File([blob], (file.name || 'room-photo').replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+  } catch (_) {
+    return file;
+  }
+}
+
+async function previewSetupPhoto(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    input.value = '';
+    showToast('Choose a JPG, PNG, or WebP image', true);
+    return;
+  }
+  pendingFile = await prepareSetupPhoto(file);
+  if (pendingFile.size > 5 * 1024 * 1024) {
+    pendingFile = null;
+    input.value = '';
+    showToast('That photo is too large. Choose one under 5 MB.', true);
+    return;
+  }
+  renderSetupPhoto(URL.createObjectURL(pendingFile), 'Photo selected');
+}
+
+// Step 1: Save hotel info
 async function saveStep1() {
   const name = document.getElementById('hotelName').value.trim();
   if (!name) { showToast('Enter your property name', true); return; }
@@ -561,42 +625,69 @@ async function saveStep1() {
 // Step 2: Rooms
 async function addRoomAndFinish() {
   const name = document.getElementById('rmName').value.trim();
+  const totalUnits = Math.max(1, parseInt(document.getElementById('rmUnits').value, 10) || 1);
+  const nightlyInput = parseFloat(document.getElementById('rmNightly').value);
   if (!name) { showToast('Enter a room or unit name', true); return; }
+  if (!Number.isFinite(nightlyInput) || nightlyInput <= 0) { showToast('Enter your starting nightly price', true); return; }
+  const nightly = Math.max(1, nightlyInput);
 
   showLoading(true);
   try {
     // Save room
     const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, maxOccupancy: 4, totalUnits: 5 }),
+      body: JSON.stringify({ id: rooms[0]?.id, name, maxOccupancy: 4, totalUnits }),
     });
     if (!res.ok) throw new Error('Server error');
+    const roomResult = await res.json();
+    const roomId = roomResult?.room?.id || rooms[0]?.id;
+
+    const existingRates = hotelData.rates || {};
+    const ratesRes = await fetch(API + '/api/setup/' + TOKEN + '/rates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nightly,
+        weekly: existingRates.weekly || Math.round(nightly * 6),
+        monthly: existingRates.monthly || Math.round(nightly * 24),
+        taxRate: existingRates.taxRate ?? 0.10,
+      }),
+    });
+    if (!ratesRes.ok) throw new Error('Could not save starting price');
+
+    if (pendingFile && roomId) {
+      const form = new FormData();
+      form.append('image', pendingFile);
+      const photoRes = await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + encodeURIComponent(roomId) + '/images', {
+        method: 'POST',
+        body: form,
+      });
+      if (!photoRes.ok) showToast('Your page was built, but the photo did not upload. You can add it in Front Desk.', true);
+    }
 
     // Complete setup — get domain + PIN
     const completeRes = await fetch(API + '/api/setup/' + TOKEN + '/complete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
     });
     const completeData = await completeRes.json();
+    if (!completeRes.ok || !completeData.success) throw new Error(completeData.error || 'Could not finish setup');
 
     // Show success
     console.log('Complete response:', completeData);
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-property').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
     document.getElementById('successDomain').textContent = domain.replace('https://', '');
     
-    // Link goes to Front Desk, not the public booking page.
-    var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    var dashboardUrl = (isLocal ? window.location.origin : domain) + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + (isLocal ? '&hotelId=' + encodeURIComponent(hotelData.id || '') : '') + '&welcome=1';
+    // Front Desk lives on the stable Marketel origin; the property domain is
+    // reserved for guests. The hotel id scopes this one-time PIN login.
+    var dashboardUrl = window.location.origin + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + '&hotelId=' + encodeURIComponent(hotelData.id || '') + '&welcome=1&reveal=1';
     window._dashboardUrl = dashboardUrl;
     document.getElementById('successLink').href = dashboardUrl;
 
-    // The domain was just added to Vercel/Cloudflare — its TLS cert may still be
-    // provisioning. Start polling now (during the quality + video steps) so the
-    // owner isn't sent to an "SSL handshake failed" page. Local dev is always ready.
-    window._siteReady = isLocal;
-    updateFinalStepState(false);
-    if (!isLocal) startSiteReadinessPolling();
+    // The reveal can open immediately on Marketel while the guest-facing domain
+    // finishes provisioning in the background.
+    window._siteReady = true;
+    updateFinalStepState(true);
 
-    // Send welcome email after they reach the dashboard (not during video)
+    // Finalize the owner handoff as they enter the personalized reveal.
     var successLink = document.getElementById('successLink');
     successLink.addEventListener('click', function(ev) {
       ev.preventDefault();
@@ -609,11 +700,6 @@ async function addRoomAndFinish() {
           body: JSON.stringify({ email: '', phone: '', pin: completeData.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
         }).catch(() => {});
       }
-      // Hold navigation until the cert is live, then go automatically.
-      if (!window._siteReady) {
-        waitForSiteThenGo();
-        return;
-      }
       setTimeout(function() { window.location.href = window._dashboardUrl || successLink.href; }, 80);
     });
 
@@ -622,37 +708,7 @@ async function addRoomAndFinish() {
   showLoading(false);
 }
 
-// --- Site readiness (TLS provisioning) gate ------------------------------
-window._siteReady = window._siteReady || false;
-let _sitePollTimer = null;
-
-function startSiteReadinessPolling() {
-  updateFinalStepState(false);
-
-  let attempts = 0;
-  const maxAttempts = 60; // ~3 min at 3s intervals
-  const poll = async () => {
-    attempts++;
-    try {
-      const r = await fetch(API + '/api/setup/' + TOKEN + '/site-status', { cache: 'no-store' });
-      const d = await r.json();
-      if (d && d.ready) { onSiteReady(); return; }
-    } catch (e) { /* keep trying */ }
-    if (attempts < maxAttempts) {
-      _sitePollTimer = setTimeout(poll, 3000);
-    } else {
-      // Gave up waiting — let them through rather than trapping them.
-      onSiteReady();
-    }
-  };
-  poll();
-}
-
-function onSiteReady() {
-  if (_sitePollTimer) { clearTimeout(_sitePollTimer); _sitePollTimer = null; }
-  window._siteReady = true;
-  updateFinalStepState(true);
-}
+window._siteReady = true;
 
 function updateFinalStepState(animate) {
   var preparing = document.getElementById('finalPreparingPanel');
@@ -671,22 +727,6 @@ function updateFinalStepState(animate) {
     if (preparing) preparing.hidden = false;
     if (animate) restartFadeUp(preparing);
   }
-}
-
-function waitForSiteThenGo() {
-  var link = document.getElementById('successLink');
-  if (link) link.style.pointerEvents = 'none';
-  setSuccessLinkLoading(true, 'Waiting for secure connection…');
-  updateFinalStepState(true);
-
-  const check = setInterval(() => {
-    if (window._siteReady) {
-      clearInterval(check);
-      window.location.href = window._dashboardUrl;
-    }
-  }, 800);
-  // Safety valve: never trap the owner — go after 90s no matter what.
-  setTimeout(() => { clearInterval(check); window.location.href = window._dashboardUrl; }, 90000);
 }
 
 function setSuccessLinkLoading(isLoading, label) {

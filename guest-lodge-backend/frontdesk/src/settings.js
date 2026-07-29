@@ -537,6 +537,7 @@ function replayWalkthrough() {
   });
   const u = new URL(window.location.href);
   u.searchParams.set('welcome', '1');
+  u.searchParams.set('reveal', '1');
   u.searchParams.delete('tab');
   const next = u.pathname + u.search + u.hash;
   if (next === window.location.pathname + window.location.search + window.location.hash) {
@@ -1243,7 +1244,7 @@ function showGoLiveOverlay() {
   if (document.getElementById('goLiveOverlay')) return;
   const ov = document.createElement('div');
   ov.id = 'goLiveOverlay';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100010;background:rgba(255,255,255,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;';
   ov.innerHTML = '<div class="logo-sprite-bounce"></div><div style="font-size:14px;font-weight:700;color:#1a5c3f;">Opening secure checkout…</div><div style="font-size:12px;color:#6b7280;">Taking you to Stripe — one moment</div>';
   document.body.appendChild(ov);
 }
