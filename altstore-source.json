@@ -12,11 +12,21 @@
       "bundleIdentifier": "com.bookmarketel.frontdesk",
       "developerName": "Marketel",
       "subtitle": "Run your property from your phone.",
-      "localizedDescription": "A private iPhone dogfood build of Marketel Front Desk. It connects to the live Front Desk over Wi-Fi or cellular. Native APNs booking alerts are not included in this first build.",
+      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2 adds native iOS navigation, quick property switching, and a focused Guest App workspace. Native APNs booking alerts are not included yet.",
       "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
       "tintColor": "2E7D5B",
       "category": "utilities",
       "versions": [
+        {
+          "version": "2.0",
+          "buildVersion": "2",
+          "date": "2026-07-29",
+          "localizedDescription": "Native iOS navigation, safe-area and scrolling fixes, property sign-in and switching, synced badges, and a cleaner Guest App workspace.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.0/Marketel-Front-Desk.ipa",
+          "size": 602475,
+          "sha256": "68b89e26e9a0505cb2ae1ae9bb2bc8c189c407037ef23f9fae0e399c942f247f",
+          "minOSVersion": "15.0"
+        },
         {
           "version": "1.0",
           "buildVersion": "1",
