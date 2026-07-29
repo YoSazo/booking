@@ -4,6 +4,7 @@ import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, schedule
 
 let settingsModulePromise = null;
 let appsModulePromise = null;
+let assistantModulePromise = null;
 const WALKTHROUGH_STORAGE_KEYS = [
   'onboardingDone',
   'settingsTourDone',
@@ -32,6 +33,16 @@ export function loadAppsModule() {
     });
   }
   return appsModulePromise;
+}
+
+export function loadAssistantModule() {
+  if (!assistantModulePromise) {
+    assistantModulePromise = import('./assistant.js').then((m) => {
+      m.install();
+      return m;
+    });
+  }
+  return assistantModulePromise;
 }
 
 function resetWalkthroughProgress() {
@@ -371,10 +382,8 @@ function syncNativeShellState() {
     hotelName: crm.activeHotelName || 'Front Desk',
     selectedTab: crm.currentFilter === 'apps' ? 'apps'
       : crm.currentFilter === 'availability' ? 'availability'
-      : crm.currentFilter === 'revenue' ? 'revenue'
-      : crm.currentFilter === 'bookings' ? 'bookings'
+      : (crm.currentFilter === 'bookings' || crm.currentFilter === 'revenue') ? 'bookings'
       : 'settings',
-    revenueEnabled: !!crm.revenueEnabled,
     bookingBadge: Math.max(0, needsCalls + unreadMessages),
   });
 }
@@ -602,9 +611,9 @@ function nativeSignOut() {
 }
 
 function marketelNativeSelectTab(filter) {
+  // Keep "revenue" for older dogfood shells; setFilter maps it into Bookings.
   const allowed = ['settings', 'bookings', 'availability', 'revenue', 'apps'];
   if (!allowed.includes(filter)) return;
-  if (filter === 'revenue' && !crm.revenueEnabled) return;
   setFilter(filter, document.querySelector(`.tab[data-nav-filter="${filter}"]`));
 }
 
@@ -612,6 +621,11 @@ function marketelNativeAction(action) {
   if (action === 'qr') showCheckinQrOverlay();
   else if (action === 'refresh') refreshCurrentView();
   else if (action === 'tour') replayWalkthrough();
+  else if (action === 'assistant') {
+    loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
+      toast('Could not open Front Desk Assistant.', 'error');
+    });
+  }
   else if (action === 'properties') showNativePropertyPicker();
   else if (action === 'signout') nativeSignOut();
 }
@@ -916,16 +930,13 @@ function formatCurrencyCompact(value) {
 }
 
 function syncRevenueUi() {
-  const existingBtn = document.getElementById('revenueTabBtn');
   const existingView = document.getElementById('revenueView');
 
   if (!crm.revenueEnabled) {
-    if (existingBtn) existingBtn.remove();
     if (existingView) existingView.remove();
-    if (crm.currentFilter === 'revenue') crm.currentFilter = 'bookings';
+    if (crm.bookingsSubview === 'revenue') crm.bookingsSubview = 'bookings';
     const activeTab = document.querySelector('.tab.active');
     if (activeTab) moveSlider(activeTab);
-    updateMobileRevenueNavVisibility();
     syncMobileNavActive(crm.currentFilter);
     return;
   }
@@ -984,13 +995,12 @@ function syncRevenueUi() {
       if (!nextPeriod || nextPeriod === crm.revenuePeriod) return;
       crm.revenuePeriod = nextPeriod;
       renderRevenueView();
-      if (crm.currentFilter === 'revenue') loadRevenueData();
+      if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'revenue') loadRevenueData();
     });
   }
 
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) moveSlider(activeTab);
-  updateMobileRevenueNavVisibility();
   syncMobileNavActive(crm.currentFilter);
 }
 
@@ -1452,7 +1462,7 @@ function renderBookingFilterChips(counts) {
   const wrap = document.getElementById('bookingFilterChips');
   if (!wrap) return;
   // Only on the Bookings tab (not the Get found subview), and only when there's something to filter.
-  if (crm.currentFilter !== 'bookings' || crm.bookingsSubview === 'growth' || !counts || counts.all === 0) {
+  if (crm.currentFilter !== 'bookings' || crm.bookingsSubview !== 'bookings' || !counts || counts.all === 0) {
     wrap.style.display = 'none';
     wrap.innerHTML = '';
     return;
@@ -1482,7 +1492,7 @@ async function loadLaunchStatus() {
     const rates = !!(res.rates && (Number(res.rates.nightly) > 0 || Number(res.rates.weekly) > 0 || Number(res.rates.monthly) > 0));
     crm.launchStatus = { photo, rates };
     if (Array.isArray(res.rooms)) crm.editRooms = res.rooms;
-    if (crm.currentFilter === 'bookings' && crm.bookingsSubview !== 'growth') renderBookings(crm.bookings);
+    if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'bookings') renderBookings(crm.bookings);
   } catch (e) { /* non-fatal */ }
 }
 
@@ -1543,39 +1553,52 @@ function renderBookingsSubtabs() {
   wrap.style.display = 'block';
   const tried = growthTriedCount();
   const badge = (crm.bookingsSubview !== 'growth' && tried > 0) ? `<span class="subtab-badge">${tried}</span>` : '';
-  // Keep the 'bookings' string literal out of template interpolations — the build
-  // splitter treats ${...} as raw and would flag it as a bare state ref.
-  const onBookings = crm.bookingsSubview !== 'growth';
-  const bkActive = onBookings ? 'active' : '';
-  const grActive = onBookings ? '' : 'active';
+  const onBookings = crm.bookingsSubview === 'bookings';
+  const onRevenue = crm.bookingsSubview === 'revenue' && crm.revenueEnabled;
+  const onGrowth = crm.bookingsSubview === 'growth';
+  const revenueTab = crm.revenueEnabled
+    ? `<button type="button" role="tab" class="subtab ${onRevenue ? 'active' : ''}" aria-selected="${onRevenue}" onclick="setBookingsSubview('revenue')">Revenue</button>`
+    : '';
   wrap.innerHTML = `
     <div class="subtab-group" role="tablist">
-      <button type="button" role="tab" class="subtab ${bkActive}" aria-selected="${onBookings}" onclick="setBookingsSubview('bookings')">Bookings</button>
-      <button type="button" role="tab" class="subtab ${grActive}" aria-selected="${!onBookings}" onclick="setBookingsSubview('growth')">Get found${badge}</button>
+      <button type="button" role="tab" class="subtab ${onBookings ? 'active' : ''}" aria-selected="${onBookings}" onclick="setBookingsSubview('bookings')">Bookings</button>
+      ${revenueTab}
+      <button type="button" role="tab" class="subtab ${onGrowth ? 'active' : ''}" aria-selected="${onGrowth}" onclick="setBookingsSubview('growth')">Get found${badge}</button>
     </div>`;
 }
 
 function setBookingsSubview(view) {
-  crm.bookingsSubview = (view === 'growth') ? 'growth' : 'bookings';
+  if (view === 'revenue' && !crm.revenueEnabled) view = 'bookings';
+  crm.bookingsSubview = ['bookings', 'revenue', 'growth'].includes(view) ? view : 'bookings';
   renderBookingsSubtabs();
   applyBookingsSubview();
+  if (crm.bookingsSubview === 'revenue') loadRevenueData();
 }
 
 function applyBookingsSubview() {
   const isGrowth = crm.bookingsSubview === 'growth';
+  const isRevenue = crm.bookingsSubview === 'revenue' && crm.revenueEnabled;
+  const isBookings = !isGrowth && !isRevenue;
   const listEl = document.getElementById('bookingsList');
   const chipsEl = document.getElementById('bookingFilterChips');
   const msgPanel = document.getElementById('messagesPanel');
   const growthEl = document.getElementById('growthPanel');
-  if (listEl) listEl.style.display = isGrowth ? 'none' : '';
-  if (msgPanel) msgPanel.style.display = isGrowth ? 'none' : '';
-  if (isGrowth && chipsEl) chipsEl.style.display = 'none';
+  const revenueEl = document.getElementById('revenueView');
+  const assistantEl = document.getElementById('frontDeskAssistantPanel');
+  if (listEl) listEl.style.display = isBookings ? '' : 'none';
+  if (msgPanel) msgPanel.style.display = isBookings ? '' : 'none';
+  if (!isBookings && chipsEl) chipsEl.style.display = 'none';
   if (growthEl) growthEl.style.display = isGrowth ? 'block' : 'none';
+  if (revenueEl) revenueEl.style.display = isRevenue ? 'flex' : 'none';
+  if (assistantEl) assistantEl.style.display = isBookings ? 'block' : 'none';
   if (isGrowth) {
     renderGrowthPanel();
+  } else if (isRevenue) {
+    renderRevenueView();
   } else {
     if (!crm.guestMessages.length) loadMessages(); else renderMessages();
     renderBookings(crm.bookings);
+    loadAssistantModule().then((module) => module.renderFrontDeskAssistantCard()).catch(() => {});
   }
   renderBookingsNotices();
 }
@@ -1771,6 +1794,8 @@ async function startCrmApp(verification) {
   crm.revenueCache = {};
   crm.revenueLoading = false;
   crm.revenueError = '';
+  crm.assistantData = null;
+  crm.assistantLoading = false;
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
@@ -1793,6 +1818,12 @@ async function startCrmApp(verification) {
     window.history.replaceState({}, '', cleanUrl);
   } else if (urlParams.get('tab') === 'bookings') {
     crm.currentFilter = 'bookings';
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('tab');
+    window.history.replaceState({}, '', cleanUrl);
+  } else if (urlParams.get('tab') === 'revenue' && crm.revenueEnabled) {
+    crm.currentFilter = 'bookings';
+    crm.bookingsSubview = 'revenue';
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
     window.history.replaceState({}, '', cleanUrl);
@@ -2029,6 +2060,8 @@ function showLogin() {
   crm.revenueCache = {};
   crm.revenueLoading = false;
   crm.revenueError = '';
+  crm.assistantData = null;
+  crm.assistantLoading = false;
   syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
 }
@@ -2103,7 +2136,7 @@ async function loadBookings(opts = {}) {
     const data = await api('GET', '/api/crm/bookings');
     if (!data.success) throw new Error(data.message);
     crm.bookings = data.data || [];
-    if (crm.currentFilter !== 'revenue') crm.revenueCache = {};
+    if (!(crm.currentFilter === 'bookings' && crm.bookingsSubview === 'revenue')) crm.revenueCache = {};
     
     // Update counts
     const needsCalls = crm.bookings.filter(b => b.callStatus === 'not-called');
@@ -2448,7 +2481,7 @@ async function refreshCurrentView() {
   if (crm.currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
   }
-  if (crm.currentFilter === 'revenue' && crm.revenueEnabled) {
+  if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'revenue' && crm.revenueEnabled) {
     tasks.push(loadRevenueData(true));
   }
   await Promise.allSettled(tasks);
@@ -2696,11 +2729,6 @@ function syncMobileNavActive(filter) {
   if (!nav) return;
   nav.querySelectorAll('.mobile-nav-item').forEach((n) => {
     const f = n.getAttribute('data-nav-filter');
-    if (f === 'revenue' && n.classList.contains('mobile-nav-item--hidden')) {
-      n.classList.remove('active');
-      n.removeAttribute('aria-current');
-      return;
-    }
     const match = f === filter;
     n.classList.toggle('active', match);
     if (match) n.setAttribute('aria-current', 'page');
@@ -2709,11 +2737,9 @@ function syncMobileNavActive(filter) {
 }
 
 function updateMobileRevenueNavVisibility() {
-  const el = document.getElementById('mobileNavRevenueBtn');
-  if (el) el.classList.toggle('mobile-nav-item--hidden', !crm.revenueEnabled);
-  // Keep the desktop Revenue tab in sync too
-  const deskEl = document.getElementById('desktopTabRevenueBtn');
-  if (deskEl) deskEl.classList.toggle('tab--hidden', !crm.revenueEnabled);
+  if (!crm.revenueEnabled && crm.bookingsSubview === 'revenue') {
+    crm.bookingsSubview = 'bookings';
+  }
 }
 
 function initMobileBottomNav() {
@@ -2725,7 +2751,6 @@ function initMobileBottomNav() {
     if (!item || item.classList.contains('mobile-nav-item--hidden')) return;
     const filter = item.getAttribute('data-nav-filter');
     if (!filter) return;
-    if (filter === 'revenue' && !crm.revenueEnabled) return;
     setFilter(filter, item);
   });
 
@@ -2737,7 +2762,16 @@ function initMobileBottomNav() {
 }
 
 function setFilter(filter, btn) {
-  if (filter === 'revenue' && !crm.revenueEnabled) return;
+  // Backward-compatible links and old native shells still route "revenue"
+  // here. Revenue now lives inside Bookings, so quietly map them to the
+  // Bookings tab and select its Revenue segment.
+  if (filter === 'revenue') {
+    if (!crm.revenueEnabled) return;
+    filter = 'bookings';
+    crm.bookingsSubview = 'revenue';
+    btn = document.querySelector('.tab[data-nav-filter="bookings"]')
+      || document.querySelector('.mobile-nav-item[data-nav-filter="bookings"]');
+  }
   crm.currentFilter = filter;
   syncNativeShellState();
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -2767,25 +2801,21 @@ function setFilter(filter, btn) {
     updateGoLiveBanner();
     return;
   }
-  if (filter === 'revenue') {
-    applyFilter();
-    if (crm.settingsTourActive) {
-      seedTourRevenueShell();
-      renderRevenueView();
-      updateGoLiveBanner();
-      return;
-    }
-    if (crm.revenueCache[crm.revenuePeriod] && !crm.revenueLoading) {
-      renderRevenueView();
-      updateGoLiveBanner();
-      return;
-    }
-    loadRevenueData(true);
-    updateGoLiveBanner();
-    return;
-  }
   applyFilter();
-  if (filter === 'bookings') loadMessages();
+  if (filter === 'bookings') {
+    if (crm.bookingsSubview === 'revenue') {
+      if (crm.settingsTourActive) {
+        seedTourRevenueShell();
+        renderRevenueView();
+      } else if (crm.revenueCache[crm.revenuePeriod] && !crm.revenueLoading) {
+        renderRevenueView();
+      } else {
+        loadRevenueData(true);
+      }
+    } else if (crm.bookingsSubview === 'bookings') {
+      loadMessages();
+    }
+  }
   updateGoLiveBanner();
 }
 
@@ -3010,6 +3040,8 @@ function applyFilter() {
   if (subtabsEl) subtabsEl.style.display = 'none';
   const growthPanelEl = document.getElementById('growthPanel');
   if (growthPanelEl) growthPanelEl.style.display = 'none';
+  const assistantPanelEl = document.getElementById('frontDeskAssistantPanel');
+  if (assistantPanelEl) assistantPanelEl.style.display = 'none';
   const previewBar = document.getElementById('previewSiteBar');
   if (previewBar) previewBar.style.display = (crm.currentFilter === 'settings') ? 'block' : 'none';
   // Remove any checklist pointer when switching tabs
@@ -3058,18 +3090,6 @@ function applyFilter() {
     return;
   }
 
-  if (crm.currentFilter === 'revenue') {
-    if (bookingsEl) bookingsEl.style.display = 'none';
-    if (availabilityEl) availabilityEl.style.display = 'none';
-    if (revenueEl) revenueEl.style.display = 'flex';
-    if (settingsEl) settingsEl.style.display = 'none';
-    const editEl = document.getElementById('editView');
-    if (editEl) editEl.style.display = 'none';
-    closeAvailabilityDayPopover();
-    renderRevenueView();
-    return;
-  }
-
   if (crm.currentFilter === 'apps') {
     if (bookingsEl) bookingsEl.style.display = 'none';
     if (availabilityEl) availabilityEl.style.display = 'none';
@@ -3102,7 +3122,7 @@ function applyFilter() {
   const editEl = document.getElementById('editView');
   if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
-  // Bookings-tab segmented control: Bookings | Get found
+  // Bookings-tab segmented control: Bookings | Revenue | Get found
   renderBookingsSubtabs();
   loadGrowthData();
   applyBookingsSubview();
@@ -4151,7 +4171,7 @@ function renderBookingsNotices() {
 
   let host = document.getElementById('bookingsNotices');
   const suppressed = crm.currentFilter !== 'bookings'
-    || crm.bookingsSubview === 'growth'
+    || crm.bookingsSubview !== 'bookings'
     || crm.settingsTourActive;
   const html = suppressed ? '' : conflictBannerHtml();
 

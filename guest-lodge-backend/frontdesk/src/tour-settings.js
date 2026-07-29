@@ -11,6 +11,10 @@ function setFilter(...args) {
   return windowFn('setFilter')?.(...args);
 }
 
+function setBookingsSubview(...args) {
+  return windowFn('setBookingsSubview')?.(...args);
+}
+
 function toast(...args) {
   return windowFn('toast')?.(...args);
 }
@@ -841,6 +845,7 @@ function startSettingsTour() {
       text: '',
       openAccordion: false,
       tab: 'bookings',
+      subview: 'bookings',
       customModal: 'bookings'
     },
     {
@@ -855,7 +860,8 @@ function startSettingsTour() {
       title: 'Track revenue and payment status',
       text: 'Revenue shows direct bookings, card status, and estimated OTA commission savings. Cards are verified, and you collect payment at check-in.',
       openAccordion: false,
-      tab: 'revenue',
+      tab: 'bookings',
+      subview: 'revenue',
       waitForVisible: true,
       scrollBlock: 'start'
     },
@@ -918,8 +924,8 @@ function startSettingsTour() {
 
     const s = steps[step];
 
-    // Skip revenue steps if revenue isn't enabled for this hotel
-    if (s.tab === 'revenue' && !crm.revenueEnabled) {
+    // Skip revenue steps if revenue isn't enabled for this property.
+    if (s.subview === 'revenue' && !crm.revenueEnabled) {
       step++;
       localStorage.setItem('settingsTourStep', String(step));
       showStep();
@@ -939,12 +945,18 @@ function startSettingsTour() {
     if (s.tab && s.tab !== crm.currentFilter) {
       const tabBtn = document.querySelector(`.tab[data-nav-filter="${s.tab}"]`) || document.querySelector(`.mobile-nav-item[data-nav-filter="${s.tab}"]`);
       if (tabBtn) setFilter(s.tab, tabBtn);
+      if (s.tab === 'bookings' && s.subview) setBookingsSubview(s.subview);
       if (s.tab === 'apps') {
         const renderApps = (typeof ensureAppsViewRendered === 'function')
           ? ensureAppsViewRendered
           : window.ensureAppsViewRendered;
         if (typeof renderApps === 'function') renderApps(true);
       }
+      scheduleTourStepContent(s, opts);
+      return;
+    }
+    if (s.tab === 'bookings' && s.subview && s.subview !== crm.bookingsSubview) {
+      setBookingsSubview(s.subview);
       scheduleTourStepContent(s, opts);
       return;
     }
@@ -1490,7 +1502,7 @@ function startSettingsTour() {
     let hasRenderedPage = false;
     function renderModalPage() {
       const isLast = modalPage >= pages.length - 1;
-      const btnLabel = isLast ? 'Next \u2014 Revenue \u2192' : 'Next \u2192';
+      const btnLabel = isLast ? 'Next \u2014 Bookings \u2192' : 'Next \u2192';
       // Panel slides in once; page swaps only crossfade the content so the
       // whole modal doesn't re-animate on every inner page.
       const panelAnim = hasRenderedPage ? 'none' : 'tourPanelIn 0.22s ease-out';

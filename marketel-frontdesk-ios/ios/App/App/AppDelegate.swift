@@ -80,18 +80,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         image: UIImage(systemName: "door.left.hand.open"),
         tag: 2
     )
-    private let revenueTabItem = UITabBarItem(
-        title: "Revenue",
-        image: UIImage(systemName: "chart.line.uptrend.xyaxis"),
-        tag: 3
-    )
     private let guestAppTabItem = UITabBarItem(
         title: "Guest App",
         image: UIImage(systemName: "iphone"),
-        tag: 4
+        tag: 3
     )
     private var bookingTabItem: UITabBarItem?
-    private var revenueEnabled = false
     private var shellVisible = false
 
     override func capacitorDidLoad() {
@@ -247,6 +241,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("refresh")
         }
+        let assistantAction = UIAction(
+            title: "Front Desk Assistant",
+            image: UIImage(systemName: "bubble.left.and.bubble.right")
+        ) { [weak self] _ in
+            self?.sendWebAction("assistant")
+        }
         let tourAction = UIAction(
             title: "How it works",
             image: UIImage(systemName: "questionmark.circle")
@@ -272,7 +272,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuConfiguration.baseForegroundColor = .label
         menuConfiguration.contentInsets = .zero
         menuButton.configuration = menuConfiguration
-        menuButton.menu = UIMenu(children: [refreshAction, tourAction, switchAction, signOutAction])
+        menuButton.menu = UIMenu(children: [assistantAction, refreshAction, tourAction, switchAction, signOutAction])
         menuButton.showsMenuAsPrimaryAction = true
         menuButton.accessibilityLabel = "Front Desk menu"
 
@@ -313,7 +313,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         bookingTabItem = bookings
         tabBar.delegate = self
-        updateVisibleTabs()
+        tabBar.items = [yourPageTabItem, bookings, availabilityTabItem, guestAppTabItem]
         tabBar.selectedItem = yourPageTabItem
         tabBar.isTranslucent = true
         tabBar.accessibilityIdentifier = "marketel.native.tabs"
@@ -325,8 +325,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         switch item.tag {
         case 1: filter = "bookings"
         case 2: filter = "availability"
-        case 3: filter = "revenue"
-        case 4: filter = "apps"
+        case 3: filter = "apps"
         default: filter = "settings"
         }
         callWeb(function: "marketelNativeSelectTab", argument: filter)
@@ -365,34 +364,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         switch identifier {
         case "bookings": tag = 1
         case "availability": tag = 2
-        case "revenue": tag = 3
-        case "apps": tag = 4
+        case "apps": tag = 3
         default: tag = 0
         }
         tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == tag })
-    }
-
-    private func updateVisibleTabs() {
-        guard let bookings = bookingTabItem else {
-            return
-        }
-        var items = [yourPageTabItem, bookings, availabilityTabItem]
-        if revenueEnabled {
-            items.append(revenueTabItem)
-        }
-        items.append(guestAppTabItem)
-        tabBar.items = items
-    }
-
-    private func updateRevenueVisibility(_ enabled: Bool) {
-        guard revenueEnabled != enabled else {
-            return
-        }
-        let selectedTag = tabBar.selectedItem?.tag ?? 0
-        revenueEnabled = enabled
-        updateVisibleTabs()
-        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == selectedTag })
-            ?? yourPageTabItem
     }
 
     private func updateBookingBadge(_ count: Int) {
@@ -444,7 +419,6 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             setShellVisible(payload["visible"] as? Bool ?? false, animated: shellVisible)
         case "state":
             updatePropertyName(payload["hotelName"] as? String ?? "Front Desk")
-            updateRevenueVisibility(payload["revenueEnabled"] as? Bool ?? false)
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
             setShellVisible(payload["visible"] as? Bool ?? true, animated: shellVisible)

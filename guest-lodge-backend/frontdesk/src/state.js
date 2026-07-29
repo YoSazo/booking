@@ -23,6 +23,8 @@ export const crm = {
   revenueError: '',
   blockedDemand: { total: 0, today: 0, recent: [] },
   bookingsSubview: 'bookings',
+  assistantData: null,
+  assistantLoading: false,
   launchStatus: null,
   growthFunnel: null,
   growthChecklist: {},

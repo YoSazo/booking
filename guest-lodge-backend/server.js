@@ -23,6 +23,9 @@ const webpush = require('web-push');
 const nodemailer = require('nodemailer');
 const sharp = require('sharp');
 const telemetry = require('./marketel-signal-extractor');
+const { createFrontDeskAssistant } = require('./frontdesk-assistant');
+
+let frontDeskAssistant = null;
 
 // Marketel CAPI (separate pixel for the onboarding funnel)
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
@@ -5596,6 +5599,11 @@ function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, c
             armedBookingId = armed?.id || bookingId;
         }
         await notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso, guestEmail, armedBookingId);
+        if (frontDeskAssistant && armedBookingId) {
+            await frontDeskAssistant.notifyNewBooking(armedBookingId).catch((error) => {
+                console.error('frontdesk-assistant booking alert:', error.message);
+            });
+        }
     };
     run().catch(() => {});
     maybeNotifyRoomSoldOutToday(hotelId, roomName, checkinIso).catch(() => {});
@@ -6427,6 +6435,18 @@ app.post('/api/crm/bookings/cancel', crmAuth, async (req, res) => {
         res.status(500).json({ success: false, message: 'Could not cancel that booking.' });
     }
 });
+
+frontDeskAssistant = createFrontDeskAssistant({
+    prisma,
+    withRetry,
+    normalizeIsoDate,
+    enumerateDatesInclusive,
+    manualBookingStayDates,
+    cancelBookingByOwner,
+    maybeNotifyRoomSoldOutToday,
+    reportTimeZone: REPORT_TIME_ZONE,
+});
+frontDeskAssistant.registerRoutes(app, { crmAuth, requireScopedHotelId });
 
 // ── OVERSELL CONFLICTS ─────────────────────────────────────────────────
 // A double-booking shows up in the data as a room-night with more live bookings
@@ -10204,5 +10224,12 @@ app.listen(PORT, () => {
             .catch((e) => console.error('Booking review reminder sweep:', e.message));
         setTimeout(reviewSweep, 20_000);
         setInterval(reviewSweep, BOOKING_REVIEW_SWEEP_INTERVAL_MS);
+    }
+
+    if (process.env.ENABLE_FRONTDESK_ASSISTANT !== 'false' && frontDeskAssistant) {
+        const assistantSweep = () => frontDeskAssistant.runScheduledChecks()
+            .catch((e) => console.error('Front Desk Assistant sweep:', e.message));
+        setTimeout(assistantSweep, 30_000);
+        setInterval(assistantSweep, 5 * 60 * 1000);
     }
 });

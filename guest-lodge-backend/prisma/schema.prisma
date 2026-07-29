@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -29,20 +29,20 @@ model Booking {
   taxesAndFees          Float
   grandTotal            Float
   bookingType           String   @default("standard")
-  
+
   // Fields for "Pay Later" bookings with pre-auth hold
-  amountPaidNow         Float?   @default(0)
-  preAuthHoldAmount     Float?
-  holdStatus            String?  // 'active', 'released', 'captured'
-  holdReleasedAt        DateTime?
-  holdCapturedAt        DateTime?
-  noShowFeePaid         Boolean  @default(false)
+  amountPaidNow     Float?    @default(0)
+  preAuthHoldAmount Float?
+  holdStatus        String? // 'active', 'released', 'captured'
+  holdReleasedAt    DateTime?
+  holdCapturedAt    DateTime?
+  noShowFeePaid     Boolean   @default(false)
 
   // Front desk CRM
-  crmStage    String?  @default("new")
-  callStatus  String?  @default("not-called")
-  notes       String?
-  callLog     String?  // stored as JSON string
+  crmStage   String? @default("new")
+  callStatus String? @default("not-called")
+  notes      String?
+  callLog    String? // stored as JSON string
 
   // Guest PWA adoption
   guestInstallReminderSentAt DateTime?
@@ -52,7 +52,7 @@ model Booking {
   // sweep auto-confirms once pendingUntil passes so silence defaults to yes.
   approvalRequestedAt DateTime?
   pendingUntil        DateTime?
-  approvalOutcome     String?   // owner_confirmed | owner_released | auto_confirmed | auto_no_alerts
+  approvalOutcome     String? // owner_confirmed | owner_released | auto_confirmed | auto_no_alerts
   approvalDecidedAt   DateTime?
 
   // Owner turned the booking away after it was already confirmed — usually
@@ -62,7 +62,7 @@ model Booking {
 
   // Immediate-confirmation follow-up. Online bookings are confirmed first, then
   // remain visible in Front Desk until the owner verifies room availability.
-  ownerReviewStatus         String?   // unreviewed | available | cancelled
+  ownerReviewStatus         String? // unreviewed | available | cancelled
   ownerReviewRequestedAt    DateTime?
   ownerReviewedAt           DateTime?
   ownerReviewReminderCount  Int       @default(0)
@@ -83,8 +83,8 @@ model GuestInstallEvent {
   createdAt       DateTime @default(now())
   hotelId         String
   reservationCode String?
-  touchpoint      String   // confirmation-page, frontdesk-qr-guest, confirmation-email, etc.
-  eventType       String   // view | cta_click | installed
+  touchpoint      String // confirmation-page, frontdesk-qr-guest, confirmation-email, etc.
+  eventType       String // view | cta_click | installed
   userAgent       String?
 
   @@index([hotelId, createdAt])
@@ -108,7 +108,7 @@ model PaymentDeclinedLead {
   errorCode        String?
   errorDeclineCode String?
   errorMessage     String?
-  paymentMethod    String?  // 'card' | 'wallet'
+  paymentMethod    String? // 'card' | 'wallet'
   called           Boolean  @default(false)
   notes            String?
 }
@@ -138,7 +138,7 @@ model PushSubscription {
   hotelId         String
   p256dh          String
   auth            String
-  source          String?     // 'funnel' | 'crm' | 'guest'
+  source          String? // 'funnel' | 'crm' | 'guest'
   reservationCode String?
 
   @@index([hotelId])
@@ -154,7 +154,7 @@ model ManualRoom {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  overrides  ManualOverride[]
+  overrides ManualOverride[]
 
   @@unique([hotelId, name])
 }
@@ -185,27 +185,27 @@ model HotelConfig {
   updatedAt     DateTime @updatedAt
 
   // Onboarding
-  setupToken      String?   @unique
-  setupComplete   Boolean   @default(false)
-  subscribed      Boolean   @default(false)
-  stripeAccountId String?
+  setupToken                   String?   @unique
+  setupComplete                Boolean   @default(false)
+  subscribed                   Boolean   @default(false)
+  stripeAccountId              String?
   marketelStripeCustomerId     String?   @unique
   marketelStripeSubscriptionId String?   @unique
   marketelSubscriptionStatus   String?
   marketelCurrentPeriodEnd     DateTime?
-  ownerEmail      String?
-  ownerPhone      String?
+  ownerEmail                   String?
+  ownerPhone                   String?
 
   // Hotel details (editable by owner)
-  phone         String?
-  address       String?
-  subtitle      String?
-  theme         String?   @default("light")
-  appIconUrl    String?
-  checkInTime   String?   @default("15:00")
-  checkOutTime  String?   @default("11:00")
+  phone              String?
+  address            String?
+  subtitle           String?
+  theme              String? @default("light")
+  appIconUrl         String?
+  checkInTime        String? @default("15:00")
+  checkOutTime       String? @default("11:00")
   cancellationPolicy String?
-  growthChecklist Json?   // owner self-reported "get found" steps: { gbp:{done,ts}, qr:{...}, textLink:{...} }
+  growthChecklist    Json? // owner self-reported "get found" steps: { gbp:{done,ts}, qr:{...}, textLink:{...} }
 
   // Owner approval: hold new bookings briefly so the owner can catch a room
   // they already sold on an OTA. Useless without push, so it stays off until
@@ -216,14 +216,102 @@ model HotelConfig {
 
   // Follow-up reminders for confirmed online bookings. Zero means the first
   // notification only; otherwise Front Desk sends at most three reminders.
-  bookingReviewReminderMinutes Int       @default(15)
+  bookingReviewReminderMinutes Int @default(15)
 
-  domains       HotelDomain[]
-  crmPins       CrmPin[]
-  pushSubscriptions PushSubscription[]
-  rooms         Room[]
-  rates         HotelRates?
-  guestMessages GuestMessage[]
+  domains                 HotelDomain[]
+  crmPins                 CrmPin[]
+  pushSubscriptions       PushSubscription[]
+  rooms                   Room[]
+  rates                   HotelRates?
+  guestMessages           GuestMessage[]
+  frontDeskAssistant      FrontDeskAssistantConfig?
+  assistantRecipients     FrontDeskAssistantRecipient[]
+  assistantActivities     FrontDeskAssistantActivity[]
+  assistantPendingActions FrontDeskAssistantPendingAction[]
+}
+
+// Property-side virtual Front Desk. Configuration is one-to-one with a hotel;
+// recipients, messages, and reversible actions stay separate so the assistant
+// has a complete audit trail without overloading HotelConfig.
+model FrontDeskAssistantConfig {
+  hotel             HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId           String      @id
+  enabled           Boolean     @default(false)
+  checkFrequency    String      @default("smart") // smart | 2h | 4h | daily | booking_only | off
+  dailyCheckTime    String      @default("18:00")
+  quietHoursStart   String?
+  quietHoursEnd     String?
+  timeZone          String      @default("America/Chicago")
+  notifyNewBookings Boolean     @default(true)
+  lastCheckAt       DateTime?
+  nextCheckAt       DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model FrontDeskAssistantRecipient {
+  id                    String      @id @default(cuid())
+  hotel                 HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId               String
+  name                  String
+  role                  String?
+  phoneE164             String
+  priority              Int         @default(0)
+  active                Boolean     @default(true)
+  verifiedAt            DateTime?
+  consentAt             DateTime?
+  verificationCodeHash  String?
+  verificationExpiresAt DateTime?
+  verificationAttempts  Int         @default(0)
+  lastInboundAt         DateTime?
+  lastOutboundAt        DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  activities     FrontDeskAssistantActivity[]
+  pendingActions FrontDeskAssistantPendingAction[]
+
+  @@unique([hotelId, phoneE164])
+  @@index([hotelId, active, priority])
+  @@index([phoneE164, active])
+}
+
+model FrontDeskAssistantActivity {
+  id                String                       @id @default(cuid())
+  hotel             HotelConfig                  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId           String
+  recipient         FrontDeskAssistantRecipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  recipientId       String?
+  direction         String // inbound | outbound | system
+  type              String // verification | booking_alert | inventory_check | availability_update | help
+  body              String?
+  summary           String?
+  status            String                       @default("recorded") // queued | sent | delivered | failed | recorded
+  providerMessageId String?
+  metadata          Json?
+  createdAt         DateTime                     @default(now())
+
+  @@index([hotelId, createdAt])
+  @@index([providerMessageId])
+}
+
+model FrontDeskAssistantPendingAction {
+  id          String                       @id @default(cuid())
+  hotel       HotelConfig                  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId     String
+  recipient   FrontDeskAssistantRecipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  recipientId String?
+  kind        String // block_availability | confirm_booking | cancel_booking
+  payload     Json
+  status      String                       @default("pending") // pending | applied | undone | cancelled | expired
+  expiresAt   DateTime
+  appliedAt   DateTime?
+  undoneAt    DateTime?
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+
+  @@index([hotelId, status, expiresAt])
+  @@index([recipientId, status, createdAt])
 }
 
 // Messages a guest sends to the property from the booking-confirmation screen.
@@ -241,7 +329,7 @@ model GuestMessage {
   guestPhone      String?
   roomName        String?
   body            String?
-  requests        String?     // JSON array of quick-request chip labels
+  requests        String? // JSON array of quick-request chip labels
   readAt          DateTime?
   sender          String      @default("guest")
 
@@ -250,19 +338,19 @@ model GuestMessage {
 }
 
 model Room {
-  id            String      @id @default(cuid())
-  hotel         HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  hotelId       String
-  name          String
-  description   String?
-  amenities     String?
-  maxOccupancy  Int         @default(4)
-  totalUnits    Int         @default(1)
-  sortOrder     Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  hotel        HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId      String
+  name         String
+  description  String?
+  amenities    String?
+  maxOccupancy Int         @default(4)
+  totalUnits   Int         @default(1)
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  images        RoomImage[]
+  images RoomImage[]
 
   @@unique([hotelId, name])
   @@index([hotelId, sortOrder])
@@ -291,24 +379,24 @@ model HotelRates {
 }
 
 model HotelDomain {
-  id         String      @id @default(cuid())
-  hotel      HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  hotelId    String
-  domain     String      @unique
-  isPrimary  Boolean     @default(false)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  hotel     HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId   String
+  domain    String      @unique
+  isPrimary Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model CrmPin {
-  id         String      @id @default(cuid())
-  hotel      HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  hotelId    String
-  pinHash    String
-  label      String?
-  active     Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  hotel     HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId   String
+  pinHash   String
+  label     String?
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   @@unique([hotelId, pinHash])
   @@index([pinHash, active])
@@ -322,7 +410,7 @@ model FunnelEvent {
   eventId        String?
   value          Float?
   currency       String?  @default("USD")
-  contentName    String?  // room name
+  contentName    String? // room name
   checkinDate    String?
   checkoutDate   String?
   nights         Int?
@@ -330,7 +418,7 @@ model FunnelEvent {
   guestLastName  String?
   guestEmail     String?
   guestPhone     String?
-  externalId     String?  // cookie-based visitor ID
+  externalId     String? // cookie-based visitor ID
   userAgent      String?
   ipAddress      String?
 
