@@ -92,6 +92,6 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               marketel-frontdesk-ios/ios/output/Marketel-Front-Desk.ipa \
               --title "Marketel Front Desk iOS ${GITHUB_REF_NAME#ios-v}" \
-              --notes "Private AltStore dogfood build with a safe-area-aware branded header, native iOS navigation, Revenue for eligible properties, property switching, and a compact Guest App tools screen. Native APNs booking alerts are not included yet." \
+              --notes "Private AltStore dogfood build with one unified Liquid Glass header, native iOS navigation, Revenue for eligible properties, property switching, and a compact Guest App tools screen. Native APNs booking alerts are not included yet." \
               --prerelease
           fi

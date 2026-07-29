@@ -2179,7 +2179,7 @@
       width: 100%;
       max-width: 860px;
       margin: 0 auto;
-      padding: calc(env(safe-area-inset-top, 0px) + 58px) 12px
+      padding: calc(env(safe-area-inset-top, 0px) + 84px) 12px
         calc(env(safe-area-inset-bottom, 0px) + 92px) !important;
     }
     body.native-ios.native-shell-visible #app.has-go-live-banner .container {

@@ -65,12 +65,9 @@ private final class MarketelMarkView: UIView {
 /// and navigation treatments, while older iOS versions receive the standard
 /// system appearance automatically.
 final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler {
-    private let statusBarBackdrop = UIVisualEffectView(
-        effect: UIBlurEffect(style: .systemChromeMaterial)
-    )
-    private let topBar = UINavigationBar()
+    private let statusBarBackdrop = UIView()
+    private let topBar = UIVisualEffectView()
     private let tabBar = UITabBar()
-    private let navigationItemState = UINavigationItem()
     private let propertyHeaderControl = UIControl()
     private let propertyNameLabel = UILabel()
     private let yourPageTabItem = UITabBarItem(
@@ -126,10 +123,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             height: safeInsets.top
         )
         topBar.frame = CGRect(
-            x: 0,
-            y: safeInsets.top,
-            width: bounds.width,
-            height: 56
+            x: 8,
+            y: safeInsets.top + 6,
+            width: bounds.width - 16,
+            height: 64
         )
 
         let measuredTabHeight = tabBar.sizeThatFits(
@@ -149,11 +146,30 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     private func configureTopBar() {
+        let shellBackground = UIColor(
+            red: 238 / 255,
+            green: 242 / 255,
+            blue: 239 / 255,
+            alpha: 1
+        )
+        statusBarBackdrop.backgroundColor = shellBackground
         statusBarBackdrop.isUserInteractionEnabled = false
         view.addSubview(statusBarBackdrop)
 
-        topBar.isTranslucent = true
-        topBar.prefersLargeTitles = false
+        if #available(iOS 26.0, *) {
+            let glass = UIGlassEffect(style: .regular)
+            glass.tintColor = UIColor(
+                red: 238 / 255,
+                green: 242 / 255,
+                blue: 239 / 255,
+                alpha: 0.12
+            )
+            topBar.effect = glass
+        } else {
+            topBar.effect = UIBlurEffect(style: .systemThinMaterial)
+            topBar.layer.cornerRadius = 22
+            topBar.clipsToBounds = true
+        }
         topBar.isUserInteractionEnabled = true
 
         let logo = MarketelMarkView()
@@ -168,6 +184,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         propertyNameLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
         propertyNameLabel.textColor = .secondaryLabel
         propertyNameLabel.lineBreakMode = .byTruncatingTail
+        propertyNameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let chevron = UIImageView(image: UIImage(systemName: "chevron.down"))
         chevron.translatesAutoresizingMaskIntoConstraints = false
@@ -183,6 +200,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         labels.axis = .vertical
         labels.alignment = .leading
         labels.spacing = 0
+        labels.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let brandRow = UIStackView(arrangedSubviews: [logo, labels])
         brandRow.translatesAutoresizingMaskIntoConstraints = false
@@ -209,18 +227,18 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             brandRow.trailingAnchor.constraint(equalTo: propertyHeaderControl.trailingAnchor),
             brandRow.topAnchor.constraint(equalTo: propertyHeaderControl.topAnchor),
             brandRow.bottomAnchor.constraint(equalTo: propertyHeaderControl.bottomAnchor),
-            propertyHeaderControl.widthAnchor.constraint(lessThanOrEqualToConstant: 210),
-            propertyHeaderControl.heightAnchor.constraint(equalToConstant: 42)
+            propertyHeaderControl.heightAnchor.constraint(equalToConstant: 48)
         ])
+        propertyHeaderControl.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        propertyHeaderControl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        navigationItemState.leftBarButtonItem = UIBarButtonItem(customView: propertyHeaderControl)
-
-        let qrButton = UIBarButtonItem(
-            image: UIImage(systemName: "qrcode.viewfinder"),
-            style: .plain,
-            target: self,
-            action: #selector(showGuestQR)
-        )
+        let qrButton = UIButton(type: .system)
+        var qrConfiguration = UIButton.Configuration.plain()
+        qrConfiguration.image = UIImage(systemName: "qrcode.viewfinder")
+        qrConfiguration.baseForegroundColor = .label
+        qrConfiguration.contentInsets = .zero
+        qrButton.configuration = qrConfiguration
+        qrButton.addTarget(self, action: #selector(showGuestQR), for: .touchUpInside)
         qrButton.accessibilityLabel = "Show guest QR"
 
         let refreshAction = UIAction(
@@ -248,16 +266,41 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("signout")
         }
-        let menuButton = UIBarButtonItem(
-            image: UIImage(systemName: "ellipsis"),
-            style: .plain,
-            target: nil,
-            action: nil
-        )
+        let menuButton = UIButton(type: .system)
+        var menuConfiguration = UIButton.Configuration.plain()
+        menuConfiguration.image = UIImage(systemName: "ellipsis")
+        menuConfiguration.baseForegroundColor = .label
+        menuConfiguration.contentInsets = .zero
+        menuButton.configuration = menuConfiguration
         menuButton.menu = UIMenu(children: [refreshAction, tourAction, switchAction, signOutAction])
+        menuButton.showsMenuAsPrimaryAction = true
         menuButton.accessibilityLabel = "Front Desk menu"
-        navigationItemState.rightBarButtonItems = [menuButton, qrButton]
-        topBar.setItems([navigationItemState], animated: false)
+
+        let actions = UIStackView(arrangedSubviews: [qrButton, menuButton])
+        actions.axis = .horizontal
+        actions.alignment = .center
+        actions.spacing = 2
+        actions.setContentHuggingPriority(.required, for: .horizontal)
+        actions.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let headerRow = UIStackView(arrangedSubviews: [propertyHeaderControl, actions])
+        headerRow.translatesAutoresizingMaskIntoConstraints = false
+        headerRow.axis = .horizontal
+        headerRow.alignment = .center
+        headerRow.spacing = 8
+
+        topBar.contentView.addSubview(headerRow)
+        NSLayoutConstraint.activate([
+            qrButton.widthAnchor.constraint(equalToConstant: 40),
+            qrButton.heightAnchor.constraint(equalToConstant: 44),
+            menuButton.widthAnchor.constraint(equalToConstant: 40),
+            menuButton.heightAnchor.constraint(equalToConstant: 44),
+            headerRow.leadingAnchor.constraint(equalTo: topBar.contentView.leadingAnchor, constant: 14),
+            headerRow.trailingAnchor.constraint(equalTo: topBar.contentView.trailingAnchor, constant: -8),
+            headerRow.topAnchor.constraint(equalTo: topBar.contentView.topAnchor, constant: 6),
+            headerRow.bottomAnchor.constraint(equalTo: topBar.contentView.bottomAnchor, constant: -6)
+        ])
+
         view.addSubview(topBar)
     }
 

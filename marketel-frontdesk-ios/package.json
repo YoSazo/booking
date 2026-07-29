@@ -1,6 +1,6 @@
 {
   "name": "marketel-frontdesk-ios",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Private iOS dogfood build for Marketel Front Desk with native navigation.",
   "scripts": {
