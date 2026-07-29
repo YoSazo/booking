@@ -18,6 +18,16 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "2.2",
+          "buildVersion": "4",
+          "date": "2026-07-29",
+          "localizedDescription": "Replaces the separate native header capsules with one roomy, full-width Liquid Glass banner. The status area now matches the page background, long property names truncate cleanly, and every tab receives consistent header spacing.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.2/Marketel-Front-Desk.ipa",
+          "size": 608276,
+          "sha256": "e7d15fa4a8f17f964d81d6e121f0b1fd7af221f9a8de50d8cfec7fabe8172e7c",
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.1",
           "buildVersion": "3",
           "date": "2026-07-29",
