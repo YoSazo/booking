@@ -371,8 +371,10 @@ function syncNativeShellState() {
     hotelName: crm.activeHotelName || 'Front Desk',
     selectedTab: crm.currentFilter === 'apps' ? 'apps'
       : crm.currentFilter === 'availability' ? 'availability'
+      : crm.currentFilter === 'revenue' ? 'revenue'
       : crm.currentFilter === 'bookings' ? 'bookings'
       : 'settings',
+    revenueEnabled: !!crm.revenueEnabled,
     bookingBadge: Math.max(0, needsCalls + unreadMessages),
   });
 }
@@ -600,8 +602,9 @@ function nativeSignOut() {
 }
 
 function marketelNativeSelectTab(filter) {
-  const allowed = ['settings', 'bookings', 'availability', 'apps'];
+  const allowed = ['settings', 'bookings', 'availability', 'revenue', 'apps'];
   if (!allowed.includes(filter)) return;
+  if (filter === 'revenue' && !crm.revenueEnabled) return;
   setFilter(filter, document.querySelector(`.tab[data-nav-filter="${filter}"]`));
 }
 

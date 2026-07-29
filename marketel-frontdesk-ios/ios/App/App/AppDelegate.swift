@@ -2,6 +2,62 @@ import UIKit
 import Capacitor
 import WebKit
 
+/// Compact vector version of the Marketel mark. Keeping it native means the
+/// header stays sharp at every display scale without shipping another asset.
+private final class MarketelMarkView: UIView {
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isOpaque = false
+        isUserInteractionEnabled = false
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        isOpaque = false
+        isUserInteractionEnabled = false
+    }
+
+    override func draw(_ rect: CGRect) {
+        let green = UIColor(red: 46 / 255, green: 125 / 255, blue: 91 / 255, alpha: 1)
+        let scale = min(rect.width / 69, rect.height / 72)
+        let drawingSize = CGSize(width: 69 * scale, height: 72 * scale)
+        let origin = CGPoint(
+            x: rect.midX - drawingSize.width / 2,
+            y: rect.midY - drawingSize.height / 2
+        )
+
+        func scaledRect(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) -> CGRect {
+            CGRect(
+                x: origin.x + x * scale,
+                y: origin.y + y * scale,
+                width: width * scale,
+                height: height * scale
+            )
+        }
+
+        green.setFill()
+        UIBezierPath(
+            roundedRect: scaledRect(0, 0, 52.37, 71.49),
+            cornerRadius: 15 * scale
+        ).fill()
+
+        UIColor.white.setFill()
+        UIBezierPath(
+            roundedRect: scaledRect(4.99, 4.99, 35.75, 61.52),
+            cornerRadius: 15 * scale
+        ).fill()
+
+        green.setFill()
+        UIBezierPath(
+            roundedRect: scaledRect(16.63, 0, 52.37, 71.49),
+            cornerRadius: 15 * scale
+        ).fill()
+
+        UIColor.white.setFill()
+        UIBezierPath(ovalIn: scaledRect(26.6, 29.93, 9.98, 10.81)).fill()
+    }
+}
+
 /// Native navigation chrome around the hosted Front Desk.
 ///
 /// The web application remains the source of truth for page content. UIKit
@@ -9,11 +65,36 @@ import WebKit
 /// and navigation treatments, while older iOS versions receive the standard
 /// system appearance automatically.
 final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler {
+    private let statusBarBackdrop = UIVisualEffectView(
+        effect: UIBlurEffect(style: .systemChromeMaterial)
+    )
     private let topBar = UINavigationBar()
     private let tabBar = UITabBar()
     private let navigationItemState = UINavigationItem()
-    private let propertyButton = UIButton(type: .system)
+    private let propertyHeaderControl = UIControl()
+    private let propertyNameLabel = UILabel()
+    private let yourPageTabItem = UITabBarItem(
+        title: "Your Page",
+        image: UIImage(systemName: "globe"),
+        tag: 0
+    )
+    private let availabilityTabItem = UITabBarItem(
+        title: "Availability",
+        image: UIImage(systemName: "door.left.hand.open"),
+        tag: 2
+    )
+    private let revenueTabItem = UITabBarItem(
+        title: "Revenue",
+        image: UIImage(systemName: "chart.line.uptrend.xyaxis"),
+        tag: 3
+    )
+    private let guestAppTabItem = UITabBarItem(
+        title: "Guest App",
+        image: UIImage(systemName: "iphone"),
+        tag: 4
+    )
     private var bookingTabItem: UITabBarItem?
+    private var revenueEnabled = false
     private var shellVisible = false
 
     override func capacitorDidLoad() {
@@ -38,11 +119,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         let bounds = view.bounds
         let safeInsets = view.safeAreaInsets
 
-        topBar.frame = CGRect(
+        statusBarBackdrop.frame = CGRect(
             x: 0,
             y: 0,
             width: bounds.width,
-            height: safeInsets.top + 52
+            height: safeInsets.top
+        )
+        topBar.frame = CGRect(
+            x: 0,
+            y: safeInsets.top,
+            width: bounds.width,
+            height: 56
         )
 
         let measuredTabHeight = tabBar.sizeThatFits(
@@ -56,28 +143,77 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             height: tabHeight
         )
 
+        view.bringSubviewToFront(statusBarBackdrop)
         view.bringSubviewToFront(topBar)
         view.bringSubviewToFront(tabBar)
     }
 
     private func configureTopBar() {
+        statusBarBackdrop.isUserInteractionEnabled = false
+        view.addSubview(statusBarBackdrop)
+
         topBar.isTranslucent = true
         topBar.prefersLargeTitles = false
         topBar.isUserInteractionEnabled = true
 
-        var titleConfiguration = UIButton.Configuration.plain()
-        titleConfiguration.title = "Front Desk"
-        titleConfiguration.image = UIImage(systemName: "chevron.down")
-        titleConfiguration.imagePlacement = .trailing
-        titleConfiguration.imagePadding = 6
-        titleConfiguration.baseForegroundColor = .label
-        propertyButton.configuration = titleConfiguration
-        propertyButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        propertyButton.titleLabel?.lineBreakMode = .byTruncatingTail
-        propertyButton.accessibilityLabel = "Switch property"
-        propertyButton.addTarget(self, action: #selector(openPropertyPicker), for: .touchUpInside)
-        propertyButton.widthAnchor.constraint(lessThanOrEqualToConstant: 250).isActive = true
-        navigationItemState.titleView = propertyButton
+        let logo = MarketelMarkView()
+        logo.translatesAutoresizingMaskIntoConstraints = false
+
+        let frontDeskLabel = UILabel()
+        frontDeskLabel.text = "Front Desk"
+        frontDeskLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        frontDeskLabel.textColor = .label
+
+        propertyNameLabel.text = "Your property"
+        propertyNameLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
+        propertyNameLabel.textColor = .secondaryLabel
+        propertyNameLabel.lineBreakMode = .byTruncatingTail
+
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.down"))
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        chevron.tintColor = .secondaryLabel
+        chevron.contentMode = .scaleAspectFit
+
+        let propertyRow = UIStackView(arrangedSubviews: [propertyNameLabel, chevron])
+        propertyRow.axis = .horizontal
+        propertyRow.alignment = .center
+        propertyRow.spacing = 4
+
+        let labels = UIStackView(arrangedSubviews: [frontDeskLabel, propertyRow])
+        labels.axis = .vertical
+        labels.alignment = .leading
+        labels.spacing = 0
+
+        let brandRow = UIStackView(arrangedSubviews: [logo, labels])
+        brandRow.translatesAutoresizingMaskIntoConstraints = false
+        brandRow.axis = .horizontal
+        brandRow.alignment = .center
+        brandRow.spacing = 8
+        brandRow.isUserInteractionEnabled = false
+
+        propertyHeaderControl.addSubview(brandRow)
+        propertyHeaderControl.addTarget(
+            self,
+            action: #selector(openPropertyPicker),
+            for: .touchUpInside
+        )
+        propertyHeaderControl.accessibilityLabel = "Switch property"
+        propertyHeaderControl.accessibilityTraits = .button
+
+        NSLayoutConstraint.activate([
+            logo.widthAnchor.constraint(equalToConstant: 23),
+            logo.heightAnchor.constraint(equalToConstant: 25),
+            chevron.widthAnchor.constraint(equalToConstant: 9),
+            chevron.heightAnchor.constraint(equalToConstant: 9),
+            brandRow.leadingAnchor.constraint(equalTo: propertyHeaderControl.leadingAnchor),
+            brandRow.trailingAnchor.constraint(equalTo: propertyHeaderControl.trailingAnchor),
+            brandRow.topAnchor.constraint(equalTo: propertyHeaderControl.topAnchor),
+            brandRow.bottomAnchor.constraint(equalTo: propertyHeaderControl.bottomAnchor),
+            propertyHeaderControl.widthAnchor.constraint(lessThanOrEqualToConstant: 210),
+            propertyHeaderControl.heightAnchor.constraint(equalToConstant: 42)
+        ])
+
+        navigationItemState.leftBarButtonItem = UIBarButtonItem(customView: propertyHeaderControl)
 
         let qrButton = UIBarButtonItem(
             image: UIImage(systemName: "qrcode.viewfinder"),
@@ -126,31 +262,16 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     private func configureTabBar() {
-        let yourPage = UITabBarItem(
-            title: "Your Page",
-            image: UIImage(systemName: "globe"),
-            tag: 0
-        )
         let bookings = UITabBarItem(
             title: "Bookings",
             image: UIImage(systemName: "tray"),
             tag: 1
         )
-        let availability = UITabBarItem(
-            title: "Availability",
-            image: UIImage(systemName: "door.left.hand.open"),
-            tag: 2
-        )
-        let guestApp = UITabBarItem(
-            title: "Guest App",
-            image: UIImage(systemName: "iphone"),
-            tag: 3
-        )
 
         bookingTabItem = bookings
         tabBar.delegate = self
-        tabBar.items = [yourPage, bookings, availability, guestApp]
-        tabBar.selectedItem = yourPage
+        updateVisibleTabs()
+        tabBar.selectedItem = yourPageTabItem
         tabBar.isTranslucent = true
         tabBar.accessibilityIdentifier = "marketel.native.tabs"
         view.addSubview(tabBar)
@@ -161,7 +282,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         switch item.tag {
         case 1: filter = "bookings"
         case 2: filter = "availability"
-        case 3: filter = "apps"
+        case 3: filter = "revenue"
+        case 4: filter = "apps"
         default: filter = "settings"
         }
         callWeb(function: "marketelNativeSelectTab", argument: filter)
@@ -190,9 +312,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     private func updatePropertyName(_ name: String) {
-        var configuration = propertyButton.configuration ?? UIButton.Configuration.plain()
-        configuration.title = name.isEmpty ? "Front Desk" : name
-        propertyButton.configuration = configuration
+        let propertyName = name.isEmpty ? "Your property" : name
+        propertyNameLabel.text = propertyName
+        propertyHeaderControl.accessibilityLabel = "Switch property, \(propertyName)"
     }
 
     private func updateSelectedTab(_ identifier: String) {
@@ -200,10 +322,34 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         switch identifier {
         case "bookings": tag = 1
         case "availability": tag = 2
-        case "apps": tag = 3
+        case "revenue": tag = 3
+        case "apps": tag = 4
         default: tag = 0
         }
         tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == tag })
+    }
+
+    private func updateVisibleTabs() {
+        guard let bookings = bookingTabItem else {
+            return
+        }
+        var items = [yourPageTabItem, bookings, availabilityTabItem]
+        if revenueEnabled {
+            items.append(revenueTabItem)
+        }
+        items.append(guestAppTabItem)
+        tabBar.items = items
+    }
+
+    private func updateRevenueVisibility(_ enabled: Bool) {
+        guard revenueEnabled != enabled else {
+            return
+        }
+        let selectedTag = tabBar.selectedItem?.tag ?? 0
+        revenueEnabled = enabled
+        updateVisibleTabs()
+        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == selectedTag })
+            ?? yourPageTabItem
     }
 
     private func updateBookingBadge(_ count: Int) {
@@ -217,20 +363,24 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private func setShellVisible(_ visible: Bool, animated: Bool) {
         shellVisible = visible
         let changes = {
+            self.statusBarBackdrop.alpha = visible ? 1 : 0
             self.topBar.alpha = visible ? 1 : 0
             self.tabBar.alpha = visible ? 1 : 0
         }
+        statusBarBackdrop.isHidden = false
         topBar.isHidden = false
         tabBar.isHidden = false
         topBar.isUserInteractionEnabled = visible
         tabBar.isUserInteractionEnabled = visible
         if animated {
             UIView.animate(withDuration: 0.2, animations: changes) { _ in
+                self.statusBarBackdrop.isHidden = !visible
                 self.topBar.isHidden = !visible
                 self.tabBar.isHidden = !visible
             }
         } else {
             changes()
+            statusBarBackdrop.isHidden = !visible
             topBar.isHidden = !visible
             tabBar.isHidden = !visible
         }
@@ -251,6 +401,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             setShellVisible(payload["visible"] as? Bool ?? false, animated: shellVisible)
         case "state":
             updatePropertyName(payload["hotelName"] as? String ?? "Front Desk")
+            updateRevenueVisibility(payload["revenueEnabled"] as? Bool ?? false)
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
             setShellVisible(payload["visible"] as? Bool ?? true, animated: shellVisible)
