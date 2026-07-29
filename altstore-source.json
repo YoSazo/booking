@@ -18,6 +18,16 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "2.1",
+          "buildVersion": "3",
+          "date": "2026-07-29",
+          "localizedDescription": "Restores Revenue for eligible properties and moves the compact logo, Front Desk title, property switcher, QR, and menu into a safe-area-aware native header below the iPhone status area.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.1/Marketel-Front-Desk.ipa",
+          "size": 607159,
+          "sha256": "6da60a6e9f57c43d8316630c34e4794c8689f6ef57a52762a7dc7047fa64c50a",
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "2.0",
           "buildVersion": "2",
           "date": "2026-07-29",
