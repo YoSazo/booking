@@ -12,11 +12,21 @@
       "bundleIdentifier": "com.bookmarketel.frontdesk",
       "developerName": "Marketel",
       "subtitle": "Run your property from your phone.",
-      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.3 keeps four clean native tabs, moves Revenue inside Bookings, and adds Front Desk Assistant access from the app menu. Native APNs booking alerts are not included yet.",
+      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.4 adds a stable capsule-shaped header, an immediate Front Desk Assistant sheet, and a native Apple contact form for the Marketel number. Native APNs booking alerts are not included yet.",
       "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
       "tintColor": "2E7D5B",
       "category": "utilities",
       "versions": [
+        {
+          "version": "2.4",
+          "buildVersion": "6",
+          "date": "2026-07-29",
+          "localizedDescription": "Makes the native header match the rounded tab bar, keeps its contents stable after closing the three-dot menu, removes native chrome while Front Desk Assistant is open, adds retryable loading, and opens a prefilled Apple contact form with the Marketel logo and Front Desk number.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.4/Marketel-Front-Desk.ipa",
+          "size": 610212,
+          "sha256": "2ecefa22e46653725b4ad154e16dd2041a0255392e77477a5b65f4b564c9970c",
+          "minOSVersion": "15.0"
+        },
         {
           "version": "2.3",
           "buildVersion": "5",
@@ -72,6 +82,7 @@
         "entitlements": [],
         "privacy": {
           "NSCameraUsageDescription": "Front Desk uses the camera when you choose to add a property or room photo.",
+          "NSContactsUsageDescription": "Front Desk lets you save the Marketel messaging number as a contact.",
           "NSPhotoLibraryUsageDescription": "Front Desk uses your photo library when you choose a property or room photo."
         }
       }
