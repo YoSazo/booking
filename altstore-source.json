@@ -23,7 +23,8 @@
           "date": "2026-07-28",
           "localizedDescription": "First private iPhone dogfood build.",
           "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.1.0/Marketel-Front-Desk.ipa",
-          "size": 5000000,
+          "size": 587298,
+          "sha256": "60cfcce884fc367f3d6dd71d57ff37c25a6a377899c0a67bf803ea3ffa1cc24c",
           "minOSVersion": "15.0"
         }
       ],
