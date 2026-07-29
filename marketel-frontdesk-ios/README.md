@@ -7,6 +7,11 @@ The test build loads:
 
 `https://guest-lodge-backend.onrender.com/frontdesk?native=ios`
 
+Version 2 adds native iOS navigation around the hosted Front Desk, including
+the system tab bar, property switching, and a compact native Guest App tools
+screen. On iOS 26 the standard UIKit navigation receives the system Liquid
+Glass appearance automatically.
+
 It does not replace the existing PWA and does not yet register for native APNs
 notifications. The existing browser Web Push flow should still be tested
 through the Home Screen PWA.

@@ -2155,3 +2155,168 @@
       .settings-dashboard-grid > .dash-b,
       .settings-dashboard-grid > .dash-c { display: contents; }
     }
+
+    /* ── NATIVE IOS SHELL ──────────────────────────────────────
+       UIKit owns the top navigation and bottom tabs. The web document keeps
+       one scrolling surface underneath those native controls. */
+    html.native-ios,
+    body.native-ios {
+      min-height: 100%;
+      background: var(--bg);
+      overscroll-behavior-y: none;
+    }
+    body.native-ios {
+      background-attachment: scroll;
+      -webkit-text-size-adjust: 100%;
+    }
+    body.native-ios #app > .header,
+    body.native-ios #app > .mobile-bottom-nav,
+    body.native-ios #app .tabs-container {
+      display: none !important;
+    }
+    body.native-ios.native-shell-visible #app .container {
+      display: block !important;
+      width: 100%;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: calc(env(safe-area-inset-top, 0px) + 58px) 12px
+        calc(env(safe-area-inset-bottom, 0px) + 92px) !important;
+    }
+    body.native-ios.native-shell-visible #app.has-go-live-banner .container {
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 92px) !important;
+    }
+    body.native-ios #bookingsList.bookings-virtual {
+      overflow: visible !important;
+      max-height: none !important;
+      -webkit-overflow-scrolling: auto;
+    }
+    body.native-ios .toast-container {
+      right: 12px;
+      left: 12px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+    }
+    body.native-ios .toast {
+      width: 100%;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .native-property-screen {
+      padding: max(18px, env(safe-area-inset-top, 0px)) 16px
+        max(18px, env(safe-area-inset-bottom, 0px));
+    }
+    .native-property-card {
+      width: min(390px, 100%);
+      max-height: calc(100dvh - 36px);
+      overflow-y: auto;
+      text-align: left;
+    }
+    .native-property-card .login-logo,
+    .native-property-card .status-title,
+    .native-property-card .native-property-copy {
+      text-align: center;
+    }
+    .native-property-copy {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin: -3px 0 20px;
+    }
+    .native-property-label {
+      display: block;
+      margin: 0 0 6px;
+      color: var(--text-soft);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .native-property-input,
+    .native-property-code {
+      letter-spacing: 0;
+      text-align: left;
+      font-size: 16px !important;
+    }
+    .native-property-code {
+      text-align: center;
+      letter-spacing: 0.22em;
+      font-size: 20px !important;
+      font-variant-numeric: tabular-nums;
+    }
+    .native-property-message {
+      min-height: 20px;
+      margin-top: 10px;
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .native-property-message.is-error { color: var(--red); }
+    .native-property-message.is-success { color: var(--green); }
+    .native-property-link {
+      display: block;
+      margin: 14px auto 0;
+      padding: 6px;
+      border: 0;
+      background: transparent;
+      color: var(--green);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .native-property-choices {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .native-property-choice {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 58px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 13px;
+      background: var(--white);
+      color: var(--text);
+      text-align: left;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .native-property-choice.is-active {
+      border-color: var(--green);
+      background: var(--green-pale);
+    }
+    .native-property-choice-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: var(--green);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 800;
+    }
+    .native-property-choice-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .native-property-choice-name {
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+    .native-property-choice-check {
+      flex-shrink: 0;
+      color: var(--green);
+      font-size: 18px;
+      font-weight: 800;
+    }

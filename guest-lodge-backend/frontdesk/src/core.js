@@ -84,6 +84,12 @@ function isNativeFrontdeskApp() {
     return false;
   }
 }
+if (isNativeFrontdeskApp()) {
+  document.documentElement.classList.add('native-ios');
+  const markNativeBody = () => document.body && document.body.classList.add('native-ios');
+  if (document.body) markNativeBody();
+  else document.addEventListener('DOMContentLoaded', markNativeBody, { once: true });
+}
 // iOS 26+ Safari hides Share behind the "⋯" menu (Compact layout is the
 // default) and tucks Add to Home Screen behind "View More". Apple froze the OS
 // version in the UA, but Safari still reports its real major version via the
@@ -256,6 +262,9 @@ try {
         if (data.success && data.pin) {
           crm.token = data.pin;
           localStorage.setItem('crmToken', crm.token);
+          if (isNativeFrontdeskApp() && data.hotelId) {
+            localStorage.setItem(NATIVE_SELECTED_HOTEL_KEY, String(data.hotelId));
+          }
           const _cleanUrl = new URL(window.location);
           _cleanUrl.searchParams.delete('magic');
           window.history.replaceState({}, '', _cleanUrl);
@@ -286,6 +295,337 @@ function getDetectedHostname() {
   return (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';
 }
 
+const NATIVE_PROPERTIES_KEY = 'marketelNativeProperties';
+const NATIVE_SELECTED_HOTEL_KEY = 'marketelNativeSelectedHotelId';
+
+function normalizeNativeProperty(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || raw.hotelId || '').trim();
+  if (!id) return null;
+  return {
+    id,
+    name: String(raw.name || raw.hotelName || id).trim(),
+    domain: String(raw.domain || '').trim(),
+    appIconUrl: String(raw.appIconUrl || '').trim(),
+  };
+}
+
+function getNativeProperties() {
+  if (!isNativeFrontdeskApp()) return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NATIVE_PROPERTIES_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeNativeProperty).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveNativeProperties(properties) {
+  if (!isNativeFrontdeskApp()) return;
+  const clean = (Array.isArray(properties) ? properties : [])
+    .map(normalizeNativeProperty)
+    .filter(Boolean);
+  const byId = new Map();
+  clean.forEach(property => byId.set(property.id, property));
+  try { localStorage.setItem(NATIVE_PROPERTIES_KEY, JSON.stringify([...byId.values()])); } catch (_) {}
+}
+
+function getNativeSelectedHotelId() {
+  if (!isNativeFrontdeskApp()) return '';
+  try { return String(localStorage.getItem(NATIVE_SELECTED_HOTEL_KEY) || '').trim(); } catch (_) { return ''; }
+}
+
+function getRequestedHotelId() {
+  return getContextParam('hotelId') || getNativeSelectedHotelId();
+}
+
+function nativeShellPost(message) {
+  if (!isNativeFrontdeskApp()) return false;
+  try {
+    const handler = window.webkit?.messageHandlers?.marketelShell;
+    if (!handler || typeof handler.postMessage !== 'function') return false;
+    handler.postMessage(message || {});
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function setNativeShellVisible(visible) {
+  if (!isNativeFrontdeskApp()) return;
+  document.body?.classList.toggle('native-shell-visible', !!visible);
+  nativeShellPost({ type: 'visibility', visible: !!visible });
+}
+
+function syncNativeShellState() {
+  if (!isNativeFrontdeskApp()) return;
+  const needsCalls = (crm.bookings || []).filter(b => b.callStatus === 'not-called').length;
+  const unreadMessages = crm.guestMessages.length
+    ? crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
+    : Number(crm.messageUnreadCount || 0);
+  nativeShellPost({
+    type: 'state',
+    visible: document.getElementById('app')?.style.display !== 'none',
+    hotelId: crm.activeHotelId || '',
+    hotelName: crm.activeHotelName || 'Front Desk',
+    selectedTab: crm.currentFilter === 'apps' ? 'apps'
+      : crm.currentFilter === 'availability' ? 'availability'
+      : crm.currentFilter === 'bookings' ? 'bookings'
+      : 'settings',
+    bookingBadge: Math.max(0, needsCalls + unreadMessages),
+  });
+}
+
+function setNativePropertyMessage(id, message, kind = '') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.toggle('is-error', kind === 'error');
+  el.classList.toggle('is-success', kind === 'success');
+}
+
+function renderNativePropertyChoices() {
+  const choices = document.getElementById('nativePropertyChoices');
+  if (!choices) return;
+  const selected = getNativeSelectedHotelId() || crm.activeHotelId;
+  const properties = getNativeProperties();
+  choices.innerHTML = properties.map(property => {
+    const initial = esc((property.name || property.id).charAt(0).toUpperCase());
+    const icon = property.appIconUrl
+      ? `<img src="${esc(property.appIconUrl)}" alt="">`
+      : initial;
+    return `<button type="button" class="native-property-choice${property.id === selected ? ' is-active' : ''}" data-native-hotel-id="${esc(property.id)}">
+      <span class="native-property-choice-icon">${icon}</span>
+      <span class="native-property-choice-name">${esc(property.name || property.id)}</span>
+      ${property.id === selected ? '<span class="native-property-choice-check">✓</span>' : '<span aria-hidden="true">›</span>'}
+    </button>`;
+  }).join('');
+  choices.querySelectorAll('[data-native-hotel-id]').forEach(button => {
+    button.addEventListener('click', () => selectNativeProperty(button.getAttribute('data-native-hotel-id')));
+  });
+}
+
+function showNativePropertyScreen({ choose = false, allowCancel = false } = {}) {
+  if (!isNativeFrontdeskApp()) return;
+  setNativeShellVisible(false);
+  const screen = document.getElementById('nativePropertyScreen');
+  const signIn = document.getElementById('nativePropertySignIn');
+  const pinLogin = document.getElementById('nativePinLogin');
+  const list = document.getElementById('nativePropertyList');
+  const cancel = document.getElementById('nativePropertyCancelBtn');
+  if (!screen || !signIn || !pinLogin || !list) return;
+  document.getElementById('bootScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  screen.style.display = 'flex';
+
+  const canChoose = choose && getNativeProperties().length > 0;
+  signIn.style.display = canChoose ? 'none' : 'block';
+  pinLogin.style.display = 'none';
+  list.style.display = canChoose ? 'block' : 'none';
+  if (cancel) cancel.style.display = allowCancel ? 'block' : 'none';
+  if (canChoose) renderNativePropertyChoices();
+}
+
+function hideNativePropertyScreen() {
+  const screen = document.getElementById('nativePropertyScreen');
+  if (screen) screen.style.display = 'none';
+}
+
+function selectNativeProperty(hotelId) {
+  const cleanHotelId = String(hotelId || '').trim();
+  if (!cleanHotelId) return;
+  try { localStorage.setItem(NATIVE_SELECTED_HOTEL_KEY, cleanHotelId); } catch (_) {}
+  const url = new URL(window.location.href);
+  url.searchParams.set('hotelId', cleanHotelId);
+  url.searchParams.set('native', 'ios');
+  url.searchParams.delete('welcome');
+  window.location.assign(url.toString());
+}
+
+function showNativePropertyPicker() {
+  if (!isNativeFrontdeskApp()) return;
+  if (!getNativeProperties().length) {
+    showNativePropertyScreen({ choose: false, allowCancel: true });
+    return;
+  }
+  showNativePropertyScreen({ choose: true, allowCancel: true });
+}
+
+function cancelNativePropertyPicker() {
+  if (!crm.activeHotelId) return;
+  hideNativePropertyScreen();
+  document.getElementById('app').style.display = 'block';
+  setNativeShellVisible(true);
+  syncNativeShellState();
+}
+
+function resetNativeSignIn() {
+  const screen = document.getElementById('nativePropertyScreen');
+  if (!screen || screen.style.display === 'none') showNativePropertyScreen();
+  document.getElementById('nativePropertySignIn').style.display = 'block';
+  document.getElementById('nativePinLogin').style.display = 'none';
+  document.getElementById('nativePropertyList').style.display = 'none';
+  document.getElementById('nativeCodeStep').style.display = 'none';
+  setNativePropertyMessage('nativePropertyMessage', '');
+  setNativePropertyMessage('nativePinMessage', '');
+}
+
+async function requestNativeLoginCode() {
+  const emailInput = document.getElementById('nativePropertyEmail');
+  const button = document.getElementById('nativeCodeRequestBtn');
+  const email = String(emailInput?.value || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    setNativePropertyMessage('nativePropertyMessage', 'Enter the email used for your property.', 'error');
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = 'Sending…'; }
+  setNativePropertyMessage('nativePropertyMessage', '');
+  try {
+    const res = await fetch('/api/auth/native-code/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.message || 'Could not send the code.');
+    document.getElementById('nativeCodeStep').style.display = 'block';
+    setNativePropertyMessage('nativePropertyMessage', 'Check your email for the six-digit code.', 'success');
+    document.getElementById('nativePropertyCode')?.focus();
+  } catch (error) {
+    setNativePropertyMessage('nativePropertyMessage', error.message || 'Could not send the code.', 'error');
+  } finally {
+    if (button) { button.disabled = false; button.textContent = 'Email me a code'; }
+  }
+}
+
+async function verifyNativeLoginCode() {
+  const email = String(document.getElementById('nativePropertyEmail')?.value || '').trim().toLowerCase();
+  const code = String(document.getElementById('nativePropertyCode')?.value || '').replace(/\D/g, '').slice(0, 6);
+  const button = document.getElementById('nativeCodeVerifyBtn');
+  if (code.length !== 6) {
+    setNativePropertyMessage('nativePropertyMessage', 'Enter the six-digit code.', 'error');
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = 'Checking…'; }
+  try {
+    const res = await fetch('/api/auth/native-code/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || !data.sessionToken) {
+      throw new Error(data.message || 'That code is invalid or expired.');
+    }
+    crm.token = String(data.sessionToken);
+    localStorage.setItem('crmToken', crm.token);
+    saveNativeProperties(data.properties || []);
+    const properties = getNativeProperties();
+    if (!properties.length) throw new Error('No active properties were found for this account.');
+    if (properties.length === 1) selectNativeProperty(properties[0].id);
+    else {
+      document.getElementById('nativePropertySignIn').style.display = 'none';
+      document.getElementById('nativePropertyList').style.display = 'block';
+      renderNativePropertyChoices();
+    }
+  } catch (error) {
+    setNativePropertyMessage('nativePropertyMessage', error.message || 'That code is invalid or expired.', 'error');
+  } finally {
+    if (button) { button.disabled = false; button.textContent = 'Continue'; }
+  }
+}
+
+async function nativePinLogin() {
+  const hotelId = String(document.getElementById('nativePropertyId')?.value || '').trim();
+  const pin = String(document.getElementById('nativePropertyPin')?.value || '').trim();
+  const button = document.getElementById('nativePinLoginBtn');
+  if (!hotelId || !pin) {
+    setNativePropertyMessage('nativePinMessage', 'Enter both the property ID and PIN.', 'error');
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = 'Opening…'; }
+  try {
+    const contextRes = await fetch('/api/hotel-context?hotelId=' + encodeURIComponent(hotelId), {
+      headers: { Accept: 'application/json' },
+    });
+    const contextJson = await contextRes.json().catch(() => ({}));
+    if (!contextRes.ok || !contextJson.success) throw new Error(contextJson.message || 'Property not found.');
+    const verifyRes = await fetch('/api/crm/verify?hotelId=' + encodeURIComponent(hotelId), {
+      headers: { 'x-crm-token': pin, Accept: 'application/json' },
+    });
+    const verification = await verifyRes.json().catch(() => ({}));
+    if (!verifyRes.ok || !verification.success) throw new Error(verification.message || 'Wrong property ID or PIN.');
+    crm.token = pin;
+    localStorage.setItem('crmToken', crm.token);
+    const config = contextJson.data?.config || {};
+    const currentProperty = {
+      id: hotelId,
+      name: config.name || verification.hotelName || hotelId,
+      domain: verification.domain || contextJson.data?.domain || '',
+      appIconUrl: config.appIconUrl || verification.appIconUrl || '',
+    };
+    let availableProperties = [...getNativeProperties(), currentProperty];
+    try {
+      const propertiesRes = await fetch('/api/crm/properties?hotelId=' + encodeURIComponent(hotelId), {
+        headers: { 'x-crm-token': pin, Accept: 'application/json' },
+      });
+      const propertiesJson = await propertiesRes.json().catch(() => ({}));
+      if (propertiesRes.ok && propertiesJson.success && Array.isArray(propertiesJson.properties)) {
+        availableProperties = propertiesJson.properties;
+      }
+    } catch (_) {}
+    saveNativeProperties(availableProperties);
+    selectNativeProperty(hotelId);
+  } catch (error) {
+    setNativePropertyMessage('nativePinMessage', error.message || 'Could not open this property.', 'error');
+  } finally {
+    if (button) { button.disabled = false; button.textContent = 'Open Front Desk'; }
+  }
+}
+
+function nativeSignOut() {
+  crm.token = '';
+  try {
+    localStorage.removeItem('crmToken');
+    localStorage.removeItem(NATIVE_PROPERTIES_KEY);
+    localStorage.removeItem(NATIVE_SELECTED_HOTEL_KEY);
+  } catch (_) {}
+  const url = new URL(window.location.href);
+  url.searchParams.delete('hotelId');
+  url.searchParams.set('native', 'ios');
+  window.history.replaceState({}, '', url);
+  resetNativeSignIn();
+}
+
+function marketelNativeSelectTab(filter) {
+  const allowed = ['settings', 'bookings', 'availability', 'apps'];
+  if (!allowed.includes(filter)) return;
+  setFilter(filter, document.querySelector(`.tab[data-nav-filter="${filter}"]`));
+}
+
+function marketelNativeAction(action) {
+  if (action === 'qr') showCheckinQrOverlay();
+  else if (action === 'refresh') refreshCurrentView();
+  else if (action === 'tour') replayWalkthrough();
+  else if (action === 'properties') showNativePropertyPicker();
+  else if (action === 'signout') nativeSignOut();
+}
+
+async function refreshNativeProperties() {
+  if (!isNativeFrontdeskApp() || !crm.token || !crm.activeHotelId) return;
+  try {
+    const data = await api('GET', '/api/crm/properties');
+    if (data?.success && Array.isArray(data.properties) && data.properties.length) {
+      saveNativeProperties(data.properties);
+    }
+  } catch (_) {
+    // Property switching is convenience UI. A temporary failure must never
+    // block the active Front Desk session.
+  }
+}
+
 function setNotificationButtonState(enabled) {
   const btn = document.getElementById('btnNotify');
   if (!btn) return;
@@ -311,8 +651,11 @@ async function syncNotificationButtonState() {
 }
 
 function resolveLegacyCrmHotelId() {
-  const overrideHotelId = getContextParam('hotelId');
+  const overrideHotelId = getRequestedHotelId();
   if (overrideHotelId) return overrideHotelId;
+  // A native app has no property-specific hostname. Never silently open a
+  // client property just because the app is hosted on Render.
+  if (isNativeFrontdeskApp()) return '';
 
   const host = getDetectedHostname();
   if (host && crm.CRM_HOTEL_BY_HOST[host]) return crm.CRM_HOTEL_BY_HOST[host];
@@ -346,7 +689,7 @@ function applyLegacyHotelContext(hotelId, reason = '') {
 
 function buildHotelContextUrl() {
   const url = new URL('/api/hotel-context', window.location.origin);
-  const overrideHotelId = getContextParam('hotelId');
+  const overrideHotelId = getRequestedHotelId();
   const overrideDomain = getContextParam('domain');
   if (overrideHotelId) url.searchParams.set('hotelId', overrideHotelId);
   // Always pass the current hostname so the backend can resolve the hotel
@@ -382,9 +725,12 @@ function updateHotelChrome() {
   }
   document.title = crm.activeHotelName ? `${crm.activeHotelName} · Front Desk` : 'Front Desk · Marketel';
   updateFrontdeskManifestLink();
+  syncNativeShellState();
 }
 
 function showBootState({ title, message, debug = '', showRetry = false } = {}) {
+  hideNativePropertyScreen();
+  setNativeShellVisible(false);
   document.getElementById('bootScreen').style.display = 'flex';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'none';
@@ -453,8 +799,25 @@ async function loadHotelContext() {
   crm.activeHotelId = String(data.hotelId || '').trim();
   crm.activeHotelName = String(config.name || data.hotelId || '').trim();
   crm.activeHotelAppIcon = String(config.appIconUrl || '').trim();
-  crm.activeHotelDomain = String(data.domain || getDetectedHostname() || '').trim();
+  const nativeStoredProperty = isNativeFrontdeskApp()
+    ? getNativeProperties().find(property => property.id === crm.activeHotelId)
+    : null;
+  crm.activeHotelDomain = String(
+    nativeStoredProperty?.domain || data.domain || getDetectedHostname() || ''
+  ).trim();
   crm.activeHotelContext = data;
+  if (isNativeFrontdeskApp()) {
+    try { localStorage.setItem(NATIVE_SELECTED_HOTEL_KEY, crm.activeHotelId); } catch (_) {}
+    saveNativeProperties([
+      ...getNativeProperties(),
+      {
+        id: crm.activeHotelId,
+        name: crm.activeHotelName,
+        domain: crm.activeHotelDomain,
+        appIconUrl: crm.activeHotelAppIcon,
+      },
+    ]);
+  }
   updateHotelChrome();
   return data;
 }
@@ -1063,14 +1426,16 @@ function updateGoLiveBanner() {
 
 function updateBookingsTabBadge() {
   const badge = document.getElementById('countNeedsCalled');
-  if (!badge) return;
   const needsCalls = (crm.bookings || []).filter(b => b.callStatus === 'not-called').length;
   const unreadMsgs = crm.guestMessages.length
     ? crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
     : crm.messageUnreadCount;
   const actionable = needsCalls + unreadMsgs;
-  badge.textContent = actionable;
-  badge.style.display = actionable > 0 ? '' : 'none';
+  if (badge) {
+    badge.textContent = actionable;
+    badge.style.display = actionable > 0 ? '' : 'none';
+  }
+  syncNativeShellState();
 }
 
 // D17: call-status filter chips at the top of the Bookings list, so the
@@ -1448,7 +1813,9 @@ async function startCrmApp(verification) {
 
   document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
+  hideNativePropertyScreen();
   document.getElementById('app').style.display = 'block';
+  setNativeShellVisible(true);
 
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
@@ -1465,6 +1832,8 @@ async function startCrmApp(verification) {
   initMobileBottomNav();
   updateMobileRevenueNavVisibility();
   syncMobileNavActive(crm.currentFilter);
+  syncNativeShellState();
+  void refreshNativeProperties();
   ensureLucideLoaded().then(() => {
     refreshMobileBottomNavIcons();
     requestAnimationFrame(refreshMobileBottomNavIcons);
@@ -1646,6 +2015,8 @@ function showLogin() {
     lastAuthError: crm.lastAuthError || '',
   }, 'warn');
   document.getElementById('bootScreen').style.display = 'none';
+  hideNativePropertyScreen();
+  setNativeShellVisible(false);
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
   crm.token = '';
@@ -1673,6 +2044,12 @@ async function bootCrmApp() {
     debug: formatContextDebugLines([`Detected host: ${getDetectedHostname() || 'unknown'}`]),
     showRetry: false,
   });
+
+  if (isNativeFrontdeskApp() && !getRequestedHotelId()) {
+    showNativePropertyScreen({ choose: getNativeProperties().length > 0, allowCancel: false });
+    crm.bootInFlight = false;
+    return;
+  }
 
   // Runs before the auth gate on purpose: the approval token proves itself, so a
   // notification tap can be answered without stopping to enter a PIN.
@@ -2286,7 +2663,9 @@ function renderBookings(fullList) {
     return;
   }
 
-  if (list.length > BOOKING_VIRTUAL_THRESHOLD) {
+  // WKWebView must keep one scrolling surface. A nested virtual list creates
+  // the "page inside a page" effect when its scroll reaches either edge.
+  if (list.length > BOOKING_VIRTUAL_THRESHOLD && !isNativeFrontdeskApp()) {
     crm.bookingsVirtualList = list;
     ensureBookingsVirtualScroll();
     renderBookingsWindow();
@@ -2357,6 +2736,7 @@ function initMobileBottomNav() {
 function setFilter(filter, btn) {
   if (filter === 'revenue' && !crm.revenueEnabled) return;
   crm.currentFilter = filter;
+  syncNativeShellState();
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   let tabBtn = null;
   if (btn && btn.classList && btn.classList.contains('tab')) {
@@ -2584,13 +2964,14 @@ function applyGuestBroadcastAudienceUi() {
   }
 }
 
-function guestBroadcastCardHtml() {
+function guestBroadcastCardHtml(options = {}) {
+  const compact = !!options.compact;
   const hName = (crm.activeHotelName || 'Your Property').replace(/"/g, '&quot;');
   return `<div id="guestBroadcastCard" style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:16px 18px;">
-    <div style="font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:4px;">📣 Notify all guests at once</div>
-    <p style="font-size:12px;color:#6b7280;margin:0 0 10px;line-height:1.45;">Push a sale, event, or check-in reminder to everyone who installed your guest app.</p>
+    <div style="font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:${compact ? '12px' : '4px'};">📣 ${compact ? 'Message guests' : 'Notify all guests at once'}</div>
+    ${compact ? '' : '<p style="font-size:12px;color:#6b7280;margin:0 0 10px;line-height:1.45;">Push a sale, event, or check-in reminder to everyone who installed your guest app.</p>'}
     <div id="guest-broadcast-audience" style="font-size:12px;line-height:1.45;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);">Checking who can receive notifications…</div>
-    <button type="button" onclick="prefillGuestInstallBroadcast()" style="background:none;border:none;padding:0;color:var(--green);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;margin:-4px 0 12px;">Suggest install reminder message</button>
+    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" style="background:none;border:none;padding:0;color:var(--green);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;margin:-4px 0 12px;">Suggest install reminder message</button>'}
     <div style="margin-bottom:8px;">
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Title</div>
       <input type="text" id="guest-broadcast-title" value="${hName}" maxlength="120" placeholder="e.g. Jack's Inn" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
@@ -2601,14 +2982,14 @@ function guestBroadcastCardHtml() {
     </div>
     <button id="guest-broadcast-btn" type="button" onclick="sendGuestBroadcast()" disabled style="width:100%;padding:12px;border-radius:10px;border:none;background:#c5d5cc;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;">Send notification</button>
     <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+    ${compact ? '' : `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
       <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;text-align:center;">What guests see</div>
       <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
         src="${GUEST_BROADCAST_DEMO_VIDEO}"
         style="width:100%;max-width:260px;display:block;margin:0 auto;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.14);background:#000;">
       </video>
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:8px 0 0;line-height:1.45;">Their phone buzzes with your message — like a text from you.</p>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -3515,6 +3896,7 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   const hName = crm.activeHotelName || 'Your Property';
   const domain = crm.activeHotelDomain || '';
   if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
+  setNativeShellVisible(false);
   if (!skipLogoGate && !preselectedCode && !crm.activeHotelAppIcon) {
     promptUploadLogoBeforeQr(preselectedCode);
     return;
@@ -3605,6 +3987,8 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   function closeCheckinQrOverlay() {
     overlay.remove();
     document.body.style.overflow = '';
+    setNativeShellVisible(true);
+    syncNativeShellState();
   }
 
   document.body.appendChild(overlay);
@@ -3616,6 +4000,8 @@ function closeCheckinQrOverlay() {
   const el = document.getElementById('checkinQrOverlay');
   if (el) el.remove();
   document.body.style.overflow = '';
+  setNativeShellVisible(true);
+  syncNativeShellState();
 }
 
 function prefillGuestInstallBroadcast() {
@@ -4434,6 +4820,8 @@ exposeToWindow({
   markAllMessagesRead,
   markConfirmed,
   markMessageRead,
+  marketelNativeAction,
+  marketelNativeSelectTab,
   maybePromptInstalledNotifications,
   moveSlider,
   needsEditPageLoad,
@@ -4479,6 +4867,7 @@ exposeToWindow({
   seedTourRevenueShell,
   sendGuestBroadcast,
   sendMagicLink,
+  selectNativeProperty,
   setActiveManualRoom,
   setAvailabilityDaySaving,
   setBookingCallFilter,
@@ -4487,6 +4876,7 @@ exposeToWindow({
   setGrowthChecklistItem,
   setGrowthPeriod,
   setMessageThread,
+  setNativeShellVisible,
   setNotificationButtonState,
   showBootState,
   showCheckinQrOverlay,
@@ -4494,11 +4884,13 @@ exposeToWindow({
   showIosInstallSheet,
   showLogin,
   showMagicLinkForm,
+  showNativePropertyPicker,
   showNotifPromptModal,
   startCrmApp,
   stepAvailabilityDay,
   syncMobileNavActive,
   syncNotificationButtonState,
+  syncNativeShellState,
   syncRevenueUi,
   threadSummary,
   timeAgo,
@@ -4531,6 +4923,40 @@ const pinInputEl = document.getElementById('pinInput');
 if (pinInputEl) pinInputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') void doLogin(); });
 const magicLinkSendBtn = document.getElementById('magicLinkSendBtn');
 if (magicLinkSendBtn) magicLinkSendBtn.addEventListener('click', () => { void sendMagicLink(); });
+const nativeCodeRequestBtn = document.getElementById('nativeCodeRequestBtn');
+if (nativeCodeRequestBtn) nativeCodeRequestBtn.addEventListener('click', () => { void requestNativeLoginCode(); });
+const nativeCodeVerifyBtn = document.getElementById('nativeCodeVerifyBtn');
+if (nativeCodeVerifyBtn) nativeCodeVerifyBtn.addEventListener('click', () => { void verifyNativeLoginCode(); });
+const nativeCodeInput = document.getElementById('nativePropertyCode');
+if (nativeCodeInput) {
+  nativeCodeInput.addEventListener('input', () => {
+    nativeCodeInput.value = nativeCodeInput.value.replace(/\D/g, '').slice(0, 6);
+  });
+  nativeCodeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') void verifyNativeLoginCode(); });
+}
+const nativePinLoginBtn = document.getElementById('nativePinLoginBtn');
+if (nativePinLoginBtn) nativePinLoginBtn.addEventListener('click', () => { void nativePinLogin(); });
+const nativePinInput = document.getElementById('nativePropertyPin');
+if (nativePinInput) nativePinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') void nativePinLogin(); });
+const nativePinLoginToggle = document.getElementById('nativePinLoginToggle');
+if (nativePinLoginToggle) nativePinLoginToggle.addEventListener('click', () => {
+  document.getElementById('nativePropertySignIn').style.display = 'none';
+  document.getElementById('nativePinLogin').style.display = 'block';
+});
+const nativeEmailLoginToggle = document.getElementById('nativeEmailLoginToggle');
+if (nativeEmailLoginToggle) nativeEmailLoginToggle.addEventListener('click', resetNativeSignIn);
+const nativeAddAccountBtn = document.getElementById('nativeAddAccountBtn');
+if (nativeAddAccountBtn) nativeAddAccountBtn.addEventListener('click', () => {
+  try {
+    localStorage.removeItem('crmToken');
+    localStorage.removeItem(NATIVE_PROPERTIES_KEY);
+    localStorage.removeItem(NATIVE_SELECTED_HOTEL_KEY);
+  } catch (_) {}
+  crm.token = '';
+  resetNativeSignIn();
+});
+const nativePropertyCancelBtn = document.getElementById('nativePropertyCancelBtn');
+if (nativePropertyCancelBtn) nativePropertyCancelBtn.addEventListener('click', cancelNativePropertyPicker);
 bootCrmApp();
 if ('requestIdleCallback' in window) {
   requestIdleCallback(() => { loadAppsModule().catch(() => {}); }, { timeout: 4000 });

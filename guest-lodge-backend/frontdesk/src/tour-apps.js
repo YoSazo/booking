@@ -506,7 +506,26 @@ function startAppsTour(opts) {
   _appsTourChainFromSettings = !!chainFromSettings;
 
   const hotelIsLive = !!crm.hotelSubscribed;
-  _appsTourSteps = [
+  const nativeMode = !!windowFn('isNativeFrontdeskApp')?.();
+  _appsTourSteps = nativeMode ? [
+    {
+      target: '#tour-guest-icon-section',
+      kicker: 'Guest App',
+      title: 'Choose the icon guests will save.',
+      text: 'Use your logo or a clear property photo.',
+      scrollBlock: 'start',
+      tooltipPosition: 'below',
+    },
+    {
+      target: '#tour-native-guest-share',
+      kicker: 'Ready',
+      title: 'Share it with guests.',
+      text: 'Show the QR, copy the link, or open the guest page.',
+      primaryLabel: 'Done',
+      secondaryLabel: 'Close',
+      tooltipPosition: 'above',
+    },
+  ] : [
     {
       target: '#tour-apps-intro',
       kicker: 'The loop',

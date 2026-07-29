@@ -50,6 +50,9 @@ let _appsLbIdx   = 0;
 
 function appsOpenLightbox(items, startIdx) {
   appsTourClose(false);
+  if (isNativeFrontdeskApp() && typeof window.setNativeShellVisible === 'function') {
+    window.setNativeShellVisible(false);
+  }
   _appsLbItems = items;
   _appsLbIdx   = startIdx || 0;
   let lb = document.getElementById('appsLightbox');
@@ -89,6 +92,10 @@ function appsCloseLightbox() {
   document.removeEventListener('keydown', lb._keyHandler);
   lb.remove();
   document.body.style.overflow = '';
+  if (isNativeFrontdeskApp() && typeof window.setNativeShellVisible === 'function') {
+    window.setNativeShellVisible(true);
+    if (typeof window.syncNativeShellState === 'function') window.syncNativeShellState();
+  }
 }
 
 function appsLbNav(dir) {
@@ -427,6 +434,23 @@ function renderAppsView() {
         ${appsHelpBodyHtml}
       </div>
     </details>`;
+  const nativeGuestShareHtml = `
+    <div class="apps-step-card" id="tour-native-guest-share">
+      <div class="apps-step-title" style="margin-bottom:14px;">Share guest app</div>
+      <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show guest QR</button>
+      ${guestInstallUrl !== '#' ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;">
+          <button type="button" onclick="navigator.clipboard.writeText('${guestInstallUrl}').then(()=>toast('Guest app link copied','success'))" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Copy link</button>
+          <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Open guest page</button>
+        </div>
+        <div id="guestInstallStats" style="display:none;margin-top:14px;"></div>`
+        : '<div id="guestInstallStats" style="display:none;"></div><div style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px;">Booking domain is still setting up.</div>'}
+    </div>`;
+  const nativeGuestToolsHtml = `
+    <div class="apps-native-title">Guest App</div>
+    ${guestIconCardHtml()}
+    ${nativeGuestShareHtml}
+    ${guestBroadcastCardHtml({ compact: true })}`;
   const unlockedToolsHtml = `
     ${deviceCardHtml(true)}
     ${guestIconCardHtml()}
@@ -434,18 +458,22 @@ function renderAppsView() {
     ${guestBroadcastCardHtml()}
     ${helpFoldHtml}`;
 
-  const appsMainHtml = `
-    ${appsStoryHtml}
-    ${loopDiagramHtml}
-    ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
+  const appsMainHtml = fdNativeTest
+    ? nativeGuestToolsHtml
+    : `${appsStoryHtml}
+      ${loopDiagramHtml}
+      ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
 
-  const appsFootnoteHtml = fdInApp
+  const appsFootnoteHtml = fdNativeTest
+    ? ''
+    : fdInApp
     ? 'Front Desk is installed. Guests can install your property from the direct booking page.'
     : 'Install Front Desk first. Then guests can install your property from the direct booking page.';
 
   el.innerHTML = `
   <style>
     .apps-page { padding:4px 0 28px; }
+    .apps-native-title { font-size:24px;font-weight:800;color:var(--text);line-height:1.2;margin:2px 0 16px; }
     .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
     .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
     .apps-story { margin:0 0 22px;padding:4px 2px 2px; }
@@ -534,7 +562,7 @@ function renderAppsView() {
     ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
     ${appsMainHtml}
 
-    <p class="apps-footnote">${appsFootnoteHtml}</p>
+    ${appsFootnoteHtml ? `<p class="apps-footnote">${appsFootnoteHtml}</p>` : ''}
 
   </div>`;
 

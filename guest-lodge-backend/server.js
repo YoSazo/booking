@@ -1924,6 +1924,8 @@ const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 25 });
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
+const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
+const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
 
 app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
     const { amount, bookingDetails, guestInfo, hotelId, preview } = req.body;
@@ -3846,9 +3848,53 @@ function hashCrmPin(pin) {
 const configuredCrmReturnTokenSecret = process.env.CRM_RETURN_TOKEN_SECRET || process.env.SESSION_SECRET || process.env.MAGIC_LINK_SECRET;
 const CRM_RETURN_TOKEN_SECRET = configuredCrmReturnTokenSecret || crypto.randomBytes(32).toString('hex');
 const CRM_RETURN_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // Aligns with Stripe Checkout's default session lifetime.
+const NATIVE_SESSION_TOKEN_SECRET = process.env.NATIVE_SESSION_TOKEN_SECRET || CRM_RETURN_TOKEN_SECRET;
+const NATIVE_SESSION_TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
 
 if (!configuredCrmReturnTokenSecret) {
     console.warn('CRM_RETURN_TOKEN_SECRET, SESSION_SECRET, or MAGIC_LINK_SECRET is not set; using an ephemeral Front Desk return-token secret for this process.');
+}
+
+function generateNativeSessionToken(email) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const payload = JSON.stringify({
+        purpose: 'frontdesk-native-session',
+        email: normalizedEmail,
+        exp: Date.now() + NATIVE_SESSION_TOKEN_EXPIRY_MS,
+    });
+    const encoded = Buffer.from(payload).toString('base64url');
+    const sig = crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET).update(encoded).digest('base64url');
+    return `fdn_${encoded}.${sig}`;
+}
+
+function verifyNativeSessionToken(token) {
+    const raw = String(token || '').trim();
+    if (!raw.startsWith('fdn_')) return null;
+    const parts = raw.slice(4).split('.');
+    if (parts.length !== 2) return null;
+    const [encoded, sig] = parts;
+    const expected = crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET).update(encoded).digest('base64url');
+    if (!timingSafeTextEqual(sig, expected)) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (payload.purpose !== 'frontdesk-native-session' || !payload.email || payload.exp < Date.now()) return null;
+        return { email: String(payload.email).trim().toLowerCase() };
+    } catch (_) {
+        return null;
+    }
+}
+
+async function getDbAllowedHotelsForOwnerEmail(email) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail || !prisma.hotelConfig) return [];
+    const rows = await withRetry(() => prisma.hotelConfig.findMany({
+        where: {
+            active: true,
+            ownerEmail: { equals: normalizedEmail, mode: 'insensitive' },
+        },
+        select: { id: true },
+    }));
+    return [...new Set(rows.map(row => String(row.id || '').trim()).filter(Boolean))];
 }
 
 function getCrmReturnSigningSecret(hotelSecret = '') {
@@ -4010,8 +4056,18 @@ function requireScopedHotelId(req, res) {
 const crmAuth = async (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
     const returnAuth = await verifyCrmReturnToken(token);
-    const dbAllowedHotels = returnAuth ? [] : await getDbAllowedHotelsForToken(token).catch(() => []);
-    let allowedHotels = returnAuth ? [returnAuth.hotelId] : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
+    const nativeAuth = returnAuth ? null : verifyNativeSessionToken(token);
+    const dbAllowedHotels = returnAuth || nativeAuth
+        ? []
+        : await getDbAllowedHotelsForToken(token).catch(() => []);
+    const nativeAllowedHotels = nativeAuth
+        ? await getDbAllowedHotelsForOwnerEmail(nativeAuth.email).catch(() => [])
+        : [];
+    let allowedHotels = returnAuth
+        ? [returnAuth.hotelId]
+        : nativeAuth
+            ? nativeAllowedHotels
+            : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
     
     // Master PIN backdoor for the admin to easily test across all hotels
     const isMasterPin = !returnAuth && isCrmMasterPin(token);
@@ -4039,6 +4095,8 @@ const crmAuth = async (req, res, next) => {
     req.crmAllowedHotels = allowedHotels;
     req.crmIsMasterPin = isMasterPin;
     req.crmIsReturnToken = !!returnAuth;
+    req.crmIsNativeSession = !!nativeAuth;
+    req.crmNativeEmail = nativeAuth?.email || '';
     req.crmResolvedHotelId = hostContext.hotelId || null;
     req.crmResolvedDomain = hostContext.domain || null;
     req.crmDefaultHotelId = hostContext.hotelId || (allowedHotels[0] === '*' ? 'guest-lodge-minot' : allowedHotels[0]);
@@ -8387,6 +8445,45 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
     }
 });
 
+// List the properties available to the current Front Desk credential. Native
+// clients use this to provide a real property switcher instead of relying on a
+// property-specific hostname.
+app.get('/api/crm/properties', crmAuth, async (req, res) => {
+    try {
+        const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
+        const isMaster = allowed.includes('*');
+        const where = isMaster
+            ? { active: true }
+            : { active: true, id: { in: allowed } };
+        const rows = await prisma.hotelConfig.findMany({
+            where,
+            select: {
+                id: true,
+                name: true,
+                appIconUrl: true,
+                domains: {
+                    where: { isPrimary: true },
+                    select: { domain: true },
+                    take: 1,
+                },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        res.json({
+            success: true,
+            properties: rows.map(row => ({
+                id: row.id,
+                name: row.name || row.id,
+                appIconUrl: row.appIconUrl || '',
+                domain: row.domains?.[0]?.domain || '',
+            })),
+        });
+    } catch (e) {
+        console.error('crm:properties failed:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load properties.' });
+    }
+});
+
 // Update hotel name/subtitle/address/phone/cancellationPolicy
 app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
     try {
@@ -8452,10 +8549,118 @@ app.post('/api/forgot-pin', async (req, res) => {
 const configuredMagicLinkSecret = process.env.MAGIC_LINK_SECRET || process.env.SESSION_SECRET;
 const MAGIC_LINK_SECRET = configuredMagicLinkSecret || crypto.randomBytes(32).toString('hex');
 const MAGIC_LINK_EXPIRY_MS = 60 * 60 * 1000; // 60 minutes
+const NATIVE_LOGIN_CODE_EXPIRY_MS = 10 * 60 * 1000;
+const nativeLoginChallenges = new Map();
 
 if (!configuredMagicLinkSecret) {
     console.warn('MAGIC_LINK_SECRET or SESSION_SECRET is not set; using an ephemeral magic-link secret for this process.');
 }
+
+function hashNativeLoginCode(email, code) {
+    return crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET)
+        .update(`${String(email || '').trim().toLowerCase()}:${String(code || '').trim()}`)
+        .digest('hex');
+}
+
+async function getNativeOwnerProperties(email) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return [];
+    const rows = await prisma.hotelConfig.findMany({
+        where: {
+            active: true,
+            ownerEmail: { equals: normalizedEmail, mode: 'insensitive' },
+        },
+        select: {
+            id: true,
+            name: true,
+            appIconUrl: true,
+            domains: {
+                where: { isPrimary: true },
+                select: { domain: true },
+                take: 1,
+            },
+        },
+        orderBy: { createdAt: 'asc' },
+    });
+    return rows.map(row => ({
+        id: row.id,
+        name: row.name || row.id,
+        appIconUrl: row.appIconUrl || '',
+        domain: row.domains?.[0]?.domain || '',
+    }));
+}
+
+app.post('/api/auth/native-code/request', nativeCodeRequestRateLimit, async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+        }
+        const properties = await getNativeOwnerProperties(email);
+        // Do not reveal whether an email owns a property.
+        if (!properties.length) return res.json({ success: true });
+        if (!emailTransporter) {
+            console.error('native-code request failed: email transporter is unavailable');
+            return res.status(503).json({ success: false, message: 'Email is temporarily unavailable. Try again shortly.' });
+        }
+
+        const code = String(crypto.randomInt(100000, 1000000));
+        nativeLoginChallenges.set(email, {
+            codeHash: hashNativeLoginCode(email, code),
+            expiresAt: Date.now() + NATIVE_LOGIN_CODE_EXPIRY_MS,
+            attempts: 0,
+        });
+        await emailTransporter.sendMail({
+            from: '"Marketel" <support@bookmarketel.com>',
+            to: email,
+            subject: `${code} is your Marketel code`,
+            html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center;">
+                <img src="https://bookmarketel.com/marketellogo.svg" alt="" width="48" height="48" style="margin-bottom:18px;">
+                <h2 style="font-size:20px;font-weight:800;color:#1a2b22;margin:0 0 12px;">Open Marketel Front Desk</h2>
+                <p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0 0 22px;">Enter this code in the Marketel app. It expires in 10 minutes.</p>
+                <div style="font-size:34px;letter-spacing:8px;font-weight:800;color:#2E7D5B;margin-left:8px;">${code}</div>
+                <p style="font-size:12px;color:#9ca3af;margin:24px 0 0;">If you did not request this, you can ignore this email.</p>
+            </div>`,
+            text: `${code} is your Marketel Front Desk verification code. It expires in 10 minutes.`,
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error('native-code request error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not send the code. Try again.' });
+    }
+});
+
+app.post('/api/auth/native-code/verify', nativeCodeVerifyRateLimit, async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
+        const challenge = nativeLoginChallenges.get(email);
+        if (!challenge || challenge.expiresAt < Date.now() || challenge.attempts >= 5) {
+            nativeLoginChallenges.delete(email);
+            return res.status(401).json({ success: false, message: 'That code is invalid or expired. Request a new one.' });
+        }
+        challenge.attempts += 1;
+        const suppliedHash = hashNativeLoginCode(email, code);
+        if (!timingSafeTextEqual(challenge.codeHash, suppliedHash)) {
+            return res.status(401).json({ success: false, message: 'That code is invalid or expired.' });
+        }
+        const properties = await getNativeOwnerProperties(email);
+        if (!properties.length) {
+            nativeLoginChallenges.delete(email);
+            return res.status(401).json({ success: false, message: 'No active properties were found for this account.' });
+        }
+        nativeLoginChallenges.delete(email);
+        res.json({
+            success: true,
+            sessionToken: generateNativeSessionToken(email),
+            expiresInDays: 90,
+            properties,
+        });
+    } catch (e) {
+        console.error('native-code verify error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not verify the code. Try again.' });
+    }
+});
 
 function generateMagicToken(email, hotelId) {
     const payload = JSON.stringify({ email, hotelId, exp: Date.now() + MAGIC_LINK_EXPIRY_MS });

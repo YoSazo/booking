@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Marketel · Front Desk</title>
   <link rel="manifest" href="/manifest-simple-crm.json">
   <meta name="theme-color" content="#EEF2EF">
@@ -20,11 +20,54 @@
     else setTimeout(loadClarity, 3000);
   })();
   </script>
-  <script type="module" crossorigin src="/frontdesk/assets/index-B0bAECrW.js"></script>
+  <script type="module" crossorigin src="/frontdesk/assets/index-B9eTpU6v.js"></script>
   <link rel="modulepreload" crossorigin href="/frontdesk/assets/settings-x53CwbLy.js">
   <link rel="stylesheet" crossorigin href="/frontdesk/assets/index.css">
 </head>
 <body>
+
+<div id="nativePropertyScreen" class="login-screen native-property-screen" style="display:none">
+  <div class="login-card native-property-card">
+    <div class="login-logo">
+      <img src="/marketellogo.svg" alt="" class="login-logo-icon">
+      <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
+    </div>
+
+    <div id="nativePropertySignIn">
+      <div class="status-title">Open your Front Desk</div>
+      <p class="native-property-copy">Enter the email used to create your Marketel property.</p>
+      <input class="login-input native-property-input" type="email" id="nativePropertyEmail" placeholder="you@example.com" autocomplete="email" inputmode="email">
+      <button type="button" class="login-btn" id="nativeCodeRequestBtn">Email me a code</button>
+      <div id="nativeCodeStep" style="display:none;margin-top:16px;">
+        <label class="native-property-label" for="nativePropertyCode">Verification code</label>
+        <input class="login-input native-property-code" type="text" id="nativePropertyCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+        <button type="button" class="login-btn" id="nativeCodeVerifyBtn">Continue</button>
+      </div>
+      <div id="nativePropertyMessage" class="native-property-message"></div>
+      <button type="button" class="native-property-link" id="nativePinLoginToggle">Use property ID and PIN</button>
+    </div>
+
+    <div id="nativePinLogin" style="display:none">
+      <div class="status-title">Use your property PIN</div>
+      <p class="native-property-copy">Enter the property ID from your setup link and your Front Desk PIN.</p>
+      <label class="native-property-label" for="nativePropertyId">Property ID</label>
+      <input class="login-input native-property-input" type="text" id="nativePropertyId" placeholder="your-property" autocapitalize="none" autocomplete="off">
+      <label class="native-property-label" for="nativePropertyPin">Front Desk PIN</label>
+      <input class="login-input native-property-code" type="password" id="nativePropertyPin" placeholder="••••••" autocomplete="current-password">
+      <button type="button" class="login-btn" id="nativePinLoginBtn">Open Front Desk</button>
+      <div id="nativePinMessage" class="native-property-message"></div>
+      <button type="button" class="native-property-link" id="nativeEmailLoginToggle">Use email instead</button>
+    </div>
+
+    <div id="nativePropertyList" style="display:none">
+      <div class="status-title">Choose a property</div>
+      <p class="native-property-copy">You can switch again from the property name at the top.</p>
+      <div id="nativePropertyChoices" class="native-property-choices"></div>
+      <button type="button" class="native-property-link" id="nativeAddAccountBtn">Sign in with another account</button>
+      <button type="button" class="native-property-link" id="nativePropertyCancelBtn" style="display:none;color:var(--text-muted);">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <div id="bootScreen" class="login-screen">
   <div class="login-card status-card">
