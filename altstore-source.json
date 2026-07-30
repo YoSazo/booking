@@ -12,11 +12,21 @@
       "bundleIdentifier": "com.bookmarketel.frontdesk",
       "developerName": "Marketel",
       "subtitle": "Run your property from your phone.",
-      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.5 bundles the complete Front Desk inside the app, adds subscriber sign-in and account controls, and prepares native booking alerts for push-enabled App Store builds.",
+      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.6 fixes returning-subscriber login while retaining the bundled Front Desk, account controls, and native booking-alert foundation.",
       "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
       "tintColor": "2E7D5B",
       "category": "utilities",
       "versions": [
+        {
+          "version": "2.6",
+          "buildVersion": "8",
+          "date": "2026-07-30",
+          "localizedDescription": "Fixes the returning-subscriber login crash caused by tour cleanup running before its lazy-loaded module existed.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.6/Marketel-Front-Desk.ipa",
+          "size": 1045217,
+          "sha256": "fe3ebcfa0248b798b3242686cf20eb7cee64e8c603bbf35b4564e846cf29ed3b",
+          "minOSVersion": "15.0"
+        },
         {
           "version": "2.5",
           "buildVersion": "7",
