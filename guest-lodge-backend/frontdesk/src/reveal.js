@@ -88,6 +88,27 @@ function bookingUrl() {
   return url.toString();
 }
 
+function bookingDisplayDomain() {
+  const configuredDomain = String(bookingPageState.domain || crm.activeHotelDomain || '')
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .toLowerCase();
+  if (configuredDomain) {
+    return configuredDomain.endsWith('.bookmarketel.com')
+      ? configuredDomain.replace(/\.bookmarketel\.com$/, '.mktel.co')
+      : configuredDomain;
+  }
+  const propertySlug = propertyName()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50);
+  return `${propertySlug || 'your-property'}.mktel.co`;
+}
+
 function frontdeskEditorUrl() {
   const url = new URL(window.location.href);
   url.search = '';
@@ -183,17 +204,18 @@ function bookingPreviewCardHtml() {
   const url = bookingUrl();
   return `<div class="mvr-booking-preview-card">
     <div class="mvr-preview-browser-bar">
-      <div class="mvr-preview-dots"><i></i><i></i><i></i></div>
-      <span><b></b> Your direct booking page</span>
+      <span class="mvr-preview-live"><i></i>Live</span>
+      <span class="mvr-preview-address"><b></b>${esc(bookingDisplayDomain())}</span>
+      <i aria-hidden="true"></i>
     </div>
     <div class="mvr-preview-teaser">
       ${url
         ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
-      <button type="button" id="mvrExpandPreview">
-        <span>Open full booking page ↗</span>
-        <small>See the guest experience, then switch to Edit</small>
+      <button type="button" id="mvrExpandPreview" aria-label="Expand your booking page preview">
+        <span class="mvr-expand-cue" aria-hidden="true"><i>←</i><strong>Expand</strong><i>→</i></span>
+        <small>See the full page right here</small>
       </button>
     </div>
   </div>`;
@@ -207,7 +229,7 @@ function bookingRevealHtml() {
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
         <span>And it is completely yours.</span>
-        Open the live preview to see what guests see, then switch to the real editor to change your details, first room, photo and price.
+        Expand the preview to see what guests see, then switch to the real editor to change your details, first room, photo and price.
       </div>
       ${bookingPageStatusHtml()}
     </div>

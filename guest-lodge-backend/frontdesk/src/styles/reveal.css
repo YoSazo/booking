@@ -271,7 +271,7 @@
 .mvr-preview-browser-bar {
   min-height: 42px;
   display: grid;
-  grid-template-columns: 52px 1fr 52px;
+  grid-template-columns: 62px minmax(0, 1fr) 62px;
   align-items: center;
   padding: 0 14px;
   color: #6f7d75;
@@ -281,7 +281,7 @@
   font-weight: 700;
 }
 
-.mvr-preview-browser-bar > span {
+.mvr-preview-address {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -291,7 +291,7 @@
   white-space: nowrap;
 }
 
-.mvr-preview-browser-bar > span b {
+.mvr-preview-address b {
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
@@ -299,16 +299,24 @@
   background: #35a467;
 }
 
-.mvr-preview-dots {
+.mvr-preview-live {
   display: flex;
+  align-items: center;
   gap: 5px;
+  color: #347657;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.mvr-preview-dots i {
-  width: 7px;
-  height: 7px;
+.mvr-preview-live i {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #c9d2cc;
+  background: #35a467;
+  box-shadow: 0 0 0 0 rgba(53, 164, 103, 0.34);
+  animation: mvr-status-pulse 1.6s ease-out infinite;
 }
 
 .mvr-preview-teaser {
@@ -327,8 +335,8 @@
   height: 142.86%;
   border: 0;
   background: #fff;
-  filter: blur(1.6px) saturate(0.86);
-  opacity: 0.88;
+  filter: none;
+  opacity: 1;
   pointer-events: none;
   transform: scale(0.7);
   transform-origin: top left;
@@ -356,11 +364,13 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.22), rgba(238, 244, 240, 0.55) 58%, rgba(231, 238, 234, 0.82)),
-    rgba(242, 246, 243, 0.18);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(241, 247, 243, 0.04) 0 24%,
+    rgba(232, 240, 235, 0.16) 58%,
+    rgba(221, 232, 225, 0.38) 100%
+  );
 }
 
 .mvr-preview-teaser > button {
@@ -368,10 +378,10 @@
   top: 50%;
   left: 50%;
   z-index: 2;
-  min-width: min(270px, calc(100% - 36px));
+  min-width: min(220px, calc(100% - 48px));
   display: grid;
-  gap: 3px;
-  padding: 15px 20px;
+  gap: 4px;
+  padding: 13px 18px 12px;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 15px;
@@ -384,9 +394,42 @@
   transition: transform 160ms ease, background 160ms ease;
 }
 
-.mvr-preview-teaser > button span {
-  font-size: 13px;
-  font-weight: 800;
+.mvr-expand-cue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+}
+
+.mvr-expand-cue strong {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.mvr-expand-cue i {
+  display: inline-block;
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mvr-expand-cue i:first-child {
+  animation: mvr-expand-left 1.45s ease-in-out infinite;
+}
+
+.mvr-expand-cue i:last-child {
+  animation: mvr-expand-right 1.45s ease-in-out infinite;
+}
+
+@keyframes mvr-expand-left {
+  0%, 100% { opacity: 0.62; transform: translateX(2px); }
+  50% { opacity: 1; transform: translateX(-4px); }
+}
+
+@keyframes mvr-expand-right {
+  0%, 100% { opacity: 0.62; transform: translateX(-2px); }
+  50% { opacity: 1; transform: translateX(4px); }
 }
 
 .mvr-preview-teaser > button small {
@@ -1178,7 +1221,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mvr-stage,
-  .mvr-live-preview {
+  .mvr-live-preview,
+  .mvr-preview-live i,
+  .mvr-expand-cue i {
     animation: none !important;
   }
 }
