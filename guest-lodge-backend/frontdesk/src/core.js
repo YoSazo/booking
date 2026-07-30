@@ -644,7 +644,7 @@ async function nativePinLogin() {
     });
     const verification = await verifyRes.json().catch(() => ({}));
     if (!verifyRes.ok || !verification.success) throw new Error(verification.message || 'Wrong property ID or PIN.');
-    if (!verification.subscribed) {
+    if (!verification.subscribed && !verification.nativePreviewAccess) {
       throw new Error('This property does not currently have Front Desk app access.');
     }
     crm.token = pin;
@@ -2043,7 +2043,10 @@ function installEmbeddedEditorPreview() {
 
 async function startCrmApp(verification, options = {}) {
   const bootstrapped = options.bootstrapped === true;
-  if (isNativeFrontdeskApp() && !(verification && verification.subscribed)) {
+  if (
+    isNativeFrontdeskApp()
+    && !(verification && (verification.subscribed || verification.nativePreviewAccess))
+  ) {
     throw new Error('This property does not currently have Front Desk app access.');
   }
   crm.lastAuthError = '';

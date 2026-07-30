@@ -3867,6 +3867,15 @@ const CRM_MASTER_PINS = new Set(
         .map(v => String(v || '').trim())
         .filter(Boolean)
 );
+// Legacy dogfood codes are retained for testing the native app, but they are
+// not production master credentials. They may open only an explicitly listed
+// dogfood property or a property the credential was already scoped to. They
+// can never expand access to an unrelated customer hotel.
+const CRM_DOGFOOD_PINS = new Set(['2026', '4040']);
+const CRM_DOGFOOD_HOTELS = new Set([
+    'hotel-a39be0df', // Jack's Inn native dogfood property
+    ...toHotelList(process.env.CRM_DOGFOOD_HOTELS || ''),
+]);
 if (process.env.NODE_ENV === 'production' && CRM_MASTER_PINS_RAW) {
     console.warn('CRM_MASTER_PINS is ignored in production; use scoped CRM_TOKEN_HOTELS credentials.');
 }
@@ -4150,7 +4159,9 @@ function resolveScopedHotelId(req, { allowFallback = true } = {}) {
         if (requested && requested !== resolvedHotelId) return null;
         return resolvedHotelId;
     }
-    if (requested && (isMaster || allowed.includes(requested))) return requested;
+    if (requested) {
+        return (isMaster || allowed.includes(requested)) ? requested : null;
+    }
     return allowFallback ? (req.crmDefaultHotelId || allowed[0]) : null;
 }
 
@@ -4189,6 +4200,26 @@ const crmAuth = async (req, res, next) => {
         : nativeAuth
             ? nativeAllowedHotels
             : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
+
+    const requestedHotelId = String(req.query?.hotelId || req.body?.hotelId || '').trim();
+    let isDogfoodPreviewAccess = false;
+    if (
+        !returnAuth
+        && !nativeAuth
+        && requestedHotelId
+        && CRM_DOGFOOD_PINS.has(token)
+    ) {
+        const wasAlreadyScoped = allowedHotels.includes(requestedHotelId) || allowedHotels.includes('*');
+        const override = await getHotelOverrideStatus(requestedHotelId).catch(() => ({ status: 'invalid' }));
+        const isListedDogfoodHotel = CRM_DOGFOOD_HOTELS.has(requestedHotelId);
+        isDogfoodPreviewAccess = (
+            (isListedDogfoodHotel || wasAlreadyScoped)
+            && (override.status === 'ok' || override.status === 'unsubscribed')
+        );
+        if (isDogfoodPreviewAccess && !wasAlreadyScoped) {
+            allowedHotels = [...allowedHotels, requestedHotelId];
+        }
+    }
     
     // Local-only developer convenience. Production never has master PINs.
     const isMasterPin = !returnAuth && isCrmMasterPin(token);
@@ -4218,6 +4249,7 @@ const crmAuth = async (req, res, next) => {
     req.crmIsReturnToken = !!returnAuth;
     req.crmIsNativeSession = !!nativeAuth;
     req.crmIsNativeClient = isNativeClient;
+    req.crmIsDogfoodPreview = isDogfoodPreviewAccess;
     req.crmClient = marketelClient;
     req.crmNativeEmail = nativeAuth?.email || '';
     req.crmResolvedHotelId = hostContext.hotelId || null;
@@ -4240,7 +4272,7 @@ const crmAuth = async (req, res, next) => {
         // already filters to active, subscribed properties. Re-querying the
         // same row on every API call doubled the authentication cost during
         // startup. PIN-based native access still needs the explicit check.
-        if (!nativeAuth) {
+        if (!nativeAuth && !isDogfoodPreviewAccess) {
             const nativeHotel = await withRetry(() => prisma.hotelConfig.findUnique({
                 where: { id: nativeHotelId },
                 select: { active: true, subscribed: true },
@@ -8930,6 +8962,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             domain: primaryDomain?.domain || '',
             allowedHotels: req.crmAllowedHotels || [],
             isMasterPin: !!req.crmIsMasterPin,
+            nativePreviewAccess: !!req.crmIsDogfoodPreview,
             pms: config.pms,
             isManualPms: config.pms === 'manual',
             hotelName: dbHotel?.name || config.name || '',
@@ -8954,7 +8987,10 @@ app.get('/api/crm/properties', crmAuth, async (req, res) => {
     try {
         const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
         const isMaster = allowed.includes('*');
-        const activeCustomerOnly = !!(req.crmIsNativeClient || req.crmIsNativeSession);
+        const activeCustomerOnly = !!(
+            (req.crmIsNativeClient || req.crmIsNativeSession)
+            && !req.crmIsDogfoodPreview
+        );
         const where = isMaster
             ? { active: true, ...(activeCustomerOnly ? { subscribed: true } : {}) }
             : { active: true, id: { in: allowed }, ...(activeCustomerOnly ? { subscribed: true } : {}) };
@@ -10786,6 +10822,7 @@ app.get('/api/crm/bootstrap', crmVerifyRateLimit, crmAuth, async (req, res) => {
                     domain,
                     allowedHotels: req.crmAllowedHotels || [],
                     isMasterPin: !!req.crmIsMasterPin,
+                    nativePreviewAccess: !!req.crmIsDogfoodPreview,
                     pms: config.pms,
                     isManualPms: config.pms === 'manual',
                     hotelName: dbHotel?.name || config.name || '',
