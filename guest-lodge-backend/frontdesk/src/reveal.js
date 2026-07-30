@@ -136,6 +136,18 @@ function shellVisible(visible) {
   }
 }
 
+function handleBookingPreviewMessage(event) {
+  if (event?.data?.type !== 'marketel:show-guest-app') return;
+  const reveal = document.getElementById('marketelValueReveal');
+  if (!reveal) return;
+  const knownFrame = Array.from(reveal.querySelectorAll('iframe'))
+    .some((frame) => frame.contentWindow === event.source);
+  if (!knownFrame) return;
+  document.getElementById('mvrLivePreview')?.remove();
+  trackReveal('GuestAppPreviewRequestedFromBookingEngine');
+  moveToStep(1);
+}
+
 function progressHtml() {
   const labels = ['Booking page', 'Guest app', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
   return `<div class="mvr-progress" aria-label="Marketel overview progress">
@@ -397,6 +409,7 @@ function finishReveal() {
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
+  window.removeEventListener('message', handleBookingPreviewMessage);
   crm.settingsTourActive = false;
   try {
     localStorage.removeItem(PENDING_KEY);
@@ -524,6 +537,7 @@ export function showMarketelValueReveal(options = {}) {
   } catch (_) {}
 
   crm.settingsTourActive = true;
+  window.addEventListener('message', handleBookingPreviewMessage);
   document.documentElement.classList.add('marketel-reveal-open');
   document.body.style.overflow = 'hidden';
   shellVisible(false);

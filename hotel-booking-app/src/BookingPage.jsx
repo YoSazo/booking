@@ -178,10 +178,10 @@ function BookingPage({
           hotelName={hotel.name}
           appIconUrl={hotel.appIconUrl || roomData?.[0]?.images?.[0]?.url || roomData?.[0]?.imageUrl}
           hotelId={hotelId}
-          ownerPreview={ownerScrollInstall}
+          ownerPreview={ownerPreview}
           sticky
           bottomOffset={14}
-          touchpoint={ownerScrollInstall ? 'frontdesk-preview' : 'booking-page'}
+          touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
           apiBaseUrl={apiBaseUrl}
         />
       )}
