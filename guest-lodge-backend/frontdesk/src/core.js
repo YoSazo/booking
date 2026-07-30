@@ -2126,7 +2126,18 @@ async function startCrmApp(verification) {
   } else if (isFirstWelcome) {
     showWelcomeModal();
   } else {
-    cleanupSettingsTourUi();
+    // The settings/tour code is lazy-loaded. A returning owner can sign in
+    // directly to Bookings before that module has ever been installed, so an
+    // unqualified cleanupSettingsTourUi() call crashes the native app here.
+    // Only clean tour remnants when the module was actually loaded.
+    if (settingsModulePromise) {
+      try {
+        const settingsModule = await settingsModulePromise;
+        settingsModule.cleanupSettingsTourUi();
+      } catch (error) {
+        console.warn('Unable to clean up settings tour UI:', error);
+      }
+    }
     await Promise.allSettled([
       loadManualAvailability(),
       loadBookings({ deferMessages: true }),
