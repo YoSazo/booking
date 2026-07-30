@@ -1605,6 +1605,22 @@ function setBookingsSubview(view) {
   if (crm.bookingsSubview === 'revenue') loadRevenueData();
 }
 
+function renderEmbeddedAssistantPreviewCard() {
+  const panel = document.getElementById('frontDeskAssistantPanel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div style="margin:0 0 14px;padding:15px 16px;border:1px solid #dbe7df;border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(28,67,45,.06);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;">
+        <div style="min-width:0;">
+          <div style="color:#2E7D5B;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Front Desk Assistant</div>
+          <strong style="display:block;margin-top:4px;color:#1a1a1a;font-size:14px;">Tell Front Desk when something changes elsewhere.</strong>
+          <span style="display:block;margin-top:4px;color:#6b7280;font-size:12px;line-height:1.45;">It checks direct bookings with your team and updates availability from a simple reply.</span>
+        </div>
+        <button type="button" style="flex:0 0 auto;padding:9px 13px;border:0;border-radius:10px;background:#2E7D5B;color:#fff;font-family:inherit;font-size:12px;font-weight:800;">Open</button>
+      </div>
+    </div>`;
+}
+
 function applyBookingsSubview() {
   const isGrowth = crm.bookingsSubview === 'growth';
   const isRevenue = crm.bookingsSubview === 'revenue' && crm.revenueEnabled;
@@ -1628,7 +1644,11 @@ function applyBookingsSubview() {
   } else {
     if (!crm.guestMessages.length) loadMessages(); else renderMessages();
     renderBookings(crm.bookings);
-    loadAssistantModule().then((module) => module.renderFrontDeskAssistantCard()).catch(() => {});
+    if (document.body.classList.contains('frontdesk-editor-preview')) {
+      renderEmbeddedAssistantPreviewCard();
+    } else {
+      loadAssistantModule().then((module) => module.renderFrontDeskAssistantCard()).catch(() => {});
+    }
   }
   renderBookingsNotices();
 }

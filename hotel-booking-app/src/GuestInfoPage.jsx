@@ -321,6 +321,7 @@ const handleAddressPaste = (e) => {
 
 // Send browser diagnostics to backend on mount (for debugging in-app browsers)
 useEffect(() => {
+  if (isPreviewMode) return;
   const ua = navigator.userAgent || '';
   const fbavMatch = ua.match(/FBAV\/(\d+[\d.]*)/);
   const vv = window.visualViewport;
@@ -358,7 +359,7 @@ useEffect(() => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(diagnostics),
   }).catch(() => {});
-}, [apiBaseUrl]);
+}, [apiBaseUrl, isPreviewMode]);
 
 // Smooth scroll handling for step changes (plan step removed)
 useEffect(() => {

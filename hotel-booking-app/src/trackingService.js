@@ -51,7 +51,13 @@ const saveSessionEvent = (eventName) => {
   setSessionItem('firedEvents', JSON.stringify(events));
 };
 
+const isOwnerPreview = () => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).has('preview') || window !== window.parent;
+};
+
 const shouldFireEvent = (eventName) => {
+  if (isOwnerPreview()) return false;
   const events = getSessionEvents();
   if (events[eventName]) {
     console.log(`⚠️ ${eventName} already fired this session - skipping`);
@@ -198,6 +204,7 @@ export const trackPageView = () => {
 // and power the Front Desk "page views → tried to book → booked" panel. Throttled
 // to once per event per session, best-effort, never blocks the guest UI.
 export const trackHotelFunnel = (event, hotelId, details = {}) => {
+    if (isOwnerPreview()) return;
     if (!hotelId || (event !== 'page_view' && event !== 'checkout_started')) return;
     if (!shouldFireEvent(`hotelFunnel_${event}`)) return;
     try {
@@ -244,6 +251,7 @@ const sendEventToPixel = (pixelEventName, payload, eventID) => {
 };
 
 export const trackSearch = (checkinDate, checkoutDate) => {
+    if (isOwnerPreview()) return;
     // Don't use shouldFireEvent for Search - allow multiple searches per session
     const eventID = `search.${Date.now()}`;
     const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
@@ -264,6 +272,7 @@ export const trackSearch = (checkinDate, checkoutDate) => {
 };
 
 export const trackAddToCart = (bookingDetails) => {
+    if (isOwnerPreview()) return;
     // Don't use shouldFireEvent for AddToCart - allow multiple room selections per session
     const eventID = `addtocart.${Date.now()}`;
     const eventTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
