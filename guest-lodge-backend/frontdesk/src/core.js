@@ -6,6 +6,7 @@ const MARKETEL_BACKEND_ORIGIN = 'https://guest-lodge-backend.onrender.com';
 const isBundledNativeFrontdesk = window.location.protocol === 'capacitor:'
   || window.location.protocol === 'ionic:';
 const marketelLocalUrlBase = isBundledNativeFrontdesk ? window.location.href : window.location.origin;
+const FRONTDESK_STARTUP_TIMEOUT_MS = 8000;
 
 // The App Store build ships this JavaScript inside the IPA. Only API requests
 // cross the network; rewriting them here keeps every existing feature module
@@ -35,6 +36,24 @@ if (isBundledNativeFrontdesk) {
     }
     return browserFetch(input, init);
   };
+}
+
+async function fetchWithTimeout(input, init = {}, milliseconds = FRONTDESK_STARTUP_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), milliseconds);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error('The server took too long to respond. Check your connection and try again.');
+      timeoutError.status = 0;
+      timeoutError.code = 'frontdesk_startup_timeout';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 let settingsModulePromise = null;
@@ -944,7 +963,9 @@ function applyHotelContextData(data = {}) {
 }
 
 async function loadHotelContext() {
-  const res = await fetch(buildHotelContextUrl(), { headers: { 'Accept': 'application/json' } });
+  const res = await fetchWithTimeout(buildHotelContextUrl(), {
+    headers: { 'Accept': 'application/json' },
+  });
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.success) {
     const err = new Error(json.message || `Failed to load property context (${res.status})`);
@@ -959,7 +980,7 @@ async function loadCrmBootstrap() {
   const url = new URL('/api/crm/bootstrap', marketelLocalUrlBase);
   const requestedHotelId = getRequestedHotelId();
   if (requestedHotelId) url.searchParams.set('hotelId', requestedHotelId);
-  const res = await fetch(url.pathname + url.search, {
+  const res = await fetchWithTimeout(url.pathname + url.search, {
     headers: {
       'Accept': 'application/json',
       'x-crm-token': crm.token,
@@ -1484,7 +1505,7 @@ async function verifyCrmToken(pin) {
     tokenKind: frontdeskTokenKind(pin),
     tokenLength: String(pin || '').length,
   });
-  const res = await fetch(`/api/crm/verify?hotelId=${encodeURIComponent(crm.activeHotelId)}`, {
+  const res = await fetchWithTimeout(`/api/crm/verify?hotelId=${encodeURIComponent(crm.activeHotelId)}`, {
     headers: {
       'x-crm-token': pin,
       ...(isNativeFrontdeskApp() ? { 'x-marketel-client': 'ios' } : {}),
@@ -1501,7 +1522,9 @@ async function verifyCrmToken(pin) {
     subscribed: !!json.subscribed,
   }, (!res.ok || !json.success) ? 'warn' : 'info');
   if (!res.ok || !json.success) {
-    throw new Error(json.message || (res.status === 401 ? 'Wrong PIN' : 'Could not verify access'));
+    const error = new Error(json.message || (res.status === 401 ? 'Wrong PIN' : 'Could not verify access'));
+    error.status = res.status;
+    throw error;
   }
   return json;
 }
@@ -2423,6 +2446,16 @@ function showNativeAuthenticationError(error) {
   return true;
 }
 
+function isAuthenticationFailure(error) {
+  const status = Number(error?.status) || 0;
+  return status === 401 || status === 403;
+}
+
+function shouldUseLegacyStartup(error) {
+  const status = Number(error?.status) || 0;
+  return !status || status === 404 || status === 408 || status === 429 || status >= 500;
+}
+
 async function bootCrmApp() {
   if (crm.bootInFlight) return;
   crm.bootInFlight = true;
@@ -2431,10 +2464,21 @@ async function bootCrmApp() {
   crm.activeHotelDomain = '';
   crm.activeHotelContext = null;
   updateHotelChrome();
+  const requestedHotelId = getRequestedHotelId();
+  const requestedProperty = isNativeFrontdeskApp()
+    ? getNativeProperties().find(property => property.id === requestedHotelId)
+    : null;
   showBootState({
-    title: 'Connecting to property...',
-    message: 'Checking this domain and loading front desk context.',
-    debug: formatContextDebugLines([`Detected host: ${getDetectedHostname() || 'unknown'}`]),
+    title: requestedProperty?.name ? `Opening ${requestedProperty.name}...` : 'Connecting to property...',
+    message: isNativeFrontdeskApp()
+      ? 'Loading your bookings and availability.'
+      : 'Checking this domain and loading front desk context.',
+    debug: formatContextDebugLines([
+      isBundledNativeFrontdesk
+        ? `App bundle host: ${getDetectedHostname() || 'localhost'} (normal)`
+        : `Detected host: ${getDetectedHostname() || 'unknown'}`,
+      requestedHotelId ? `Property ID: ${requestedHotelId}` : '',
+    ]),
     showRetry: false,
   });
 
@@ -2460,7 +2504,7 @@ async function bootCrmApp() {
         // while the backend is still on the prior release. Use the established
         // startup path until /bootstrap is available instead of signing the
         // owner out.
-        if (e?.status === 404) {
+        if (shouldUseLegacyStartup(e)) {
           try {
             await loadHotelContext();
             const verification = await verifyCrmToken(crm.token);
@@ -2471,7 +2515,9 @@ async function bootCrmApp() {
           }
         }
         crm.lastAuthError = e && e.message ? e.message : 'verify failed';
-        if (!showNativeAuthenticationError(e)) {
+        if (isNativeFrontdeskApp() && !isAuthenticationFailure(e)) {
+          showHotelContextError(e);
+        } else if (!showNativeAuthenticationError(e)) {
           // Bootstrap authentication can fail before context is populated.
           // Web/PWA login still needs the resolved hotel in order to submit a
           // replacement PIN, so recover that lightweight context first.
