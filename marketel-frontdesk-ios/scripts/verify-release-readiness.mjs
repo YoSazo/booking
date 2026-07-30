@@ -55,6 +55,10 @@ expect(delegate, /marketelNativeContactResult/,
   'AppDelegate does not return the native contact result to Front Desk');
 expect(delegate, /case "tourMode":/,
   'AppDelegate does not lock native navigation during the native walkthrough');
+expect(delegate, /title: "Front Desk Assistant"[\s\S]{0,220}sendWebAction\("assistant"\)/,
+  'Native menu does not expose Front Desk Assistant');
+expect(delegate, /title: "Replay app tour"[\s\S]{0,220}sendWebAction\("tour"\)/,
+  'Native menu does not expose tour replay clearly');
 expect(capacitor, /"appId":\s*"com\.bookmarketel\.frontdesk"/,
   'Capacitor app ID must match com.bookmarketel.frontdesk');
 if (/"url"\s*:\s*"https?:\/\//.test(capacitor)) {

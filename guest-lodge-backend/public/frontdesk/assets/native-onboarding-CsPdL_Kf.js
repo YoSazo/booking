@@ -73,28 +73,11 @@ import{c as N}from"./settings-Bw-9fpLt.js";const y="marketelNativeOnboardingV1Do
     }
 
     .mno-mark {
-      position: relative;
       width: 27px;
       height: 30px;
       flex: 0 0 auto;
-    }
-
-    .mno-mark::before,
-    .mno-mark::after {
-      content: "";
-      position: absolute;
-      inset: 2px 7px 2px 1px;
-      border-radius: 10px 10px 11px 3px;
-      background: var(--native-green);
-      transform: rotate(-7deg);
-    }
-
-    .mno-mark::after {
-      inset: 7px 1px 1px 9px;
-      border-radius: 3px 11px 10px 10px;
-      background: #72B28F;
-      transform: rotate(7deg);
-      mix-blend-mode: multiply;
+      display: block;
+      object-fit: contain;
     }
 
     .mno-skip,
@@ -753,21 +736,21 @@ import{c as N}from"./settings-Bw-9fpLt.js";const y="marketelNativeOnboardingV1Do
           <div><strong>Bring guests back</strong><span>Share the app link or QR when they are ready.</span></div>
         </div>
       </div>
-    </div>`}function B(t){return t===1&&!e.contactSaved?`
+    </div>`}function I(t){return t===1&&!e.contactSaved?`
       <button class="mno-primary" type="button" data-mno-action="save-contact">Save Front Desk to Contacts</button>
       <button class="mno-secondary" type="button" data-mno-action="next">Continue without saving</button>
       <div class="mno-status-note">${e.contactAttempted?"No problem — you can save it later from Assistant.":"Save it now so you recognize Marketel when messages begin."}</div>
       <div class="mno-progress">${v(t,3)}</div>`:`
     <button class="mno-primary" type="button" data-mno-action="next">${t===0?"Set up Front Desk":t===1?"Continue":"Show me the app"}</button>
-    <div class="mno-progress">${v(t,3)}</div>`}function I(){m(!1),l(!1);const t=S();t.innerHTML=`
+    <div class="mno-progress">${v(t,3)}</div>`}function B(){m(!1),l(!1);const t=S();t.innerHTML=`
     <section class="mno-intro" role="dialog" aria-modal="true" aria-label="Front Desk setup">
       <div class="mno-topline">
-        <div class="mno-wordmark"><span class="mno-mark" aria-hidden="true"></span>Front Desk</div>
+        <div class="mno-wordmark"><img class="mno-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</div>
         <button class="mno-skip" type="button" data-mno-action="skip">Skip</button>
       </div>
       <main class="mno-main">${$(e.step)}</main>
       <footer class="mno-footer">
-        ${B(e.step)}
+        ${I(e.step)}
       </footer>
     </section>`}function w(t){typeof window.marketelNativeSelectTab=="function"&&window.marketelNativeSelectTab(t)}function T(){const t=a[e.step]||a[0];l(!0),m(!0),w(t.filter);const n=S();n.innerHTML=`
     <section class="mno-tour" role="dialog" aria-modal="true" aria-label="Front Desk walkthrough">
@@ -785,4 +768,4 @@ import{c as N}from"./settings-Bw-9fpLt.js";const y="marketelNativeOnboardingV1Do
           <button class="mno-primary" type="button" data-mno-action="next">${e.step===a.length-1?"Open Front Desk":"Next"}</button>
         </div>
       </div>
-    </section>`}function S(){let t=document.getElementById(r);return t||(t=document.createElement("div"),t.id=r,t.addEventListener("click",M),document.body.appendChild(t)),t}function s(){e&&(O(),document.documentElement.classList.add("marketel-native-tour-open"),u(),e.phase==="tour"?T():I())}function M(t){const n=t.target?.closest?.("[data-mno-action]");if(!n||!e)return;const o=n.getAttribute("data-mno-action");o==="next"?_():o==="back"?Y():o==="skip"?F({skipped:!0}):o==="save-contact"&&P()}function _(){if(e){if(e.phase==="intro")e.step<2?e.step+=1:(e.phase="tour",e.step=0);else if(e.step<a.length-1)e.step+=1;else{F();return}s()}}function Y(){e&&(e.phase==="tour"?e.step>0?e.step-=1:(e.phase="intro",e.step=2):e.step>0&&(e.step-=1),s())}function P(){if(!e)return;e.contactAttempted=!0,u(),p({type:"saveContact",phone:A})||s()}function z(){document.getElementById(r)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),m(!1),l(!0)}function F({skipped:t=!1}={}){try{localStorage.setItem(y,"1"),localStorage.removeItem(d)}catch{}e=null,z(),w("bookings"),D(),!t&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function R(t){if(e){if(e.contactAttempted=!0,e.contactSaved=t===!0,t)try{localStorage.setItem(c,"1")}catch{}u(),e.phase==="intro"&&e.step===1&&s()}}function E({replay:t=!1}={}){return k()?(e&&z(),e=(t?null:C())||{phase:"intro",step:0,contactSaved:g(c),contactAttempted:!1},s(),!0):!1}function H(){return!k()||g(y)?!1:E()}function V(){f||(f=!0,window.marketelNativeContactResult=R,window.startNativeOnboarding=E,window.maybeStartNativeOnboarding=H)}export{V as install,H as maybeStartNativeOnboarding,E as startNativeOnboarding};
+    </section>`}function S(){let t=document.getElementById(r);return t||(t=document.createElement("div"),t.id=r,t.addEventListener("click",M),document.body.appendChild(t)),t}function s(){e&&(O(),document.documentElement.classList.add("marketel-native-tour-open"),u(),e.phase==="tour"?T():B())}function M(t){const n=t.target?.closest?.("[data-mno-action]");if(!n||!e)return;const o=n.getAttribute("data-mno-action");o==="next"?_():o==="back"?Y():o==="skip"?E({skipped:!0}):o==="save-contact"&&P()}function _(){if(e){if(e.phase==="intro")e.step<2?e.step+=1:(e.phase="tour",e.step=0);else if(e.step<a.length-1)e.step+=1;else{E();return}s()}}function Y(){e&&(e.phase==="tour"?e.step>0?e.step-=1:(e.phase="intro",e.step=2):e.step>0&&(e.step-=1),s())}function P(){if(!e)return;e.contactAttempted=!0,u(),p({type:"saveContact",phone:A})||s()}function z(){document.getElementById(r)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),m(!1),l(!0)}function E({skipped:t=!1}={}){try{localStorage.setItem(y,"1"),localStorage.removeItem(d)}catch{}e=null,z(),w("bookings"),D(),!t&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function R(t){if(e){if(e.contactAttempted=!0,e.contactSaved=t===!0,t)try{localStorage.setItem(c,"1")}catch{}u(),e.phase==="intro"&&e.step===1&&s()}}function F({replay:t=!1}={}){return k()?(e&&z(),e=(t?null:C())||{phase:"intro",step:0,contactSaved:g(c),contactAttempted:!1},s(),!0):!1}function H(){return!k()||g(y)?!1:F()}function j(){f||(f=!0,window.marketelNativeContactResult=R,window.startNativeOnboarding=F,window.maybeStartNativeOnboarding=H)}export{j as install,H as maybeStartNativeOnboarding,F as startNativeOnboarding};

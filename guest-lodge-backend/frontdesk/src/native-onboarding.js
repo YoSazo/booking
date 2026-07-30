@@ -200,28 +200,11 @@ function ensureStyles() {
     }
 
     .mno-mark {
-      position: relative;
       width: 27px;
       height: 30px;
       flex: 0 0 auto;
-    }
-
-    .mno-mark::before,
-    .mno-mark::after {
-      content: "";
-      position: absolute;
-      inset: 2px 7px 2px 1px;
-      border-radius: 10px 10px 11px 3px;
-      background: var(--native-green);
-      transform: rotate(-7deg);
-    }
-
-    .mno-mark::after {
-      inset: 7px 1px 1px 9px;
-      border-radius: 3px 11px 10px 10px;
-      background: #72B28F;
-      transform: rotate(7deg);
-      mix-blend-mode: multiply;
+      display: block;
+      object-fit: contain;
     }
 
     .mno-skip,
@@ -927,7 +910,7 @@ function renderIntro() {
   overlay.innerHTML = `
     <section class="mno-intro" role="dialog" aria-modal="true" aria-label="Front Desk setup">
       <div class="mno-topline">
-        <div class="mno-wordmark"><span class="mno-mark" aria-hidden="true"></span>Front Desk</div>
+        <div class="mno-wordmark"><img class="mno-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</div>
         <button class="mno-skip" type="button" data-mno-action="skip">Skip</button>
       </div>
       <main class="mno-main">${introStageHtml(session.step)}</main>
@@ -1097,4 +1080,3 @@ export function install() {
   window.startNativeOnboarding = startNativeOnboarding;
   window.maybeStartNativeOnboarding = maybeStartNativeOnboarding;
 }
-

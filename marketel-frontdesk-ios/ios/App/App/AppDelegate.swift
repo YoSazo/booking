@@ -309,8 +309,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(url)
         }
+        let assistantAction = UIAction(
+            title: "Front Desk Assistant",
+            image: UIImage(systemName: "message.badge")
+        ) { [weak self] _ in
+            self?.sendWebAction("assistant")
+        }
         let tourAction = UIAction(
-            title: "How it works",
+            title: "Replay app tour",
             image: UIImage(systemName: "questionmark.circle")
         ) { [weak self] _ in
             self?.sendWebAction("tour")
@@ -341,6 +347,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuButton.configuration = menuConfiguration
         menuButton.menu = UIMenu(
             children: [
+                assistantAction,
                 notificationSettingsAction,
                 refreshAction,
                 tourAction,
