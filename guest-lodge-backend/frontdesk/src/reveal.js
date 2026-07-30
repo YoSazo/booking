@@ -258,11 +258,11 @@ function assistantRevealHtml() {
   return `<section class="mvr-stage mvr-stage-assistant">
     <div class="mvr-copy">
       <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
-      <h1>Something changed outside Marketel? Tell Front Desk once.</h1>
-      <p>Keep the tools and walk-ins you already have. Front Desk checks direct bookings with the people who know the property.</p>
+      <h1>Front Desk checks in before a room conflict becomes a guest problem.</h1>
+      <p>When a direct booking arrives, Front Desk asks you and the people you choose whether the room is still available. If a walk-in or another booking took it, reply normally and Marketel handles the rest.</p>
       <div class="mvr-callout">
-        <strong>No integration maze.</strong>
-        When a room is taken elsewhere, reply in plain language and Marketel updates availability for you.
+        <strong>Front Desk follows up—you don't have to remember.</strong>
+        One reply can block the dates, release the guest's $1 hold and notify them automatically.
       </div>
     </div>
     <div class="mvr-visual mvr-assistant-visual">
@@ -273,10 +273,10 @@ function assistantRevealHtml() {
       </div>
       <div class="mvr-chat">
         <div class="mvr-bubble mvr-bubble-in">Is ${esc(roomName)} still available tomorrow?</div>
-        <div class="mvr-bubble mvr-bubble-out">We gave it to a walk-in.</div>
-        <div class="mvr-bubble mvr-bubble-in success"><strong>Done.</strong> Tomorrow is blocked, the $1 hold was released and the guest was notified.</div>
+        <div class="mvr-bubble mvr-bubble-out">No, a walk-in took it.</div>
+        <div class="mvr-bubble mvr-bubble-in success"><strong>Handled.</strong> Tomorrow is blocked, the $1 hold was released and the guest was notified.</div>
       </div>
-      <div class="mvr-handled-row"><span>✓</span><div><strong>Handled by Front Desk</strong><small>Your booking page is up to date</small></div></div>
+      <div class="mvr-handled-row"><span>✓</span><div><strong>Front Desk asks. You answer.</strong><small>Marketel handles the rest.</small></div></div>
     </div>
   </section>`;
 }
