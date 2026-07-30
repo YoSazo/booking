@@ -13,6 +13,9 @@ let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
 let bookingPageTimer = 0;
 
+const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
+const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
+
 function isLocalFrontdesk() {
   const host = window.location.hostname;
   return host === 'localhost'
@@ -74,10 +77,15 @@ function bookingUrl() {
     url.search = '';
     url.hash = '';
     url.searchParams.set('hotelId', crm.activeHotelId);
+    url.searchParams.set('preview', '1');
     return url.toString();
   }
   const domain = bookingPageState.domain || crm.activeHotelDomain || '';
-  return domain ? `https://${domain}/` : '';
+  if (!domain) return '';
+  const url = new URL(`https://${domain}/`);
+  if (crm.activeHotelId) url.searchParams.set('hotelId', crm.activeHotelId);
+  url.searchParams.set('preview', '1');
+  return url.toString();
 }
 
 function frontdeskEditorUrl() {
@@ -160,35 +168,21 @@ function bookingPageStatusHtml() {
 }
 
 function bookingPreviewCardHtml() {
-  const room = firstRoom();
+  const url = bookingUrl();
   return `<div class="mvr-booking-preview-card">
     <div class="mvr-preview-browser-bar">
       <div class="mvr-preview-dots"><i></i><i></i><i></i></div>
       <span><b></b> Your direct booking page</span>
     </div>
-    <div class="mvr-preview-page">
-      <div class="mvr-preview-property">
-        <small>Book direct with</small>
-        <strong>${esc(propertyName())}</strong>
-        <span>Choose your dates and stay</span>
-      </div>
-      <div class="mvr-preview-search">
-        <span><small>Check in</small>Select date</span>
-        <span><small>Check out</small>Select date</span>
-        <b>Search</b>
-      </div>
-      <div class="mvr-preview-room">
-        ${roomPhotoHtml('mvr-preview-room-photo')}
-        <div>
-          <strong>${esc(room.name || 'Your room')}</strong>
-          <small>${Math.max(1, Number(room.totalUnits) || 1)} available</small>
-        </div>
-        <span><strong>${money(nightlyRate())}</strong><small>/night</small></span>
-      </div>
-    </div>
-    <div class="mvr-booking-preview-action">
-      <div><strong>See the real page</strong><span>Open it full screen, then switch to Edit whenever you want.</span></div>
-      <button type="button" id="mvrExpandPreview">Open full booking page <span>↗</span></button>
+    <div class="mvr-preview-teaser">
+      ${url
+        ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
+        : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
+      <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
+      <button type="button" id="mvrExpandPreview">
+        <span>Open full booking page ↗</span>
+        <small>See the guest experience, then switch to Edit</small>
+      </button>
     </div>
   </div>`;
 }
@@ -211,25 +205,8 @@ function bookingRevealHtml() {
   </section>`;
 }
 
-function phoneIconSvg() {
-  return `<svg viewBox="0 0 64 64" aria-hidden="true">
-    <defs><linearGradient id="mvrPhoneGreen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#62e46f"/><stop offset="1" stop-color="#08a837"/></linearGradient></defs>
-    <rect width="64" height="64" rx="14" fill="url(#mvrPhoneGreen)"/>
-    <path fill="#fff" d="M20.1 14.8c1.7-1 4.2-.5 5.2 1.3l4.2 7.4c.8 1.5.6 3.3-.6 4.5l-3 3c2.1 4.5 5.7 8.1 10.2 10.2l3-3c1.2-1.2 3-1.5 4.5-.6l7.4 4.2c1.8 1 2.4 3.5 1.3 5.2l-2.2 3.5c-1.7 2.8-5.1 4.2-8.3 3.4-15.7-3.7-28-16-31.7-31.7-.8-3.2.6-6.6 3.4-8.3l3.6-2.1z"/>
-  </svg>`;
-}
-
-function safariIconSvg() {
-  return `<svg viewBox="0 0 64 64" aria-hidden="true">
-    <rect width="64" height="64" rx="14" fill="#fff"/>
-    <circle cx="32" cy="32" r="25" fill="#40b8ed"/>
-    <circle cx="32" cy="32" r="20.5" fill="none" stroke="#fff" stroke-width="1.5" opacity=".9"/>
-    <g stroke="#fff" stroke-width="1.3" opacity=".9">
-      <path d="M32 9v5M32 50v5M9 32h5M50 32h5M15.7 15.7l3.5 3.5M44.8 44.8l3.5 3.5M48.3 15.7l-3.5 3.5M19.2 44.8l-3.5 3.5"/>
-    </g>
-    <path d="M37.3 26.7 27.7 30l-4 9.1 9.6-3.3 4-9.1z" fill="#fff"/>
-    <path d="m37.3 26.7-4 9.1-3.2-3.2 7.2-5.9z" fill="#ef3d52"/>
-  </svg>`;
+function iosSystemIcon(url, label) {
+  return `<img class="mvr-ios-system-icon" src="${esc(url)}" alt="${esc(label)}">`;
 }
 
 function guestAppRevealHtml() {
@@ -256,8 +233,8 @@ function guestAppRevealHtml() {
       <div class="mvr-ios-crop">
         <div class="mvr-ios-dock">
           <div class="mvr-dock-icon mvr-dock-property">${appIconHtml()}</div>
-          <div class="mvr-dock-icon">${phoneIconSvg()}</div>
-          <div class="mvr-dock-icon">${safariIconSvg()}</div>
+          <div class="mvr-dock-icon">${iosSystemIcon(IOS_PHONE_ICON_URL, 'Phone')}</div>
+          <div class="mvr-dock-icon">${iosSystemIcon(IOS_SAFARI_ICON_URL, 'Safari')}</div>
         </div>
       </div>
     </div>

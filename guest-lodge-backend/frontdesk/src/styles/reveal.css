@@ -311,188 +311,93 @@
   background: #c9d2cc;
 }
 
-.mvr-preview-page {
-  padding: 22px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(222, 239, 228, 0.7), transparent 48%),
-    #f8faf8;
+.mvr-preview-teaser {
+  position: relative;
+  height: 350px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #edf3ef;
 }
 
-.mvr-preview-property {
+.mvr-preview-teaser iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 142.86%;
+  height: 142.86%;
+  border: 0;
+  background: #fff;
+  filter: blur(1.6px) saturate(0.86);
+  opacity: 0.88;
+  pointer-events: none;
+  transform: scale(0.7);
+  transform-origin: top left;
+}
+
+.mvr-preview-teaser-fallback {
+  position: absolute;
+  inset: 0;
   display: grid;
+  align-content: center;
   justify-items: center;
-  text-align: center;
-}
-
-.mvr-preview-property small {
-  color: #6f7e75;
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.mvr-preview-property strong {
-  max-width: 100%;
-  margin-top: 2px;
-  overflow: hidden;
-  color: #183126;
-  font-size: clamp(20px, 3vw, 28px);
-  letter-spacing: -0.035em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-preview-property span {
-  margin-top: 3px;
-  color: #839087;
-  font-size: 9px;
-}
-
-.mvr-preview-search {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  align-items: center;
   gap: 7px;
-  margin: 18px 0 12px;
-  padding: 8px;
-  border: 1px solid #e0e8e3;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 5px 16px rgba(29, 58, 42, 0.07);
+  color: #244b38;
+  background:
+    linear-gradient(90deg, transparent 7%, rgba(255,255,255,.92) 7% 93%, transparent 93%),
+    repeating-linear-gradient(#dfeae3 0 18px, transparent 18px 38px);
 }
 
-.mvr-preview-search > span {
-  display: grid;
-  gap: 2px;
-  padding: 6px 8px;
-  color: #526158;
-  border-radius: 8px;
-  background: #f5f7f5;
-  font-size: 9px;
+.mvr-preview-teaser-fallback span {
+  color: #728079;
+  font-size: 11px;
 }
 
-.mvr-preview-search small {
-  color: #89958e;
-  font-size: 7px;
-  font-weight: 700;
-  text-transform: uppercase;
+.mvr-preview-teaser-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.22), rgba(238, 244, 240, 0.55) 58%, rgba(231, 238, 234, 0.82)),
+    rgba(242, 246, 243, 0.18);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
-.mvr-preview-search > b {
-  padding: 11px 13px;
-  color: #fff;
-  border-radius: 9px;
-  background: var(--mvr-green);
-  font-size: 9px;
-}
-
-.mvr-preview-room {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border: 1px solid #e0e8e3;
-  border-radius: 13px;
-  background: #fff;
-}
-
-.mvr-preview-room-photo {
-  width: 84px;
-  height: 62px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 9px;
-  object-fit: cover;
-}
-
-.mvr-preview-room-photo.mvr-photo-placeholder span {
-  font-size: 19px;
-}
-
-.mvr-preview-room > div,
-.mvr-preview-room > span {
-  min-width: 0;
+.mvr-preview-teaser > button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  min-width: min(270px, calc(100% - 36px));
   display: grid;
   gap: 3px;
+  padding: 15px 20px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 15px;
+  background: rgba(37, 105, 75, 0.96);
+  box-shadow: 0 18px 44px rgba(24, 64, 44, 0.28);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: transform 160ms ease, background 160ms ease;
 }
 
-.mvr-preview-room > div strong {
-  overflow: hidden;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.mvr-preview-teaser > button span {
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.mvr-preview-room small {
-  color: #87938c;
-  font-size: 8px;
+.mvr-preview-teaser > button small {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 9px;
   font-weight: 600;
 }
 
-.mvr-preview-room > span {
-  justify-items: end;
-}
-
-.mvr-preview-room > span strong {
-  color: #224b37;
-  font-size: 13px;
-}
-
-.mvr-booking-preview-action {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
-  border-top: 1px solid #e3eae6;
-  background: #fff;
-}
-
-.mvr-booking-preview-action > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.mvr-booking-preview-action > div strong {
-  font-size: 12px;
-}
-
-.mvr-booking-preview-action > div span {
-  color: #7a8780;
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.mvr-booking-preview-action button {
-  min-height: 42px;
-  padding: 10px 14px;
-  color: #fff;
-  border: 0;
-  border-radius: 11px;
-  background: var(--mvr-green);
-  box-shadow: 0 8px 18px rgba(46, 125, 91, 0.2);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.mvr-booking-preview-action button:hover {
-  background: #246a4c;
-}
-
-.mvr-booking-preview-action button span {
-  display: inline-block;
-  margin-left: 3px;
-  transition: transform 160ms ease;
-}
-
-.mvr-booking-preview-action button:hover span {
-  transform: translate(2px, -2px);
+.mvr-preview-teaser > button:hover {
+  background: #215f45;
+  transform: translate(-50%, calc(-50% - 2px));
 }
 
 .mvr-install-visual {
@@ -635,10 +540,16 @@
   filter: drop-shadow(0 5px 8px rgba(15, 39, 25, 0.16));
 }
 
-.mvr-dock-icon svg {
+.mvr-dock-icon svg,
+.mvr-ios-system-icon {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.mvr-ios-system-icon {
+  border-radius: inherit;
+  object-fit: cover;
 }
 
 .mvr-dock-property {
@@ -1227,34 +1138,8 @@
     font-size: 10px;
   }
 
-  .mvr-preview-page {
-    padding: 15px;
-  }
-
-  .mvr-preview-search {
-    margin-top: 14px;
-  }
-
-  .mvr-preview-room {
-    grid-template-columns: 68px minmax(0, 1fr);
-  }
-
-  .mvr-preview-room-photo {
-    width: 68px;
-    height: 54px;
-  }
-
-  .mvr-preview-room > span {
-    grid-column: 2;
-    justify-items: start;
-  }
-
-  .mvr-booking-preview-action {
-    grid-template-columns: 1fr;
-  }
-
-  .mvr-booking-preview-action button {
-    width: 100%;
+  .mvr-preview-teaser {
+    height: 275px;
   }
 
   .mvr-install-card {

@@ -28,13 +28,21 @@ function BookingPage({
   hotelId,
   apiBaseUrl,
 }) {
-  useEffect(() => { trackPageView(); }, []);
+  const ownerPreview = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).has('preview') || window !== window.parent;
+  }, []);
+
+  useEffect(() => {
+    if (!ownerPreview) trackPageView();
+  }, [ownerPreview]);
   useEffect(() => { setIsProcessingBooking(false); }, [setIsProcessingBooking]);
   // Per-hotel funnel: page view (owner's "Get found" metrics). Throttled per session.
   useEffect(() => {
+    if (ownerPreview) return;
     const id = hotel?.id || hotelId;
     if (id) trackHotelFunnel('page_view', id);
-  }, [hotel, hotelId]);
+  }, [ownerPreview, hotel, hotelId]);
 
   const ownerScrollInstall = useMemo(() => {
     if (typeof window === 'undefined') return false;

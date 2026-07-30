@@ -148,6 +148,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     // can see "N guests tried to book." Best-effort; never blocks the UI.
     // Per-hotel funnel: guest entered checkout (owner's "Get found" metrics). Once per session.
     useEffect(() => {
+        if (isPreviewMode) return;
         const id = (hotel && hotel.id) || hotelId;
         if (!id) return;
         trackHotelFunnel('checkout_started', id, {
@@ -156,7 +157,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
             checkout: bookingDetails?.checkout || null,
             nights: bookingDetails?.nights || null,
         });
-    }, [hotel, bookingDetails]);
+    }, [isPreviewMode, hotel, bookingDetails]);
 
     const blockedBeaconSent = useRef(false);
     useEffect(() => {
@@ -379,14 +380,14 @@ useEffect(() => {
 
 // Show "Why we need your card" modal when payment step loads
 useEffect(() => {
-  if (currentStep === 4 && !whyCardModalDismissed) {
+  if (currentStep === 4 && !whyCardModalDismissed && !isPreviewMode && hotel?.subscribed !== false) {
     const timer = setTimeout(() => {
       setShowWhyCardModal(true);
       document.body.style.overflow = 'hidden';
     }, 400);
     return () => clearTimeout(timer);
   }
-}, [currentStep, whyCardModalDismissed]);
+}, [currentStep, whyCardModalDismissed, isPreviewMode, hotel?.subscribed]);
 
 // Auto-scroll to error message when it appears
 useEffect(() => {
@@ -629,9 +630,9 @@ useEffect(() => {
   
   if (currentStep === 1) {
     setCurrentStep(2);
-    trackInitiateCheckout(bookingDetails);
+    if (!isPreviewMode) trackInitiateCheckout(bookingDetails);
   } else if (currentStep === 2) {
-    if (validateInfoStep()) {
+    if (isPreviewMode || validateInfoStep()) {
       setFormErrors({});
 
       // Optimization: skip the Plan step entirely and go straight to payment.
@@ -1200,7 +1201,7 @@ const handlePayLaterBooking = async (e) => {
         return 'Confirm Reservation - $0 Today';
     };
     
-    const onlineBookingGateActive = !isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4;
+    const onlineBookingGateActive = hotel && hotel.subscribed === false && currentStep === 4;
     const showGuestInstallBanner = !onlineBookingGateActive;
 
     const handleDismissWhyCardModal = () => {
@@ -1226,11 +1227,11 @@ const handlePayLaterBooking = async (e) => {
               <>
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.3)', zIndex: 9998, pointerEvents: 'all' }} />
                 <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
-                  <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>Online booking opens soon</div>
+                  <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>Call to reserve this room</div>
                   <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: '13px', lineHeight: 1.45, marginBottom: hotel.phone ? '12px' : '0', maxWidth: '360px', marginLeft: 'auto', marginRight: 'auto' }}>
                     {hotel.phone
-                      ? 'This room isn\u2019t bookable online just yet \u2014 call us and we\u2019ll reserve it for you right now.'
-                      : 'This room isn\u2019t bookable online just yet. Please check back shortly.'}
+                      ? 'Online booking isn\u2019t active yet \u2014 call us and we\u2019ll reserve it for you right now.'
+                      : 'Online booking isn\u2019t active yet. Please call the property directly to reserve.'}
                   </div>
                   {hotel.phone && (
                     <a

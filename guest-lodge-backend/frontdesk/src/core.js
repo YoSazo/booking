@@ -1824,35 +1824,48 @@ function installEmbeddedEditorPreview() {
     editView.insertAdjacentHTML('afterbegin', `
       <div id="embeddedEditorNotice">
         <div>
-          <strong>This is your real editor.</strong>
-          <span>Change your property details, first room, photo or price here. Every save is real.</span>
+          <strong>This is your complete Front Desk preview.</strong>
+          <span>Explore every section above. Everything is read-only except your first room card, where changes save for real.</span>
         </div>
-        <div class="embedded-editor-locked" aria-label="Available after activation">
-          <span>Bookings</span><span>Availability</span><span>Assistant</span>
-          <small>waiting after activation</small>
+        <div class="embedded-editor-locked" aria-label="Preview mode">
+          <span>Preview mode</span>
+          <small>safe to explore</small>
         </div>
       </div>
     `);
   }
 
-  const finishEditorLayout = () => {
-    const ratesCard = document.getElementById('tour-rates-card');
-    const ratesBody = ratesCard?.querySelector('.accordion-body');
-    const ratesArrow = ratesCard?.querySelector('.accordion-arrow');
-    if (!ratesCard || !ratesBody) return false;
-    ratesBody.style.display = 'block';
-    if (ratesArrow) ratesArrow.style.transform = 'rotate(90deg)';
-    return true;
-  };
-
-  if (finishEditorLayout()) return;
-  const list = document.getElementById('editRoomsList');
-  if (!list || typeof MutationObserver === 'undefined') return;
-  const observer = new MutationObserver(() => {
-    if (finishEditorLayout()) observer.disconnect();
-  });
-  observer.observe(list, { childList: true, subtree: true });
-  window.setTimeout(() => observer.disconnect(), 15000);
+  // Navigation remains usable so the owner can inspect the complete product.
+  // Actions are locked at capture time as a safety net behind the CSS lock;
+  // the first room card is the one deliberate exception and keeps its real
+  // editing/save behavior.
+  if (document.body.dataset.previewActionGuard !== '1') {
+    document.body.dataset.previewActionGuard = '1';
+    const isAllowedPreviewTarget = (target) => {
+      const interactive = target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
+      if (!interactive) return true;
+      const isNavigation = !!interactive.closest(
+        '.tab, .mobile-nav-item, #bookingsSubtabs .subtab, #revenuePeriodBar button'
+      );
+      const firstRoomCard = interactive.closest('#editRoomsCards > .booking-card:first-child');
+      const isFirstRoomEditor = !!firstRoomCard && !interactive.closest('.room-edit-delete-btn');
+      return isNavigation || isFirstRoomEditor;
+    };
+    const blockLockedPreviewAction = (event) => {
+      const interactive = event.target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
+      if (!interactive) return;
+      if (isAllowedPreviewTarget(interactive)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    document.addEventListener('click', blockLockedPreviewAction, true);
+    document.addEventListener('change', blockLockedPreviewAction, true);
+    document.addEventListener('submit', blockLockedPreviewAction, true);
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      blockLockedPreviewAction(event);
+    }, true);
+  }
 }
 
 async function startCrmApp(verification) {
@@ -1967,6 +1980,13 @@ async function startCrmApp(verification) {
     if (typeof loadSettingsModule === 'function') await loadSettingsModule();
     crm.currentFilter = 'settings';
     applyFilter();
+    initMobileBottomNav();
+    updateMobileRevenueNavVisibility();
+    syncMobileNavActive(crm.currentFilter);
+    ensureLucideLoaded().then(() => {
+      refreshMobileBottomNavIcons();
+      requestAnimationFrame(refreshMobileBottomNavIcons);
+    }).catch(() => {});
     installEmbeddedEditorPreview();
   } else if (shouldShowValueReveal) {
     try {

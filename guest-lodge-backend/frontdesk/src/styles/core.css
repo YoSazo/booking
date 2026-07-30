@@ -2321,17 +2321,14 @@
       font-weight: 800;
     }
 
-    /* Constrained, real Your Page editor used inside the onboarding reveal.
-       Saves still use the normal APIs; global navigation and secondary setup
-       paths stay out of the way until the owner activates. */
+    /* Complete Front Desk used inside the onboarding reveal. Navigation stays
+       live so owners can inspect every section; actions are read-only except
+       the first real room editor. */
     html.frontdesk-editor-preview,
     body.frontdesk-editor-preview {
       min-height: 100%;
       background: #f4f7f4;
     }
-    .frontdesk-editor-preview #app > .header,
-    .frontdesk-editor-preview #app > .mobile-bottom-nav,
-    .frontdesk-editor-preview .tabs-container,
     .frontdesk-editor-preview #goLiveBanner,
     .frontdesk-editor-preview #previewSiteBar,
     .frontdesk-editor-preview #tour-preview-btn,
@@ -2341,17 +2338,26 @@
     .frontdesk-editor-preview .room-edit-delete-btn {
       display: none !important;
     }
+
+    /* WKWebView normally replaces these with native controls. The reveal is
+       itself a web preview, so expose the complete web chrome inside it. */
+    body.frontdesk-editor-preview.native-ios #app > .header {
+      display: flex !important;
+    }
+    body.frontdesk-editor-preview.native-ios #app .tabs-container {
+      display: flex !important;
+    }
     .frontdesk-editor-preview #app .container {
-      display: block !important;
       width: 100%;
-      max-width: 1180px;
       margin: 0 auto;
-      padding: 18px clamp(12px, 3vw, 28px) 44px !important;
+    }
+    body.frontdesk-editor-preview.native-ios #app .container,
+    body.frontdesk-editor-preview.native-ios.native-shell-visible #app .container {
+      max-width: 1180px;
+      padding: 18px clamp(12px, 3vw, 28px) 86px !important;
     }
     .frontdesk-editor-preview #editView {
-      display: block !important;
       margin-top: 0 !important;
-      padding-bottom: 0 !important;
       content-visibility: visible;
     }
     .frontdesk-editor-preview #embeddedEditorNotice {
@@ -2400,40 +2406,41 @@
       font-size: 9px;
       font-weight: 700;
     }
-    .frontdesk-editor-preview .settings-dashboard-grid {
-      display: grid !important;
-      grid-template-columns: minmax(290px, 360px) minmax(0, 1fr) !important;
-      column-gap: 20px;
-      align-items: start;
+
+    /* All product actions are visibly present but inert in preview. The main
+       tabs and read-only Bookings/Revenue view switches remain navigable. */
+    .frontdesk-editor-preview #app button:not(.tab):not(.mobile-nav-item):not(.subtab),
+    .frontdesk-editor-preview #app a,
+    .frontdesk-editor-preview #app input,
+    .frontdesk-editor-preview #app select,
+    .frontdesk-editor-preview #app textarea,
+    .frontdesk-editor-preview #app label,
+    .frontdesk-editor-preview #app [role="button"] {
+      pointer-events: none !important;
     }
-    .frontdesk-editor-preview .settings-dashboard-grid > .dash-a {
-      display: block !important;
-      grid-column: 1 !important;
-      grid-row: 1 !important;
+    .frontdesk-editor-preview #app button:not(.tab):not(.mobile-nav-item):not(.subtab),
+    .frontdesk-editor-preview #app a {
+      cursor: default !important;
     }
-    .frontdesk-editor-preview .settings-dashboard-grid > .dash-b {
-      display: block !important;
-      grid-column: 2 !important;
-      grid-row: 1 / span 2 !important;
+    .frontdesk-editor-preview #app #revenuePeriodBar button,
+    .frontdesk-editor-preview #app #bookingsSubtabs .subtab,
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child,
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child input,
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child select,
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child textarea,
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child label,
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child button {
+      pointer-events: auto !important;
     }
-    .frontdesk-editor-preview .settings-dashboard-grid > .dash-c {
-      display: block !important;
-      grid-column: 1 !important;
-      grid-row: 2 !important;
-    }
-    .frontdesk-editor-preview .dash-c > .booking-card:not(#tour-rates-card),
-    .frontdesk-editor-preview #editRoomsCards > .booking-card:not(:first-child) {
+    .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child .room-edit-delete-btn {
       display: none !important;
-    }
-    .frontdesk-editor-preview #tour-rates-card {
-      display: block !important;
-    }
-    .frontdesk-editor-preview .room-edit-grid > .room-edit-media .room-edit-photo {
-      height: clamp(220px, 32vw, 330px);
-      min-height: 220px;
+      pointer-events: none !important;
     }
 
     @media (max-width: 760px) {
+      body.frontdesk-editor-preview.native-ios #app > .mobile-bottom-nav {
+        display: flex !important;
+      }
       .frontdesk-editor-preview #embeddedEditorNotice {
         align-items: flex-start;
         flex-direction: column;
@@ -2441,14 +2448,5 @@
       .frontdesk-editor-preview .embedded-editor-locked {
         width: 100%;
         flex-wrap: wrap;
-      }
-      .frontdesk-editor-preview .settings-dashboard-grid {
-        grid-template-columns: minmax(0, 1fr) !important;
-      }
-      .frontdesk-editor-preview .settings-dashboard-grid > .dash-a,
-      .frontdesk-editor-preview .settings-dashboard-grid > .dash-b,
-      .frontdesk-editor-preview .settings-dashboard-grid > .dash-c {
-        grid-column: 1 !important;
-        grid-row: auto !important;
       }
     }

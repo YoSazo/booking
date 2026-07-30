@@ -336,7 +336,11 @@ function App() {
 
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
-  const location = useLocation(); 
+  const location = useLocation();
+  const ownerPreview = typeof window !== 'undefined' && (
+    new URLSearchParams(location.search).has('preview')
+    || window !== window.parent
+  );
 
   // PWA entry: installed app opens to Guest Home. Returning guests with a stay at
   // this hotel skip the booking page. Other hotels' stays must not hijack the engine.
@@ -350,14 +354,14 @@ function App() {
 
     const hasActiveStay = !!readGuestStay(hotelId);
 
-    if (hasActiveStay || isStandalone()) {
+    if (!ownerPreview && (hasActiveStay || isStandalone())) {
       initialRedirectDone.current = true;
       navigate('/guest/home', { replace: true });
       return;
     }
 
     initialRedirectDone.current = true;
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, ownerPreview]);
   
   const [checkinDate, setCheckinDate] = useState(null);
   const [checkoutDate, setCheckoutDate] = useState(null);
@@ -550,7 +554,7 @@ function App() {
   setSelectedRoom(bookingState);
   const nights = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
   const subtotal = toFiniteNumber(room.subtotal) ?? calculateTieredPrice(nights, RATES);
-  trackAddToCart({ ...bookingState, subtotal });
+  if (!ownerPreview) trackAddToCart({ ...bookingState, subtotal });
 };
 
 
@@ -561,9 +565,6 @@ const handleConfirmBooking = async (bookingDetails) => {
     alert("Please select a room first.");
     return;
   }
-
-  const searchParams = window.location.search;
-  const isPreview = new URLSearchParams(searchParams).has('preview');
 
   setIsProcessingBooking(true);
 
@@ -587,6 +588,35 @@ const handleConfirmBooking = async (bookingDetails) => {
   };
 
   setFinalBooking(newBooking);
+  writeSessionJson('finalBooking', newBooking);
+
+  // The owner-facing live preview is a complete visual walkthrough, not a
+  // transaction. Carry a local-only placeholder into GuestInfoPage so the
+  // preview can reach its final inactive-property call banner without asking
+  // Stripe for a PaymentIntent or creating any booking/hold.
+  if (ownerPreview) {
+    const previewClientSecret = 'marketel_owner_preview';
+    const previewHotelId = currentHotel.id || hotelId;
+    setClientSecret(previewClientSecret);
+    writeSessionValue('clientSecret', previewClientSecret);
+    setIsProcessingBooking(false);
+    navigate(`/guest-info?hotelId=${encodeURIComponent(previewHotelId)}&preview=1`, {
+      state: {
+        room: {
+          name: selectedRoom.name,
+          beds: selectedRoom.beds || 'N/A',
+        },
+        totalPrice: total,
+        searchParams: {
+          checkIn: checkinDate,
+          checkOut: checkoutDate,
+          nights,
+          guests: selectedRoom.guests,
+        },
+      },
+    });
+    return;
+  }
 
   const stripeMetadata = {
     roomTypeID: newBooking.roomTypeID,
@@ -610,8 +640,7 @@ const handleConfirmBooking = async (bookingDetails) => {
         amount: newBooking.total / 2,
         bookingDetails: stripeMetadata,
         guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
-        hotelId: hotelId,
-        preview: isPreview || undefined
+        hotelId: currentHotel.id || hotelId
       }),
     });
     
@@ -830,7 +859,11 @@ const handleConfirmBooking = async (bookingDetails) => {
                   removeSessionItem('finalBooking');
                   removeSessionItem('clientSecret');
                   removeSessionItem('selectedPlan');
-                  navigate('/');
+                  if (ownerPreview) {
+                    navigate(`/?hotelId=${encodeURIComponent(currentHotel.id || hotelId)}&preview=1`);
+                  } else {
+                    navigate('/');
+                  }
                 }}
                 onComplete={handleCompleteBooking}
                 apiBaseUrl={API_BASE_URL}
