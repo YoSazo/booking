@@ -12,11 +12,21 @@
       "bundleIdentifier": "com.bookmarketel.frontdesk",
       "developerName": "Marketel",
       "subtitle": "Run your property from your phone.",
-      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.8 fixes dogfood property sign-in while retaining the substantially faster Front Desk startup introduced in 2.7.",
+      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.9 prevents native startup from hanging indefinitely and safely recovers when the optimized startup request stalls.",
       "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
       "tintColor": "2E7D5B",
       "category": "utilities",
       "versions": [
+        {
+          "version": "2.9",
+          "buildVersion": "11",
+          "date": "2026-07-30",
+          "localizedDescription": "Adds an eight-second startup timeout, automatically falls back to the established loading path, preserves the signed-in session on temporary network failures, provides a working retry state, and labels localhost as the normal bundled-app host.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.9/Marketel-Front-Desk.ipa",
+          "size": 1046373,
+          "sha256": "94b241817046ec4dc5e095bc8d79afd2a0ec3458c58b1874c9646fe9cde62e5d",
+          "minOSVersion": "15.0"
+        },
         {
           "version": "2.8",
           "buildVersion": "10",
