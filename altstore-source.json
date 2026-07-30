@@ -12,11 +12,21 @@
       "bundleIdentifier": "com.bookmarketel.frontdesk",
       "developerName": "Marketel",
       "subtitle": "Run your property from your phone.",
-      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.4 adds a stable capsule-shaped header, an immediate Front Desk Assistant sheet, and a native Apple contact form for the Marketel number. Native APNs booking alerts are not included yet.",
+      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 2.5 bundles the complete Front Desk inside the app, adds subscriber sign-in and account controls, and prepares native booking alerts for push-enabled App Store builds.",
       "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
       "tintColor": "2E7D5B",
       "category": "utilities",
       "versions": [
+        {
+          "version": "2.5",
+          "buildVersion": "7",
+          "date": "2026-07-29",
+          "localizedDescription": "Bundles the complete Front Desk into the iPhone app, adds active-subscriber sign-in, property-aware navigation, privacy and account deletion controls, and native booking-notification support. Native APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.2.5/Marketel-Front-Desk.ipa",
+          "size": 1045211,
+          "sha256": "c73221a5b1f5bafa609a3ad79d8f03b4923a918101648c4850cf89b52dbbd8de",
+          "minOSVersion": "15.0"
+        },
         {
           "version": "2.4",
           "buildVersion": "6",
