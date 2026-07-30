@@ -18,6 +18,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_local_missing_set_STRIPE_SECRET_KEY_in_env');
 const xml2js = require('xml2js');
 const http = require('http');
+const http2 = require('http2');
 const https = require('https');
 const webpush = require('web-push');
 const nodemailer = require('nodemailer');
@@ -341,7 +342,7 @@ async function runGuestInstallReminders() {
 }
 
 // Web Push configuration
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:notifications@example.com';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@bookmarketel.com';
 
 // Meta Ads / Facebook Marketing API config
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
@@ -359,6 +360,25 @@ const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
     console.log('✅ Web push configured with subject:', VAPID_SUBJECT);
+}
+
+// Native iOS push. APNS_PRIVATE_KEY accepts either the literal .p8 contents or
+// a one-line environment value containing escaped newlines.
+const APNS_TEAM_ID = String(process.env.APNS_TEAM_ID || '').trim();
+const APNS_KEY_ID = String(process.env.APNS_KEY_ID || '').trim();
+const APNS_PRIVATE_KEY = String(process.env.APNS_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
+const APNS_BUNDLE_ID = String(process.env.APNS_BUNDLE_ID || 'com.bookmarketel.frontdesk').trim();
+let APNS_PRIVATE_KEY_OBJECT = null;
+if (APNS_PRIVATE_KEY) {
+    try {
+        APNS_PRIVATE_KEY_OBJECT = crypto.createPrivateKey(APNS_PRIVATE_KEY);
+    } catch (error) {
+        console.error(`❌ APNs private key is invalid: ${error.message}`);
+    }
+}
+const APNS_CONFIGURED = !!(APNS_TEAM_ID && APNS_KEY_ID && APNS_PRIVATE_KEY_OBJECT && APNS_BUNDLE_ID);
+if (APNS_CONFIGURED) {
+    console.log(`✅ Native iOS push configured for ${APNS_BUNDLE_ID}`);
 }
 
 const app = express();
@@ -510,6 +530,8 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3001',
     'http://localhost:55031',
+    'capacitor://localhost',
+    'ionic://localhost',
 ].concat((process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean));
 
 const corsOptions = {
@@ -1959,7 +1981,7 @@ const createPreauthHoldRateLimit = createRouteRateLimiter('create-preauth-hold',
 const completePayLaterRateLimit = createRouteRateLimiter('complete-pay-later-booking', { windowMs: 60 * 1000, max: 12 });
 const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1000, max: 12 });
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
-const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 25 });
+const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 10 });
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
@@ -3806,11 +3828,17 @@ app.get('/health', async (req, res) => {
 
 // --- Front Desk CRM ---
 const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
-const CRM_PASSWORD_ALT = process.env.CRM_PASSWORD_ALT || '2026';
+const CRM_PASSWORD_ALT = process.env.CRM_PASSWORD_ALT || '';
 const DEFAULT_CRM_HOTEL_ID = (process.env.HOTEL_ID || 'guest-lodge-minot').trim();
 const CRM_TOKEN_HOTELS_JSON = process.env.CRM_TOKEN_HOTELS || process.env.CRM_PIN_HOTEL_MAP || '';
 const CRM_MASTER_PINS_RAW = process.env.CRM_MASTER_PINS || '';
 const ADMIN_TOKEN = (process.env.ADMIN_TOKEN || process.env.CRM_ADMIN_TOKEN || '').trim();
+const CRM_PIN_HASH_SECRET = String(
+    process.env.CRM_PIN_HASH_SECRET
+    || process.env.SESSION_SECRET
+    || process.env.MAGIC_LINK_SECRET
+    || ''
+).trim();
 
 function toHotelList(value) {
     if (Array.isArray(value)) {
@@ -3824,11 +3852,16 @@ function toHotelList(value) {
     return [];
 }
 
+// Universal Front Desk PINs are intentionally disabled in production. Admin
+// APIs use ADMIN_TOKEN and normal Front Desk credentials stay property-scoped.
 const CRM_MASTER_PINS = new Set(
-    ['2026', '4040', CRM_PASSWORD, CRM_PASSWORD_ALT, ...toHotelList(CRM_MASTER_PINS_RAW)]
+    (process.env.NODE_ENV === 'production' ? [] : toHotelList(CRM_MASTER_PINS_RAW))
         .map(v => String(v || '').trim())
         .filter(Boolean)
 );
+if (process.env.NODE_ENV === 'production' && CRM_MASTER_PINS_RAW) {
+    console.warn('CRM_MASTER_PINS is ignored in production; use scoped CRM_TOKEN_HOTELS credentials.');
+}
 
 function isCrmMasterPin(value) {
     return CRM_MASTER_PINS.has(String(value || '').trim());
@@ -3837,7 +3870,7 @@ function isCrmMasterPin(value) {
 function generateCrmOwnerPin() {
     let pin = '';
     do {
-        pin = String(Math.floor(1000 + Math.random() * 9000));
+        pin = String(Math.floor(100000 + Math.random() * 900000));
     } while (isCrmMasterPin(pin));
     return pin;
 }
@@ -3865,11 +3898,12 @@ function buildCrmTokenHotelMap() {
         }
     }
 
-    // Backward compatible fallback: existing PINs scoped to one default hotel.
+    // Backward-compatible environment credentials are limited to the configured
+    // default property. They must never become universal credentials.
     if (!Object.keys(map).length) {
         const fallbackPins = [CRM_PASSWORD, CRM_PASSWORD_ALT].map(v => String(v || '').trim()).filter(Boolean);
         for (const pin of fallbackPins) {
-            map[pin] = ['*'];
+            map[pin] = [DEFAULT_CRM_HOTEL_ID];
         }
     }
 
@@ -3879,7 +3913,19 @@ function buildCrmTokenHotelMap() {
 const CRM_TOKEN_HOTELS_MAP = buildCrmTokenHotelMap();
 
 function hashCrmPin(pin) {
+    const cleanPin = String(pin || '').trim();
+    if (!CRM_PIN_HASH_SECRET) {
+        return crypto.createHash('sha256').update(cleanPin).digest('hex');
+    }
+    return 'v2:' + crypto.createHmac('sha256', CRM_PIN_HASH_SECRET).update(cleanPin).digest('hex');
+}
+
+function legacyHashCrmPin(pin) {
     return crypto.createHash('sha256').update(String(pin || '').trim()).digest('hex');
+}
+
+function crmPinHashCandidates(pin) {
+    return [...new Set([hashCrmPin(pin), legacyHashCrmPin(pin)])];
 }
 
 const configuredCrmReturnTokenSecret = process.env.CRM_RETURN_TOKEN_SECRET || process.env.SESSION_SECRET || process.env.MAGIC_LINK_SECRET;
@@ -3890,6 +3936,9 @@ const NATIVE_SESSION_TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
 
 if (!configuredCrmReturnTokenSecret) {
     console.warn('CRM_RETURN_TOKEN_SECRET, SESSION_SECRET, or MAGIC_LINK_SECRET is not set; using an ephemeral Front Desk return-token secret for this process.');
+}
+if (process.env.NODE_ENV === 'production' && !CRM_PIN_HASH_SECRET) {
+    console.warn('CRM_PIN_HASH_SECRET/SESSION_SECRET is not set; legacy unkeyed PIN hashes remain in use.');
 }
 
 function generateNativeSessionToken(email) {
@@ -3927,6 +3976,7 @@ async function getDbAllowedHotelsForOwnerEmail(email) {
     const rows = await withRetry(() => prisma.hotelConfig.findMany({
         where: {
             active: true,
+            subscribed: true,
             ownerEmail: { equals: normalizedEmail, mode: 'insensitive' },
         },
         select: { id: true },
@@ -4041,11 +4091,18 @@ async function verifyCrmReturnToken(token) {
 
 async function getDbAllowedHotelsForToken(token) {
     if (!token || !prisma.crmPin) return [];
-    const pinHash = hashCrmPin(token);
+    const pinHashes = crmPinHashCandidates(token);
     const rows = await withRetry(() => prisma.crmPin.findMany({
-        where: { pinHash, active: true, hotel: { active: true } },
-        select: { hotelId: true },
+        where: { pinHash: { in: pinHashes }, active: true, hotel: { active: true } },
+        select: { id: true, hotelId: true, pinHash: true },
     }));
+    const secureHash = hashCrmPin(token);
+    const legacyIds = rows.filter(row => row.pinHash !== secureHash).map(row => row.id);
+    if (CRM_PIN_HASH_SECRET && legacyIds.length) {
+        await Promise.allSettled(legacyIds.map(id =>
+            prisma.crmPin.update({ where: { id }, data: { pinHash: secureHash } })
+        ));
+    }
     return [...new Set(rows.map(r => String(r.hotelId || '').trim()).filter(Boolean))];
 }
 
@@ -4092,6 +4149,8 @@ function requireScopedHotelId(req, res) {
 
 const crmAuth = async (req, res, next) => {
     const token = (req.headers['x-crm-token'] || req.query.token || '').toString().trim();
+    const marketelClient = String(req.headers['x-marketel-client'] || '').trim().toLowerCase();
+    const isNativeClient = marketelClient === 'ios' || marketelClient === 'android';
     const returnAuth = await verifyCrmReturnToken(token);
     const nativeAuth = returnAuth ? null : verifyNativeSessionToken(token);
     const dbAllowedHotels = returnAuth || nativeAuth
@@ -4106,7 +4165,7 @@ const crmAuth = async (req, res, next) => {
             ? nativeAllowedHotels
             : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
     
-    // Master PIN backdoor for the admin to easily test across all hotels
+    // Local-only developer convenience. Production never has master PINs.
     const isMasterPin = !returnAuth && isCrmMasterPin(token);
     if (isMasterPin) {
         if (!allowedHotels.includes('*')) allowedHotels = [...allowedHotels, '*'];
@@ -4133,10 +4192,37 @@ const crmAuth = async (req, res, next) => {
     req.crmIsMasterPin = isMasterPin;
     req.crmIsReturnToken = !!returnAuth;
     req.crmIsNativeSession = !!nativeAuth;
+    req.crmIsNativeClient = isNativeClient;
+    req.crmClient = marketelClient;
     req.crmNativeEmail = nativeAuth?.email || '';
     req.crmResolvedHotelId = hostContext.hotelId || null;
     req.crmResolvedDomain = hostContext.domain || null;
-    req.crmDefaultHotelId = hostContext.hotelId || (allowedHotels[0] === '*' ? 'guest-lodge-minot' : allowedHotels[0]);
+    req.crmDefaultHotelId = hostContext.hotelId || (allowedHotels[0] === '*' ? DEFAULT_CRM_HOTEL_ID : allowedHotels[0]);
+
+    // The App Store build is a companion for active Marketel customers. This
+    // server-side gate is defense in depth behind the native login UI and also
+    // guarantees that no native request can reach Stripe activation routes.
+    if (isNativeClient) {
+        const nativeHotelId = resolveScopedHotelId(req, { allowFallback: true });
+        if (!nativeHotelId || nativeHotelId === '*') {
+            return res.status(403).json({
+                success: false,
+                message: 'Choose an active Marketel property to continue.',
+                code: 'native_property_required',
+            });
+        }
+        const nativeHotel = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: nativeHotelId },
+            select: { active: true, subscribed: true },
+        })).catch(() => null);
+        if (!nativeHotel?.active || !nativeHotel?.subscribed) {
+            return res.status(403).json({
+                success: false,
+                message: 'This property does not currently have Front Desk app access.',
+                code: 'native_subscription_required',
+            });
+        }
+    }
     next();
 };
 
@@ -4684,6 +4770,82 @@ app.post('/api/push/subscribe', crmAuth, async (req, res) => {
     }
 });
 
+function normalizeApnsDeviceToken(value) {
+    const token = String(value || '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+    return token.length >= 64 && token.length <= 200 ? token : '';
+}
+
+app.post('/api/push/native/register', crmAuth, async (req, res) => {
+    try {
+        if (!req.crmIsNativeClient) {
+            return res.status(400).json({ success: false, message: 'Native client header required.' });
+        }
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const deviceToken = normalizeApnsDeviceToken(req.body?.deviceToken);
+        const environment = String(req.body?.environment || '').toLowerCase() === 'sandbox'
+            ? 'sandbox'
+            : 'production';
+        if (!deviceToken) {
+            return res.status(400).json({ success: false, message: 'A valid APNs device token is required.' });
+        }
+        await prisma.nativePushDevice.upsert({
+            where: { deviceToken_hotelId: { deviceToken, hotelId } },
+            create: {
+                deviceToken,
+                hotelId,
+                environment,
+                platform: 'ios',
+                active: true,
+                lastSeenAt: new Date(),
+            },
+            update: {
+                environment,
+                platform: 'ios',
+                active: true,
+                lastSeenAt: new Date(),
+            },
+        });
+        res.json({ success: true, pushConfigured: APNS_CONFIGURED });
+    } catch (error) {
+        console.error('push/native/register:', error.message);
+        res.status(500).json({ success: false, message: 'Could not register this device for notifications.' });
+    }
+});
+
+app.post('/api/push/native/unregister', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const deviceToken = normalizeApnsDeviceToken(req.body?.deviceToken);
+        if (!deviceToken) {
+            return res.status(400).json({ success: false, message: 'A valid APNs device token is required.' });
+        }
+        const unregisterAllForDevice = req.crmIsNativeClient && req.body?.all === true;
+        await prisma.nativePushDevice.deleteMany({
+            where: unregisterAllForDevice ? { deviceToken } : { deviceToken, hotelId },
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('push/native/unregister:', error.message);
+        res.status(500).json({ success: false, message: 'Could not unregister this device.' });
+    }
+});
+
+app.get('/api/push/native/status', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const registeredDevices = await prisma.nativePushDevice.count({
+            where: { hotelId, active: true },
+        });
+        res.json({ success: true, configured: APNS_CONFIGURED, registeredDevices });
+    } catch (error) {
+        console.error('push/native/status:', error.message);
+        res.status(500).json({ success: false, message: 'Could not load notification status.' });
+    }
+});
+
 // Guest PWA: register for message notifications (public, no auth).
 app.post('/api/guest-push-subscribe', async (req, res) => {
     try {
@@ -5034,7 +5196,7 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
                     enabled: false,
                     windowMinutes: resolveApprovalWindowMinutes(null),
                     supported: true,
-                    pushConfigured: !!VAPID_PRIVATE,
+                    pushConfigured: ownerPushConfigured(),
                     devices: 0,
                     installedAt: null,
                     missedReviews: 0,
@@ -5068,7 +5230,7 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
                 windowMinutes: resolveApprovalWindowMinutes(hotel),
                 // Only manual-PMS hotels hold bookings locally.
                 supported: String(hotel?.pms || '').toLowerCase() === 'manual',
-                pushConfigured: !!VAPID_PRIVATE,
+                pushConfigured: ownerPushConfigured(),
                 devices,
                 installedAt: hotel?.frontdeskInstalledAt || null,
                 missedReviews,
@@ -5266,27 +5428,21 @@ app.post('/api/crm/guest-broadcast', crmAuth, async (req, res) => {
 // PWA push: send a test notification to this hotel's subscribed devices
 app.post('/api/push/test', crmAuth, async (req, res) => {
     try {
-        if (!VAPID_PRIVATE) return res.status(503).json({ success: false, message: 'Push not configured' });
+        if (!ownerPushConfigured()) return res.status(503).json({ success: false, message: 'Push not configured' });
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
-        if (!subs.length) return res.json({ success: false, message: 'No subscribed devices yet' });
-        const payload = JSON.stringify({
+        const sent = await sendPushToHotel(hotelId, {
             title: 'Notifications are on ✅',
             body: "This is how you'll be alerted when a guest books.",
             url: '/frontdesk',
             icon: '/apple-touch-icon.png',
+            data: { type: 'test' },
+        }, { TTL: 60, urgency: 'high' }, 'push/test');
+        res.json({
+            success: sent > 0,
+            sent,
+            message: sent > 0 ? undefined : 'No registered devices could be reached.',
         });
-        const results = await Promise.allSettled(subs.map((s) =>
-            webpush.sendNotification(
-                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                payload,
-                { TTL: 60 }
-            )
-        ));
-        await cleanupPushResults(subs, results, 'push/test');
-        const sent = results.filter((r) => r.status === 'fulfilled').length;
-        res.json({ success: sent > 0, sent, failed: results.length - sent });
     } catch (e) {
         console.error('push/test error:', e.message);
         res.status(500).json({ success: false, message: e.message });
@@ -5298,6 +5454,148 @@ const BIG_BOOKING_USD = Number(process.env.BIG_BOOKING_USD || 250);
 // Owner-facing alerts only — guest PWA subscriptions use source='guest'.
 function ownerPushWhere(hotelId) {
     return { hotelId, NOT: { source: 'guest' } };
+}
+
+let cachedApnsProviderToken = null;
+
+function ownerPushConfigured() {
+    return !!VAPID_PRIVATE || APNS_CONFIGURED;
+}
+
+function createApnsProviderToken() {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (cachedApnsProviderToken && cachedApnsProviderToken.expiresAt > nowSeconds + 60) {
+        return cachedApnsProviderToken.value;
+    }
+    const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: APNS_KEY_ID })).toString('base64url');
+    const claims = Buffer.from(JSON.stringify({ iss: APNS_TEAM_ID, iat: nowSeconds })).toString('base64url');
+    const signingInput = `${header}.${claims}`;
+    const signature = crypto.sign('sha256', Buffer.from(signingInput), {
+        key: APNS_PRIVATE_KEY_OBJECT,
+        dsaEncoding: 'ieee-p1363',
+    }).toString('base64url');
+    const value = `${signingInput}.${signature}`;
+    cachedApnsProviderToken = { value, expiresAt: nowSeconds + 50 * 60 };
+    return value;
+}
+
+function buildApnsPayload(payloadObj = {}, hotelId = '') {
+    const data = payloadObj.data && typeof payloadObj.data === 'object' ? payloadObj.data : {};
+    const type = String(data.type || '').trim();
+    const category = type === 'booking_approval'
+        ? 'MARKETEL_BOOKING_APPROVAL'
+        : type === 'booking_review'
+            ? 'MARKETEL_BOOKING_REVIEW'
+            : 'MARKETEL_GENERAL';
+    return {
+        aps: {
+            alert: {
+                title: String(payloadObj.title || 'Marketel Front Desk').slice(0, 100),
+                body: String(payloadObj.body || '').slice(0, 240),
+            },
+            sound: 'default',
+            badge: 1,
+            category,
+            ...(payloadObj.tag ? { 'thread-id': String(payloadObj.tag).slice(0, 64) } : {}),
+        },
+        url: String(payloadObj.url || '/frontdesk').slice(0, 1000),
+        hotelId: String(hotelId || '').slice(0, 160),
+        data,
+        tag: String(payloadObj.tag || '').slice(0, 64),
+    };
+}
+
+function sendApnsRequest(device, payloadObj, opts = {}) {
+    const host = device.environment === 'sandbox'
+        ? 'https://api.sandbox.push.apple.com'
+        : 'https://api.push.apple.com';
+    const ttl = Math.max(0, Number(opts.TTL || 600));
+    const collapseId = String(payloadObj.tag || '').replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 64);
+    const body = JSON.stringify(buildApnsPayload(payloadObj, device.hotelId));
+
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        let timer = null;
+        const client = http2.connect(host);
+        const finish = (error, result) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            try { client.close(); } catch (_) {}
+            if (error) reject(error);
+            else resolve(result);
+        };
+        timer = setTimeout(() => finish(new Error('APNs request timed out')), 12000);
+        client.once('error', error => finish(error));
+
+        let request;
+        try {
+            request = client.request({
+                ':method': 'POST',
+                ':path': `/3/device/${device.deviceToken}`,
+                authorization: `bearer ${createApnsProviderToken()}`,
+                'apns-topic': APNS_BUNDLE_ID,
+                'apns-push-type': 'alert',
+                'apns-priority': '10',
+                'apns-expiration': String(Math.floor(Date.now() / 1000) + ttl),
+                ...(collapseId ? { 'apns-collapse-id': collapseId } : {}),
+            });
+        } catch (error) {
+            finish(error);
+            return;
+        }
+
+        let status = 0;
+        let responseBody = '';
+        request.setEncoding('utf8');
+        request.on('response', headers => {
+            status = Number(headers[':status'] || 0);
+        });
+        request.on('data', chunk => { responseBody += chunk; });
+        request.on('error', error => finish(error));
+        request.on('end', () => {
+            let reason = '';
+            try { reason = JSON.parse(responseBody || '{}').reason || ''; } catch (_) {}
+            if (status === 200) {
+                finish(null, { ok: true, status });
+                return;
+            }
+            const error = new Error(`APNs ${status || 'error'}${reason ? `: ${reason}` : ''}`);
+            error.statusCode = status;
+            error.reason = reason;
+            finish(error);
+        });
+        request.end(body);
+    });
+}
+
+async function sendNativePushToHotel(hotelId, payloadObj, opts = {}, label = 'nativePush') {
+    if (!APNS_CONFIGURED || !hotelId || !prisma.nativePushDevice) return 0;
+    const devices = await prisma.nativePushDevice.findMany({
+        where: { hotelId, active: true, platform: 'ios' },
+    });
+    if (!devices.length) return 0;
+    const results = await Promise.allSettled(devices.map(device =>
+        sendApnsRequest(device, payloadObj, opts)
+    ));
+    const deadReasons = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
+    const deadIds = [];
+    results.forEach((result, index) => {
+        if (result.status === 'rejected' && deadReasons.has(result.reason?.reason)) {
+            deadIds.push(devices[index].id);
+        } else if (result.status === 'rejected') {
+            console.error(`❌ [apns] ${label} device=${devices[index].id}: ${result.reason?.message || result.reason}`);
+        }
+    });
+    if (deadIds.length) {
+        await prisma.nativePushDevice.updateMany({
+            where: { id: { in: deadIds } },
+            data: { active: false },
+        }).catch(() => {});
+    }
+    const sent = results.filter(result => result.status === 'fulfilled').length;
+    console.log(`📲 [apns] ${label} hotel=${hotelId}: ${sent}/${devices.length} sent`);
+    return sent;
 }
 
 async function saveGuestPushSubscription({ endpoint, p256dh, auth, hotelId, reservationCode }) {
@@ -5347,20 +5645,33 @@ async function sendPushToGuests(hotelId, payloadObj, opts = {}, label = 'guestPu
 // Generic push sender for one hotel: loads subs, sends, self-heals dead ones,
 // and returns how many were delivered. All owner notifications funnel through this.
 async function sendPushToHotel(hotelId, payloadObj, opts = {}, label = 'push') {
-    if (!VAPID_PRIVATE) { console.log(`🔕 [push] ${label} skipped — VAPID not configured (hotel=${hotelId})`); return 0; }
     if (!hotelId) { console.log(`🔕 [push] ${label} skipped — no hotelId`); return 0; }
-    const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
-    if (subs.length === 0) { console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 subscriptions`); return 0; }
-    const payload = JSON.stringify(payloadObj);
-    const results = await Promise.allSettled(subs.map((s) =>
-        webpush.sendNotification(
-            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-            payload,
-            Object.assign({ TTL: 600 }, opts)
-        )
-    ));
-    await cleanupPushResults(subs, results, label);
-    return results.filter((r) => r.status === 'fulfilled').length;
+    if (!ownerPushConfigured()) {
+        console.log(`🔕 [push] ${label} skipped — neither Web Push nor APNs is configured (hotel=${hotelId})`);
+        return 0;
+    }
+
+    let webSent = 0;
+    if (VAPID_PRIVATE) {
+        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
+        if (subs.length) {
+            const payload = JSON.stringify(payloadObj);
+            const results = await Promise.allSettled(subs.map((s) =>
+                webpush.sendNotification(
+                    { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                    payload,
+                    Object.assign({ TTL: 600 }, opts)
+                )
+            ));
+            await cleanupPushResults(subs, results, label);
+            webSent = results.filter((r) => r.status === 'fulfilled').length;
+        }
+    }
+    const nativeSent = await sendNativePushToHotel(hotelId, payloadObj, opts, label);
+    if (webSent + nativeSent === 0) {
+        console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 reachable devices`);
+    }
+    return webSent + nativeSent;
 }
 
 const MONTHLY_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
@@ -5506,7 +5817,7 @@ async function sendBookingReviewPush(booking, { reminderNumber = 0 } = {}) {
 // returning guest, or a same-day arrival each get their own framing. Also fires a
 // separate 🏆 milestone alert when the hotel crosses a monthly bookings threshold.
 async function notifyNewBooking(hotelId, guestName, roomName, grandTotal, checkinIso = '', guestEmail = '', bookingId = '') {
-    if (!VAPID_PRIVATE || !hotelId) { console.log(`🔕 [push] new booking skipped (vapid=${!!VAPID_PRIVATE}, hotel=${hotelId})`); return; }
+    if (!ownerPushConfigured() || !hotelId) { console.log(`🔕 [push] new booking skipped (configured=${ownerPushConfigured()}, hotel=${hotelId})`); return; }
     try {
         const amount = (grandTotal !== undefined && grandTotal !== null) ? Number(grandTotal) : null;
         const todayIso = getReportingTodayIso();
@@ -5662,26 +5973,16 @@ async function getManualRoomTodayAvailability(hotelId, roomName, referenceIso = 
 }
 
 async function notifyRoomSoldOutToday(hotelId, roomName) {
-    if (!VAPID_PRIVATE || !hotelId || !roomName) return;
+    if (!ownerPushConfigured() || !hotelId || !roomName) return;
     try {
-        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
-        if (subs.length === 0) return;
-
-        const payload = JSON.stringify({
+        await sendPushToHotel(hotelId, {
             title: 'Sold Out Tonight! 🎉',
             body: `${roomName} is SOLD OUT for tonight on your website. Let’s go!`,
             url: '/frontdesk',
             icon: '/marketellogo.svg',
             tag: `soldout-${slugifyText(roomName)}`,
-        });
-
-        await Promise.allSettled(subs.map((s) =>
-            webpush.sendNotification(
-                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                payload,
-                { TTL: 120, urgency: 'high' }
-            )
-        ));
+            data: { type: 'sold_out' },
+        }, { TTL: 120, urgency: 'high' }, 'soldOutToday');
     } catch (e) {
         console.error('notifyRoomSoldOutToday:', e.message);
     }
@@ -5735,7 +6036,7 @@ function triggerBookingNotifications(hotelId, guestName, roomName, grandTotal, c
 
 // Notify the owner that a guest messaged them from the confirmation screen.
 async function notifyGuestMessage(hotelId, guestName, preview, reservationCode = '') {
-    if (!VAPID_PRIVATE || !hotelId) return;
+    if (!ownerPushConfigured() || !hotelId) return;
     try {
         const tag = reservationCode ? ` · #${reservationCode}` : '';
         const sent = await sendPushToHotel(hotelId, {
@@ -5806,9 +6107,17 @@ function resolveApprovalWindowMinutes(config) {
 }
 
 async function countOwnerPushDevices(hotelId) {
-    if (!prisma.pushSubscription || !hotelId) return 0;
+    if (!hotelId) return 0;
     try {
-        return await withRetry(() => prisma.pushSubscription.count({ where: ownerPushWhere(hotelId) }));
+        const [webCount, nativeCount] = await Promise.all([
+            prisma.pushSubscription
+                ? withRetry(() => prisma.pushSubscription.count({ where: ownerPushWhere(hotelId) }))
+                : Promise.resolve(0),
+            prisma.nativePushDevice
+                ? withRetry(() => prisma.nativePushDevice.count({ where: { hotelId, active: true } }))
+                : Promise.resolve(0),
+        ]);
+        return webCount + nativeCount;
     } catch (_) {
         return 0;
     }
@@ -5820,7 +6129,7 @@ async function resolveBookingApprovalPlan(config) {
     // Manual PMS only: the local Booking table is the inventory, so pending and
     // released rows are meaningful without an external reservation round-trip.
     if (String(config.pms || '').toLowerCase() !== 'manual') return off;
-    if (!VAPID_PRIVATE) return { ...off, outcome: 'auto_no_alerts' };
+    if (!ownerPushConfigured()) return { ...off, outcome: 'auto_no_alerts' };
     if ((await countOwnerPushDevices(config.id)) < 1) return { ...off, outcome: 'auto_no_alerts' };
 
     const windowMinutes = resolveApprovalWindowMinutes(config);
@@ -5884,7 +6193,7 @@ function formatApprovalStayRange(checkin, checkout) {
 }
 
 async function notifyBookingNeedsApproval(booking) {
-    if (!VAPID_PRIVATE || !booking?.hotelId || !booking?.id) return 0;
+    if (!ownerPushConfigured() || !booking?.hotelId || !booking?.id) return 0;
     try {
         const token = signBookingActionToken({ bookingId: booking.id, hotelId: booking.hotelId });
         const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'A guest';
@@ -5917,7 +6226,7 @@ async function notifyBookingNeedsApproval(booking) {
 // Re-send on the same tag so a decided booking stops prompting on the owner's
 // other devices instead of leaving a stale "confirm or release" card behind.
 async function notifyBookingApprovalResolved(booking, outcome) {
-    if (!VAPID_PRIVATE || !booking?.hotelId) return;
+    if (!ownerPushConfigured() || !booking?.hotelId) return;
     try {
         const released = outcome === 'owner_released';
         const auto = outcome === 'auto_confirmed';
@@ -6815,9 +7124,24 @@ async function sendHotelRecap(hotelId) {
 
 // Run a per-hotel job across every hotel that has at least one subscriber.
 async function forEachSubscribedHotel(label, fn) {
-    if (!VAPID_PRIVATE) return;
-    const subs = await prisma.pushSubscription.findMany({ select: { hotelId: true } });
-    const hotelIds = [...new Set(subs.map((s) => s.hotelId).filter(Boolean))];
+    if (!ownerPushConfigured()) return;
+    const [webSubs, nativeDevices] = await Promise.all([
+        VAPID_PRIVATE
+            ? prisma.pushSubscription.findMany({
+                where: { NOT: { source: 'guest' } },
+                select: { hotelId: true },
+            })
+            : Promise.resolve([]),
+        APNS_CONFIGURED
+            ? prisma.nativePushDevice.findMany({
+                where: { active: true },
+                select: { hotelId: true },
+            })
+            : Promise.resolve([]),
+    ]);
+    const hotelIds = [...new Set(
+        [...webSubs, ...nativeDevices].map((subscription) => subscription.hotelId).filter(Boolean)
+    )];
     if (!hotelIds.length) return;
     console.log(`⏰ [push] running ${label} for ${hotelIds.length} hotel(s)`);
     for (const hotelId of hotelIds) {
@@ -6852,11 +7176,8 @@ if (process.env.ENABLE_SCHEDULED_PUSH_DIGESTS !== 'false') {
 
 // Notify about payment declined leads (URGENT - call within 60 seconds!)
 async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMessage) {
-    if (!VAPID_PRIVATE || !hotelId) return;
+    if (!ownerPushConfigured() || !hotelId) return;
     try {
-        const subs = await prisma.pushSubscription.findMany({ where: ownerPushWhere(hotelId) });
-        if (subs.length === 0) return;
-
         const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || 'Guest';
         const roomName = bookingDetails.roomName || 'Room';
         const total = bookingDetails.total ? `$${bookingDetails.total}` : '';
@@ -6870,14 +7191,12 @@ async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMe
             else if (errorMessage.includes('declined')) declineReason = 'Card declined';
         }
 
-        const payload = JSON.stringify({
+        await sendPushToHotel(hotelId, {
             title: '🔴 URGENT: Payment Declined',
             body: `${guestName} • ${phone}\n${roomName} • ${total}\n${declineReason} - CALL NOW!`,
             icon: '/apple-touch-icon.png',
-            badge: '/apple-touch-icon.png',
             tag: 'payment-declined',
-            requireInteraction: true, // Keeps notification visible until dismissed
-            vibrate: [200, 100, 200, 100, 200], // Longer vibration pattern
+            requireInteraction: true,
             data: {
                 url: '/frontdesk',
                 type: 'payment_declined',
@@ -6888,15 +7207,7 @@ async function notifyPaymentDeclined(hotelId, guestInfo, bookingDetails, errorMe
                 total: total,
                 errorMessage: errorMessage
             }
-        });
-
-        await Promise.allSettled(subs.map((s) =>
-            webpush.sendNotification(
-                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                payload,
-                { TTL: 300, urgency: 'high' } // 5 min TTL, high urgency
-            )
-        ));
+        }, { TTL: 300, urgency: 'high' }, 'paymentDeclined');
         
         console.log(`🔴 Urgent payment declined notification sent for ${guestName}`);
     } catch (e) {
@@ -7511,6 +7822,9 @@ app.get('/privacy', (req, res) => {
 app.get('/terms', (req, res) => {
     res.sendFile(path.join(__dirname, 'terms.html'));
 });
+app.get('/app-support', (req, res) => {
+    res.sendFile(path.join(__dirname, 'app-support.html'));
+});
 
 // Root serves landing page too (for mktel.co)
 app.get('/', (req, res) => {
@@ -7676,7 +7990,12 @@ app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
 // Upload room image
 const multer = require('multer');
 const { optimizeRoomImageBuffer } = require('./lib/optimizeRoomImage');
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const {
+    S3Client,
+    PutObjectCommand,
+    ListObjectsV2Command,
+    DeleteObjectsCommand,
+} = require('@aws-sdk/client-s3');
 
 // Cloudflare R2 setup
 const r2 = new S3Client({
@@ -8604,9 +8923,10 @@ app.get('/api/crm/properties', crmAuth, async (req, res) => {
     try {
         const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
         const isMaster = allowed.includes('*');
+        const activeCustomerOnly = !!(req.crmIsNativeClient || req.crmIsNativeSession);
         const where = isMaster
-            ? { active: true }
-            : { active: true, id: { in: allowed } };
+            ? { active: true, ...(activeCustomerOnly ? { subscribed: true } : {}) }
+            : { active: true, id: { in: allowed }, ...(activeCustomerOnly ? { subscribed: true } : {}) };
         const rows = await prisma.hotelConfig.findMany({
             where,
             select: {
@@ -8671,7 +8991,7 @@ app.post('/api/forgot-pin', async (req, res) => {
         if (email) {
             const hotel = await prisma.hotelConfig.findFirst({ where: { ownerEmail: email } });
             if (hotel) {
-                // Generate new 4-digit PIN
+                // Generate a fresh 6-digit PIN.
                 const newPin = generateCrmOwnerPin();
                 const pinHash = hashCrmPin(newPin);
                 // Deactivate old PINs
@@ -8702,7 +9022,6 @@ const configuredMagicLinkSecret = process.env.MAGIC_LINK_SECRET || process.env.S
 const MAGIC_LINK_SECRET = configuredMagicLinkSecret || crypto.randomBytes(32).toString('hex');
 const MAGIC_LINK_EXPIRY_MS = 60 * 60 * 1000; // 60 minutes
 const NATIVE_LOGIN_CODE_EXPIRY_MS = 10 * 60 * 1000;
-const nativeLoginChallenges = new Map();
 
 if (!configuredMagicLinkSecret) {
     console.warn('MAGIC_LINK_SECRET or SESSION_SECRET is not set; using an ephemeral magic-link secret for this process.');
@@ -8720,6 +9039,7 @@ async function getNativeOwnerProperties(email) {
     const rows = await prisma.hotelConfig.findMany({
         where: {
             active: true,
+            subscribed: true,
             ownerEmail: { equals: normalizedEmail, mode: 'insensitive' },
         },
         select: {
@@ -8757,11 +9077,23 @@ app.post('/api/auth/native-code/request', nativeCodeRequestRateLimit, async (req
         }
 
         const code = String(crypto.randomInt(100000, 1000000));
-        nativeLoginChallenges.set(email, {
-            codeHash: hashNativeLoginCode(email, code),
-            expiresAt: Date.now() + NATIVE_LOGIN_CODE_EXPIRY_MS,
-            attempts: 0,
+        await prisma.nativeLoginChallenge.upsert({
+            where: { email },
+            create: {
+                email,
+                codeHash: hashNativeLoginCode(email, code),
+                expiresAt: new Date(Date.now() + NATIVE_LOGIN_CODE_EXPIRY_MS),
+                attempts: 0,
+            },
+            update: {
+                codeHash: hashNativeLoginCode(email, code),
+                expiresAt: new Date(Date.now() + NATIVE_LOGIN_CODE_EXPIRY_MS),
+                attempts: 0,
+            },
         });
+        await prisma.nativeLoginChallenge.deleteMany({
+            where: { expiresAt: { lt: new Date(Date.now() - NATIVE_LOGIN_CODE_EXPIRY_MS) } },
+        }).catch(() => {});
         await emailTransporter.sendMail({
             from: '"Marketel" <support@bookmarketel.com>',
             to: email,
@@ -8786,22 +9118,27 @@ app.post('/api/auth/native-code/verify', nativeCodeVerifyRateLimit, async (req, 
     try {
         const email = String(req.body?.email || '').trim().toLowerCase();
         const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
-        const challenge = nativeLoginChallenges.get(email);
-        if (!challenge || challenge.expiresAt < Date.now() || challenge.attempts >= 5) {
-            nativeLoginChallenges.delete(email);
+        const challenge = await prisma.nativeLoginChallenge.findUnique({ where: { email } });
+        if (!challenge || challenge.expiresAt.getTime() < Date.now() || challenge.attempts >= 5) {
+            if (email) {
+                await prisma.nativeLoginChallenge.deleteMany({ where: { email } }).catch(() => {});
+            }
             return res.status(401).json({ success: false, message: 'That code is invalid or expired. Request a new one.' });
         }
-        challenge.attempts += 1;
+        await prisma.nativeLoginChallenge.update({
+            where: { email },
+            data: { attempts: { increment: 1 } },
+        });
         const suppliedHash = hashNativeLoginCode(email, code);
         if (!timingSafeTextEqual(challenge.codeHash, suppliedHash)) {
             return res.status(401).json({ success: false, message: 'That code is invalid or expired.' });
         }
         const properties = await getNativeOwnerProperties(email);
         if (!properties.length) {
-            nativeLoginChallenges.delete(email);
+            await prisma.nativeLoginChallenge.deleteMany({ where: { email } }).catch(() => {});
             return res.status(401).json({ success: false, message: 'No active properties were found for this account.' });
         }
-        nativeLoginChallenges.delete(email);
+        await prisma.nativeLoginChallenge.deleteMany({ where: { email } }).catch(() => {});
         res.json({
             success: true,
             sessionToken: generateNativeSessionToken(email),
@@ -8909,8 +9246,8 @@ app.post('/api/crm/change-pin', crmAuth, async (req, res) => {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
         const newPin = String(req.body?.newPin || '').trim();
-        if (!newPin || newPin.length < 4) {
-            return res.status(400).json({ success: false, message: 'PIN must be at least 4 characters.' });
+        if (!newPin || newPin.length < 6) {
+            return res.status(400).json({ success: false, message: 'PIN must be at least 6 characters.' });
         }
         if (isCrmMasterPin(newPin)) {
             return res.status(400).json({
@@ -9125,6 +9462,12 @@ app.post('/api/marketel-stripe-webhook', async (req, res) => {
 // Go Live — create Stripe checkout for subscription (from front desk)
 app.post('/api/crm/go-live', crmAuth, async (req, res) => {
     try {
+        if (req.crmIsNativeClient) {
+            return res.status(403).json({
+                success: false,
+                message: 'Subscription purchases are not available in the iOS app.',
+            });
+        }
         if (!marketelStripe) return res.status(503).json({ success: false, message: 'Payment not configured' });
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
@@ -9366,6 +9709,12 @@ app.get('/api/crm/go-live-success', async (req, res) => {
 // Billing portal — redirect to Stripe customer portal
 app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
     try {
+        if (req.crmIsNativeClient) {
+            return res.status(403).json({
+                success: false,
+                message: 'Manage your Marketel subscription on the web or contact support@bookmarketel.com.',
+            });
+        }
         if (!marketelStripe) {
             return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
         }
@@ -9442,6 +9791,353 @@ app.post('/api/crm/support', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('crm:support error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to send message.' });
+    }
+});
+
+const ACCOUNT_DELETION_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+const ACCOUNT_DELETION_SWEEP_MS = 60 * 60 * 1000;
+
+function requireNativeOwnerSession(req, res, hotel) {
+    const sessionEmail = String(req.crmNativeEmail || '').trim().toLowerCase();
+    const ownerEmail = String(hotel?.ownerEmail || '').trim().toLowerCase();
+    if (!req.crmIsNativeSession || !sessionEmail || !ownerEmail || sessionEmail !== ownerEmail) {
+        res.status(403).json({
+            success: false,
+            message: 'For your security, sign out and sign in with the owner email before deleting this account.',
+        });
+        return false;
+    }
+    return true;
+}
+
+async function cancelStripeSubscriptionForDeletion(subscriptionId) {
+    if (!subscriptionId) return;
+    if (!marketelStripe) {
+        throw new Error('Stripe is unavailable; subscription cancellation could not be verified.');
+    }
+    try {
+        const subscription = await marketelStripe.subscriptions.retrieve(subscriptionId);
+        if (subscription?.status !== 'canceled') {
+            await marketelStripe.subscriptions.cancel(subscriptionId);
+        }
+    } catch (error) {
+        // A previously deleted Stripe object is already incapable of renewing,
+        // so retries may safely continue with Marketel data deletion.
+        if (error?.code === 'resource_missing' || error?.statusCode === 404) return;
+        throw error;
+    }
+}
+
+async function cancelStripeSubscriptionsForDeletion(hotel) {
+    if (!hotel?.subscribed && !hotel?.marketelStripeSubscriptionId && !hotel?.marketelStripeCustomerId) {
+        return;
+    }
+    if (!marketelStripe) {
+        throw new Error('Stripe is unavailable; subscription cancellation could not be verified.');
+    }
+
+    const subscriptionIds = new Set();
+    const customerIds = new Set();
+    if (hotel.marketelStripeSubscriptionId) subscriptionIds.add(hotel.marketelStripeSubscriptionId);
+    if (hotel.marketelStripeCustomerId) customerIds.add(hotel.marketelStripeCustomerId);
+
+    if (!customerIds.size && hotel.ownerEmail) {
+        const customers = await marketelStripe.customers.list({
+            email: hotel.ownerEmail,
+            limit: 10,
+        });
+        customers.data.forEach(customer => customerIds.add(customer.id));
+    }
+
+    for (const customerId of customerIds) {
+        const subscriptions = await marketelStripe.subscriptions.list({
+            customer: customerId,
+            status: 'all',
+            limit: 100,
+        });
+        subscriptions.data
+            .filter(subscription => subscription.status !== 'canceled')
+            .forEach(subscription => subscriptionIds.add(subscription.id));
+    }
+
+    for (const subscriptionId of subscriptionIds) {
+        await cancelStripeSubscriptionForDeletion(subscriptionId);
+    }
+}
+
+function r2ObjectKeyFromPublicUrl(url) {
+    const base = String(R2_PUBLIC_URL || '').replace(/\/+$/, '');
+    const value = String(url || '');
+    if (!base || !value.startsWith(`${base}/`)) return '';
+    try {
+        return decodeURIComponent(value.slice(base.length + 1));
+    } catch (_) {
+        return value.slice(base.length + 1);
+    }
+}
+
+async function deleteHotelUploadedMedia(hotelId, urls = []) {
+    const cleanHotelId = String(hotelId || '').trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanHotelId)) {
+        throw new Error('Unsafe property identifier while deleting uploaded media.');
+    }
+
+    if (R2_PUBLIC_URL) {
+        const keys = new Set(urls.map(r2ObjectKeyFromPublicUrl).filter(Boolean));
+        let continuationToken;
+        do {
+            const page = await r2.send(new ListObjectsV2Command({
+                Bucket: R2_BUCKET,
+                Prefix: `${cleanHotelId}/`,
+                ContinuationToken: continuationToken,
+            }));
+            (page.Contents || []).forEach(object => {
+                if (object.Key) keys.add(object.Key);
+            });
+            continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+        } while (continuationToken);
+
+        const allKeys = [...keys];
+        for (let index = 0; index < allKeys.length; index += 1000) {
+            const batch = allKeys.slice(index, index + 1000);
+            if (!batch.length) continue;
+            const result = await r2.send(new DeleteObjectsCommand({
+                Bucket: R2_BUCKET,
+                Delete: {
+                    Objects: batch.map(Key => ({ Key })),
+                    Quiet: true,
+                },
+            }));
+            if (result.Errors?.length) {
+                throw new Error(`Uploaded-media deletion failed: ${result.Errors[0].Message || result.Errors[0].Code}`);
+            }
+        }
+    }
+
+    const uploadsRoot = path.resolve(__dirname, 'public', 'uploads');
+    const propertyUploads = path.resolve(uploadsRoot, cleanHotelId);
+    if (propertyUploads.startsWith(`${uploadsRoot}${path.sep}`)) {
+        fs.rmSync(propertyUploads, { recursive: true, force: true });
+    }
+}
+
+async function completeAccountDeletion(request) {
+    const hotel = await prisma.hotelConfig.findUnique({
+        where: { id: request.hotelId },
+        select: {
+            id: true,
+            name: true,
+            ownerEmail: true,
+            appIconUrl: true,
+            subscribed: true,
+            marketelStripeCustomerId: true,
+            marketelStripeSubscriptionId: true,
+            rooms: { select: { images: { select: { url: true } } } },
+        },
+    });
+    if (!hotel) {
+        await prisma.accountDeletionRequest.deleteMany({ where: { id: request.id } }).catch(() => {});
+        return;
+    }
+
+    const claimed = await prisma.accountDeletionRequest.updateMany({
+        where: {
+            id: request.id,
+            status: { in: ['pending', 'failed'] },
+        },
+        data: { status: 'processing', lastError: null },
+    });
+    if (!claimed.count) return;
+
+    try {
+        await cancelStripeSubscriptionsForDeletion(hotel);
+
+        const mediaUrls = [
+            hotel.appIconUrl,
+            ...hotel.rooms.flatMap(room => room.images.map(image => image.url)),
+        ].filter(Boolean);
+        await deleteHotelUploadedMedia(hotel.id, mediaUrls);
+
+        // Models with HotelConfig relations cascade. The older analytics and
+        // booking tables predate those relations, so delete them explicitly.
+        await prisma.$transaction([
+            prisma.booking.deleteMany({ where: { hotelId: hotel.id } }),
+            prisma.guestInstallEvent.deleteMany({ where: { hotelId: hotel.id } }),
+            prisma.paymentDeclinedLead.deleteMany({ where: { hotelId: hotel.id } }),
+            prisma.hitPayment.deleteMany({ where: { hotelId: hotel.id } }),
+            prisma.funnelEvent.deleteMany({ where: { hotelId: hotel.id } }),
+            // ManualRoom predates HotelConfig relations. Its overrides cascade
+            // when the room rows are removed.
+            prisma.manualRoom.deleteMany({ where: { hotelId: hotel.id } }),
+            prisma.hotelConfig.delete({ where: { id: hotel.id } }),
+        ]);
+
+        clearHotelDomainCache();
+        hotelConfigCache.delete(hotel.id);
+        if (emailTransporter && hotel.ownerEmail) {
+            await emailTransporter.sendMail({
+                from: '"Marketel Support" <support@bookmarketel.com>',
+                to: hotel.ownerEmail,
+                subject: 'Your Marketel account was deleted',
+                text: `The Marketel account for ${hotel.name || hotel.id} has been deleted. Its property, guest, booking, uploaded-media, login, and notification data were removed.`,
+            }).catch(() => {});
+        }
+        console.log(`🗑️ Account deletion completed for ${hotel.id}`);
+    } catch (error) {
+        await prisma.accountDeletionRequest.update({
+            where: { id: request.id },
+            data: {
+                status: 'failed',
+                lastError: String(error?.message || 'Deletion failed').slice(0, 500),
+            },
+        }).catch(() => {});
+        if (emailTransporter) {
+            await emailTransporter.sendMail({
+                from: '"Marketel Account Safety" <support@bookmarketel.com>',
+                to: 'support@bookmarketel.com',
+                subject: `Account deletion needs attention: ${hotel.id}`,
+                text: `Automatic deletion failed for ${hotel.id}.\n\n${error?.stack || error?.message || error}`,
+            }).catch(() => {});
+        }
+        throw error;
+    }
+}
+
+async function runAccountDeletionSweep() {
+    const due = await prisma.accountDeletionRequest.findMany({
+        where: {
+            status: { in: ['pending', 'failed'] },
+            scheduledFor: { lte: new Date() },
+        },
+        orderBy: { scheduledFor: 'asc' },
+        take: 20,
+    });
+    for (const request of due) {
+        await completeAccountDeletion(request).catch(error => {
+            console.error(`Account deletion sweep ${request.hotelId}:`, error.message);
+        });
+    }
+}
+
+app.get('/api/crm/account-deletion/status', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { ownerEmail: true },
+        });
+        if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
+        const request = await prisma.accountDeletionRequest.findUnique({ where: { hotelId } });
+        res.json({
+            success: true,
+            ownerSession: !!(
+                req.crmIsNativeSession
+                && String(req.crmNativeEmail || '').toLowerCase() === String(hotel.ownerEmail || '').toLowerCase()
+            ),
+            request: request ? {
+                status: request.status,
+                requestedAt: request.requestedAt,
+                scheduledFor: request.scheduledFor,
+            } : null,
+        });
+    } catch (error) {
+        console.error('account-deletion/status:', error.message);
+        res.status(500).json({ success: false, message: 'Could not load account status.' });
+    }
+});
+
+app.post('/api/crm/account-deletion/request', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: {
+                name: true,
+                ownerEmail: true,
+            },
+        });
+        if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
+        if (!requireNativeOwnerSession(req, res, hotel)) return;
+        if (String(req.body?.confirmation || '').trim().toUpperCase() !== 'DELETE') {
+            return res.status(400).json({ success: false, message: 'Type DELETE to confirm.' });
+        }
+        const existingDeletion = await prisma.accountDeletionRequest.findUnique({ where: { hotelId } });
+        if (existingDeletion?.status === 'processing') {
+            return res.status(409).json({
+                success: false,
+                message: 'Account deletion is already being processed.',
+            });
+        }
+
+        const scheduledFor = new Date(Date.now() + ACCOUNT_DELETION_GRACE_MS);
+        const deletion = await prisma.accountDeletionRequest.upsert({
+            where: { hotelId },
+            create: {
+                hotelId,
+                requestedByEmail: req.crmNativeEmail,
+                scheduledFor,
+                status: 'pending',
+            },
+            update: {
+                requestedByEmail: req.crmNativeEmail,
+                requestedAt: new Date(),
+                scheduledFor,
+                status: 'pending',
+                lastError: null,
+            },
+        });
+
+        if (emailTransporter) {
+            await Promise.allSettled([
+                emailTransporter.sendMail({
+                    from: '"Marketel Support" <support@bookmarketel.com>',
+                    to: hotel.ownerEmail,
+                    subject: 'Marketel account deletion scheduled',
+                    text: `Deletion for ${hotel.name || hotelId} is scheduled for ${scheduledFor.toISOString()}. Sign back into Front Desk and cancel the request before then if you change your mind. The subscription will be canceled when deletion completes.`,
+                }),
+                emailTransporter.sendMail({
+                    from: '"Marketel Account Safety" <support@bookmarketel.com>',
+                    to: 'support@bookmarketel.com',
+                    subject: `Account deletion scheduled: ${hotel.name || hotelId}`,
+                    text: `${req.crmNativeEmail} scheduled deletion of ${hotelId} for ${scheduledFor.toISOString()}.`,
+                }),
+            ]);
+        }
+        res.json({ success: true, scheduledFor: deletion.scheduledFor });
+    } catch (error) {
+        console.error('account-deletion/request:', error.message);
+        res.status(500).json({ success: false, message: 'Could not schedule account deletion.' });
+    }
+});
+
+app.post('/api/crm/account-deletion/cancel', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { ownerEmail: true },
+        });
+        if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
+        if (!requireNativeOwnerSession(req, res, hotel)) return;
+        const deleted = await prisma.accountDeletionRequest.deleteMany({
+            where: { hotelId, status: { not: 'processing' } },
+        });
+        if (!deleted.count) {
+            const existingDeletion = await prisma.accountDeletionRequest.findUnique({ where: { hotelId } });
+            if (existingDeletion?.status === 'processing') {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Account deletion is already being processed.',
+                });
+            }
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('account-deletion/cancel:', error.message);
+        res.status(500).json({ success: false, message: 'Could not cancel account deletion.' });
     }
 });
 
@@ -10319,5 +11015,12 @@ app.listen(PORT, () => {
             .catch((e) => console.error('Front Desk Assistant sweep:', e.message));
         setTimeout(assistantSweep, 30_000);
         setInterval(assistantSweep, 5 * 60 * 1000);
+    }
+
+    if (process.env.ENABLE_ACCOUNT_DELETION_SWEEP !== 'false') {
+        const deletionSweep = () => runAccountDeletionSweep()
+            .catch((e) => console.error('Account deletion sweep:', e.message));
+        setTimeout(deletionSweep, 45_000);
+        setInterval(deletionSweep, ACCOUNT_DELETION_SWEEP_MS);
     }
 });

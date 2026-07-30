@@ -4,7 +4,6 @@ import { exposeToWindow } from './utils.js';
 let installed = false;
 let loadPromise = null;
 const ASSISTANT_LOAD_TIMEOUT_MS = 12000;
-const ASSISTANT_TEST_PHONE = '1231231234';
 
 function api(method, path, body) {
   if (typeof window.api !== 'function') return Promise.reject(new Error('Front Desk is not ready.'));
@@ -335,7 +334,7 @@ function sheetBodyHtml() {
       <div class="fda-bubble assistant"><strong>Done.</strong> I updated availability. If an online guest is affected, I’ll ask before cancelling anything.</div>
     </div>
 
-    ${!subscribed ? `<div class="fda-section fda-lock">
+    ${!subscribed && !isNativeApp ? `<div class="fda-section fda-lock">
       <div class="fda-section-title">Included with your $199/month activation</div>
       <div class="fda-lock-price">Activate your direct booking page to connect phones, receive booking texts, and update availability by reply.</div>
       <button type="button" class="fda-btn primary full" onclick="activateFromAssistant()">Activate Marketel</button>
@@ -363,7 +362,7 @@ function sheetBodyHtml() {
       </div>
       <div class="fda-field"><label for="assistant-person-phone">Mobile number</label><input id="assistant-person-phone" type="tel" autocomplete="tel" placeholder="(701) 555-0123"></div>
       <button type="button" class="fda-btn secondary full" onclick="addAssistantRecipient()" ${subscribed && capabilities.smsConfigured ? '' : 'disabled'}>Send verification code</button>` : ''}
-      ${capabilities.assistantPhone || isNativeApp ? `<button type="button" class="fda-icon-btn" style="margin-top:10px;" onclick="saveAssistantContact()">Save “Marketel Front Desk” to contacts</button>` : ''}
+      ${capabilities.assistantPhone ? `<button type="button" class="fda-icon-btn" style="margin-top:10px;" onclick="saveAssistantContact()">Save “Marketel Front Desk” to contacts</button>` : ''}
       <div class="fda-note">Verification confirms consent and prevents a mistyped number from texting someone else. Reply STOP anytime to disconnect.</div>
     </div>
 
@@ -559,7 +558,10 @@ export async function runAssistantCheckNow() {
 }
 
 export function saveAssistantContact() {
-  const phone = crm.assistantData?.capabilities?.assistantPhone || ASSISTANT_TEST_PHONE;
+  const phone = crm.assistantData?.capabilities?.assistantPhone || '';
+  if (!phone) {
+    return toast('The Front Desk number is not available yet.', 'error');
+  }
   try {
     const nativeHandler = window.webkit?.messageHandlers?.marketelShell;
     if (nativeHandler && typeof nativeHandler.postMessage === 'function') {
@@ -572,9 +574,6 @@ export function saveAssistantContact() {
     }
   } catch (_) {}
 
-  if (!crm.assistantData?.capabilities?.assistantPhone) {
-    return toast('The Front Desk number is not available yet.', 'error');
-  }
   const vcard = [
     'BEGIN:VCARD',
     'VERSION:3.0',
@@ -595,6 +594,11 @@ export function saveAssistantContact() {
 }
 
 export async function activateFromAssistant() {
+  if (typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp()) {
+    closeFrontDeskAssistant();
+    toast('Front Desk app access is managed with your Marketel account.', 'info');
+    return;
+  }
   closeFrontDeskAssistant();
   try {
     const module = await window.loadSettingsModule?.();

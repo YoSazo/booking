@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv } from 'vite';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -6,15 +7,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '');
+  const isNativeBuild = mode === 'native';
+  const nativeWwwRoot = path.resolve(__dirname, '../../marketel-frontdesk-ios/www');
   const apiTarget = process.env.FRONTDESK_API_PROXY
     || env.FRONTDESK_API_PROXY
     || 'http://localhost:3001';
 
   return {
     root: __dirname,
-    base: '/frontdesk/',
+    base: isNativeBuild ? './' : '/frontdesk/',
     build: {
-      outDir: path.resolve(__dirname, '../public/frontdesk'),
+      outDir: isNativeBuild
+        ? path.join(nativeWwwRoot, 'frontdesk')
+        : path.resolve(__dirname, '../public/frontdesk'),
       emptyOutDir: true,
       target: 'es2020',
       rollupOptions: {
@@ -41,8 +46,28 @@ export default defineConfig(({ mode }) => {
       },
     },
     esbuild: {
-      drop: mode === 'production' ? ['console', 'debugger'] : [],
+      drop: (mode === 'production' || isNativeBuild) ? ['console', 'debugger'] : [],
     },
+    plugins: isNativeBuild ? [{
+      name: 'marketel-native-static-assets',
+      transformIndexHtml(html) {
+        return html
+          .replace(/<script id="marketel-web-analytics">[\s\S]*?<\/script>/, '')
+          .replace(/\s*<link rel="manifest"[^>]*>/, '');
+      },
+      closeBundle() {
+        const publicRoot = path.resolve(__dirname, '../public');
+        fs.mkdirSync(nativeWwwRoot, { recursive: true });
+        for (const filename of [
+          'apple-touch-icon.png',
+          'manifest-simple-crm.json',
+          'marketel.svg',
+          'marketellogo.svg',
+        ]) {
+          fs.copyFileSync(path.join(publicRoot, filename), path.join(nativeWwwRoot, filename));
+        }
+      },
+    }] : [],
     server: {
       port: 5174,
       proxy: {

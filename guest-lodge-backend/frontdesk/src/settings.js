@@ -19,12 +19,56 @@ import {
 
 // ── SETTINGS TAB ───────────────────────────────────────────────
 
+function isNativeApp() {
+  return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
+}
+
+function legalAccountCardHtml(deletionStatus = null) {
+  const native = isNativeApp();
+  const legalOrigin = native ? 'https://guest-lodge-backend.onrender.com' : '';
+  const request = deletionStatus?.request || null;
+  const scheduled = request?.scheduledFor
+    ? new Date(request.scheduledFor).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
+    : '';
+  const deletionControls = !native ? '' : request
+    ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:700;color:#9a3412;">Account deletion scheduled</div>
+        <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin:5px 0 10px;">Your property and account data will be deleted${scheduled ? ` on ${scheduled}` : ''}. You can cancel until processing begins.</p>
+        <button type="button" onclick="cancelAccountDeletion()" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--green);background:#fff;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Keep my Marketel account</button>
+      </div>`
+    : deletionStatus?.ownerSession
+      ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+          <button type="button" onclick="requestAccountDeletion()" style="border:0;background:none;padding:0;color:#b42318;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Delete Marketel account and property data</button>
+          <p style="font-size:11px;color:var(--text-muted);line-height:1.45;margin:6px 0 0;">Includes a seven-day recovery window. The subscription is canceled when deletion completes.</p>
+        </div>`
+      : `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+          <button type="button" onclick="window.marketelNativeAction?.('signout')" style="border:0;background:none;padding:0;color:#b42318;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Sign in with the owner email to delete this account</button>
+        </div>`;
+
+  return `<div class="booking-card" id="privacyAccountCard" style="margin-bottom:14px;scroll-margin-top:96px;">
+    <div style="padding:18px;">
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;">Privacy &amp; account</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <a href="${legalOrigin}/privacy" target="_blank" rel="noopener" style="color:var(--green);font-size:13px;font-weight:700;text-decoration:none;">Privacy Policy</a>
+        <a href="${legalOrigin}/terms" target="_blank" rel="noopener" style="color:var(--green);font-size:13px;font-weight:700;text-decoration:none;">Terms of Service</a>
+        <a href="mailto:support@bookmarketel.com" style="color:var(--green);font-size:13px;font-weight:700;text-decoration:none;">Email support</a>
+      </div>
+      ${deletionControls}
+    </div>
+  </div>`;
+}
+
 async function loadSettings() {
   const list = document.getElementById('settingsList');
   if (!list) return;
   list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
   try {
-    const hotelRes = await api('GET', '/api/crm/verify');
+    const [hotelRes, deletionStatus] = await Promise.all([
+      api('GET', '/api/crm/verify'),
+      isNativeApp()
+        ? api('GET', '/api/crm/account-deletion/status').catch(() => null)
+        : Promise.resolve(null),
+    ]);
     const bookingDomain = hotelRes?.domain || (crm.activeHotelId + '.mktel.co');
     const bookingUrl = 'https://' + bookingDomain;
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
@@ -116,14 +160,14 @@ async function loadSettings() {
       <div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Change PIN</div>
-          <input type="text" id="settings-new-pin" placeholder="Enter new PIN (min 4 chars)" style="width:100%;font-size:16px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;margin-bottom:10px;">
+          <input type="text" id="settings-new-pin" placeholder="Enter new PIN (min 6 chars)" style="width:100%;font-size:16px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;margin-bottom:10px;">
           <button onclick="settingsChangePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
         </div>
       </div>
     `;
 
     // Subscription
-    if (hotelRes?.subscribed) {
+    if (hotelRes?.subscribed && !isNativeApp()) {
       html += `
         <div class="booking-card" style="margin-bottom:14px;">
           <div style="padding:18px;">
@@ -142,11 +186,12 @@ async function loadSettings() {
           <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Need Help?</div>
           <textarea id="settings-support-msg" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
           <button onclick="settingsSendSupport()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email within 24 hours.</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We aim to reply within two business days.</p>
         </div>
       </div>
     `;
 
+    html += legalAccountCardHtml(deletionStatus);
     list.innerHTML = html;
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load settings</div></div>';
@@ -277,10 +322,12 @@ async function postRoomImageUpload(roomId, file) {
   uploadForm.append('image', optimized, optimized.name || 'room.webp');
   const qs = new URLSearchParams();
   if (crm.activeHotelId) qs.set('hotelId', crm.activeHotelId);
-  qs.set('token', authToken);
   const res = await fetch(`/api/crm/rooms/${roomId}/images?${qs}`, {
     method: 'POST',
-    headers: { 'x-crm-token': authToken },
+    headers: {
+      'x-crm-token': authToken,
+      ...(isNativeApp() ? { 'x-marketel-client': 'ios' } : {}),
+    },
     body: uploadForm,
   });
   const data = await res.json().catch(() => ({}));
@@ -314,7 +361,7 @@ async function settingsSaveRates() {
 
 async function settingsChangePin() {
   const newPin = document.getElementById('settings-new-pin')?.value.trim();
-  if (!newPin || newPin.length < 4) { toast('PIN must be at least 4 characters', 'error'); return; }
+  if (!newPin || newPin.length < 6) { toast('PIN must be at least 6 characters', 'error'); return; }
   try {
     const result = await api('POST', '/api/crm/change-pin', { newPin });
     if (!result.success) throw new Error(result.message || 'Failed to change PIN');
@@ -753,9 +800,12 @@ async function loadEditRooms() {
   crm.editRoomsLoadPromise = (async () => {
   list.innerHTML = '<div class="loading"><div class="logo-sprite-bounce"></div> Loading…</div>';
   try {
-    const [res, hotelRes] = await Promise.all([
+    const [res, hotelRes, deletionStatus] = await Promise.all([
       api('GET', '/api/crm/rooms'),
       api('GET', '/api/crm/verify'),
+      isNativeApp()
+        ? api('GET', '/api/crm/account-deletion/status').catch(() => null)
+        : Promise.resolve(null),
     ]);
     if (!res.rooms) throw new Error('No data');
     crm.editRooms = res.rooms;
@@ -900,13 +950,13 @@ async function loadEditRooms() {
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
           <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 4 chars)'}" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+            <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 6 chars)'}" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
           </div>
           <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>
         </div>
       </div>
-      ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
+      ${hotelRes?.subscribed && !isNativeApp() ? `<div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
@@ -929,6 +979,7 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
         </div>
       </div>
+      ${legalAccountCardHtml(deletionStatus)}
       </div>
       </div>
     `;
@@ -1202,8 +1253,8 @@ async function saveRates() {
 
 async function changePin() {
   const newPin = document.getElementById('edit-new-pin')?.value.trim();
-  if (!newPin || newPin.length < 4) {
-    toast('PIN must be at least 4 characters', 'error');
+  if (!newPin || newPin.length < 6) {
+    toast('PIN must be at least 6 characters', 'error');
     return;
   }
   try {
@@ -1253,6 +1304,10 @@ function hideGoLiveOverlay() {
   if (ov) ov.remove();
 }
 async function goLive() {
+  if (isNativeApp()) {
+    toast('Front Desk app access is managed with your Marketel account.', 'info');
+    return;
+  }
   if (goLiveInFlight) return;
   goLiveInFlight = true;
   showGoLiveOverlay();
@@ -1273,6 +1328,10 @@ async function goLive() {
 }
 
 async function openBillingPortal() {
+  if (isNativeApp()) {
+    toast('Email support@bookmarketel.com for billing help.', 'info');
+    return;
+  }
   try {
     const res = await api('GET', '/api/crm/billing-portal');
     if (res.success && res.url) {
@@ -1282,6 +1341,31 @@ async function openBillingPortal() {
     }
   } catch (e) {
     toast('Contact support@bookmarketel.com to manage your subscription.', 'error');
+  }
+}
+
+async function requestAccountDeletion() {
+  if (!confirm('Delete this Marketel account and all property data? The subscription will be canceled when deletion completes.')) return;
+  const confirmation = prompt('Type DELETE to schedule permanent deletion after a seven-day recovery window.');
+  if (String(confirmation || '').trim().toUpperCase() !== 'DELETE') return;
+  try {
+    const result = await api('POST', '/api/crm/account-deletion/request', { confirmation: 'DELETE' });
+    if (!result?.success) throw new Error(result?.message || 'Could not schedule deletion.');
+    toast('Account deletion scheduled. You can cancel during the next seven days.', 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (error) {
+    toast(error.message || 'Could not schedule account deletion.', 'error');
+  }
+}
+
+async function cancelAccountDeletion() {
+  try {
+    const result = await api('POST', '/api/crm/account-deletion/cancel');
+    if (!result?.success) throw new Error(result?.message || 'Could not cancel deletion.');
+    toast('Account deletion cancelled.', 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (error) {
+    toast(error.message || 'Could not cancel account deletion.', 'error');
   }
 }
 
@@ -1433,10 +1517,12 @@ async function uploadAppIcon(input) {
     const authToken = getCrmAuthToken();
     const qs = new URLSearchParams();
     if (crm.activeHotelId) qs.set('hotelId', crm.activeHotelId);
-    if (authToken) qs.set('token', authToken);
     const res = await fetch(`/api/crm/hotel-app-icon?${qs}`, {
       method: 'POST',
-      headers: { 'x-crm-token': authToken },
+      headers: {
+        'x-crm-token': authToken,
+        ...(isNativeApp() ? { 'x-marketel-client': 'ios' } : {}),
+      },
       body: uploadForm,
     });
     const data = await res.json();
@@ -1523,6 +1609,7 @@ const _settingsExports = {
   checklistGoToRates,
   cleanupPostActivationTourUi,
   cleanupSettingsTourUi,
+  cancelAccountDeletion,
   closeAmenityPicker,
   confirmAmenityPicker,
   confirmEditAddRoom,
@@ -1549,6 +1636,7 @@ const _settingsExports = {
   openTourAccordion,
   postRoomImageUpload,
   queryTourSelector,
+  requestAccountDeletion,
   removeAmenity,
   renderEditRooms,
   renderEditRoomsCards,

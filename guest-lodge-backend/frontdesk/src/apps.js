@@ -233,10 +233,14 @@ function renderAppsView() {
   // Booking alerts are a current-device capability. A server-side install event
   // from another phone must not unlock them in an ordinary browser tab.
   const fdInApp = isStandaloneApp();
-  const fdNativeTest = isNativeFrontdeskApp();
-  const fdAlertsAvailable = fdInApp && !fdNativeTest;
-  const fdGranted = fdAlertsAvailable &&
-    (typeof Notification !== 'undefined') && Notification.permission === 'granted';
+  const fdNativeApp = isNativeFrontdeskApp();
+  const nativeNotificationState = String(crm.nativeNotificationState || '');
+  const nativeAlertsOn = nativeNotificationState === 'registered';
+  const nativePermissionGranted = ['authorized', 'registered', 'unavailable'].includes(nativeNotificationState);
+  const fdAlertsAvailable = fdNativeApp ? nativeAlertsOn : fdInApp;
+  const fdGranted = fdNativeApp
+    ? nativeAlertsOn
+    : fdAlertsAvailable && (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
   const fdInstallLabel = fdOnNarrowScreen ? 'Put Front Desk on this phone' : 'Put Front Desk on my phone';
   const reminderMinutes = Number(crm.bookingReviewSettings?.reminderMinutes ?? 15);
@@ -249,14 +253,14 @@ function renderAppsView() {
         <option value="60"${reminderMinutes === 60 ? ' selected' : ''}>Remind every 1 hour · up to 3 times</option>
         <option value="0"${reminderMinutes === 0 ? ' selected' : ''}>Send the first notification only</option>
       </select>
-      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdNativeTest ? 'Native booking alerts will unlock after APNs is connected.' : (fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Front Desk to unlock this setting.')}</div>
+      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdNativeApp ? (nativeAlertsOn ? 'Reminders can reach this iPhone even when Front Desk is closed.' : (nativePermissionGranted ? 'Front Desk is connecting this iPhone to booking alerts.' : 'Allow notifications in iPhone Settings to receive booking alerts.')) : (fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Front Desk to unlock this setting.')}</div>
     </div>`;
 
   let fdCtaHtml;
-  if (fdNativeTest) {
+  if (fdNativeApp) {
     fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
       <div style="width:32px;height:32px;border-radius:50%;background:#2E7D5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✓</div>
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Private iPhone test installed</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">Use this build to test Front Desk on your phone. Native booking alerts are the next iOS step.</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#166534;">Front Desk is installed</div><div style="font-size:12px;color:#166534;margin-top:2px;line-height:1.45;">${nativeAlertsOn ? 'Booking alerts can reach this iPhone even when the app is closed.' : (nativePermissionGranted ? 'Connecting this iPhone to booking alerts…' : 'Allow notifications in iPhone Settings so booking alerts can reach you.')}</div></div>
     </div>`;
   } else if (fdInApp && fdGranted) {
     fdCtaHtml = `<div id="tour-fd-installed-badge" style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
@@ -272,10 +276,10 @@ function renderAppsView() {
       <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until Front Desk is installed on your phone</div>`;
   }
 
-  const storyFrontdeskActionHtml = fdNativeTest
+  const storyFrontdeskActionHtml = fdNativeApp
     ? `<div class="apps-story-status">
         <span class="apps-story-status-icon">✓</span>
-        <span>Private Front Desk test is installed here. Native booking alerts are not connected in this first build.</span>
+        <span>Front Desk is installed here. ${nativeAlertsOn ? 'This iPhone can receive booking alerts.' : (nativePermissionGranted ? 'Booking-alert connection is in progress.' : 'Turn on notifications in iPhone Settings to receive booking alerts.')}</span>
       </div>`
     : fdInApp
     ? `<div class="apps-story-status">
@@ -446,8 +450,24 @@ function renderAppsView() {
         <div id="guestInstallStats" style="display:none;margin-top:14px;"></div>`
         : '<div id="guestInstallStats" style="display:none;"></div><div style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px;">Booking domain is still setting up.</div>'}
     </div>`;
+  const nativeAlertsCardHtml = `
+    <div class="apps-step-card">
+      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your iPhone</div>
+      <div class="apps-step-title">${nativeAlertsOn ? 'Booking alerts are on' : (nativePermissionGranted ? 'Connecting booking alerts' : 'Turn on booking alerts')}</div>
+      <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin:0 0 ${nativeAlertsOn ? '0' : '12px'};">${nativeAlertsOn
+        ? 'Front Desk can alert you about new bookings and room checks even when the app is closed.'
+        : (nativePermissionGranted
+          ? 'Front Desk has notification permission and is registering this iPhone. Refresh once if this message remains.'
+          : 'Notifications are what let Front Desk warn you before an online booking conflicts with a walk-in or outside booking.')}</p>
+      ${nativeAlertsOn
+        ? '<button type="button" onclick="toggleAppNotifications()" style="width:100%;padding:11px;border:1.5px solid var(--green);border-radius:11px;background:#fff;color:var(--green);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;margin-top:12px;">Send a test booking alert</button>'
+        : (nativePermissionGranted
+        ? '<button type="button" onclick="window.location.reload()" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Retry booking alerts</button>'
+        : '<button type="button" onclick="openNativeNotificationSettings()" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Open iPhone notification settings</button>')}
+    </div>`;
   const nativeGuestToolsHtml = `
     <div class="apps-native-title">Guest App</div>
+    ${nativeAlertsCardHtml}
     ${guestIconCardHtml()}
     ${nativeGuestShareHtml}
     ${guestBroadcastCardHtml({ compact: true })}`;
@@ -458,13 +478,13 @@ function renderAppsView() {
     ${guestBroadcastCardHtml()}
     ${helpFoldHtml}`;
 
-  const appsMainHtml = fdNativeTest
+  const appsMainHtml = fdNativeApp
     ? nativeGuestToolsHtml
     : `${appsStoryHtml}
       ${loopDiagramHtml}
       ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
 
-  const appsFootnoteHtml = fdNativeTest
+  const appsFootnoteHtml = fdNativeApp
     ? ''
     : fdInApp
     ? 'Front Desk is installed. Guests can install your property from the direct booking page.'

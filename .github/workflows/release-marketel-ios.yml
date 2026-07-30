@@ -1,0 +1,220 @@
+name: Release Marketel Front Desk to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: Upload the signed IPA to App Store Connect
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: marketel-frontdesk-ios
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify Apple release secrets
+        env:
+          APPLE_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+          UPLOAD_TO_TESTFLIGHT: ${{ inputs.upload_to_testflight }}
+        run: |
+          required=(
+            APPLE_DISTRIBUTION_CERTIFICATE_BASE64
+            APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD
+            APPLE_PROVISIONING_PROFILE_BASE64
+            APPLE_PROVISIONING_PROFILE_NAME
+            APPLE_TEAM_ID
+          )
+          if [[ "$UPLOAD_TO_TESTFLIGHT" == "true" ]]; then
+            required+=(
+              APP_STORE_CONNECT_KEY_ID
+              APP_STORE_CONNECT_ISSUER_ID
+              APP_STORE_CONNECT_PRIVATE_KEY_BASE64
+            )
+          fi
+          missing=()
+          for variable_name in "${required[@]}"; do
+            if [[ -z "${!variable_name}" ]]; then
+              missing+=("$variable_name")
+            fi
+          done
+          if (( ${#missing[@]} )); then
+            echo "Missing GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            marketel-frontdesk-ios/package-lock.json
+            guest-lodge-backend/package-lock.json
+            guest-lodge-backend/frontdesk/package-lock.json
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Validate App Store release files
+        run: npm run verify:release
+
+      - name: Validate backend and build Front Desk
+        working-directory: guest-lodge-backend
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/marketel_validation
+          DIRECT_URL: postgresql://user:password@localhost:5432/marketel_validation
+        run: |
+          npm ci
+          node --check server.js
+          npx prisma validate
+          (
+            cd frontdesk
+            npm ci
+            npm run build
+            npm run build:native
+          )
+
+      - name: Synchronize the iOS project
+        run: npm run sync
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -resolvePackageDependencies
+
+      - name: Install distribution certificate and profile
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          certificate_path="$RUNNER_TEMP/marketel-distribution.p12"
+          profile_path="$RUNNER_TEMP/marketel-app-store.mobileprovision"
+          keychain_path="$RUNNER_TEMP/marketel-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+
+          printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$certificate_path"
+          printf '%s' "$PROFILE_BASE64" | base64 -D > "$profile_path"
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+
+          security cms -D -i "$profile_path" > "$RUNNER_TEMP/marketel-profile.plist"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/marketel-profile.plist")"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+          echo "MARKETEL_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+
+      - name: Prepare App Store export options
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
+        run: |
+          cp ios/ExportOptions.plist "$RUNNER_TEMP/MarketelExportOptions.plist"
+          /usr/libexec/PlistBuddy \
+            -c "Set :teamID $APPLE_TEAM_ID" \
+            "$RUNNER_TEMP/MarketelExportOptions.plist"
+          /usr/libexec/PlistBuddy \
+            -c "Set :provisioningProfiles:com.bookmarketel.frontdesk $PROFILE_NAME" \
+            "$RUNNER_TEMP/MarketelExportOptions.plist"
+          echo "MARKETEL_BUILD_NUMBER=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Archive signed app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath ios/output/Marketel-Front-Desk.xcarchive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CURRENT_PROJECT_VERSION="$MARKETEL_BUILD_NUMBER" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $MARKETEL_KEYCHAIN_PATH" \
+            clean archive
+
+      - name: Export App Store IPA
+        run: |
+          xcodebuild \
+            -exportArchive \
+            -archivePath ios/output/Marketel-Front-Desk.xcarchive \
+            -exportPath ios/output/app-store \
+            -exportOptionsPlist "$RUNNER_TEMP/MarketelExportOptions.plist"
+          exported_ipa="$(find ios/output/app-store -maxdepth 1 -type f -name '*.ipa' -print -quit)"
+          test -n "$exported_ipa"
+          if [[ "$exported_ipa" != "ios/output/app-store/Marketel-Front-Desk.ipa" ]]; then
+            mv "$exported_ipa" ios/output/app-store/Marketel-Front-Desk.ipa
+          fi
+
+      - name: Upload signed IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marketel-Front-Desk-App-Store-IPA
+          path: marketel-frontdesk-ios/ios/output/app-store/Marketel-Front-Desk.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload to TestFlight
+        if: inputs.upload_to_testflight == true
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+        run: |
+          if grep -q "REPLACE_WITH_REVIEW" app-store/review-notes.md; then
+            echo "Replace the App Review demo-account placeholders before uploading." >&2
+            exit 1
+          fi
+          mkdir -p private_keys
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" \
+            | base64 -D \
+            > "private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8"
+          xcrun altool \
+            --upload-app \
+            --type ios \
+            --file ios/output/app-store/Marketel-Front-Desk.ipa \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"

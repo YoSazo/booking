@@ -3,6 +3,18 @@ import Capacitor
 import WebKit
 import Contacts
 import ContactsUI
+import UserNotifications
+
+private extension Notification.Name {
+    static let marketelDidRegisterForRemoteNotifications =
+        Notification.Name("MarketelDidRegisterForRemoteNotifications")
+    static let marketelDidFailToRegisterForRemoteNotifications =
+        Notification.Name("MarketelDidFailToRegisterForRemoteNotifications")
+    static let marketelOpenNotificationPath =
+        Notification.Name("MarketelOpenNotificationPath")
+}
+
+private var marketelPendingNotificationDestination: [String: String]?
 
 /// Compact vector version of the Marketel mark. Keeping it native means the
 /// header stays sharp at every display scale without shipping another asset.
@@ -67,6 +79,8 @@ private final class MarketelMarkView: UIView {
 /// and navigation treatments, while older iOS versions receive the standard
 /// system appearance automatically.
 final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler, CNContactViewControllerDelegate {
+    private let backendOrigin = URL(string: "https://guest-lodge-backend.onrender.com")!
+    private let bundledFrontDesk = URL(string: "capacitor://localhost/frontdesk/index.html")!
     private let statusBarBackdrop = UIView()
     private let topBar = UIVisualEffectView()
     private let tabBar = UITabBar()
@@ -91,6 +105,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var bookingTabItem: UITabBarItem?
     private var shellVisible = false
     private var shellSuppressedByModal = false
+    private var nativeAuthToken = ""
+    private var activeHotelId = ""
+    private var apnsDeviceToken = ""
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -107,6 +124,33 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         configureTopBar()
         configureTabBar()
         setShellVisible(false, animated: false)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didRegisterForRemoteNotifications(_:)),
+            name: .marketelDidRegisterForRemoteNotifications,
+            object: nil
+        )
+        if let pendingDestination = marketelPendingNotificationDestination {
+            DispatchQueue.main.async { [weak self] in
+                self?.openNotificationDestination(pendingDestination)
+            }
+        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didFailToRegisterForRemoteNotifications(_:)),
+            name: .marketelDidFailToRegisterForRemoteNotifications,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openNotificationPath(_:)),
+            name: .marketelOpenNotificationPath,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func viewDidLayoutSubviews() {
@@ -257,11 +301,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("refresh")
         }
-        let assistantAction = UIAction(
-            title: "Front Desk Assistant",
-            image: UIImage(systemName: "bubble.left.and.bubble.right")
-        ) { [weak self] _ in
-            self?.sendWebAction("assistant")
+        let notificationSettingsAction = UIAction(
+            title: "Notification settings",
+            image: UIImage(systemName: "bell")
+        ) { _ in
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
         }
         let tourAction = UIAction(
             title: "How it works",
@@ -275,6 +320,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("properties")
         }
+        let accountAction = UIAction(
+            title: "Privacy & account",
+            image: UIImage(systemName: "person.crop.circle")
+        ) { [weak self] _ in
+            self?.sendWebAction("account")
+        }
         let signOutAction = UIAction(
             title: "Sign out",
             image: UIImage(systemName: "rectangle.portrait.and.arrow.right"),
@@ -287,7 +338,16 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuConfiguration.baseForegroundColor = .label
         menuConfiguration.contentInsets = .zero
         menuButton.configuration = menuConfiguration
-        menuButton.menu = UIMenu(children: [assistantAction, refreshAction, tourAction, switchAction, signOutAction])
+        menuButton.menu = UIMenu(
+            children: [
+                notificationSettingsAction,
+                refreshAction,
+                tourAction,
+                switchAction,
+                accountAction,
+                signOutAction,
+            ]
+        )
         menuButton.showsMenuAsPrimaryAction = true
         menuButton.changesSelectionAsPrimaryAction = false
         menuButton.automaticallyUpdatesConfiguration = false
@@ -374,6 +434,151 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         )
     }
 
+    private func sendNotificationState(_ state: String) {
+        callWeb(function: "marketelNativeNotificationState", argument: state)
+    }
+
+    private func requestNativeNotifications() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            guard let self else { return }
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                UNUserNotificationCenter.current().requestAuthorization(
+                    options: [.alert, .badge, .sound]
+                ) { granted, _ in
+                    DispatchQueue.main.async {
+                        self.sendNotificationState(granted ? "authorized" : "denied")
+                        if granted {
+                            UIApplication.shared.registerForRemoteNotifications()
+                        }
+                    }
+                }
+            case .authorized, .provisional, .ephemeral:
+                DispatchQueue.main.async {
+                    self.sendNotificationState("authorized")
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            case .denied:
+                DispatchQueue.main.async {
+                    self.sendNotificationState("denied")
+                }
+            @unknown default:
+                DispatchQueue.main.async {
+                    self.sendNotificationState("unavailable")
+                }
+            }
+        }
+    }
+
+    private func postNativeDeviceRegistration(unregister: Bool = false) {
+        guard !nativeAuthToken.isEmpty,
+              !activeHotelId.isEmpty,
+              !apnsDeviceToken.isEmpty else {
+            return
+        }
+        let endpoint = unregister ? "/api/push/native/unregister" : "/api/push/native/register"
+        guard let endpointURL = URL(string: endpoint, relativeTo: backendOrigin)?.absoluteURL,
+              var components = URLComponents(
+            url: endpointURL,
+            resolvingAgainstBaseURL: false
+        ) else {
+            return
+        }
+        components.queryItems = [URLQueryItem(name: "hotelId", value: activeHotelId)]
+        guard let url = components.url else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(nativeAuthToken, forHTTPHeaderField: "x-crm-token")
+        request.setValue("ios", forHTTPHeaderField: "x-marketel-client")
+#if DEBUG
+        let environment = "sandbox"
+#else
+        let environment = "production"
+#endif
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "hotelId": activeHotelId,
+            "deviceToken": apnsDeviceToken,
+            "environment": environment,
+            "all": unregister,
+        ])
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard !unregister else {
+                return
+            }
+            guard error == nil,
+                  let status = (response as? HTTPURLResponse)?.statusCode,
+                  (200..<300).contains(status) else {
+                DispatchQueue.main.async {
+                    self?.sendNotificationState("unavailable")
+                }
+                return
+            }
+            let responseObject = data.flatMap { payload -> [String: Any]? in
+                guard let object = try? JSONSerialization.jsonObject(with: payload) else {
+                    return nil
+                }
+                return object as? [String: Any]
+            }
+            let pushConfigured = responseObject?["pushConfigured"] as? Bool ?? false
+            DispatchQueue.main.async {
+                self?.sendNotificationState(pushConfigured ? "registered" : "unavailable")
+            }
+        }.resume()
+    }
+
+    @objc private func didRegisterForRemoteNotifications(_ notification: Notification) {
+        guard let token = notification.object as? String, !token.isEmpty else { return }
+        apnsDeviceToken = token
+        postNativeDeviceRegistration()
+    }
+
+    @objc private func didFailToRegisterForRemoteNotifications(_ notification: Notification) {
+        sendNotificationState("unavailable")
+    }
+
+    @objc private func openNotificationPath(_ notification: Notification) {
+        if let destination = notification.object as? [String: String] {
+            openNotificationDestination(destination)
+        } else if let path = notification.object as? String {
+            openNotificationDestination(["path": path])
+        }
+    }
+
+    private func openNotificationDestination(_ destination: [String: String]) {
+        marketelPendingNotificationDestination = nil
+        let path = destination["path"] ?? "/frontdesk?tab=bookings"
+        let notificationHotelId = destination["hotelId"] ?? ""
+        if !notificationHotelId.isEmpty {
+            activeHotelId = notificationHotelId
+        }
+        let relative = path.hasPrefix("/") ? path : "/frontdesk"
+        guard let payloadURL = URL(string: relative, relativeTo: backendOrigin)?.absoluteURL,
+              let payloadComponents = URLComponents(
+                url: payloadURL,
+                resolvingAgainstBaseURL: false
+              ),
+              var components = URLComponents(
+            url: bundledFrontDesk,
+            resolvingAgainstBaseURL: false
+        ) else {
+            return
+        }
+        var queryItems = payloadComponents.queryItems ?? []
+        queryItems.removeAll { $0.name == "native" || $0.name == "hotelId" }
+        queryItems.append(URLQueryItem(name: "native", value: "ios"))
+        let destinationHotelId = notificationHotelId.isEmpty ? activeHotelId : notificationHotelId
+        if !destinationHotelId.isEmpty {
+            queryItems.append(URLQueryItem(name: "hotelId", value: destinationHotelId))
+        }
+        components.queryItems = queryItems
+        guard let url = components.url else { return }
+        webView?.load(URLRequest(url: url))
+    }
+
     private func updatePropertyName(_ name: String) {
         let propertyName = name.isEmpty ? "Your property" : name
         propertyNameLabel.text = propertyName
@@ -421,7 +626,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
     private func presentMarketelContact(phone rawPhone: String) {
         let digits = rawPhone.filter(\.isNumber)
-        let phone = (10...15).contains(digits.count) ? rawPhone : "1231231234"
+        guard (10...15).contains(digits.count) else {
+            let alert = UIAlertController(
+                title: "Front Desk number unavailable",
+                message: "Marketel messaging has not been connected for this account yet.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        let phone = rawPhone
 
         let contact = CNMutableContact()
         contact.contactType = .person
@@ -503,7 +718,28 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             let requestedVisible = payload["visible"] as? Bool ?? true
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "saveContact":
-            presentMarketelContact(phone: payload["phone"] as? String ?? "1231231234")
+            presentMarketelContact(phone: payload["phone"] as? String ?? "")
+        case "authenticated":
+            let hotelId = String(describing: payload["hotelId"] ?? "")
+            let authToken = String(describing: payload["authToken"] ?? "")
+            guard payload["subscribed"] as? Bool == true,
+                  !hotelId.isEmpty,
+                  !authToken.isEmpty else {
+                return
+            }
+            activeHotelId = hotelId
+            nativeAuthToken = authToken
+            requestNativeNotifications()
+            if !apnsDeviceToken.isEmpty {
+                postNativeDeviceRegistration()
+            }
+        case "signedOut":
+            postNativeDeviceRegistration(unregister: true)
+            nativeAuthToken = ""
+            activeHotelId = ""
+        case "notificationSettings":
+            guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(settingsURL)
         default:
             break
         }
@@ -511,13 +747,140 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 }
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        let confirm = UNNotificationAction(
+            identifier: "MARKETEL_CONFIRM_BOOKING",
+            title: "Confirm",
+            options: []
+        )
+        let release = UNNotificationAction(
+            identifier: "MARKETEL_RELEASE_BOOKING",
+            title: "Release",
+            options: [.destructive]
+        )
+        let review = UNNotificationAction(
+            identifier: "MARKETEL_REVIEW_BOOKING",
+            title: "Review room",
+            options: [.foreground]
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(
+                identifier: "MARKETEL_BOOKING_APPROVAL",
+                actions: [confirm, release],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "MARKETEL_BOOKING_REVIEW",
+                actions: [review],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "MARKETEL_GENERAL",
+                actions: [],
+                intentIdentifiers: [],
+                options: []
+            ),
+        ])
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(
+            name: .marketelDidRegisterForRemoteNotifications,
+            object: token
+        )
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        NotificationCenter.default.post(
+            name: .marketelDidFailToRegisterForRemoteNotifications,
+            object: error.localizedDescription
+        )
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .list, .sound, .badge])
+        } else {
+            completionHandler([.alert, .sound, .badge])
+        }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        let path = userInfo["url"] as? String ?? "/frontdesk?tab=bookings"
+        let hotelId = userInfo["hotelId"] as? String ?? ""
+        let data = userInfo["data"] as? NSDictionary
+        let token = data?["token"] as? String ?? ""
+
+        let action: String?
+        switch response.actionIdentifier {
+        case "MARKETEL_CONFIRM_BOOKING":
+            action = "confirm"
+        case "MARKETEL_RELEASE_BOOKING":
+            action = "release"
+        default:
+            action = nil
+        }
+
+        guard let action, !token.isEmpty else {
+            let destination = ["path": path, "hotelId": hotelId]
+            marketelPendingNotificationDestination = destination
+            NotificationCenter.default.post(name: .marketelOpenNotificationPath, object: destination)
+            completionHandler()
+            return
+        }
+
+        guard let url = URL(
+            string: "https://guest-lodge-backend.onrender.com/api/booking-approval/act"
+        ) else {
+            completionHandler()
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "token": token,
+            "action": action,
+        ])
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            DispatchQueue.main.async {
+                let destination = [
+                    "path": "/frontdesk?tab=bookings",
+                    "hotelId": hotelId,
+                ]
+                marketelPendingNotificationDestination = destination
+                NotificationCenter.default.post(
+                    name: .marketelOpenNotificationPath,
+                    object: destination
+                )
+                completionHandler()
+            }
+        }.resume()
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -535,7 +898,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(0)
+        } else {
+            application.applicationIconBadgeNumber = 0
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

@@ -27,10 +27,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: marketel-frontdesk-ios/package-lock.json
+          cache-dependency-path: |
+            marketel-frontdesk-ios/package-lock.json
+            guest-lodge-backend/frontdesk/package-lock.json
 
       - name: Install JavaScript dependencies
         run: npm ci
+
+      - name: Install Front Desk dependencies
+        working-directory: guest-lodge-backend/frontdesk
+        run: npm ci
+
+      - name: Build Front Desk into the native bundle
+        working-directory: guest-lodge-backend/frontdesk
+        run: npm run build:native
 
       - name: Synchronize the iOS project
         run: npm run sync
@@ -92,6 +102,6 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               marketel-frontdesk-ios/ios/output/Marketel-Front-Desk.ipa \
               --title "Marketel Front Desk iOS ${GITHUB_REF_NAME#ios-v}" \
-              --notes "Private AltStore dogfood build with a capsule-shaped stable Liquid Glass header, an instant shell-safe Front Desk Assistant sheet, and a native prefilled Apple contact form for Marketel Front Desk. Verified SMS booking alerts activate once Twilio is configured; native APNs booking alerts are not included yet." \
+              --notes "Device-testing build of Marketel Front Desk with native navigation, property switching, booking-alert support, and a prefilled Marketel contact form. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
               --prerelease
           fi

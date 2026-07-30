@@ -1,19 +1,72 @@
 import { crm } from './state.js';
+import {
+  Bath,
+  Car,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CookingPot,
+  CopyCheck,
+  DoorOpen,
+  Ellipsis,
+  Globe,
+  Inbox,
+  Laptop,
+  PawPrint,
+  QrCode,
+  Rocket,
+  Share,
+  Shirt,
+  Smartphone,
+  Sparkles,
+  SquarePlus,
+  ThermometerSnowflake,
+  Tv,
+  Waves,
+  Wifi,
+  Wind,
+  createIcons,
+} from 'lucide';
 
-let lucideLoadPromise = null;
+const bundledLucideIcons = {
+  Bath,
+  Car,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CookingPot,
+  CopyCheck,
+  DoorOpen,
+  Ellipsis,
+  Globe,
+  Inbox,
+  Laptop,
+  PawPrint,
+  QrCode,
+  Rocket,
+  Share,
+  Shirt,
+  Smartphone,
+  Sparkles,
+  SquarePlus,
+  ThermometerSnowflake,
+  Tv,
+  Waves,
+  Wifi,
+  Wind,
+};
+
+// Keep the existing small global surface used throughout the Front Desk, but
+// source it from the signed bundle instead of downloading executable
+// JavaScript from a CDN at runtime.
+window.lucide = {
+  createIcons(options = {}) {
+    createIcons({ ...options, icons: bundledLucideIcons });
+  },
+};
 
 function ensureLucideLoaded() {
-  if (typeof lucide !== 'undefined') return Promise.resolve();
-  if (lucideLoadPromise) return lucideLoadPromise;
-  lucideLoadPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js';
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('lucide load failed'));
-    document.head.appendChild(s);
-  });
-  return lucideLoadPromise;
+  return Promise.resolve();
 }
 
 async function optimizeRoomPhotoForUpload(file) {

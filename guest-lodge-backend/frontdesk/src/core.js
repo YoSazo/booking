@@ -2,6 +2,41 @@ import { crm } from './state.js';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 
+const MARKETEL_BACKEND_ORIGIN = 'https://guest-lodge-backend.onrender.com';
+const isBundledNativeFrontdesk = window.location.protocol === 'capacitor:'
+  || window.location.protocol === 'ionic:';
+const marketelLocalUrlBase = isBundledNativeFrontdesk ? window.location.href : window.location.origin;
+
+// The App Store build ships this JavaScript inside the IPA. Only API requests
+// cross the network; rewriting them here keeps every existing feature module
+// on the same authenticated backend without turning the app back into a remote
+// website wrapper.
+if (isBundledNativeFrontdesk) {
+  const browserFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    try {
+      const rawUrl = input instanceof URL
+        ? input.href
+        : (typeof input === 'string' ? input : input?.url);
+      const parsed = new URL(rawUrl, window.location.href);
+      if (
+        parsed.protocol === window.location.protocol
+        && parsed.hostname === window.location.hostname
+        && parsed.pathname.startsWith('/api/')
+      ) {
+        const backendUrl = new URL(parsed.pathname + parsed.search + parsed.hash, MARKETEL_BACKEND_ORIGIN);
+        if (typeof input === 'string' || input instanceof URL) {
+          return browserFetch(backendUrl.href, init);
+        }
+        return browserFetch(new Request(backendUrl.href, input), init);
+      }
+    } catch (_) {
+      // Let the browser surface the original fetch error.
+    }
+    return browserFetch(input, init);
+  };
+}
+
 let settingsModulePromise = null;
 let appsModulePromise = null;
 let assistantModulePromise = null;
@@ -101,6 +136,7 @@ function isNativeFrontdeskApp() {
   try {
     const nativeParam = new URLSearchParams(window.location.search || '').get('native');
     if (nativeParam === 'ios' || nativeParam === 'android') return true;
+    if (isBundledNativeFrontdesk) return true;
     return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' &&
       window.Capacitor.isNativePlatform());
   } catch (_) {
@@ -112,6 +148,17 @@ if (isNativeFrontdeskApp()) {
   const markNativeBody = () => document.body && document.body.classList.add('native-ios');
   if (document.body) markNativeBody();
   else document.addEventListener('DOMContentLoaded', markNativeBody, { once: true });
+  const rewriteNativeLegalLinks = () => {
+    document.querySelectorAll('a[href="/privacy"],a[href="/terms"],a[href="/app-support"]').forEach(link => {
+      const href = link.getAttribute('href');
+      link.href = MARKETEL_BACKEND_ORIGIN + href;
+    });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', rewriteNativeLegalLinks, { once: true });
+  } else {
+    rewriteNativeLegalLinks();
+  }
 }
 // iOS 26+ Safari hides Share behind the "⋯" menu (Compact layout is the
 // default) and tucks Add to Home Screen behind "View More". Apple froze the OS
@@ -400,6 +447,16 @@ function syncNativeShellState() {
   });
 }
 
+function syncNativeAuthenticatedSession() {
+  if (!isNativeFrontdeskApp() || !crm.activeHotelId || !crm.token || !crm.hotelSubscribed) return;
+  nativeShellPost({
+    type: 'authenticated',
+    hotelId: crm.activeHotelId,
+    authToken: crm.token,
+    subscribed: true,
+  });
+}
+
 function setNativePropertyMessage(id, message, kind = '') {
   const el = document.getElementById(id);
   if (!el) return;
@@ -576,10 +633,17 @@ async function nativePinLogin() {
     const contextJson = await contextRes.json().catch(() => ({}));
     if (!contextRes.ok || !contextJson.success) throw new Error(contextJson.message || 'Property not found.');
     const verifyRes = await fetch('/api/crm/verify?hotelId=' + encodeURIComponent(hotelId), {
-      headers: { 'x-crm-token': pin, Accept: 'application/json' },
+      headers: {
+        'x-crm-token': pin,
+        'x-marketel-client': 'ios',
+        Accept: 'application/json',
+      },
     });
     const verification = await verifyRes.json().catch(() => ({}));
     if (!verifyRes.ok || !verification.success) throw new Error(verification.message || 'Wrong property ID or PIN.');
+    if (!verification.subscribed) {
+      throw new Error('This property does not currently have Front Desk app access.');
+    }
     crm.token = pin;
     localStorage.setItem('crmToken', crm.token);
     const config = contextJson.data?.config || {};
@@ -592,7 +656,11 @@ async function nativePinLogin() {
     let availableProperties = [...getNativeProperties(), currentProperty];
     try {
       const propertiesRes = await fetch('/api/crm/properties?hotelId=' + encodeURIComponent(hotelId), {
-        headers: { 'x-crm-token': pin, Accept: 'application/json' },
+        headers: {
+          'x-crm-token': pin,
+          'x-marketel-client': 'ios',
+          Accept: 'application/json',
+        },
       });
       const propertiesJson = await propertiesRes.json().catch(() => ({}));
       if (propertiesRes.ok && propertiesJson.success && Array.isArray(propertiesJson.properties)) {
@@ -609,6 +677,7 @@ async function nativePinLogin() {
 }
 
 function nativeSignOut() {
+  nativeShellPost({ type: 'signedOut' });
   crm.token = '';
   try {
     localStorage.removeItem('crmToken');
@@ -643,7 +712,33 @@ function marketelNativeAction(action) {
     });
   }
   else if (action === 'properties') showNativePropertyPicker();
+  else if (action === 'account') {
+    const settingsButton = document.querySelector('.tab[data-nav-filter="settings"]');
+    setFilter('settings', settingsButton);
+    let attempts = 0;
+    const revealAccount = setInterval(() => {
+      attempts += 1;
+      const accountCard = document.getElementById('privacyAccountCard');
+      if (accountCard || attempts >= 30) {
+        clearInterval(revealAccount);
+        accountCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  }
   else if (action === 'signout') nativeSignOut();
+}
+
+function openNativeNotificationSettings() {
+  nativeShellPost({ type: 'notificationSettings' });
+}
+
+function marketelNativeNotificationState(state) {
+  crm.nativeNotificationState = String(state || '');
+  if (crm.currentFilter === 'apps') {
+    loadAppsModule()
+      .then(module => module.ensureAppsViewRendered(true))
+      .catch(() => {});
+  }
 }
 
 async function refreshNativeProperties() {
@@ -721,7 +816,7 @@ function applyLegacyHotelContext(hotelId, reason = '') {
 }
 
 function buildHotelContextUrl() {
-  const url = new URL('/api/hotel-context', window.location.origin);
+  const url = new URL('/api/hotel-context', marketelLocalUrlBase);
   const overrideHotelId = getRequestedHotelId();
   const overrideDomain = getContextParam('domain');
   if (overrideHotelId) url.searchParams.set('hotelId', overrideHotelId);
@@ -1348,7 +1443,10 @@ async function verifyCrmToken(pin) {
     tokenLength: String(pin || '').length,
   });
   const res = await fetch(`/api/crm/verify?hotelId=${encodeURIComponent(crm.activeHotelId)}`, {
-    headers: { 'x-crm-token': pin }
+    headers: {
+      'x-crm-token': pin,
+      ...(isNativeFrontdeskApp() ? { 'x-marketel-client': 'ios' } : {}),
+    }
   });
   const json = await res.json().catch(() => ({}));
   logFrontdeskAuth('verify-response', {
@@ -1368,6 +1466,7 @@ async function verifyCrmToken(pin) {
 
 // D19: proof-of-demand line — the strongest converter for a skeptical owner.
 function blockedDemandLineHtml() {
+  if (isNativeFrontdeskApp()) return '';
   if (!crm.blockedDemand || crm.blockedDemand.total < 1) return '';
   const n = crm.blockedDemand.today > 0 ? crm.blockedDemand.today : crm.blockedDemand.total;
   const when = crm.blockedDemand.today > 0 ? 'today' : 'recently';
@@ -1383,6 +1482,7 @@ function blockedDemandLineHtml() {
 // blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
 // that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
+  if (isNativeFrontdeskApp()) return '';
   const demand = crm.blockedDemand && crm.blockedDemand.total > 0 ? crm.blockedDemand.total : 0;
   if (demand > 0) {
     return `
@@ -1405,7 +1505,7 @@ function goLiveInlineCardHtml() {
   // D19: never surface pricing during onboarding (welcome modal + settings tour).
   // The card preloads before settingsTourActive flips true, so also gate on the
   // tour-completion flag — value is established first, price only after.
-  if (crm.hotelSubscribed || crm.settingsTourActive || !localStorage.getItem('settingsTourDone')) return '';
+  if (isNativeFrontdeskApp() || crm.hotelSubscribed || crm.settingsTourActive || !localStorage.getItem('settingsTourDone')) return '';
   return `
     <div class="booking-card" id="tour-go-live-card" style="margin-bottom:14px;background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border:none;">
       <div style="padding:18px;text-align:center;">
@@ -1445,7 +1545,7 @@ function refreshGoLiveInlineCard() {
 
 // D19: fetch blocked-demand counts and refresh any visible go-live surfaces.
 async function loadBlockedDemand() {
-  if (crm.hotelSubscribed) return;
+  if (isNativeFrontdeskApp() || crm.hotelSubscribed) return;
   try {
     const data = await api('GET', '/api/crm/blocked-demand');
     if (data && data.success) {
@@ -1460,7 +1560,7 @@ async function loadBlockedDemand() {
 function updateGoLiveBanner() {
   const banner = document.getElementById('goLiveBanner');
   if (!banner) return;
-  const shouldShow = !crm.hotelSubscribed && !banner.dataset.tourHidden;
+  const shouldShow = !isNativeFrontdeskApp() && !crm.hotelSubscribed && !banner.dataset.tourHidden;
   banner.style.display = shouldShow ? 'block' : 'none';
   if (shouldShow) banner.innerHTML = goLiveBannerHtml();
   const app = document.getElementById('app');
@@ -1636,7 +1736,7 @@ function applyBookingsSubview() {
   if (!isBookings && chipsEl) chipsEl.style.display = 'none';
   if (growthEl) growthEl.style.display = isGrowth ? 'block' : 'none';
   if (revenueEl) revenueEl.style.display = isRevenue ? 'flex' : 'none';
-  if (assistantEl) assistantEl.style.display = isBookings ? 'block' : 'none';
+  if (assistantEl) assistantEl.style.display = (isBookings && !isNativeFrontdeskApp()) ? 'block' : 'none';
   if (isGrowth) {
     renderGrowthPanel();
   } else if (isRevenue) {
@@ -1644,7 +1744,9 @@ function applyBookingsSubview() {
   } else {
     if (!crm.guestMessages.length) loadMessages(); else renderMessages();
     renderBookings(crm.bookings);
-    if (document.body.classList.contains('frontdesk-editor-preview')) {
+    if (isNativeFrontdeskApp()) {
+      if (assistantEl) assistantEl.innerHTML = '';
+    } else if (document.body.classList.contains('frontdesk-editor-preview')) {
       renderEmbeddedAssistantPreviewCard();
     } else {
       loadAssistantModule().then((module) => module.renderFrontDeskAssistantCard()).catch(() => {});
@@ -1889,6 +1991,9 @@ function installEmbeddedEditorPreview() {
 }
 
 async function startCrmApp(verification) {
+  if (isNativeFrontdeskApp() && !(verification && verification.subscribed)) {
+    throw new Error('This property does not currently have Front Desk app access.');
+  }
   crm.lastAuthError = '';
   crm.isMasterPin = !!(verification && verification.isMasterPin);
   crm.currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
@@ -1976,6 +2081,7 @@ async function startCrmApp(verification) {
   }
   updateGoLiveBanner();
   if (!crm.hotelSubscribed) loadBlockedDemand();
+  syncNativeAuthenticatedSession();
 
   const realignActiveTab = () => {
     const activeTab = document.querySelector('.tab.active');
@@ -2036,7 +2142,7 @@ async function startCrmApp(verification) {
     }
   }
 
-  if (urlParams.get('action') === 'go-live') {
+  if (!isNativeFrontdeskApp() && urlParams.get('action') === 'go-live') {
     window.history.replaceState({}, '', window.location.pathname);
     goLive();
   }
@@ -2167,12 +2273,19 @@ async function sendMagicLink() {
 // ── API ────────────────────────────────────────────────
 async function api(method, path, body) {
   if (!crm.activeHotelId) throw new Error('Property context is not loaded.');
-  const url = new URL(path, window.location.origin);
+  const url = new URL(path, marketelLocalUrlBase);
   if (!url.searchParams.get('hotelId')) {
     url.searchParams.set('hotelId', crm.activeHotelId);
   }
 
-  const opts = { method, headers: { 'Content-Type': 'application/json', 'x-crm-token': crm.token } };
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-crm-token': crm.token,
+      ...(isNativeFrontdeskApp() ? { 'x-marketel-client': 'ios' } : {}),
+    },
+  };
   const normalizedMethod = String(method || 'GET').toUpperCase();
   if (body || (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD')) {
     const payload = (body && typeof body === 'object' && !Array.isArray(body)) ? { ...body } : (body || {});
@@ -2211,6 +2324,14 @@ function showLogin() {
   try { localStorage.removeItem('crmToken'); } catch(e) {}
 }
 
+function showNativeAuthenticationError(error) {
+  if (!isNativeFrontdeskApp()) return false;
+  const message = error?.message || 'Sign in again to continue.';
+  nativeSignOut();
+  setNativePropertyMessage('nativePropertyMessage', message, 'error');
+  return true;
+}
+
 async function bootCrmApp() {
   if (crm.bootInFlight) return;
   crm.bootInFlight = true;
@@ -2246,7 +2367,7 @@ async function bootCrmApp() {
         return;
       } catch (e) {
         crm.lastAuthError = e && e.message ? e.message : 'verify failed';
-        showLogin();
+        if (!showNativeAuthenticationError(e)) showLogin();
         return;
       }
     }
@@ -2261,7 +2382,7 @@ async function bootCrmApp() {
           return;
         } catch (verifyError) {
           crm.lastAuthError = verifyError && verifyError.message ? verifyError.message : 'legacy verify failed';
-          showLogin();
+          if (!showNativeAuthenticationError(verifyError)) showLogin();
           return;
         }
       }
@@ -4785,6 +4906,16 @@ function handleInstallFrontdesk() {
 }
 
 async function toggleAppNotifications() {
+  if (isNativeFrontdeskApp()) {
+    try {
+      const result = await api('POST', '/api/push/test', {});
+      if (!result?.success) throw new Error(result?.message || 'Could not reach this iPhone.');
+      toast('Test notification sent', 'success');
+    } catch (e) {
+      toast(e.message || 'Could not send test', 'error');
+    }
+    return;
+  }
   const granted = (typeof Notification !== 'undefined') && Notification.permission === 'granted';
   if (granted) {
     // Already on — fire a test so they know it works.
@@ -4973,6 +5104,8 @@ exposeToWindow({
   isEditPageDomReady,
   isIosDevice,
   isNativeFrontdeskApp,
+  marketelNativeNotificationState,
+  openNativeNotificationSettings,
   isPwaSimulated,
   isStandaloneApp,
   jsStr,
@@ -5085,7 +5218,9 @@ exposeToWindow({
 });
 
 // ── INIT ───────────────────────────────────────────────
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/frontdesk-sw.js').catch(() => {});
+if (!isNativeFrontdeskApp() && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/frontdesk-sw.js').catch(() => {});
+}
 const signInBtn = document.getElementById('signInBtn');
 if (signInBtn) signInBtn.addEventListener('click', () => { void doLogin(); });
 const pinInputEl = document.getElementById('pinInput');

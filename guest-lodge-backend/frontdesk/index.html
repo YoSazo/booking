@@ -11,8 +11,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Front Desk">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <script>
+  <script id="marketel-web-analytics">
   (function(){
+    // Session replay is intentionally disabled inside the authenticated native
+    // app. This keeps guest/property data out of third-party analytics and
+    // makes the App Store privacy disclosure substantially simpler.
+    var isNative = new URLSearchParams(window.location.search).get('native')
+      || window.location.protocol === 'capacitor:'
+      || (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function'
+        && window.Capacitor.isNativePlatform());
+    if (isNative) return;
     function loadClarity(){
       (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");
     }
@@ -62,6 +70,12 @@
       <div id="nativePropertyChoices" class="native-property-choices"></div>
       <button type="button" class="native-property-link" id="nativeAddAccountBtn">Sign in with another account</button>
       <button type="button" class="native-property-link" id="nativePropertyCancelBtn" style="display:none;color:var(--text-muted);">Cancel</button>
+    </div>
+
+    <div style="display:flex;justify-content:center;gap:16px;margin-top:20px;font-size:12px;">
+      <a href="/privacy" target="_blank" rel="noopener" style="color:var(--text-muted);">Privacy Policy</a>
+      <a href="/terms" target="_blank" rel="noopener" style="color:var(--text-muted);">Terms</a>
+      <a href="mailto:support@bookmarketel.com" style="color:var(--text-muted);">Support</a>
     </div>
   </div>
 </div>

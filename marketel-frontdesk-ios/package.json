@@ -1,11 +1,12 @@
 {
   "name": "marketel-frontdesk-ios",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
-  "description": "Private iOS dogfood build for Marketel Front Desk with native navigation.",
+  "description": "Marketel Front Desk iOS companion app with native navigation and booking alerts.",
   "scripts": {
     "sync": "npx cap sync ios",
-    "open": "npx cap open ios"
+    "open": "npx cap open ios",
+    "verify:release": "node scripts/verify-release-readiness.mjs"
   },
   "dependencies": {
     "@capacitor/core": "8.4.2",

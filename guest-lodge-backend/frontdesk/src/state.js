@@ -60,6 +60,7 @@ export const crm = {
   deferredInstallPrompt: null,
   frontdeskInstalled: false,
   frontdeskInstallReported: false,
+  nativeNotificationState: '',
   guestPushSubscriberCount: 0,
   bookingReviewSettings: { reminderMinutes: 15, maxReminders: 3 },
   bookingConflicts: [],

@@ -146,6 +146,39 @@ model PushSubscription {
   @@index([hotelId, reservationCode])
 }
 
+// Native App Store devices use APNs rather than browser Web Push. A device may
+// subscribe to more than one property so multi-property owners receive every
+// booking alert without having to keep switching the app's active property.
+model NativePushDevice {
+  id          String      @id @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  lastSeenAt  DateTime    @default(now())
+  hotel       HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId     String
+  deviceToken String
+  platform    String      @default("ios")
+  environment String      @default("production") // production | sandbox
+  active      Boolean     @default(true)
+
+  @@unique([deviceToken, hotelId])
+  @@index([hotelId, active])
+  @@index([deviceToken, active])
+}
+
+// Email-code challenges must survive a Render restart and work correctly when
+// more than one server instance is handling requests.
+model NativeLoginChallenge {
+  email     String   @id
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
 model ManualRoom {
   id         String   @id @default(cuid())
   hotelId    String
@@ -228,6 +261,24 @@ model HotelConfig {
   assistantRecipients     FrontDeskAssistantRecipient[]
   assistantActivities     FrontDeskAssistantActivity[]
   assistantPendingActions FrontDeskAssistantPendingAction[]
+  nativePushDevices       NativePushDevice[]
+  accountDeletionRequest  AccountDeletionRequest?
+}
+
+// Account deletion is initiated inside the iOS app, includes a seven-day
+// recovery window, and is then completed by the server-side deletion sweep.
+model AccountDeletionRequest {
+  id               String      @id @default(cuid())
+  hotel            HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId          String      @unique
+  requestedByEmail String
+  requestedAt      DateTime    @default(now())
+  scheduledFor     DateTime
+  status           String      @default("pending") // pending | processing | failed
+  lastError        String?
+  updatedAt        DateTime    @updatedAt
+
+  @@index([status, scheduledFor])
 }
 
 // Property-side virtual Front Desk. Configuration is one-to-one with a hotel;
