@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import BookingPage from './BookingPage.jsx';
 import CalendarModal from './CalendarModal.jsx';
 import { trackAddToCart, trackInitiateCheckout, trackPurchase } from './trackingService.js';
@@ -783,6 +783,14 @@ const handleConfirmBooking = async (bookingDetails) => {
                 apiBaseUrl={API_BASE_URL}
               />
           } />
+
+          {/* A legacy Front Desk PWA once used this origin during local
+              development. If it reopens /frontdesk on port 5173, keep the
+              current property id and repair the URL back to the guest engine. */}
+          <Route
+            path="/frontdesk/*"
+            element={<Navigate to={`/?hotelId=${encodeURIComponent(currentHotel.id || hotelId)}`} replace />}
+          />
 
           {/* Guest Dashboard routes */}
           <Route path="/guest/home" element={

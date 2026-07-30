@@ -161,23 +161,36 @@ function bookingPageStatusHtml() {
 
 function bookingPreviewCardHtml() {
   const room = firstRoom();
-  return `<button type="button" class="mvr-booking-preview-card" id="mvrExpandPreview">
-    <div class="mvr-booking-preview-hero">
-      ${roomPhotoHtml('mvr-booking-preview-photo')}
-      <span class="mvr-live-pill"><i></i> Direct booking page</span>
-      <div class="mvr-booking-preview-title">
+  return `<div class="mvr-booking-preview-card">
+    <div class="mvr-preview-browser-bar">
+      <div class="mvr-preview-dots"><i></i><i></i><i></i></div>
+      <span><b></b> Your direct booking page</span>
+    </div>
+    <div class="mvr-preview-page">
+      <div class="mvr-preview-property">
         <small>Book direct with</small>
         <strong>${esc(propertyName())}</strong>
+        <span>Choose your dates and stay</span>
+      </div>
+      <div class="mvr-preview-search">
+        <span><small>Check in</small>Select date</span>
+        <span><small>Check out</small>Select date</span>
+        <b>Search</b>
+      </div>
+      <div class="mvr-preview-room">
+        ${roomPhotoHtml('mvr-preview-room-photo')}
+        <div>
+          <strong>${esc(room.name || 'Your room')}</strong>
+          <small>${Math.max(1, Number(room.totalUnits) || 1)} available</small>
+        </div>
+        <span><strong>${money(nightlyRate())}</strong><small>/night</small></span>
       </div>
     </div>
-    <div class="mvr-booking-preview-body">
-      <div>
-        <span>${esc(room.name || 'Your room')}</span>
-        <small>${Math.max(1, Number(room.totalUnits) || 1)} available · from ${money(nightlyRate())}/night</small>
-      </div>
-      <b>Open live preview <span>↗</span></b>
+    <div class="mvr-booking-preview-action">
+      <div><strong>See the real page</strong><span>Open it full screen, then switch to Edit whenever you want.</span></div>
+      <button type="button" id="mvrExpandPreview">Open full booking page <span>↗</span></button>
     </div>
-  </button>`;
+  </div>`;
 }
 
 function bookingRevealHtml() {
@@ -351,8 +364,11 @@ function showExpandedPreview() {
   modal.id = 'mvrLivePreview';
   modal.className = 'mvr-live-preview';
   modal.innerHTML = `<div class="mvr-live-toolbar">
-    <button type="button" id="mvrClosePreview">← Back to overview</button>
-    <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span>Live preview · changes in Edit save for real</span></div>
+    <div class="mvr-live-topline">
+      <button type="button" id="mvrClosePreview">← Back to overview</button>
+      <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span>Live preview · changes in Edit save for real</span></div>
+      <i aria-hidden="true"></i>
+    </div>
     <div class="mvr-live-switch" role="tablist" aria-label="Guest page and editor">
       <button type="button" data-live-preview-mode="guest" class="is-active">Guest booking page</button>
       <button type="button" data-live-preview-mode="edit">Edit in Front Desk</button>

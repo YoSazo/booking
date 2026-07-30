@@ -28,7 +28,10 @@ export default defineConfig(({ mode }) => {
             if (/\.(woff2?|ttf|eot)$/i.test(assetInfo.name || '')) {
               return 'assets/fonts/[name][extname]';
             }
-            return 'assets/[name][extname]';
+            // CSS is served with immutable caching alongside JS. It must be
+            // content-addressed too, otherwise a new reveal chunk can load
+            // against an older cached reveal.css and render as raw markup.
+            return 'assets/[name]-[hash][extname]';
           },
           manualChunks(id) {
             if (id.endsWith('settings.js')) return 'settings';

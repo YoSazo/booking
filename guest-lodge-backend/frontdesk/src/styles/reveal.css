@@ -258,139 +258,240 @@
 }
 
 .mvr-booking-preview-card {
-  width: min(560px, 100%);
+  width: min(540px, 100%);
   overflow: hidden;
-  padding: 0;
   color: var(--mvr-text);
   text-align: left;
   border: 1px solid #d3e0d8;
-  border-radius: 28px;
+  border-radius: 22px;
   background: #fff;
-  box-shadow: 0 34px 80px rgba(24, 55, 38, 0.17);
-  font: inherit;
-  cursor: pointer;
-  transform: rotate(0.5deg);
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  box-shadow: 0 28px 70px rgba(24, 55, 38, 0.15);
 }
 
-.mvr-booking-preview-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 39px 88px rgba(24, 55, 38, 0.2);
-}
-
-.mvr-booking-preview-hero {
-  position: relative;
-  min-height: 310px;
-  display: flex;
-  align-items: end;
-  overflow: hidden;
-  padding: 28px;
-  color: #fff;
-  background: linear-gradient(150deg, #234a37, #73aa89);
-}
-
-.mvr-booking-preview-hero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(8, 23, 16, 0.05), rgba(8, 23, 16, 0.68));
-}
-
-.mvr-booking-preview-photo {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.mvr-booking-preview-photo.mvr-photo-placeholder {
+.mvr-preview-browser-bar {
+  min-height: 42px;
   display: grid;
-  place-items: center;
-}
-
-.mvr-live-pill {
-  position: absolute;
-  z-index: 2;
-  top: 18px;
-  left: 18px;
-  display: flex;
+  grid-template-columns: 52px 1fr 52px;
   align-items: center;
-  gap: 7px;
-  padding: 8px 11px;
-  color: #214f39;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 0 14px;
+  color: #6f7d75;
+  border-bottom: 1px solid #e3eae6;
+  background: #f5f7f5;
   font-size: 10px;
-  font-weight: 800;
-  backdrop-filter: blur(12px);
-}
-
-.mvr-live-pill i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #33a565;
-}
-
-.mvr-booking-preview-title {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  gap: 3px;
-}
-
-.mvr-booking-preview-title small {
-  font-size: 12px;
   font-weight: 700;
-  opacity: 0.84;
 }
 
-.mvr-booking-preview-title strong {
-  font-size: clamp(27px, 4vw, 40px);
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.mvr-booking-preview-body {
+.mvr-preview-browser-bar > span {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 20px 22px;
-}
-
-.mvr-booking-preview-body > div {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.mvr-booking-preview-body > div span {
+  justify-content: center;
+  gap: 6px;
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mvr-booking-preview-body small {
-  color: #75837b;
-  font-size: 10px;
+.mvr-preview-browser-bar > span b {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #35a467;
 }
 
-.mvr-booking-preview-body b {
-  flex: 0 0 auto;
-  color: var(--mvr-green);
+.mvr-preview-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.mvr-preview-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c9d2cc;
+}
+
+.mvr-preview-page {
+  padding: 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(222, 239, 228, 0.7), transparent 48%),
+    #f8faf8;
+}
+
+.mvr-preview-property {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.mvr-preview-property small {
+  color: #6f7e75;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.mvr-preview-property strong {
+  max-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  color: #183126;
+  font-size: clamp(20px, 3vw, 28px);
+  letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mvr-preview-property span {
+  margin-top: 3px;
+  color: #839087;
+  font-size: 9px;
+}
+
+.mvr-preview-search {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0 12px;
+  padding: 8px;
+  border: 1px solid #e0e8e3;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(29, 58, 42, 0.07);
+}
+
+.mvr-preview-search > span {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  color: #526158;
+  border-radius: 8px;
+  background: #f5f7f5;
+  font-size: 9px;
+}
+
+.mvr-preview-search small {
+  color: #89958e;
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mvr-preview-search > b {
+  padding: 11px 13px;
+  color: #fff;
+  border-radius: 9px;
+  background: var(--mvr-green);
+  font-size: 9px;
+}
+
+.mvr-preview-room {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #e0e8e3;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.mvr-preview-room-photo {
+  width: 84px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.mvr-preview-room-photo.mvr-photo-placeholder span {
+  font-size: 19px;
+}
+
+.mvr-preview-room > div,
+.mvr-preview-room > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mvr-preview-room > div strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mvr-preview-room small {
+  color: #87938c;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.mvr-preview-room > span {
+  justify-items: end;
+}
+
+.mvr-preview-room > span strong {
+  color: #224b37;
+  font-size: 13px;
+}
+
+.mvr-booking-preview-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-top: 1px solid #e3eae6;
+  background: #fff;
+}
+
+.mvr-booking-preview-action > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.mvr-booking-preview-action > div strong {
   font-size: 12px;
 }
 
-.mvr-booking-preview-body b span {
+.mvr-booking-preview-action > div span {
+  color: #7a8780;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.mvr-booking-preview-action button {
+  min-height: 42px;
+  padding: 10px 14px;
+  color: #fff;
+  border: 0;
+  border-radius: 11px;
+  background: var(--mvr-green);
+  box-shadow: 0 8px 18px rgba(46, 125, 91, 0.2);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mvr-booking-preview-action button:hover {
+  background: #246a4c;
+}
+
+.mvr-booking-preview-action button span {
   display: inline-block;
+  margin-left: 3px;
   transition: transform 160ms ease;
 }
 
-.mvr-booking-preview-card:hover .mvr-booking-preview-body b span {
+.mvr-booking-preview-action button:hover span {
   transform: translate(2px, -2px);
 }
 
@@ -901,17 +1002,25 @@
 }
 
 .mvr-live-toolbar {
-  display: grid;
-  grid-template-columns: auto minmax(140px, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 18px;
-  min-height: 68px;
-  padding: max(12px, env(safe-area-inset-top)) 18px 10px;
+  gap: 10px;
+  padding: max(12px, env(safe-area-inset-top)) 18px 12px;
   border-bottom: 1px solid #dbe4de;
   background: rgba(255, 255, 255, 0.94);
 }
 
-.mvr-live-toolbar button {
+.mvr-live-topline {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(160px, 2fr) minmax(130px, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.mvr-live-topline > button {
+  justify-self: start;
   padding: 10px 13px;
   color: var(--mvr-green);
   border: 1px solid #cfe0d6;
@@ -929,14 +1038,14 @@
   text-align: center;
 }
 
-.mvr-live-toolbar strong {
+.mvr-live-title strong {
   overflow: hidden;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mvr-live-toolbar span {
+.mvr-live-title span {
   overflow: hidden;
   color: #7e8b83;
   font-size: 10px;
@@ -945,6 +1054,7 @@
 }
 
 .mvr-live-switch {
+  width: min(430px, 100%);
   display: flex;
   gap: 3px;
   padding: 4px;
@@ -954,12 +1064,17 @@
 }
 
 .mvr-live-switch button {
+  flex: 1;
   padding: 8px 12px;
   color: #68766e;
   border: 0;
   border-radius: 999px;
   background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .mvr-live-switch button.is-active {
@@ -1033,14 +1148,6 @@
     min-height: auto;
   }
 
-  .mvr-booking-preview-card {
-    transform: none;
-  }
-
-  .mvr-booking-preview-hero {
-    min-height: 240px;
-  }
-
   .mvr-install-visual {
     padding-top: 4px;
   }
@@ -1072,21 +1179,29 @@
   }
 
   .mvr-live-toolbar {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 9px;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .mvr-live-topline {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mvr-live-topline > button {
+    justify-self: start;
   }
 
   .mvr-live-title {
-    text-align: right;
+    text-align: left;
+  }
+
+  .mvr-live-topline > i {
+    display: none;
   }
 
   .mvr-live-switch {
-    grid-column: 1 / -1;
-    justify-self: stretch;
-  }
-
-  .mvr-live-switch button {
-    flex: 1;
+    width: 100%;
   }
 }
 
@@ -1112,15 +1227,34 @@
     font-size: 10px;
   }
 
-  .mvr-booking-preview-hero {
-    min-height: 205px;
-    padding: 20px;
+  .mvr-preview-page {
+    padding: 15px;
   }
 
-  .mvr-booking-preview-body {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 16px;
+  .mvr-preview-search {
+    margin-top: 14px;
+  }
+
+  .mvr-preview-room {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+
+  .mvr-preview-room-photo {
+    width: 68px;
+    height: 54px;
+  }
+
+  .mvr-preview-room > span {
+    grid-column: 2;
+    justify-items: start;
+  }
+
+  .mvr-booking-preview-action {
+    grid-template-columns: 1fr;
+  }
+
+  .mvr-booking-preview-action button {
+    width: 100%;
   }
 
   .mvr-install-card {
