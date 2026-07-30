@@ -425,7 +425,13 @@ function getPrismaDatasourceUrl() {
     const base = process.env.DATABASE_URL || '';
     if (!base) return base;
     const isLocalDb = /localhost|127\.0\.0\.1/i.test(base);
-    const connectionLimit = process.env.PRISMA_CONNECTION_LIMIT || (isLocalDb ? '10' : '1');
+    // The Front Desk hydrates several independent read models together. A
+    // single remote connection turns those reads into a queue and makes both
+    // localhost and the native app feel several seconds slower than the
+    // underlying queries. Neon is accessed through its pooler, so a small
+    // bounded pool gives us concurrency without opening an excessive number of
+    // database connections.
+    const connectionLimit = process.env.PRISMA_CONNECTION_LIMIT || (isLocalDb ? '10' : '5');
     const poolTimeout = process.env.PRISMA_POOL_TIMEOUT || '20';
     const connectTimeout = process.env.PRISMA_CONNECT_TIMEOUT || '15';
 
@@ -1277,24 +1283,26 @@ async function getManualRooms(hotelId) {
     }
     // Auto-sync: ensure ManualRoom matches Room table (source of truth)
     try {
-        const realRooms = await prisma.room.findMany({ where: { hotelId }, select: { name: true, totalUnits: true } });
-        const manualRooms = await prisma.manualRoom.findMany({ where: { hotelId }, select: { name: true } });
+        const [realRooms, manualRooms] = await Promise.all([
+            prisma.room.findMany({ where: { hotelId }, select: { name: true, totalUnits: true } }),
+            prisma.manualRoom.findMany({ where: { hotelId }, select: { name: true } }),
+        ]);
         const realNames = new Set(realRooms.map(r => r.name));
         const manualNames = new Set(manualRooms.map(r => r.name));
         // Delete ManualRooms that don't exist in Room
         const toDelete = manualRooms.filter(m => !realNames.has(m.name));
-        if (toDelete.length) {
-            await prisma.manualRoom.deleteMany({ where: { hotelId, name: { in: toDelete.map(r => r.name) } } });
-        }
         // Create ManualRooms for Rooms that don't have one
         const toCreate = realRooms.filter(r => !manualNames.has(r.name));
-        for (const r of toCreate) {
-            await prisma.manualRoom.upsert({
+        await Promise.all([
+            toDelete.length
+                ? prisma.manualRoom.deleteMany({ where: { hotelId, name: { in: toDelete.map(r => r.name) } } })
+                : Promise.resolve(),
+            ...toCreate.map(r => prisma.manualRoom.upsert({
                 where: { hotelId_name: { hotelId, name: r.name } },
                 create: { hotelId, name: r.name, totalUnits: r.totalUnits || 1 },
                 update: { totalUnits: r.totalUnits || 1 },
-            });
-        }
+            })),
+        ]);
     } catch (e) { /* sync failed silently — continue with what we have */ }
 
     return withRetry(() => prisma.manualRoom.findMany({
@@ -3970,9 +3978,13 @@ function verifyNativeSessionToken(token) {
     }
 }
 
+const nativeOwnerHotelsCache = new Map();
+
 async function getDbAllowedHotelsForOwnerEmail(email) {
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!normalizedEmail || !prisma.hotelConfig) return [];
+    const cached = nativeOwnerHotelsCache.get(normalizedEmail);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
     const rows = await withRetry(() => prisma.hotelConfig.findMany({
         where: {
             active: true,
@@ -3981,7 +3993,20 @@ async function getDbAllowedHotelsForOwnerEmail(email) {
         },
         select: { id: true },
     }));
-    return [...new Set(rows.map(row => String(row.id || '').trim()).filter(Boolean))];
+    const value = [...new Set(rows.map(row => String(row.id || '').trim()).filter(Boolean))];
+    const cacheEntry = {
+        value,
+        // Short-lived on purpose: follow-up startup requests reuse the result,
+        // while subscription changes still take effect promptly.
+        expiresAt: Date.now() + 15 * 1000,
+    };
+    nativeOwnerHotelsCache.set(normalizedEmail, cacheEntry);
+    setTimeout(() => {
+        if (nativeOwnerHotelsCache.get(normalizedEmail) === cacheEntry) {
+            nativeOwnerHotelsCache.delete(normalizedEmail);
+        }
+    }, 15 * 1000).unref?.();
+    return value;
 }
 
 function getCrmReturnSigningSecret(hotelSecret = '') {
@@ -4211,16 +4236,22 @@ const crmAuth = async (req, res, next) => {
                 code: 'native_property_required',
             });
         }
-        const nativeHotel = await withRetry(() => prisma.hotelConfig.findUnique({
-            where: { id: nativeHotelId },
-            select: { active: true, subscribed: true },
-        })).catch(() => null);
-        if (!nativeHotel?.active || !nativeHotel?.subscribed) {
-            return res.status(403).json({
-                success: false,
-                message: 'This property does not currently have Front Desk app access.',
-                code: 'native_subscription_required',
-            });
+        // A signed native owner session was resolved above from a query that
+        // already filters to active, subscribed properties. Re-querying the
+        // same row on every API call doubled the authentication cost during
+        // startup. PIN-based native access still needs the explicit check.
+        if (!nativeAuth) {
+            const nativeHotel = await withRetry(() => prisma.hotelConfig.findUnique({
+                where: { id: nativeHotelId },
+                select: { active: true, subscribed: true },
+            })).catch(() => null);
+            if (!nativeHotel?.active || !nativeHotel?.subscribed) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'This property does not currently have Front Desk app access.',
+                    code: 'native_subscription_required',
+                });
+            }
         }
     }
     next();
@@ -10610,14 +10641,49 @@ const CRM_BOOKING_LIST_SELECT = {
     ownerReviewNextReminderAt: true,
 };
 
-app.get('/api/crm/bookings', crmAuth, async (req, res) => {
-    try {
-        const hotelId = requireScopedHotelId(req, res);
-        if (!hotelId) return;
-        if (isStaticOnlyHotelId(hotelId)) {
-            return res.json({ success: true, data: [] });
-        }
-        const bookings = await withRetry(() => prisma.booking.findMany({
+const CRM_DECLINED_LEAD_LIST_SELECT = {
+    id: true,
+    createdAt: true,
+    hotelId: true,
+    guestFirstName: true,
+    guestLastName: true,
+    guestEmail: true,
+    guestPhone: true,
+    roomName: true,
+    checkinDate: true,
+    checkoutDate: true,
+    nights: true,
+    grandTotal: true,
+    errorMessage: true,
+};
+
+function crmDeclinedLeadAsBooking(lead) {
+    return {
+        id: lead.id,
+        createdAt: lead.createdAt,
+        hotelId: lead.hotelId,
+        guestFirstName: lead.guestFirstName,
+        guestLastName: lead.guestLastName,
+        guestEmail: lead.guestEmail,
+        guestPhone: lead.guestPhone,
+        roomName: lead.roomName,
+        checkinDate: new Date(lead.checkinDate),
+        checkoutDate: new Date(lead.checkoutDate),
+        nights: lead.nights,
+        grandTotal: lead.grandTotal,
+        subtotal: lead.grandTotal * 0.85,
+        taxesAndFees: lead.grandTotal * 0.15,
+        callStatus: 'not-called',
+        crmStage: 'new',
+        notes: `PAYMENT DECLINED - ${lead.errorMessage || 'Card issue, verify payment method when calling'}`,
+        paymentDeclined: true,
+    };
+}
+
+async function getCrmBookingList(hotelId) {
+    if (isStaticOnlyHotelId(hotelId)) return [];
+    const [bookings, declinedLeads] = await Promise.all([
+        withRetry(() => prisma.booking.findMany({
             select: CRM_BOOKING_LIST_SELECT,
             orderBy: { checkinDate: 'asc' },
             where: {
@@ -10629,57 +10695,124 @@ app.get('/api/crm/bookings', crmAuth, async (req, res) => {
                     gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
                 }
             }
-        }));
-        
-        const declinedLeads = await withRetry(() => prisma.paymentDeclinedLead.findMany({
-            select: {
-                id: true,
-                createdAt: true,
-                hotelId: true,
-                guestFirstName: true,
-                guestLastName: true,
-                guestEmail: true,
-                guestPhone: true,
-                roomName: true,
-                checkinDate: true,
-                checkoutDate: true,
-                nights: true,
-                grandTotal: true,
-                errorMessage: true,
-            },
+        })),
+        withRetry(() => prisma.paymentDeclinedLead.findMany({
+            select: CRM_DECLINED_LEAD_LIST_SELECT,
             orderBy: { createdAt: 'desc' },
             where: {
                 hotelId,
                 called: false
             }
-        }));
-        
-        // Transform declined leads to match booking structure
-        const transformedDeclined = declinedLeads.map(lead => ({
-            id: lead.id,
-            createdAt: lead.createdAt,
-            hotelId: lead.hotelId,
-            guestFirstName: lead.guestFirstName,
-            guestLastName: lead.guestLastName,
-            guestEmail: lead.guestEmail,
-            guestPhone: lead.guestPhone,
-            roomName: lead.roomName,
-            checkinDate: new Date(lead.checkinDate),
-            checkoutDate: new Date(lead.checkoutDate),
-            nights: lead.nights,
-            grandTotal: lead.grandTotal,
-            subtotal: lead.grandTotal * 0.85, // Approximate
-            taxesAndFees: lead.grandTotal * 0.15,
-            callStatus: 'not-called',
-            crmStage: 'new',
-            notes: `PAYMENT DECLINED - ${lead.errorMessage || 'Card issue, verify payment method when calling'}`,
-            paymentDeclined: true // Flag for UI
-        }));
-        
-        // Merge both lists
-        const allBookings = [...bookings, ...transformedDeclined];
-        
-        res.json({ success: true, data: allBookings });
+        })),
+    ]);
+    return [...bookings, ...declinedLeads.map(crmDeclinedLeadAsBooking)];
+}
+
+// One startup request replaces the sequential context → verification →
+// bookings/availability chain. Secondary surfaces (messages, analytics,
+// conflicts and push maintenance) intentionally load after first paint.
+app.get('/api/crm/bootstrap', crmVerifyRateLimit, crmAuth, async (req, res) => {
+    const startedAt = Date.now();
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const staticOnly = isStaticOnlyHotelId(hotelId);
+
+        const [config, dbHotel, primaryDomain, manualRoomRows, bookings] = await Promise.all([
+            resolveHotelConfig(hotelId),
+            staticOnly ? Promise.resolve(null) : prisma.hotelConfig.findUnique({
+                where: { id: hotelId },
+                select: {
+                    name: true,
+                    subtitle: true,
+                    address: true,
+                    phone: true,
+                    cancellationPolicy: true,
+                    theme: true,
+                    appIconUrl: true,
+                    subscribed: true,
+                    setupToken: true,
+                    ownerEmail: true,
+                },
+            }),
+            staticOnly ? Promise.resolve(null) : prisma.hotelDomain.findFirst({
+                where: { hotelId, isPrimary: true },
+                select: { domain: true },
+            }),
+            staticOnly ? Promise.resolve([]) : getManualRooms(hotelId),
+            getCrmBookingList(hotelId),
+        ]);
+
+        if (dbHotel?.setupToken) {
+            // Analytics must never hold the owner on the splash screen.
+            void (async () => {
+                const opened = await prisma.funnelEvent.findFirst({
+                    where: { hotelId, eventName: 'FrontDeskOpened' },
+                    select: { id: true },
+                }).catch(() => null);
+                if (!opened) {
+                    await prisma.funnelEvent.create({
+                        data: {
+                            hotelId,
+                            eventName: 'FrontDeskOpened',
+                            eventId: `marketel-frontdesk.${hotelId}`,
+                            guestEmail: dbHotel.ownerEmail || null,
+                        },
+                    }).catch(() => {});
+                }
+            })();
+        }
+
+        const domain = primaryDomain?.domain || req.crmResolvedDomain || '';
+        const responseConfig = {
+            ...sanitizeConfigForResponse(config),
+            name: dbHotel?.name || config.name || hotelId,
+            appIconUrl: dbHotel?.appIconUrl || '',
+        };
+        const manualAvailability = formatManualAvailabilityPayload(manualRoomRows);
+        res.set('Server-Timing', `bootstrap;dur=${Date.now() - startedAt}`);
+        res.json({
+            success: true,
+            data: {
+                context: {
+                    hotelId,
+                    domain,
+                    config: responseConfig,
+                    manualRooms: manualAvailability.rooms,
+                },
+                verification: {
+                    success: true,
+                    hotelId,
+                    domain,
+                    allowedHotels: req.crmAllowedHotels || [],
+                    isMasterPin: !!req.crmIsMasterPin,
+                    pms: config.pms,
+                    isManualPms: config.pms === 'manual',
+                    hotelName: dbHotel?.name || config.name || '',
+                    hotelSubtitle: dbHotel?.subtitle || '',
+                    hotelAddress: dbHotel?.address || '',
+                    hotelPhone: dbHotel?.phone || '',
+                    cancellationPolicy: dbHotel?.cancellationPolicy || '',
+                    theme: dbHotel?.theme || 'light',
+                    appIconUrl: dbHotel?.appIconUrl || '',
+                    subscribed: dbHotel?.subscribed || false,
+                },
+                bookings,
+                manualAvailability,
+            },
+        });
+    } catch (e) {
+        console.error('crm:bootstrap failed:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.get('/api/crm/bookings', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const bookings = await getCrmBookingList(hotelId);
+        res.json({ success: true, data: bookings });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

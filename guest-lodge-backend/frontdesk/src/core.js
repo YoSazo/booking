@@ -41,6 +41,9 @@ let settingsModulePromise = null;
 let appsModulePromise = null;
 let assistantModulePromise = null;
 let revealModulePromise = null;
+let messagesLoadPromise = null;
+let growthLoadPromise = null;
+let conflictsLoadPromise = null;
 const WALKTHROUGH_STORAGE_KEYS = [
   'onboardingDone',
   'settingsTourDone',
@@ -906,17 +909,7 @@ function showHotelContextError(error) {
   });
 }
 
-async function loadHotelContext() {
-  const res = await fetch(buildHotelContextUrl(), { headers: { 'Accept': 'application/json' } });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.success) {
-    const err = new Error(json.message || `Failed to load property context (${res.status})`);
-    err.status = res.status;
-    err.domain = (json && json.domain) || getDetectedHostname();
-    throw err;
-  }
-
-  const data = json.data || {};
+function applyHotelContextData(data = {}) {
   const config = data.config || {};
   if (!data.hotelId) {
     const err = new Error('Property context response is missing hotelId.');
@@ -948,6 +941,55 @@ async function loadHotelContext() {
   }
   updateHotelChrome();
   return data;
+}
+
+async function loadHotelContext() {
+  const res = await fetch(buildHotelContextUrl(), { headers: { 'Accept': 'application/json' } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    const err = new Error(json.message || `Failed to load property context (${res.status})`);
+    err.status = res.status;
+    err.domain = (json && json.domain) || getDetectedHostname();
+    throw err;
+  }
+  return applyHotelContextData(json.data || {});
+}
+
+async function loadCrmBootstrap() {
+  const url = new URL('/api/crm/bootstrap', marketelLocalUrlBase);
+  const requestedHotelId = getRequestedHotelId();
+  if (requestedHotelId) url.searchParams.set('hotelId', requestedHotelId);
+  const res = await fetch(url.pathname + url.search, {
+    headers: {
+      'Accept': 'application/json',
+      'x-crm-token': crm.token,
+      ...(isNativeFrontdeskApp() ? { 'x-marketel-client': 'ios' } : {}),
+    },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success || !json.data?.verification) {
+    const err = new Error(json.message || json.error || `Could not start Front Desk (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+
+  const data = json.data;
+  applyHotelContextData(data.context || {});
+  crm.bookings = Array.isArray(data.bookings) ? data.bookings : [];
+  crm.manualAvailability = data.manualAvailability || { rooms: [], overrides: {} };
+  if (!Array.isArray(crm.manualAvailability.rooms)) crm.manualAvailability.rooms = [];
+  if (!crm.manualAvailability.overrides || typeof crm.manualAvailability.overrides !== 'object') {
+    crm.manualAvailability.overrides = {};
+  }
+  if (!crm.manualSelectedRoom && crm.manualAvailability.rooms.length) {
+    crm.manualSelectedRoom = crm.manualAvailability.rooms[0].name;
+  }
+  const needsCalls = crm.bookings.filter(booking => booking.callStatus === 'not-called');
+  const statEl = document.getElementById('statCount');
+  if (statEl) statEl.textContent = needsCalls.length;
+  updateBookingsTabBadge();
+  refreshRoomBadge();
+  return data.verification;
 }
 
 function esc(s) {
@@ -1703,6 +1745,7 @@ function setBookingsSubview(view) {
   renderBookingsSubtabs();
   applyBookingsSubview();
   if (crm.bookingsSubview === 'revenue') loadRevenueData();
+  if (crm.bookingsSubview === 'growth') loadGrowthData();
 }
 
 function renderEmbeddedAssistantPreviewCard() {
@@ -1756,17 +1799,25 @@ function applyBookingsSubview() {
 }
 
 async function loadGrowthData() {
+  if (growthLoadPromise) return growthLoadPromise;
+  growthLoadPromise = (async () => {
+    try {
+      const [funnel, checklist] = await Promise.all([
+        api('GET', `/api/crm/growth-funnel?period=${encodeURIComponent(crm.growthPeriod)}`).catch(() => null),
+        api('GET', '/api/crm/growth-checklist').catch(() => null),
+      ]);
+      if (funnel && funnel.success) crm.growthFunnel = funnel;
+      if (checklist && checklist.success) crm.growthChecklist = checklist.checklist || {};
+      renderBookingsSubtabs();
+      if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'growth') renderGrowthPanel();
+      else renderBookingsNotices();
+    } catch (e) { /* non-fatal */ }
+  })();
   try {
-    const [funnel, checklist] = await Promise.all([
-      api('GET', `/api/crm/growth-funnel?period=${encodeURIComponent(crm.growthPeriod)}`).catch(() => null),
-      api('GET', '/api/crm/growth-checklist').catch(() => null),
-    ]);
-    if (funnel && funnel.success) crm.growthFunnel = funnel;
-    if (checklist && checklist.success) crm.growthChecklist = checklist.checklist || {};
-    renderBookingsSubtabs();
-    if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'growth') renderGrowthPanel();
-    else renderBookingsNotices();
-  } catch (e) { /* non-fatal */ }
+    return await growthLoadPromise;
+  } finally {
+    growthLoadPromise = null;
+  }
 }
 
 function setGrowthPeriod(p) {
@@ -1990,7 +2041,8 @@ function installEmbeddedEditorPreview() {
   }
 }
 
-async function startCrmApp(verification) {
+async function startCrmApp(verification, options = {}) {
+  const bootstrapped = options.bootstrapped === true;
   if (isNativeFrontdeskApp() && !(verification && verification.subscribed)) {
     throw new Error('This property does not currently have Front Desk app access.');
   }
@@ -2062,7 +2114,7 @@ async function startCrmApp(verification) {
     if (crm.revenueEnabled) seedTourRevenueShell();
     if (typeof loadSettingsModule === 'function') await loadSettingsModule();
     applyFilter();
-    hydrateCrmInBackground();
+    if (!bootstrapped) hydrateCrmInBackground();
   }
 
   document.getElementById('bootScreen').style.display = 'none';
@@ -2081,7 +2133,19 @@ async function startCrmApp(verification) {
   }
   updateGoLiveBanner();
   if (!crm.hotelSubscribed) loadBlockedDemand();
-  syncNativeAuthenticatedSession();
+
+  // Device registration and property-list maintenance are useful, but neither
+  // belongs on the critical path to the owner's bookings. Let the first frame
+  // render before they compete for API/database time.
+  const runNativeMaintenance = () => {
+    syncNativeAuthenticatedSession();
+    void refreshNativeProperties();
+  };
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(runNativeMaintenance, { timeout: 1800 });
+  } else {
+    setTimeout(runNativeMaintenance, 500);
+  }
 
   const realignActiveTab = () => {
     const activeTab = document.querySelector('.tab.active');
@@ -2095,7 +2159,6 @@ async function startCrmApp(verification) {
     updateMobileRevenueNavVisibility();
     syncMobileNavActive(crm.currentFilter);
     syncNativeShellState();
-    void refreshNativeProperties();
     ensureLucideLoaded().then(() => {
       refreshMobileBottomNavIcons();
       requestAnimationFrame(refreshMobileBottomNavIcons);
@@ -2125,6 +2188,20 @@ async function startCrmApp(verification) {
     }
   } else if (isFirstWelcome) {
     showWelcomeModal();
+  } else if (bootstrapped) {
+    // Bootstrap has already supplied the data needed for the first useful
+    // screen. Render it synchronously and leave secondary alerts/messages to
+    // idle time instead of requesting the same booking data again.
+    applyFilter();
+    refreshMobileBottomNavIcons();
+    const loadSecondaryData = () => {
+      loadBookingConflicts().catch(() => {});
+    };
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(loadSecondaryData, { timeout: 2200 });
+    } else {
+      setTimeout(loadSecondaryData, 650);
+    }
   } else {
     // The settings/tour code is lazy-loaded. A returning owner can sign in
     // directly to Bookings before that module has ever been installed, so an
@@ -2370,18 +2447,42 @@ async function bootCrmApp() {
   maybeShowBookingApprovalCard().catch(() => {});
 
   try {
-    await loadHotelContext();
     if (crm.token) {
       try {
-        const verification = await verifyCrmToken(crm.token);
-        await startCrmApp(verification);
+        const verification = await loadCrmBootstrap();
+        await startCrmApp(verification, { bootstrapped: true });
         return;
       } catch (e) {
+        // Safe rolling deploy: an already-installed native bundle may launch
+        // while the backend is still on the prior release. Use the established
+        // startup path until /bootstrap is available instead of signing the
+        // owner out.
+        if (e?.status === 404) {
+          try {
+            await loadHotelContext();
+            const verification = await verifyCrmToken(crm.token);
+            await startCrmApp(verification);
+            return;
+          } catch (legacyError) {
+            e = legacyError;
+          }
+        }
         crm.lastAuthError = e && e.message ? e.message : 'verify failed';
-        if (!showNativeAuthenticationError(e)) showLogin();
+        if (!showNativeAuthenticationError(e)) {
+          // Bootstrap authentication can fail before context is populated.
+          // Web/PWA login still needs the resolved hotel in order to submit a
+          // replacement PIN, so recover that lightweight context first.
+          try {
+            await loadHotelContext();
+            showLogin();
+          } catch (contextError) {
+            showHotelContextError(contextError);
+          }
+        }
         return;
       }
     }
+    await loadHotelContext();
     showLogin();
   } catch (e) {
     const legacyHotelId = resolveLegacyCrmHotelId();
@@ -2428,8 +2529,6 @@ async function loadBookings(opts = {}) {
     // Render based on current filter
     applyFilter();
     loadBookingConflicts();
-    if (opts.deferMessages) scheduleDeferredMessagesLoad();
-    else loadMessages();
   } catch(e) {
     if (silent) return;
     if (e.message === 'Unauthorized') return;
@@ -2453,14 +2552,22 @@ async function loadMessageBadges() {
 }
 
 async function loadMessages() {
+  if (messagesLoadPromise) return messagesLoadPromise;
+  messagesLoadPromise = (async () => {
+    try {
+      const data = await api('GET', '/api/crm/messages');
+      if (!data.success) return;
+      crm.guestMessages = data.messages || [];
+      crm.messageUnreadCount = 0;
+      updateMessageBadges();
+      if (crm.currentFilter === 'bookings') renderMessages();
+    } catch (e) { /* non-fatal */ }
+  })();
   try {
-    const data = await api('GET', '/api/crm/messages');
-    if (!data.success) return;
-    crm.guestMessages = data.messages || [];
-    crm.messageUnreadCount = 0;
-    updateMessageBadges();
-    if (crm.currentFilter === 'bookings') renderMessages();
-  } catch (e) { /* non-fatal */ }
+    return await messagesLoadPromise;
+  } finally {
+    messagesLoadPromise = null;
+  }
 }
 
 function updateMessageBadges() {
@@ -3089,8 +3196,6 @@ function setFilter(filter, btn) {
       } else {
         loadRevenueData(true);
       }
-    } else if (crm.bookingsSubview === 'bookings') {
-      loadMessages();
     }
   }
   updateGoLiveBanner();
@@ -3401,7 +3506,7 @@ function applyFilter() {
   closeAvailabilityDayPopover();
   // Bookings-tab segmented control: Bookings | Revenue | Get found
   renderBookingsSubtabs();
-  loadGrowthData();
+  if (crm.bookingsSubview === 'growth') loadGrowthData();
   applyBookingsSubview();
 }
 
@@ -4383,13 +4488,21 @@ function toast(msg, type = '') {
 
 async function loadBookingConflicts() {
   if (!crm.token) return;
+  if (conflictsLoadPromise) return conflictsLoadPromise;
+  conflictsLoadPromise = (async () => {
+    try {
+      const res = await api('GET', '/api/crm/conflicts');
+      crm.bookingConflicts = (res && res.success) ? (res.conflicts || []) : [];
+    } catch (_) {
+      crm.bookingConflicts = [];
+    }
+    renderBookingsNotices();
+  })();
   try {
-    const res = await api('GET', '/api/crm/conflicts');
-    crm.bookingConflicts = (res && res.success) ? (res.conflicts || []) : [];
-  } catch (_) {
-    crm.bookingConflicts = [];
+    return await conflictsLoadPromise;
+  } finally {
+    conflictsLoadPromise = null;
   }
-  renderBookingsNotices();
 }
 
 function conflictDateLabel(iso) {
