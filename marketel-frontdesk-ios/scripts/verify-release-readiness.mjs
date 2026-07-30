@@ -51,6 +51,10 @@ expect(delegate, /registerForRemoteNotifications\(\)/,
   'AppDelegate does not register for remote notifications');
 expect(delegate, /MARKETEL_CONFIRM_BOOKING/,
   'AppDelegate is missing native booking actions');
+expect(delegate, /marketelNativeContactResult/,
+  'AppDelegate does not return the native contact result to Front Desk');
+expect(delegate, /case "tourMode":/,
+  'AppDelegate does not lock native navigation during the native walkthrough');
 expect(capacitor, /"appId":\s*"com\.bookmarketel\.frontdesk"/,
   'Capacitor app ID must match com.bookmarketel.frontdesk');
 if (/"url"\s*:\s*"https?:\/\//.test(capacitor)) {
@@ -58,6 +62,13 @@ if (/"url"\s*:\s*"https?:\/\//.test(capacitor)) {
 }
 if (/clarity\.ms|unpkg\.com/.test(bundledFrontDesk)) {
   failures.push('Bundled Front Desk must not load analytics or executable JavaScript from a CDN');
+}
+const bundledAssetsPath = path.resolve(root, 'www/frontdesk/assets');
+const bundledAssets = fs.existsSync(bundledAssetsPath)
+  ? fs.readdirSync(bundledAssetsPath)
+  : [];
+if (!bundledAssets.some(filename => /^native-onboarding-.*\.js$/.test(filename))) {
+  failures.push('Bundled Front Desk is missing the native onboarding module');
 }
 for (const match of bundledFrontDesk.matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
   const referencedFile = path.resolve(root, 'www/frontdesk', match[1]);

@@ -105,6 +105,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var bookingTabItem: UITabBarItem?
     private var shellVisible = false
     private var shellSuppressedByModal = false
+    private var nativeTourActive = false
     private var nativeAuthToken = ""
     private var activeHotelId = ""
     private var apnsDeviceToken = ""
@@ -671,10 +672,19 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         _ viewController: CNContactViewController,
         didCompleteWith contact: CNContact?
     ) {
+        let saved = contact != nil
+        let completion = { [weak self] in
+            let script = """
+            if (typeof window.marketelNativeContactResult === 'function') {
+              window.marketelNativeContactResult(\(saved ? "true" : "false"));
+            }
+            """
+            self?.webView?.evaluateJavaScript(script)
+        }
         if let navigationController = viewController.navigationController {
-            navigationController.dismiss(animated: true)
+            navigationController.dismiss(animated: true, completion: completion)
         } else {
-            viewController.dismiss(animated: true)
+            viewController.dismiss(animated: true, completion: completion)
         }
     }
 
@@ -691,9 +701,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         topBar.isHidden = !visible
         menuButton.isHidden = !visible
         tabBar.isHidden = !visible
-        topBar.isUserInteractionEnabled = visible
-        menuButton.isUserInteractionEnabled = visible
-        tabBar.isUserInteractionEnabled = visible
+        topBar.isUserInteractionEnabled = visible && !nativeTourActive
+        menuButton.isUserInteractionEnabled = visible && !nativeTourActive
+        tabBar.isUserInteractionEnabled = visible && !nativeTourActive
     }
 
     func userContentController(
@@ -719,6 +729,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "saveContact":
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
+        case "tourMode":
+            nativeTourActive = payload["active"] as? Bool ?? false
+            setShellVisible(shellVisible, animated: false)
+        case "requestNotifications":
+            requestNativeNotifications()
         case "authenticated":
             let hotelId = String(describing: payload["hotelId"] ?? "")
             let authToken = String(describing: payload["authToken"] ?? "")
@@ -729,7 +744,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             }
             activeHotelId = hotelId
             nativeAuthToken = authToken
-            requestNativeNotifications()
+            if payload["deferNotifications"] as? Bool != true {
+                requestNativeNotifications()
+            }
             if !apnsDeviceToken.isEmpty {
                 postNativeDeviceRegistration()
             }

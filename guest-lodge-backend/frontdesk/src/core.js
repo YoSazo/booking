@@ -7,6 +7,7 @@ const isBundledNativeFrontdesk = window.location.protocol === 'capacitor:'
   || window.location.protocol === 'ionic:';
 const marketelLocalUrlBase = isBundledNativeFrontdesk ? window.location.href : window.location.origin;
 const FRONTDESK_STARTUP_TIMEOUT_MS = 8000;
+const NATIVE_ONBOARDING_DONE_KEY = 'marketelNativeOnboardingV1Done';
 
 // The App Store build ships this JavaScript inside the IPA. Only API requests
 // cross the network; rewriting them here keeps every existing feature module
@@ -60,6 +61,7 @@ let settingsModulePromise = null;
 let appsModulePromise = null;
 let assistantModulePromise = null;
 let revealModulePromise = null;
+let nativeOnboardingModulePromise = null;
 let messagesLoadPromise = null;
 let growthLoadPromise = null;
 let conflictsLoadPromise = null;
@@ -113,6 +115,16 @@ export function loadRevealModule() {
   return revealModulePromise;
 }
 
+export function loadNativeOnboardingModule() {
+  if (!nativeOnboardingModulePromise) {
+    nativeOnboardingModulePromise = import('./native-onboarding.js').then((m) => {
+      m.install();
+      return m;
+    });
+  }
+  return nativeOnboardingModulePromise;
+}
+
 function resetWalkthroughProgress() {
   WALKTHROUGH_STORAGE_KEYS.forEach((k) => {
     try { localStorage.removeItem(k); } catch (_) {}
@@ -120,6 +132,12 @@ function resetWalkthroughProgress() {
 }
 
 function replayWalkthrough() {
+  if (isNativeFrontdeskApp()) {
+    loadNativeOnboardingModule()
+      .then((module) => module.startNativeOnboarding({ replay: true }))
+      .catch(() => toast('Could not open the Front Desk tour.', 'error'));
+    return;
+  }
   resetWalkthroughProgress();
   const u = new URL(window.location.href);
   u.searchParams.set('welcome', '1');
@@ -476,6 +494,7 @@ function syncNativeAuthenticatedSession() {
     hotelId: crm.activeHotelId,
     authToken: crm.token,
     subscribed: true,
+    deferNotifications: localStorage.getItem(NATIVE_ONBOARDING_DONE_KEY) !== '1',
   });
 }
 
@@ -2320,8 +2339,18 @@ async function startCrmApp(verification, options = {}) {
   // 'appinstalled' never fires — record it every launch, server-side dedupes.
   if (!isEmbeddedEditorPreview && isStandaloneApp()) reportFrontdeskInstalled();
 
-  // First time opening the INSTALLED app → offer to turn on booking alerts.
-  if (!isEmbeddedEditorPreview) maybePromptInstalledNotifications();
+  if (!isEmbeddedEditorPreview && isNativeFrontdeskApp()) {
+    // The native app explains the operational value before iOS asks for
+    // notification permission. Returning owners bypass this entirely.
+    requestAnimationFrame(() => {
+      loadNativeOnboardingModule()
+        .then((module) => module.maybeStartNativeOnboarding())
+        .catch((error) => console.warn('Unable to start native onboarding:', error));
+    });
+  } else if (!isEmbeddedEditorPreview) {
+    // First time opening the INSTALLED PWA → offer to turn on booking alerts.
+    maybePromptInstalledNotifications();
+  }
 }
 
 async function doLogin() {
@@ -5121,6 +5150,7 @@ async function enableBookingAlerts() {
 // "Enable" button supplies that gesture. Shown once per device.
 function maybePromptInstalledNotifications() {
   try {
+    if (isNativeFrontdeskApp()) return;             // native onboarding owns this permission
     if (!isStandaloneApp()) return;                 // only inside the installed app
     if (!pushSupported()) return;                   // device can't do web push
     if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
