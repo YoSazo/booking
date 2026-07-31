@@ -53,6 +53,8 @@ expect(delegate, /MARKETEL_CONFIRM_BOOKING/,
   'AppDelegate is missing native booking actions');
 expect(delegate, /marketelNativeContactResult/,
   'AppDelegate does not return the native contact result to Front Desk');
+expect(delegate, /case "openBrowser":[\s\S]{0,180}presentInAppBrowser/,
+  'AppDelegate does not keep booking-page previews inside the app');
 expect(delegate, /case "tourMode":/,
   'AppDelegate does not lock native navigation during the native walkthrough');
 expect(delegate, /title: "Front Desk Assistant"[\s\S]{0,220}sendWebAction\("assistant"\)/,

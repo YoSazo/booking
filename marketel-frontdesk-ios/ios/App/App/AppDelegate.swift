@@ -4,6 +4,7 @@ import WebKit
 import Contacts
 import ContactsUI
 import UserNotifications
+import SafariServices
 
 private extension Notification.Name {
     static let marketelDidRegisterForRemoteNotifications =
@@ -713,6 +714,23 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         tabBar.isUserInteractionEnabled = visible && !nativeTourActive
     }
 
+    private func presentInAppBrowser(_ rawURL: String) {
+        guard let url = URL(string: rawURL),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else {
+            return
+        }
+        let browser = SFSafariViewController(url: url)
+        browser.dismissButtonStyle = .close
+        browser.preferredControlTintColor = UIColor(
+            red: 46 / 255,
+            green: 125 / 255,
+            blue: 91 / 255,
+            alpha: 1
+        )
+        present(browser, animated: true)
+    }
+
     func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
@@ -736,6 +754,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "saveContact":
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
+        case "openBrowser":
+            presentInAppBrowser(payload["url"] as? String ?? "")
         case "tourMode":
             nativeTourActive = payload["active"] as? Bool ?? false
             setShellVisible(shellVisible, animated: false)

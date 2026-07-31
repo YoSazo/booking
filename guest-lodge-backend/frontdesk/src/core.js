@@ -468,6 +468,25 @@ function setNativeShellVisible(visible) {
   nativeShellPost({ type: 'visibility', visible: !!visible });
 }
 
+const nativeModalOwners = new Set();
+
+function setNativeModalOpen(owner, open) {
+  if (!isNativeFrontdeskApp()) return;
+  const key = String(owner || 'modal');
+  if (open) nativeModalOwners.add(key);
+  else nativeModalOwners.delete(key);
+  setNativeShellVisible(nativeModalOwners.size === 0);
+  if (nativeModalOwners.size === 0) syncNativeShellState();
+}
+
+function openInAppBrowser(url) {
+  const target = String(url || '').trim();
+  if (!target) return false;
+  if (nativeShellPost({ type: 'openBrowser', url: target })) return true;
+  window.open(target, '_blank', 'noopener');
+  return true;
+}
+
 function syncNativeShellState() {
   if (!isNativeFrontdeskApp()) return;
   const needsCalls = (crm.bookings || []).filter(b => b.callStatus === 'not-called').length;
@@ -1042,14 +1061,16 @@ function jsStr(s) {
 
 function guestBookingEngineUrl(options = {}) {
   const host = window.location.hostname;
-  const isLocal = host === 'localhost'
-    || host === '127.0.0.1'
-    || host === '0.0.0.0'
-    || host === '::1'
-    || host.endsWith('.local')
-    || /^10\./.test(host)
-    || /^192\.168\./.test(host)
-    || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  const isLocal = !isNativeFrontdeskApp() && (
+    host === 'localhost'
+      || host === '127.0.0.1'
+      || host === '0.0.0.0'
+      || host === '::1'
+      || host.endsWith('.local')
+      || /^10\./.test(host)
+      || /^192\.168\./.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  );
   const focusInstall = !!options.focusInstall;
   let url = '';
 
@@ -1079,7 +1100,7 @@ function openGuestBookingEngine(options = {}) {
     toast('Your booking domain is still setting up.', 'info');
     return;
   }
-  window.open(url, '_blank');
+  openInAppBrowser(url);
 }
 
 function toIsoDate(dateLike) {
@@ -2744,97 +2765,159 @@ function setMessageThread(key) {
   pickMessageThread(key);
 }
 
+function normalizePhoneTarget(rawPhone) {
+  const raw = String(rawPhone || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 11 && digits.startsWith('1')) return `+1${digits.slice(1)}`;
+  // Keep a local 10-digit number local. iOS can dial it directly, and we
+  // avoid manufacturing a second country-code digit in its confirmation UI.
+  if (digits.length === 10) return digits;
+  if (raw.startsWith('+') && digits.length >= 8 && digits.length <= 15) return `+${digits}`;
+  return digits.length >= 7 && digits.length <= 15 ? digits : '';
+}
+
+function messageGuestInitial(name) {
+  return String(name || 'Guest').trim().charAt(0).toUpperCase() || 'G';
+}
+
 function renderMessageThreadDetail(thread) {
   const hasUnread = thread.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
-  const phone = (thread.guestPhone || '').trim();
+  const phone = normalizePhoneTarget(thread.guestPhone);
   const email = (thread.guestEmail || '').trim();
   const contactBtns = [
-    phone ? `<a href="tel:${esc(phone)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#2E7D5B;color:#fff;font-size:12px;font-weight:700;">📞 Call</a>` : '',
-    phone ? `<a href="sms:${esc(phone)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:700;">💬 Text</a>` : '',
-    email ? `<a href="mailto:${esc(email)}" style="text-decoration:none;padding:7px 12px;border-radius:8px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:700;">✉️ Email</a>` : '',
+    phone ? `<a href="tel:${esc(phone)}" class="message-contact-btn primary" aria-label="Call ${esc(thread.guestName || 'guest')}">Call</a>` : '',
+    phone ? `<a href="sms:${esc(phone)}" class="message-contact-btn">Text</a>` : '',
+    email ? `<a href="mailto:${esc(email)}" class="message-contact-btn">Email</a>` : '',
   ].filter(Boolean).join('');
 
   const sortedMsgs = thread.msgs.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   const msgBubbles = sortedMsgs.map(m => {
     const isHotel = (m.sender || 'guest') === 'hotel';
     const chips = (m.requests || []).map(r =>
-      `<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#eef6f1;color:#2E7D5B;font-size:12px;font-weight:600;margin:0 6px 6px 0;">${esc(r)}</span>`
+      `<span class="message-request-chip">${esc(r)}</span>`
     ).join('');
     return `
-      <div style="display:flex;flex-direction:column;align-items:${isHotel ? 'flex-end' : 'flex-start'};margin-bottom:8px;">
-        <div style="font-size:10px;font-weight:700;color:${isHotel ? '#2E7D5B' : '#6b7280'};margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;">${isHotel ? 'You' : esc(thread.guestName || 'Guest')} · ${esc(timeAgo(m.createdAt))}</div>
-        ${chips ? `<div style="margin-bottom:4px;">${chips}</div>` : ''}
-        ${m.body ? `<div style="background:${isHotel ? '#2E7D5B' : '#f3f4f6'};color:${isHotel ? '#fff' : '#1a1a2e'};padding:10px 14px;border-radius:14px;${isHotel ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;'}font-size:14px;line-height:1.5;max-width:85%;white-space:pre-wrap;">${esc(m.body)}</div>` : ''}
+      <div class="message-row ${isHotel ? 'from-hotel' : 'from-guest'}">
+        <div class="message-meta">${isHotel ? 'You' : esc(thread.guestName || 'Guest')} · ${esc(timeAgo(m.createdAt))}</div>
+        ${chips ? `<div class="message-request-chips">${chips}</div>` : ''}
+        ${m.body ? `<div class="message-bubble">${esc(m.body)}</div>` : ''}
       </div>`;
   }).join('');
 
-  const replyInputId = `reply-${esc(thread.key)}`;
+  const replyInputId = 'activeMessageReply';
   return `
-    <div style="border:1px solid ${hasUnread ? '#bfe0cd' : '#e6e9e7'};background:${hasUnread ? '#f4fbf6' : '#fbfcfb'};border-radius:12px;padding:14px;margin-top:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
-        <div style="font-weight:800;color:#1a1a1a;font-size:14px;display:flex;align-items:center;gap:8px;">
-          ${hasUnread ? '<span style="width:8px;height:8px;border-radius:50%;background:#e0245e;display:inline-block;"></span>' : ''}
-          ${esc(thread.guestName || 'Guest')}
-          ${thread.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;">· ${esc(thread.roomName)}</span>` : ''}
+    <section class="message-thread-detail${hasUnread ? ' has-unread' : ''}">
+      <div class="message-thread-heading">
+        <div class="message-avatar">${esc(messageGuestInitial(thread.guestName))}</div>
+        <div class="message-guest-copy">
+          <div class="message-guest-name">
+            ${hasUnread ? '<span class="message-unread-dot"></span>' : ''}
+            ${esc(thread.guestName || 'Guest')}
+          </div>
+          <div class="message-booking-context">
+            ${thread.roomName ? esc(thread.roomName) : 'Booking guest'}
+            ${thread.code ? `<span>· #${esc(thread.code)}</span>` : ''}
+          </div>
         </div>
-        ${thread.code ? `<div style="font-size:11px;color:#9ca3af;">#${esc(thread.code)}</div>` : ''}
+        <div class="message-contact-actions">${contactBtns}</div>
       </div>
-      <div style="margin-bottom:10px;max-height:min(50vh,360px);overflow-y:auto;">${msgBubbles}</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-        ${contactBtns}
-        ${hasUnread ? thread.msgs.filter(m => !m.read && (m.sender||'guest')==='guest').map(m => `<button onclick="markMessageRead('${esc(m.id)}')" style="margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">✓ Mark read</button>`).join('') : ''}
+      <div class="message-conversation" id="activeMessageConversation">
+        ${msgBubbles}
       </div>
+      ${hasUnread ? '<button type="button" class="message-mark-read" onclick="markActiveMessageThreadRead()">Mark conversation read</button>' : ''}
       ${thread.code ? `
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}..." maxlength="2000" style="flex:1;padding:10px 14px;border-radius:24px;border:1.5px solid #d1d5db;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.2s;" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onfocus="event.stopPropagation();this.style.borderColor='#2E7D5B'" onblur="this.style.borderColor='#d1d5db'" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
-        <button onclick="replyToThread('${esc(thread.code)}','${replyInputId}')" style="width:40px;height:40px;border-radius:50%;border:none;background:#2E7D5B;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s;" onmousedown="this.style.transform='scale(0.92)'" onmouseup="this.style.transform='scale(1)'">
+      <div class="message-composer">
+        <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}…" maxlength="2000" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
+        <button type="button" onclick="replyToThread('${esc(thread.code)}','${replyInputId}')" aria-label="Send reply">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
       </div>` : ''}
-    </div>`;
+    </section>`;
 }
 
 function renderMessageThreadPicker(threadList, activeThread) {
   const summary = threadSummary(activeThread);
   const pickerList = crm.messagesThreadPickerOpen ? `
-    <div style="margin-top:6px;border:1.5px solid #e6e9e7;border-radius:12px;background:#fff;box-shadow:0 10px 28px rgba(0,0,0,0.12);max-height:min(50vh,280px);overflow-y:auto;">
+    <div class="message-thread-menu">
       ${threadList.map(thread => {
         const s = threadSummary(thread);
         const isActive = thread.key === activeThread.key;
         return `
-        <button type="button" onclick="pickMessageThread('${esc(thread.key)}')" style="width:100%;display:block;padding:12px 14px;border:none;border-bottom:1px solid #f0f2f1;background:${isActive ? '#f4fbf6' : '#fff'};font-family:inherit;text-align:left;cursor:pointer;">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-            <div style="min-width:0;flex:1;">
-              <div style="font-size:13px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:6px;">
-                ${s.hasUnread ? '<span style="width:7px;height:7px;border-radius:50%;background:#e0245e;flex-shrink:0;"></span>' : ''}
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(thread.guestName || 'Guest')}</span>
-                ${thread.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;white-space:nowrap;">· ${esc(thread.roomName)}</span>` : ''}
-              </div>
-              <div style="font-size:12px;color:#6b7280;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.preview)}</div>
-              <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${esc(timeAgo(s.latest?.createdAt))}${thread.code ? ` · #${esc(thread.code)}` : ''}</div>
-            </div>
-            ${isActive ? '<span style="font-size:11px;font-weight:700;color:#2E7D5B;flex-shrink:0;">✓</span>' : ''}
-          </div>
+        <button type="button" onclick="pickMessageThread('${esc(thread.key)}')" class="message-thread-option${isActive ? ' active' : ''}">
+          <span class="message-avatar small">${esc(messageGuestInitial(thread.guestName))}</span>
+          <span class="message-thread-option-copy">
+              <span class="message-thread-option-name">
+                ${s.hasUnread ? '<span class="message-unread-dot"></span>' : ''}
+                ${esc(thread.guestName || 'Guest')}
+              </span>
+              <span class="message-thread-option-preview">${esc(s.preview)}</span>
+              <span class="message-thread-option-time">${esc(timeAgo(s.latest?.createdAt))}${thread.roomName ? ` · ${esc(thread.roomName)}` : ''}</span>
+          </span>
+          ${isActive ? '<span class="message-thread-check">✓</span>' : ''}
         </button>`;
       }).join('')}
     </div>` : '';
 
   return `
-    <div style="flex:1;min-width:200px;position:relative;">
-      <span style="display:block;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Booking conversation</span>
-      <button type="button" onclick="toggleMessageThreadPicker()" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid #d1d5db;background:#fff;font-family:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="min-width:0;flex:1;">
-          <div style="font-size:13px;font-weight:800;color:#1a1a1a;display:flex;align-items:center;gap:6px;">
-            ${summary.hasUnread ? '<span style="width:7px;height:7px;border-radius:50%;background:#e0245e;flex-shrink:0;"></span>' : ''}
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(activeThread.guestName || 'Guest')}</span>
-            ${activeThread.roomName ? `<span style="font-weight:500;color:#6b7280;font-size:12px;white-space:nowrap;">· ${esc(activeThread.roomName)}</span>` : ''}
+    <div class="message-thread-picker">
+      <span class="message-thread-picker-label">Conversation</span>
+      <button type="button" onclick="toggleMessageThreadPicker()" class="message-thread-picker-button">
+        <div class="message-thread-picker-copy">
+          <div class="message-thread-option-name">
+            ${summary.hasUnread ? '<span class="message-unread-dot"></span>' : ''}
+            ${esc(activeThread.guestName || 'Guest')}
           </div>
-          <div style="font-size:12px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(summary.preview)}</div>
+          <div class="message-thread-option-preview">${esc(summary.preview)}</div>
         </div>
-        <span style="font-size:14px;color:#9ca3af;flex-shrink:0;transition:transform 0.2s;transform:rotate(${crm.messagesThreadPickerOpen ? '180deg' : '0deg'});">▾</span>
+        <span class="message-thread-chevron${crm.messagesThreadPickerOpen ? ' open' : ''}">⌄</span>
       </button>
       ${pickerList}
     </div>`;
+}
+
+function openMessagesWorkspace() {
+  crm.messagesExpanded = true;
+  crm.messagesInboxOpen = true;
+  crm.messagesThreadPickerOpen = false;
+  if (!crm.selectedMessageThread) crm.selectedMessageThread = pickDefaultMessageThread(buildMessageThreads());
+  setNativeModalOpen('guest-messages', true);
+  renderMessages();
+}
+
+function closeMessagesWorkspace() {
+  crm.messagesExpanded = false;
+  crm.messagesThreadPickerOpen = false;
+  document.getElementById('messagesWorkspace')?.remove();
+  setNativeModalOpen('guest-messages', false);
+  renderMessages();
+}
+
+function renderMessagesWorkspace(threadList, activeThread, unreadCount) {
+  let workspace = document.getElementById('messagesWorkspace');
+  if (!workspace) {
+    workspace = document.createElement('div');
+    workspace.id = 'messagesWorkspace';
+    workspace.className = 'messages-workspace';
+    document.body.appendChild(workspace);
+  }
+  workspace.innerHTML = `
+    <header class="messages-workspace-header">
+      <button type="button" class="messages-workspace-close" onclick="closeMessagesWorkspace()" aria-label="Close guest messages">‹</button>
+      <div>
+        <div class="messages-workspace-title">Guest messages</div>
+        <div class="messages-workspace-subtitle">${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}</div>
+      </div>
+      ${unreadCount > 0 ? `<button type="button" class="messages-workspace-read" onclick="markAllMessagesRead()">Read all</button>` : '<span></span>'}
+    </header>
+    <main class="messages-workspace-body">
+      ${renderMessageThreadPicker(threadList, activeThread)}
+      ${renderMessageThreadDetail(activeThread)}
+    </main>`;
+  requestAnimationFrame(() => {
+    const conversation = document.getElementById('activeMessageConversation');
+    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+  });
 }
 
 function renderMessages() {
@@ -2843,11 +2926,12 @@ function renderMessages() {
 
   const threadList = buildMessageThreads();
   if (threadList.length === 0) {
+    if (crm.messagesExpanded) closeMessagesWorkspace();
     const pending = crm.messageUnreadCount > 0;
     panel.innerHTML = (pending ? `
-      <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
+      <div class="guest-messages-card loading">
         <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
-        <div style="font-size:14px;font-weight:600;color:#6b7280;">Loading guest messages…</div>
+        <div>Loading guest messages…</div>
       </div>` : '');
     if (pending && crm.currentFilter === 'bookings') loadMessages();
     return;
@@ -2861,27 +2945,55 @@ function renderMessages() {
   const unreadCount = crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') === 'guest').length;
   const activeThread = threadList.find(t => t.key === crm.selectedMessageThread) || threadList[0];
 
-  const inboxBody = crm.messagesInboxOpen ? `
-    <div style="padding:0 16px 16px;border-top:1px solid #e6e9e7;">
-      <div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-top:12px;">
+  if (crm.messagesExpanded) renderMessagesWorkspace(threadList, activeThread, unreadCount);
+  else document.getElementById('messagesWorkspace')?.remove();
+
+  const inboxBody = crm.messagesInboxOpen && !crm.messagesExpanded ? `
+    <div class="guest-messages-inline-body">
+      <div class="guest-messages-inline-tools">
         ${renderMessageThreadPicker(threadList, activeThread)}
-        ${unreadCount > 0 ? `<button onclick="markAllMessagesRead()" style="align-self:flex-end;padding:8px 12px;border-radius:8px;border:1px solid #d7dde3;background:#fff;color:#6b7280;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Mark all read</button>` : ''}
+        ${unreadCount > 0 ? `<button type="button" onclick="markAllMessagesRead()" class="message-mark-all">Mark all read</button>` : ''}
       </div>
       ${renderMessageThreadDetail(activeThread)}
     </div>` : '';
 
   panel.innerHTML = `
-    <div style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;">
-      <button type="button" onclick="toggleMessagesInbox()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border:none;background:transparent;font-family:inherit;cursor:pointer;text-align:left;">
-        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-          <span style="font-size:15px;font-weight:800;color:#1a1a1a;white-space:nowrap;">💬 Guest messages</span>
-          <span style="font-size:12px;font-weight:600;color:#6b7280;white-space:nowrap;">${threadList.length} booking${threadList.length === 1 ? '' : 's'}</span>
-          ${unreadCount > 0 ? `<span style="background:#e0245e;color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap;">${unreadCount} new</span>` : ''}
-        </div>
-        <span style="font-size:18px;color:#9ca3af;flex-shrink:0;transition:transform 0.2s;transform:rotate(${crm.messagesInboxOpen ? '90deg' : '0deg'});">›</span>
-      </button>
+    <section class="guest-messages-card">
+      <div class="guest-messages-card-header">
+        <button type="button" onclick="toggleMessagesInbox()" class="guest-messages-toggle">
+          <span class="guest-messages-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+          </span>
+          <span class="guest-messages-heading">
+            <strong>Guest messages</strong>
+            <span>${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}</span>
+          </span>
+          ${unreadCount > 0 ? `<span class="guest-messages-unread">${unreadCount} new</span>` : ''}
+          <span class="guest-messages-disclosure${crm.messagesInboxOpen ? ' open' : ''}">›</span>
+        </button>
+        <button type="button" onclick="openMessagesWorkspace()" class="guest-messages-expand" aria-label="Expand guest messages">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+          <span>Expand</span>
+        </button>
+      </div>
       ${inboxBody}
-    </div>`;
+    </section>`;
+}
+
+function markActiveMessageThreadRead() {
+  const active = buildMessageThreads().find(thread => thread.key === crm.selectedMessageThread);
+  const pending = new Set((active?.msgs || [])
+    .filter(message => !message.read && (message.sender || 'guest') === 'guest')
+    .map(message => message.id));
+  if (!pending.size) return;
+  crm.guestMessages.forEach(message => {
+    if (pending.has(message.id)) message.read = true;
+  });
+  updateMessageBadges();
+  renderMessages();
+  Promise.all([...pending].map(id =>
+    api('POST', `/api/crm/messages/${encodeURIComponent(id)}/read`).catch(() => null)
+  )).catch(() => {});
 }
 
 async function markMessageRead(id) {
@@ -2958,13 +3070,8 @@ function bookingCardHtml(b) {
   const ci = b.checkinDate ? new Date(b.checkinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
   const co = b.checkoutDate ? new Date(b.checkoutDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
   const ago = timeAgo(b.createdAt);
-  const rawPhoneDigits = String(b.guestPhone || '').replace(/\D/g, '');
-  let localPhoneDigits = rawPhoneDigits;
-  if (localPhoneDigits.length > 10 && localPhoneDigits.startsWith('1')) {
-    localPhoneDigits = localPhoneDigits.slice(1);
-  }
-  localPhoneDigits = localPhoneDigits.slice(0, 10);
-  const phoneHref = localPhoneDigits.length === 10 ? `tel:+1${localPhoneDigits}` : '';
+  const normalizedPhone = normalizePhoneTarget(b.guestPhone);
+  const phoneHref = normalizedPhone ? `tel:${normalizedPhone}` : '';
   const noteBtnClass = crm.currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
   const guestLabel = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'this guest';
   const reviewStatus = String(b.ownerReviewStatus || '').toLowerCase();
@@ -3704,6 +3811,7 @@ function renderMobileRoomActions() {
 function openRoomsAddModal() {
   const modal = document.getElementById('roomsAddModalBg');
   if (!modal) return;
+  setNativeModalOpen('rooms-add', true);
   modal.classList.add('open');
   const nameInput = document.getElementById('roomsAddNameInput');
   const unitsInput = document.getElementById('roomsAddUnitsInput');
@@ -3716,6 +3824,7 @@ function closeRoomsAddModal() {
   const modal = document.getElementById('roomsAddModalBg');
   if (!modal) return;
   modal.classList.remove('open');
+  setNativeModalOpen('rooms-add', false);
 }
 
 function openRoomsEditModal(roomName) {
@@ -3730,6 +3839,7 @@ function openRoomsEditModal(roomName) {
   crm.editingRoomName = room.name;
   nameInput.value = room.name;
   unitsInput.value = Math.max(0, parseInt(room.totalUnits, 10) || 0);
+  setNativeModalOpen('rooms-edit', true);
   modal.classList.add('open');
   nameInput.focus();
 }
@@ -3738,6 +3848,7 @@ function closeRoomsEditModal() {
   const modal = document.getElementById('roomsEditModalBg');
   if (modal) modal.classList.remove('open');
   crm.editingRoomName = '';
+  setNativeModalOpen('rooms-edit', false);
 }
 
 function openRoomsDeleteModal(roomName) {
@@ -3749,13 +3860,17 @@ function openRoomsDeleteModal(roomName) {
   if (copy) {
     copy.innerHTML = `Delete <strong>${esc(room.name)}</strong>? This removes its day-by-day overrides and cannot be undone.`;
   }
-  if (modal) modal.classList.add('open');
+  if (modal) {
+    setNativeModalOpen('rooms-delete', true);
+    modal.classList.add('open');
+  }
 }
 
 function closeRoomsDeleteModal() {
   const modal = document.getElementById('roomsDeleteModalBg');
   if (modal) modal.classList.remove('open');
   crm.pendingDeleteRoomName = '';
+  setNativeModalOpen('rooms-delete', false);
 }
 
 function bookingsByRoomDate() {
@@ -3913,6 +4028,7 @@ function openAvailabilityDayPopover(event, dayIso) {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   if (!room || !pop || !title || !countEl) return;
 
+  setNativeModalOpen('availability-day', true);
   crm.availabilityEditingDay = dayIso;
   const bookedMap = bookingsByRoomDate();
   const result = availabilityForDay(room, dayIso, bookedMap);
@@ -4005,6 +4121,7 @@ function closeAvailabilityDayPopover() {
     pop.setAttribute('aria-hidden', 'true');
     pop.style.display = 'none';
   }
+  setNativeModalOpen('availability-day', false);
 }
 
 function closeAvailabilityPopoverIfOutside(event) {
@@ -4189,6 +4306,7 @@ function addNote(id, existingNote = '') {
   const modal = document.getElementById('notesModal');
   const input = document.getElementById('noteInput');
   input.value = existingNote;
+  setNativeModalOpen('booking-note', true);
   modal.style.display = 'flex';
   setTimeout(() => input.focus(), 100);
 }
@@ -4199,6 +4317,7 @@ function closeNotesModal(event) {
   modal.style.display = 'none';
   currentNoteBookingId = null;
   document.getElementById('noteInput').value = '';
+  setNativeModalOpen('booking-note', false);
 }
 
 async function saveNote() {
@@ -4229,6 +4348,8 @@ document.addEventListener('keydown', (e) => {
     closeRoomsEditModal();
     closeRoomsDeleteModal();
     closeAvailabilityDayPopover();
+    if (crm.messagesExpanded) closeMessagesWorkspace();
+    if (document.getElementById('editAddRoomModal')) window.closeEditAddRoom?.();
   }
 
   if (e.key === 'Enter') {
@@ -4658,6 +4779,7 @@ function renderBookingsNotices() {
 function promptCancelBooking(bookingId, guestName) {
   const existing = document.getElementById('cancelBookingOverlay');
   if (existing) existing.remove();
+  setNativeModalOpen('cancel-booking', true);
 
   const overlay = document.createElement('div');
   overlay.id = 'cancelBookingOverlay';
@@ -4679,7 +4801,11 @@ function promptCancelBooking(bookingId, guestName) {
     </div>`;
   document.body.appendChild(overlay);
 
-  document.getElementById('cancelBookingBack').onclick = () => overlay.remove();
+  const close = () => {
+    overlay.remove();
+    setNativeModalOpen('cancel-booking', false);
+  };
+  document.getElementById('cancelBookingBack').onclick = close;
   document.getElementById('cancelBookingGo').onclick = async () => {
     const go = document.getElementById('cancelBookingGo');
     const reason = document.getElementById('cancelBookingReason').value;
@@ -4689,7 +4815,7 @@ function promptCancelBooking(bookingId, guestName) {
       const res = await api('POST', '/api/crm/bookings/cancel', { id: bookingId, reason });
       if (res && res.success) {
         toast(res.alreadyCancelled ? 'That booking was already cancelled.' : 'Cancelled — the room is back on sale.', 'success');
-        overlay.remove();
+        close();
         await loadBookings();
         await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
         if (!res.alreadyCancelled && res.calendarCorrection) {
@@ -4767,6 +4893,7 @@ async function maybeShowBookingApprovalCard() {
 function showBookingApprovalModal(token, booking) {
   const existing = document.getElementById('bookingApprovalOverlay');
   if (existing) existing.remove();
+  setNativeModalOpen('booking-approval', true);
 
   const fmt = (d) => {
     try {
@@ -4809,17 +4936,21 @@ function showBookingApprovalModal(token, booking) {
   const buttons = ['bookingApprovalConfirm', 'bookingApprovalRelease', 'bookingApprovalLater']
     .map((id) => document.getElementById(id));
   const setBusy = (busy) => buttons.forEach((btn) => { if (btn) btn.disabled = busy; });
+  const close = () => {
+    overlay.remove();
+    setNativeModalOpen('booking-approval', false);
+  };
 
   const decide = async (action) => {
     setBusy(true);
     const ok = await submitBookingApproval(token, action);
     setBusy(false);
-    if (ok) overlay.remove();
+    if (ok) close();
   };
 
   document.getElementById('bookingApprovalConfirm').onclick = () => decide('confirm');
   document.getElementById('bookingApprovalRelease').onclick = () => decide('release');
-  document.getElementById('bookingApprovalLater').onclick = () => overlay.remove();
+  document.getElementById('bookingApprovalLater').onclick = close;
 }
 
 async function submitBookingApproval(token, action) {
@@ -4908,6 +5039,7 @@ async function openBookingReviewFromCard(bookingId) {
 
 function showBookingReviewModal(token, booking) {
   document.getElementById('bookingReviewOverlay')?.remove();
+  setNativeModalOpen('booking-review', true);
   const total = Number(booking.grandTotal || 0).toFixed(2);
   const paidNow = Number(booking.amountPaidNow || 0);
   const isDead = ['cancelled', 'canceled', 'released'].includes(String(booking.status || '').toLowerCase());
@@ -4953,13 +5085,17 @@ function showBookingReviewModal(token, booking) {
     </div>`;
   document.body.appendChild(overlay);
 
+  const close = () => {
+    overlay.remove();
+    setNativeModalOpen('booking-review', false);
+  };
   const setBusy = (busy) => {
     ['bookingReviewAvailable', 'bookingReviewCancel', 'bookingReviewLater'].forEach((id) => {
       const btn = document.getElementById(id);
       if (btn) btn.disabled = busy;
     });
   };
-  document.getElementById('bookingReviewLater').onclick = () => overlay.remove();
+  document.getElementById('bookingReviewLater').onclick = close;
   const availableBtn = document.getElementById('bookingReviewAvailable');
   if (availableBtn) {
     availableBtn.onclick = async () => {
@@ -4967,7 +5103,7 @@ function showBookingReviewModal(token, booking) {
       const result = await submitBookingReview(token, 'available');
       setBusy(false);
       if (result?.success) {
-        overlay.remove();
+        close();
         toast('Room verified — reminders stopped.', 'success');
         if (crm.token) loadBookings().catch(() => {});
       }
@@ -4981,7 +5117,7 @@ function showBookingReviewModal(token, booking) {
       const result = await submitBookingReview(token, 'cancel');
       setBusy(false);
       if (result?.success) {
-        overlay.remove();
+        close();
         toast('Booking cancelled — the guest has been emailed.', 'success');
         if (crm.token) loadBookings().catch(() => {});
         if (result.calendarCorrection) {
@@ -5016,6 +5152,7 @@ async function submitBookingReview(token, action) {
 function showAvailabilityCorrectionModal(correction, options = {}) {
   if (!correction?.roomName || !correction?.checkinDate || !correction?.checkoutDate) return;
   document.getElementById('availabilityCorrectionOverlay')?.remove();
+  setNativeModalOpen('availability-correction', true);
   const totalUnits = Math.max(1, parseInt(correction.totalUnits, 10) || 1);
   const choices = Array.from({ length: totalUnits + 1 }, (_, value) =>
     `<option value="${value}"${value === 0 ? ' selected' : ''}>${value} room${value === 1 ? '' : 's'} available</option>`
@@ -5039,7 +5176,11 @@ function showAvailabilityCorrectionModal(correction, options = {}) {
       <button type="button" id="availabilityCorrectionLater" style="width:100%;padding:11px;border:none;background:none;color:#7B8C82;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;margin-top:5px;">Not now</button>
     </div>`;
   document.body.appendChild(overlay);
-  document.getElementById('availabilityCorrectionLater').onclick = () => overlay.remove();
+  const close = () => {
+    overlay.remove();
+    setNativeModalOpen('availability-correction', false);
+  };
+  document.getElementById('availabilityCorrectionLater').onclick = close;
   document.getElementById('availabilityCorrectionSave').onclick = async () => {
     const save = document.getElementById('availabilityCorrectionSave');
     const availableUnits = Math.max(0, parseInt(document.getElementById('availabilityCorrectionUnits').value, 10) || 0);
@@ -5066,7 +5207,7 @@ function showAvailabilityCorrectionModal(correction, options = {}) {
         });
       }
       if (!body?.success) throw new Error(body?.message || 'Could not update those dates.');
-      overlay.remove();
+      close();
       toast('Availability updated for those dates.', 'success');
       if (crm.token) loadManualAvailability({ silent: true }).catch(() => {});
     } catch (e) {
@@ -5322,6 +5463,7 @@ exposeToWindow({
   loadMessages,
   loadRevenueData,
   markAllMessagesRead,
+  markActiveMessageThreadRead,
   markConfirmed,
   markMessageRead,
   marketelNativeAction,
@@ -5331,6 +5473,8 @@ exposeToWindow({
   needsEditPageLoad,
   normalizeRevenuePeriod,
   openAvailabilityDayPopover,
+  openInAppBrowser,
+  openMessagesWorkspace,
   openRoomsAddModal,
   openRoomsDeleteModal,
   openRoomsEditModal,
@@ -5380,6 +5524,7 @@ exposeToWindow({
   setGrowthChecklistItem,
   setGrowthPeriod,
   setMessageThread,
+  setNativeModalOpen,
   setNativeShellVisible,
   setNotificationButtonState,
   showBootState,
@@ -5404,6 +5549,7 @@ exposeToWindow({
   toggleAvailabilityDayClosed,
   toggleMessageThreadPicker,
   toggleMessagesInbox,
+  closeMessagesWorkspace,
   twoRoomExplainerHtml,
   updateBookingsTabBadge,
   updateFrontdeskManifestLink,

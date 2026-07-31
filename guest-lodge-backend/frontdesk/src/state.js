@@ -69,6 +69,7 @@ export const crm = {
   editRoomsLoadPromise: null,
   messageUnreadCount: 0,
   messagesInboxOpen: false,
+  messagesExpanded: false,
   messagesThreadPickerOpen: false,
   selectedMessageThread: '',
   bookingsVirtualList: [],

@@ -385,13 +385,16 @@ async function settingsSendSupport() {
 
 function openPreviewSite() {
   const domain = crm.activeHotelDomain || (crm.activeHotelId + '.mktel.co');
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocal = !isNativeApp()
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const url = isLocal ? 'http://localhost:5173/?hotelId=' + encodeURIComponent(crm.activeHotelId) + '&preview=1' : 'https://' + domain + '?preview=1';
-  window.open(url, '_blank');
+  if (typeof window.openInAppBrowser === 'function') window.openInAppBrowser(url);
+  else window.open(url, '_blank', 'noopener');
 }
 
 function guestBookingEngineUrl() {
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocal = !isNativeApp()
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   if (isLocal && crm.activeHotelId) {
     return 'http://localhost:5173/?hotelId=' + encodeURIComponent(crm.activeHotelId);
   }
@@ -405,7 +408,8 @@ function openGuestBookingEngine() {
     toast('Your booking domain is still setting up.', 'info');
     return;
   }
-  window.open(url, '_blank');
+  if (typeof window.openInAppBrowser === 'function') window.openInAppBrowser(url);
+  else window.open(url, '_blank', 'noopener');
 }
 
 function updatePreviewSiteBar() {
@@ -1575,29 +1579,44 @@ async function deleteEditRoom(roomId) {
 }
 
 function openEditAddRoom() {
-  const list = document.getElementById('editRoomsList');
-  // Check if add form already exists
-  if (document.getElementById('editAddForm')) return;
-  list.insertAdjacentHTML('beforeend', `
-    <div id="editAddForm" class="booking-card" style="margin-bottom:12px; border-color:var(--green);">
-      <div style="padding:16px;">
-        <input type="text" id="editNewRoomName" placeholder="Room type name (e.g. King Suite)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:16px;outline:none;margin-bottom:10px;">
-        <div style="display:flex;gap:8px;">
-          <button onclick="confirmEditAddRoom()" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Add</button>
-          <button onclick="document.getElementById('editAddForm').remove()" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--text-muted);">Cancel</button>
+  if (document.getElementById('editAddRoomModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="editAddRoomModal" class="edit-add-room-modal" role="dialog" aria-modal="true" aria-labelledby="editAddRoomTitle" onclick="if(event.target===this) closeEditAddRoom()">
+      <div class="edit-add-room-card">
+        <h3 id="editAddRoomTitle">Add a room to your booking page</h3>
+        <p>You can add photos, pricing and details as soon as the room is created.</p>
+        <input type="text" id="editNewRoomName" placeholder="Room name, like King Suite" autocomplete="off" onkeydown="if(event.key==='Enter') confirmEditAddRoom(); if(event.key==='Escape') closeEditAddRoom();">
+        <div class="edit-add-room-actions">
+          <button type="button" onclick="closeEditAddRoom()">Cancel</button>
+          <button type="button" class="primary" onclick="confirmEditAddRoom()">Add room</button>
         </div>
       </div>
     </div>
   `);
-  document.getElementById('editNewRoomName').focus();
+  window.setNativeModalOpen?.('edit-add-room', true);
+  requestAnimationFrame(() => document.getElementById('editNewRoomName')?.focus());
+}
+
+function closeEditAddRoom() {
+  document.getElementById('editAddRoomModal')?.remove();
+  window.setNativeModalOpen?.('edit-add-room', false);
 }
 
 function confirmEditAddRoom() {
-  const name = document.getElementById('editNewRoomName').value.trim();
+  const input = document.getElementById('editNewRoomName');
+  const name = input?.value.trim() || '';
   if (!name) return;
+  if (input) input.disabled = true;
   api('POST', '/api/crm/rooms', { name, maxOccupancy: 4, totalUnits: 5 })
-    .then(() => { toast('Room added', 'success'); loadEditRooms(); })
-    .catch(() => toast('Failed to add', 'error'));
+    .then(() => {
+      closeEditAddRoom();
+      toast('Room added', 'success');
+      loadEditRooms();
+    })
+    .catch(() => {
+      if (input) input.disabled = false;
+      toast('Failed to add', 'error');
+    });
 }
 
 
@@ -1611,6 +1630,7 @@ const _settingsExports = {
   cleanupSettingsTourUi,
   cancelAccountDeletion,
   closeAmenityPicker,
+  closeEditAddRoom,
   confirmAmenityPicker,
   confirmEditAddRoom,
   copyBookingLink,
