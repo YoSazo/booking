@@ -1,21 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
-  BookOpen,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Copy,
   Ellipsis,
   ExternalLink,
-  PanelTop,
-  RotateCw,
   Share,
   SquarePlus,
   X,
 } from 'lucide-react';
 import { HotelIcon, IOS_SHARE_BLUE, isIos26Plus } from './guestInstallUi.jsx';
+import standardGlass from './assets/install-coach/safari-standard-glass.svg';
+import standardActions from './assets/install-coach/safari-standard-actions.svg';
+import compactBack from './assets/install-coach/safari-compact-back.svg';
+import compactAddress from './assets/install-coach/safari-compact-address.svg';
+import compactMenu from './assets/install-coach/safari-compact-menu.svg';
+import viewMore from './assets/install-coach/safari-view-more.svg';
 import './BookingInstallCoach.css';
 
 const isIosSafari = () => {
@@ -25,26 +27,14 @@ const isIosSafari = () => {
   return /Safari/i.test(ua) && !knownOtherBrowser.test(ua);
 };
 
-function SafariGlass({ children, className = '', target = false }) {
-  return (
-    <div className={`booking-install-glass ${className} ${target ? 'booking-install-target' : ''}`.trim()}>
-      {children}
-    </div>
-  );
-}
-
 function StandardSafariBar({ compact = false, target = true }) {
   return (
     <div className={`booking-install-standard-bar ${compact ? 'booking-install-standard-bar--small' : ''}`}>
-      <SafariGlass className="booking-install-standard-pill">
-        <ChevronLeft aria-hidden />
-        <ChevronRight className="booking-install-muted-icon" aria-hidden />
-        <span className={target ? 'booking-install-icon-target' : ''}>
-          <Share aria-hidden />
-        </span>
-        <BookOpen aria-hidden />
-        <Copy aria-hidden />
-      </SafariGlass>
+      <div className="booking-install-standard-artwork" aria-hidden>
+        <img className="booking-install-standard-glass" src={standardGlass} alt="" />
+        <img className="booking-install-standard-actions" src={standardActions} alt="" />
+        {target ? <span className="booking-install-target-ring booking-install-target-ring--share" /> : null}
+      </div>
     </div>
   );
 }
@@ -52,17 +42,12 @@ function StandardSafariBar({ compact = false, target = true }) {
 function CompactSafariBar({ small = false, target = true }) {
   return (
     <div className={`booking-install-compact-bar ${small ? 'booking-install-compact-bar--small' : ''}`}>
-      <SafariGlass className="booking-install-circle">
-        <ChevronLeft aria-hidden />
-      </SafariGlass>
-      <SafariGlass className="booking-install-address-pill">
-        <PanelTop aria-hidden />
-        <span aria-hidden />
-        <RotateCw aria-hidden />
-      </SafariGlass>
-      <SafariGlass className={`booking-install-circle ${target ? 'booking-install-icon-target' : ''}`}>
-        <Ellipsis aria-hidden />
-      </SafariGlass>
+      <div className="booking-install-compact-artwork" aria-hidden>
+        <img className="booking-install-compact-piece booking-install-compact-piece--back" src={compactBack} alt="" />
+        <img className="booking-install-compact-piece booking-install-compact-piece--address" src={compactAddress} alt="" />
+        <img className="booking-install-compact-piece booking-install-compact-piece--menu" src={compactMenu} alt="" />
+        {target ? <span className="booking-install-target-ring booking-install-target-ring--menu" /> : null}
+      </div>
     </div>
   );
 }
@@ -127,11 +112,11 @@ function LayoutChoice({ hotelName, appIconUrl, onSelect, onClose }) {
       <div className="booking-install-heading">
         <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={54} />
         <div>
-          <span className="booking-install-eyebrow">Install in about 10 seconds</span>
-          <h2>Match the Safari bar on your phone</h2>
+          <span className="booking-install-eyebrow">Add to Home Screen</span>
+          <h2>Which Safari bar do you see?</h2>
         </div>
       </div>
-      <p className="booking-install-intro">Choose the one that looks like the bottom of your screen.</p>
+      <p className="booking-install-intro">Choose the one that matches Safari on your iPhone.</p>
       <div className="booking-install-layout-choices">
         <button type="button" onClick={() => onSelect('standard')}>
           <span className="booking-install-choice-copy">
@@ -139,7 +124,7 @@ function LayoutChoice({ hotelName, appIconUrl, onSelect, onClose }) {
             <small>It is already in Safari&apos;s bar</small>
           </span>
           <StandardSafariBar compact />
-          <span className="booking-install-choice-cta">Use these steps <ChevronRight aria-hidden /></span>
+          <span className="booking-install-choice-cta">This one <ChevronRight aria-hidden /></span>
         </button>
         <button type="button" onClick={() => onSelect('compact')}>
           <span className="booking-install-choice-copy">
@@ -147,7 +132,7 @@ function LayoutChoice({ hotelName, appIconUrl, onSelect, onClose }) {
             <small>Share is inside that menu</small>
           </span>
           <CompactSafariBar small />
-          <span className="booking-install-choice-cta">Use these steps <ChevronRight aria-hidden /></span>
+          <span className="booking-install-choice-cta">This one <ChevronRight aria-hidden /></span>
         </button>
       </div>
     </div>
@@ -194,7 +179,7 @@ function GuidedSteps({ hotelName, appIconUrl, layout, modernIos, onBack, onClose
         <div className="booking-install-action-list">
           {modernIos ? (
             <NextAction
-              icon={<ChevronDown aria-hidden />}
+              icon={<span className="booking-install-exact-action"><img src={viewMore} alt="" /></span>}
               title="View More"
               note="This reveals the full list"
             />

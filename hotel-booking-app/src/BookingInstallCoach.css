@@ -7,11 +7,13 @@
   position: fixed;
   inset: 0;
   z-index: 12000;
-  display: grid;
-  place-items: center;
-  padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
-  color: #18231d;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+  color: #1c1c1e;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 .booking-install-backdrop {
@@ -21,128 +23,163 @@
   height: 100%;
   padding: 0;
   border: 0;
-  background: rgba(12, 23, 17, 0.58);
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
 }
 
 .booking-install-panel {
   position: relative;
   z-index: 1;
-  width: min(100%, 430px);
-  max-height: calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  width: min(100%, 440px);
+  max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 26px;
+  padding: 22px;
+  border: 0.5px solid rgba(255, 255, 255, 0.78);
+  border-radius: 34px;
   background:
-    radial-gradient(circle at 8% 0%, rgba(215, 240, 225, 0.7), transparent 34%),
-    rgba(250, 252, 251, 0.96);
-  box-shadow: 0 30px 90px rgba(7, 31, 18, 0.34);
-  animation: bookingInstallEnter 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(239, 239, 244, 0.72)),
+    rgba(242, 242, 247, 0.76);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(44px) saturate(1.75);
+  -webkit-backdrop-filter: blur(44px) saturate(1.75);
+  animation: bookingInstallEnter 360ms cubic-bezier(0.22, 0.78, 0.2, 1);
+}
+
+.booking-install-panel::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: -9px auto 17px;
+  border-radius: 999px;
+  background: rgba(60, 60, 67, 0.24);
 }
 
 .booking-install-close {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  z-index: 2;
-  width: 36px;
-  height: 36px;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(226, 233, 229, 0.88);
-  color: #4f6057;
+  background: rgba(118, 118, 128, 0.14);
+  color: rgba(60, 60, 67, 0.68);
   cursor: pointer;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.booking-install-close:active,
+.booking-install-top-actions button:active {
+  transform: scale(0.94);
 }
 
 .booking-install-close svg,
 .booking-install-top-actions svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
 }
 
 .booking-install-heading,
 .booking-install-step-title {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-right: 34px;
+  gap: 13px;
+  min-height: 56px;
+  padding-right: 32px;
 }
 
 .booking-install-heading h2,
 .booking-install-step-title h2,
 .booking-install-panel--handoff h2 {
   margin: 3px 0 0;
-  color: #17241d;
-  font-size: 21px;
-  line-height: 1.18;
+  color: #1c1c1e;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.13;
   letter-spacing: -0.025em;
 }
 
 .booking-install-eyebrow {
   display: block;
-  color: #2e7d5b;
+  color: #007aff;
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.055em;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
 .booking-install-intro {
-  margin: 15px 0 18px;
-  color: #657269;
+  margin: 13px 2px 17px;
+  color: rgba(60, 60, 67, 0.72);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.42;
 }
 
 .booking-install-layout-choices {
   display: grid;
-  gap: 12px;
+  gap: 11px;
 }
 
 .booking-install-layout-choices > button {
   width: 100%;
   overflow: hidden;
-  padding: 16px;
-  border: 1px solid #d6e1da;
-  border-radius: 18px;
-  background: #fff;
+  padding: 15px;
+  border: 0.5px solid rgba(84, 84, 88, 0.16);
+  border-radius: 23px;
+  background: rgba(255, 255, 255, 0.68);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 5px 16px rgba(34, 70, 49, 0.05);
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  box-shadow:
+    0 7px 22px rgba(0, 0, 0, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(25px) saturate(1.5);
+  -webkit-backdrop-filter: blur(25px) saturate(1.5);
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
 .booking-install-layout-choices > button:hover,
 .booking-install-layout-choices > button:focus-visible {
-  border-color: #67a487;
-  box-shadow: 0 9px 24px rgba(46, 125, 91, 0.13);
+  border-color: rgba(0, 122, 255, 0.5);
+  background: rgba(255, 255, 255, 0.84);
   outline: none;
-  transform: translateY(-1px);
+}
+
+.booking-install-layout-choices > button:active {
+  transform: scale(0.985);
 }
 
 .booking-install-choice-copy {
   display: block;
+  padding: 0 2px;
 }
 
 .booking-install-choice-copy strong {
   display: block;
+  color: #1c1c1e;
   font-size: 15px;
+  font-weight: 650;
   line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
 .booking-install-choice-copy small {
   display: block;
   margin-top: 2px;
-  color: #708078;
+  color: rgba(60, 60, 67, 0.6);
   font-size: 12px;
 }
 
@@ -150,220 +187,232 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 3px;
-  margin-top: 4px;
-  color: #2e7d5b;
-  font-size: 12px;
-  font-weight: 800;
+  gap: 1px;
+  margin-top: 2px;
+  color: #007aff;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .booking-install-choice-cta svg {
-  width: 14px;
-  height: 14px;
-}
-
-.booking-install-glass {
-  border: 1px solid rgba(255, 255, 255, 0.94);
-  background: rgba(243, 246, 244, 0.78);
-  box-shadow: 0 9px 25px rgba(22, 42, 31, 0.12), inset 0 0 0 0.5px rgba(124, 139, 130, 0.18);
-  backdrop-filter: blur(10px) saturate(1.3);
-  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.2;
 }
 
 .booking-install-standard-bar,
 .booking-install-compact-bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 82px;
-  margin: 8px 0 0;
-  border-radius: 16px;
+  width: 100%;
+  min-height: 92px;
+  margin: 7px 0 0;
+  overflow: hidden;
+  border: 0.5px solid rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
   background:
-    linear-gradient(135deg, rgba(194, 211, 203, 0.48), rgba(233, 239, 236, 0.88)),
-    repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,255,255,0.2) 39px 40px);
+    radial-gradient(circle at 28% 8%, rgba(255, 255, 255, 0.86), transparent 30%),
+    linear-gradient(145deg, rgba(190, 205, 198, 0.62), rgba(231, 235, 233, 0.88));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
-.booking-install-standard-pill {
-  width: min(100%, 330px);
-  height: 49px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: center;
-  justify-items: center;
-  padding: 0 8px;
-  border-radius: 999px;
-}
-
-.booking-install-standard-pill svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.8;
-}
-
-.booking-install-muted-icon {
-  opacity: 0.3;
-}
-
-.booking-install-icon-target {
+.booking-install-standard-artwork {
   position: relative;
-  display: grid;
-  place-items: center;
-  color: #0879ec;
+  width: min(100%, 428px);
+  aspect-ratio: 428 / 108;
+  flex: 0 0 auto;
 }
 
-.booking-install-icon-target::before,
-.booking-install-icon-target::after {
+.booking-install-standard-glass {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.booking-install-standard-actions {
+  position: absolute;
+  top: 20.83%;
+  left: 7.59%;
+  display: block;
+  width: 84.81%;
+  height: 39.81%;
+}
+
+.booking-install-target-ring {
+  position: absolute;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(0, 122, 255, 0.86);
+  border-radius: 50%;
+  background: rgba(0, 122, 255, 0.08);
+  box-shadow: 0 0 0 5px rgba(0, 122, 255, 0.08);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.booking-install-target-ring::before,
+.booking-install-target-ring::after {
   content: "";
   position: absolute;
-  z-index: -1;
-  width: 38px;
-  height: 38px;
-  border: 2px solid rgba(0, 122, 255, 0.65);
-  border-radius: 50%;
-  animation: bookingInstallPulse 1.8s ease-out infinite;
+  inset: -2px;
+  border: 2px solid rgba(0, 122, 255, 0.56);
+  border-radius: inherit;
+  animation: bookingInstallPulse 1.9s ease-out infinite;
 }
 
-.booking-install-icon-target::after {
-  animation-delay: 0.8s;
+.booking-install-target-ring::after {
+  animation-delay: 0.85s;
 }
 
-.booking-install-compact-bar {
-  gap: 7px;
-  padding: 0 8px;
+.booking-install-target-ring--share {
+  top: 41%;
+  left: 49.55%;
 }
 
-.booking-install-circle {
-  width: 49px;
-  height: 49px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 50%;
+.booking-install-compact-artwork {
+  --compact-scale: 0.9;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 385px;
+  height: 109px;
+  transform: translate(-50%, -50%) scale(var(--compact-scale));
+  transform-origin: center;
 }
 
-.booking-install-circle svg {
-  width: 19px;
-  height: 19px;
-  stroke-width: 1.9;
+.booking-install-compact-piece {
+  position: absolute;
+  top: 0;
+  display: block;
+  height: 109px;
 }
 
-.booking-install-address-pill {
-  height: 49px;
-  min-width: 0;
-  flex: 1 1 190px;
-  max-width: 215px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 13px;
-  border-radius: 999px;
+.booking-install-compact-piece--back {
+  left: 0;
+  width: 109px;
 }
 
-.booking-install-address-pill svg {
-  width: 17px;
-  height: 17px;
+.booking-install-compact-piece--address {
+  top: 0.5px;
+  left: 56px;
+  width: 273px;
+  height: 108px;
 }
 
-.booking-install-address-pill span {
-  min-width: 0;
-  height: 6px;
-  flex: 1;
-  border-radius: 999px;
-  background: rgba(104, 119, 111, 0.27);
+.booking-install-compact-piece--menu {
+  left: 276px;
+  width: 109px;
+}
+
+.booking-install-target-ring--menu {
+  top: 44.5px;
+  left: 330.5px;
 }
 
 .booking-install-standard-bar--small,
 .booking-install-compact-bar--small {
-  min-height: 70px;
-  margin-top: 11px;
+  min-height: 76px;
+  margin-top: 10px;
+  border-radius: 17px;
 }
 
-.booking-install-standard-bar--small .booking-install-standard-pill {
-  transform: scale(0.88);
+.booking-install-standard-bar--small .booking-install-standard-artwork {
+  width: 330px;
 }
 
-.booking-install-compact-bar--small .booking-install-glass {
-  transform: scale(0.82);
-}
-
-.booking-install-compact-bar--small {
-  gap: 0;
-  padding: 0 4px;
-}
-
-.booking-install-compact-bar--small .booking-install-address-pill {
-  margin: 0 -7px;
+.booking-install-compact-bar--small .booking-install-compact-artwork {
+  --compact-scale: 0.76;
 }
 
 .booking-install-top-actions {
-  min-height: 36px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: -8px 0 10px;
+  margin: -9px 0 11px;
 }
 
 .booking-install-top-actions button {
-  min-height: 36px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 0 9px;
+  gap: 4px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 10px;
-  background: #e7eee9;
-  color: #53625a;
+  border-radius: 999px;
+  background: rgba(118, 118, 128, 0.12);
+  color: #007aff;
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .booking-install-top-actions button:last-child {
-  width: 36px;
+  width: 32px;
   padding: 0;
   justify-content: center;
-  border-radius: 50%;
+  color: rgba(60, 60, 67, 0.68);
 }
 
 .booking-install-toolbar-demo {
   position: relative;
-  margin: 18px 0;
-  padding-top: 11px;
-  border: 1px solid #dbe5df;
-  border-radius: 19px;
-  background: rgba(239, 244, 241, 0.82);
+  margin: 19px 0 14px;
+  padding-top: 10px;
+  overflow: hidden;
+  border: 0.5px solid rgba(84, 84, 88, 0.14);
+  border-radius: 23px;
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .booking-install-example-label {
   position: absolute;
-  top: -9px;
+  top: 9px;
   left: 14px;
-  padding: 2px 7px;
+  z-index: 3;
+  padding: 4px 8px;
   border-radius: 999px;
-  background: #fff;
-  color: #718078;
+  background: rgba(118, 118, 128, 0.12);
+  color: rgba(60, 60, 67, 0.63);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .booking-install-toolbar-demo .booking-install-standard-bar,
 .booking-install-toolbar-demo .booking-install-compact-bar {
+  min-height: 105px;
   margin: 0;
-  border-radius: 18px 18px 0 0;
-  background: transparent;
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  background:
+    radial-gradient(circle at 22% 6%, rgba(255, 255, 255, 0.9), transparent 32%),
+    linear-gradient(150deg, rgba(185, 200, 193, 0.66), rgba(234, 237, 235, 0.94));
+  box-shadow: none;
 }
 
 .booking-install-share-menu-example {
   display: flex;
   align-items: center;
   gap: 11px;
-  margin: 0 14px 14px;
+  margin: -2px 12px 12px;
   padding: 11px 13px;
-  border: 1px solid #d4dfd8;
-  border-radius: 13px;
-  background: rgba(255,255,255,0.9);
+  border: 0.5px solid rgba(84, 84, 88, 0.16);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.055);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .booking-install-share-menu-example svg {
@@ -378,53 +427,75 @@
 
 .booking-install-share-menu-example strong {
   font-size: 13px;
+  font-weight: 600;
 }
 
 .booking-install-share-menu-example small {
   margin-top: 1px;
-  color: #748279;
+  color: rgba(60, 60, 67, 0.58);
   font-size: 10px;
 }
 
 .booking-install-then {
-  padding: 15px;
-  border: 1px solid #d6e2da;
-  border-radius: 17px;
-  background: #fff;
+  padding: 14px;
+  border: 0.5px solid rgba(84, 84, 88, 0.14);
+  border-radius: 21px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .booking-install-action-list {
   display: grid;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 1px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: 15px;
+  background: rgba(60, 60, 67, 0.12);
 }
 
 .booking-install-next-action {
-  min-height: 50px;
+  min-height: 53px;
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: #eff5f1;
+  padding: 8px 11px;
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .booking-install-action-icon {
-  width: 34px;
-  height: 34px;
+  position: relative;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   flex: 0 0 auto;
   border-radius: 10px;
-  background: #fff;
-  color: #2e7d5b;
-  box-shadow: 0 2px 7px rgba(26, 65, 43, 0.08);
+  background: rgba(0, 122, 255, 0.1);
+  color: #007aff;
 }
 
-.booking-install-action-icon svg {
-  width: 19px;
-  height: 19px;
-  stroke-width: 2;
+.booking-install-action-icon > svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.9;
+}
+
+.booking-install-exact-action {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.booking-install-exact-action img {
+  position: absolute;
+  top: -15px;
+  left: -23px;
+  width: 84px;
+  height: 84px;
+  max-width: none;
 }
 
 .booking-install-next-action > span:last-child {
@@ -433,12 +504,14 @@
 }
 
 .booking-install-next-action strong {
+  color: #1c1c1e;
   font-size: 13px;
+  font-weight: 600;
 }
 
 .booking-install-next-action small {
   margin-top: 2px;
-  color: #718077;
+  color: rgba(60, 60, 67, 0.57);
   font-size: 10px;
 }
 
@@ -447,29 +520,38 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin: 14px 0 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #2e7d5b;
-  color: #fff;
+  margin: 13px 0 8px;
+  padding: 11px 13px;
+  border: 0.5px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.64);
+  color: #007aff;
   text-align: center;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
 }
 
 .booking-install-real-toolbar svg {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
+  stroke-width: 2.2;
   animation: bookingInstallNudge 1.25s ease-in-out infinite;
 }
 
 .booking-install-real-toolbar strong {
   font-size: 12px;
+  font-weight: 650;
   line-height: 1.35;
 }
 
 .booking-install-help {
   display: block;
-  color: #718077;
+  padding: 0 5px;
+  color: rgba(60, 60, 67, 0.55);
   font-size: 10px;
   line-height: 1.45;
   text-align: center;
@@ -486,7 +568,7 @@
 
 .booking-install-panel--handoff p {
   margin: 11px 0 18px;
-  color: #647169;
+  color: rgba(60, 60, 67, 0.68);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -496,20 +578,22 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin: 0 0 14px;
+  margin: 0 0 13px;
   padding: 13px 8px;
-  border: 1px solid #d7e2db;
-  border-radius: 15px;
-  background: #fff;
+  border: 0.5px solid rgba(84, 84, 88, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .booking-install-handoff-route span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #35463c;
+  color: #1c1c1e;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .booking-install-handoff-route svg {
@@ -519,21 +603,27 @@
 
 .booking-install-secondary-button {
   width: 100%;
-  min-height: 48px;
+  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   margin: 0 0 10px;
   padding: 11px 16px;
-  border: 1px solid #2e7d5b;
-  border-radius: 13px;
-  background: #2e7d5b;
+  border: 0;
+  border-radius: 999px;
+  background: #007aff;
   color: #fff;
   font: inherit;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 650;
   cursor: pointer;
+  box-shadow: 0 7px 20px rgba(0, 122, 255, 0.24);
+}
+
+.booking-install-secondary-button:active {
+  transform: scale(0.985);
+  opacity: 0.88;
 }
 
 .booking-install-secondary-button svg {
@@ -542,13 +632,13 @@
 }
 
 @keyframes bookingInstallEnter {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  from { opacity: 0; transform: translateY(36px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes bookingInstallPulse {
-  0% { opacity: 0.75; transform: scale(0.62); }
-  70%, 100% { opacity: 0; transform: scale(1.42); }
+  0% { opacity: 0.72; transform: scale(0.7); }
+  75%, 100% { opacity: 0; transform: scale(1.55); }
 }
 
 @keyframes bookingInstallNudge {
@@ -556,16 +646,31 @@
   50% { transform: translateY(3px); }
 }
 
-@media (max-width: 380px) {
+@media (min-width: 700px) {
+  .booking-install-overlay {
+    align-items: center;
+    padding: 16px;
+  }
+
+  .booking-install-panel {
+    max-height: calc(100dvh - 32px);
+  }
+}
+
+@media (max-width: 420px) {
   .booking-install-panel {
     padding: 19px;
-    border-radius: 22px;
+    border-radius: 31px;
+  }
+
+  .booking-install-panel::before {
+    margin-top: -7px;
   }
 
   .booking-install-heading h2,
   .booking-install-step-title h2,
   .booking-install-panel--handoff h2 {
-    font-size: 19px;
+    font-size: 20px;
   }
 
   .booking-install-heading,
@@ -575,18 +680,40 @@
 
   .booking-install-standard-bar,
   .booking-install-compact-bar {
-    min-height: 72px;
+    min-height: 82px;
   }
 
-  .booking-install-address-pill {
-    flex-basis: 160px;
+  .booking-install-compact-artwork {
+    --compact-scale: 0.8;
+  }
+
+  .booking-install-compact-bar--small .booking-install-compact-artwork {
+    --compact-scale: 0.7;
+  }
+}
+
+@media (max-width: 360px) {
+  .booking-install-panel {
+    padding: 16px;
+  }
+
+  .booking-install-layout-choices > button {
+    padding: 13px;
+  }
+
+  .booking-install-compact-artwork {
+    --compact-scale: 0.72;
+  }
+
+  .booking-install-compact-bar--small .booking-install-compact-artwork {
+    --compact-scale: 0.64;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .booking-install-panel,
-  .booking-install-icon-target::before,
-  .booking-install-icon-target::after,
+  .booking-install-target-ring::before,
+  .booking-install-target-ring::after,
   .booking-install-real-toolbar svg {
     animation: none;
   }

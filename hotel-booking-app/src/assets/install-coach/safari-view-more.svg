@@ -1,0 +1,20 @@
+<svg width="109" height="109" viewBox="0 0 109 109" fill="none" xmlns="http://www.w3.org/2000/svg">
+<foreignObject x="0" y="0" width="109" height="109"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(2px);clip-path:url(#bgblur_0_1_53_clip_path);height:100%;width:100%"></div></foreignObject><g filter="url(#filter0_d_1_53)" data-figma-bg-blur-radius="4">
+<rect x="30" y="20" width="49" height="49" rx="24.5" fill="#FCFCFC" fill-opacity="0.5" shape-rendering="crispEdges"/>
+<rect x="30.5" y="20.5" width="48" height="48" rx="24" stroke="white" shape-rendering="crispEdges"/>
+<path d="M54.3197 51.13C54.1836 51.1313 54.0545 51.1039 53.9322 51.0478C53.8171 50.9988 53.709 50.9246 53.6077 50.8253L45.201 42.3981C45.0058 42.2066 44.9068 41.9712 44.9042 41.6919C44.9024 41.5129 44.9438 41.3477 45.0283 41.1965C45.1128 41.0453 45.2298 40.926 45.3794 40.8386C45.5218 40.7513 45.686 40.7068 45.8722 40.705C46.1372 40.7024 46.3708 40.7933 46.5731 40.9775L54.2965 48.7238L61.8693 40.8302C62.068 40.6421 62.2999 40.5468 62.5648 40.5442C62.751 40.5424 62.9161 40.5838 63.0602 40.6684C63.2114 40.7529 63.3307 40.8699 63.4181 41.0194C63.5055 41.169 63.55 41.3333 63.5517 41.5123C63.5544 41.7916 63.4636 42.0288 63.2793 42.224L55.0256 50.8116C54.9264 50.9129 54.8161 50.9891 54.6948 51.0404C54.5808 51.0988 54.4558 51.1287 54.3197 51.13Z" fill="black"/>
+</g>
+<defs>
+<filter id="filter0_d_1_53" x="0" y="0" width="109" height="109" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="10"/>
+<feGaussianBlur stdDeviation="15"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_53"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_53" result="shape"/>
+</filter>
+<clipPath id="bgblur_0_1_53_clip_path" transform="translate(0 0)"><rect x="30" y="20" width="49" height="49" rx="24.5"/>
+</clipPath></defs>
+</svg>
