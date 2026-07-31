@@ -465,6 +465,9 @@ function appsTourRender() {
       if (isLast) {
         appsTourMarkCompleteFromFinalStep();
         appsTourClose(false);
+        if (step.openGuestInstallCoachOnNext) {
+          window.setTimeout(() => windowFn('appsOpenGuestInstallCoach')?.(), 0);
+        }
         return;
       }
       _appsTourIdx++;
@@ -521,8 +524,16 @@ function startAppsTour(opts) {
       kicker: 'Ready',
       title: 'Share it with guests.',
       text: 'Show the QR, copy the link, or open the guest page.',
-      primaryLabel: 'Done',
+      tooltipPosition: 'above',
+    },
+    {
+      target: '#tour-native-install-guide',
+      kicker: 'Your cheat sheet',
+      title: 'Know exactly what to tell them.',
+      text: 'Open this anytime to practice the exact Safari taps for older iPhones and every iOS 26 layout.',
+      primaryLabel: 'Show me',
       secondaryLabel: 'Close',
+      openGuestInstallCoachOnNext: true,
       tooltipPosition: 'above',
     },
   ] : [

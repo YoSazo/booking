@@ -36,8 +36,8 @@ const OPERATIONAL_STEPS = [
     filter: 'apps',
     eyebrow: 'Guest App',
     title: 'Give guests a way back.',
-    body: 'Share your link or QR code so returning guests can keep your property on their Home Screen and book direct next time.',
-    note: 'Assistant, property switching and this tour live under •••.',
+    body: 'Share your link or QR code, then use Show installation steps to guide any iPhone guest through the exact Safari buttons.',
+    note: 'The Guest App tab keeps every iPhone install path ready whenever you need it.',
     tabPosition: '87.5%',
   },
 ];
