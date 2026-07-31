@@ -94,6 +94,48 @@
   stroke-width: 2.15;
 }
 
+.booking-install-preview-nav {
+  position: relative;
+  z-index: 3;
+  width: max-content;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 auto 6px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(118, 118, 128, 0.12);
+}
+
+.booking-install-preview-nav button {
+  min-width: 66px;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(60, 60, 67, 0.72);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.booking-install-preview-nav button.is-active {
+  background: rgba(255, 255, 255, 0.82);
+  color: #1c1c1e;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.booking-install-panel--preview .booking-install-choice-heading {
+  padding-top: 7px;
+}
+
+.booking-install-panel--preview .booking-install-single-action {
+  padding-top: 8px;
+}
+
 .booking-install-choice-heading {
   padding: 43px 4px 16px;
   text-align: center;

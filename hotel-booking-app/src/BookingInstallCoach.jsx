@@ -52,6 +52,29 @@ function SheetHeader({ onBack, onClose }) {
   );
 }
 
+function InstallPreviewNav({ modernIos, onChange }) {
+  return (
+    <div className="booking-install-preview-nav" aria-label="Installation guide preview">
+      <button
+        type="button"
+        className={!modernIos ? 'is-active' : ''}
+        aria-pressed={!modernIos}
+        onClick={() => onChange(false)}
+      >
+        Classic
+      </button>
+      <button
+        type="button"
+        className={modernIos ? 'is-active' : ''}
+        aria-pressed={modernIos}
+        onClick={() => onChange(true)}
+      >
+        iOS 26
+      </button>
+    </div>
+  );
+}
+
 function BrowserHandoff({ onClose }) {
   const [copied, setCopied] = useState(false);
 
@@ -81,10 +104,11 @@ function BrowserHandoff({ onClose }) {
   );
 }
 
-function LayoutChoice({ onSelect, onClose }) {
+function LayoutChoice({ onSelect, onClose, previewNav }) {
   return (
-    <div className="booking-install-panel">
+    <div className={`booking-install-panel ${previewNav ? 'booking-install-panel--preview' : ''}`}>
       <SheetHeader onClose={onClose} />
+      {previewNav}
       <div className="booking-install-choice-heading">
         <h2>What do you see in Safari?</h2>
         <p>Choose the button in your toolbar.</p>
@@ -105,7 +129,7 @@ function LayoutChoice({ onSelect, onClose }) {
   );
 }
 
-function GuidedCue({ layout, modernIos, onBack, onClose }) {
+function GuidedCue({ layout, modernIos, onBack, onClose, previewNav }) {
   const compact = layout === 'compact';
   const title = compact ? 'Tap the three dots, then Share' : 'Tap Share in Safari';
   const next = modernIos
@@ -113,8 +137,9 @@ function GuidedCue({ layout, modernIos, onBack, onClose }) {
     : 'Then tap Add to Home Screen.';
 
   return (
-    <div className="booking-install-panel">
+    <div className={`booking-install-panel ${previewNav ? 'booking-install-panel--preview' : ''}`}>
       <SheetHeader onBack={modernIos ? onBack : undefined} onClose={onClose} />
+      {previewNav}
       <div className="booking-install-single-action">
         <div className="booking-install-cue-symbol">
           {compact ? <AppleMenuControl large /> : <AppleShareGlyph large />}
@@ -128,9 +153,26 @@ function GuidedCue({ layout, modernIos, onBack, onClose }) {
 }
 
 export default function BookingInstallCoach({ onClose }) {
-  const modernIos = useMemo(() => isIos26Plus(), []);
+  const detectedModernIos = useMemo(() => isIos26Plus(), []);
   const safari = useMemo(() => isIosSafari(), []);
+  const previewSetting = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('install-preview') || '';
+  }, []);
+  const showPreviewNav = import.meta.env.DEV || ['1', 'classic', 'ios26'].includes(previewSetting);
+  const [modernIos, setModernIos] = useState(
+    previewSetting === 'ios26' ? true : previewSetting === 'classic' ? false : detectedModernIos
+  );
   const [layout, setLayout] = useState(modernIos ? null : 'standard');
+
+  const changePreviewVersion = (nextModernIos) => {
+    setModernIos(nextModernIos);
+    setLayout(nextModernIos ? null : 'standard');
+  };
+
+  const previewNav = showPreviewNav ? (
+    <InstallPreviewNav modernIos={modernIos} onChange={changePreviewVersion} />
+  ) : null;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -151,13 +193,14 @@ export default function BookingInstallCoach({ onClose }) {
       {!safari ? (
         <BrowserHandoff onClose={onClose} />
       ) : modernIos && !layout ? (
-        <LayoutChoice onSelect={setLayout} onClose={onClose} />
+        <LayoutChoice onSelect={setLayout} onClose={onClose} previewNav={previewNav} />
       ) : (
         <GuidedCue
           layout={layout}
           modernIos={modernIos}
           onBack={() => setLayout(null)}
           onClose={onClose}
+          previewNav={previewNav}
         />
       )}
     </div>
