@@ -2,22 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
   ChevronRight,
   Copy,
   Ellipsis,
   ExternalLink,
-  Share,
-  SquarePlus,
   X,
 } from 'lucide-react';
-import { HotelIcon, IOS_SHARE_BLUE, isIos26Plus } from './guestInstallUi.jsx';
-import standardGlass from './assets/install-coach/safari-standard-glass.svg';
+import { isIos26Plus } from './guestInstallUi.jsx';
 import standardActions from './assets/install-coach/safari-standard-actions.svg';
-import compactBack from './assets/install-coach/safari-compact-back.svg';
-import compactAddress from './assets/install-coach/safari-compact-address.svg';
-import compactMenu from './assets/install-coach/safari-compact-menu.svg';
-import viewMore from './assets/install-coach/safari-view-more.svg';
 import './BookingInstallCoach.css';
 
 const isIosSafari = () => {
@@ -27,44 +19,39 @@ const isIosSafari = () => {
   return /Safari/i.test(ua) && !knownOtherBrowser.test(ua);
 };
 
-function StandardSafariBar({ compact = false, target = true }) {
+function AppleShareGlyph({ large = false }) {
   return (
-    <div className={`booking-install-standard-bar ${compact ? 'booking-install-standard-bar--small' : ''}`}>
-      <div className="booking-install-standard-artwork" aria-hidden>
-        <img className="booking-install-standard-glass" src={standardGlass} alt="" />
-        <img className="booking-install-standard-actions" src={standardActions} alt="" />
-        {target ? <span className="booking-install-target-ring booking-install-target-ring--share" /> : null}
-      </div>
+    <span className={`booking-install-share-glyph ${large ? 'booking-install-share-glyph--large' : ''}`} aria-hidden>
+      <img src={standardActions} alt="" />
+    </span>
+  );
+}
+
+function AppleMenuControl({ large = false }) {
+  return (
+    <span className={`booking-install-menu-glyph ${large ? 'booking-install-menu-glyph--large' : ''}`} aria-hidden>
+      <i /><i /><i />
+    </span>
+  );
+}
+
+function SheetHeader({ onBack, onClose }) {
+  return (
+    <div className="booking-install-sheet-header">
+      {onBack ? (
+        <button type="button" onClick={onBack}>
+          <ArrowLeft aria-hidden />
+          Back
+        </button>
+      ) : <span />}
+      <button type="button" onClick={onClose} aria-label="Close">
+        <X aria-hidden />
+      </button>
     </div>
   );
 }
 
-function CompactSafariBar({ small = false, target = true }) {
-  return (
-    <div className={`booking-install-compact-bar ${small ? 'booking-install-compact-bar--small' : ''}`}>
-      <div className="booking-install-compact-artwork" aria-hidden>
-        <img className="booking-install-compact-piece booking-install-compact-piece--back" src={compactBack} alt="" />
-        <img className="booking-install-compact-piece booking-install-compact-piece--address" src={compactAddress} alt="" />
-        <img className="booking-install-compact-piece booking-install-compact-piece--menu" src={compactMenu} alt="" />
-        {target ? <span className="booking-install-target-ring booking-install-target-ring--menu" /> : null}
-      </div>
-    </div>
-  );
-}
-
-function NextAction({ icon, title, note }) {
-  return (
-    <div className="booking-install-next-action">
-      <span className="booking-install-action-icon">{icon}</span>
-      <span>
-        <strong>{title}</strong>
-        {note ? <small>{note}</small> : null}
-      </span>
-    </div>
-  );
-}
-
-function BrowserHandoff({ hotelName, appIconUrl, onClose }) {
+function BrowserHandoff({ onClose }) {
   const [copied, setCopied] = useState(false);
 
   const copyCurrentUrl = async () => {
@@ -78,133 +65,68 @@ function BrowserHandoff({ hotelName, appIconUrl, onClose }) {
   };
 
   return (
-    <div className="booking-install-panel booking-install-panel--handoff">
-      <button className="booking-install-close" type="button" onClick={onClose} aria-label="Close install guide">
-        <X aria-hidden />
-      </button>
-      <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={62} />
-      <span className="booking-install-eyebrow">One quick step first</span>
-      <h2>Open this page in Safari</h2>
-      <p>
-        Safari gives you the reliable Home Screen install path. Use this browser&apos;s menu and choose
-        <strong> Open in Safari</strong>, then tap Install again.
-      </p>
-      <div className="booking-install-handoff-route" aria-label="Open in Safari instructions">
-        <span><Ellipsis aria-hidden /> Browser menu</span>
-        <ChevronRight aria-hidden />
-        <span><ExternalLink aria-hidden /> Open in Safari</span>
+    <div className="booking-install-panel">
+      <SheetHeader onClose={onClose} />
+      <div className="booking-install-single-action">
+        <span className="booking-install-plain-symbol"><ExternalLink aria-hidden /></span>
+        <h2>Open in Safari</h2>
+        <p>Choose <strong>Open in Safari</strong> from this browser&apos;s menu, then tap Install again.</p>
+        <button className="booking-install-copy-link" type="button" onClick={copyCurrentUrl}>
+          {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+          {copied ? 'Copied' : 'Copy link instead'}
+        </button>
       </div>
-      <button className="booking-install-secondary-button" type="button" onClick={copyCurrentUrl}>
-        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-        {copied ? 'Link copied' : 'Copy this page link'}
-      </button>
-      <small className="booking-install-help">No App Store. Safari adds the property straight to your Home Screen.</small>
     </div>
   );
 }
 
-function LayoutChoice({ hotelName, appIconUrl, onSelect, onClose }) {
+function LayoutChoice({ onSelect, onClose }) {
   return (
     <div className="booking-install-panel">
-      <button className="booking-install-close" type="button" onClick={onClose} aria-label="Close install guide">
-        <X aria-hidden />
-      </button>
-      <div className="booking-install-heading">
-        <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={54} />
-        <div>
-          <span className="booking-install-eyebrow">Add to Home Screen</span>
-          <h2>Which Safari bar do you see?</h2>
-        </div>
+      <SheetHeader onClose={onClose} />
+      <div className="booking-install-choice-heading">
+        <h2>What do you see in Safari?</h2>
+        <p>Choose the button in your toolbar.</p>
       </div>
-      <p className="booking-install-intro">Choose the one that matches Safari on your iPhone.</p>
-      <div className="booking-install-layout-choices">
+      <div className="booking-install-choice-list">
         <button type="button" onClick={() => onSelect('standard')}>
-          <span className="booking-install-choice-copy">
-            <strong>I see the Share button</strong>
-            <small>It is already in Safari&apos;s bar</small>
-          </span>
-          <StandardSafariBar compact />
-          <span className="booking-install-choice-cta">This one <ChevronRight aria-hidden /></span>
+          <span className="booking-install-choice-icon"><AppleShareGlyph /></span>
+          <span>Share button</span>
+          <ChevronRight aria-hidden />
         </button>
         <button type="button" onClick={() => onSelect('compact')}>
-          <span className="booking-install-choice-copy">
-            <strong>I see three dots</strong>
-            <small>Share is inside that menu</small>
-          </span>
-          <CompactSafariBar small />
-          <span className="booking-install-choice-cta">This one <ChevronRight aria-hidden /></span>
+          <span className="booking-install-choice-icon"><AppleMenuControl /></span>
+          <span>Three dots</span>
+          <ChevronRight aria-hidden />
         </button>
       </div>
     </div>
   );
 }
 
-function GuidedSteps({ hotelName, appIconUrl, layout, modernIos, onBack, onClose }) {
+function GuidedCue({ hotelName, layout, modernIos, onBack, onClose }) {
   const compact = layout === 'compact';
+  const title = compact ? 'Tap the three dots, then Share' : 'Tap Share in Safari';
+  const next = modernIos
+    ? 'Choose View More, then Add to Home Screen.'
+    : 'Choose Add to Home Screen.';
 
   return (
-    <div className="booking-install-panel booking-install-panel--steps">
-      <div className="booking-install-top-actions">
-        {modernIos ? (
-          <button type="button" onClick={onBack} aria-label="Choose a different Safari layout">
-            <ArrowLeft aria-hidden /> Back
-          </button>
-        ) : <span />}
-        <button type="button" onClick={onClose} aria-label="Close install guide">
-          <X aria-hidden />
-        </button>
-      </div>
-
-      <div className="booking-install-step-title">
-        <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={50} />
-        <div>
-          <span className="booking-install-eyebrow">Step 1</span>
-          <h2>{compact ? 'Tap the three dots, then Share' : 'Tap Share in Safari'}</h2>
+    <div className="booking-install-panel">
+      <SheetHeader onBack={modernIos ? onBack : undefined} onClose={onClose} />
+      <div className="booking-install-single-action">
+        <div className="booking-install-cue-symbol">
+          {compact ? <AppleMenuControl large /> : <AppleShareGlyph large />}
         </div>
+        <h2>{title}</h2>
+        <p>{next}</p>
+        <small>{hotelName || 'This property'} will appear on your Home Screen. No App Store needed.</small>
       </div>
-
-      <div className="booking-install-toolbar-demo" aria-label="Example of the Safari control to tap">
-        <span className="booking-install-example-label">This is what to look for</span>
-        {compact ? <CompactSafariBar /> : <StandardSafariBar />}
-        {compact ? (
-          <div className="booking-install-share-menu-example">
-            <Share color={IOS_SHARE_BLUE} aria-hidden />
-            <span><strong>Share</strong><small>Tap this in the menu</small></span>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="booking-install-then">
-        <span className="booking-install-eyebrow">Then finish with these taps</span>
-        <div className="booking-install-action-list">
-          {modernIos ? (
-            <NextAction
-              icon={<span className="booking-install-exact-action"><img src={viewMore} alt="" /></span>}
-              title="View More"
-              note="This reveals the full list"
-            />
-          ) : null}
-          <NextAction
-            icon={<SquarePlus aria-hidden />}
-            title="Add to Home Screen"
-            note={modernIos ? null : 'Scroll down if you do not see it yet'}
-          />
-          <NextAction icon={<Check aria-hidden />} title="Add" note="Your property app is ready" />
-        </div>
-      </div>
-
-      <div className="booking-install-real-toolbar">
-        <ChevronDown aria-hidden />
-        <strong>Now use Safari&apos;s real toolbar {compact ? 'at the bottom of your screen' : 'on your screen'}.</strong>
-      </div>
-      <small className="booking-install-help">
-        You are not downloading another app. This puts {hotelName || 'this property'} directly on your Home Screen.
-      </small>
     </div>
   );
 }
 
-export default function BookingInstallCoach({ hotelName, appIconUrl, onClose }) {
+export default function BookingInstallCoach({ hotelName, onClose }) {
   const modernIos = useMemo(() => isIos26Plus(), []);
   const safari = useMemo(() => isIosSafari(), []);
   const [layout, setLayout] = useState(modernIos ? null : 'standard');
@@ -223,21 +145,15 @@ export default function BookingInstallCoach({ hotelName, appIconUrl, onClose }) 
   }, [onClose]);
 
   return (
-    <div className="booking-install-overlay" role="dialog" aria-modal="true" aria-label={`Install ${hotelName || 'property app'}`}>
-      <button className="booking-install-backdrop" type="button" onClick={onClose} aria-label="Close install guide" />
+    <div className="booking-install-overlay" role="dialog" aria-modal="true" aria-label="Add to Home Screen">
+      <button className="booking-install-backdrop" type="button" onClick={onClose} aria-label="Close" />
       {!safari ? (
-        <BrowserHandoff hotelName={hotelName} appIconUrl={appIconUrl} onClose={onClose} />
+        <BrowserHandoff onClose={onClose} />
       ) : modernIos && !layout ? (
-        <LayoutChoice
-          hotelName={hotelName}
-          appIconUrl={appIconUrl}
-          onSelect={setLayout}
-          onClose={onClose}
-        />
+        <LayoutChoice onSelect={setLayout} onClose={onClose} />
       ) : (
-        <GuidedSteps
+        <GuidedCue
           hotelName={hotelName}
-          appIconUrl={appIconUrl}
           layout={layout}
           modernIos={modernIos}
           onBack={() => setLayout(null)}
