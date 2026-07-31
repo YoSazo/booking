@@ -222,50 +222,33 @@
   shape-rendering: geometricPrecision;
 }
 
-.booking-install-share-glyph--large {
-  width: 29px;
-  height: 35px;
-}
-
 .booking-install-menu-glyph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3.55px;
+  display: block;
   width: 38px;
   height: 38px;
 }
 
-.booking-install-menu-glyph i {
-  width: 3.7px;
-  height: 3.7px;
-  border-radius: 50%;
-  background: currentColor;
+.booking-install-menu-glyph svg,
+.booking-install-view-more-glyph svg,
+.booking-install-add-home-glyph svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: currentColor;
+  shape-rendering: geometricPrecision;
 }
 
-.booking-install-menu-glyph--large {
-  width: 58px;
-  height: 58px;
-  gap: 5.3px;
-}
-
-.booking-install-menu-glyph--large i {
-  width: 5.55px;
-  height: 5.55px;
+.booking-install-view-more-glyph,
+.booking-install-add-home-glyph {
+  display: block;
+  width: 27px;
+  height: 27px;
 }
 
 .booking-install-single-action {
   padding: 18px 12px 2px;
   text-align: center;
-}
-
-.booking-install-cue-symbol {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  margin: 0 auto 14px;
-  color: #007aff;
 }
 
 .booking-install-plain-symbol {
@@ -291,10 +274,58 @@
 
 .booking-install-single-action small {
   display: block;
-  margin: 14px auto 0;
+  margin: 15px auto 0;
   color: rgba(60, 60, 67, 0.62);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.booking-install-visual-sequence {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin: 20px auto 0;
+}
+
+.booking-install-sequence-step {
+  min-width: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: rgba(60, 60, 67, 0.72);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.booking-install-sequence-icon {
+  min-height: 29px;
+  display: grid;
+  place-items: center;
+  color: #007aff;
+}
+
+.booking-install-sequence-icon .booking-install-share-glyph {
+  width: 23px;
+  height: 28px;
+}
+
+.booking-install-sequence-icon .booking-install-menu-glyph {
+  width: 30px;
+  height: 28px;
+}
+
+.booking-install-sequence-arrow {
+  flex: 0 0 auto;
+  margin: 6px -2px 0;
+  color: rgba(60, 60, 67, 0.34);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .booking-install-copy-link {
