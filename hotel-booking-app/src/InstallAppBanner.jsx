@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isStandalone } from './pwaUtils.js';
-import { BRAND, HotelIcon, IosInstallSheet, isIos } from './guestInstallUi.jsx';
+import { BRAND, HotelIcon, isIos } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import BookingInstallCoach from './BookingInstallCoach.jsx';
 
@@ -22,7 +22,6 @@ function InstallAppBanner({
   const navigate = useNavigate();
   const [installed, setInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showIosSheet, setShowIosSheet] = useState(false);
   const [showBookingCoach, setShowBookingCoach] = useState(false);
   const [showOwnerPreviewInfo, setShowOwnerPreviewInfo] = useState(false);
   const ios = isIos();
@@ -84,8 +83,7 @@ function InstallAppBanner({
     });
 
     if (ios) {
-      if (guidedBookingInstall) setShowBookingCoach(true);
-      else setShowIosSheet(true);
+      setShowBookingCoach(true);
       return;
     }
 
@@ -240,15 +238,6 @@ function InstallAppBanner({
             </button>
           </div>
         </div>
-      )}
-      {showIosSheet && (
-        <IosInstallSheet
-          hotelName={hotelName}
-          appIconUrl={appIconUrl}
-          title={`Install ${hotelName || 'our app'}`}
-          subtitle="Add it to your home screen — takes 3 seconds."
-          onClose={() => setShowIosSheet(false)}
-        />
       )}
       {showBookingCoach && (
         <BookingInstallCoach

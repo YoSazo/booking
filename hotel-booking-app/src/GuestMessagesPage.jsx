@@ -4,17 +4,10 @@ import { Send, Search } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { isStandalone } from './pwaUtils.js';
+import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
+import { fetchWithTimeout } from './fetchWithTimeout.js';
 
 const QUICK_CHIPS = ['Early check-in', 'Late check-out', 'Extra towels', 'Quiet room'];
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  const output = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
-  return output;
-}
 
 function formatRelativeTime(dateStr) {
   const now = new Date();
@@ -61,6 +54,7 @@ export default function GuestMessagesPage({ hotel }) {
   const [messageText, setMessageText] = useState('');
   const [selectedChips, setSelectedChips] = useState([]);
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -70,7 +64,7 @@ export default function GuestMessagesPage({ hotel }) {
   }, []);
 
   // Fetch messages
-  const fetchMessages = useCallback(async (isInitial = false) => {
+  const fetchMessages = useCallback(async (isInitial = false, omitTemporaryId = '') => {
     if (!guestStay?.code || !hotelId) return;
     try {
       const params = new URLSearchParams({
@@ -78,70 +72,29 @@ export default function GuestMessagesPage({ hotel }) {
         code: guestStay.code,
         email: guestStay.email || '',
       });
-      const res = await fetch(`${apiBaseUrl}/api/guest-messages?${params}`);
-      const data = await res.json();
+      const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'Could not load messages.');
+      setLoadError('');
       if (data.success) {
         setMessages((prev) => {
           const newMessages = data.messages || [];
+          const pendingMessages = prev.filter((message) => (
+            String(message.id || '').startsWith('temp-') && message.id !== omitTemporaryId
+          ));
+          const mergedMessages = [...newMessages, ...pendingMessages];
           // Only update if message count or content changed
-          if (JSON.stringify(prev) !== JSON.stringify(newMessages)) {
-            return newMessages;
+          if (JSON.stringify(prev) !== JSON.stringify(mergedMessages)) {
+            return mergedMessages;
           }
           return prev;
         });
       }
-    } catch (e) { /* ignore */ }
+    } catch (error) {
+      if (isInitial) setLoadError(error.message || 'Could not load messages.');
+    }
     if (isInitial) setLoading(false);
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
-
-  // Register for push notifications (once per stay, when permission allows).
-  useEffect(() => {
-    if (!guestStay?.code || !hotelId || !apiBaseUrl) return;
-    const flagKey = `guest_push_${hotelId}_${guestStay.code}`;
-    if (localStorage.getItem(flagKey)) return;
-    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
-    (async () => {
-      try {
-        let perm = Notification.permission;
-        if (perm === 'default') {
-          perm = await Notification.requestPermission();
-        }
-        if (perm !== 'granted') return;
-
-        const keyRes = await fetch(`${apiBaseUrl}/api/push/vapid-public`);
-        const keyData = await keyRes.json().catch(() => ({}));
-        if (!keyData.publicKey) return;
-
-        const reg = await navigator.serviceWorker.ready;
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
-          });
-        }
-
-        const bufToB64 = (buf) => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
-        await fetch(`${apiBaseUrl}/api/guest-push-subscribe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            hotelId,
-            reservationCode: guestStay.code,
-            subscription: {
-              endpoint: sub.endpoint,
-              keys: {
-                p256dh: bufToB64(sub.getKey('p256dh')),
-                auth: bufToB64(sub.getKey('auth')),
-              },
-            },
-          }),
-        });
-        localStorage.setItem(flagKey, '1');
-      } catch (e) { /* ignore — messaging still works without push */ }
-    })();
-  }, [guestStay?.code, hotelId, apiBaseUrl]);
 
   // Initial load
   useEffect(() => {
@@ -163,12 +116,12 @@ export default function GuestMessagesPage({ hotel }) {
   // Mark hotel messages as read (fire-and-forget)
   useEffect(() => {
     if (!guestStay?.code || !hotelId) return;
-    const unread = messages.filter((m) => m.sender === 'hotel' && !m.readAt);
+    const unread = messages.filter((m) => m.sender === 'hotel' && !m.guestReadAt);
     if (unread.length === 0) return;
 
     const markRead = async () => {
       try {
-        await fetch(`${apiBaseUrl}/api/guest-messages/read`, {
+        const response = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages/read`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -176,7 +129,15 @@ export default function GuestMessagesPage({ hotel }) {
             code: guestStay.code,
             email: guestStay.email || '',
           }),
-        });
+        }, 12000);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) return;
+        const readAt = new Date().toISOString();
+        setMessages((previous) => previous.map((message) => (
+          message.sender === 'hotel' ? { ...message, guestReadAt: message.guestReadAt || readAt } : message
+        )));
+        if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
+        window.dispatchEvent(new CustomEvent('marketel:guest-messages-read'));
       } catch (e) { /* ignore */ }
     };
     markRead();
@@ -186,6 +147,39 @@ export default function GuestMessagesPage({ hotel }) {
     setSelectedChips((prev) =>
       prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip]
     );
+  };
+
+  const submitMessage = async (optimisticMessage) => {
+    try {
+      const response = await fetchWithTimeout(`${apiBaseUrl}/api/guest-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotelId,
+          reservationCode: guestStay.code,
+          body: optimisticMessage.draftBody || '',
+          requests: optimisticMessage.requests || [],
+          guestName: guestStay.name || '',
+          guestEmail: guestStay.email || '',
+          guestPhone: guestStay.phone || '',
+        }),
+      }, 15000);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Message not sent.');
+      }
+      setMessages((previous) => previous.filter((message) => message.id !== optimisticMessage.id));
+      await fetchMessages(false, optimisticMessage.id);
+    } catch (error) {
+      setMessages((previous) => previous.map((message) => (
+        message.id === optimisticMessage.id
+          ? { ...message, status: 'failed', error: error.message || 'Message not sent.' }
+          : message
+      )));
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
   };
 
   const handleSend = async () => {
@@ -200,33 +194,24 @@ export default function GuestMessagesPage({ hotel }) {
       id: `temp-${Date.now()}`,
       sender: 'guest',
       body: body || selectedChips.join(', '),
+      draftBody: body,
       requests: selectedChips.length > 0 ? [...selectedChips] : undefined,
       createdAt: new Date().toISOString(),
+      status: 'sending',
     };
     setMessages((prev) => [...prev, optimisticMsg]);
     setMessageText('');
     setSelectedChips([]);
 
-    try {
-      await fetch(`${apiBaseUrl}/api/guest-message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hotelId,
-          reservationCode: guestStay.code,
-          body,
-          requests: optimisticMsg.requests || [],
-          guestName: guestStay.name || '',
-          guestEmail: guestStay.email || '',
-          guestPhone: guestStay.phone || '',
-        }),
-      });
-      // Refresh to get the server version
-      setTimeout(() => fetchMessages(false), 1000);
-    } catch (e) { /* ignore — message already shown optimistically */ }
+    await submitMessage(optimisticMsg);
+  };
 
-    setSending(false);
-    inputRef.current?.focus();
+  const handleRetry = async (message) => {
+    if (sending) return;
+    setSending(true);
+    const retrying = { ...message, status: 'sending', error: '' };
+    setMessages((previous) => previous.map((item) => (item.id === message.id ? retrying : item)));
+    await submitMessage(retrying);
   };
 
   const handleKeyDown = (e) => {
@@ -292,11 +277,27 @@ export default function GuestMessagesPage({ hotel }) {
         </div>
       )}
 
+      <div style={{ padding: '0 16px' }}>
+        <GuestNotificationPrompt
+          apiBaseUrl={apiBaseUrl}
+          hotelId={hotelId}
+          guestStay={guestStay}
+        />
+      </div>
+
       {/* Message area */}
       <div ref={scrollContainerRef} style={styles.messagesArea}>
         {loading ? (
           <div style={styles.emptyContainer}>
             <div style={styles.spinner} />
+          </div>
+        ) : loadError ? (
+          <div style={styles.emptyContainer}>
+            <p style={styles.emptyTitle}>Messages couldn’t load</p>
+            <p style={styles.emptySubtitle}>{loadError}</p>
+            <button type="button" onClick={() => { setLoading(true); fetchMessages(true); }} style={styles.lookupButton}>
+              Try again
+            </button>
           </div>
         ) : messages.length === 0 ? (
           <div style={styles.emptyContainer}>
@@ -333,23 +334,29 @@ export default function GuestMessagesPage({ hotel }) {
                   )}
 
                   {/* Bubble */}
-                  <div
-                    style={{
-                      ...(isGuest ? styles.bubbleGuest : styles.bubbleHotel),
-                    }}
-                  >
-                    {msg.body}
-                  </div>
+                  {msg.body && (
+                    <div
+                      style={{
+                        ...(isGuest ? styles.bubbleGuest : styles.bubbleHotel),
+                      }}
+                    >
+                      {msg.body}
+                    </div>
+                  )}
 
                   {/* Timestamp */}
-                  <span
-                    style={{
-                      ...styles.timestamp,
-                      alignSelf: isGuest ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    {formatRelativeTime(msg.createdAt)}
-                  </span>
+                  <div style={{ ...styles.deliveryRow, alignSelf: isGuest ? 'flex-end' : 'flex-start' }}>
+                    <span style={styles.timestamp}>{formatRelativeTime(msg.createdAt)}</span>
+                    {msg.status === 'sending' && <span style={styles.sendingStatus}>Sending…</span>}
+                    {msg.status === 'failed' && (
+                      <>
+                        <span style={styles.failedStatus}>Not sent</span>
+                        <button type="button" style={styles.retryButton} onClick={() => handleRetry(msg)} disabled={sending}>
+                          Retry
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -544,9 +551,36 @@ const styles = {
   timestamp: {
     fontSize: 11,
     color: '#9ca3af',
-    marginTop: 4,
+  },
+  deliveryRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 20,
+    marginTop: 3,
     paddingLeft: 4,
     paddingRight: 4,
+  },
+  sendingStatus: {
+    color: '#7b8780',
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  failedStatus: {
+    color: '#b42318',
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  retryButton: {
+    padding: 0,
+    border: 0,
+    background: 'transparent',
+    color: '#2E7D5B',
+    fontFamily: 'inherit',
+    fontSize: 11,
+    fontWeight: 800,
+    textDecoration: 'underline',
+    cursor: 'pointer',
   },
 
   // Empty state

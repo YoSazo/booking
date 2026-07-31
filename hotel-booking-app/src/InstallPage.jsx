@@ -10,12 +10,12 @@ import {
   isAndroid,
   qrCodeUrl,
   HotelIcon,
-  IosInstallSheet,
   AndroidInstallSteps,
   InstallBenefits,
   SuccessCheckIcon,
 } from './guestInstallUi.jsx';
 import { trackGuestInstall, installTouchpointFromRef } from './guestInstallTracking.js';
+import BookingInstallCoach from './BookingInstallCoach.jsx';
 
 function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const [searchParams] = useSearchParams();
@@ -26,7 +26,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const ref = searchParams.get('ref') || 'direct';
 
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showIosSheet, setShowIosSheet] = useState(false);
+  const [showInstallCoach, setShowInstallCoach] = useState(false);
   const [showAndroidSteps, setShowAndroidSteps] = useState(false);
   const [installed, setInstalled] = useState(isStandalone());
   const [installing, setInstalling] = useState(false);
@@ -192,7 +192,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
       <>
         <button
           type="button"
-          onClick={() => { trackCta(); setShowIosSheet(true); }}
+          onClick={() => { trackCta(); setShowInstallCoach(true); }}
           style={styles.primaryBtn}
         >
           <Share size={18} color="#fff" strokeWidth={2.2} />
@@ -294,13 +294,11 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
         </div>
       </div>
 
-      {showIosSheet && (
-        <IosInstallSheet
+      {showInstallCoach && (
+        <BookingInstallCoach
           hotelName={hotelName}
           appIconUrl={appIconUrl}
-          title={`Install ${hotelName}`}
-          subtitle="Add it to your home screen — takes 3 seconds."
-          onClose={() => setShowIosSheet(false)}
+          onClose={() => setShowInstallCoach(false)}
         />
       )}
     </div>

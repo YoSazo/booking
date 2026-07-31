@@ -104,12 +104,12 @@ function LayoutChoice({ onSelect, onClose }) {
   );
 }
 
-function GuidedCue({ hotelName, layout, modernIos, onBack, onClose }) {
+function GuidedCue({ layout, modernIos, onBack, onClose }) {
   const compact = layout === 'compact';
   const title = compact ? 'Tap the three dots, then Share' : 'Tap Share in Safari';
   const next = modernIos
-    ? 'Choose View More, then Add to Home Screen.'
-    : 'Choose Add to Home Screen.';
+    ? 'Then tap View More, then Add to Home Screen.'
+    : 'Then tap Add to Home Screen.';
 
   return (
     <div className="booking-install-panel">
@@ -120,13 +120,13 @@ function GuidedCue({ hotelName, layout, modernIos, onBack, onClose }) {
         </div>
         <h2>{title}</h2>
         <p>{next}</p>
-        <small>{hotelName || 'This property'} will appear on your Home Screen. No App Store needed.</small>
+        <small>No App Store download required.</small>
       </div>
     </div>
   );
 }
 
-export default function BookingInstallCoach({ hotelName, onClose }) {
+export default function BookingInstallCoach({ onClose }) {
   const modernIos = useMemo(() => isIos26Plus(), []);
   const safari = useMemo(() => isIosSafari(), []);
   const [layout, setLayout] = useState(modernIos ? null : 'standard');
@@ -153,7 +153,6 @@ export default function BookingInstallCoach({ hotelName, onClose }) {
         <LayoutChoice onSelect={setLayout} onClose={onClose} />
       ) : (
         <GuidedCue
-          hotelName={hotelName}
           layout={layout}
           modernIos={modernIos}
           onBack={() => setLayout(null)}

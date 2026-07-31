@@ -382,6 +382,7 @@ model GuestMessage {
   body            String?
   requests        String? // JSON array of quick-request chip labels
   readAt          DateTime?
+  guestReadAt     DateTime?
   sender          String      @default("guest")
 
   @@index([hotelId, createdAt])

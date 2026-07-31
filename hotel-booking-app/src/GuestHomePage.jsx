@@ -5,6 +5,7 @@ import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { isStandalone } from './pwaUtils.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
+import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -235,6 +236,12 @@ export default function GuestHomePage({ hotel: hotelProp }) {
         apiBaseUrl={apiBaseUrl}
         touchpoint="guest-home"
         variant="card"
+      />
+
+      <GuestNotificationPrompt
+        apiBaseUrl={apiBaseUrl}
+        hotelId={hotelId}
+        guestStay={guestStay}
       />
 
       {/* Stay card */}

@@ -66,6 +66,7 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
     email: booking.guestEmail,
     phone: booking.guestPhone,
   } : null;
+  const displayConfirmationCode = booking?.confirmationCode || booking?.reservationCode;
 
   return (
     <div className="confirmation-container" style={{ minHeight: '60vh' }}>
@@ -132,7 +133,7 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
             </div>
             <div className="confirmation-header">
               <h2>Your reservation</h2>
-              <p className="confirmation-code">Confirmation Code: <strong>#{booking.reservationCode}</strong></p>
+              <p className="confirmation-code">Confirmation Code: <strong>#{displayConfirmationCode}</strong></p>
               {booking.guestFirstName && (
                 <p className="confirmation-email">Booked for <strong>{[booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ')}</strong></p>
               )}
@@ -153,7 +154,7 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
             <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={() => downloadStayIcs({ hotel, bookingDetails: { checkin: booking.checkin, checkout: booking.checkout }, reservationCode: booking.reservationCode })}
+                onClick={() => downloadStayIcs({ hotel, bookingDetails: { checkin: booking.checkin, checkout: booking.checkout }, reservationCode: displayConfirmationCode })}
                 style={{ flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', borderRadius: 12, cursor: 'pointer', border: '1px solid #d7e3dc', background: '#f5f9f6', color: '#2E7D5B', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}
               >
                 <CalendarPlus size={17} /> Add to Calendar

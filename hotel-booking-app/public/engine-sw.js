@@ -35,7 +35,11 @@ self.addEventListener('push', function (event) {
     vibrate: [200, 100, 200, 100, 200],
     data: Object.assign({ url: data.url || '/frontdesk' }, data.data || {}),
   };
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  const notificationPromise = self.registration.showNotification(data.title, options);
+  const badgePromise = self.navigator && typeof self.navigator.setAppBadge === 'function'
+    ? self.navigator.setAppBadge(1).catch(function () {})
+    : Promise.resolve();
+  event.waitUntil(Promise.all([notificationPromise, badgePromise]));
 });
 
 self.addEventListener('notificationclick', function (event) {

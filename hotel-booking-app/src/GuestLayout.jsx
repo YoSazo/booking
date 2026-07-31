@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, CalendarSearch, MessageCircle } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { isStandalone } from './pwaUtils.js';
+import { fetchWithTimeout } from './fetchWithTimeout.js';
 
 const NAV_TABS = [
   { key: 'home', label: 'Home', icon: Home, path: '/guest/home' },
@@ -47,23 +48,43 @@ export default function GuestLayout({ children }) {
         code: guestStay.code,
         email: guestStay.email || '',
       });
-      const res = await fetch(`${apiBaseUrl}/api/guest-messages?${params}`);
+      const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
       const data = await res.json();
       if (data.success) {
         const unread = data.messages.filter(
-          (m) => m.sender === 'hotel' && !m.readAt
+          (m) => m.sender === 'hotel' && !m.guestReadAt
         ).length;
         setUnreadCount(unread);
+        if (installedApp && 'setAppBadge' in navigator && unread > 0) {
+          navigator.setAppBadge(unread).catch(() => {});
+        } else if (installedApp && 'clearAppBadge' in navigator) {
+          navigator.clearAppBadge().catch(() => {});
+        }
       }
     } catch (e) { /* ignore */ }
-  }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
+  }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl, installedApp]);
 
   useEffect(() => {
     if (!installedApp || !isGuest) return;
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000);
-    return () => clearInterval(interval);
+    const clearUnread = () => {
+      setUnreadCount(0);
+      if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
+    };
+    window.addEventListener('marketel:guest-messages-read', clearUnread);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('marketel:guest-messages-read', clearUnread);
+    };
   }, [installedApp, isGuest, fetchUnread]);
+
+  useEffect(() => {
+    if (installedApp && !guestStay?.code && 'clearAppBadge' in navigator) {
+      navigator.clearAppBadge().catch(() => {});
+      setUnreadCount(0);
+    }
+  }, [installedApp, guestStay?.code]);
 
   const isInstallPage = location.pathname === '/install';
   // Bottom nav: installed PWA only. Browser booking flow stays nav-free.

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Smartphone } from 'lucide-react';
 import { isStandalone } from './pwaUtils.js';
-import { BRAND, isIos, HotelIcon, IosInstallSheet } from './guestInstallUi.jsx';
+import { BRAND, isIos, HotelIcon } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
+import BookingInstallCoach from './BookingInstallCoach.jsx';
 
 function GuestInstallCard({
   hotelName,
@@ -18,7 +19,7 @@ function GuestInstallCard({
 }) {
   const navigate = useNavigate();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showIosSheet, setShowIosSheet] = useState(false);
+  const [showInstallCoach, setShowInstallCoach] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -85,7 +86,7 @@ function GuestInstallCard({
   const handlePrimary = async () => {
     trackCta();
     if (ios) {
-      setShowIosSheet(true);
+      setShowInstallCoach(true);
       return;
     }
     if (deferredPrompt) {
@@ -106,13 +107,11 @@ function GuestInstallCard({
   const title = headline || `Add ${hotelName || 'us'} to your home screen`;
   const subtitle = subline || 'Get check-in updates and message the front desk — lives on your home screen. No App Store.';
 
-  const iosSheet = showIosSheet && (
-    <IosInstallSheet
+  const installCoach = showInstallCoach && (
+    <BookingInstallCoach
       hotelName={hotelName}
       appIconUrl={appIconUrl}
-      title={`Install ${hotelName || 'our app'}`}
-      subtitle="Add it to your home screen — takes 3 seconds."
-      onClose={() => setShowIosSheet(false)}
+      onClose={() => setShowInstallCoach(false)}
     />
   );
 
@@ -159,7 +158,7 @@ function GuestInstallCard({
             </button>
           )}
         </div>
-        {iosSheet}
+        {installCoach}
       </>
     );
   }
@@ -200,7 +199,7 @@ function GuestInstallCard({
           Maybe later
         </button>
       </div>
-      {iosSheet}
+      {installCoach}
     </>
   );
 }

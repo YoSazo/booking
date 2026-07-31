@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MessageSquare, Send, CheckCircle2 } from 'lucide-react';
+import { fetchWithTimeout } from './fetchWithTimeout.js';
 
 export const QUICK_REQUESTS = [
   'Early check-in',
@@ -72,7 +73,7 @@ export function GuestMessageCard({ apiBaseUrl = '', hotelId, reservationCode, gu
     setSending(true);
     setError('');
     try {
-      const res = await fetch(`${apiBaseUrl}/api/guest-message`, {
+      const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,7 +85,7 @@ export function GuestMessageCard({ apiBaseUrl = '', hotelId, reservationCode, gu
           guestEmail: guestInfo?.email || undefined,
           guestPhone: guestInfo?.phone || undefined,
         }),
-      });
+      }, 15000);
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) setSent(true);
       else setError(data.message || 'Could not send. Please call us instead.');

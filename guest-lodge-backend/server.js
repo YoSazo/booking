@@ -1190,10 +1190,15 @@ function getRateLimitClientKey(req) {
         .toLowerCase();
 }
 
-function createRouteRateLimiter(name, { windowMs, max }) {
+function createRouteRateLimiter(name, { windowMs, max, scope }) {
     return (req, res, next) => {
         const now = Date.now();
-        const key = `${name}:${getRateLimitClientKey(req)}`;
+        let requestScope = '';
+        if (typeof scope === 'function') {
+            try { requestScope = String(scope(req) || '').trim().slice(0, 180).toLowerCase(); }
+            catch (_) { requestScope = ''; }
+        }
+        const key = `${name}:${getRateLimitClientKey(req)}:${requestScope}`;
         const existing = routeRateLimitStore.get(key);
         if (!existing || existing.resetAt <= now) {
             routeRateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
@@ -1993,6 +1998,61 @@ const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
+const guestMessageRateLimit = createRouteRateLimiter('guest-message', {
+    windowMs: 60 * 1000,
+    max: 10,
+    scope: (req) => req.body?.reservationCode,
+});
+const guestMessageGlobalRateLimit = createRouteRateLimiter('guest-message-global', { windowMs: 60 * 1000, max: 60 });
+const guestMessagesReadRateLimit = createRouteRateLimiter('guest-messages-read', {
+    windowMs: 5 * 60 * 1000,
+    max: 30,
+    scope: (req) => req.body?.code,
+});
+const guestMessagesReadGlobalRateLimit = createRouteRateLimiter('guest-messages-read-global', { windowMs: 5 * 60 * 1000, max: 120 });
+const guestMessagesFetchRateLimit = createRouteRateLimiter('guest-messages-fetch', {
+    windowMs: 60 * 1000,
+    max: 12,
+    scope: (req) => req.query?.code,
+});
+const guestMessagesFetchGlobalRateLimit = createRouteRateLimiter('guest-messages-fetch-global', { windowMs: 60 * 1000, max: 240 });
+const guestPushSubscribeRateLimit = createRouteRateLimiter('guest-push-subscribe', {
+    windowMs: 5 * 60 * 1000,
+    max: 8,
+    scope: (req) => req.body?.reservationCode,
+});
+const guestPushSubscribeGlobalRateLimit = createRouteRateLimiter('guest-push-subscribe-global', { windowMs: 5 * 60 * 1000, max: 60 });
+const guestBookingLookupRateLimit = createRouteRateLimiter('guest-booking-lookup', { windowMs: 5 * 60 * 1000, max: 60 });
+
+function guestBookingThreadCode(booking, fallback = '') {
+    return String(booking?.ourReservationCode || booking?.pmsConfirmationCode || fallback || '').trim();
+}
+
+function guestBookingThreadCodes(booking, suppliedCode = '') {
+    return [...new Set([
+        booking?.ourReservationCode,
+        booking?.pmsConfirmationCode,
+        suppliedCode,
+    ].map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
+function guestEmailMatches(booking, suppliedEmail = '') {
+    const email = String(suppliedEmail || '').trim().toLowerCase();
+    if (!email) return true;
+    return String(booking?.guestEmail || '').trim().toLowerCase() === email;
+}
+
+async function findGuestBooking(hotelId, reservationCode, select) {
+    const code = String(reservationCode || '').trim();
+    if (!hotelId || !code) return null;
+    return prisma.booking.findFirst({
+        where: {
+            hotelId,
+            OR: [{ ourReservationCode: code }, { pmsConfirmationCode: code }],
+        },
+        ...(select ? { select } : {}),
+    });
+}
 
 app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
     const { amount, bookingDetails, guestInfo, hotelId, preview } = req.body;
@@ -2477,21 +2537,21 @@ app.post('/api/release-hold', requireCrmAuthDeferred, async (req, res) => {
 // PUBLIC: guest sends a message / special request from the booking-confirmation
 // screen. We verify a matching booking exists (so randoms can't spam a hotel),
 // persist it, and ping the owner's Front Desk in real time.
-app.post('/api/guest-message', async (req, res) => {
+app.post('/api/guest-message', guestMessageGlobalRateLimit, guestMessageRateLimit, async (req, res) => {
     try {
         const { hotelId, reservationCode, body, requests } = req.body || {};
         const cleanCode = String(reservationCode || '').trim();
         const cleanBody = String(body || '').trim().slice(0, 2000);
         const requestList = Array.isArray(requests)
-            ? requests.map((r) => String(r || '').trim()).filter(Boolean).slice(0, 10)
+            ? requests.map((r) => String(r || '').trim().slice(0, 100)).filter(Boolean).slice(0, 10)
             : [];
-        // Client-supplied contact fallback (used only when we can't match a booking).
-        const fbName = String(req.body?.guestName || '').trim().slice(0, 120);
         const fbEmail = String(req.body?.guestEmail || '').trim().slice(0, 200);
-        const fbPhone = String(req.body?.guestPhone || '').trim().slice(0, 40);
 
         if (!cleanBody && requestList.length === 0) {
             return res.status(400).json({ success: false, message: 'Message is empty.' });
+        }
+        if (!cleanCode || cleanCode.length > 160) {
+            return res.status(400).json({ success: false, message: 'A valid reservation is required.' });
         }
 
         const validation = await getActiveHotelValidation(hotelId);
@@ -2501,50 +2561,44 @@ app.post('/api/guest-message', async (req, res) => {
         }
         const resolvedHotelId = validation.hotelId;
 
-        // Try to tie the message to a real booking — but DON'T hard-fail if we can't
-        // (preview/test bookings aren't persisted, and PMS codes can differ). The
-        // hotel itself is validated, so this is effectively an authenticated contact
-        // form; a missing match just means no linked booking.
-        let booking = null;
-        if (cleanCode) {
-            booking = await prisma.booking.findFirst({
-                where: {
-                    hotelId: resolvedHotelId,
-                    OR: [{ ourReservationCode: cleanCode }, { pmsConfirmationCode: cleanCode }],
-                },
-                select: {
-                    id: true, guestFirstName: true, guestLastName: true,
-                    guestEmail: true, guestPhone: true, roomName: true,
-                },
-            });
-            if (!booking) {
-                console.log(`💬 [guest-message] no booking match for hotel=${resolvedHotelId} code=${cleanCode} — accepting as contact`);
-            }
+        const booking = await findGuestBooking(resolvedHotelId, cleanCode, {
+            id: true,
+            ourReservationCode: true,
+            pmsConfirmationCode: true,
+            guestFirstName: true,
+            guestLastName: true,
+            guestEmail: true,
+            guestPhone: true,
+            roomName: true,
+        });
+        // Use the same generic failure for a wrong code and a wrong email so the
+        // public endpoint does not reveal whether a reservation exists.
+        if (!booking || !guestEmailMatches(booking, fbEmail)) {
+            return res.status(404).json({ success: false, message: 'We couldn’t verify this reservation.' });
         }
 
-        const guestName = booking
-            ? ([booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim() || 'Guest')
-            : (fbName || 'Guest');
+        const canonicalCode = guestBookingThreadCode(booking, cleanCode);
+        const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim() || 'Guest';
 
         await prisma.guestMessage.create({
             data: {
                 hotelId: resolvedHotelId,
-                bookingId: booking?.id || null,
-                reservationCode: cleanCode || null,
+                bookingId: booking.id,
+                reservationCode: canonicalCode,
                 guestName,
-                guestEmail: booking?.guestEmail || fbEmail || null,
-                guestPhone: booking?.guestPhone || fbPhone || null,
-                roomName: booking?.roomName || null,
+                guestEmail: booking.guestEmail || null,
+                guestPhone: booking.guestPhone || null,
+                roomName: booking.roomName || null,
                 body: cleanBody || null,
                 requests: requestList.length ? JSON.stringify(requestList) : null,
                 sender: 'guest',
             },
         });
-        console.log(`💬 [guest-message] saved for hotel=${resolvedHotelId} (booking=${booking?.id || 'none'})`);
+        console.log(`💬 [guest-message] saved for hotel=${resolvedHotelId} (booking=${booking.id})`);
 
         // Notify the owner. Lead with the request chips since they're scannable.
         const preview = [requestList.join(', '), cleanBody].filter(Boolean).join(' — ').slice(0, 140);
-        notifyGuestMessage(resolvedHotelId, guestName, preview, cleanCode).catch(() => {});
+        notifyGuestMessage(resolvedHotelId, guestName, preview, canonicalCode).catch(() => {});
 
         res.json({ success: true });
     } catch (e) {
@@ -2554,7 +2608,7 @@ app.post('/api/guest-message', async (req, res) => {
 });
 
 // PUBLIC: guest fetches their conversation thread for a reservation.
-app.get('/api/guest-messages', async (req, res) => {
+app.get('/api/guest-messages', guestMessagesFetchGlobalRateLimit, guestMessagesFetchRateLimit, async (req, res) => {
     try {
         const { hotelId, code, email } = req.query;
         if (!hotelId || !code) return res.status(400).json({ success: false, message: 'Missing hotelId or code.' });
@@ -2563,25 +2617,26 @@ app.get('/api/guest-messages', async (req, res) => {
         if (!validation.ok) return res.status(validation.status || 404).json({ success: false, message: 'Property not found.' });
         const resolvedHotelId = validation.hotelId;
 
-        const booking = await prisma.booking.findFirst({
-            where: {
-                hotelId: resolvedHotelId,
-                OR: [
-                    { ourReservationCode: String(code).trim() },
-                    { pmsConfirmationCode: String(code).trim() }
-                ]
-            }
-        });
+        const cleanCode = String(code).trim();
+        const cleanEmail = String(email || '').trim();
+        if (!cleanCode || cleanCode.length > 160 || cleanEmail.length > 200) {
+            return res.status(400).json({ success: false, message: 'Invalid reservation details.' });
+        }
+        const booking = await findGuestBooking(resolvedHotelId, cleanCode);
         if (!booking) return res.json({ success: true, messages: [] });
-        if (email && String(booking.guestEmail || '').toLowerCase() !== String(email).toLowerCase()) {
+        if (!guestEmailMatches(booking, cleanEmail)) {
             return res.json({ success: true, messages: [] });
         }
 
         const messages = await prisma.guestMessage.findMany({
-            where: { hotelId: resolvedHotelId, reservationCode: booking.ourReservationCode },
-            orderBy: { createdAt: 'asc' },
+            where: {
+                hotelId: resolvedHotelId,
+                reservationCode: { in: guestBookingThreadCodes(booking, cleanCode) },
+            },
+            orderBy: { createdAt: 'desc' },
             take: 200
         });
+        messages.reverse();
 
         res.json({
             success: true,
@@ -2590,8 +2645,12 @@ app.get('/api/guest-messages', async (req, res) => {
                 body: m.body,
                 sender: m.sender || 'guest',
                 createdAt: m.createdAt,
-                requests: m.requests ? JSON.parse(m.requests) : [],
-                readAt: m.readAt
+                requests: (() => {
+                    try { return m.requests ? JSON.parse(m.requests) : []; }
+                    catch (_) { return []; }
+                })(),
+                readAt: m.readAt,
+                guestReadAt: m.guestReadAt,
             }))
         });
     } catch (err) {
@@ -2600,15 +2659,51 @@ app.get('/api/guest-messages', async (req, res) => {
     }
 });
 
+// PUBLIC: a guest opening the conversation marks only Front Desk replies read.
+// Owner unread state remains independent in GuestMessage.readAt.
+app.post('/api/guest-messages/read', guestMessagesReadGlobalRateLimit, guestMessagesReadRateLimit, async (req, res) => {
+    try {
+        const hotelId = req.body?.hotelId;
+        const code = String(req.body?.code || '').trim();
+        const email = String(req.body?.email || '').trim();
+        if (!hotelId || !code || code.length > 160 || email.length > 200) {
+            return res.status(400).json({ success: false, message: 'Missing reservation details.' });
+        }
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) return res.status(validation.status || 404).json({ success: false, message: 'Property not found.' });
+        const booking = await findGuestBooking(validation.hotelId, code);
+        if (!booking || !guestEmailMatches(booking, email)) {
+            return res.status(404).json({ success: false, message: 'We couldn’t verify this reservation.' });
+        }
+
+        const result = await prisma.guestMessage.updateMany({
+            where: {
+                hotelId: validation.hotelId,
+                reservationCode: { in: guestBookingThreadCodes(booking, code) },
+                sender: 'hotel',
+                guestReadAt: null,
+            },
+            data: { guestReadAt: new Date() },
+        });
+        res.json({ success: true, updated: result.count });
+    } catch (error) {
+        console.error('POST /api/guest-messages/read error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not update message status.' });
+    }
+});
+
 // PUBLIC: look up a reservation so the guest can return to it after closing the
 // app. The confirmation code is the secret (long & random); the optional email
 // adds a second factor for the manual "find my reservation" form.
-app.get('/api/booking/lookup', async (req, res) => {
+app.get('/api/booking/lookup', guestBookingLookupRateLimit, async (req, res) => {
     try {
         const hotelId = req.query.hotelId;
         const code = String(req.query.code || '').trim();
         const email = String(req.query.email || '').trim();
-        if (!code) return res.status(400).json({ success: false, message: 'Confirmation code required.' });
+        if (!code || code.length > 160 || email.length > 200) {
+            return res.status(400).json({ success: false, message: 'Valid reservation details are required.' });
+        }
 
         const validation = await getActiveHotelValidation(hotelId);
         if (!validation.ok) {
@@ -2631,7 +2726,8 @@ app.get('/api/booking/lookup', async (req, res) => {
         res.json({
             success: true,
             booking: {
-                reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
+                reservationCode: guestBookingThreadCode(booking, code),
+                confirmationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
                 guestFirstName: booking.guestFirstName,
                 guestLastName: booking.guestLastName,
                 guestEmail: booking.guestEmail,
@@ -4910,16 +5006,33 @@ app.get('/api/push/native/status', crmAuth, async (req, res) => {
 });
 
 // Guest PWA: register for message notifications (public, no auth).
-app.post('/api/guest-push-subscribe', async (req, res) => {
+app.post('/api/guest-push-subscribe', guestPushSubscribeGlobalRateLimit, guestPushSubscribeRateLimit, async (req, res) => {
     try {
-        const { hotelId, reservationCode, subscription } = req.body || {};
+        const { hotelId, reservationCode, email, subscription } = req.body || {};
         const sub = subscription || req.body || {};
         const endpoint = sub.endpoint || req.body?.endpoint;
         const p256dh = sub.keys?.p256dh || req.body?.p256dh;
         const auth = sub.keys?.auth || req.body?.auth;
 
-        if (!endpoint || !p256dh || !auth) {
+        const cleanEndpoint = String(endpoint || '').trim();
+        const cleanP256dh = String(p256dh || '').trim();
+        const cleanAuth = String(auth || '').trim();
+        let validEndpoint = false;
+        try { validEndpoint = new URL(cleanEndpoint).protocol === 'https:'; }
+        catch (_) { validEndpoint = false; }
+        if (
+            !validEndpoint
+            || cleanEndpoint.length > 4096
+            || !cleanP256dh
+            || cleanP256dh.length > 512
+            || !cleanAuth
+            || cleanAuth.length > 512
+        ) {
             return res.status(400).json({ success: false, message: 'Missing subscription data' });
+        }
+        const cleanCode = String(reservationCode || '').trim();
+        if (!cleanCode || cleanCode.length > 160) {
+            return res.status(400).json({ success: false, message: 'A valid reservation is required.' });
         }
 
         const validation = await getActiveHotelValidation(hotelId);
@@ -4927,12 +5040,17 @@ app.post('/api/guest-push-subscribe', async (req, res) => {
             return res.status(validation.status || 400).json({ success: false, message: validation.message });
         }
 
+        const booking = await findGuestBooking(validation.hotelId, cleanCode);
+        if (!booking || !guestEmailMatches(booking, email)) {
+            return res.status(404).json({ success: false, message: 'We couldn’t verify this reservation.' });
+        }
+
         await saveGuestPushSubscription({
-            endpoint,
-            p256dh,
-            auth,
+            endpoint: cleanEndpoint,
+            p256dh: cleanP256dh,
+            auth: cleanAuth,
             hotelId: validation.hotelId,
-            reservationCode,
+            reservationCode: guestBookingThreadCode(booking, cleanCode),
         });
         res.json({ success: true });
     } catch (e) {
@@ -5689,7 +5807,11 @@ async function sendPushToGuests(hotelId, payloadObj, opts = {}, label = 'guestPu
     if (!VAPID_PRIVATE) { console.log(`🔕 [push] ${label} skipped — VAPID not configured (hotel=${hotelId})`); return { sent: 0, failed: 0, cleaned: 0 }; }
     if (!hotelId) { console.log(`🔕 [push] ${label} skipped — no hotelId`); return { sent: 0, failed: 0, cleaned: 0 }; }
     const where = { hotelId, source: 'guest' };
-    if (reservationCode) where.reservationCode = String(reservationCode).trim();
+    const reservationCodes = (Array.isArray(reservationCode) ? reservationCode : [reservationCode])
+        .map((code) => String(code || '').trim())
+        .filter(Boolean);
+    if (reservationCodes.length === 1) where.reservationCode = reservationCodes[0];
+    else if (reservationCodes.length > 1) where.reservationCode = { in: [...new Set(reservationCodes)] };
     const subs = await prisma.pushSubscription.findMany({ where });
     if (subs.length === 0) { console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 guest subscriptions`); return { sent: 0, failed: 0, cleaned: 0 }; }
     const payload = JSON.stringify(payloadObj);
@@ -11026,6 +11148,14 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
             orderBy: { createdAt: 'desc' },
             take: 200,
         }));
+        const bookingIds = [...new Set(rows.map((message) => message.bookingId).filter(Boolean))];
+        const threadBookings = bookingIds.length
+            ? await withRetry(() => prisma.booking.findMany({
+                where: { hotelId, id: { in: bookingIds } },
+                select: { id: true, ourReservationCode: true, pmsConfirmationCode: true },
+            }))
+            : [];
+        const bookingById = new Map(threadBookings.map((booking) => [booking.id, booking]));
         const messages = rows.map((m) => {
             let requests = [];
             try { requests = m.requests ? JSON.parse(m.requests) : []; } catch (_) { requests = []; }
@@ -11033,7 +11163,7 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
                 id: m.id,
                 createdAt: m.createdAt,
                 bookingId: m.bookingId,
-                reservationCode: m.reservationCode,
+                reservationCode: guestBookingThreadCode(bookingById.get(m.bookingId), m.reservationCode),
                 guestName: m.guestName,
                 guestEmail: m.guestEmail,
                 guestPhone: m.guestPhone,
@@ -11095,15 +11225,18 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
         if (!body || !body.trim()) return res.status(400).json({ success: false, message: 'Reply cannot be empty.' });
         if (body.length > 2000) return res.status(400).json({ success: false, message: 'Reply too long.' });
 
+        const booking = await findGuestBooking(hotelId, reservationCode);
+        const threadCodes = booking ? guestBookingThreadCodes(booking, reservationCode) : [reservationCode];
+        const canonicalCode = booking ? guestBookingThreadCode(booking, reservationCode) : reservationCode;
         const latestMsg = await withRetry(() => prisma.guestMessage.findFirst({
-            where: { hotelId, reservationCode },
+            where: { hotelId, reservationCode: { in: threadCodes } },
             orderBy: { createdAt: 'desc' }
         }));
 
         const reply = await withRetry(() => prisma.guestMessage.create({
             data: {
                 hotelId,
-                reservationCode,
+                reservationCode: canonicalCode,
                 bookingId: latestMsg?.bookingId || null,
                 guestName: latestMsg?.guestName || null,
                 guestEmail: latestMsg?.guestEmail || null,
@@ -11112,6 +11245,7 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
                 body: body.trim(),
                 sender: 'hotel',
                 readAt: new Date(),
+                guestReadAt: null,
             }
         }));
 
@@ -11121,7 +11255,7 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
             body: body.trim().slice(0, 160),
             url: '/guest/messages',
             icon: '/icon-192.png',
-        }, { TTL: 60 * 60 }, 'guestReply', reservationCode).catch((e) => {
+        }, { TTL: 60 * 60 }, 'guestReply', threadCodes).catch((e) => {
             console.error('guest reply push error:', e.message);
         });
 
