@@ -183,6 +183,7 @@ function BookingPage({
           bottomOffset={14}
           touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
           apiBaseUrl={apiBaseUrl}
+          guidedBookingInstall
         />
       )}
     </div>

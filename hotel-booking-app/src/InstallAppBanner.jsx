@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isStandalone } from './pwaUtils.js';
 import { BRAND, HotelIcon, IosInstallSheet, isIos } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
+import BookingInstallCoach from './BookingInstallCoach.jsx';
 
 // "Tap to Install" — lets a guest add this property to their home screen so
 // they book direct next time (no Safari, no OTA). Android/desktop use the
@@ -16,11 +17,13 @@ function InstallAppBanner({
   bottomOffset = 0,
   touchpoint = 'booking-page',
   apiBaseUrl = '',
+  guidedBookingInstall = false,
 }) {
   const navigate = useNavigate();
   const [installed, setInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIosSheet, setShowIosSheet] = useState(false);
+  const [showBookingCoach, setShowBookingCoach] = useState(false);
   const [showOwnerPreviewInfo, setShowOwnerPreviewInfo] = useState(false);
   const ios = isIos();
 
@@ -81,7 +84,8 @@ function InstallAppBanner({
     });
 
     if (ios) {
-      setShowIosSheet(true);
+      if (guidedBookingInstall) setShowBookingCoach(true);
+      else setShowIosSheet(true);
       return;
     }
 
@@ -138,12 +142,14 @@ function InstallAppBanner({
           <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={44} style={{ boxShadow: 'none' }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.25 }}>
-              Add {hotelName || 'us'} to your home screen
+              {guidedBookingInstall ? `Get the ${hotelName || 'property'} app` : `Add ${hotelName || 'us'} to your home screen`}
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
               {ownerPreview
                 ? 'Available when you activate Marketel.'
-                : 'Book direct in one tap next time.'}
+                : guidedBookingInstall
+                  ? 'Keep us one tap away for future stays. No app store.'
+                  : 'Book direct in one tap next time.'}
             </div>
           </div>
           <button
@@ -242,6 +248,13 @@ function InstallAppBanner({
           title={`Install ${hotelName || 'our app'}`}
           subtitle="Add it to your home screen — takes 3 seconds."
           onClose={() => setShowIosSheet(false)}
+        />
+      )}
+      {showBookingCoach && (
+        <BookingInstallCoach
+          hotelName={hotelName}
+          appIconUrl={appIconUrl}
+          onClose={() => setShowBookingCoach(false)}
         />
       )}
     </>
