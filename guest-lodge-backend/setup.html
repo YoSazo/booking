@@ -402,12 +402,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <!-- STEP 3: Quality question -->
   <div class="step" id="step-3">
     <div class="form-card fade-stagger" style="text-align:center;">
-      <h2 style="font-size:18px; margin-bottom:16px;">Why do you want a booking page?</h2>
+      <h2 style="font-size:18px; margin-bottom:16px;">Where do most guests find you before they book?</h2>
       <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_commissions')">I'm tired of paying OTA commissions</button>
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('direct_bookings')">I want guests to book directly from my website / Google listing</button>
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('professional')">I want to look more professional online</button>
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('other')">Other</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('google_website')">They search for us on Google or visit our website</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('social_ads')">They find us through social media or ads</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_marketplaces')">They find us on Airbnb, Booking.com, Expedia, or another marketplace</button>
+        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('referrals_offline')">Most come through referrals, phone calls, or walk-ins</button>
       </div>
     </div>
   </div>
@@ -498,7 +498,7 @@ function goToStep(n) {
 }
 
 function answerQualityQ(answer) {
-  const isQualifiedLead = answer === 'ota_commissions' || answer === 'direct_bookings';
+  const isQualifiedLead = answer === 'google_website' || answer === 'social_ads';
   if (isQualifiedLead && !qualifiedLeadTracked) {
     qualifiedLeadTracked = true;
     // Keep this ID stable for the setup so repeat clicks/reloads do not create

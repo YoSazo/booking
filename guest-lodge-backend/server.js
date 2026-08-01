@@ -32,7 +32,7 @@ let frontDeskAssistant = null;
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
 
-async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId } = {}) {
+async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId, contentName } = {}) {
     if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
     try {
         const userData = {};
@@ -54,7 +54,13 @@ async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, source
             user_data: userData,
         };
         if (sourceUrl) eventPayload.event_source_url = sourceUrl;
-        if (value) eventPayload.custom_data = { value: parseFloat(value), currency: currency || 'USD' };
+        const customData = {};
+        if (value) {
+            customData.value = parseFloat(value);
+            customData.currency = currency || 'USD';
+        }
+        if (contentName) customData.content_name = String(contentName).slice(0, 500);
+        if (Object.keys(customData).length) eventPayload.custom_data = customData;
 
         await axios.post(
             `https://graph.facebook.com/v18.0/${MARKETEL_PIXEL_ID}/events`,
@@ -7637,14 +7643,14 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         }
 
         if (eventName === 'QualityAnswer') {
-            const allowedAnswers = new Set(['ota_commissions', 'direct_bookings', 'professional', 'other']);
+            const allowedAnswers = new Set(['google_website', 'social_ads', 'ota_marketplaces', 'referrals_offline']);
             if (!setupHotel || !allowedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid quality answer' });
             }
         }
 
         if (eventName === 'Lead') {
-            const qualifiedAnswers = new Set(['ota_commissions', 'direct_bookings']);
+            const qualifiedAnswers = new Set(['google_website', 'social_ads']);
             if (!setupHotel || !qualifiedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid qualified lead' });
             }
@@ -7686,6 +7692,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
                 fbp: leadFbp,
                 fbc: leadFbc,
                 eventId: cleanEventId || undefined,
+                contentName: cleanContentName || undefined,
             });
         }
         res.json({ success: true });

@@ -12,9 +12,8 @@ let revealData = { rooms: [], rates: null };
 let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
 let bookingPageTimer = 0;
-
-const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
-const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
+let guestAppDemoTimer = 0;
+let guestAppDemoObserver = null;
 
 function isLocalFrontdesk() {
   const host = window.location.hostname;
@@ -239,36 +238,56 @@ function bookingRevealHtml() {
   </section>`;
 }
 
-function iosSystemIcon(url, label) {
-  return `<img class="mvr-ios-system-icon" src="${esc(url)}" alt="${esc(label)}">`;
-}
-
 function guestAppRevealHtml() {
   return `<section class="mvr-stage mvr-stage-app">
     <div class="mvr-copy">
       <div class="mvr-eyebrow">2 · Your guest app</div>
-      <h1>Stay on your guests’ Home Screens.</h1>
-      <p>Guests can save <strong>${esc(propertyName())}</strong> while they are on your booking page, return to book direct again, and receive your updates if they turn on notifications.</p>
+      <h1>Stay on their Home Screen. Reach them again.</h1>
+      <p>Guests install <strong>${esc(propertyName())}</strong> from your booking page. After that, they can book direct in one tap and receive notifications you send from Front Desk.</p>
       <div class="mvr-callout">
-        <strong>No App Store search or account.</strong>
-        They tap Install on your booking page. Your property appears beside the apps they already use.
+        <strong>One install. Two lasting advantages.</strong>
+        A direct path back for them and a direct line from Front Desk for you.
       </div>
     </div>
     <div class="mvr-visual mvr-install-visual ${homeScreenInstalled ? 'is-installed' : ''}">
-      <div class="mvr-install-card">
-        <div class="mvr-install-property-icon">${appIconHtml()}</div>
-        <div>
-          <strong>Add ${esc(propertyName())} to your Home Screen</strong>
-          <span>Book direct in one tap next time.</span>
+      <div class="mvr-install-demo-stage">
+        <div class="mvr-install-entry">
+          <div class="mvr-install-card">
+            <div class="mvr-install-property-icon">${appIconHtml()}</div>
+            <div>
+              <strong>Get the ${esc(propertyName())} app</strong>
+              <span>Keep us one tap away for future stays. No app store.</span>
+            </div>
+            <button type="button" id="mvrInstallDemo" ${homeScreenInstalled ? 'disabled' : ''}>${homeScreenInstalled ? 'Installed ✓' : 'Install'}</button>
+          </div>
+          <small class="mvr-install-context">The same Install button guests see on your booking page.</small>
         </div>
-        <button type="button" id="mvrInstallDemo">${homeScreenInstalled ? 'Installed ✓' : 'Install'}</button>
-      </div>
-      <div class="mvr-install-arrow"><span>${homeScreenInstalled ? 'Now on their phone' : 'Tap Install'}</span><b>↓</b></div>
-      <div class="mvr-ios-crop">
-        <div class="mvr-ios-dock">
-          <div class="mvr-dock-icon mvr-dock-property">${appIconHtml()}</div>
-          <div class="mvr-dock-icon">${iosSystemIcon(IOS_PHONE_ICON_URL, 'Phone')}</div>
-          <div class="mvr-dock-icon">${iosSystemIcon(IOS_SAFARI_ICON_URL, 'Safari')}</div>
+        <div class="mvr-installed-value" aria-hidden="${homeScreenInstalled ? 'false' : 'true'}">
+          <div class="mvr-installed-value-head">
+            <div class="mvr-installed-app-icon">${appIconHtml()}</div>
+            <div>
+              <strong>${esc(propertyName())} is now on their Home Screen</strong>
+              <span>No App Store search or account.</span>
+            </div>
+            <b>✓</b>
+          </div>
+          <div class="mvr-app-direct-result">
+            <span aria-hidden="true">↗</span>
+            <div>
+              <strong>Book direct again</strong>
+              <small>One tap brings them straight back to your booking page.</small>
+            </div>
+          </div>
+          <div class="mvr-app-push-preview">
+            <div class="mvr-app-push-meta">
+              <span class="mvr-app-push-icon">${appIconHtml()}</span>
+              <strong>${esc(propertyName())}</strong>
+              <span>now</span>
+            </div>
+            <div class="mvr-app-push-title">Summer dates are open</div>
+            <div class="mvr-app-push-body">Tap to see availability and book direct.</div>
+          </div>
+          <div class="mvr-app-push-foot">Sent from Front Desk → delivered to their phone</div>
         </div>
       </div>
     </div>
@@ -313,7 +332,7 @@ function finaleHtml() {
       <p>${isSubscribed ? 'Your direct booking page, guest app and Front Desk work together as one system.' : 'Turn on the system you just saw and finish making it yours.'}</p>
       <div class="mvr-value-list">
         <div><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-        <div><span>✓</span><p><strong>Your guest Home Screen app</strong><small>A direct path back to your property</small></p></div>
+        <div><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
         <div><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
       </div>
       ${isSubscribed ? '' : `<div class="mvr-price"><strong>$199</strong><span>/month</span></div>
@@ -410,6 +429,12 @@ function showExpandedPreview() {
 }
 
 function moveToStep(nextStep) {
+  if (guestAppDemoTimer) {
+    window.clearTimeout(guestAppDemoTimer);
+    guestAppDemoTimer = 0;
+  }
+  guestAppDemoObserver?.disconnect();
+  guestAppDemoObserver = null;
   currentStep = Math.max(0, Math.min(3, nextStep));
   persistStep();
   const events = [
@@ -428,6 +453,12 @@ function finishReveal() {
     window.clearTimeout(bookingPageTimer);
     bookingPageTimer = 0;
   }
+  if (guestAppDemoTimer) {
+    window.clearTimeout(guestAppDemoTimer);
+    guestAppDemoTimer = 0;
+  }
+  guestAppDemoObserver?.disconnect();
+  guestAppDemoObserver = null;
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -464,17 +495,65 @@ async function activateMarketel(button) {
   }
 }
 
+function revealGuestAppValue(manual = false) {
+  if (homeScreenInstalled) return;
+  homeScreenInstalled = true;
+  if (guestAppDemoTimer) {
+    window.clearTimeout(guestAppDemoTimer);
+    guestAppDemoTimer = 0;
+  }
+  guestAppDemoObserver?.disconnect();
+  guestAppDemoObserver = null;
+  const visual = document.querySelector('.mvr-install-visual');
+  visual?.classList.add('is-installed');
+  const value = visual?.querySelector('.mvr-installed-value');
+  if (value) value.setAttribute('aria-hidden', 'false');
+  const button = document.getElementById('mvrInstallDemo');
+  if (button) {
+    button.textContent = 'Installed ✓';
+    button.disabled = true;
+  }
+  if (manual) trackReveal('GuestAppInstallDemoClicked');
+}
+
+function scheduleGuestAppValueDemo() {
+  if (guestAppDemoTimer) window.clearTimeout(guestAppDemoTimer);
+  guestAppDemoTimer = 0;
+  guestAppDemoObserver?.disconnect();
+  guestAppDemoObserver = null;
+  if (currentStep !== 1 || homeScreenInstalled) return;
+  const visual = document.querySelector('.mvr-install-visual');
+  if (!visual) return;
+  const begin = () => {
+    if (guestAppDemoTimer || homeScreenInstalled) return;
+    guestAppDemoTimer = window.setTimeout(() => {
+      if (currentStep === 1 && document.getElementById('marketelValueReveal')) {
+        revealGuestAppValue(false);
+      }
+    }, 1600);
+  };
+  if ('IntersectionObserver' in window) {
+    guestAppDemoObserver = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.35)) return;
+      guestAppDemoObserver?.disconnect();
+      guestAppDemoObserver = null;
+      begin();
+    }, { threshold: [0.35] });
+    guestAppDemoObserver.observe(visual);
+  } else {
+    begin();
+  }
+}
+
 function bindRevealEvents() {
   document.getElementById('mvrNext')?.addEventListener('click', () => moveToStep(currentStep + 1));
   document.getElementById('mvrBack')?.addEventListener('click', () => moveToStep(currentStep - 1));
   document.getElementById('mvrExpandPreview')?.addEventListener('click', showExpandedPreview);
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.getElementById('mvrInstallDemo')?.addEventListener('click', () => {
-    if (homeScreenInstalled) return;
-    homeScreenInstalled = true;
-    trackReveal('GuestAppInstallDemoClicked');
-    renderReveal();
+    revealGuestAppValue(true);
   });
+  scheduleGuestAppValueDemo();
 }
 
 async function loadRevealData() {
@@ -546,6 +625,10 @@ export function showMarketelValueReveal(options = {}) {
   bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
+  if (guestAppDemoTimer) window.clearTimeout(guestAppDemoTimer);
+  guestAppDemoTimer = 0;
+  guestAppDemoObserver?.disconnect();
+  guestAppDemoObserver = null;
 
   if (!crm.hotelSubscribed) {
     try {

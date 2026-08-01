@@ -446,11 +446,31 @@
 .mvr-install-visual {
   width: 100%;
   align-content: center;
-  gap: 17px;
+}
+
+.mvr-install-demo-stage {
+  width: min(560px, 100%);
+  min-height: 360px;
+  display: grid;
+  align-items: center;
+}
+
+.mvr-install-entry,
+.mvr-installed-value {
+  grid-area: 1 / 1;
+  transition: opacity 300ms ease, transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mvr-install-entry {
+  display: grid;
+  justify-items: center;
+  gap: 11px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .mvr-install-card {
-  width: min(560px, 100%);
+  width: 100%;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -463,7 +483,8 @@
 }
 
 .mvr-install-property-icon,
-.mvr-dock-property {
+.mvr-installed-app-icon,
+.mvr-app-push-icon {
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -473,14 +494,15 @@
 }
 
 .mvr-install-property-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .mvr-install-property-icon img,
-.mvr-dock-property img {
+.mvr-installed-app-icon img,
+.mvr-app-push-icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -521,91 +543,187 @@
   cursor: pointer;
 }
 
-.mvr-install-visual.is-installed .mvr-install-card button {
-  color: #1e6b48;
-  background: #e7f5ed;
+.mvr-install-context {
+  color: #78867e;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
 }
 
-.mvr-install-arrow {
+.mvr-installed-value {
+  width: 100%;
+  padding: 18px;
+  opacity: 0;
+  border: 1px solid #d2e1d8;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 28px 70px rgba(24, 55, 38, 0.16);
+  pointer-events: none;
+  transform: translateY(18px) scale(0.97);
+}
+
+.mvr-installed-value-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e2e9e5;
+}
+
+.mvr-installed-app-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 13px;
+  font-size: 20px;
+}
+
+.mvr-installed-value-head > div:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mvr-installed-value-head strong,
+.mvr-installed-value-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mvr-installed-value-head strong {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.mvr-installed-value-head span {
+  color: #75837b;
+  font-size: 10px;
+}
+
+.mvr-installed-value-head > b {
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  gap: 2px;
-  color: #718078;
+  color: #fff;
+  border-radius: 50%;
+  background: var(--mvr-green);
+  font-size: 13px;
 }
 
-.mvr-install-arrow span {
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.mvr-install-arrow b {
-  color: var(--mvr-green);
-  font-size: 22px;
-}
-
-.mvr-ios-crop {
-  width: min(500px, 100%);
-  min-height: 184px;
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  overflow: hidden;
-  padding: 34px 28px 24px;
-  border: 1px solid rgba(32, 70, 51, 0.16);
-  border-radius: 30px;
-  background:
-    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.65), transparent 36%),
-    linear-gradient(145deg, #3c7559, #a2d1b5);
-  box-shadow: 0 28px 68px rgba(22, 47, 34, 0.2);
-}
-
-.mvr-ios-dock {
-  display: flex;
+.mvr-app-direct-result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: clamp(18px, 4vw, 28px);
-  padding: 16px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 30px;
-  background: rgba(225, 239, 229, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 10px 34px rgba(23, 50, 35, 0.16);
-  -webkit-backdrop-filter: saturate(1.4) blur(20px);
-  backdrop-filter: saturate(1.4) blur(20px);
+  gap: 11px;
+  padding: 14px 2px 12px;
 }
 
-.mvr-dock-icon {
-  width: clamp(62px, 8vw, 76px);
-  height: clamp(62px, 8vw, 76px);
-  flex: 0 0 auto;
-  border-radius: clamp(14px, 2vw, 18px);
-  filter: drop-shadow(0 5px 8px rgba(15, 39, 25, 0.16));
+.mvr-app-direct-result > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--mvr-green);
+  border-radius: 11px;
+  background: #e8f4ed;
+  font-size: 19px;
+  font-weight: 900;
 }
 
-.mvr-dock-icon svg,
-.mvr-ios-system-icon {
-  width: 100%;
-  height: 100%;
-  display: block;
+.mvr-app-direct-result > div {
+  display: grid;
+  gap: 2px;
 }
 
-.mvr-ios-system-icon {
-  border-radius: inherit;
-  object-fit: cover;
+.mvr-app-direct-result strong {
+  color: var(--mvr-text);
+  font-size: 13px;
+  font-weight: 850;
 }
 
-.mvr-dock-property {
-  font-size: 30px;
-  opacity: 0.82;
-  transform: scale(0.92);
-  transition: opacity 240ms ease, transform 360ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 240ms ease;
+.mvr-app-direct-result small {
+  color: #728078;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
-.mvr-install-visual.is-installed .mvr-dock-property {
+.mvr-app-push-preview {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 17px;
+  background: rgba(238, 242, 239, 0.92);
+  box-shadow: 0 10px 30px rgba(23, 47, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: saturate(1.35) blur(16px);
+  backdrop-filter: saturate(1.35) blur(16px);
+}
+
+.mvr-app-push-meta {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  color: #748078;
+  font-size: 9px;
+}
+
+.mvr-app-push-icon {
+  width: 25px;
+  height: 25px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.mvr-app-push-meta strong {
+  overflow: hidden;
+  color: #5d6962;
+  font-size: 10px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mvr-app-push-title {
+  margin-top: 8px;
+  color: #18211c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mvr-app-push-body {
+  margin-top: 2px;
+  color: #3c4841;
+  font-size: 11px;
+}
+
+.mvr-app-push-foot {
+  margin-top: 9px;
+  color: #567164;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.mvr-install-visual.is-installed .mvr-install-entry {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-16px) scale(0.96);
+}
+
+.mvr-install-visual.is-installed .mvr-installed-value {
   opacity: 1;
-  transform: scale(1);
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.32), 0 7px 18px rgba(18, 47, 29, 0.24);
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.mvr-install-visual.is-installed .mvr-app-push-preview {
+  animation: mvr-notification-arrive 520ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes mvr-notification-arrive {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .mvr-marketel-avatar {
@@ -1194,16 +1312,17 @@
     width: 100%;
   }
 
-  .mvr-ios-crop {
-    min-height: 150px;
-    padding: 25px 14px 18px;
-    border-radius: 24px;
+  .mvr-install-demo-stage {
+    min-height: 350px;
   }
 
-  .mvr-ios-dock {
-    gap: 15px;
-    padding: 13px;
-    border-radius: 24px;
+  .mvr-installed-value {
+    padding: 15px;
+    border-radius: 21px;
+  }
+
+  .mvr-installed-value-head strong {
+    font-size: 12px;
   }
 
   .mvr-finale-card h1 {
@@ -1216,6 +1335,17 @@
 
   .mvr-price strong {
     font-size: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mvr-install-entry,
+  .mvr-installed-value {
+    transition-duration: 1ms;
+  }
+
+  .mvr-install-visual.is-installed .mvr-app-push-preview {
+    animation: none;
   }
 }
 
