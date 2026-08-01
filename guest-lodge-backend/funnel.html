@@ -428,6 +428,7 @@
     font-family: 'DM Mono', monospace, monospace;
     font-size: 12px;
     color: var(--muted);
+    white-space: pre-wrap;
   }
   .event-guest {
     font-size: 14px;
@@ -536,6 +537,8 @@
 
   @media (max-width: 600px) {
     .header { padding: 12px 16px; }
+    .header-right { justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+    .refresh-btn { padding: 7px 9px; }
     .filters { padding: 12px 16px; }
     .events-list { padding: 0 16px 80px; }
     .event-card { padding: 12px; }
@@ -563,6 +566,7 @@
       <span id="dateLabel">Last 7 days</span>
     </button>
     <button class="refresh-btn" onclick="loadEvents()">Refresh</button>
+    <button class="refresh-btn export-btn" onclick="downloadJourneyExport(event)">Export JSON</button>
 
     <!-- Calendar popup -->
     <div class="cal-popup" id="calPopup">
@@ -909,6 +913,12 @@ function showDetail(index) {
   const rows = [
     { label: 'Event', value: label },
     { label: 'Time', value: new Date(e.timestamp).toLocaleString() },
+    { label: 'Property', value: e.hotel_id || '—', mono: true },
+    { label: 'Session', value: e.session_id || '—', mono: true },
+    { label: 'Sequence', value: e.sequence || '—' },
+    { label: 'Surface', value: e.surface || '—' },
+    { label: 'Page', value: e.page_path || '—', mono: true },
+    { label: 'Duration', value: e.duration_ms != null ? Math.round(e.duration_ms / 100) / 10 + 's' : '—' },
     { label: 'Name', value: ((e.guest_first_name || '') + ' ' + (e.guest_last_name || '')).trim() || '—' },
     { label: 'Email', value: e.guest_email || '—' },
     { label: 'Phone', value: e.guest_phone || '—' },
@@ -923,6 +933,7 @@ function showDetail(index) {
     { label: 'Visitor ID', value: e.external_id || '—', mono: true },
     { label: 'Event ID', value: e.event_id || '—', mono: true },
     { label: 'User Agent', value: ua || '—', mono: true },
+    { label: 'Journey Context', value: e.metadata ? JSON.stringify(e.metadata, null, 2) : '—', mono: true },
   ];
 
   document.getElementById('detailRows').innerHTML = rows
@@ -1124,6 +1135,32 @@ async function loadEvents() {
     renderEvents();
   } catch (e) {
     document.getElementById('eventsList').innerHTML = '<div class="empty-state"><p>Failed to load events. Try refreshing.</p></div>';
+  }
+}
+
+async function downloadJourneyExport(clickEvent) {
+  if (!calStart || !calEnd) return;
+  const button = clickEvent?.currentTarget;
+  const previousLabel = button?.textContent || 'Export JSON';
+  if (button) { button.disabled = true; button.textContent = 'Preparing…'; }
+  try {
+    const from = fmtDate(calStart);
+    const to = fmtDate(calEnd);
+    const response = await adminFetch('/api/funnel/journey-export?from=' + from + '&to=' + to + '&download=1');
+    if (!response.ok) throw new Error('Export failed');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'marketel-journeys-' + to + '.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (_) {
+    alert('Could not export journeys. Try again.');
+  } finally {
+    if (button) { button.disabled = false; button.textContent = previousLabel; }
   }
 }
 

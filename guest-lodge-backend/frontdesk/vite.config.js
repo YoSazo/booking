@@ -53,6 +53,7 @@ export default defineConfig(({ mode }) => {
       transformIndexHtml(html) {
         return html
           .replace(/<script id="marketel-web-analytics">[\s\S]*?<\/script>/, '')
+          .replace(/\s*<script(?:\s+vite-ignore)?\s+src="\/marketel-journey\.js"><\/script>/, '')
           .replace(/\s*<link rel="manifest"[^>]*>/, '');
       },
       closeBundle() {

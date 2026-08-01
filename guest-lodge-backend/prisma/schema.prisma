@@ -455,13 +455,20 @@ model CrmPin {
 }
 
 model FunnelEvent {
-  id             String   @id @default(cuid())
-  createdAt      DateTime @default(now())
+  id             String    @id @default(cuid())
+  createdAt      DateTime  @default(now())
+  occurredAt     DateTime?
   hotelId        String
   eventName      String
   eventId        String?
+  sessionId      String?
+  sequence       Int?
+  surface        String?
+  pagePath       String?
+  durationMs     Int?
+  metadata       Json?
   value          Float?
-  currency       String?  @default("USD")
+  currency       String?   @default("USD")
   contentName    String? // room name
   checkinDate    String?
   checkoutDate   String?
@@ -476,4 +483,7 @@ model FunnelEvent {
 
   @@index([hotelId, createdAt])
   @@index([eventName, createdAt])
+  @@index([externalId, createdAt])
+  @@index([sessionId, sequence])
+  @@index([hotelId, sessionId, createdAt])
 }

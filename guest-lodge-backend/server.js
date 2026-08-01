@@ -2202,6 +2202,7 @@ const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 10 });
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
+const journeyEventRateLimit = createRouteRateLimiter('marketel-journey', { windowMs: 60 * 1000, max: 180 });
 const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
@@ -5481,6 +5482,223 @@ app.post('/api/crm/frontdesk-install-event', crmAuth, async (req, res) => {
     }
 });
 
+// Detailed first-party owner journey events. These complement the durable
+// conversion milestones below: a conversion is still counted once, while
+// journey rows preserve ordering, timing, attribution and interaction context.
+const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
+    'JourneyPageViewed',
+    'JourneyPagePerformance',
+    'JourneyPageExited',
+    'JourneyEngagementMilestone',
+    'JourneyScrollDepth',
+    'JourneyVisibilityChanged',
+    'JourneyConnectivityChanged',
+    'JourneyControlActivated',
+    'JourneyFieldFocused',
+    'JourneyFieldCompleted',
+    'JourneyValidationFailed',
+    'JourneyClientError',
+    'JourneyRequestStarted',
+    'JourneyRequestCompleted',
+    'JourneyRequestFailed',
+    'JourneyDemoSelected',
+    'JourneyDemoLoaded',
+    'JourneySetupStepViewed',
+    'JourneySetupNavigation',
+    'JourneySetupStepCompleted',
+    'JourneyPhotoSelected',
+    'JourneyQualitySelected',
+    'JourneyPreviewReady',
+    'JourneyHandoffStarted',
+    'JourneyHandoffCompleted',
+    'JourneyFrontDeskReady',
+    'JourneyRevealStarted',
+    'JourneyRevealStageViewed',
+    'JourneyRevealStageCompleted',
+    'JourneyRevealNavigation',
+    'JourneyBookingPreviewOpened',
+    'JourneyBookingPreviewModeChanged',
+    'JourneyGuestAppDemo',
+    'JourneyBookingPageStatus',
+    'JourneyCheckoutRequested',
+    'JourneyCheckoutRedirected',
+    'JourneyCheckoutFailed',
+]);
+
+function redactJourneyString(value, maxLength = 300) {
+    return String(value == null ? '' : value)
+        .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+        .replace(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g, '[phone]')
+        .slice(0, maxLength);
+}
+
+function sanitizeJourneyMetadataValue(value, depth = 0) {
+    if (depth > 3 || value == null) return value == null ? null : undefined;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') return redactJourneyString(value);
+    if (Array.isArray(value)) {
+        return value.slice(0, 20)
+            .map((item) => sanitizeJourneyMetadataValue(item, depth + 1))
+            .filter((item) => item !== undefined);
+    }
+    if (typeof value !== 'object') return undefined;
+    const result = {};
+    Object.entries(value).slice(0, 40).forEach(([rawKey, rawValue]) => {
+        if (/password|passcode|pin|token|secret|authorization|cookie|card|email|phone|message|filename|image(data|url)/i.test(rawKey)) return;
+        const key = String(rawKey).replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 60);
+        if (!key) return;
+        const cleanValue = sanitizeJourneyMetadataValue(rawValue, depth + 1);
+        if (cleanValue !== undefined) result[key] = cleanValue;
+    });
+    return result;
+}
+
+function sanitizeJourneyMetadata(value) {
+    const clean = sanitizeJourneyMetadataValue(value && typeof value === 'object' ? value : {}, 0) || {};
+    try {
+        if (JSON.stringify(clean).length <= 12000) return clean;
+    } catch (_) {}
+    return {
+        truncated: true,
+        retainedKeys: Object.keys(clean).slice(0, 30),
+    };
+}
+
+function sanitizeJourneyIdentifier(value, prefix) {
+    const clean = String(value || '').trim().replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 100);
+    if (!clean || (prefix && !clean.startsWith(prefix))) return null;
+    return clean;
+}
+
+function sanitizeJourneyPath(value) {
+    const clean = String(value || '/')
+        .split('?')[0]
+        .replace(/\/setup\/[^/]+/i, '/setup/:token')
+        .replace(/[^a-zA-Z0-9/_:.-]/g, '')
+        .slice(0, 240);
+    return clean.startsWith('/') ? clean : `/${clean}`;
+}
+
+function journeyOccurredAt(value) {
+    const parsed = new Date(value || '');
+    const now = Date.now();
+    if (Number.isNaN(parsed.getTime())) return new Date();
+    if (parsed.getTime() > now + 10 * 60 * 1000 || parsed.getTime() < now - 30 * 24 * 60 * 60 * 1000) return new Date();
+    return parsed;
+}
+
+function journeyContentName(metadata) {
+    const candidate = metadata.control
+        || metadata.request
+        || metadata.stepName
+        || metadata.answer
+        || metadata.stageName
+        || metadata.demo
+        || metadata.kind;
+    return candidate == null ? null : redactJourneyString(candidate, 120);
+}
+
+async function persistMarketelJourneyEvents({ req, hotelId, ownerEmail = null, events }) {
+    const incoming = Array.isArray(events) ? events.slice(0, 25) : [];
+    const rows = incoming.map((event) => {
+        const eventName = String(event?.eventName || '').trim();
+        if (!MARKETEL_JOURNEY_EVENT_NAMES.has(eventName)) return null;
+        const sessionId = sanitizeJourneyIdentifier(event?.sessionId, 'mjs_');
+        const externalId = sanitizeJourneyIdentifier(event?.visitorId, 'mjv_');
+        const eventId = sanitizeJourneyIdentifier(event?.eventId, 'journey.');
+        if (!sessionId || !externalId || !eventId) return null;
+        const sequence = Math.max(1, Math.min(1000000, parseInt(event?.sequence, 10) || 1));
+        const durationValue = Number(event?.durationMs);
+        const durationMs = Number.isFinite(durationValue)
+            ? Math.max(0, Math.min(24 * 60 * 60 * 1000, Math.round(durationValue)))
+            : null;
+        const metadata = sanitizeJourneyMetadata(event?.metadata);
+        return {
+            hotelId,
+            eventName,
+            eventId,
+            occurredAt: journeyOccurredAt(event?.occurredAt),
+            sessionId,
+            sequence,
+            surface: redactJourneyString(event?.surface || 'unknown', 40),
+            pagePath: sanitizeJourneyPath(event?.pagePath),
+            durationMs,
+            metadata,
+            contentName: journeyContentName(metadata),
+            guestEmail: ownerEmail || null,
+            externalId,
+            userAgent: req.headers['user-agent'] || null,
+            ipAddress: req.ip || req.socket?.remoteAddress || null,
+        };
+    }).filter(Boolean);
+    if (!rows.length) return { accepted: 0, duplicates: 0 };
+
+    const ids = rows.map((row) => row.eventId);
+    const existing = await prisma.funnelEvent.findMany({
+        where: { eventId: { in: ids } },
+        select: { eventId: true },
+    });
+    const existingIds = new Set(existing.map((row) => row.eventId));
+    const uniqueRows = rows.filter((row) => !existingIds.has(row.eventId));
+    const created = uniqueRows.length
+        ? await prisma.funnelEvent.createMany({ data: uniqueRows, skipDuplicates: true })
+        : { count: 0 };
+    return { accepted: created.count, duplicates: rows.length - created.count };
+}
+
+// Landing and setup must work before CRM authentication exists. Setup events
+// are scoped by the unguessable setup token; unauthenticated rows are accepted
+// only from the public landing surface.
+app.post('/api/funnel/journey', journeyEventRateLimit, async (req, res) => {
+    if (!funnelTrackingEnabled) return res.json({ success: true, accepted: 0, disabled: true });
+    try {
+        const setupToken = String(req.body?.setupToken || '').trim();
+        const events = Array.isArray(req.body?.events) ? req.body.events : [];
+        let hotelId = 'marketel-onboarding';
+        let ownerEmail = null;
+        if (setupToken) {
+            const hotel = await prisma.hotelConfig.findUnique({
+                where: { setupToken },
+                select: { id: true, ownerEmail: true },
+            });
+            if (!hotel) return res.status(404).json({ success: false, message: 'Invalid setup context.' });
+            hotelId = hotel.id;
+            ownerEmail = hotel.ownerEmail || null;
+        } else {
+            const onlyLanding = events.length > 0 && events.every((event) => event?.surface === 'landing');
+            if (!onlyLanding) return res.status(400).json({ success: false, message: 'Setup context required.' });
+        }
+        const result = await persistMarketelJourneyEvents({ req, hotelId, ownerEmail, events });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Public journey tracking failed:', error.message);
+        res.json({ success: true, accepted: 0 });
+    }
+});
+
+app.post('/api/crm/journey-events', journeyEventRateLimit, crmAuth, async (req, res) => {
+    if (!funnelTrackingEnabled) return res.json({ success: true, accepted: 0, disabled: true });
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { ownerEmail: true },
+        }).catch(() => null);
+        const result = await persistMarketelJourneyEvents({
+            req,
+            hotelId,
+            ownerEmail: hotel?.ownerEmail || null,
+            events: req.body?.events,
+        });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('CRM journey tracking failed:', error.message);
+        res.json({ success: true, accepted: 0 });
+    }
+});
+
 // CRM: the short pre-activation value reveal. These milestones make it
 // possible to tell whether owners understand each core value before checkout
 // without treating ordinary clicks as Meta Leads.
@@ -5493,6 +5711,10 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'AssistantRevealViewed',
     'ActivationOfferViewed',
     'ActivationCtaClicked',
+    'GuestAppPreviewRequestedFromBookingEngine',
+    'GuestAppValueSlideViewed',
+    'GuestAppInstallSlideReplayed',
+    'GuestAppInstallDemoClicked',
 ]);
 app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true, local: true });
@@ -5509,12 +5731,21 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
             select: { id: true },
         });
         if (!existing) {
+            const linkedExternalId = sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_');
+            const linkedSessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
             await prisma.funnelEvent.create({
                 data: {
                     hotelId,
                     eventName,
                     eventId: `marketel-reveal.${hotelId}.${eventName}`,
+                    occurredAt: linkedSessionId ? journeyOccurredAt(req.body?.journeyOccurredAt) : null,
+                    sessionId: linkedSessionId,
+                    sequence: linkedSessionId ? Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1)) : null,
+                    surface: linkedSessionId ? redactJourneyString(req.body?.journeySurface || 'frontdesk', 40) : null,
+                    pagePath: linkedSessionId ? sanitizeJourneyPath(req.body?.journeyPagePath) : null,
+                    metadata: linkedSessionId ? { linkedJourney: true } : undefined,
                     contentName: contentName || null,
+                    externalId: linkedExternalId,
                     userAgent: req.headers['user-agent'] || null,
                     ipAddress: req.ip || req.socket?.remoteAddress || null,
                 },
@@ -7813,6 +8044,7 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'ActivationEmailSent',
     'SubscriptionStatusChanged',
     ...MARKETEL_VALUE_REVEAL_EVENTS,
+    ...MARKETEL_JOURNEY_EVENT_NAMES,
 ];
 const MARKETEL_PUBLIC_ONBOARDING_EVENTS = new Set([
     'LandingPageView',
@@ -7830,7 +8062,20 @@ const MARKETEL_PUBLIC_ONBOARDING_EVENTS = new Set([
 app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true });
     try {
-        const { eventName, referrer, contentName, eventId, setupToken } = req.body || {};
+        const {
+            eventName,
+            referrer,
+            contentName,
+            eventId,
+            setupToken,
+            journeyVisitorId,
+            journeySessionId,
+            journeySequence,
+            journeyEventId,
+            journeyOccurredAt: clientOccurredAt,
+            journeySurface,
+            journeyPagePath,
+        } = req.body || {};
         if (!MARKETEL_PUBLIC_ONBOARDING_EVENTS.has(eventName)) {
             return res.status(400).json({ success: false, message: 'Invalid onboarding event' });
         }
@@ -7895,17 +8140,29 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             }
         }
 
-        const cleanEventId = String(eventId || '').trim().slice(0, 160) || null;
+        const linkedExternalId = sanitizeJourneyIdentifier(journeyVisitorId, 'mjv_');
+        const linkedSessionId = sanitizeJourneyIdentifier(journeySessionId, 'mjs_');
+        const linkedSequence = linkedSessionId
+            ? Math.max(1, Math.min(1000000, parseInt(journeySequence, 10) || 1))
+            : null;
+        const cleanEventId = String(eventId || sanitizeJourneyIdentifier(journeyEventId, 'journey-link.') || '').trim().slice(0, 160) || null;
         const cleanContentName = String(contentName || referrer || '').trim().slice(0, 500) || null;
         await prisma.funnelEvent.create({
             data: {
                 hotelId: trackedHotelId,
                 eventName,
                 eventId: cleanEventId,
+                occurredAt: linkedSessionId ? journeyOccurredAt(clientOccurredAt) : null,
+                sessionId: linkedSessionId,
+                sequence: linkedSequence,
+                surface: linkedSessionId ? redactJourneyString(journeySurface || 'unknown', 40) : null,
+                pagePath: linkedSessionId ? sanitizeJourneyPath(journeyPagePath) : null,
+                metadata: linkedSessionId ? { linkedJourney: true } : undefined,
                 guestEmail: trackedEmail,
                 userAgent: req.headers['user-agent'] || null,
                 ipAddress: req.ip || req.socket?.remoteAddress || null,
                 contentName: cleanContentName,
+                externalId: linkedExternalId,
             },
         });
 
@@ -7959,10 +8216,14 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
             where.eventName = { notIn: MARKETEL_ONBOARDING_EVENT_NAMES };
         }
 
+        const requestedLimit = parseInt(req.query.limit, 10);
+        const eventLimit = Number.isFinite(requestedLimit)
+            ? Math.max(100, Math.min(5000, requestedLimit))
+            : (source === 'onboarding' ? 2000 : 500);
         const events = await withRetry(() => prisma.funnelEvent.findMany({
             where,
             orderBy: { createdAt: 'desc' },
-            take: 500,
+            take: eventLimit,
         }));
 
         const counts = {};
@@ -7970,8 +8231,16 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
 
         const recent = events.map(e => ({
             event_name: e.eventName,
-            timestamp: e.createdAt.getTime(),
+            timestamp: (e.occurredAt || e.createdAt).getTime(),
+            received_at: e.createdAt.getTime(),
             event_id: e.eventId,
+            hotel_id: e.hotelId,
+            session_id: e.sessionId,
+            sequence: e.sequence,
+            surface: e.surface,
+            page_path: e.pagePath,
+            duration_ms: e.durationMs,
+            metadata: e.metadata,
             value: e.value,
             content_name: e.contentName,
             checkin_date: e.checkinDate,
@@ -7990,6 +8259,205 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
     } catch (e) {
         console.error('Funnel API error:', e.message);
         res.json({ counts: {}, recent: [] });
+    }
+});
+
+// Analysis-ready, privacy-conscious export. It preserves exact event ordering
+// and the owner journey context an LLM needs, while omitting emails, phone
+// numbers, IP addresses and form contents from the downloadable file.
+app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
+    try {
+        let since, until;
+        if (req.query.from && req.query.to) {
+            since = new Date(req.query.from + 'T00:00:00.000Z');
+            until = new Date(req.query.to + 'T23:59:59.999Z');
+            if (isNaN(since) || isNaN(until)) {
+                return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+            }
+        } else {
+            const daysBack = Math.max(1, Math.min(180, parseInt(req.query.days, 10) || 30));
+            until = new Date();
+            since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+        }
+
+        const where = {
+            createdAt: { gte: since, lte: until },
+            eventName: { in: MARKETEL_ONBOARDING_EVENT_NAMES },
+        };
+        const [totalRows, rows] = await Promise.all([
+            prisma.funnelEvent.count({ where }),
+            prisma.funnelEvent.findMany({
+                where,
+                orderBy: [{ createdAt: 'asc' }, { sequence: 'asc' }],
+                take: 10000,
+            }),
+        ]);
+
+        const counts = {};
+        const propertyMap = new Map();
+        const visitorMap = new Map();
+        const unlinkedEvents = [];
+        const normalized = rows.map((row) => {
+            counts[row.eventName] = (counts[row.eventName] || 0) + 1;
+            const timestamp = (row.occurredAt || row.createdAt).toISOString();
+            const event = {
+                event: row.eventName,
+                timestamp,
+                receivedAt: row.createdAt.toISOString(),
+                eventId: row.eventId,
+                hotelId: row.hotelId,
+                visitorId: row.externalId,
+                sessionId: row.sessionId,
+                sequence: row.sequence,
+                surface: row.surface,
+                pagePath: row.pagePath,
+                durationMs: row.durationMs,
+                context: row.metadata || {},
+                content: row.contentName,
+                value: row.value,
+                currency: row.currency,
+            };
+
+            const property = propertyMap.get(row.hotelId) || {
+                hotelId: row.hotelId,
+                firstSeenAt: timestamp,
+                lastSeenAt: timestamp,
+                eventCount: 0,
+                sessions: new Set(),
+                milestones: {},
+            };
+            property.lastSeenAt = timestamp;
+            property.eventCount += 1;
+            if (row.sessionId) property.sessions.add(row.sessionId);
+            if (['Lead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'].includes(row.eventName)) {
+                property.milestones[row.eventName] = timestamp;
+            }
+            propertyMap.set(row.hotelId, property);
+            return event;
+        });
+
+        normalized.forEach((event) => {
+            if (!event.visitorId || !event.sessionId) {
+                unlinkedEvents.push(event);
+                return;
+            }
+            const visitor = visitorMap.get(event.visitorId) || { visitorId: event.visitorId, sessions: new Map() };
+            const session = visitor.sessions.get(event.sessionId) || {
+                sessionId: event.sessionId,
+                startedAt: event.timestamp,
+                endedAt: event.timestamp,
+                durationMs: 0,
+                hotelIds: new Set(),
+                surfaces: new Set(),
+                attribution: null,
+                device: null,
+                outcome: 'browsed',
+                events: [],
+            };
+            session.startedAt = session.events.length ? session.startedAt : event.timestamp;
+            session.endedAt = event.timestamp;
+            if (event.hotelId) session.hotelIds.add(event.hotelId);
+            if (event.surface) session.surfaces.add(event.surface);
+            const context = event.context || {};
+            if (!session.attribution && (context.firstTouch || context.latestTouch)) {
+                session.attribution = { firstTouch: context.firstTouch || {}, latestTouch: context.latestTouch || {} };
+            }
+            if (!session.device && (context.viewport || context.displayMode || context.connection)) {
+                session.device = {
+                    viewport: context.viewport || null,
+                    screen: context.screen || null,
+                    displayMode: context.displayMode || null,
+                    language: context.language || null,
+                    timezone: context.timezone || null,
+                    connection: context.connection || null,
+                };
+            }
+            const outcomeRank = {
+                browsed: 0,
+                'qualified-lead': 1,
+                'setup-completed': 2,
+                'offer-viewed': 3,
+                'checkout-requested': 4,
+                'checkout-started': 5,
+                paid: 6,
+            };
+            let nextOutcome = session.outcome;
+            if (event.event === 'Lead' || (event.event === 'JourneyQualitySelected' && context.qualified)) nextOutcome = 'qualified-lead';
+            if (event.event === 'SetupCompleted' || event.event === 'JourneyPreviewReady') nextOutcome = 'setup-completed';
+            if (event.event === 'ActivationOfferViewed' || (event.event === 'JourneyRevealStageViewed' && context.stageName === 'activation')) nextOutcome = 'offer-viewed';
+            if (event.event === 'JourneyCheckoutRequested' || event.event === 'ActivationCtaClicked' || event.event === 'GoLiveClicked') nextOutcome = 'checkout-requested';
+            if (event.event === 'CheckoutStarted' || event.event === 'JourneyCheckoutRedirected') nextOutcome = 'checkout-started';
+            if (event.event === 'PaymentSucceeded') nextOutcome = 'paid';
+            if ((outcomeRank[nextOutcome] || 0) > (outcomeRank[session.outcome] || 0)) session.outcome = nextOutcome;
+            session.events.push(event);
+            visitor.sessions.set(event.sessionId, session);
+            visitorMap.set(event.visitorId, visitor);
+        });
+
+        const journeys = Array.from(visitorMap.values()).map((visitor) => ({
+            visitorId: visitor.visitorId,
+            sessions: Array.from(visitor.sessions.values()).map((session) => {
+                session.events.sort((a, b) => {
+                    const aSequence = Number(a.sequence) || Number.MAX_SAFE_INTEGER;
+                    const bSequence = Number(b.sequence) || Number.MAX_SAFE_INTEGER;
+                    return aSequence - bSequence || new Date(a.timestamp) - new Date(b.timestamp);
+                });
+                const startedAt = session.events[0]?.timestamp || session.startedAt;
+                const endedAt = session.events[session.events.length - 1]?.timestamp || session.endedAt;
+                const started = new Date(startedAt).getTime();
+                const ended = new Date(endedAt).getTime();
+                return {
+                    ...session,
+                    startedAt,
+                    endedAt,
+                    durationMs: Math.max(0, ended - started),
+                    hotelIds: Array.from(session.hotelIds),
+                    surfaces: Array.from(session.surfaces),
+                };
+            }),
+        }));
+
+        const properties = Array.from(propertyMap.values()).map((property) => ({
+            ...property,
+            sessionCount: property.sessions.size,
+            sessions: undefined,
+        }));
+        const output = {
+            schemaVersion: 1,
+            generatedAt: new Date().toISOString(),
+            range: { from: since.toISOString(), to: until.toISOString() },
+            privacy: {
+                excluded: ['passwords and PINs', 'card data', 'raw form values', 'emails', 'phone numbers', 'IP addresses', 'message contents', 'uploaded image contents'],
+                identity: 'Anonymous visitor and per-tab session IDs are used to join events.',
+            },
+            interpretation: {
+                conversionEvents: ['Lead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'],
+                journeyEvents: 'Journey* rows are high-resolution behavior. Conversion rows remain the authoritative business milestones.',
+                duration: 'JourneyRevealStageCompleted.durationMs is time spent on a reveal stage. JourneyPageExited.durationMs is page residence time.',
+                ordering: 'Within a session, sort by sequence first and timestamp second.',
+                caution: 'Do not infer intent from a single click. Compare repeated drop-off patterns across qualified sessions.',
+            },
+            totals: {
+                events: rows.length,
+                availableEvents: totalRows,
+                truncated: totalRows > rows.length,
+                visitors: journeys.length,
+                sessions: journeys.reduce((sum, journey) => sum + journey.sessions.length, 0),
+                properties: properties.filter((property) => property.hotelId !== 'marketel-onboarding').length,
+            },
+            eventCounts: counts,
+            properties,
+            journeys,
+            unlinkedMilestones: unlinkedEvents,
+        };
+        if (req.query.download === '1') {
+            const date = new Date().toISOString().slice(0, 10);
+            res.set('Content-Disposition', `attachment; filename="marketel-journeys-${date}.json"`);
+        }
+        res.json(output);
+    } catch (error) {
+        console.error('Journey export failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not build journey export.' });
     }
 });
 
@@ -8995,6 +9463,8 @@ app.post('/api/setup/:token/complete', async (req, res) => {
 
         // Keep local development runs out of production funnel reporting.
         if (funnelTrackingEnabled) {
+            const linkedExternalId = sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_');
+            const linkedSessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
             prisma.funnelEvent.findFirst({
                 where: { hotelId: hotel.id, eventName: 'SetupCompleted' },
                 select: { id: true },
@@ -9003,7 +9473,14 @@ app.post('/api/setup/:token/complete', async (req, res) => {
                     hotelId: hotel.id,
                     eventName: 'SetupCompleted',
                     eventId: `marketel-setup.${hotel.id}`,
+                    occurredAt: linkedSessionId ? journeyOccurredAt(req.body?.journeyOccurredAt) : null,
+                    sessionId: linkedSessionId,
+                    sequence: linkedSessionId ? Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1)) : null,
+                    surface: linkedSessionId ? redactJourneyString(req.body?.journeySurface || 'setup', 40) : null,
+                    pagePath: linkedSessionId ? sanitizeJourneyPath(req.body?.journeyPagePath) : null,
+                    metadata: linkedSessionId ? { linkedJourney: true } : undefined,
                     guestEmail: hotel.ownerEmail || null,
+                    externalId: linkedExternalId,
                 },
             })).catch(() => {});
         }
@@ -9894,6 +10371,8 @@ async function sendMarketelActivationEmailOnce(hotelId, req = null) {
 async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = null }) {
     if (!hotelId || !checkoutSession?.id) return;
     const eventId = `marketel-subscribe.${checkoutSession.id}`;
+    const journeyExternalId = sanitizeJourneyIdentifier(checkoutSession?.metadata?.journeyVisitorId, 'mjv_');
+    const journeySessionId = sanitizeJourneyIdentifier(checkoutSession?.metadata?.journeySessionId, 'mjs_');
     let amountUsd = MARKETEL_MONTHLY_PRICE_USD;
     try {
         amountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
@@ -9918,6 +10397,15 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
                 value: amountUsd,
                 currency: 'USD',
                 contentName: 'marketel-monthly',
+                externalId: journeyExternalId,
+                sessionId: journeySessionId,
+                surface: 'stripe',
+                pagePath: '/checkout/success',
+                metadata: {
+                    provider: 'stripe',
+                    product: 'marketel-monthly',
+                    attributionLinked: !!(journeyExternalId && journeySessionId),
+                },
             },
         }).catch((e) => console.error('Payment funnel tracking failed:', e.message));
     }
@@ -10038,6 +10526,9 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         }
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
+        const journeyExternalId = sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_');
+        const journeySessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
+        const journeySequence = Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1));
         const frontdeskOrigin = marketelFrontdeskOrigin(req);
         const { id: subscriptionPriceId, amountUsd } = await getMarketelSubscriptionPrice();
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
@@ -10056,6 +10547,12 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 guestPhone: hotel.ownerPhone || null,
                 value: amountUsd,
                 currency: 'USD',
+                externalId: journeyExternalId,
+                sessionId: journeySessionId,
+                sequence: journeySequence,
+                surface: 'frontdesk',
+                pagePath: '/frontdesk',
+                metadata: { source: 'activation-cta', provider: 'stripe' },
             },
         }).catch(() => {});
         console.log('crm:go-live checkout session creating:', {
@@ -10072,9 +10569,19 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
             ...(hotel.marketelStripeCustomerId
                 ? { customer: hotel.marketelStripeCustomerId }
                 : { customer_email: hotel.ownerEmail || undefined }),
-            metadata: { product: 'hotel-go-live', hotelId },
+            metadata: {
+                product: 'hotel-go-live',
+                hotelId,
+                ...(journeyExternalId ? { journeyVisitorId: journeyExternalId } : {}),
+                ...(journeySessionId ? { journeySessionId } : {}),
+            },
             subscription_data: {
-                metadata: { product: 'hotel-go-live', hotelId },
+                metadata: {
+                    product: 'hotel-go-live',
+                    hotelId,
+                    ...(journeyExternalId ? { journeyVisitorId: journeyExternalId } : {}),
+                    ...(journeySessionId ? { journeySessionId } : {}),
+                },
             },
             success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}&frontdeskOrigin=${encodeURIComponent(frontdeskOrigin)}`,
             cancel_url: cancelUrl,
@@ -10089,6 +10596,12 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 guestPhone: hotel.ownerPhone || null,
                 value: amountUsd,
                 currency: 'USD',
+                externalId: journeyExternalId,
+                sessionId: journeySessionId,
+                sequence: journeySequence + 1,
+                surface: 'stripe',
+                pagePath: '/checkout',
+                metadata: { source: 'activation-cta', provider: 'stripe' },
             },
         }).catch(() => {});
         const { fbp, fbc } = getMetaCookies(req);

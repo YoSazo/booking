@@ -15,6 +15,8 @@ let bookingPageTimer = 0;
 let guestAppDemoTimer = 0;
 let guestAppDemoObserver = null;
 let guestAppDemoSlide = 0;
+let revealStartedAt = 0;
+let stageStartedAt = 0;
 
 const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
@@ -142,7 +144,16 @@ function trackReveal(eventName, contentName = '') {
   window.api('POST', '/api/crm/value-reveal-event', {
     eventName,
     contentName,
+    ...(window.MarketelJourney?.linkage?.() || {}),
   }).catch(() => {});
+}
+
+function trackJourney(eventName, metadata = {}, options = {}) {
+  return window.MarketelJourney?.track(eventName, {
+    revealStep: currentStep,
+    stageName: ['booking-page', 'guest-app', 'front-desk-assistant', 'activation'][currentStep] || 'unknown',
+    ...metadata,
+  }, options);
 }
 
 function cleanRevealUrl() {
@@ -169,6 +180,7 @@ function handleBookingPreviewMessage(event) {
   if (!knownFrame) return;
   document.getElementById('mvrLivePreview')?.remove();
   trackReveal('GuestAppPreviewRequestedFromBookingEngine');
+  trackJourney('JourneyBookingPreviewModeChanged', { action: 'guest-app-requested-from-booking-engine' });
   moveToStep(1);
 }
 
@@ -369,7 +381,8 @@ function finaleHtml() {
         <div><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
         <div><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
       </div>
-      ${isSubscribed ? '' : `<div class="mvr-price"><strong>$199</strong><span>/month</span></div>
+      ${isSubscribed ? '' : `<div class="mvr-proof"><strong>$5,800 booked direct</strong><span>in one recorded month through this booking engine for Suite Stay, Alabama.</span></div>
+        <div class="mvr-price"><strong>$199</strong><span>/month</span></div>
         <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>Try the complete system. Cancel anytime—no contract.</small></p></div>`}
       <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">
         ${isSubscribed ? 'Open Front Desk' : 'Activate Marketel — $199/month'}
@@ -424,6 +437,7 @@ function showExpandedPreview() {
   const url = bookingUrl();
   if (!url || document.getElementById('mvrLivePreview')) return;
   livePreviewMode = 'guest';
+  const previewOpenedAt = Date.now();
   const modal = document.createElement('div');
   modal.id = 'mvrLivePreview';
   modal.className = 'mvr-live-preview';
@@ -440,7 +454,13 @@ function showExpandedPreview() {
   </div>
   <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
-  document.getElementById('mvrClosePreview')?.addEventListener('click', () => modal.remove());
+  document.getElementById('mvrClosePreview')?.addEventListener('click', () => {
+    trackJourney('JourneyBookingPreviewModeChanged', {
+      action: 'closed',
+      mode: livePreviewMode,
+    }, { durationMs: Date.now() - previewOpenedAt });
+    modal.remove();
+  });
   modal.querySelectorAll('[data-live-preview-mode]').forEach((button) => {
     button.addEventListener('click', () => {
       const nextMode = button.dataset.livePreviewMode === 'edit' ? 'edit' : 'guest';
@@ -456,15 +476,36 @@ function showExpandedPreview() {
           : `${propertyName()} booking-page preview`;
         iframe.src = livePreviewMode === 'edit' ? frontdeskEditorUrl() : bookingUrl();
       }
+      trackJourney('JourneyBookingPreviewModeChanged', {
+        action: 'mode-selected',
+        mode: livePreviewMode,
+      }, { durationMs: Date.now() - previewOpenedAt });
       if (livePreviewMode === 'edit') trackReveal('BookingEngineEditPreviewViewed');
     });
   });
   trackReveal('BookingEngineFullPreviewOpened');
+  trackJourney('JourneyBookingPreviewOpened', {
+    mode: 'guest',
+    bookingPageReady: !!bookingPageState.ready,
+    bookingPageReason: bookingPageState.reason || '',
+  });
 }
 
 function moveToStep(nextStep) {
   clearGuestAppDemoSchedule();
-  currentStep = Math.max(0, Math.min(3, nextStep));
+  const previousStep = currentStep;
+  const normalizedStep = Math.max(0, Math.min(3, nextStep));
+  const now = Date.now();
+  if (stageStartedAt && normalizedStep !== previousStep) {
+    trackJourney('JourneyRevealStageCompleted', {
+      revealStep: previousStep,
+      stageName: ['booking-page', 'guest-app', 'front-desk-assistant', 'activation'][previousStep] || 'unknown',
+      nextStep: normalizedStep,
+      direction: normalizedStep > previousStep ? 'forward' : 'back',
+    }, { durationMs: now - stageStartedAt });
+  }
+  currentStep = normalizedStep;
+  stageStartedAt = now;
   persistStep();
   const events = [
     'BookingEngineRevealViewed',
@@ -473,11 +514,21 @@ function moveToStep(nextStep) {
     'ActivationOfferViewed',
   ];
   trackReveal(events[currentStep]);
+  trackJourney('JourneyRevealStageViewed', {
+    resumed: revealStartedAt > 0 && now - revealStartedAt < 100,
+    bookingPageReady: currentStep === 0 ? !!bookingPageState.ready : undefined,
+  });
   renderReveal();
   document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function finishReveal() {
+  if (stageStartedAt) {
+    trackJourney('JourneyRevealStageCompleted', {
+      action: 'reveal-finished',
+      totalRevealMs: revealStartedAt ? Date.now() - revealStartedAt : null,
+    }, { durationMs: Date.now() - stageStartedAt });
+  }
   if (bookingPageTimer) {
     window.clearTimeout(bookingPageTimer);
     bookingPageTimer = 0;
@@ -509,6 +560,11 @@ async function activateMarketel(button) {
   button.disabled = true;
   button.textContent = 'Opening secure checkout…';
   trackReveal('ActivationCtaClicked');
+  trackJourney('JourneyCheckoutRequested', {
+    price: 199,
+    currency: 'USD',
+    subscribed: !!crm.hotelSubscribed,
+  }, { durationMs: stageStartedAt ? Date.now() - stageStartedAt : null, immediate: true });
   try {
     await window.goLive();
   } finally {
@@ -565,6 +621,11 @@ function setGuestAppDemoSlide(nextSlide, manual = false) {
     scheduleGuestAppValueDemo();
   }
   if (manual) trackReveal(guestAppDemoSlide === 1 ? 'GuestAppValueSlideViewed' : 'GuestAppInstallSlideReplayed');
+  trackJourney('JourneyGuestAppDemo', {
+    action: 'slide-viewed',
+    slide: guestAppDemoSlide === 1 ? 'value' : 'install',
+    manual: !!manual,
+  });
 }
 
 function revealGuestAppValue(manual = false) {
@@ -572,6 +633,10 @@ function revealGuestAppValue(manual = false) {
   clearGuestAppDemoSchedule();
   setGuestAppInstallVisual(true);
   if (manual) trackReveal('GuestAppInstallDemoClicked');
+  trackJourney('JourneyGuestAppDemo', {
+    action: 'install-demonstrated',
+    manual: !!manual,
+  });
   guestAppDemoTimer = window.setTimeout(() => {
     if (currentStep === 1 && document.getElementById('marketelValueReveal')) {
       setGuestAppDemoSlide(1, false);
@@ -607,8 +672,14 @@ function scheduleGuestAppValueDemo() {
 }
 
 function bindRevealEvents() {
-  document.getElementById('mvrNext')?.addEventListener('click', () => moveToStep(currentStep + 1));
-  document.getElementById('mvrBack')?.addEventListener('click', () => moveToStep(currentStep - 1));
+  document.getElementById('mvrNext')?.addEventListener('click', () => {
+    trackJourney('JourneyRevealNavigation', { action: 'next', toStep: currentStep + 1 });
+    moveToStep(currentStep + 1);
+  });
+  document.getElementById('mvrBack')?.addEventListener('click', () => {
+    trackJourney('JourneyRevealNavigation', { action: 'back', toStep: currentStep - 1 });
+    moveToStep(currentStep - 1);
+  });
   document.getElementById('mvrExpandPreview')?.addEventListener('click', showExpandedPreview);
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.getElementById('mvrInstallDemo')?.addEventListener('click', () => {
@@ -652,6 +723,11 @@ async function checkBookingPageStatus() {
       attempts: 1,
       domain: '',
     };
+    trackJourney('JourneyBookingPageStatus', {
+      ready: bookingPageState.ready,
+      reason: bookingPageState.reason,
+      attempts: bookingPageState.attempts,
+    });
     if (currentStep === 0 && !document.getElementById('mvrLivePreview')) renderReveal();
     return;
   }
@@ -670,6 +746,12 @@ async function checkBookingPageStatus() {
     bookingPageState.checking = false;
     bookingPageState.reason = 'unreachable';
   }
+
+  trackJourney('JourneyBookingPageStatus', {
+    ready: bookingPageState.ready,
+    reason: bookingPageState.reason,
+    attempts: bookingPageState.attempts,
+  });
 
   if (currentStep === 0 && !document.getElementById('mvrLivePreview')) renderReveal();
   if (bookingPageState.ready || bookingPageState.reason === 'deployment-disabled') return;
@@ -690,6 +772,8 @@ export function showMarketelValueReveal(options = {}) {
   livePreviewMode = 'guest';
   homeScreenInstalled = false;
   guestAppDemoSlide = 0;
+  revealStartedAt = Date.now();
+  stageStartedAt = 0;
   bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
@@ -718,6 +802,11 @@ export function showMarketelValueReveal(options = {}) {
   document.body.appendChild(root);
   renderReveal();
   trackReveal('ValueRevealStarted', crm.hotelSubscribed ? 'subscribed-replay' : 'pre-activation');
+  trackJourney('JourneyRevealStarted', {
+    startStep: currentStep,
+    replay: !!crm.hotelSubscribed,
+    pendingResume: !Number.isFinite(requestedStep) && storedStep > 0,
+  });
   moveToStep(currentStep);
   void loadRevealData();
   void checkBookingPageStatus();

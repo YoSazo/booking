@@ -134,7 +134,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <p id="heroCopy">Build your property&apos;s direct booking engine in under 3 minutes.</p>
   <div class="cta-box">
     <input type="email" id="setupEmail" placeholder="Your email" autocomplete="email">
-    <button class="cta-btn" onclick="startFreeSetup()">Build My Free Preview &rarr;</button>
+    <button class="cta-btn" data-journey="landing-build-preview" onclick="startFreeSetup()">Build My Free Preview &rarr;</button>
     <div class="cta-sub">Free to build and preview. <strong>$199/month</strong> only when you activate, with a <strong>7-day money-back guarantee</strong>. Cancel anytime.<br><span style="display:inline-block;margin-top:4px;">For hotels, inns, B&amp;Bs, cabins, and vacation rentals.</span></div>
   </div>
 </section>
@@ -147,15 +147,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <span style="font-size:13px; color:#dc2626; display:block; margin-top:4px; font-weight:600;">At a 20% OTA commission, that&apos;s up to $1,160 kept by the property.</span>
   </div>
   <div class="demo-tabs">
-    <button class="demo-tab active" onclick="switchDemo('suite')">Suite Stay &mdash; AL</button>
-    <button class="demo-tab" onclick="switchDemo('stcroix')">St Croix Falls &mdash; WI</button>
-    <button class="demo-tab" onclick="switchDemo('hp')">Home Place Suites &mdash; OK</button>
+    <button class="demo-tab active" data-journey="demo-suite-stay" onclick="switchDemo('suite')">Suite Stay &mdash; AL</button>
+    <button class="demo-tab" data-journey="demo-st-croix" onclick="switchDemo('stcroix')">St Croix Falls &mdash; WI</button>
+    <button class="demo-tab" data-journey="demo-home-place" onclick="switchDemo('hp')">Home Place Suites &mdash; OK</button>
   </div>
   <div class="demo-frame-wrap" id="demoWrap" style="max-width:100%; margin:0 8px; position:relative;">
     <iframe id="demoFrame" src="https://suitestay.clickinns.com" title="Live Marketel booking-page example" loading="lazy" fetchpriority="low" style="width:100%; height:750px;"></iframe>
   </div>
 </section>
 
+<script src="/marketel-journey.js"></script>
 <script>
 const requestedAngle = new URLSearchParams(window.location.search).get('angle') || 'direct';
 const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requestedAngle) ? requestedAngle : 'direct';
@@ -174,16 +175,25 @@ if (angleCopy[ACQUISITION_ANGLE]) {
   document.getElementById('heroCopy').textContent = angleCopy[ACQUISITION_ANGLE].copy;
 }
 
+window.MarketelJourney?.init({
+  surface: 'landing',
+  context: { acquisitionAngle: ACQUISITION_ANGLE },
+});
+function journeyLinkage() {
+  return window.MarketelJourney?.linkage?.() || {};
+}
+
 // Track landing page view and the ad promise that brought the owner here.
 fetch('/api/funnel/onboarding', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ eventName: 'LandingPageView', contentName: ACQUISITION_ANGLE }),
+  body: JSON.stringify({ eventName: 'LandingPageView', contentName: ACQUISITION_ANGLE, ...journeyLinkage() }),
 }).catch(() => {});
 
 function startFreeSetup() {
   const email = document.getElementById('setupEmail').value.trim();
   if (!email || !email.includes('@')) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'landing-email', reason: 'invalid-email' });
     const input = document.getElementById('setupEmail');
     input.style.borderColor = '#dc2626';
     input.placeholder = 'Please enter your email';
@@ -194,27 +204,44 @@ function startFreeSetup() {
   const btn = document.querySelector('.cta-btn');
   btn.textContent = 'Setting up...'; btn.disabled = true;
   const API = '';
+  const requestStartedAt = Date.now();
+  window.MarketelJourney?.track('JourneyRequestStarted', { request: 'setup-start', acquisitionAngle: ACQUISITION_ANGLE });
   fetch(API + '/api/setup/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, acquisitionAngle: ACQUISITION_ANGLE }),
   }).then(r => r.json()).then(data => {
     if (data.setupUrl) {
+      window.MarketelJourney?.configure({ setupToken: data.token || '', hotelId: data.hotelId || '' });
+      window.MarketelJourney?.track('JourneyRequestCompleted', {
+        request: 'setup-start',
+        outcome: 'success',
+      }, { durationMs: Date.now() - requestStartedAt });
       fetch('/api/funnel/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventName: 'SetupStarted', setupToken: data.token, contentName: ACQUISITION_ANGLE }),
+        body: JSON.stringify({ eventName: 'SetupStarted', setupToken: data.token, contentName: ACQUISITION_ANGLE, ...journeyLinkage() }),
         keepalive: true,
       }).catch(() => {});
+      window.MarketelJourney?.track('JourneyHandoffStarted', {
+        from: 'landing',
+        to: 'setup',
+        acquisitionAngle: ACQUISITION_ANGLE,
+      }, { immediate: true, keepalive: true });
       window.location.href = API + data.setupUrl;
     }
     else { throw new Error(); }
   }).catch(() => {
+    window.MarketelJourney?.track('JourneyRequestFailed', {
+      request: 'setup-start',
+      outcome: 'failed',
+    }, { durationMs: Date.now() - requestStartedAt, immediate: true });
     alert('Something went wrong. Try again.');
     btn.textContent = 'Build My Free Preview \u2192'; btn.disabled = false;
   });
 }
 
 function switchDemo(which) {
+  window.MarketelJourney?.track('JourneyDemoSelected', { demo: which });
   const frame = document.getElementById('demoFrame');
   document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
   if (which === 'suite') {
@@ -228,6 +255,12 @@ function switchDemo(which) {
     document.querySelectorAll('.demo-tab')[2].classList.add('active');
   }
 }
+
+document.getElementById('demoFrame')?.addEventListener('load', function () {
+  window.MarketelJourney?.track('JourneyDemoLoaded', {
+    demo: document.querySelector('.demo-tab.active')?.dataset.journey || 'unknown',
+  });
+});
 </script>
 
 <footer style="max-width:600px; margin:40px auto 0; padding:20px; text-align:center; border-top:1px solid #e5e7eb;">

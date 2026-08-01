@@ -846,10 +846,10 @@ async function loadEditRooms() {
         <div style="padding:18px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Header Preview — tap any field to edit</div>
           <div style="background:#f4f7f9;border-radius:12px;padding:20px 16px;text-align:center;border:1px solid var(--border);">
-            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="123 Main St, City, State" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="text" value="${hotelAddress}" id="edit-hotel-address" placeholder="Add your property address (optional)" style="width:100%;text-align:center;font-size:13px;color:#555;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="text" value="${hotelName}" id="edit-hotel-name" placeholder="Your Property Name" style="width:100%;text-align:center;font-size:24px;font-weight:700;color:#007bff;border:none;background:transparent;outline:none;margin-bottom:4px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Your subtitle or slogan" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
-            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="(555) 123-4567" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Add a short description (optional)" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
+            <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="Add your guest phone number (optional)" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
           </div>
           <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
         </div>
@@ -1315,16 +1315,40 @@ async function goLive() {
   if (goLiveInFlight) return;
   goLiveInFlight = true;
   showGoLiveOverlay();
+  const journey = window.MarketelJourney;
+  journey?.track('JourneyCheckoutRequested', {
+    source: document.getElementById('marketelValueReveal') ? 'value-reveal' : 'frontdesk',
+    price: 199,
+    currency: 'USD',
+  }, { immediate: true });
+  const journeyContext = journey?.getContext?.() || {};
   try {
-    const res = await api('POST', '/api/crm/go-live');
+    const res = await api('POST', '/api/crm/go-live', {
+      journeyVisitorId: journeyContext.visitorId || '',
+      journeySessionId: journeyContext.sessionId || '',
+      journeySequence: journeyContext.sequence || null,
+    });
     if (res.success && res.url) {
+      journey?.track('JourneyCheckoutRedirected', {
+        provider: 'stripe',
+        price: 199,
+        currency: 'USD',
+      }, { immediate: true, keepalive: true });
       window.location.href = res.url; // leave overlay up through the redirect
       return;
     }
+    journey?.track('JourneyCheckoutFailed', {
+      stage: 'create-checkout-session',
+      reason: 'server-rejected',
+    }, { immediate: true });
     hideGoLiveOverlay();
     goLiveInFlight = false;
     toast(res.message || 'Failed to start checkout', 'error');
   } catch (e) {
+    journey?.track('JourneyCheckoutFailed', {
+      stage: 'create-checkout-session',
+      reason: 'network-or-server-error',
+    }, { immediate: true });
     hideGoLiveOverlay();
     goLiveInFlight = false;
     toast('Failed to start checkout. Try again.', 'error');

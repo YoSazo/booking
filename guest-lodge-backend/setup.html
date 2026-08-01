@@ -363,7 +363,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label>Property Name</label>
         <input type="text" id="hotelName" placeholder="e.g. Sunset Inn or Lakeview Cabin">
       </div>
-      <button class="btn btn-primary" onclick="saveStep1()">Next &rarr;</button>
+      <button class="btn btn-primary" data-journey="setup-property-next" onclick="saveStep1()">Next &rarr;</button>
     </div>
   </div>
 
@@ -394,8 +394,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
           <p id="setupPhotoHint">It makes your personalized preview feel like yours. You can add the rest later.</p>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
-      <button class="btn btn-back" onclick="goToStep(1)">&larr; Back</button>
+      <button class="btn btn-primary" data-journey="setup-build-booking-page" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
+      <button class="btn btn-back" data-journey="setup-room-back" onclick="goToStep(1)">&larr; Back</button>
     </div>
   </div>
 
@@ -404,10 +404,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="form-card fade-stagger" style="text-align:center;">
       <h2 style="font-size:18px; margin-bottom:16px;">Where do most guests find you before they book?</h2>
       <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('google_website')">They search for us on Google or visit our website</button>
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('social_ads')">They find us through social media or ads</button>
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_marketplaces')">They find us on Airbnb, Booking.com, Expedia, or another marketplace</button>
-        <button class="btn btn-back" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('referrals_offline')">Most come through referrals, phone calls, or walk-ins</button>
+        <button class="btn btn-back" data-journey="quality-google-website" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('google_website')">They search for us on Google or visit our website</button>
+        <button class="btn btn-back" data-journey="quality-social-ads" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('social_ads')">They find us through social media or ads</button>
+        <button class="btn btn-back" data-journey="quality-ota-marketplaces" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_marketplaces')">They find us on Airbnb, Booking.com, Expedia, or another marketplace</button>
+        <button class="btn btn-back" data-journey="quality-referrals-offline" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('referrals_offline')">Most come through referrals, phone calls, or walk-ins</button>
       </div>
     </div>
   </div>
@@ -438,7 +438,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
           <div class="final-domain-value" id="successDomain"></div>
           <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Personalized preview ready</div>
         </div>
-        <a class="btn btn-primary final-dashboard-cta" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
+        <a class="btn btn-primary final-dashboard-cta" data-journey="setup-open-personalized-reveal" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
           See what you built →
         </a>
       </div>
@@ -450,6 +450,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="toast" id="toast"></div>
 <div class="loading-overlay" id="loadingOverlay"><div class="logo-sprite-bounce"></div></div>
 
+<script src="/marketel-journey.js"></script>
 <script>
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
 const API = '';
@@ -459,6 +460,18 @@ let hotelData = {};
 let rooms = [];
 let pendingFile = null;
 let qualifiedLeadTracked = false;
+let currentSetupStep = 1;
+let setupStepStartedAt = Date.now();
+
+window.MarketelJourney?.init({
+  surface: 'setup',
+  setupToken: TOKEN,
+  context: { acquisitionAngle: ACQUISITION_ANGLE },
+});
+window.MarketelJourney?.track('JourneySetupStepViewed', { step: 1, stepName: 'property' });
+function journeyLinkage() {
+  return window.MarketelJourney?.linkage?.() || {};
+}
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -483,10 +496,17 @@ function animateVisibleStep(stepEl) {
 }
 
 function goToStep(n) {
+  const nextStepName = { 1: 'property', 2: 'room', 3: 'quality', 4: 'ready' }[n] || 'unknown';
+  window.MarketelJourney?.track('JourneySetupNavigation', {
+    fromStep: currentSetupStep,
+    toStep: n,
+  }, { durationMs: Date.now() - setupStepStartedAt });
+  currentSetupStep = n;
+  setupStepStartedAt = Date.now();
   fetch('/api/funnel/onboarding', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ eventName: 'Step' + n + 'Reached', setupToken: TOKEN }),
+    body: JSON.stringify({ eventName: 'Step' + n + 'Reached', setupToken: TOKEN, ...journeyLinkage() }),
   }).catch(() => {});
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   const nextStep = document.getElementById('step-' + n);
@@ -497,12 +517,18 @@ function goToStep(n) {
   if (n === 4) updateFinalStepState(true);
   else animateVisibleStep(nextStep);
   window.scrollTo(0, 0);
+  window.MarketelJourney?.track('JourneySetupStepViewed', { step: n, stepName: nextStepName });
 }
 
 function answerQualityQ(answer) {
   const isQualifiedLead = answer === 'google_website'
     || answer === 'social_ads'
     || (ACQUISITION_ANGLE === 'guest_app' && answer === 'ota_marketplaces');
+  window.MarketelJourney?.track('JourneyQualitySelected', {
+    answer,
+    qualified: isQualifiedLead,
+    acquisitionAngle: ACQUISITION_ANGLE,
+  });
   if (isQualifiedLead && !qualifiedLeadTracked) {
     qualifiedLeadTracked = true;
     // Keep this ID stable for the setup so repeat clicks/reloads do not create
@@ -519,6 +545,7 @@ function answerQualityQ(answer) {
         eventId,
         setupToken: TOKEN,
         contentName: answer,
+        ...journeyLinkage(),
       }),
     }).catch(() => {});
   }
@@ -530,6 +557,7 @@ function answerQualityQ(answer) {
       eventName: 'QualityAnswer',
       setupToken: TOKEN,
       contentName: answer,
+      ...journeyLinkage(),
     }),
   }).catch(() => {});
   goToStep(4);
@@ -538,11 +566,17 @@ function answerQualityQ(answer) {
 // Load existing data
 async function loadSetup() {
   if (!TOKEN) return;
+  const requestStartedAt = Date.now();
+  window.MarketelJourney?.track('JourneyRequestStarted', { request: 'load-setup' });
   try {
     const res = await fetch(API + '/api/setup/' + TOKEN);
-    if (!res.ok) return;
+    if (!res.ok) {
+      window.MarketelJourney?.track('JourneyRequestFailed', { request: 'load-setup', status: res.status }, { durationMs: Date.now() - requestStartedAt });
+      return;
+    }
     const data = await res.json();
     hotelData = data.hotel || {};
+    window.MarketelJourney?.configure({ hotelId: hotelData.id || '' });
     hotelData.rates = data.rates || null;
     rooms = data.rooms || [];
     if (hotelData.name) document.getElementById('hotelName').value = hotelData.name;
@@ -554,7 +588,14 @@ async function loadSetup() {
       if (firstImage?.url) renderSetupPhoto(firstImage.url, 'Current room photo');
     }
     if (data.rates?.nightly) document.getElementById('rmNightly').value = Number(data.rates.nightly) || 99;
-  } catch (e) {}
+    window.MarketelJourney?.track('JourneyRequestCompleted', {
+      request: 'load-setup',
+      existingRooms: rooms.length,
+      propertyAlreadyNamed: !!hotelData.name,
+    }, { durationMs: Date.now() - requestStartedAt });
+  } catch (e) {
+    window.MarketelJourney?.track('JourneyRequestFailed', { request: 'load-setup', reason: 'network-or-parse' }, { durationMs: Date.now() - requestStartedAt });
+  }
 }
 
 function renderSetupPhoto(url, label) {
@@ -595,34 +636,53 @@ async function previewSetupPhoto(input) {
   const file = input?.files?.[0];
   if (!file) return;
   if (!file.type.startsWith('image/')) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room-photo', reason: 'unsupported-type' });
     input.value = '';
     showToast('Choose a JPG, PNG, or WebP image', true);
     return;
   }
   pendingFile = await prepareSetupPhoto(file);
   if (pendingFile.size > 5 * 1024 * 1024) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room-photo', reason: 'too-large', bytes: pendingFile.size });
     pendingFile = null;
     input.value = '';
     showToast('That photo is too large. Choose one under 5 MB.', true);
     return;
   }
+  window.MarketelJourney?.track('JourneyPhotoSelected', {
+    mimeType: pendingFile.type || file.type || '',
+    originalBytes: file.size,
+    preparedBytes: pendingFile.size,
+  });
   renderSetupPhoto(URL.createObjectURL(pendingFile), 'Photo selected');
 }
 
 // Step 1: Save hotel info
 async function saveStep1() {
   const name = document.getElementById('hotelName').value.trim();
-  if (!name) { showToast('Enter your property name', true); return; }
+  if (!name) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'property', field: 'property-name', reason: 'empty' });
+    showToast('Enter your property name', true);
+    return;
+  }
 
   showLoading(true);
+  const requestStartedAt = Date.now();
+  window.MarketelJourney?.track('JourneyRequestStarted', { request: 'save-property', nameLength: name.length });
   try {
-    await fetch(API + '/api/setup/' + TOKEN + '/hotel', {
+    const response = await fetch(API + '/api/setup/' + TOKEN + '/hotel', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
+    if (!response.ok) throw new Error('save-property-failed');
     hotelData = { ...hotelData, name };
+    window.MarketelJourney?.track('JourneySetupStepCompleted', { step: 1, stepName: 'property', nameLength: name.length }, { durationMs: Date.now() - setupStepStartedAt });
+    window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'save-property' }, { durationMs: Date.now() - requestStartedAt });
     goToStep(2);
-  } catch (e) { showToast('Failed to save', true); }
+  } catch (e) {
+    window.MarketelJourney?.track('JourneyRequestFailed', { request: 'save-property', reason: 'request-failed' }, { durationMs: Date.now() - requestStartedAt });
+    showToast('Failed to save', true);
+  }
   showLoading(false);
 }
 
@@ -631,11 +691,27 @@ async function addRoomAndFinish() {
   const name = document.getElementById('rmName').value.trim();
   const totalUnits = Math.max(1, parseInt(document.getElementById('rmUnits').value, 10) || 1);
   const nightlyInput = parseFloat(document.getElementById('rmNightly').value);
-  if (!name) { showToast('Enter a room or unit name', true); return; }
-  if (!Number.isFinite(nightlyInput) || nightlyInput <= 0) { showToast('Enter your starting nightly price', true); return; }
+  if (!name) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room', field: 'room-name', reason: 'empty' });
+    showToast('Enter a room or unit name', true);
+    return;
+  }
+  if (!Number.isFinite(nightlyInput) || nightlyInput <= 0) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room', field: 'nightly-price', reason: 'invalid' });
+    showToast('Enter your starting nightly price', true);
+    return;
+  }
   const nightly = Math.max(1, nightlyInput);
 
   showLoading(true);
+  const buildStartedAt = Date.now();
+  window.MarketelJourney?.track('JourneyRequestStarted', {
+    request: 'build-marketel',
+    roomNameLength: name.length,
+    totalUnits,
+    nightly,
+    hasPhoto: !!pendingFile,
+  });
   try {
     // Save room
     const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
@@ -671,6 +747,7 @@ async function addRoomAndFinish() {
     // Complete setup — get domain + PIN
     const completeRes = await fetch(API + '/api/setup/' + TOKEN + '/complete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(journeyLinkage()),
     });
     const completeData = await completeRes.json();
     if (!completeRes.ok || !completeData.success) throw new Error(completeData.error || 'Could not finish setup');
@@ -685,11 +762,26 @@ async function addRoomAndFinish() {
     var dashboardUrl = window.location.origin + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + '&hotelId=' + encodeURIComponent(hotelData.id || '') + '&welcome=1&reveal=1';
     window._dashboardUrl = dashboardUrl;
     document.getElementById('successLink').href = dashboardUrl;
+    window.MarketelJourney?.configure({ hotelId: hotelData.id || '' });
 
     // The reveal can open immediately on Marketel while the guest-facing domain
     // finishes provisioning in the background.
     window._siteReady = true;
     updateFinalStepState(true);
+    window.MarketelJourney?.track('JourneySetupStepCompleted', {
+      step: 2,
+      stepName: 'room',
+      roomNameLength: name.length,
+      totalUnits,
+      nightly,
+      photoUploaded: !!pendingFile,
+    }, { durationMs: Date.now() - setupStepStartedAt });
+    window.MarketelJourney?.track('JourneyPreviewReady', {
+      bookingPageReady: true,
+      frontDeskReady: true,
+      personalized: true,
+    }, { durationMs: Date.now() - buildStartedAt });
+    window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'build-marketel' }, { durationMs: Date.now() - buildStartedAt });
 
     // Finalize the owner handoff as they enter the personalized reveal.
     var successLink = document.getElementById('successLink');
@@ -697,6 +789,10 @@ async function addRoomAndFinish() {
       ev.preventDefault();
       if (successLink.dataset.opening === '1') return;
       setSuccessLinkLoading(true);
+      window.MarketelJourney?.track('JourneyHandoffStarted', {
+        from: 'setup',
+        to: 'frontdesk-reveal',
+      }, { durationMs: Date.now() - setupStepStartedAt });
       if (!successLink.dataset.finalized) {
         successLink.dataset.finalized = '1';
         try {
@@ -707,11 +803,18 @@ async function addRoomAndFinish() {
           });
         } catch (_) { /* Front Desk remains available even if email delivery fails. */ }
       }
+      window.MarketelJourney?.track('JourneyHandoffCompleted', {
+        from: 'setup',
+        to: 'frontdesk-reveal',
+      }, { immediate: true, keepalive: true });
       window.location.href = window._dashboardUrl || successLink.href;
     });
 
     goToStep(3);
-  } catch (e) { showToast('Something went wrong. Try again.', true); }
+  } catch (e) {
+    window.MarketelJourney?.track('JourneyRequestFailed', { request: 'build-marketel', reason: 'request-failed' }, { durationMs: Date.now() - buildStartedAt });
+    showToast('Something went wrong. Try again.', true);
+  }
   showLoading(false);
 }
 

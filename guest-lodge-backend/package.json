@@ -7,7 +7,7 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "test": "node test/frontdesk-assistant.test.js",
+    "test": "node --test test/*.test.js",
     "start": "npx prisma migrate deploy && node server.js",
     "postinstall": "prisma generate",
     "build:frontdesk": "cd frontdesk && npm install && npm run build",

@@ -2058,12 +2058,12 @@ function installEmbeddedEditorPreview() {
     editView.insertAdjacentHTML('afterbegin', `
       <div id="embeddedEditorNotice">
         <div>
-          <strong>This is your complete Front Desk preview.</strong>
-          <span>Explore every section above. Everything is read-only except your first room card, where changes save for real.</span>
+          <strong>Try your Front Desk.</strong>
+          <span>Explore every section and edit your first room now. Activate when you&apos;re ready to unlock every tool.</span>
         </div>
         <div class="embedded-editor-locked" aria-label="Preview mode">
           <span>Preview mode</span>
-          <small>safe to explore</small>
+          <small>Your first room saves</small>
         </div>
       </div>
     `);
@@ -2100,6 +2100,34 @@ function installEmbeddedEditorPreview() {
       blockLockedPreviewAction(event);
     }, true);
   }
+}
+
+function initializeFrontdeskJourney(isEmbeddedEditorPreview) {
+  // The acquisition/checkout funnel runs on the web. Keep the App Store build
+  // free of this analytics layer; native owners are already activated and the
+  // app has separate operational diagnostics.
+  if (isNativeFrontdeskApp()) return;
+  const tracker = window.MarketelJourney;
+  if (!tracker || !crm.activeHotelId || !crm.token) return;
+  tracker.init({
+    endpoint: '/api/crm/journey-events?hotelId=' + encodeURIComponent(crm.activeHotelId),
+    hotelId: crm.activeHotelId,
+    surface: isEmbeddedEditorPreview ? 'frontdesk-editor-preview' : 'frontdesk',
+    headers: {
+      'x-crm-token': crm.token,
+    },
+    context: {
+      subscribed: !!crm.hotelSubscribed,
+      pms: crm.currentHotelPms || 'unknown',
+      initialTab: crm.currentFilter || 'unknown',
+      embeddedEditorPreview: !!isEmbeddedEditorPreview,
+    },
+  });
+  tracker.track('JourneyFrontDeskReady', {
+    subscribed: !!crm.hotelSubscribed,
+    initialTab: crm.currentFilter || 'unknown',
+    revealRequested: new URLSearchParams(window.location.search).has('reveal'),
+  });
 }
 
 async function startCrmApp(verification, options = {}) {
@@ -2197,6 +2225,7 @@ async function startCrmApp(verification, options = {}) {
   }
   updateGoLiveBanner();
   if (!crm.hotelSubscribed) loadBlockedDemand();
+  initializeFrontdeskJourney(isEmbeddedEditorPreview);
 
   // Device registration and property-list maintenance are useful, but neither
   // belongs on the critical path to the owner's bookings. Let the first frame
