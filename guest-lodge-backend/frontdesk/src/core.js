@@ -1181,16 +1181,16 @@ function syncRevenueUi() {
             <button type="button" class="revenue-period-btn active" data-period="30d">30 days</button>
             <button type="button" class="revenue-period-btn" data-period="all">All time</button>
           </div>
-          <div class="revenue-subhint" id="revenueSubhint">Last 30 days · stay dates</div>
+          <div class="revenue-subhint" id="revenueSubhint">Last 30 days · check-in dates</div>
           <div id="revenueStatus"></div>
           <div id="revenueContent" style="display:none">
             <div class="revenue-savings-pill">
-              <div class="revenue-savings-copy" id="revenueSavingsCopy">You saved today</div>
+              <div class="revenue-savings-copy" id="revenueSavingsCopy">Est. OTA fees avoided today</div>
               <div class="revenue-savings-value" id="revenueKpiSaved">$0</div>
             </div>
             <div class="revenue-grid">
               <div class="revenue-card">
-                <div class="revenue-label">Revenue</div>
+                <div class="revenue-label">Booked revenue</div>
                 <div class="revenue-value" id="revenueKpiRev">$0</div>
               </div>
               <div class="revenue-card">
@@ -1274,7 +1274,7 @@ function renderRevenueView() {
   const subhintEl = document.getElementById('revenueSubhint');
   const periodButtons = document.querySelectorAll('.revenue-period-btn');
   const currentPeriodLabel = revenuePeriodLabel(crm.revenuePeriod);
-  if (subhintEl) subhintEl.textContent = `${currentPeriodLabel} · stay dates`;
+  if (subhintEl) subhintEl.textContent = `${currentPeriodLabel} · check-in dates`;
   periodButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.period === crm.revenuePeriod);
   });
@@ -1311,7 +1311,9 @@ function renderRevenueView() {
   if (bookingsEl) bookingsEl.textContent = String(data['bookings'] || 0);
   const savedAmount = revenueValue * crm.OTA_COMMISSION_RATE;
   if (savedEl) savedEl.textContent = formatCurrencyCompact(savedAmount);
-  if (savedCopyEl) savedCopyEl.textContent = crm.revenuePeriod === 'today' ? 'You saved today' : `You saved (${currentPeriodLabel.toLowerCase()})`;
+  if (savedCopyEl) savedCopyEl.textContent = crm.revenuePeriod === 'today'
+    ? 'Est. OTA fees avoided today'
+    : `Est. OTA fees avoided (${currentPeriodLabel.toLowerCase()})`;
   renderRevenueRooms(data.rooms);
 }
 
@@ -1417,8 +1419,8 @@ function ensureAvailabilityUi() {
 
       <div id="roomsAddModalBg" class="rooms-modal-bg">
         <div class="rooms-modal" onclick="event.stopPropagation()">
-          <h3>Inventory room</h3>
-          <p style="font-size:12px;color:var(--text-muted);margin:-6px 0 12px;line-height:1.45;">For the <strong>Availability</strong> calendar only — how many units are open per day. Add photos &amp; descriptions under <strong>Your page</strong>.</p>
+          <h3>Add room type</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin:-6px 0 12px;line-height:1.45;">This creates the room on your booking page and in Availability. Add photos and details under <strong>Your page</strong>.</p>
           <input id="roomsAddNameInput" type="text" placeholder="Room name (e.g. King Room)">
           <input id="roomsAddUnitsInput" type="number" min="1" step="1" placeholder="Total rooms">
           <div class="rooms-modal-row">
@@ -1444,7 +1446,7 @@ function ensureAvailabilityUi() {
         <div class="rooms-modal" onclick="event.stopPropagation()">
           <h3>Delete room type?</h3>
           <p class="rooms-modal-delete-copy" id="roomsDeleteCopy">
-            Deleting this room will remove its day-by-day overrides.
+            This removes the room from your booking page and Availability, including its saved day-by-day changes. Rooms with current or upcoming bookings cannot be deleted.
           </p>
           <div class="rooms-modal-row">
             <button id="roomsDeleteCancelBtn" class="rooms-modal-btn" type="button">Keep room</button>
@@ -3482,7 +3484,7 @@ function twoRoomExplainerHtml(context) {
   if (isBookingPage) {
     return `<div class="two-room-explainer" id="tour-two-room-card">
       <div class="two-room-text">
-        <div class="two-room-explainer-title">Two places for rooms — don't mix them up</div>
+        <div class="two-room-explainer-title">One room list, two simple views</div>
         <div class="two-room-cols">
           <div class="two-room-col two-room-col--here">
             <div class="two-room-col-label">① Your page (here)</div>
@@ -3493,7 +3495,7 @@ function twoRoomExplainerHtml(context) {
             How many units you have open each day — your inventory calendar.
           </div>
         </div>
-        <p class="two-room-explainer-foot">Start here: add the room types guests should see. Then open <strong>Availability</strong> and add matching inventory rooms so the calendar isn't empty.</p>
+        <p class="two-room-explainer-foot">Add each room once here. Marketel automatically carries its name and room count into <strong>Availability</strong>.</p>
       </div>
       <div class="two-room-explainer-actions two-room-actions">
         <button type="button" class="two-room-btn two-room-btn--ghost" onclick="goToAvailabilityTab()">Next: set up Availability →</button>
@@ -3502,10 +3504,10 @@ function twoRoomExplainerHtml(context) {
   }
   const bookingNames = (crm.editRooms || []).map((r) => r.name).filter(Boolean);
   const namesHint = bookingNames.length
-    ? `Your booking page already has: <strong>${bookingNames.map((n) => esc(n)).join(', ')}</strong>. Add matching inventory rooms here (same names work best).`
-    : 'You haven\'t added booking page rooms yet — set those up under <strong>Your page</strong> first.';
+    ? `Your booking page has: <strong>${bookingNames.map((n) => esc(n)).join(', ')}</strong>. Refresh once; Marketel will restore a missing Availability row without deleting saved dates.`
+    : 'Add your first room here. You can add its photos and description under <strong>Your page</strong> afterward.';
   return `<div class="two-room-explainer">
-    <div class="two-room-explainer-title">This calendar is empty because inventory isn't set up yet</div>
+    <div class="two-room-explainer-title">Add your first room to open the calendar</div>
     <div class="two-room-cols">
       <div class="two-room-col">
         <div class="two-room-col-label">Your page</div>
@@ -3518,7 +3520,7 @@ function twoRoomExplainerHtml(context) {
     </div>
     <p class="two-room-explainer-foot">${namesHint}</p>
     <div class="two-room-explainer-actions">
-      <button type="button" class="two-room-btn two-room-btn--primary" onclick="openRoomsAddModal()">+ Add inventory room</button>
+      <button type="button" class="two-room-btn two-room-btn--primary" onclick="openRoomsAddModal()">+ Add room</button>
       <button type="button" class="two-room-btn two-room-btn--ghost" onclick="setFilter('settings', document.querySelector('[data-nav-filter=\\'settings\\']'))">← Back to Your page</button>
     </div>
   </div>`;
@@ -3844,7 +3846,7 @@ function renderRoomPills() {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'room-pill-add';
-  addBtn.textContent = '+ Add inventory room';
+  addBtn.textContent = '+ Add room';
   addBtn.addEventListener('click', openRoomsAddModal);
   // Only show if no rooms exist yet (otherwise use Edit tab)
   if (bar.querySelectorAll('.room-pill').length === 0) {
@@ -3998,7 +4000,7 @@ function renderAvailabilityView() {
   if (!crm.manualSelectedRoom) {
     renderAvailabilityEmptyState();
     if (calWrap) calWrap.style.display = 'none';
-    if (activeLabel) activeLabel.textContent = 'Add an inventory room to open the calendar.';
+    if (activeLabel) activeLabel.textContent = 'Add a room to open the calendar.';
     closeAvailabilityDayPopover();
     return;
   }
@@ -4279,7 +4281,7 @@ async function saveRoomType() {
     renderAvailabilityView();
     toast('Room type saved', 'success');
   } catch (e) {
-    toast('Failed to save room type', 'error');
+    toast(e.message || 'Failed to save room type', 'error');
   }
 }
 

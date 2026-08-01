@@ -616,6 +616,26 @@
       <div class="stat-label">Setup Done</div>
     </div>
     <div class="stat-card">
+      <div class="stat-icon">🌐</div>
+      <div class="stat-value" id="stat-booking-reveal">0</div>
+      <div class="stat-label">Saw Booking Page</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📱</div>
+      <div class="stat-value" id="stat-app-reveal">0</div>
+      <div class="stat-label">Saw Guest App</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🛎</div>
+      <div class="stat-value" id="stat-assistant-reveal">0</div>
+      <div class="stat-label">Saw Assistant</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">$</div>
+      <div class="stat-value" id="stat-offer-reveal">0</div>
+      <div class="stat-label">Saw $199 Offer</div>
+    </div>
+    <div class="stat-card">
       <div class="stat-icon">🖱</div>
       <div class="stat-value" id="stat-cta">0</div>
       <div class="stat-label">Activation Clicks</div>
@@ -636,6 +656,10 @@
   <button class="filter-btn" data-filter="SetupStarted" onclick="setFilter('SetupStarted')">Started</button>
   <button class="filter-btn" data-filter="Lead" onclick="setFilter('Lead')">Qualified</button>
   <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
+  <button class="filter-btn" data-filter="BookingEngineRevealViewed" onclick="setFilter('BookingEngineRevealViewed')">Booking Reveal</button>
+  <button class="filter-btn" data-filter="GuestAppRevealViewed" onclick="setFilter('GuestAppRevealViewed')">Guest App</button>
+  <button class="filter-btn" data-filter="AssistantRevealViewed" onclick="setFilter('AssistantRevealViewed')">Assistant</button>
+  <button class="filter-btn" data-filter="ActivationOfferViewed" onclick="setFilter('ActivationOfferViewed')">Offer</button>
   <button class="filter-btn" data-filter="GoLiveClicked" onclick="setFilter('GoLiveClicked')">Activation</button>
   <button class="filter-btn" data-filter="CheckoutStarted" onclick="setFilter('CheckoutStarted')">Checkout</button>
   <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
@@ -931,6 +955,16 @@ const ICONS = {
   QualityAnswer: '💬',
   Lead: '🎯',
   SetupCompleted: '🏨',
+  ValueRevealStarted: '✨',
+  BookingEngineRevealViewed: '🌐',
+  BookingEngineEditPreviewViewed: '✏️',
+  BookingEngineFullPreviewOpened: '↔️',
+  GuestAppRevealViewed: '📱',
+  AssistantRevealViewed: '🛎',
+  ActivationOfferViewed: '$',
+  ActivationCtaClicked: '🖱',
+  PreviewReadyEmailSent: '✉️',
+  ActivationEmailSent: '📨',
   PaymentCTAClicked: '🖱',
   GoLiveClicked: '🖱',
   CheckoutStarted: '💳',
@@ -949,6 +983,16 @@ const TYPE_LABELS = {
   QualityAnswer: 'Quality Answer',
   Lead: 'Qualified Lead',
   SetupCompleted: 'Setup Completed',
+  ValueRevealStarted: 'Value Reveal Started',
+  BookingEngineRevealViewed: 'Booking Page Reveal',
+  BookingEngineEditPreviewViewed: 'Front Desk Preview Opened',
+  BookingEngineFullPreviewOpened: 'Full Booking Preview',
+  GuestAppRevealViewed: 'Guest App Reveal',
+  AssistantRevealViewed: 'Assistant Reveal',
+  ActivationOfferViewed: '$199 Offer Viewed',
+  ActivationCtaClicked: 'Activation CTA Clicked',
+  PreviewReadyEmailSent: 'Preview Email Sent',
+  ActivationEmailSent: 'Activation Email Sent',
   PaymentCTAClicked: 'Hit Gate',
   GoLiveClicked: 'Activation Clicked',
   CheckoutStarted: 'Stripe Checkout',
@@ -999,6 +1043,10 @@ function renderEvents() {
   document.getElementById('stat-started').textContent = allCounts.SetupStarted || 0;
   document.getElementById('stat-leads').textContent = allCounts.Lead || 0;
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
+  document.getElementById('stat-booking-reveal').textContent = allCounts.BookingEngineRevealViewed || 0;
+  document.getElementById('stat-app-reveal').textContent = allCounts.GuestAppRevealViewed || 0;
+  document.getElementById('stat-assistant-reveal').textContent = allCounts.AssistantRevealViewed || 0;
+  document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
   document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
   document.getElementById('stat-paid').textContent = paid;
 

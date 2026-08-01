@@ -501,8 +501,8 @@ function App() {
             amenities: 'Free WiFi • TV • Free Parking',
             description: 'Comfortable room available for your selected dates.',
             maxOccupancy: 4,
-            imageUrls: ['https://suitestay.clickinns.com/kingbedsuitestay.webp'],
-            imageUrl: 'https://suitestay.clickinns.com/kingbedsuitestay.webp',
+            imageUrls: [`${API_BASE_URL}/room-placeholder.svg`],
+            imageUrl: `${API_BASE_URL}/room-placeholder.svg`,
             ...apiRoom,
           }));
           setAvailableRooms(genericRooms);

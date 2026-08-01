@@ -14,6 +14,59 @@ const ACTION_UNDO_TTL_MS = 10 * 60 * 1000;
 const BOOKING_ACTION_TTL_MS = 48 * 60 * 60 * 1000;
 const MAX_SMS_BODY = 1200;
 
+function addIsoDays(iso, days) {
+    const date = new Date(`${iso}T00:00:00.000Z`);
+    if (!Number.isFinite(date.getTime())) return '';
+    date.setUTCDate(date.getUTCDate() + Number(days || 0));
+    return date.toISOString().slice(0, 10);
+}
+
+// Short replies only have meaning in the context of the message they answer.
+// In particular, "NO" after an inventory check means nothing changed, while
+// "NO" after a booking alert means the room is not available.
+function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextType = '') {
+    const text = String(body || '').trim();
+    const lower = text.toLowerCase();
+    if (/^(help|\?)$/.test(lower)) return { intent: 'help' };
+    if (/^(undo|undo that|revert|revert that)$/.test(lower)) return { intent: 'undo' };
+    if (/^(cancel|cancel it|cancel booking)$/.test(lower)) return { intent: 'cancel_booking' };
+    if (/^(keep|keep it|do not cancel|don't cancel)$/.test(lower)) return { intent: 'keep_booking' };
+    if (/^(yes|y|available|still available|it is available)$/.test(lower)) {
+        return contextType === 'inventory_check'
+            ? { intent: 'no_change' }
+            : { intent: 'booking_available' };
+    }
+    if (/^(no change|no changes|nothing changed|nothing|none|all good)$/.test(lower)) {
+        return { intent: 'no_change' };
+    }
+    if (/^(no|n|nope)$/.test(lower)) {
+        if (contextType === 'inventory_check') return { intent: 'no_change' };
+        if (contextType === 'booking_alert') return { intent: 'booking_taken' };
+        return {
+            intent: 'unknown',
+            clarification: 'Are you replying to a booking alert, or saying nothing changed? Include the room name so I can act safely.',
+        };
+    }
+    if (/^(not available|room taken|it's taken|it is taken)$/.test(lower)) {
+        return { intent: 'booking_taken' };
+    }
+
+    const room = rooms.find((entry) => lower.includes(String(entry.name || '').toLowerCase()));
+    const walkInLanguage = /\b(walk[- ]?in|took|taken|gave|sold|occupied|checked in|booked outside|outside booking)\b/.test(lower);
+    if (room && walkInLanguage) {
+        const startDate = /\btomorrow\b/.test(lower) ? addIsoDays(todayIso, 1) : todayIso;
+        return {
+            intent: 'block_room',
+            roomName: room.name,
+            startDate,
+            endDate: startDate,
+            units: 1,
+            clarification: '',
+        };
+    }
+    return null;
+}
+
 function createFrontDeskAssistant({
     prisma,
     withRetry,
@@ -102,10 +155,7 @@ function createFrontDeskAssistant({
     }
 
     function addDaysIso(iso, days) {
-        const date = new Date(`${iso}T00:00:00.000Z`);
-        if (!Number.isFinite(date.getTime())) return '';
-        date.setUTCDate(date.getUTCDate() + Number(days || 0));
-        return date.toISOString().slice(0, 10);
+        return addIsoDays(iso, days);
     }
 
     function zonedDateTimeToUtc(dateIso, time, timeZone) {
@@ -710,6 +760,39 @@ function createFrontDeskAssistant({
         });
     }
 
+    async function createBookingCancellationQuestion(reviewAction, recipient) {
+        const bookingId = String(reviewAction?.payload?.bookingId || '');
+        if (!bookingId) return null;
+        const booking = await prisma.booking.findFirst({
+            where: { id: bookingId, hotelId: recipient.hotelId },
+        });
+        if (!booking || DEAD_BOOKING_STATUSES.includes(String(booking.status || '').toLowerCase())) {
+            return null;
+        }
+        const existing = await getPendingCancelAction(recipient.hotelId);
+        if (existing && String(existing.payload?.bookingId || '') === booking.id) {
+            return { action: existing, booking };
+        }
+        const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+        const action = await prisma.frontDeskAssistantPendingAction.create({
+            data: {
+                hotelId: recipient.hotelId,
+                recipientId: recipient.id,
+                kind: 'cancel_booking',
+                payload: {
+                    bookingId: booking.id,
+                    roomName: booking.roomName,
+                    startDate: stayDates[0] || null,
+                    endDate: stayDates[stayDates.length - 1] || null,
+                    units: 1,
+                    reason: 'Room was given to a walk-in',
+                },
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            },
+        });
+        return { action, booking };
+    }
+
     async function cancelBookingAndReplaceWithWalkIn(action, recipient) {
         const payload = action?.payload || {};
         const booking = await prisma.booking.findFirst({
@@ -864,35 +947,23 @@ function createFrontDeskAssistant({
         };
     }
 
-    function deterministicIntent(body, rooms, todayIso) {
-        const text = String(body || '').trim();
-        const lower = text.toLowerCase();
-        if (/^(help|\?)$/.test(lower)) return { intent: 'help' };
-        if (/^(undo|undo that|revert|revert that)$/.test(lower)) return { intent: 'undo' };
-        if (/^(cancel|cancel it|cancel booking)$/.test(lower)) return { intent: 'cancel_booking' };
-        if (/^(keep|keep it|do not cancel|don't cancel)$/.test(lower)) return { intent: 'keep_booking' };
-        if (/^(yes|y|available|still available|it is available)$/.test(lower)) return { intent: 'booking_available' };
-        if (/^(no|n|not available|room taken|it's taken|it is taken)$/.test(lower)) {
-            return { intent: 'booking_taken' };
-        }
-        if (/^(no change|no changes|nothing changed|nothing|none|nope|all good)$/.test(lower)) {
-            return { intent: 'no_change' };
-        }
+    function deterministicIntent(body, rooms, todayIso, contextType) {
+        return classifyDeterministicIntent(body, rooms, todayIso, contextType);
+    }
 
-        const room = rooms.find((entry) => lower.includes(String(entry.name || '').toLowerCase()));
-        const walkInLanguage = /\b(walk[- ]?in|took|taken|gave|sold|occupied|checked in|booked outside|outside booking)\b/.test(lower);
-        if (room && walkInLanguage) {
-            const startDate = /\btomorrow\b/.test(lower) ? addDaysIso(todayIso, 1) : todayIso;
-            return {
-                intent: 'block_room',
-                roomName: room.name,
-                startDate,
-                endDate: startDate,
-                units: 1,
-                clarification: '',
-            };
-        }
-        return null;
+    async function getRecentOutboundContext(recipient) {
+        const activity = await prisma.frontDeskAssistantActivity.findFirst({
+            where: {
+                hotelId: recipient.hotelId,
+                recipientId: recipient.id,
+                direction: 'outbound',
+                type: { in: ['booking_alert', 'inventory_check'] },
+                createdAt: { gte: new Date(Date.now() - BOOKING_ACTION_TTL_MS) },
+            },
+            select: { type: true },
+            orderBy: { createdAt: 'desc' },
+        });
+        return activity?.type || '';
     }
 
     async function extractIntentWithOpenAI({ body, rooms, timeZone, recipientId }) {
@@ -957,16 +1028,17 @@ function createFrontDeskAssistant({
     }
 
     async function understandInbound(recipient, body) {
-        const [rooms, config] = await Promise.all([
+        const [rooms, config, contextType] = await Promise.all([
             prisma.manualRoom.findMany({
                 where: { hotelId: recipient.hotelId },
                 select: { name: true, totalUnits: true },
                 orderBy: { name: 'asc' },
             }),
             ensureConfig(recipient.hotelId),
+            getRecentOutboundContext(recipient),
         ]);
         const todayIso = localTodayIso(config.timeZone || reportTimeZone);
-        const deterministic = deterministicIntent(body, rooms, todayIso);
+        const deterministic = deterministicIntent(body, rooms, todayIso, contextType);
         if (deterministic) return { ...deterministic, todayIso, rooms };
 
         try {
@@ -1025,7 +1097,11 @@ function createFrontDeskAssistant({
             if (!action) {
                 return 'Tell me which room was taken and the dates, for example: “Queen Room tonight.”';
             }
-            return (await cancelBookingAndReplaceWithWalkIn(action, recipient)).message;
+            const pending = await createBookingCancellationQuestion(action, recipient);
+            if (!pending) return 'That booking is no longer available to review.';
+            const guest = [pending.booking.guestFirstName, pending.booking.guestLastName]
+                .filter(Boolean).join(' ') || 'the guest';
+            return `${pending.booking.roomName} is marked as taken. Reply CANCEL to cancel ${guest}'s online booking, notify them, release the payment hold, and keep the dates unavailable. Reply KEEP to leave it unchanged.`;
         }
         if (intent.intent === 'no_change') {
             return 'Got it — no availability changes recorded.';
@@ -1654,4 +1730,5 @@ function createFrontDeskAssistant({
 
 module.exports = {
     createFrontDeskAssistant,
+    classifyDeterministicIntent,
 };

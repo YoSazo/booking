@@ -453,6 +453,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
 const API = '';
+const requestedAngle = new URLSearchParams(window.location.search).get('angle') || 'direct';
+const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requestedAngle) ? requestedAngle : 'direct';
 let hotelData = {};
 let rooms = [];
 let pendingFile = null;
@@ -498,7 +500,9 @@ function goToStep(n) {
 }
 
 function answerQualityQ(answer) {
-  const isQualifiedLead = answer === 'google_website' || answer === 'social_ads';
+  const isQualifiedLead = answer === 'google_website'
+    || answer === 'social_ads'
+    || (ACQUISITION_ANGLE === 'guest_app' && answer === 'ota_marketplaces');
   if (isQualifiedLead && !qualifiedLeadTracked) {
     qualifiedLeadTracked = true;
     // Keep this ID stable for the setup so repeat clicks/reloads do not create
@@ -689,18 +693,21 @@ async function addRoomAndFinish() {
 
     // Finalize the owner handoff as they enter the personalized reveal.
     var successLink = document.getElementById('successLink');
-    successLink.addEventListener('click', function(ev) {
+    successLink.addEventListener('click', async function(ev) {
       ev.preventDefault();
       if (successLink.dataset.opening === '1') return;
       setSuccessLinkLoading(true);
       if (!successLink.dataset.finalized) {
         successLink.dataset.finalized = '1';
-        fetch(API + '/api/setup/' + TOKEN + '/finalize', {
+        try {
+          await fetch(API + '/api/setup/' + TOKEN + '/finalize', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
           body: JSON.stringify({ email: '', phone: '', pin: completeData.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
-        }).catch(() => {});
+          });
+        } catch (_) { /* Front Desk remains available even if email delivery fails. */ }
       }
-      setTimeout(function() { window.location.href = window._dashboardUrl || successLink.href; }, 80);
+      window.location.href = window._dashboardUrl || successLink.href;
     });
 
     goToStep(3);

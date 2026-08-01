@@ -95,26 +95,70 @@ const emailTransporter = (process.env.ENABLE_OUTBOUND_EMAIL !== 'false'
     })
     : null;
 
-async function sendWelcomeEmail(toEmail, hotelName, pin, domain) {
+function emailTemplateValue(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+async function sendMarketelLifecycleEmail({ toEmail, subject, template, replacements = {}, text = '' }) {
     if (!emailTransporter) {
-        console.log('⚠️ Email not configured — skipping welcome email');
-        return;
+        console.log(`⚠️ Email not configured — skipping ${template}`);
+        return false;
     }
     try {
-        let html = fs.readFileSync(path.join(__dirname, 'email-templates', 'welcome.html'), 'utf8');
-        html = html.replace(/\{\{DOMAIN\}\}/g, domain);
-        html = html.replace(/\{\{PIN\}\}/g, pin);
+        let html = fs.readFileSync(path.join(__dirname, 'email-templates', template), 'utf8');
+        for (const [key, value] of Object.entries(replacements)) {
+            html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), emailTemplateValue(value));
+        }
 
         await emailTransporter.sendMail({
             from: '"Marketel" <support@bookmarketel.com>',
             to: toEmail,
-            subject: 'Your booking engine is live',
+            subject: String(subject || 'Marketel update').replace(/[\r\n]+/g, ' ').slice(0, 180),
             html,
+            text,
         });
-        console.log(`✅ Welcome email sent to ${toEmail}`);
+        console.log(`✅ ${template} sent to ${toEmail}`);
+        return true;
     } catch (e) {
-        console.error('❌ Welcome email failed:', e.message);
+        console.error(`❌ ${template} failed:`, e.message);
+        return false;
     }
+}
+
+async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, pin, domain, frontdeskUrl }) {
+    return sendMarketelLifecycleEmail({
+        toEmail,
+        subject: `Your ${hotelName || 'Marketel'} preview is ready`,
+        template: 'preview-ready.html',
+        replacements: {
+            HOTEL_NAME: hotelName || 'Your property',
+            HOTEL_ID: hotelId,
+            DOMAIN: domain,
+            PIN: pin,
+            FRONTDESK_URL: frontdeskUrl,
+        },
+        text: `Your Marketel preview is ready.\n\nFront Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nPIN: ${pin}\nBooking-page preview: https://${domain}\n\nThe booking page remains in preview mode until you activate Marketel.`,
+    });
+}
+
+async function sendActivationEmail({ toEmail, hotelName, hotelId, domain, frontdeskUrl }) {
+    return sendMarketelLifecycleEmail({
+        toEmail,
+        subject: `${hotelName || 'Your Marketel property'} is activated`,
+        template: 'activation.html',
+        replacements: {
+            HOTEL_NAME: hotelName || 'Your property',
+            HOTEL_ID: hotelId,
+            DOMAIN: domain,
+            FRONTDESK_URL: frontdeskUrl,
+        },
+        text: `${hotelName || 'Your property'} is activated.\n\nOpen Front Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking page: https://${domain}\n\nNext: turn on Front Desk alerts, review availability, and make one test booking. Questions? Reply to this email.`,
+    });
 }
 
 // Build a durable link back to the guest's reservation page (survives closing
@@ -1298,22 +1342,16 @@ async function getManualRooms(hotelId) {
             prisma.room.findMany({ where: { hotelId }, select: { name: true, totalUnits: true } }),
             prisma.manualRoom.findMany({ where: { hotelId }, select: { name: true } }),
         ]);
-        const realNames = new Set(realRooms.map(r => r.name));
         const manualNames = new Set(manualRooms.map(r => r.name));
-        // Delete ManualRooms that don't exist in Room
-        const toDelete = manualRooms.filter(m => !realNames.has(m.name));
-        // Create ManualRooms for Rooms that don't have one
+        // Never delete an unmatched ManualRoom here. It may contain months of
+        // overrides from a legacy rename. Mutating routes keep both catalogs in
+        // sync transactionally; this read path only repairs missing rows.
         const toCreate = realRooms.filter(r => !manualNames.has(r.name));
-        await Promise.all([
-            toDelete.length
-                ? prisma.manualRoom.deleteMany({ where: { hotelId, name: { in: toDelete.map(r => r.name) } } })
-                : Promise.resolve(),
-            ...toCreate.map(r => prisma.manualRoom.upsert({
+        await Promise.all(toCreate.map(r => prisma.manualRoom.upsert({
                 where: { hotelId_name: { hotelId, name: r.name } },
                 create: { hotelId, name: r.name, totalUnits: r.totalUnits || 1 },
                 update: { totalUnits: r.totalUnits || 1 },
-            })),
-        ]);
+            })));
     } catch (e) { /* sync failed silently — continue with what we have */ }
 
     return withRetry(() => prisma.manualRoom.findMany({
@@ -1330,6 +1368,168 @@ const DEAD_BOOKING_STATUSES = ['cancelled', 'canceled', 'released'];
 
 // Reusable Prisma filter for "bookings that still count".
 const ACTIVE_BOOKING_STATUS_FILTER = { notIn: DEAD_BOOKING_STATUSES };
+
+function roomCatalogError(code, message) {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+}
+
+function safeRoomUnits(value, fallback = 1) {
+    if (value === undefined || value === null || value === '') return Math.max(1, Number(fallback) || 1);
+    return Math.max(1, parseInt(value, 10) || 1);
+}
+
+async function saveRoomCatalogEntry({
+    hotelId,
+    roomId = '',
+    name,
+    description,
+    amenities,
+    maxOccupancy,
+    totalUnits,
+}) {
+    const roomName = String(name || '').trim();
+    if (!hotelId || !roomName) throw roomCatalogError('ROOM_INVALID', 'Room name required.');
+
+    return prisma.$transaction(async (tx) => {
+        // One catalog lock per property prevents simultaneous renames from
+        // splitting guest-facing rooms and availability into different names.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext('room-catalog'))`;
+
+        const existing = roomId
+            ? await tx.room.findFirst({ where: { id: roomId, hotelId } })
+            : await tx.room.findUnique({ where: { hotelId_name: { hotelId, name: roomName } } });
+        if (roomId && !existing) throw roomCatalogError('ROOM_NOT_FOUND', 'Room type not found.');
+
+        const oldName = existing?.name || '';
+        if (oldName && oldName !== roomName) {
+            const conflictingRoom = await tx.room.findUnique({
+                where: { hotelId_name: { hotelId, name: roomName } },
+                select: { id: true },
+            });
+            if (conflictingRoom && conflictingRoom.id !== existing.id) {
+                throw roomCatalogError('ROOM_NAME_CONFLICT', 'A room with this name already exists.');
+            }
+        }
+
+        const units = safeRoomUnits(totalUnits, existing?.totalUnits || 1);
+        const data = { name: roomName, totalUnits: units };
+        if (description !== undefined) data.description = description || null;
+        if (amenities !== undefined) data.amenities = amenities || null;
+        if (maxOccupancy !== undefined) data.maxOccupancy = Math.max(1, parseInt(maxOccupancy, 10) || 4);
+
+        let room;
+        if (existing) {
+            room = await tx.room.update({ where: { id: existing.id }, data });
+        } else {
+            const count = await tx.room.count({ where: { hotelId } });
+            room = await tx.room.create({
+                data: {
+                    hotelId,
+                    ...data,
+                    description: data.description ?? null,
+                    amenities: data.amenities ?? null,
+                    maxOccupancy: data.maxOccupancy ?? 4,
+                    sortOrder: count,
+                },
+            });
+        }
+
+        const oldManual = oldName
+            ? await tx.manualRoom.findUnique({ where: { hotelId_name: { hotelId, name: oldName } } })
+            : null;
+        const newManual = await tx.manualRoom.findUnique({
+            where: { hotelId_name: { hotelId, name: roomName } },
+        });
+
+        let syncedManualRoom;
+        if (oldName && oldName !== roomName && oldManual) {
+            if (newManual && newManual.id !== oldManual.id) {
+                throw roomCatalogError(
+                    'ROOM_NAME_CONFLICT',
+                    'That room name already has availability saved. Choose another name so no dates are overwritten.'
+                );
+            }
+            syncedManualRoom = await tx.manualRoom.update({
+                where: { id: oldManual.id },
+                data: { name: roomName, totalUnits: units },
+            });
+        } else {
+            syncedManualRoom = await tx.manualRoom.upsert({
+                where: { hotelId_name: { hotelId, name: roomName } },
+                create: { hotelId, name: roomName, totalUnits: units },
+                update: { totalUnits: units },
+            });
+        }
+
+        // A room-count reduction must not leave a date explicitly selling more
+        // units than the property now owns.
+        await tx.manualOverride.updateMany({
+            where: { roomId: syncedManualRoom.id, availableUnits: { gt: units } },
+            data: { availableUnits: units },
+        });
+
+        if (oldName && oldName !== roomName) {
+            await tx.booking.updateMany({
+                where: { hotelId, roomName: oldName },
+                data: { roomName },
+            });
+            await tx.guestMessage.updateMany({
+                where: { hotelId, roomName: oldName },
+                data: { roomName },
+            });
+            const assistantActions = await tx.frontDeskAssistantPendingAction.findMany({
+                where: {
+                    hotelId,
+                    status: { in: ['pending', 'applied'] },
+                    expiresAt: { gt: new Date() },
+                },
+            });
+            for (const action of assistantActions) {
+                const payload = action.payload || {};
+                if (String(payload.roomName || '') !== oldName) continue;
+                await tx.frontDeskAssistantPendingAction.update({
+                    where: { id: action.id },
+                    data: { payload: { ...payload, roomName } },
+                });
+            }
+        }
+        return room;
+    }, { maxWait: 5000, timeout: 15000 });
+}
+
+async function deleteRoomCatalogEntry({ hotelId, roomId = '', roomName = '' }) {
+    return prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext('room-catalog'))`;
+        const room = roomId
+            ? await tx.room.findFirst({ where: { id: roomId, hotelId } })
+            : await tx.room.findUnique({ where: { hotelId_name: { hotelId, name: roomName } } });
+        if (roomId && !room) throw roomCatalogError('ROOM_NOT_FOUND', 'Room type not found.');
+        const resolvedName = room?.name || String(roomName || '').trim();
+        const liveBookingCount = resolvedName
+            ? await tx.booking.count({
+                where: {
+                    hotelId,
+                    roomName: resolvedName,
+                    status: ACTIVE_BOOKING_STATUS_FILTER,
+                    checkoutDate: { gt: new Date() },
+                },
+            })
+            : 0;
+        if (liveBookingCount > 0) {
+            throw roomCatalogError(
+                'ROOM_HAS_BOOKINGS',
+                `This room has ${liveBookingCount} current or upcoming ${liveBookingCount === 1 ? 'booking' : 'bookings'}. Cancel or move them before deleting it.`
+            );
+        }
+        if (room) await tx.room.delete({ where: { id: room.id } });
+        if (resolvedName) {
+            await tx.manualRoom.deleteMany({ where: { hotelId, name: resolvedName } });
+        }
+        return { roomName: resolvedName, deleted: !!room };
+    }, { maxWait: 5000, timeout: 15000 });
+}
 
 function isDeadBookingStatus(status) {
     return DEAD_BOOKING_STATUSES.includes(String(status || '').trim().toLowerCase());
@@ -2002,6 +2202,7 @@ const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 10 });
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
+const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
 const guestMessageRateLimit = createRouteRateLimiter('guest-message', {
@@ -6132,11 +6333,9 @@ async function getManualRoomTodayAvailability(hotelId, roomName, referenceIso = 
 
     const override = (room.overrides || [])[0] || null;
     const baseUnits = Math.max(0, parseInt(room.totalUnits, 10) || 0);
-    const effectiveCapacity = override?.closed
-        ? 0
-        : (override && override.availableUnits !== null && override.availableUnits !== undefined
-            ? Math.max(0, parseInt(override.availableUnits, 10) || 0)
-            : baseUnits);
+    const explicitlyAvailable = override && override.availableUnits !== null && override.availableUnits !== undefined
+        ? Math.max(0, parseInt(override.availableUnits, 10) || 0)
+        : null;
 
     const dayStart = new Date(`${todayIso}T00:00:00.000Z`);
     const dayEndExclusive = new Date(`${addDaysToIso(todayIso, 1)}T00:00:00.000Z`);
@@ -6159,7 +6358,14 @@ async function getManualRoomTodayAvailability(hotelId, roomName, referenceIso = 
         tracked: true,
         roomName: room.name,
         todayIso,
-        availableUnits: Math.max(0, effectiveCapacity - bookedCount),
+        // Explicit overrides are remaining sellable units and are already
+        // decremented by the booking path. Only base capacity needs bookings
+        // subtracted here.
+        availableUnits: override?.closed
+            ? 0
+            : explicitlyAvailable !== null
+                ? explicitlyAvailable
+                : Math.max(0, baseUnits - bookedCount),
     };
 }
 
@@ -7588,6 +7794,7 @@ app.post('/api/crm/add-dummy-bookings', crmAuth, async (req, res) => {
 
 const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'LandingPageView',
+    'AcquisitionAngle',
     'SetupStarted',
     'Step1Reached',
     'Step2Reached',
@@ -7601,7 +7808,11 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'GoLiveClicked',
     'CheckoutStarted',
     'PaymentSucceeded',
+    'PreviewReadyEmailSent',
+    'ActivationEmailSending',
+    'ActivationEmailSent',
     'SubscriptionStatusChanged',
+    ...MARKETEL_VALUE_REVEAL_EVENTS,
 ];
 const MARKETEL_PUBLIC_ONBOARDING_EVENTS = new Set([
     'LandingPageView',
@@ -7650,7 +7861,16 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         }
 
         if (eventName === 'Lead') {
+            const angleEvent = await prisma.funnelEvent.findFirst({
+                where: { hotelId: trackedHotelId, eventName: 'AcquisitionAngle' },
+                select: { contentName: true },
+                orderBy: { createdAt: 'desc' },
+            });
+            const acquisitionAngle = String(angleEvent?.contentName || 'direct').trim();
             const qualifiedAnswers = new Set(['google_website', 'social_ads']);
+            // Marketplace traffic is qualified only for the guest-app angle:
+            // the product can turn those stays into future direct relationships.
+            if (acquisitionAngle === 'guest_app') qualifiedAnswers.add('ota_marketplaces');
             if (!setupHotel || !qualifiedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid qualified lead' });
             }
@@ -7658,7 +7878,16 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             // A setup can qualify only once. The browser also uses a stable
             // event_id, while this protects the database and CAPI from replays.
             const existingLead = await prisma.funnelEvent.findFirst({
-                where: { hotelId: trackedHotelId, eventName: 'Lead' },
+                where: {
+                    eventName: 'Lead',
+                    OR: [
+                        { hotelId: trackedHotelId },
+                        ...(trackedEmail ? [{
+                            guestEmail: trackedEmail,
+                            createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+                        }] : []),
+                    ],
+                },
                 select: { id: true },
             });
             if (existingLead) {
@@ -8026,9 +8255,13 @@ app.get('/', (req, res) => {
 // ── SELF-SERVE SETUP ──────────────────────────────────────────
 
 // Start free setup — create hotel and redirect to wizard (no payment needed)
-app.post('/api/setup/start', async (req, res) => {
+app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
     try {
         const { email } = req.body;
+        const requestedAngle = String(req.body?.acquisitionAngle || 'direct').trim();
+        const acquisitionAngle = new Set(['direct', 'guest_app', 'assistant']).has(requestedAngle)
+            ? requestedAngle
+            : 'direct';
         if (!email || !email.includes('@')) {
             return res.status(400).json({ error: 'Valid email required' });
         }
@@ -8048,8 +8281,26 @@ app.post('/api/setup/start', async (req, res) => {
             }
         });
 
-        console.log(`✅ Free setup started: ${hotelSlug}, token: ${setupToken}, email: ${email}`);
-        res.json({ success: true, setupUrl: '/setup/' + setupToken, token: setupToken });
+        if (funnelTrackingEnabled) {
+            await prisma.funnelEvent.create({
+                data: {
+                    hotelId: hotelSlug,
+                    eventName: 'AcquisitionAngle',
+                    eventId: `marketel-angle.${hotelSlug}`,
+                    guestEmail: email.trim().toLowerCase(),
+                    contentName: acquisitionAngle,
+                    userAgent: req.headers['user-agent'] || null,
+                    ipAddress: req.ip || req.socket?.remoteAddress || null,
+                },
+            }).catch(() => {});
+        }
+
+        console.log('✅ Free setup started:', { hotelId: hotelSlug, acquisitionAngle });
+        res.json({
+            success: true,
+            setupUrl: `/setup/${setupToken}?angle=${encodeURIComponent(acquisitionAngle)}`,
+            token: setupToken,
+        });
     } catch (e) {
         console.error('Start setup error:', e.message);
         res.status(500).json({ error: 'Failed to start setup' });
@@ -8140,29 +8391,21 @@ app.post('/api/setup/:token/rooms', async (req, res) => {
         const { id, name, description, amenities, maxOccupancy, totalUnits } = req.body;
         if (!name) return res.status(400).json({ error: 'Room name required' });
 
-        let room;
-        if (id) {
-            room = await prisma.room.update({ where: { id }, data: { name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 } });
-        } else {
-            const count = await prisma.room.count({ where: { hotelId: hotel.id } });
-            room = await prisma.room.upsert({
-                where: { hotelId_name: { hotelId: hotel.id, name } },
-                create: { hotelId: hotel.id, name, description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1, sortOrder: count },
-                update: { description, amenities, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1 },
-            });
-        }
-
-        // Also create/update ManualRoom for availability tracking
-        await prisma.manualRoom.upsert({
-            where: { hotelId_name: { hotelId: hotel.id, name } },
-            create: { hotelId: hotel.id, name, totalUnits: totalUnits || 1 },
-            update: { totalUnits: totalUnits || 1 },
+        const room = await saveRoomCatalogEntry({
+            hotelId: hotel.id,
+            roomId: id,
+            name,
+            description,
+            amenities,
+            maxOccupancy,
+            totalUnits,
         });
 
         res.json({ success: true, room: { id: room.id, name: room.name } });
     } catch (e) {
         console.error('Setup room save error:', e.message);
-        res.status(500).json({ error: 'Failed to save room' });
+        const status = e.code === 'ROOM_NOT_FOUND' ? 404 : e.code === 'ROOM_NAME_CONFLICT' ? 409 : 500;
+        res.status(status).json({ error: e.code?.startsWith('ROOM_') ? e.message : 'Failed to save room' });
     }
 });
 
@@ -8171,11 +8414,12 @@ app.delete('/api/setup/:token/rooms/:roomId', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
-        await prisma.room.delete({ where: { id: req.params.roomId } });
+        await deleteRoomCatalogEntry({ hotelId: hotel.id, roomId: req.params.roomId });
         res.json({ success: true });
     } catch (e) {
         console.error('Setup room delete error:', e.message);
-        res.status(500).json({ error: 'Failed to delete' });
+        const status = e.code === 'ROOM_HAS_BOOKINGS' ? 409 : 500;
+        res.status(status).json({ error: e.code?.startsWith('ROOM_') ? e.message : 'Failed to delete' });
     }
 });
 
@@ -8277,6 +8521,11 @@ app.post('/api/setup/:token/rooms/:roomId/images', async (req, res, next) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
+        const room = await prisma.room.findFirst({
+            where: { id: req.params.roomId, hotelId: hotel.id },
+            select: { id: true },
+        });
+        if (!room) return res.status(404).json({ error: 'Room not found' });
         req.hotelId = hotel.id;
         next();
     } catch (e) { res.status(500).json({ error: 'Server error' }); }
@@ -8298,7 +8547,12 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
-        await prisma.roomImage.delete({ where: { id: req.params.imageId } });
+        const image = await prisma.roomImage.findFirst({
+            where: { id: req.params.imageId, roomId: req.params.roomId, room: { hotelId: hotel.id } },
+            select: { id: true },
+        });
+        if (!image) return res.status(404).json({ error: 'Image not found' });
+        await prisma.roomImage.delete({ where: { id: image.id } });
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to delete image' });
@@ -8586,7 +8840,8 @@ app.get('/setup/:token/success', async (req, res) => {
     }
 });
 
-// Finalize — save phone and domain preference after payment
+// Finalize the preview handoff. This happens before payment, so every message
+// must describe preview access rather than implying that activation occurred.
 app.post('/api/setup/:token/finalize', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
@@ -8626,23 +8881,56 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             }
         }
 
-        // Send welcome email with PIN
+        // Send a clearly labelled preview/resume email once.
         const finalEmail = email || hotel.ownerEmail;
-        if (finalEmail) {
-            const domain = domainPref === 'custom' ? customDomain : assignedDomain;
+        let previewEmailSent = false;
+        let activationEmailSent = false;
+        if (finalEmail && hotel.subscribed) {
+            // The legacy setup checkout collects contact details on its paid
+            // success page. Once that email is saved, retry the paid handoff
+            // instead of sending pre-activation language.
+            activationEmailSent = await sendMarketelActivationEmailOnce(hotel.id, req);
+        } else if (finalEmail) {
+            const domain = String(domainPref === 'custom' ? customDomain : assignedDomain)
+                .trim()
+                .replace(/^https?:\/\//i, '')
+                .replace(/\/.*$/, '');
             const pin = String(req.body.pin || '').trim();
-            sendWelcomeEmail(finalEmail, hotel.name || 'Your Hotel', pin || 'See your setup page', domain);
+            const existingEmail = await prisma.funnelEvent.findFirst({
+                where: { hotelId: hotel.id, eventName: 'PreviewReadyEmailSent' },
+                select: { id: true },
+            });
+            if (!existingEmail) {
+                const frontdeskUrl = `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotel.id)}`;
+                previewEmailSent = await sendPreviewReadyEmail({
+                    toEmail: finalEmail,
+                    hotelName: hotel.name || 'Your property',
+                    hotelId: hotel.id,
+                    pin: pin || 'Use email login',
+                    domain,
+                    frontdeskUrl,
+                });
+                if (previewEmailSent) {
+                    await prisma.funnelEvent.create({
+                        data: {
+                            hotelId: hotel.id,
+                            eventName: 'PreviewReadyEmailSent',
+                            eventId: `marketel-preview-email.${hotel.id}`,
+                            guestEmail: finalEmail,
+                        },
+                    }).catch(() => {});
+                }
+            }
         }
 
-        // Log for you to action manually
-        console.log(`\n🔔 NEW CUSTOMER PAID — ACTION NEEDED`);
-        console.log(`   Hotel: ${hotel.name} (${hotel.id})`);
-        console.log(`   Email: ${hotel.ownerEmail}`);
-        console.log(`   Phone: ${phone}`);
-        console.log(`   Domain: ${domainPref === 'custom' ? customDomain : assignedDomain}`);
-        console.log(`   Setup token: ${req.params.token}\n`);
+        console.log('✅ Preview handoff completed:', {
+            hotelId: hotel.id,
+            domain: domainPref === 'custom' ? customDomain : assignedDomain,
+            previewEmailSent,
+            activationEmailSent,
+        });
 
-        res.json({ success: true, domain: assignedDomain });
+        res.json({ success: true, domain: assignedDomain, previewEmailSent, activationEmailSent });
     } catch (e) {
         console.error('Finalize error:', e.message);
         res.status(500).json({ error: 'Failed' });
@@ -8702,7 +8990,8 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore duplicate */ }
 
-        // Welcome email sent via /finalize call from the client
+        // The preview/resume email is sent via /finalize. A separate activation
+        // email is sent only after Stripe verifies payment.
 
         // Keep local development runs out of production funnel reporting.
         if (funnelTrackingEnabled) {
@@ -9018,8 +9307,8 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
                 amenities: r.amenities,
                 maxOccupancy: r.maxOccupancy,
                 totalUnits: r.totalUnits,
-                imageUrl: r.images[0]?.url ? resolveImgUrl(r.images[0].url) : 'https://suitestay.clickinns.com/kingbedsuitestay.webp',
-                imageUrls: r.images.length ? r.images.map(img => resolveImgUrl(img.url)) : ['https://suitestay.clickinns.com/kingbedsuitestay.webp'],
+                imageUrl: r.images[0]?.url ? resolveImgUrl(r.images[0].url) : `${baseUrl}/room-placeholder.svg`,
+                imageUrls: r.images.length ? r.images.map(img => resolveImgUrl(img.url)) : [`${baseUrl}/room-placeholder.svg`],
             })),
         });
     } catch (e) {
@@ -9538,6 +9827,70 @@ async function syncMarketelSubscription(subscription, { forcedStatus = '' } = {}
     return { hotelId, subscribed, status };
 }
 
+async function sendMarketelActivationEmailOnce(hotelId, req = null) {
+    if (!hotelId || !emailTransporter) return false;
+    let claim = null;
+    await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext('activation-email'))`;
+        const existing = await tx.funnelEvent.findFirst({
+            where: {
+                hotelId,
+                eventName: { in: ['ActivationEmailSending', 'ActivationEmailSent'] },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (existing?.eventName === 'ActivationEmailSent') return;
+        if (existing && existing.createdAt > new Date(Date.now() - 5 * 60 * 1000)) return;
+        if (existing) await tx.funnelEvent.delete({ where: { id: existing.id } });
+        claim = await tx.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: 'ActivationEmailSending',
+                eventId: `marketel-activation-email.${hotelId}.${Date.now()}`,
+            },
+        });
+    });
+    if (!claim) return false;
+
+    try {
+        const [hotel, domainRow] = await Promise.all([
+            prisma.hotelConfig.findUnique({
+                where: { id: hotelId },
+                select: { id: true, name: true, ownerEmail: true },
+            }),
+            prisma.hotelDomain.findFirst({
+                where: { hotelId },
+                orderBy: { isPrimary: 'desc' },
+                select: { domain: true },
+            }),
+        ]);
+        if (!hotel?.ownerEmail) throw new Error('Property has no owner email');
+        const domain = domainRow?.domain || await assignUniqueDomainForHotel(hotel);
+        const frontdeskUrl = `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotelId)}`;
+        const sent = await sendActivationEmail({
+            toEmail: hotel.ownerEmail,
+            hotelName: hotel.name || 'Your property',
+            hotelId,
+            domain,
+            frontdeskUrl,
+        });
+        if (!sent) throw new Error('Activation email was not sent');
+        await prisma.funnelEvent.update({
+            where: { id: claim.id },
+            data: {
+                eventName: 'ActivationEmailSent',
+                eventId: `marketel-activation-email.${hotelId}`,
+                guestEmail: hotel.ownerEmail,
+            },
+        });
+        return true;
+    } catch (error) {
+        await prisma.funnelEvent.deleteMany({ where: { id: claim.id, eventName: 'ActivationEmailSending' } }).catch(() => {});
+        console.error('Activation email failed:', error.message);
+        return false;
+    }
+}
+
 async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = null }) {
     if (!hotelId || !checkoutSession?.id) return;
     const eventId = `marketel-subscribe.${checkoutSession.id}`;
@@ -9589,6 +9942,7 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
             eventId,
         });
     }
+    await sendMarketelActivationEmailOnce(hotelId, req);
 }
 
 function invoiceSubscriptionId(invoice) {
@@ -10424,11 +10778,16 @@ app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'roomName is required.' });
         }
 
-        await withRetry(() => prisma.manualRoom.upsert({
+        const existingRoom = await prisma.room.findUnique({
             where: { hotelId_name: { hotelId, name: roomName } },
-            update: { totalUnits },
-            create: { hotelId, name: roomName, totalUnits },
-        }));
+            select: { id: true },
+        });
+        await saveRoomCatalogEntry({
+            hotelId,
+            roomId: existingRoom?.id || '',
+            name: roomName,
+            totalUnits: safeRoomUnits(totalUnits),
+        });
         maybeNotifyRoomSoldOutToday(hotelId, roomName).catch(() => {});
 
         const rooms = await getManualRooms(hotelId);
@@ -10436,7 +10795,8 @@ app.post('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
         res.json({ success: true, data: payload });
     } catch (e) {
         console.error('manual-availability:rooms failed:', e.message);
-        res.status(500).json({ success: false, message: e.message });
+        const status = e.code === 'ROOM_NAME_CONFLICT' ? 409 : 500;
+        res.status(status).json({ success: false, message: e.message });
     }
 });
 
@@ -10464,20 +10824,53 @@ app.put('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
             return res.status(404).json({ success: false, message: 'Room type not found.' });
         }
 
-        if (newRoomName !== currentRoomName) {
-            const conflict = await withRetry(() => prisma.manualRoom.findUnique({
-                where: { hotelId_name: { hotelId, name: newRoomName } },
-                select: { id: true },
-            }));
-            if (conflict) {
-                return res.status(409).json({ success: false, message: 'A room with this name already exists.' });
-            }
+        const engineRoom = await prisma.room.findUnique({
+            where: { hotelId_name: { hotelId, name: currentRoomName } },
+            select: { id: true },
+        });
+        if (engineRoom) {
+            await saveRoomCatalogEntry({
+                hotelId,
+                roomId: engineRoom.id,
+                name: newRoomName,
+                totalUnits: safeRoomUnits(totalUnits),
+            });
+        } else {
+            // Preserve legacy inventory-only rooms and their overrides while
+            // repairing the missing guest-facing Room row.
+            await prisma.$transaction(async (tx) => {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext('room-catalog'))`;
+                const roomConflict = await tx.room.findUnique({
+                    where: { hotelId_name: { hotelId, name: newRoomName } },
+                    select: { id: true },
+                });
+                const manualConflict = await tx.manualRoom.findUnique({
+                    where: { hotelId_name: { hotelId, name: newRoomName } },
+                    select: { id: true },
+                });
+                if (roomConflict || (manualConflict && manualConflict.id !== room.id)) {
+                    throw roomCatalogError('ROOM_NAME_CONFLICT', 'A room with this name already exists.');
+                }
+                const units = safeRoomUnits(totalUnits);
+                await tx.manualRoom.update({ where: { id: room.id }, data: { name: newRoomName, totalUnits: units } });
+                await tx.manualOverride.updateMany({
+                    where: { roomId: room.id, availableUnits: { gt: units } },
+                    data: { availableUnits: units },
+                });
+                const count = await tx.room.count({ where: { hotelId } });
+                await tx.room.create({
+                    data: { hotelId, name: newRoomName, totalUnits: units, maxOccupancy: 4, sortOrder: count },
+                });
+                await tx.booking.updateMany({
+                    where: { hotelId, roomName: currentRoomName },
+                    data: { roomName: newRoomName },
+                });
+                await tx.guestMessage.updateMany({
+                    where: { hotelId, roomName: currentRoomName },
+                    data: { roomName: newRoomName },
+                });
+            }, { maxWait: 5000, timeout: 15000 });
         }
-
-        await withRetry(() => prisma.manualRoom.update({
-            where: { id: room.id },
-            data: { name: newRoomName, totalUnits },
-        }));
         maybeNotifyRoomSoldOutToday(hotelId, newRoomName).catch(() => {});
 
         const rooms = await getManualRooms(hotelId);
@@ -10485,7 +10878,8 @@ app.put('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
         res.json({ success: true, data: payload });
     } catch (e) {
         console.error('manual-availability:rooms update failed:', e.message);
-        res.status(500).json({ success: false, message: e.message });
+        const status = e.code === 'ROOM_NAME_CONFLICT' ? 409 : 500;
+        res.status(status).json({ success: false, message: e.message });
     }
 });
 
@@ -10507,38 +10901,15 @@ app.delete('/api/crm/manual-availability/rooms', crmAuth, async (req, res) => {
             return res.status(404).json({ success: false, message: 'Room type not found.' });
         }
 
-        await withRetry(() => prisma.$transaction([
-            prisma.manualOverride.deleteMany({ where: { roomId: room.id } }),
-            prisma.manualRoom.delete({ where: { id: room.id } }),
-        ]));
-
-        // Also delete the corresponding Room record (engine)
-        // Must use individual delete (not deleteMany) to trigger cascade on RoomImage
-        let roomDeleteCount = 0;
-        try {
-            const roomsToDelete = await prisma.room.findMany({ where: { hotelId, name: roomName }, select: { id: true } });
-            for (const r of roomsToDelete) {
-                await prisma.room.delete({ where: { id: r.id } });
-                roomDeleteCount++;
-            }
-        } catch (roomDelErr) {
-            // If cascade fails, manually delete images first then room
-            try {
-                const roomsToDelete = await prisma.room.findMany({ where: { hotelId, name: roomName }, select: { id: true } });
-                for (const r of roomsToDelete) {
-                    await prisma.roomImage.deleteMany({ where: { roomId: r.id } });
-                    await prisma.room.delete({ where: { id: r.id } });
-                    roomDeleteCount++;
-                }
-            } catch (e2) { /* give up */ }
-        }
+        const deletion = await deleteRoomCatalogEntry({ hotelId, roomName: room.name });
 
         const rooms = await getManualRooms(hotelId);
         const payload = formatManualAvailabilityPayload(rooms);
-        res.json({ success: true, data: payload, roomDeleteCount });
+        res.json({ success: true, data: payload, roomDeleteCount: deletion.deleted ? 1 : 0 });
     } catch (e) {
         console.error('manual-availability:rooms delete failed:', e.message);
-        res.status(500).json({ success: false, message: e.message });
+        const status = e.code === 'ROOM_HAS_BOOKINGS' ? 409 : 500;
+        res.status(status).json({ success: false, message: e.message });
     }
 });
 
@@ -10647,43 +11018,24 @@ app.post('/api/crm/rooms', crmAuth, async (req, res) => {
         const { id, name, description, amenities, maxOccupancy, totalUnits } = req.body;
         if (!name) return res.status(400).json({ success: false, message: 'Room name required' });
 
-        let room;
-        if (id) {
-            // Get old name before update (for ManualRoom rename sync)
-            const oldRoom = await prisma.room.findUnique({ where: { id }, select: { name: true } });
-            const data = { name };
-            if (description !== undefined) data.description = description || null;
-            if (amenities !== undefined) data.amenities = amenities || null;
-            if (maxOccupancy !== undefined) data.maxOccupancy = maxOccupancy || 4;
-            if (totalUnits !== undefined) data.totalUnits = totalUnits || 1;
-            room = await withRetry(() => prisma.room.update({
-                where: { id },
-                data,
-            }));
-            // If name changed, delete old ManualRoom
-            if (oldRoom && oldRoom.name !== name) {
-                await prisma.manualRoom.deleteMany({ where: { hotelId, name: oldRoom.name } }).catch(() => {});
-            }
-        } else {
-            const count = await prisma.room.count({ where: { hotelId } });
-            room = await withRetry(() => prisma.room.create({
-                data: { hotelId, name, description: description || null, amenities: amenities || null, maxOccupancy: maxOccupancy || 4, totalUnits: totalUnits || 1, sortOrder: count },
-            }));
-        }
-
-        // Sync ManualRoom for availability
-        const syncUnits = totalUnits !== undefined ? (totalUnits || 1) : (room.totalUnits || 1);
-        await prisma.manualRoom.upsert({
-            where: { hotelId_name: { hotelId, name } },
-            create: { hotelId, name, totalUnits: syncUnits },
-            update: { totalUnits: syncUnits },
+        const room = await saveRoomCatalogEntry({
+            hotelId,
+            roomId: id,
+            name,
+            description,
+            amenities,
+            maxOccupancy,
+            totalUnits,
         });
 
         res.json({ success: true, room: { id: room.id, name: room.name } });
     } catch (e) {
         console.error('CRM rooms POST error:', e.message);
-        const msg = e.message?.includes('Unique constraint') ? 'A room with that name already exists' : 'Failed to save room';
-        res.status(500).json({ success: false, message: msg });
+        const status = e.code === 'ROOM_NOT_FOUND' ? 404 : e.code === 'ROOM_NAME_CONFLICT' ? 409 : 500;
+        const msg = e.code?.startsWith('ROOM_')
+            ? e.message
+            : e.message?.includes('Unique constraint') ? 'A room with that name already exists' : 'Failed to save room';
+        res.status(status).json({ success: false, message: msg });
     }
 });
 
@@ -10692,17 +11044,15 @@ app.delete('/api/crm/rooms/:roomId', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        // Get room name before deleting (needed to clean up ManualRoom)
-        const room = await prisma.room.findUnique({ where: { id: req.params.roomId }, select: { name: true } });
-        await withRetry(() => prisma.room.delete({ where: { id: req.params.roomId } }));
-        // Also delete the corresponding ManualRoom (availability)
-        if (room?.name) {
-            await prisma.manualRoom.deleteMany({ where: { hotelId, name: room.name } }).catch(() => {});
-        }
+        await deleteRoomCatalogEntry({ hotelId, roomId: req.params.roomId });
         res.json({ success: true });
     } catch (e) {
         console.error('CRM rooms DELETE error:', e.message);
-        res.status(500).json({ success: false, message: 'Failed to delete room' });
+        const status = e.code === 'ROOM_HAS_BOOKINGS' ? 409 : e.code === 'ROOM_NOT_FOUND' ? 404 : 500;
+        res.status(status).json({
+            success: false,
+            message: e.code?.startsWith('ROOM_') ? e.message : 'Failed to delete room',
+        });
     }
 });
 
@@ -10730,7 +11080,18 @@ app.post('/api/crm/rooms/:roomId/images', crmAuth, upload.single('image'), async
 // Delete room image
 app.delete('/api/crm/rooms/:roomId/images/:imageId', crmAuth, async (req, res) => {
     try {
-        await withRetry(() => prisma.roomImage.delete({ where: { id: req.params.imageId } }));
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const image = await prisma.roomImage.findFirst({
+            where: {
+                id: req.params.imageId,
+                roomId: req.params.roomId,
+                room: { hotelId },
+            },
+            select: { id: true },
+        });
+        if (!image) return res.status(404).json({ success: false, message: 'Image not found' });
+        await withRetry(() => prisma.roomImage.delete({ where: { id: image.id } }));
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: 'Failed to delete image' });

@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marketel &mdash; Stop Paying OTAs for Guests Who Already Found You</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,7 +121,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <script>if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');}</script>
 <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1545780930244672&ev=PageView&noscript=1"/></noscript>
 <!-- End Meta Pixel Code -->
-<script type="text/javascript">if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");}</script>
+<script type="text/javascript">if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){var loadClarity=function(){(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");};if('requestIdleCallback'in window)requestIdleCallback(loadClarity,{timeout:3000});else setTimeout(loadClarity,1800);}</script>
 </head>
 <body>
 
@@ -128,8 +130,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </nav>
 
 <section class="hero">
-  <h1>Stop paying <span class="red">15&ndash;25%</span> to OTAs on guests who <span class="green">already found you</span>.</h1>
-  <p>Build your property&apos;s direct booking engine in under 3 minutes.</p>
+  <h1 id="heroTitle">Stop paying <span class="red">15&ndash;25%</span> to OTAs on guests who <span class="green">already found you</span>.</h1>
+  <p id="heroCopy">Build your property&apos;s direct booking engine in under 3 minutes.</p>
   <div class="cta-box">
     <input type="email" id="setupEmail" placeholder="Your email" autocomplete="email">
     <button class="cta-btn" onclick="startFreeSetup()">Build My Free Preview &rarr;</button>
@@ -141,8 +143,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <div class="demo-label">Properties using this right now:</div>
   <div style="text-align:center; margin-bottom:16px;">
     <span style="font-size:28px; font-weight:800; color:#2E7D5B;">$5,800</span>
-    <span style="font-size:13px; color:#6b7280; display:block; margin-top:2px;">booked direct last month &mdash; Suite Stay, Alabama.</span>
-    <span style="font-size:13px; color:#dc2626; display:block; margin-top:4px; font-weight:600;">Without it, $1,160 of that would've gone to Booking.com.</span>
+    <span style="font-size:13px; color:#6b7280; display:block; margin-top:2px;">booked direct in one recorded month &mdash; Suite Stay, Alabama.</span>
+    <span style="font-size:13px; color:#dc2626; display:block; margin-top:4px; font-weight:600;">At a 20% OTA commission, that&apos;s up to $1,160 kept by the property.</span>
   </div>
   <div class="demo-tabs">
     <button class="demo-tab active" onclick="switchDemo('suite')">Suite Stay &mdash; AL</button>
@@ -150,13 +152,34 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <button class="demo-tab" onclick="switchDemo('hp')">Home Place Suites &mdash; OK</button>
   </div>
   <div class="demo-frame-wrap" id="demoWrap" style="max-width:100%; margin:0 8px; position:relative;">
-    <iframe id="demoFrame" src="https://suitestay.clickinns.com" style="width:100%; height:750px;"></iframe>
+    <iframe id="demoFrame" src="https://suitestay.clickinns.com" title="Live Marketel booking-page example" loading="lazy" fetchpriority="low" style="width:100%; height:750px;"></iframe>
   </div>
 </section>
 
 <script>
-// Track landing page view
-fetch('/api/funnel/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventName: 'LandingPageView' }) }).catch(() => {});
+const requestedAngle = new URLSearchParams(window.location.search).get('angle') || 'direct';
+const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requestedAngle) ? requestedAngle : 'direct';
+const angleCopy = {
+  guest_app: {
+    title: 'Put your property on your guests\' <span class="green">Home Screen</span>.',
+    copy: 'Give guests one-tap direct rebooking and a direct line back to your property.',
+  },
+  assistant: {
+    title: 'Add direct bookings without losing track of <span class="green">walk-ins</span>.',
+    copy: 'Marketel checks in, records outside bookings, and keeps your direct availability current.',
+  },
+};
+if (angleCopy[ACQUISITION_ANGLE]) {
+  document.getElementById('heroTitle').innerHTML = angleCopy[ACQUISITION_ANGLE].title;
+  document.getElementById('heroCopy').textContent = angleCopy[ACQUISITION_ANGLE].copy;
+}
+
+// Track landing page view and the ad promise that brought the owner here.
+fetch('/api/funnel/onboarding', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ eventName: 'LandingPageView', contentName: ACQUISITION_ANGLE }),
+}).catch(() => {});
 
 function startFreeSetup() {
   const email = document.getElementById('setupEmail').value.trim();
@@ -173,13 +196,13 @@ function startFreeSetup() {
   const API = '';
   fetch(API + '/api/setup/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, acquisitionAngle: ACQUISITION_ANGLE }),
   }).then(r => r.json()).then(data => {
     if (data.setupUrl) {
       fetch('/api/funnel/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventName: 'SetupStarted', setupToken: data.token }),
+        body: JSON.stringify({ eventName: 'SetupStarted', setupToken: data.token, contentName: ACQUISITION_ANGLE }),
         keepalive: true,
       }).catch(() => {});
       window.location.href = API + data.setupUrl;

@@ -110,7 +110,7 @@ export function GuestMessageCard({ apiBaseUrl = '', hotelId, reservationCode, gu
       ) : (
         <>
           <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', lineHeight: 1.5 }}>
-            Have a request or question? Send it straight to the property — they'll see it instantly.
+            Have a request or question? Send it straight to the property's Front Desk so their team can follow up.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
             {QUICK_REQUESTS.map((label) => {

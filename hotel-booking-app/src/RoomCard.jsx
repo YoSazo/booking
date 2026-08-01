@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     ? 'http://localhost:3001'
     : ''
 );
-const FALLBACK_ROOM_IMAGE = 'https://suitestay.clickinns.com/kingbedsuitestay.webp';
+const FALLBACK_ROOM_IMAGE = `${API_BASE_URL}/room-placeholder.svg`;
 
 function PhotoUploadButton({ roomId, onPhotosAdded, hotelId }) {
   const fileRef = useRef(null);

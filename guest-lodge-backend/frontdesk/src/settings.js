@@ -1022,7 +1022,7 @@ function renderEditRoomsCards() {
       <div class="room-edit-media">
       <div class="room-edit-photo" data-photo-index="0">
         ${images.length ? `
-          <img class="room-edit-main-img" src="${esc(images[0].url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';">
+          <img class="room-edit-main-img" src="${esc(images[0].url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/room-placeholder.svg';">
           ${images.length > 1 ? `
             <button type="button" class="room-edit-image-nav room-edit-image-nav--left" aria-label="Previous photo" onclick="event.stopPropagation();stepEditRoomPhoto('${roomIdJs}', -1)"><i data-lucide="chevron-left" style="width:20px;height:20px;"></i></button>
             <button type="button" class="room-edit-image-nav room-edit-image-nav--right" aria-label="Next photo" onclick="event.stopPropagation();stepEditRoomPhoto('${roomIdJs}', 1)"><i data-lucide="chevron-right" style="width:20px;height:20px;"></i></button>
@@ -1036,7 +1036,7 @@ function renderEditRoomsCards() {
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${roomIdJs}')">
         </label>
       </div>
-      ${images.length > 1 ? `<div class="room-edit-thumbs">` + images.map((img, idx) => `<div class="room-edit-thumb-wrap"><button type="button" class="room-edit-thumb ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="showEditRoomPhoto('${roomIdJs}', ${idx})"><img src="${esc(img.url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://suitestay.clickinns.com/kingbedsuitestay.webp';"></button><button type="button" onclick="event.stopPropagation();deleteEditImage('${roomIdJs}','${jsStr(img.id)}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
+      ${images.length > 1 ? `<div class="room-edit-thumbs">` + images.map((img, idx) => `<div class="room-edit-thumb-wrap"><button type="button" class="room-edit-thumb ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="showEditRoomPhoto('${roomIdJs}', ${idx})"><img src="${esc(img.url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/room-placeholder.svg';"></button><button type="button" onclick="event.stopPropagation();deleteEditImage('${roomIdJs}','${jsStr(img.id)}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       </div>
       <div class="room-edit-fields" style="padding:18px;">
         <div data-tour-room-details-anchor="1" style="margin-bottom:12px;">
@@ -1568,13 +1568,13 @@ async function deleteEditImage(roomId, imageId) {
 }
 
 async function deleteEditRoom(roomId) {
-  if (!confirm('Delete this room type?')) return;
+  if (!confirm('Delete this room from your booking page and Availability? Saved date changes will also be removed.')) return;
   try {
     await api('DELETE', `/api/crm/rooms/${roomId}`);
     toast('Room deleted', 'success');
     loadEditRooms();
   } catch (e) {
-    toast('Failed to delete', 'error');
+    toast(e.message || 'Failed to delete', 'error');
   }
 }
 
