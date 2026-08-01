@@ -14,6 +14,10 @@ let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, 
 let bookingPageTimer = 0;
 let guestAppDemoTimer = 0;
 let guestAppDemoObserver = null;
+let guestAppDemoSlide = 0;
+
+const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
+const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 
 function isLocalFrontdesk() {
   const host = window.location.hostname;
@@ -238,6 +242,10 @@ function bookingRevealHtml() {
   </section>`;
 }
 
+function iosSystemIcon(url, label) {
+  return `<img class="mvr-ios-system-icon" src="${esc(url)}" alt="${esc(label)}">`;
+}
+
 function guestAppRevealHtml() {
   return `<section class="mvr-stage mvr-stage-app">
     <div class="mvr-copy">
@@ -249,45 +257,71 @@ function guestAppRevealHtml() {
         A direct path back for them and a direct line from Front Desk for you.
       </div>
     </div>
-    <div class="mvr-visual mvr-install-visual ${homeScreenInstalled ? 'is-installed' : ''}">
-      <div class="mvr-install-demo-stage">
-        <div class="mvr-install-entry">
-          <div class="mvr-install-card">
-            <div class="mvr-install-property-icon">${appIconHtml()}</div>
-            <div>
-              <strong>Get the ${esc(propertyName())} app</strong>
-              <span>Keep us one tap away for future stays. No app store.</span>
+    <div class="mvr-visual mvr-install-visual ${homeScreenInstalled ? 'is-installed' : ''} ${guestAppDemoSlide === 1 ? 'is-slide-2' : ''}">
+      <div class="mvr-app-carousel">
+        <div class="mvr-app-carousel-viewport">
+          <div class="mvr-app-carousel-track">
+            <div class="mvr-app-carousel-slide mvr-app-carousel-install" aria-hidden="${guestAppDemoSlide === 0 ? 'false' : 'true'}">
+              <div class="mvr-install-demo-stage">
+                <div class="mvr-install-entry">
+                  <small class="mvr-install-context">On your booking page</small>
+                  <div class="mvr-install-card">
+                    <div class="mvr-install-property-icon">${appIconHtml()}</div>
+                    <div>
+                      <strong>Get the ${esc(propertyName())} app</strong>
+                      <span>Keep us one tap away for future stays. No app store.</span>
+                    </div>
+                    <button type="button" id="mvrInstallDemo" ${homeScreenInstalled ? 'disabled' : ''}>${homeScreenInstalled ? 'Installed ✓' : 'Install'}</button>
+                  </div>
+                  <div class="mvr-install-arrow"><span>${homeScreenInstalled ? 'Now on their Home Screen' : 'Tap Install'}</span><b>↓</b></div>
+                  <div class="mvr-ios-crop">
+                    <div class="mvr-ios-dock">
+                      <div class="mvr-dock-icon mvr-dock-property">${appIconHtml()}</div>
+                      <div class="mvr-dock-icon">${iosSystemIcon(IOS_PHONE_ICON_URL, 'Phone')}</div>
+                      <div class="mvr-dock-icon">${iosSystemIcon(IOS_SAFARI_ICON_URL, 'Safari')}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <button type="button" id="mvrInstallDemo" ${homeScreenInstalled ? 'disabled' : ''}>${homeScreenInstalled ? 'Installed ✓' : 'Install'}</button>
+            <div class="mvr-app-carousel-slide mvr-app-carousel-value" aria-hidden="${guestAppDemoSlide === 1 ? 'false' : 'true'}">
+              <div class="mvr-installed-value">
+                <div class="mvr-installed-value-head">
+                  <div class="mvr-installed-app-icon">${appIconHtml()}</div>
+                  <div>
+                    <strong>From their Home Screen</strong>
+                    <span>${esc(propertyName())} stays one tap away.</span>
+                  </div>
+                  <b>✓</b>
+                </div>
+                <div class="mvr-app-direct-result">
+                  <span aria-hidden="true">↗</span>
+                  <div>
+                    <strong>Book direct again</strong>
+                    <small>One tap brings them straight back to your booking page.</small>
+                  </div>
+                </div>
+                <div class="mvr-app-push-preview">
+                  <div class="mvr-app-push-meta">
+                    <span class="mvr-app-push-icon">${appIconHtml()}</span>
+                    <strong>${esc(propertyName())}</strong>
+                    <span>now</span>
+                  </div>
+                  <div class="mvr-app-push-title">Summer dates are open</div>
+                  <div class="mvr-app-push-body">Tap to see availability and book direct.</div>
+                </div>
+                <div class="mvr-app-push-foot">Sent from Front Desk → delivered to their phone</div>
+              </div>
+            </div>
           </div>
-          <small class="mvr-install-context">The same Install button guests see on your booking page.</small>
         </div>
-        <div class="mvr-installed-value" aria-hidden="${homeScreenInstalled ? 'false' : 'true'}">
-          <div class="mvr-installed-value-head">
-            <div class="mvr-installed-app-icon">${appIconHtml()}</div>
-            <div>
-              <strong>${esc(propertyName())} is now on their Home Screen</strong>
-              <span>No App Store search or account.</span>
-            </div>
-            <b>✓</b>
+        <div class="mvr-app-carousel-controls" aria-label="Guest app demonstration">
+          <button type="button" data-mvr-app-slide="0" aria-label="Show how guests install the app" ${guestAppDemoSlide === 0 ? 'disabled' : ''}>‹</button>
+          <div class="mvr-app-carousel-dots">
+            <button type="button" data-mvr-app-slide="0" class="${guestAppDemoSlide === 0 ? 'is-active' : ''}" aria-label="Installation" aria-current="${guestAppDemoSlide === 0 ? 'step' : 'false'}"></button>
+            <button type="button" data-mvr-app-slide="1" class="${guestAppDemoSlide === 1 ? 'is-active' : ''}" aria-label="What the app unlocks" aria-current="${guestAppDemoSlide === 1 ? 'step' : 'false'}"></button>
           </div>
-          <div class="mvr-app-direct-result">
-            <span aria-hidden="true">↗</span>
-            <div>
-              <strong>Book direct again</strong>
-              <small>One tap brings them straight back to your booking page.</small>
-            </div>
-          </div>
-          <div class="mvr-app-push-preview">
-            <div class="mvr-app-push-meta">
-              <span class="mvr-app-push-icon">${appIconHtml()}</span>
-              <strong>${esc(propertyName())}</strong>
-              <span>now</span>
-            </div>
-            <div class="mvr-app-push-title">Summer dates are open</div>
-            <div class="mvr-app-push-body">Tap to see availability and book direct.</div>
-          </div>
-          <div class="mvr-app-push-foot">Sent from Front Desk → delivered to their phone</div>
+          <button type="button" data-mvr-app-slide="1" aria-label="Show what the guest app unlocks" ${guestAppDemoSlide === 1 ? 'disabled' : ''}>›</button>
         </div>
       </div>
     </div>
@@ -429,12 +463,7 @@ function showExpandedPreview() {
 }
 
 function moveToStep(nextStep) {
-  if (guestAppDemoTimer) {
-    window.clearTimeout(guestAppDemoTimer);
-    guestAppDemoTimer = 0;
-  }
-  guestAppDemoObserver?.disconnect();
-  guestAppDemoObserver = null;
+  clearGuestAppDemoSchedule();
   currentStep = Math.max(0, Math.min(3, nextStep));
   persistStep();
   const events = [
@@ -453,12 +482,7 @@ function finishReveal() {
     window.clearTimeout(bookingPageTimer);
     bookingPageTimer = 0;
   }
-  if (guestAppDemoTimer) {
-    window.clearTimeout(guestAppDemoTimer);
-    guestAppDemoTimer = 0;
-  }
-  guestAppDemoObserver?.disconnect();
-  guestAppDemoObserver = null;
+  clearGuestAppDemoSchedule();
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -495,42 +519,79 @@ async function activateMarketel(button) {
   }
 }
 
-function revealGuestAppValue(manual = false) {
-  if (homeScreenInstalled) return;
-  homeScreenInstalled = true;
+function clearGuestAppDemoSchedule() {
   if (guestAppDemoTimer) {
     window.clearTimeout(guestAppDemoTimer);
     guestAppDemoTimer = 0;
   }
   guestAppDemoObserver?.disconnect();
   guestAppDemoObserver = null;
+}
+
+function setGuestAppInstallVisual(installed) {
+  homeScreenInstalled = !!installed;
   const visual = document.querySelector('.mvr-install-visual');
-  visual?.classList.add('is-installed');
-  const value = visual?.querySelector('.mvr-installed-value');
-  if (value) value.setAttribute('aria-hidden', 'false');
+  visual?.classList.toggle('is-installed', homeScreenInstalled);
   const button = document.getElementById('mvrInstallDemo');
   if (button) {
-    button.textContent = 'Installed ✓';
-    button.disabled = true;
+    button.textContent = homeScreenInstalled ? 'Installed ✓' : 'Install';
+    button.disabled = homeScreenInstalled;
   }
+  const arrowLabel = visual?.querySelector('.mvr-install-arrow span');
+  if (arrowLabel) arrowLabel.textContent = homeScreenInstalled ? 'Now on their Home Screen' : 'Tap Install';
+}
+
+function setGuestAppDemoSlide(nextSlide, manual = false) {
+  clearGuestAppDemoSchedule();
+  guestAppDemoSlide = Number(nextSlide) === 1 ? 1 : 0;
+  const visual = document.querySelector('.mvr-install-visual');
+  if (!visual) return;
+  visual.classList.toggle('is-slide-2', guestAppDemoSlide === 1);
+  visual.querySelectorAll('.mvr-app-carousel-slide').forEach((slide, index) => {
+    slide.setAttribute('aria-hidden', index === guestAppDemoSlide ? 'false' : 'true');
+  });
+  visual.querySelectorAll('.mvr-app-carousel-dots button').forEach((dot) => {
+    const isActive = Number(dot.dataset.mvrAppSlide) === guestAppDemoSlide;
+    dot.classList.toggle('is-active', isActive);
+    dot.setAttribute('aria-current', isActive ? 'step' : 'false');
+  });
+  visual.querySelectorAll('.mvr-app-carousel-controls > button').forEach((button) => {
+    button.disabled = Number(button.dataset.mvrAppSlide) === guestAppDemoSlide;
+  });
+  if (guestAppDemoSlide === 1) {
+    setGuestAppInstallVisual(true);
+  } else {
+    setGuestAppInstallVisual(false);
+    scheduleGuestAppValueDemo();
+  }
+  if (manual) trackReveal(guestAppDemoSlide === 1 ? 'GuestAppValueSlideViewed' : 'GuestAppInstallSlideReplayed');
+}
+
+function revealGuestAppValue(manual = false) {
+  if (homeScreenInstalled || guestAppDemoSlide !== 0) return;
+  clearGuestAppDemoSchedule();
+  setGuestAppInstallVisual(true);
   if (manual) trackReveal('GuestAppInstallDemoClicked');
+  guestAppDemoTimer = window.setTimeout(() => {
+    if (currentStep === 1 && document.getElementById('marketelValueReveal')) {
+      setGuestAppDemoSlide(1, false);
+    }
+  }, manual ? 900 : 1200);
 }
 
 function scheduleGuestAppValueDemo() {
-  if (guestAppDemoTimer) window.clearTimeout(guestAppDemoTimer);
-  guestAppDemoTimer = 0;
-  guestAppDemoObserver?.disconnect();
-  guestAppDemoObserver = null;
-  if (currentStep !== 1 || homeScreenInstalled) return;
+  clearGuestAppDemoSchedule();
+  if (currentStep !== 1 || guestAppDemoSlide !== 0) return;
   const visual = document.querySelector('.mvr-install-visual');
   if (!visual) return;
   const begin = () => {
-    if (guestAppDemoTimer || homeScreenInstalled) return;
+    if (guestAppDemoTimer) return;
     guestAppDemoTimer = window.setTimeout(() => {
       if (currentStep === 1 && document.getElementById('marketelValueReveal')) {
-        revealGuestAppValue(false);
+        if (homeScreenInstalled) setGuestAppDemoSlide(1, false);
+        else revealGuestAppValue(false);
       }
-    }, 1600);
+    }, homeScreenInstalled ? 900 : 1300);
   };
   if ('IntersectionObserver' in window) {
     guestAppDemoObserver = new IntersectionObserver((entries) => {
@@ -552,6 +613,12 @@ function bindRevealEvents() {
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.getElementById('mvrInstallDemo')?.addEventListener('click', () => {
     revealGuestAppValue(true);
+  });
+  document.querySelectorAll('[data-mvr-app-slide]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextSlide = Number(button.dataset.mvrAppSlide) === 1 ? 1 : 0;
+      if (nextSlide !== guestAppDemoSlide) setGuestAppDemoSlide(nextSlide, true);
+    });
   });
   scheduleGuestAppValueDemo();
 }
@@ -622,13 +689,11 @@ export function showMarketelValueReveal(options = {}) {
   if (crm.hotelSubscribed && currentStep === 3) currentStep = 0;
   livePreviewMode = 'guest';
   homeScreenInstalled = false;
+  guestAppDemoSlide = 0;
   bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
-  if (guestAppDemoTimer) window.clearTimeout(guestAppDemoTimer);
-  guestAppDemoTimer = 0;
-  guestAppDemoObserver?.disconnect();
-  guestAppDemoObserver = null;
+  clearGuestAppDemoSchedule();
 
   if (!crm.hotelSubscribed) {
     try {
