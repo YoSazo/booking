@@ -98,7 +98,7 @@ async function optimizeRoomPhotoForUpload(file) {
 
 function scheduleDeferredMessagesLoad() {
   const run = () => {
-    if (crm.currentFilter === 'bookings') loadMessages();
+    if (crm.currentFilter === 'apps') loadMessages();
     else loadMessageBadges();
   };
   if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 2500 });

@@ -613,6 +613,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         }
     }
 
+    private func updateGuestAppBadge(_ count: Int) {
+        if count <= 0 {
+            guestAppTabItem.badgeValue = nil
+        } else {
+            guestAppTabItem.badgeValue = count > 99 ? "99+" : String(count)
+        }
+    }
+
     private func marketelContactImage() -> UIImage {
         let size = CGSize(width: 512, height: 512)
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -750,6 +758,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             updatePropertyName(payload["hotelName"] as? String ?? "Front Desk")
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
+            updateGuestAppBadge(payload["guestAppBadge"] as? Int ?? 0)
             let requestedVisible = payload["visible"] as? Bool ?? true
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "saveContact":

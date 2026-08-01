@@ -6227,7 +6227,7 @@ async function notifyGuestMessage(hotelId, guestName, preview, reservationCode =
         const sent = await sendPushToHotel(hotelId, {
             title: `💬 Message from ${guestName || 'a guest'}`,
             body: (preview || 'Tap to read').slice(0, 160) + tag,
-            url: '/frontdesk?tab=bookings',
+            url: '/frontdesk?tab=apps',
             icon: '/apple-touch-icon.png',
         }, { TTL: 60 * 60 }, 'guestMessage');
         console.log(`💬 [push] guest message hotel=${hotelId} sent=${sent}`);

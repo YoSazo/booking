@@ -512,19 +512,26 @@ function startAppsTour(opts) {
   const nativeMode = !!windowFn('isNativeFrontdeskApp')?.();
   _appsTourSteps = nativeMode ? [
     {
+      target: '#tour-guest-reach',
+      kicker: 'Direct guest reach',
+      title: 'Send a push notification directly to their phone.',
+      text: 'Every guest who downloads your app and turns on notifications can receive a message from you whenever you choose.',
+      tooltipPosition: 'above',
+    },
+    {
+      target: '#tour-native-guest-share',
+      kicker: 'Build your audience',
+      title: 'Get your app onto their phone.',
+      text: 'Show the QR, copy the link, or open the guest page. They install it from there.',
+      tooltipPosition: 'above',
+    },
+    {
       target: '#tour-guest-icon-section',
-      kicker: 'Guest App',
+      kicker: 'Make it yours',
       title: 'Choose the icon guests will save.',
       text: 'Use your logo or a clear property photo.',
       scrollBlock: 'start',
       tooltipPosition: 'below',
-    },
-    {
-      target: '#tour-native-guest-share',
-      kicker: 'Ready',
-      title: 'Share it with guests.',
-      text: 'Show the QR, copy the link, or open the guest page.',
-      tooltipPosition: 'above',
     },
     {
       target: '#tour-native-install-guide',
@@ -540,8 +547,8 @@ function startAppsTour(opts) {
     {
       target: '#tour-apps-intro',
       kicker: 'The loop',
-      title: 'Your property becomes the app.',
-      text: 'Guests book direct, save your property to their phone, and come back with one tap.',
+      title: 'Your property becomes the app—and the direct connection.',
+      text: 'Guests book direct, save your property to their phone, and can receive notifications from you.',
     },
     {
       target: '#tour-apps-first',
@@ -562,6 +569,15 @@ function startAppsTour(opts) {
       tooltipGap: 8,
     },
     {
+      target: '#tour-apps-after',
+      kicker: 'Direct reach',
+      title: 'Send a notification to their phone whenever you want.',
+      text: 'Anyone who installs your app and turns on notifications becomes reachable directly from Front Desk.',
+      scrollBlock: 'center',
+      tooltipPosition: 'below',
+      tooltipGap: 8,
+    },
+    {
       target: '#tour-guest-icon-section',
       kicker: 'One setup item',
       title: 'Make the icon feel like your property.',
@@ -575,8 +591,8 @@ function startAppsTour(opts) {
       kicker: hotelIsLive ? 'Live loop' : 'Activation',
       title: hotelIsLive ? 'This loop is on.' : 'Everything is ready to turn on.',
       text: hotelIsLive
-        ? 'Guests book, save your property, and message you. Front Desk gets the alerts.'
-        : 'For $199/month, guests can book direct, save your property, and message you — while Front Desk receives the alerts.',
+        ? 'Guests book, save your property, receive your updates, and message you. Front Desk gets the alerts.'
+        : 'For $199/month, guests can book direct, save your property, receive your updates, and message you — while Front Desk receives the alerts.',
       primaryLabel: hotelIsLive ? 'Done' : 'Activate everything — $199/month',
       secondaryLabel: hotelIsLive ? 'Close' : 'Keep exploring',
       activateOnNext: !hotelIsLive,

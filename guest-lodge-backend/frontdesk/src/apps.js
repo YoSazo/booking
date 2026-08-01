@@ -401,7 +401,7 @@ function renderAppsView() {
     { type: 'image', src: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest sends message', title: 'Your guest texts you',
       caption: 'Like "How do I connect to WiFi?" — they type it in your guest app.' },
     { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'You reply', title: 'You text them back',
-      caption: 'Open <strong>Bookings</strong>, type your reply. Takes 5 seconds.' },
+      caption: 'Open <strong>Guest App</strong>, choose the conversation, and reply.' },
     { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest gets reply alert', title: 'Their phone buzzes with your answer',
       caption: 'They get your reply on their phone — like a text from you.' },
   ];
@@ -523,7 +523,7 @@ function renderAppsView() {
       <div class="apps-loop-side">
         <div class="apps-loop-tile apps-loop-tile--guest">${loopGuestTile}</div>
         <div class="apps-loop-name">${hName}</div>
-        <div class="apps-loop-sub">book &amp; message, 1 tap</div>
+        <div class="apps-loop-sub">book direct &amp; receive updates</div>
       </div>
     </div>`;
 
@@ -531,8 +531,8 @@ function renderAppsView() {
     <section class="apps-story">
       <div id="tour-apps-intro">
         <div class="apps-story-kicker">Guest App</div>
-        <h2 class="apps-story-title" id="tour-apps-headline">Your property can be on your guest&apos;s home screen.</h2>
-        <p class="apps-story-copy" id="tour-apps-copy">Guests do not need the App Store. They go to your direct booking page, scroll down, tap <strong>Install</strong>, and your property appears on their phone like an app.</p>
+        <h2 class="apps-story-title" id="tour-apps-headline">Live on their Home Screen. Reach their phone directly.</h2>
+        <p class="apps-story-copy" id="tour-apps-copy">Guests install your property from the direct booking page—no App Store. If they turn on notifications, you can send a push notification directly to their phone whenever you want.</p>
       </div>
 
       <div class="apps-story-line" id="tour-apps-first">
@@ -551,8 +551,8 @@ function renderAppsView() {
 
       <div class="apps-story-line" id="tour-apps-after">
         <div class="apps-story-step">After that</div>
-        <h3 class="apps-story-line-title">Everything connects.</h3>
-        <p>Guests tap your property icon to book direct or message you. New bookings and messages come back here in Front Desk.</p>
+        <h3 class="apps-story-line-title">You can reach them directly.</h3>
+        <p>Send one notification from Front Desk and it goes directly to every guest who has your app notifications turned on. They can tap it and return to your property.</p>
       </div>
     </section>`;
 
@@ -646,23 +646,27 @@ function renderAppsView() {
         ? '<button type="button" onclick="window.location.reload()" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Retry booking alerts</button>'
         : '<button type="button" onclick="openNativeNotificationSettings()" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Open iPhone notification settings</button>')}
     </div>`;
+  const guestMessagesPanelHtml = '<div id="messagesPanel"></div>';
   const nativeGuestToolsHtml = `
     <div class="apps-native-title">Guest App</div>
-    ${nativeAlertsCardHtml}
-    ${guestIconCardHtml()}
+    <p class="apps-native-lead">Guests who download your app and turn on notifications become directly reachable from Front Desk.</p>
+    ${guestMessagesPanelHtml}
+    ${guestBroadcastCardHtml({ compact: true })}
     ${nativeGuestShareHtml}
-    ${guestBroadcastCardHtml({ compact: true })}`;
+    ${guestIconCardHtml()}
+    ${nativeAlertsCardHtml}`;
   const unlockedToolsHtml = `
     ${deviceCardHtml(true)}
-    ${guestIconCardHtml()}
     ${guestPhonesCardHtml}
     ${guestBroadcastCardHtml()}
+    ${guestIconCardHtml()}
     ${helpFoldHtml}`;
 
   const appsMainHtml = fdNativeApp
     ? nativeGuestToolsHtml
     : `${appsStoryHtml}
       ${loopDiagramHtml}
+      ${guestMessagesPanelHtml}
       ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
 
   const appsFootnoteHtml = fdNativeApp
@@ -674,7 +678,8 @@ function renderAppsView() {
   el.innerHTML = `
   <style>
     .apps-page { padding:4px 0 28px; }
-    .apps-native-title { font-size:24px;font-weight:800;color:var(--text);line-height:1.2;margin:2px 0 16px; }
+    .apps-native-title { font-size:24px;font-weight:800;color:var(--text);line-height:1.2;margin:2px 0 7px; }
+    .apps-native-lead { margin:0 0 16px;color:var(--text-muted);font-size:14px;line-height:1.5; }
     .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
     .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
     .apps-story { margin:0 0 22px;padding:4px 2px 2px; }
@@ -733,7 +738,24 @@ function renderAppsView() {
     .apps-video-teaser__play::after { content:'';width:0;height:0;border-style:solid;border-width:6px 0 6px 9px;border-color:transparent transparent transparent #fff;margin-left:2px; }
     @keyframes appsVideoPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.08);opacity:0.85} }
     .apps-step-title-row { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px; }
-    .apps-broadcast-card { background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow); }
+    .apps-broadcast-card { background:var(--white);border:1.5px solid #CFE0D6;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 12px 34px rgba(26,43,34,.09); }
+    .guest-reach-intro { margin-bottom:13px; }
+    .guest-reach-kicker { margin-bottom:6px;color:var(--green);font-size:10px;font-weight:850;letter-spacing:.085em;text-transform:uppercase; }
+    .guest-reach-title { color:var(--text);font-size:20px;font-weight:850;line-height:1.18;letter-spacing:-.01em; }
+    .guest-reach-intro p { margin:7px 0 0;color:var(--text-muted);font-size:13px;line-height:1.5; }
+    .guest-notification-demo { margin:0 0 14px;padding:15px 11px 11px;border-radius:16px;background:linear-gradient(145deg,#BFD2C7,#E7ECE9);overflow:hidden; }
+    .guest-notification-shell { padding:11px 12px 12px;border:1px solid rgba(255,255,255,.64);border-radius:17px;background:rgba(246,248,247,.88);box-shadow:0 8px 24px rgba(20,40,29,.16),inset 0 1px 0 rgba(255,255,255,.82);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-backdrop-filter:saturate(1.35) blur(18px);backdrop-filter:saturate(1.35) blur(18px); }
+    .guest-notification-meta { min-width:0;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:7px;color:#66716B;font-size:10px;line-height:1; }
+    .guest-notification-meta strong { overflow:hidden;color:#59645E;font-size:10px;font-weight:650;text-overflow:ellipsis;white-space:nowrap; }
+    .guest-notification-meta > span:last-child { color:#78817C; }
+    .guest-notification-icon { width:24px;height:24px;display:grid;place-items:center;overflow:hidden;border-radius:6px;background:var(--green);color:#fff;font-size:11px;font-weight:850; }
+    .guest-notification-icon img { width:100%;height:100%;display:block;object-fit:cover; }
+    .guest-notification-title { margin-top:8px;overflow:hidden;color:#131714;font-size:13px;font-weight:750;line-height:1.25;text-overflow:ellipsis;white-space:nowrap; }
+    .guest-notification-body { min-height:30px;margin-top:2px;overflow:hidden;color:#303632;font-size:12px;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2; }
+    .guest-notification-caption { margin-top:8px;color:#526158;font-size:10px;font-weight:700;text-align:center; }
+    .guest-reach-suggestion { margin:-2px 0 12px;padding:0;border:0;background:none;color:var(--green);font:inherit;font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer; }
+    .guest-reach-video { width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;padding:8px;border:0;background:none;color:var(--green);font:inherit;font-size:11px;font-weight:750;cursor:pointer; }
+    .guest-reach-video span { width:21px;height:21px;display:grid;place-items:center;padding-left:1px;border-radius:50%;background:#E6F2EB;color:var(--green);font-size:8px; }
     .apps-footnote { font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.5; }
     .apps-tour-replay { display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--border);background:var(--white);color:var(--green);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:18px;box-shadow:var(--shadow); }
     .apps-tour-replay:active { background:var(--bg); }
@@ -776,6 +798,8 @@ function renderAppsView() {
   </div>`;
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
+  if (crm.guestMessages.length) renderMessages();
+  else loadMessages();
   loadGuestInstallStats();
   loadBookingReviewSettings();
 }

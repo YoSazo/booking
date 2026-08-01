@@ -35,9 +35,9 @@ const OPERATIONAL_STEPS = [
   {
     filter: 'apps',
     eyebrow: 'Guest App',
-    title: 'Give guests a way back.',
-    body: 'Share your link or QR code, then use Show installation steps to guide any iPhone guest through the exact Safari buttons.',
-    note: 'The Guest App tab keeps every iPhone install path ready whenever you need it.',
+    title: 'Get on their phone. Then reach it.',
+    body: 'Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone whenever you want.',
+    note: 'Share the QR or link, then use Show installation steps to guide them through the exact Safari buttons.',
     tabPosition: '87.5%',
   },
 ];

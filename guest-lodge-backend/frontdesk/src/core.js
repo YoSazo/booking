@@ -502,7 +502,8 @@ function syncNativeShellState() {
       : crm.currentFilter === 'availability' ? 'availability'
       : (crm.currentFilter === 'bookings' || crm.currentFilter === 'revenue') ? 'bookings'
       : 'settings',
-    bookingBadge: Math.max(0, needsCalls + unreadMessages),
+    bookingBadge: Math.max(0, needsCalls),
+    guestAppBadge: Math.max(0, unreadMessages),
   });
 }
 
@@ -1675,13 +1676,9 @@ function updateGoLiveBanner() {
 function updateBookingsTabBadge() {
   const badge = document.getElementById('countNeedsCalled');
   const needsCalls = (crm.bookings || []).filter(b => b.callStatus === 'not-called').length;
-  const unreadMsgs = crm.guestMessages.length
-    ? crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
-    : crm.messageUnreadCount;
-  const actionable = needsCalls + unreadMsgs;
   if (badge) {
-    badge.textContent = actionable;
-    badge.style.display = actionable > 0 ? '' : 'none';
+    badge.textContent = needsCalls;
+    badge.style.display = needsCalls > 0 ? '' : 'none';
   }
   syncNativeShellState();
 }
@@ -1838,7 +1835,7 @@ function applyBookingsSubview() {
   const revenueEl = document.getElementById('revenueView');
   const assistantEl = document.getElementById('frontDeskAssistantPanel');
   if (listEl) listEl.style.display = isBookings ? '' : 'none';
-  if (msgPanel) msgPanel.style.display = isBookings ? '' : 'none';
+  if (msgPanel) msgPanel.style.display = 'none';
   if (!isBookings && chipsEl) chipsEl.style.display = 'none';
   if (growthEl) growthEl.style.display = isGrowth ? 'block' : 'none';
   if (revenueEl) revenueEl.style.display = isRevenue ? 'flex' : 'none';
@@ -1848,7 +1845,6 @@ function applyBookingsSubview() {
   } else if (isRevenue) {
     renderRevenueView();
   } else {
-    if (!crm.guestMessages.length) loadMessages(); else renderMessages();
     renderBookings(crm.bookings);
     if (isNativeFrontdeskApp()) {
       if (assistantEl) assistantEl.innerHTML = '';
@@ -2659,7 +2655,7 @@ async function loadMessages() {
       crm.guestMessages = data.messages || [];
       crm.messageUnreadCount = 0;
       updateMessageBadges();
-      if (crm.currentFilter === 'bookings') renderMessages();
+      if (crm.currentFilter === 'apps' || crm.messagesExpanded) renderMessages();
     } catch (e) { /* non-fatal */ }
   })();
   try {
@@ -2876,6 +2872,23 @@ function renderMessageThreadPicker(threadList, activeThread) {
     </div>`;
 }
 
+function renderMessageThreadList(threadList, activeThread) {
+  return `<div class="messages-workspace-thread-list" role="list" aria-label="Guest conversations">
+    ${threadList.map(thread => {
+      const summary = threadSummary(thread);
+      const isActive = thread.key === activeThread.key;
+      return `<button type="button" role="listitem" class="messages-workspace-thread${isActive ? ' active' : ''}${summary.hasUnread ? ' unread' : ''}" onclick="pickMessageThread('${jsStr(thread.key)}')" aria-current="${isActive ? 'true' : 'false'}">
+        <span class="message-avatar small">${esc(messageGuestInitial(thread.guestName))}</span>
+        <span class="messages-workspace-thread-copy">
+          <span class="messages-workspace-thread-name">${summary.hasUnread ? '<i></i>' : ''}${esc(thread.guestName || 'Guest')}</span>
+          <span class="messages-workspace-thread-preview">${esc(summary.preview)}</span>
+          <span class="messages-workspace-thread-context">${esc(timeAgo(summary.latest?.createdAt))}${thread.roomName ? ` · ${esc(thread.roomName)}` : ''}</span>
+        </span>
+      </button>`;
+    }).join('')}
+  </div>`;
+}
+
 function openMessagesWorkspace() {
   crm.messagesExpanded = true;
   crm.messagesInboxOpen = true;
@@ -2911,12 +2924,24 @@ function renderMessagesWorkspace(threadList, activeThread, unreadCount) {
       ${unreadCount > 0 ? `<button type="button" class="messages-workspace-read" onclick="markAllMessagesRead()">Read all</button>` : '<span></span>'}
     </header>
     <main class="messages-workspace-body">
-      ${renderMessageThreadPicker(threadList, activeThread)}
-      ${renderMessageThreadDetail(activeThread)}
+      <aside class="messages-workspace-sidebar">
+        <div class="messages-workspace-sidebar-heading">
+          <strong>Conversations</strong>
+          <span>${threadList.length}</span>
+        </div>
+        ${renderMessageThreadList(threadList, activeThread)}
+      </aside>
+      <div class="messages-workspace-chat">
+        ${renderMessageThreadDetail(activeThread)}
+      </div>
     </main>`;
   requestAnimationFrame(() => {
     const conversation = document.getElementById('activeMessageConversation');
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
+    workspace.querySelector('.messages-workspace-thread.active')?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
   });
 }
 
@@ -2933,7 +2958,7 @@ function renderMessages() {
         <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
         <div>Loading guest messages…</div>
       </div>` : '');
-    if (pending && crm.currentFilter === 'bookings') loadMessages();
+    if (pending && crm.currentFilter === 'apps') loadMessages();
     return;
   }
 
@@ -3047,11 +3072,13 @@ async function refreshCurrentView() {
   // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
   if (crm.currentFilter === 'settings') return;
   if (crm.currentFilter === 'apps') {
-    loadAppsModule().then(() => loadGuestInstallStats()).catch(() => {});
+    loadAppsModule().then(() => Promise.allSettled([
+      loadGuestInstallStats(),
+      loadMessages(),
+    ])).catch(() => {});
     return;
   }
   const tasks = [loadBookings()];
-  if (crm.currentFilter === 'bookings') tasks.push(loadMessages());
   if (crm.currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
   }
@@ -3546,10 +3573,10 @@ function applyGuestBroadcastAudienceUi() {
   const count = crm.guestPushSubscriberCount || 0;
   if (audience) {
     audience.textContent = count === 0
-      ? 'No guests have notifications on yet — show your QR at check-in first.'
+      ? 'No guests have notifications on yet. Start by sharing your guest app.'
       : count === 1
-        ? '1 guest has notifications on for you.'
-        : count + ' guests have notifications on for you.';
+        ? '1 guest can receive this notification.'
+        : count + ' guests can receive this notification.';
     audience.style.color = count === 0 ? 'var(--text-muted)' : '#166534';
     audience.style.fontWeight = count === 0 ? '500' : '700';
     audience.style.background = count === 0 ? 'var(--bg)' : '#f0fdf4';
@@ -3558,38 +3585,70 @@ function applyGuestBroadcastAudienceUi() {
   if (btn) {
     const enabled = count > 0;
     btn.disabled = !enabled;
+    btn.textContent = enabled
+      ? `Send to ${count} guest${count === 1 ? '' : 's'}`
+      : 'No guests to notify yet';
     btn.style.background = enabled ? 'var(--green)' : '#c5d5cc';
     btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
     btn.style.opacity = enabled ? '1' : '0.9';
   }
 }
 
+function updateGuestBroadcastPreview() {
+  const title = document.getElementById('guest-broadcast-title')?.value.trim();
+  const body = document.getElementById('guest-broadcast-body')?.value.trim();
+  const previewTitle = document.getElementById('guest-broadcast-preview-title');
+  const previewBody = document.getElementById('guest-broadcast-preview-body');
+  if (previewTitle) previewTitle.textContent = title || (crm.activeHotelName || 'Your Property');
+  if (previewBody) previewBody.textContent = body || 'Your message will appear here as you type.';
+}
+
 function guestBroadcastCardHtml(options = {}) {
   const compact = !!options.compact;
-  const hName = (crm.activeHotelName || 'Your Property').replace(/"/g, '&quot;');
-  return `<div id="guestBroadcastCard" style="background:#fff;border:1px solid #e6e9e7;border-radius:16px;margin-bottom:14px;padding:16px 18px;">
-    <div style="font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:${compact ? '12px' : '4px'};">📣 ${compact ? 'Message guests' : 'Notify all guests at once'}</div>
-    ${compact ? '' : '<p style="font-size:12px;color:#6b7280;margin:0 0 10px;line-height:1.45;">Push a sale, event, or check-in reminder to everyone who installed your guest app.</p>'}
+  const rawName = crm.activeHotelName || 'Your Property';
+  const hName = esc(rawName);
+  const hNameAttr = hName;
+  const appIcon = crm.activeHotelAppIcon
+    ? `<img src="${esc(crm.activeHotelAppIcon)}" alt="">`
+    : `<span>${esc(rawName.trim().charAt(0).toUpperCase() || 'M')}</span>`;
+  const demoItems = JSON.stringify([{
+    type: 'video',
+    src: GUEST_BROADCAST_DEMO_VIDEO,
+    alt: 'Guest receives a property notification',
+    title: 'A message arriving on a guest phone',
+    caption: 'You send it once from Front Desk. Every guest with notifications on receives it on their phone.',
+  }]).replace(/"/g, '&quot;');
+  return `<div id="guestBroadcastCard" class="apps-broadcast-card guest-reach-card" data-compact="${compact ? 'true' : 'false'}">
+    <div id="tour-guest-reach" class="guest-reach-intro">
+      <div class="guest-reach-kicker">Direct to their phone</div>
+      <div class="guest-reach-title">Reach guests whenever you want.</div>
+      <p>Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone.</p>
+    </div>
     <div id="guest-broadcast-audience" style="font-size:12px;line-height:1.45;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);">Checking who can receive notifications…</div>
-    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" style="background:none;border:none;padding:0;color:var(--green);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;margin:-4px 0 12px;">Suggest install reminder message</button>'}
+    <div class="guest-notification-demo" aria-label="Preview of the notification guests will receive">
+      <div class="guest-notification-shell">
+        <div class="guest-notification-meta">
+          <span class="guest-notification-icon">${appIcon}</span>
+          <strong>${hName}</strong>
+          <span>now</span>
+        </div>
+        <div id="guest-broadcast-preview-title" class="guest-notification-title">${hName}</div>
+        <div id="guest-broadcast-preview-body" class="guest-notification-body">Your message will appear here as you type.</div>
+      </div>
+      <div class="guest-notification-caption">This is what arrives on their phone.</div>
+    </div>
+    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" class="guest-reach-suggestion">Suggest an app reminder</button>'}
     <div style="margin-bottom:8px;">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Title</div>
-      <input type="text" id="guest-broadcast-title" value="${hName}" maxlength="120" placeholder="e.g. Jack's Inn" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
+      <label for="guest-broadcast-title" style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;">Notification title</label>
+      <input type="text" id="guest-broadcast-title" value="${hNameAttr}" maxlength="120" placeholder="e.g. Weekend dates just opened" oninput="updateGuestBroadcastPreview()" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
     </div>
     <div style="margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Message</div>
-      <textarea id="guest-broadcast-body" maxlength="500" placeholder="e.g. Pool is open until 10pm tonight!" style="width:100%;min-height:64px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+      <label for="guest-broadcast-body" style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;">Message</label>
+      <textarea id="guest-broadcast-body" maxlength="500" placeholder="e.g. Our pool is open until 10pm tonight." oninput="updateGuestBroadcastPreview()" style="width:100%;min-height:64px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
     </div>
-    <button id="guest-broadcast-btn" type="button" onclick="sendGuestBroadcast()" disabled style="width:100%;padding:12px;border-radius:10px;border:none;background:#c5d5cc;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;">Send notification</button>
+    <button id="guest-broadcast-btn" type="button" onclick="sendGuestBroadcast()" disabled style="width:100%;padding:12px;border-radius:10px;border:none;background:#c5d5cc;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;">No guests to notify yet</button>
     <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
-    ${compact ? '' : `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;text-align:center;">What guests see</div>
-      <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
-        src="${GUEST_BROADCAST_DEMO_VIDEO}"
-        style="width:100%;max-width:260px;display:block;margin:0 auto;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,0.14);background:#000;">
-      </video>
-      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:8px 0 0;line-height:1.45;">Their phone buzzes with your message — like a text from you.</p>
-    </div>`}
+    <button type="button" class="guest-reach-video" onclick="appsOpenLightbox(${demoItems},0)"><span aria-hidden="true">▶</span> Watch a real notification arrive</button>
   </div>`;
 }
 
@@ -3664,7 +3723,6 @@ function applyFilter() {
     if (settingsEl) settingsEl.style.display = 'none';
     const editEl2 = document.getElementById('editView');
     if (editEl2) editEl2.style.display = 'none';
-    if (msgPanel) msgPanel.style.display = 'none';
     const appsEl2 = document.getElementById('appsView');
     if (appsEl2) {
       appsEl2.style.display = 'block';
@@ -3676,6 +3734,10 @@ function applyFilter() {
     loadAppsModule().then(() => {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
+      const guestMessagesPanel = document.getElementById('messagesPanel');
+      if (guestMessagesPanel) guestMessagesPanel.style.display = 'block';
+      if (!crm.guestMessages.length) loadMessages();
+      else renderMessages();
     }).catch(() => {
       if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest App</div></div>';
     });
@@ -4620,6 +4682,7 @@ function prefillGuestInstallBroadcast() {
       ? `Add ${hName} to your home screen — message us anytime and book direct next time. Tap here: ${installUrl}`
       : `Add ${hName} to your home screen — message us anytime and book direct next time.`;
   }
+  updateGuestBroadcastPreview();
   document.getElementById('guestBroadcastCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   if (crm.currentFilter !== 'apps') {
     const tabBtn = document.querySelector('.tab[data-nav-filter="apps"]')
@@ -4657,6 +4720,7 @@ async function sendGuestBroadcast() {
       if (resultEl) resultEl.textContent = msg;
       toast(msg, data.sent > 0 ? 'success' : '');
       if (bodyEl) bodyEl.value = '';
+      updateGuestBroadcastPreview();
     } else {
       toast(data.message || 'Broadcast failed', 'error');
     }
@@ -5481,6 +5545,7 @@ exposeToWindow({
   pickDefaultMessageThread,
   pickMessageThread,
   prefillGuestInstallBroadcast,
+  updateGuestBroadcastPreview,
   promptUploadLogoBeforeQr,
   pushSupported,
   refreshAppsInstallSection,

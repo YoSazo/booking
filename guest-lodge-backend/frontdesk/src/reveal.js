@@ -248,7 +248,7 @@ function guestAppRevealHtml() {
     <div class="mvr-copy">
       <div class="mvr-eyebrow">2 · Your guest app</div>
       <h1>Stay on your guests’ Home Screens.</h1>
-      <p>Guests can save <strong>${esc(propertyName())}</strong> while they are on your booking page, then reopen it whenever they want to book direct again.</p>
+      <p>Guests can save <strong>${esc(propertyName())}</strong> while they are on your booking page, return to book direct again, and receive your updates if they turn on notifications.</p>
       <div class="mvr-callout">
         <strong>No App Store search or account.</strong>
         They tap Install on your booking page. Your property appears beside the apps they already use.
