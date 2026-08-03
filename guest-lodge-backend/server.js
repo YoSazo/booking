@@ -9033,6 +9033,21 @@ const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
     : null;
 const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_Uls6PKBuIH3dFL';
 const MARKETEL_MONTHLY_PRICE_USD = 199;
+const MARKETEL_YEARLY_PRICE_USD = 1990;
+const MARKETEL_BILLING_PLANS = Object.freeze({
+    month: Object.freeze({
+        interval: 'month',
+        amountUsd: MARKETEL_MONTHLY_PRICE_USD,
+        contentName: 'marketel-monthly',
+        configuredPriceId: () => process.env.STRIPE_MARKETEL_PRICE_ID || '',
+    }),
+    year: Object.freeze({
+        interval: 'year',
+        amountUsd: MARKETEL_YEARLY_PRICE_USD,
+        contentName: 'marketel-yearly',
+        configuredPriceId: () => process.env.STRIPE_MARKETEL_YEARLY_PRICE_ID || '',
+    }),
+});
 const MARKETEL_STRIPE_KEY_MODE = process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_live_')
     ? 'live'
     : process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_test_')
@@ -9057,8 +9072,42 @@ function stripePeriodEnd(subscription) {
     return raw > 0 ? new Date(raw * 1000) : null;
 }
 
-async function getMarketelSubscriptionPrice() {
+function normalizeMarketelBillingInterval(value) {
+    return String(value || '').trim().toLowerCase() === 'year' ? 'year' : 'month';
+}
+
+function marketelBillingPlan(value) {
+    return MARKETEL_BILLING_PLANS[normalizeMarketelBillingInterval(value)];
+}
+
+function validateMarketelStripePrice(price, plan) {
+    const amountUsd = (price?.unit_amount || 0) / 100;
+    if (!price?.active) throw new Error(`Marketel ${plan.interval}ly subscription price is inactive`);
+    if (price.currency !== 'usd') throw new Error(`Marketel ${plan.interval}ly subscription price must use USD`);
+    if (price.recurring?.interval !== plan.interval || price.recurring?.interval_count !== 1) {
+        throw new Error(`Marketel subscription price must recur ${plan.interval}ly`);
+    }
+    if (amountUsd !== plan.amountUsd) {
+        throw new Error(`Marketel ${plan.interval}ly subscription price must be $${plan.amountUsd}/${plan.interval}`);
+    }
+    if (process.env.NODE_ENV === 'production' && (!price.livemode || MARKETEL_STRIPE_KEY_MODE !== 'live')) {
+        throw new Error('Live Marketel Stripe billing is not configured');
+    }
+    return {
+        id: price.id,
+        productId: stripeObjectId(price.product),
+        amountUsd,
+        livemode: !!price.livemode,
+        interval: plan.interval,
+        contentName: plan.contentName,
+        lineItem: { price: price.id, quantity: 1 },
+        source: 'stripe-price',
+    };
+}
+
+async function getMarketelSubscriptionPrice(billingInterval = 'month') {
     if (!marketelStripe) throw new Error('Payment not configured');
+    const plan = marketelBillingPlan(billingInterval);
     if (process.env.NODE_ENV === 'production' && !process.env.STRIPE_MARKETEL_WEBHOOK_SECRET) {
         throw new Error('Marketel Stripe webhook is not configured');
     }
@@ -9069,46 +9118,83 @@ async function getMarketelSubscriptionPrice() {
     ) {
         throw new Error('Live Marketel Stripe price or product is not configured');
     }
-    let price;
-    if (process.env.STRIPE_MARKETEL_PRICE_ID) {
-        price = await marketelStripe.prices.retrieve(process.env.STRIPE_MARKETEL_PRICE_ID);
+    const configuredPriceId = plan.configuredPriceId();
+    let price = null;
+    if (configuredPriceId) {
+        price = await marketelStripe.prices.retrieve(configuredPriceId);
     } else {
-        const product = await marketelStripe.products.retrieve(MARKETEL_SUBSCRIPTION_PRODUCT_ID, {
-            expand: ['default_price'],
-        });
-        price = product.default_price;
+        let productId = MARKETEL_SUBSCRIPTION_PRODUCT_ID;
+        if (plan.interval === 'month') {
+            const product = await marketelStripe.products.retrieve(productId, {
+                expand: ['default_price'],
+            });
+            const defaultPrice = product.default_price;
+            if (defaultPrice && typeof defaultPrice !== 'string') {
+                const defaultAmountUsd = (defaultPrice.unit_amount || 0) / 100;
+                if (
+                    defaultPrice.active
+                    && defaultPrice.currency === 'usd'
+                    && defaultPrice.recurring?.interval === plan.interval
+                    && defaultPrice.recurring?.interval_count === 1
+                    && defaultAmountUsd === plan.amountUsd
+                ) {
+                    price = defaultPrice;
+                }
+            }
+        } else {
+            // The configured monthly Price is the safest way to resolve the
+            // correct test/live Product when an annual Price has not yet been
+            // created in Stripe.
+            const monthlyPrice = await getMarketelSubscriptionPrice('month');
+            productId = monthlyPrice.productId || productId;
+        }
+
         if (!price) {
             const prices = await marketelStripe.prices.list({
-                product: MARKETEL_SUBSCRIPTION_PRODUCT_ID,
+                product: productId,
                 active: true,
                 type: 'recurring',
-                limit: 1,
+                limit: 100,
             });
-            if (!prices.data.length) throw new Error('No active subscription price for Marketel product');
-            price = prices.data[0];
-        } else if (typeof price === 'string') {
-            price = await marketelStripe.prices.retrieve(price);
+            price = prices.data.find((candidate) => (
+                candidate.currency === 'usd'
+                && candidate.recurring?.interval === plan.interval
+                && candidate.recurring?.interval_count === 1
+                && (candidate.unit_amount || 0) / 100 === plan.amountUsd
+            )) || null;
+        }
+
+        // Stripe supports recurring price_data in Checkout. This keeps the
+        // annual option deployable before a reusable annual Price ID is added;
+        // once STRIPE_MARKETEL_YEARLY_PRICE_ID exists it is used automatically.
+        if (!price && plan.interval === 'year') {
+            if (!productId) throw new Error('Marketel Stripe product is not configured');
+            if (process.env.NODE_ENV === 'production' && MARKETEL_STRIPE_KEY_MODE !== 'live') {
+                throw new Error('Live Marketel Stripe billing is not configured');
+            }
+            return {
+                id: null,
+                productId,
+                amountUsd: plan.amountUsd,
+                livemode: MARKETEL_STRIPE_KEY_MODE === 'live',
+                interval: plan.interval,
+                contentName: plan.contentName,
+                lineItem: {
+                    price_data: {
+                        currency: 'usd',
+                        product: productId,
+                        unit_amount: plan.amountUsd * 100,
+                        recurring: { interval: plan.interval, interval_count: 1 },
+                    },
+                    quantity: 1,
+                },
+                source: 'inline-price',
+            };
         }
     }
 
-    const amountUsd = (price?.unit_amount || 0) / 100;
-    if (!price?.active) throw new Error('Marketel subscription price is inactive');
-    if (price.currency !== 'usd') throw new Error('Marketel subscription price must use USD');
-    if (price.recurring?.interval !== 'month' || price.recurring?.interval_count !== 1) {
-        throw new Error('Marketel subscription price must recur monthly');
-    }
-    if (amountUsd !== MARKETEL_MONTHLY_PRICE_USD) {
-        throw new Error(`Marketel subscription price must be $${MARKETEL_MONTHLY_PRICE_USD}/month`);
-    }
-    if (process.env.NODE_ENV === 'production' && (!price.livemode || MARKETEL_STRIPE_KEY_MODE !== 'live')) {
-        throw new Error('Live Marketel Stripe billing is not configured');
-    }
-    return {
-        id: price.id,
-        amountUsd,
-        livemode: !!price.livemode,
-        interval: price.recurring.interval,
-    };
+    if (!price) throw new Error(`No active ${plan.interval}ly subscription price for Marketel product`);
+    return validateMarketelStripePrice(price, plan);
 }
 
 app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
@@ -9121,13 +9207,17 @@ app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
         });
     }
     try {
-        const price = await getMarketelSubscriptionPrice();
+        const [monthlyPrice, yearlyPrice] = await Promise.all([
+            getMarketelSubscriptionPrice('month'),
+            getMarketelSubscriptionPrice('year'),
+        ]);
         res.json({
             success: true,
             configured: true,
             keyMode: MARKETEL_STRIPE_KEY_MODE,
             webhookConfigured: !!process.env.STRIPE_MARKETEL_WEBHOOK_SECRET,
-            price,
+            price: monthlyPrice,
+            prices: { month: monthlyPrice, year: yearlyPrice },
         });
     } catch (e) {
         res.status(503).json({
@@ -9159,15 +9249,13 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         });
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
-        const { id: subscriptionPriceId } = await getMarketelSubscriptionPrice();
+        const billingInterval = normalizeMarketelBillingInterval(req.body?.billingInterval);
+        const billing = await getMarketelSubscriptionPrice(billingInterval);
 
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             client_reference_id: hotel.id,
-            line_items: [{
-                price: subscriptionPriceId,
-                quantity: 1,
-            }],
+            line_items: [billing.lineItem],
             ...(hotel.marketelStripeCustomerId
                 ? { customer: hotel.marketelStripeCustomerId }
                 : { customer_email: hotel.ownerEmail || undefined }),
@@ -9175,12 +9263,16 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
                 product: 'hotel-onboarding',
                 hotelId: hotel.id,
                 setupToken: req.params.token,
+                billingInterval,
+                billingAmountUsd: String(billing.amountUsd),
             },
             subscription_data: {
                 metadata: {
                     product: 'hotel-onboarding',
                     hotelId: hotel.id,
                     setupToken: req.params.token,
+                    billingInterval,
+                    billingAmountUsd: String(billing.amountUsd),
                 },
             },
             success_url: `${baseUrl}/setup/${req.params.token}/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -9267,7 +9359,11 @@ app.get('/setup/:token/success', async (req, res) => {
             checkoutSession,
             req,
         });
-        const subscriptionAmountUsd = MARKETEL_MONTHLY_PRICE_USD;
+        const paidPlan = marketelBillingPlan(checkoutSession.metadata?.billingInterval);
+        const paidAmountUsd = Number(checkoutSession.amount_total) / 100;
+        const subscriptionAmountUsd = Number.isFinite(paidAmountUsd) && paidAmountUsd > 0
+            ? paidAmountUsd
+            : paidPlan.amountUsd;
         const subscriptionEventId = `marketel-subscribe.${checkoutSession.id}`;
 
         // Create default CRM PIN
@@ -10373,10 +10469,15 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
     const eventId = `marketel-subscribe.${checkoutSession.id}`;
     const journeyExternalId = sanitizeJourneyIdentifier(checkoutSession?.metadata?.journeyVisitorId, 'mjv_');
     const journeySessionId = sanitizeJourneyIdentifier(checkoutSession?.metadata?.journeySessionId, 'mjs_');
-    let amountUsd = MARKETEL_MONTHLY_PRICE_USD;
-    try {
-        amountUsd = (await getMarketelSubscriptionPrice()).amountUsd;
-    } catch (_) { /* checkout itself already validates the configured price */ }
+    const billingInterval = normalizeMarketelBillingInterval(checkoutSession?.metadata?.billingInterval);
+    const billingPlan = marketelBillingPlan(billingInterval);
+    const checkoutAmountUsd = Number(checkoutSession.amount_total) / 100;
+    const metadataAmountUsd = Number(checkoutSession?.metadata?.billingAmountUsd);
+    const amountUsd = Number.isFinite(checkoutAmountUsd) && checkoutAmountUsd > 0
+        ? checkoutAmountUsd
+        : Number.isFinite(metadataAmountUsd) && metadataAmountUsd > 0
+            ? metadataAmountUsd
+            : billingPlan.amountUsd;
 
     const hotel = await prisma.hotelConfig.findUnique({
         where: { id: hotelId },
@@ -10396,14 +10497,15 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
                 guestPhone: hotel?.ownerPhone || null,
                 value: amountUsd,
                 currency: 'USD',
-                contentName: 'marketel-monthly',
+                contentName: billingPlan.contentName,
                 externalId: journeyExternalId,
                 sessionId: journeySessionId,
                 surface: 'stripe',
                 pagePath: '/checkout/success',
                 metadata: {
                     provider: 'stripe',
-                    product: 'marketel-monthly',
+                    product: billingPlan.contentName,
+                    billingInterval,
                     attributionLinked: !!(journeyExternalId && journeySessionId),
                 },
             },
@@ -10529,8 +10631,10 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const journeyExternalId = sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_');
         const journeySessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
         const journeySequence = Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1));
+        const billingInterval = normalizeMarketelBillingInterval(req.body?.billingInterval);
         const frontdeskOrigin = marketelFrontdeskOrigin(req);
-        const { id: subscriptionPriceId, amountUsd } = await getMarketelSubscriptionPrice();
+        const billing = await getMarketelSubscriptionPrice(billingInterval);
+        const { amountUsd } = billing;
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
         const cancelParams = new URLSearchParams({
             returnToken,
@@ -10552,7 +10656,8 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 sequence: journeySequence,
                 surface: 'frontdesk',
                 pagePath: '/frontdesk',
-                metadata: { source: 'activation-cta', provider: 'stripe' },
+                contentName: billing.contentName,
+                metadata: { source: 'activation-cta', provider: 'stripe', billingInterval },
             },
         }).catch(() => {});
         console.log('crm:go-live checkout session creating:', {
@@ -10565,13 +10670,15 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             client_reference_id: hotelId,
-            line_items: [{ price: subscriptionPriceId, quantity: 1 }],
+            line_items: [billing.lineItem],
             ...(hotel.marketelStripeCustomerId
                 ? { customer: hotel.marketelStripeCustomerId }
                 : { customer_email: hotel.ownerEmail || undefined }),
             metadata: {
                 product: 'hotel-go-live',
                 hotelId,
+                billingInterval,
+                billingAmountUsd: String(amountUsd),
                 ...(journeyExternalId ? { journeyVisitorId: journeyExternalId } : {}),
                 ...(journeySessionId ? { journeySessionId } : {}),
             },
@@ -10579,6 +10686,8 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 metadata: {
                     product: 'hotel-go-live',
                     hotelId,
+                    billingInterval,
+                    billingAmountUsd: String(amountUsd),
                     ...(journeyExternalId ? { journeyVisitorId: journeyExternalId } : {}),
                     ...(journeySessionId ? { journeySessionId } : {}),
                 },
@@ -10601,7 +10710,8 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 sequence: journeySequence + 1,
                 surface: 'stripe',
                 pagePath: '/checkout',
-                metadata: { source: 'activation-cta', provider: 'stripe' },
+                contentName: billing.contentName,
+                metadata: { source: 'activation-cta', provider: 'stripe', billingInterval },
             },
         }).catch(() => {});
         const { fbp, fbc } = getMetaCookies(req);

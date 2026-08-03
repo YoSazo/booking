@@ -4,6 +4,7 @@ import { exposeToWindow } from './utils.js';
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
+const BILLING_KEY = 'marketelBillingIntervalV1';
 
 let currentStep = 0;
 let livePreviewMode = 'guest';
@@ -17,6 +18,7 @@ let guestAppDemoObserver = null;
 let guestAppDemoSlide = 0;
 let revealStartedAt = 0;
 let stageStartedAt = 0;
+let billingInterval = 'month';
 
 const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
@@ -370,6 +372,12 @@ function assistantRevealHtml() {
 
 function finaleHtml() {
   const isSubscribed = crm.hotelSubscribed;
+  const isYearly = billingInterval === 'year';
+  const displayedPrice = isYearly ? '$1,990' : '$199';
+  const displayedInterval = isYearly ? '/year' : '/month';
+  const activationLabel = isYearly
+    ? 'Activate Marketel — $1,990/year'
+    : 'Activate Marketel — $199/month';
   return `<section class="mvr-stage mvr-stage-finale">
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
@@ -382,10 +390,15 @@ function finaleHtml() {
         <div><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
       </div>
       ${isSubscribed ? '' : `<div class="mvr-proof"><strong>$5,800 booked direct</strong><span>in one recorded month through this booking engine for Suite Stay, Alabama.</span></div>
-        <div class="mvr-price"><strong>$199</strong><span>/month</span></div>
-        <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>Try the complete system. Cancel anytime—no contract.</small></p></div>`}
+        <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">
+          <button type="button" role="radio" aria-checked="${!isYearly}" class="${!isYearly ? 'is-active' : ''}" data-mvr-billing="month">Monthly</button>
+          <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $398</span></button>
+        </div>
+        <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
+        <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">Two months free · $398 saved</div>
+        <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Renews yearly at $1,990 unless canceled.' : 'Renews monthly at $199 unless canceled.'}</small></p></div>`}
       <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">
-        ${isSubscribed ? 'Open Front Desk' : 'Activate Marketel — $199/month'}
+        ${isSubscribed ? 'Open Front Desk' : activationLabel}
       </button>
       <div class="mvr-secure-note">${isSubscribed
         ? 'You can replay this overview anytime from How it works.'
@@ -561,16 +574,19 @@ async function activateMarketel(button) {
   button.textContent = 'Opening secure checkout…';
   trackReveal('ActivationCtaClicked');
   trackJourney('JourneyCheckoutRequested', {
-    price: 199,
+    price: billingInterval === 'year' ? 1990 : 199,
     currency: 'USD',
+    billingInterval,
     subscribed: !!crm.hotelSubscribed,
   }, { durationMs: stageStartedAt ? Date.now() - stageStartedAt : null, immediate: true });
   try {
-    await window.goLive();
+    await window.goLive({ billingInterval });
   } finally {
     if (document.body.contains(button)) {
       button.disabled = false;
-      button.textContent = 'Activate Marketel — $199/month';
+      button.textContent = billingInterval === 'year'
+        ? 'Activate Marketel — $1,990/year'
+        : 'Activate Marketel — $199/month';
     }
   }
 }
@@ -682,6 +698,21 @@ function bindRevealEvents() {
   });
   document.getElementById('mvrExpandPreview')?.addEventListener('click', showExpandedPreview);
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
+  document.querySelectorAll('[data-mvr-billing]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextInterval = button.dataset.mvrBilling === 'year' ? 'year' : 'month';
+      if (nextInterval === billingInterval) return;
+      billingInterval = nextInterval;
+      try { localStorage.setItem(BILLING_KEY, billingInterval); } catch (_) {}
+      trackReveal(nextInterval === 'year' ? 'YearlyBillingSelected' : 'MonthlyBillingSelected');
+      trackJourney('JourneyBillingIntervalSelected', {
+        billingInterval,
+        price: billingInterval === 'year' ? 1990 : 199,
+        currency: 'USD',
+      });
+      renderReveal();
+    });
+  });
   document.getElementById('mvrInstallDemo')?.addEventListener('click', () => {
     revealGuestAppValue(true);
   });
@@ -765,6 +796,7 @@ export function showMarketelValueReveal(options = {}) {
   const requestedStep = Number(options.startAt);
   let storedStep = 0;
   try { storedStep = Number.parseInt(localStorage.getItem(STEP_KEY) || '0', 10); } catch (_) {}
+  try { billingInterval = localStorage.getItem(BILLING_KEY) === 'year' ? 'year' : 'month'; } catch (_) { billingInterval = 'month'; }
   currentStep = Number.isFinite(requestedStep)
     ? Math.max(0, Math.min(3, requestedStep))
     : Math.max(0, Math.min(3, Number.isFinite(storedStep) ? storedStep : 0));

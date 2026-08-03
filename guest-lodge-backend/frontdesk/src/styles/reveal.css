@@ -1128,11 +1128,49 @@
   font-size: 12px;
 }
 
+.mvr-billing-toggle {
+  width: min(330px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 0 auto 10px;
+  padding: 4px;
+  border: 1px solid #d7e3dc;
+  border-radius: 999px;
+  background: #edf2ef;
+}
+
+.mvr-billing-toggle button {
+  min-width: 0;
+  padding: 9px 10px;
+  color: #65746c;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mvr-billing-toggle button.is-active {
+  color: var(--mvr-text);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(30, 62, 45, 0.11);
+}
+
+.mvr-billing-toggle button span {
+  margin-left: 3px;
+  color: var(--mvr-green);
+  font-size: 9px;
+}
+
 .mvr-price {
   display: flex;
   align-items: baseline;
   justify-content: center;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .mvr-price strong {
@@ -1146,6 +1184,18 @@
   color: #718078;
   font-size: 13px;
   font-weight: 700;
+}
+
+.mvr-price-detail {
+  min-height: 16px;
+  margin-top: 1px;
+  color: transparent;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.mvr-price-detail.is-visible {
+  color: var(--mvr-green);
 }
 
 .mvr-guarantee {
@@ -1555,6 +1605,12 @@
 
   .mvr-price strong {
     font-size: 36px;
+  }
+
+  .mvr-billing-toggle button {
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 11px;
   }
 }
 

@@ -1307,19 +1307,22 @@ function hideGoLiveOverlay() {
   const ov = document.getElementById('goLiveOverlay');
   if (ov) ov.remove();
 }
-async function goLive() {
+async function goLive(options = {}) {
   if (isNativeApp()) {
     toast('Front Desk app access is managed with your Marketel account.', 'info');
     return;
   }
   if (goLiveInFlight) return;
+  const billingInterval = options?.billingInterval === 'year' ? 'year' : 'month';
+  const checkoutPrice = billingInterval === 'year' ? 1990 : 199;
   goLiveInFlight = true;
   showGoLiveOverlay();
   const journey = window.MarketelJourney;
   journey?.track('JourneyCheckoutRequested', {
     source: document.getElementById('marketelValueReveal') ? 'value-reveal' : 'frontdesk',
-    price: 199,
+    price: checkoutPrice,
     currency: 'USD',
+    billingInterval,
   }, { immediate: true });
   const journeyContext = journey?.getContext?.() || {};
   try {
@@ -1327,12 +1330,14 @@ async function goLive() {
       journeyVisitorId: journeyContext.visitorId || '',
       journeySessionId: journeyContext.sessionId || '',
       journeySequence: journeyContext.sequence || null,
+      billingInterval,
     });
     if (res.success && res.url) {
       journey?.track('JourneyCheckoutRedirected', {
         provider: 'stripe',
-        price: 199,
+        price: checkoutPrice,
         currency: 'USD',
+        billingInterval,
       }, { immediate: true, keepalive: true });
       window.location.href = res.url; // leave overlay up through the redirect
       return;
