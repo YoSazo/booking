@@ -130,15 +130,20 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [showCardDeclineModal, setShowCardDeclineModal] = useState(false);
     const CARD_DECLINE_MODAL_DELAY_MS = 800; // Let user see inline error briefly before modal
 
-    // The owner preview uses this exact route as the finish line for its
-    // optional booking-speed challenge. The parent verifies the sending frame;
-    // no guest details or transaction data cross the boundary.
+    const previewCheckoutSignalSent = useRef(false);
+
+    // Payment is the actual finish line for the owner's booking-speed
+    // challenge. Entering guest information alone does not count as checkout.
+    // The parent verifies the sending frame, and no guest or transaction data
+    // cross the boundary.
     useEffect(() => {
+        if (currentStep !== 4 || previewCheckoutSignalSent.current) return;
         if (typeof window === 'undefined' || window === window.parent) return;
         const params = new URLSearchParams(window.location.search);
         if (params.get('preview') !== '1') return;
+        previewCheckoutSignalSent.current = true;
         window.parent.postMessage({ type: 'marketel:checkout-reached' }, '*');
-    }, []);
+    }, [currentStep]);
     
     // Preload Stripe.js as early as possible so Step 4 feels instant.
     useEffect(() => {
