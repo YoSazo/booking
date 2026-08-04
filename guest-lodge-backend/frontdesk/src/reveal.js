@@ -19,6 +19,7 @@ let guestAppDemoSlide = 0;
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
+let activeBookingChallenge = null;
 
 const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
@@ -173,13 +174,147 @@ function shellVisible(visible) {
   }
 }
 
+function formatChallengeTime(elapsedMs) {
+  const totalSeconds = Math.max(0, Math.floor(Number(elapsedMs || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function hideBookingChallengeLayer(challenge) {
+  if (!challenge?.layer) return;
+  challenge.layer.classList.remove('is-visible');
+  challenge.layer.setAttribute('aria-hidden', 'true');
+  challenge.layer.innerHTML = '';
+}
+
+function stopBookingChallenge(reason = '', shouldTrack = false) {
+  const challenge = activeBookingChallenge;
+  if (!challenge) return;
+  if (challenge.timerId) {
+    window.clearInterval(challenge.timerId);
+    challenge.timerId = 0;
+  }
+  if (shouldTrack && challenge.status === 'running') {
+    const elapsedMs = Date.now() - challenge.startedAt;
+    trackReveal('BookingChallengeAbandoned', reason);
+    trackJourney('JourneyBookingChallengeAbandoned', {
+      reason,
+      elapsedMs,
+    }, { durationMs: elapsedMs });
+  }
+  if (challenge.timer) challenge.timer.hidden = true;
+  if (challenge.status === 'running') challenge.status = 'abandoned';
+  hideBookingChallengeLayer(challenge);
+}
+
+function updateBookingChallengeTimer(challenge) {
+  if (!challenge || challenge.status !== 'running' || !challenge.timer) return;
+  const elapsedMs = Date.now() - challenge.startedAt;
+  const time = challenge.timer.querySelector('[data-challenge-time]');
+  if (time) time.textContent = `${formatChallengeTime(elapsedMs)} / 1:00`;
+  challenge.timer.classList.toggle('is-over-minute', elapsedMs >= 60000);
+}
+
+function startBookingChallenge(challenge) {
+  if (!challenge || challenge !== activeBookingChallenge || challenge.status !== 'prompted') return;
+  challenge.status = 'running';
+  challenge.startedAt = Date.now();
+  hideBookingChallengeLayer(challenge);
+  challenge.timer.hidden = false;
+  updateBookingChallengeTimer(challenge);
+  challenge.timerId = window.setInterval(() => updateBookingChallengeTimer(challenge), 500);
+  trackReveal('BookingChallengeStarted');
+  trackJourney('JourneyBookingChallengeStarted', {
+    targetSeconds: 60,
+    bookingDomain: bookingDisplayDomain(),
+  });
+}
+
+function showBookingChallengePrompt(challenge) {
+  if (!challenge || challenge !== activeBookingChallenge || challenge.hasPrompted || livePreviewMode !== 'guest') return;
+  challenge.hasPrompted = true;
+  challenge.status = 'prompted';
+  challenge.layer.innerHTML = `<section class="mvr-challenge-card" role="dialog" aria-labelledby="mvrChallengeTitle">
+    <span class="mvr-challenge-eyebrow">Try it like a guest</span>
+    <h2 id="mvrChallengeTitle">Can you reach checkout in under 60 seconds?</h2>
+    <p>Choose a room and dates, then continue to checkout. Nothing you do here creates a real booking.</p>
+    <div class="mvr-challenge-actions">
+      <button type="button" class="mvr-challenge-start">Start 60-second challenge</button>
+      <button type="button" class="mvr-challenge-skip">Explore normally</button>
+    </div>
+  </section>`;
+  challenge.layer.classList.add('is-visible');
+  challenge.layer.setAttribute('aria-hidden', 'false');
+  challenge.layer.querySelector('.mvr-challenge-start')?.addEventListener('click', () => startBookingChallenge(challenge));
+  challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
+    challenge.status = 'dismissed';
+    hideBookingChallengeLayer(challenge);
+    trackReveal('BookingChallengeDismissed');
+    trackJourney('JourneyBookingChallengeDismissed');
+  });
+  trackReveal('BookingChallengeShown');
+  trackJourney('JourneyBookingChallengeShown', {
+    bookingDomain: bookingDisplayDomain(),
+  });
+}
+
+function completeBookingChallenge(challenge) {
+  if (!challenge || challenge !== activeBookingChallenge) return;
+  if (challenge.status !== 'running') {
+    trackJourney('JourneyBookingPreviewCheckoutReached', {
+      challengeRunning: false,
+    });
+    return;
+  }
+  const elapsedMs = Date.now() - challenge.startedAt;
+  if (challenge.timerId) {
+    window.clearInterval(challenge.timerId);
+    challenge.timerId = 0;
+  }
+  challenge.status = 'completed';
+  challenge.timer.hidden = true;
+  challenge.layer.innerHTML = `<section class="mvr-challenge-card mvr-challenge-complete" role="dialog" aria-labelledby="mvrChallengeCompleteTitle">
+    <span class="mvr-challenge-check" aria-hidden="true">✓</span>
+    <span class="mvr-challenge-eyebrow">Checkout reached in ${esc(formatChallengeTime(elapsedMs))}</span>
+    <h2 id="mvrChallengeCompleteTitle">That is the direct-booking experience your guests get.</h2>
+    <p>Now see where you change rooms, prices, photos, and availability.</p>
+    <div class="mvr-challenge-actions">
+      <button type="button" class="mvr-challenge-edit">See how you edit it</button>
+      <button type="button" class="mvr-challenge-skip">Keep exploring</button>
+    </div>
+  </section>`;
+  challenge.layer.classList.add('is-visible');
+  challenge.layer.setAttribute('aria-hidden', 'false');
+  challenge.layer.querySelector('.mvr-challenge-edit')?.addEventListener('click', () => {
+    hideBookingChallengeLayer(challenge);
+    setLivePreviewMode(challenge.modal, 'edit', challenge.previewOpenedAt, 'challenge-completed');
+  });
+  challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
+    hideBookingChallengeLayer(challenge);
+  });
+  trackReveal('BookingChallengeCheckoutReached', formatChallengeTime(elapsedMs));
+  trackJourney('JourneyBookingChallengeCompleted', {
+    elapsedMs,
+    completedWithin60Seconds: elapsedMs <= 60000,
+  }, { durationMs: elapsedMs });
+}
+
 function handleBookingPreviewMessage(event) {
-  if (event?.data?.type !== 'marketel:show-guest-app') return;
+  const messageType = event?.data?.type;
+  if (messageType !== 'marketel:show-guest-app' && messageType !== 'marketel:checkout-reached') return;
   const reveal = document.getElementById('marketelValueReveal');
   if (!reveal) return;
   const knownFrame = Array.from(reveal.querySelectorAll('iframe'))
     .some((frame) => frame.contentWindow === event.source);
   if (!knownFrame) return;
+  if (messageType === 'marketel:checkout-reached') {
+    if (activeBookingChallenge?.iframe?.contentWindow !== event.source || livePreviewMode !== 'guest') return;
+    completeBookingChallenge(activeBookingChallenge);
+    return;
+  }
+  stopBookingChallenge('guest-app-selected', true);
+  activeBookingChallenge = null;
   document.getElementById('mvrLivePreview')?.remove();
   trackReveal('GuestAppPreviewRequestedFromBookingEngine');
   trackJourney('JourneyBookingPreviewModeChanged', { action: 'guest-app-requested-from-booking-engine' });
@@ -460,40 +595,57 @@ function showExpandedPreview() {
       <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span>Live preview · changes in Edit save for real</span></div>
       <i aria-hidden="true"></i>
     </div>
+    <div class="mvr-live-address-row" id="mvrLiveAddressRow">
+      <span>Your booking link</span>
+      <div class="mvr-live-address">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
+        <strong>${esc(bookingDisplayDomain())}</strong>
+      </div>
+    </div>
     <div class="mvr-live-switch" role="tablist" aria-label="Guest page and editor">
       <button type="button" data-live-preview-mode="guest" class="is-active">Guest booking page</button>
       <button type="button" data-live-preview-mode="edit">Edit in Front Desk</button>
     </div>
   </div>
-  <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>`;
+  <div class="mvr-live-stage">
+    <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+    <div class="mvr-challenge-layer" aria-hidden="true"></div>
+    <div class="mvr-challenge-timer" hidden aria-live="polite">
+      <span></span>
+      <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
+    </div>
+  </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
+  const iframe = modal.querySelector('.mvr-live-stage > iframe');
+  activeBookingChallenge = {
+    modal,
+    iframe,
+    layer: modal.querySelector('.mvr-challenge-layer'),
+    timer: modal.querySelector('.mvr-challenge-timer'),
+    previewOpenedAt,
+    status: 'waiting',
+    hasPrompted: false,
+    startedAt: 0,
+    timerId: 0,
+  };
+  iframe?.addEventListener('load', () => {
+    if (activeBookingChallenge?.modal !== modal || livePreviewMode !== 'guest') return;
+    window.setTimeout(() => showBookingChallengePrompt(activeBookingChallenge), 250);
+  });
   document.getElementById('mvrClosePreview')?.addEventListener('click', () => {
     trackJourney('JourneyBookingPreviewModeChanged', {
       action: 'closed',
       mode: livePreviewMode,
     }, { durationMs: Date.now() - previewOpenedAt });
+    stopBookingChallenge('preview-closed', true);
+    activeBookingChallenge = null;
     modal.remove();
   });
   modal.querySelectorAll('[data-live-preview-mode]').forEach((button) => {
     button.addEventListener('click', () => {
       const nextMode = button.dataset.livePreviewMode === 'edit' ? 'edit' : 'guest';
       if (nextMode === livePreviewMode) return;
-      livePreviewMode = nextMode;
-      modal.querySelectorAll('[data-live-preview-mode]').forEach((item) => {
-        item.classList.toggle('is-active', item.dataset.livePreviewMode === livePreviewMode);
-      });
-      const iframe = modal.querySelector('iframe');
-      if (iframe) {
-        iframe.title = livePreviewMode === 'edit'
-          ? `${propertyName()} Front Desk editor`
-          : `${propertyName()} booking-page preview`;
-        iframe.src = livePreviewMode === 'edit' ? frontdeskEditorUrl() : bookingUrl();
-      }
-      trackJourney('JourneyBookingPreviewModeChanged', {
-        action: 'mode-selected',
-        mode: livePreviewMode,
-      }, { durationMs: Date.now() - previewOpenedAt });
-      if (livePreviewMode === 'edit') trackReveal('BookingEngineEditPreviewViewed');
+      setLivePreviewMode(modal, nextMode, previewOpenedAt);
     });
   });
   trackReveal('BookingEngineFullPreviewOpened');
@@ -502,6 +654,28 @@ function showExpandedPreview() {
     bookingPageReady: !!bookingPageState.ready,
     bookingPageReason: bookingPageState.reason || '',
   });
+}
+
+function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-selected') {
+  if (!modal?.isConnected) return;
+  if (nextMode === 'edit') stopBookingChallenge('edit-mode-selected', true);
+  livePreviewMode = nextMode === 'edit' ? 'edit' : 'guest';
+  modal.querySelectorAll('[data-live-preview-mode]').forEach((item) => {
+    item.classList.toggle('is-active', item.dataset.livePreviewMode === livePreviewMode);
+  });
+  modal.querySelector('#mvrLiveAddressRow')?.classList.toggle('is-editor', livePreviewMode === 'edit');
+  const iframe = modal.querySelector('.mvr-live-stage > iframe');
+  if (iframe) {
+    iframe.title = livePreviewMode === 'edit'
+      ? `${propertyName()} Front Desk editor`
+      : `${propertyName()} booking-page preview`;
+    iframe.src = livePreviewMode === 'edit' ? frontdeskEditorUrl() : bookingUrl();
+  }
+  trackJourney('JourneyBookingPreviewModeChanged', {
+    action,
+    mode: livePreviewMode,
+  }, { durationMs: Date.now() - previewOpenedAt });
+  if (livePreviewMode === 'edit') trackReveal('BookingEngineEditPreviewViewed');
 }
 
 function moveToStep(nextStep) {
@@ -546,6 +720,8 @@ function finishReveal() {
     window.clearTimeout(bookingPageTimer);
     bookingPageTimer = 0;
   }
+  stopBookingChallenge('reveal-finished', true);
+  activeBookingChallenge = null;
   clearGuestAppDemoSchedule();
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');

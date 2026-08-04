@@ -129,6 +129,16 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const [whyCardModalDismissed, setWhyCardModalDismissed] = useState(false);
     const [showCardDeclineModal, setShowCardDeclineModal] = useState(false);
     const CARD_DECLINE_MODAL_DELAY_MS = 800; // Let user see inline error briefly before modal
+
+    // The owner preview uses this exact route as the finish line for its
+    // optional booking-speed challenge. The parent verifies the sending frame;
+    // no guest details or transaction data cross the boundary.
+    useEffect(() => {
+        if (typeof window === 'undefined' || window === window.parent) return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('preview') !== '1') return;
+        window.parent.postMessage({ type: 'marketel:checkout-reached' }, '*');
+    }, []);
     
     // Preload Stripe.js as early as possible so Step 4 feels instant.
     useEffect(() => {

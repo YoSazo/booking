@@ -1361,6 +1361,62 @@
   white-space: nowrap;
 }
 
+.mvr-live-address-row {
+  width: min(560px, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  transition: opacity 160ms ease, max-height 160ms ease, margin 160ms ease;
+}
+
+.mvr-live-address-row > span {
+  color: #7a877f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mvr-live-address-row.is-editor {
+  display: none;
+}
+
+.mvr-live-address {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 14px;
+  color: #526159;
+  border: 1px solid #dce5df;
+  border-radius: 11px;
+  background: #f4f6f4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.mvr-live-address svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #718077;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.mvr-live-address strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mvr-live-switch {
   width: min(430px, 100%);
   display: flex;
@@ -1391,11 +1447,167 @@
   box-shadow: 0 2px 9px rgba(26, 57, 41, 0.1);
 }
 
-.mvr-live-preview > iframe {
+.mvr-live-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.mvr-live-stage > iframe {
   width: 100%;
   height: 100%;
   border: 0;
   background: #fff;
+}
+
+.mvr-challenge-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: start end;
+  padding: 22px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.mvr-challenge-layer.is-visible {
+  visibility: visible;
+}
+
+.mvr-challenge-card {
+  width: min(390px, 100%);
+  padding: 22px;
+  color: #183126;
+  border: 1px solid rgba(37, 78, 56, 0.14);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 22px 55px rgba(22, 49, 34, 0.2);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  pointer-events: auto;
+  animation: mvr-stage-in 180ms ease-out both;
+}
+
+.mvr-challenge-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--mvr-green);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mvr-challenge-card h2 {
+  margin: 0;
+  font-size: clamp(20px, 2vw, 26px);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.mvr-challenge-card p {
+  margin: 10px 0 18px;
+  color: #68786f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mvr-challenge-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mvr-challenge-actions button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mvr-challenge-start,
+.mvr-challenge-edit {
+  flex: 1;
+  color: #fff;
+  background: var(--mvr-green);
+  box-shadow: 0 7px 18px rgba(35, 101, 70, 0.2);
+}
+
+.mvr-challenge-skip {
+  color: #617168;
+  background: #edf2ef;
+}
+
+.mvr-challenge-check {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  color: #fff;
+  border-radius: 50%;
+  background: var(--mvr-green);
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.mvr-challenge-timer {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 4;
+  min-width: 150px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  color: #183126;
+  border: 1px solid rgba(37, 78, 56, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(22, 49, 34, 0.16);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.mvr-challenge-timer:not([hidden]) {
+  display: flex;
+}
+
+.mvr-challenge-timer > span {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border: 2px solid var(--mvr-green);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(46, 125, 91, 0.1);
+}
+
+.mvr-challenge-timer div {
+  display: grid;
+}
+
+.mvr-challenge-timer small {
+  color: #7a877f;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mvr-challenge-timer strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mvr-challenge-timer.is-over-minute > span {
+  box-shadow: none;
 }
 
 @media (max-width: 820px) {
@@ -1516,6 +1728,35 @@
 
   .mvr-live-switch {
     width: 100%;
+  }
+
+  .mvr-live-address-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .mvr-live-address-row > span {
+    display: none;
+  }
+
+  .mvr-challenge-layer {
+    place-items: start center;
+    padding: 12px;
+  }
+
+  .mvr-challenge-card {
+    padding: 18px;
+    border-radius: 17px;
+  }
+
+  .mvr-challenge-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mvr-challenge-timer {
+    top: 10px;
+    right: 10px;
   }
 }
 

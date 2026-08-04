@@ -5518,6 +5518,12 @@ const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
     'JourneyRevealNavigation',
     'JourneyBookingPreviewOpened',
     'JourneyBookingPreviewModeChanged',
+    'JourneyBookingPreviewCheckoutReached',
+    'JourneyBookingChallengeShown',
+    'JourneyBookingChallengeStarted',
+    'JourneyBookingChallengeDismissed',
+    'JourneyBookingChallengeAbandoned',
+    'JourneyBookingChallengeCompleted',
     'JourneyGuestAppDemo',
     'JourneyBookingPageStatus',
     'JourneyCheckoutRequested',
@@ -5715,6 +5721,11 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppValueSlideViewed',
     'GuestAppInstallSlideReplayed',
     'GuestAppInstallDemoClicked',
+    'BookingChallengeShown',
+    'BookingChallengeStarted',
+    'BookingChallengeDismissed',
+    'BookingChallengeAbandoned',
+    'BookingChallengeCheckoutReached',
 ]);
 app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true, local: true });
