@@ -509,7 +509,9 @@ function startAppsTour(opts) {
   _appsTourChainFromSettings = !!chainFromSettings;
 
   const hotelIsLive = !!crm.hotelSubscribed;
-  const nativeMode = !!windowFn('isNativeFrontdeskApp')?.();
+  const nativeMode = !!windowFn('isNativeFrontdeskApp')?.()
+    || document.body.classList.contains('frontdesk-editor-preview')
+    || new URLSearchParams(window.location.search).get('previewEditor') === '1';
   _appsTourSteps = nativeMode ? [
     {
       target: '#tour-guest-reach',

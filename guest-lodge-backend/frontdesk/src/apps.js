@@ -357,7 +357,9 @@ function detectAppPlatform() {
 function ensureAppsViewRendered(force) {
   const el = document.getElementById('appsView');
   if (!el) return;
-  const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '');
+  const embeddedNativePreview = document.body.classList.contains('frontdesk-editor-preview')
+    || new URLSearchParams(window.location.search).get('previewEditor') === '1';
+  const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '') + '|' + (embeddedNativePreview ? 'native-preview' : 'standard');
   if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
     renderAppsView();
     el.dataset.appsKey = key;
@@ -410,9 +412,12 @@ function renderAppsView() {
   // from another phone must not unlock them in an ordinary browser tab.
   const fdInApp = isStandaloneApp();
   const fdNativeApp = isNativeFrontdeskApp();
+  const embeddedNativePreview = document.body.classList.contains('frontdesk-editor-preview')
+    || new URLSearchParams(window.location.search).get('previewEditor') === '1';
+  const nativePresentation = fdNativeApp || embeddedNativePreview;
   const nativeNotificationState = String(crm.nativeNotificationState || '');
-  const nativeAlertsOn = nativeNotificationState === 'registered';
-  const nativePermissionGranted = ['authorized', 'registered', 'unavailable'].includes(nativeNotificationState);
+  const nativeAlertsOn = embeddedNativePreview || nativeNotificationState === 'registered';
+  const nativePermissionGranted = embeddedNativePreview || ['authorized', 'registered', 'unavailable'].includes(nativeNotificationState);
   const fdAlertsAvailable = fdNativeApp ? nativeAlertsOn : fdInApp;
   const fdGranted = fdNativeApp
     ? nativeAlertsOn
@@ -662,14 +667,14 @@ function renderAppsView() {
     ${guestIconCardHtml()}
     ${helpFoldHtml}`;
 
-  const appsMainHtml = fdNativeApp
+  const appsMainHtml = nativePresentation
     ? nativeGuestToolsHtml
     : `${appsStoryHtml}
       ${loopDiagramHtml}
       ${guestMessagesPanelHtml}
       ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
 
-  const appsFootnoteHtml = fdNativeApp
+  const appsFootnoteHtml = nativePresentation
     ? ''
     : fdInApp
     ? 'Front Desk is installed. Guests can install your property from the direct booking page.'
