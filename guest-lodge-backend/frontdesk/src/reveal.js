@@ -371,9 +371,13 @@ function bookingPreviewCardHtml() {
         ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
-      <button type="button" id="mvrExpandPreview" aria-label="Try booking as a guest">
-        <span class="mvr-expand-cue" aria-hidden="true"><i>←</i><strong>Try booking as a guest</strong><i>→</i></span>
-        <small>See if you can reach payment in under 60 seconds</small>
+      <button type="button" id="mvrExpandPreview" aria-label="Expand booking page preview">
+        <span class="mvr-expand-cue" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>
+          </svg>
+          <strong>Expand</strong>
+        </span>
       </button>
     </div>
   </div>`;
