@@ -211,12 +211,21 @@ function hideBookingChallengeLayer(challenge) {
   challenge.layer.innerHTML = '';
 }
 
+function setLivePreviewActionsVisible(modal, visible) {
+  const actions = modal?.querySelector('#mvrLiveActions');
+  if (actions) actions.hidden = !visible;
+}
+
 function stopBookingChallenge(reason = '', shouldTrack = false) {
   const challenge = activeBookingChallenge;
   if (!challenge) return;
   if (challenge.timerId) {
     window.clearInterval(challenge.timerId);
     challenge.timerId = 0;
+  }
+  if (challenge.promptFallbackId) {
+    window.clearTimeout(challenge.promptFallbackId);
+    challenge.promptFallbackId = 0;
   }
   if (shouldTrack && challenge.status === 'running') {
     const elapsedMs = Date.now() - challenge.startedAt;
@@ -244,6 +253,7 @@ function startBookingChallenge(challenge) {
   challenge.status = 'running';
   challenge.startedAt = Date.now();
   hideBookingChallengeLayer(challenge);
+  setLivePreviewActionsVisible(challenge.modal, true);
   challenge.timer.hidden = false;
   updateBookingChallengeTimer(challenge);
   challenge.timerId = window.setInterval(() => updateBookingChallengeTimer(challenge), 500);
@@ -258,6 +268,11 @@ function showBookingChallengePrompt(challenge) {
   if (!challenge || challenge !== activeBookingChallenge || challenge.hasPrompted || livePreviewMode !== 'guest') return;
   challenge.hasPrompted = true;
   challenge.status = 'prompted';
+  if (challenge.promptFallbackId) {
+    window.clearTimeout(challenge.promptFallbackId);
+    challenge.promptFallbackId = 0;
+  }
+  setLivePreviewActionsVisible(challenge.modal, false);
   challenge.layer.innerHTML = `<section class="mvr-challenge-card" role="dialog" aria-labelledby="mvrChallengeTitle">
     <span class="mvr-challenge-eyebrow">Try it like a guest</span>
     <h2 id="mvrChallengeTitle">Can you reach checkout in under 60 seconds?</h2>
@@ -273,6 +288,7 @@ function showBookingChallengePrompt(challenge) {
   challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
     challenge.status = 'dismissed';
     hideBookingChallengeLayer(challenge);
+    setLivePreviewActionsVisible(challenge.modal, true);
     trackReveal('BookingChallengeDismissed');
     trackJourney('JourneyBookingChallengeDismissed');
   });
@@ -297,6 +313,7 @@ function completeBookingChallenge(challenge) {
   }
   challenge.status = 'completed';
   challenge.timer.hidden = true;
+  setLivePreviewActionsVisible(challenge.modal, false);
   challenge.layer.innerHTML = `<section class="mvr-challenge-card mvr-challenge-complete" role="dialog" aria-labelledby="mvrChallengeCompleteTitle">
     <span class="mvr-challenge-check" aria-hidden="true">✓</span>
     <span class="mvr-challenge-eyebrow">Checkout reached in ${esc(formatChallengeTime(elapsedMs))}</span>
@@ -315,6 +332,7 @@ function completeBookingChallenge(challenge) {
   });
   challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
     hideBookingChallengeLayer(challenge);
+    setLivePreviewActionsVisible(challenge.modal, true);
   });
   trackReveal('BookingChallengeCheckoutReached', formatChallengeTime(elapsedMs));
   trackJourney('JourneyBookingChallengeCompleted', {
@@ -589,7 +607,6 @@ function footerHtml() {
   if (currentStep === 0) {
     if (!bookingPreviewOpened && !bookingPreviewUnavailable) return '';
     return `<div class="mvr-footer mvr-footer-booking">
-      <span>${bookingPreviewUnavailable ? 'Your setup is safe while publishing finishes.' : 'You’ve seen the guest experience. Explore more or keep going.'}</span>
       <button type="button" class="mvr-primary" id="mvrNext">Continue to Guest App →</button>
     </div>`;
   }
@@ -650,14 +667,7 @@ function showExpandedPreview() {
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
         <strong data-live-location-text>${esc(bookingDisplayDomain())}</strong>
       </div>
-      <div class="mvr-live-actions">
-        <button type="button" class="mvr-live-continue" id="mvrContinueTour">Continue tour</button>
-        <button type="button" class="mvr-live-forward" id="mvrLiveForward">
-          <span class="mvr-live-forward-long" data-live-forward-long>See how you edit this</span>
-          <span class="mvr-live-forward-short" data-live-forward-short>How to edit</span>
-          <b aria-hidden="true">→</b>
-        </button>
-      </div>
+      <span class="mvr-live-balance" aria-hidden="true"></span>
     </div>
     <div class="mvr-challenge-timer" hidden aria-live="polite">
       <span></span>
@@ -667,6 +677,13 @@ function showExpandedPreview() {
   <div class="mvr-live-stage">
     <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
     <div class="mvr-challenge-layer" aria-hidden="true"></div>
+  </div>
+  <div class="mvr-live-actions" id="mvrLiveActions" hidden>
+    <button type="button" class="mvr-live-forward" id="mvrLiveForward">
+      <span data-live-forward-long>See how to edit your booking page</span>
+      <b aria-hidden="true">→</b>
+    </button>
+    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp">Continue to Guest App</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
@@ -680,7 +697,12 @@ function showExpandedPreview() {
     hasPrompted: false,
     startedAt: 0,
     timerId: 0,
+    promptFallbackId: 0,
   };
+  activeBookingChallenge.promptFallbackId = window.setTimeout(() => {
+    if (activeBookingChallenge?.modal !== modal || activeBookingChallenge.status !== 'waiting') return;
+    setLivePreviewActionsVisible(modal, true);
+  }, 4000);
   iframe?.addEventListener('load', () => {
     if (activeBookingChallenge?.modal !== modal || livePreviewMode !== 'guest') return;
     window.setTimeout(() => showBookingChallengePrompt(activeBookingChallenge), 250);
@@ -695,7 +717,7 @@ function showExpandedPreview() {
     modal.remove();
     renderReveal();
   });
-  modal.querySelector('#mvrContinueTour')?.addEventListener('click', () => {
+  modal.querySelector('#mvrContinueGuestApp')?.addEventListener('click', () => {
     continueFromBookingPreview(modal, previewOpenedAt, 'continued-without-editor');
   });
   modal.querySelector('#mvrLiveForward')?.addEventListener('click', () => {
@@ -733,18 +755,17 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   const location = modal.querySelector('#mvrLiveLocation');
   const locationText = modal.querySelector('[data-live-location-text]');
   const forward = modal.querySelector('#mvrLiveForward');
-  const continueTour = modal.querySelector('#mvrContinueTour');
+  const continueGuestApp = modal.querySelector('#mvrContinueGuestApp');
   const forwardLong = modal.querySelector('[data-live-forward-long]');
-  const forwardShort = modal.querySelector('[data-live-forward-short]');
   location?.classList.toggle('is-editor', livePreviewMode === 'edit');
   if (locationText) locationText.textContent = livePreviewMode === 'edit' ? 'Front Desk editor' : bookingDisplayDomain();
   if (location) location.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Front Desk editor' : 'Your live booking address');
-  if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Continue to Guest App' : 'See how you edit this';
-  if (forwardShort) forwardShort.textContent = livePreviewMode === 'edit' ? 'Continue' : 'How to edit';
+  if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Continue to Guest App' : 'See how to edit your booking page';
   if (forward) {
     forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Continue to the Guest App' : 'See how you edit this booking page');
   }
-  if (continueTour) continueTour.hidden = livePreviewMode === 'edit';
+  if (continueGuestApp) continueGuestApp.hidden = livePreviewMode === 'edit';
+  setLivePreviewActionsVisible(modal, true);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
   if (iframe) {
     iframe.title = livePreviewMode === 'edit'
