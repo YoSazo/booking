@@ -23,6 +23,19 @@ function isNativeApp() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
 
+function supportCardHtml() {
+  return `<div class="booking-card" style="margin-bottom:14px;">
+    <div style="padding:18px;display:flex;align-items:center;gap:14px;">
+      <div style="width:42px;height:42px;display:grid;place-items:center;flex:0 0 auto;border-radius:13px;background:var(--green-pale);color:var(--green);font-size:19px;font-weight:800;">?</div>
+      <div style="min-width:0;flex:1;">
+        <div style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:var(--text);">Need help? <span class="marketel-support-unread"></span></div>
+        <p style="font-size:12px;color:var(--text-muted);line-height:1.45;margin:4px 0 0;">Ask a question, report a problem, or share feedback directly with Marketel.</p>
+      </div>
+      <button type="button" onclick="openMarketelSupport()" style="flex:0 0 auto;padding:10px 13px;border-radius:10px;border:1.5px solid var(--green);background:#fff;color:var(--green);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Message us</button>
+    </div>
+  </div>`;
+}
+
 function legalAccountCardHtml(deletionStatus = null) {
   const native = isNativeApp();
   const legalOrigin = native ? 'https://guest-lodge-backend.onrender.com' : '';
@@ -179,20 +192,12 @@ async function loadSettings() {
       `;
     }
 
-    // Support
-    html += `
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Need Help?</div>
-          <textarea id="settings-support-msg" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
-          <button onclick="settingsSendSupport()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We aim to reply within two business days.</p>
-        </div>
-      </div>
-    `;
+    // Founder support conversation
+    html += supportCardHtml();
 
     html += legalAccountCardHtml(deletionStatus);
     list.innerHTML = html;
+    window.refreshSupportSummary?.();
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load settings</div></div>';
   }
@@ -374,13 +379,7 @@ async function settingsChangePin() {
 }
 
 async function settingsSendSupport() {
-  const msg = document.getElementById('settings-support-msg')?.value.trim();
-  if (!msg) { toast('Please enter a message', 'error'); return; }
-  try {
-    await api('POST', '/api/crm/support', { message: msg });
-    toast('Message sent!', 'success');
-    document.getElementById('settings-support-msg').value = '';
-  } catch (e) { toast('Failed to send', 'error'); }
+  window.openMarketelSupport?.();
 }
 
 function openPreviewSite() {
@@ -971,25 +970,14 @@ async function loadEditRooms() {
           <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
         </div>
       </div>` : ''}
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Need Help?</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="margin-bottom:12px;">
-            <textarea id="supportMessage" placeholder="Describe your issue or question..." style="width:100%;min-height:80px;padding:10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
-          </div>
-          <button onclick="sendSupportMessage()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Send Message</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">We'll reply to your email on file.</p>
-        </div>
-      </div>
+      ${supportCardHtml()}
       ${legalAccountCardHtml(deletionStatus)}
       </div>
       </div>
     `;
     list.innerHTML = html;
     renderEditRoomsCards();
+    window.refreshSupportSummary?.();
     if (typeof lucide !== 'undefined') lucide.createIcons();
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load your page</div><div class="empty-sub">Check your connection and refresh.</div></div>';
@@ -1404,15 +1392,7 @@ async function cancelAccountDeletion() {
 }
 
 async function sendSupportMessage() {
-  const msg = document.getElementById('supportMessage')?.value.trim();
-  if (!msg) { toast('Please enter a message', 'error'); return; }
-  try {
-    await api('POST', '/api/crm/support', { message: msg });
-    document.getElementById('supportMessage').value = '';
-    toast('Message sent! We\'ll reply to your email.', 'success');
-  } catch (e) {
-    toast('Failed to send. Email support@bookmarketel.com directly.', 'error');
-  }
+  window.openMarketelSupport?.();
 }
 
 async function saveEditRoom(roomId) {

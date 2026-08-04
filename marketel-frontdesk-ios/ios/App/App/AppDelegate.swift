@@ -316,6 +316,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("assistant")
         }
+        let supportAction = UIAction(
+            title: "Message Marketel",
+            image: UIImage(systemName: "questionmark.bubble")
+        ) { [weak self] _ in
+            self?.sendWebAction("support")
+        }
         let tourAction = UIAction(
             title: "Replay app tour",
             image: UIImage(systemName: "questionmark.circle")
@@ -349,6 +355,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuButton.menu = UIMenu(
             children: [
                 assistantAction,
+                supportAction,
                 notificationSettingsAction,
                 refreshAction,
                 tourAction,

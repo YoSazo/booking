@@ -60,6 +60,7 @@ async function fetchWithTimeout(input, init = {}, milliseconds = FRONTDESK_START
 let settingsModulePromise = null;
 let appsModulePromise = null;
 let assistantModulePromise = null;
+let supportModulePromise = null;
 let revealModulePromise = null;
 let nativeOnboardingModulePromise = null;
 let messagesLoadPromise = null;
@@ -103,6 +104,31 @@ export function loadAssistantModule() {
     });
   }
   return assistantModulePromise;
+}
+
+export function loadSupportModule() {
+  if (!supportModulePromise) {
+    supportModulePromise = import('./support.js').then((m) => {
+      m.install();
+      return m;
+    });
+  }
+  return supportModulePromise;
+}
+
+function openMarketelSupport() {
+  return loadSupportModule()
+    .then((module) => module.openSupportConversation())
+    .catch((error) => {
+      console.error('Unable to open Marketel support:', error);
+      toast('Could not open support. Email support@bookmarketel.com.', 'error');
+    });
+}
+
+function refreshSupportSummary() {
+  return loadSupportModule()
+    .then((module) => module.loadSupportSummary())
+    .catch(() => {});
 }
 
 export function loadRevealModule() {
@@ -770,6 +796,13 @@ function marketelNativeAction(action) {
     loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
       setNativeShellVisible(true);
       toast('Could not open Front Desk Assistant.', 'error');
+    });
+  }
+  else if (action === 'support') {
+    setNativeShellVisible(false);
+    loadSupportModule().then((module) => module.openSupportConversation()).catch(() => {
+      setNativeShellVisible(true);
+      toast('Could not open support. Email support@bookmarketel.com.', 'error');
     });
   }
   else if (action === 'properties') showNativePropertyPicker();
@@ -2161,6 +2194,8 @@ async function startCrmApp(verification, options = {}) {
   crm.assistantData = null;
   crm.assistantLoading = false;
   crm.assistantError = '';
+  crm.supportThread = null;
+  crm.supportUnreadCount = 0;
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
@@ -2403,7 +2438,13 @@ async function startCrmApp(verification, options = {}) {
   // 'appinstalled' never fires — record it every launch, server-side dedupes.
   if (!isEmbeddedEditorPreview && isStandaloneApp()) reportFrontdeskInstalled();
 
-  if (!isEmbeddedEditorPreview && isNativeFrontdeskApp()) {
+  const shouldOpenSupport = !isEmbeddedEditorPreview && urlParams.get('openSupport') === '1';
+  if (shouldOpenSupport) {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('openSupport');
+    window.history.replaceState({}, '', cleanUrl);
+    requestAnimationFrame(() => openMarketelSupport());
+  } else if (!isEmbeddedEditorPreview && isNativeFrontdeskApp()) {
     // The native app explains the operational value before iOS asks for
     // notification permission. Returning owners bypass this entirely.
     requestAnimationFrame(() => {
@@ -5638,6 +5679,7 @@ exposeToWindow({
   normalizeRevenuePeriod,
   openAvailabilityDayPopover,
   openInAppBrowser,
+  openMarketelSupport,
   openMessagesWorkspace,
   openRoomsAddModal,
   openRoomsDeleteModal,
@@ -5653,6 +5695,7 @@ exposeToWindow({
   refreshGoLiveInlineCard,
   refreshMobileBottomNavIcons,
   refreshRatesInputs,
+  refreshSupportSummary,
   refreshRoomBadge,
   renderAvailabilityCalendar,
   renderAvailabilityEmptyState,

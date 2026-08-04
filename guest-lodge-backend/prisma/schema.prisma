@@ -263,6 +263,38 @@ model HotelConfig {
   assistantPendingActions FrontDeskAssistantPendingAction[]
   nativePushDevices       NativePushDevice[]
   accountDeletionRequest  AccountDeletionRequest?
+  supportThread           SupportThread?
+}
+
+// One durable founder-support conversation per property. Keeping support
+// separate from guest messages prevents owner questions from appearing in the
+// operational guest inbox while still preserving a complete history.
+model SupportThread {
+  id                String      @id @default(cuid())
+  hotel             HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId           String      @unique
+  status            String      @default("open") // open | resolved
+  lastMessageAt     DateTime    @default(now())
+  ownerLastReadAt   DateTime?
+  supportLastReadAt DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([status, lastMessageAt])
+}
+
+model SupportMessage {
+  id        String        @id @default(cuid())
+  thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId  String
+  sender    String // owner | support
+  body      String
+  context   Json?
+  createdAt DateTime      @default(now())
+
+  @@index([threadId, createdAt])
 }
 
 // Account deletion is initiated inside the iOS app, includes a seven-day

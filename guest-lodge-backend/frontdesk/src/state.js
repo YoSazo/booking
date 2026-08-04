@@ -26,6 +26,8 @@ export const crm = {
   assistantData: null,
   assistantLoading: false,
   assistantError: '',
+  supportThread: null,
+  supportUnreadCount: 0,
   launchStatus: null,
   growthFunnel: null,
   growthChecklist: {},

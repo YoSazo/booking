@@ -2206,6 +2206,11 @@ const journeyEventRateLimit = createRouteRateLimiter('marketel-journey', { windo
 const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
+const supportMessageRateLimit = createRouteRateLimiter('marketel-support-message', {
+    windowMs: 5 * 60 * 1000,
+    max: 10,
+    scope: (req) => req.body?.hotelId || req.query?.hotelId,
+});
 const guestMessageRateLimit = createRouteRateLimiter('guest-message', {
     windowMs: 60 * 1000,
     max: 10,
@@ -10953,28 +10958,313 @@ app.post('/api/crm/onboarding-answers', crmAuth, async (req, res) => {
     }
 });
 
-// Support contact — hotel owner sends a message, we get an email
-app.post('/api/crm/support', crmAuth, async (req, res) => {
+// Durable owner ↔ Marketel support conversation. This stays intentionally
+// separate from GuestMessage: one is product support, the other is a hotel's
+// operational conversation with its guests.
+const SUPPORT_MESSAGE_MAX = 4000;
+
+function normalizeSupportMessage(value) {
+    return String(value || '')
+        .replace(/\0/g, '')
+        .replace(/\r\n?/g, '\n')
+        .trim()
+        .slice(0, SUPPORT_MESSAGE_MAX);
+}
+
+function supportMessageContext(req) {
+    const clean = (value, max) => String(value || '').trim().slice(0, max) || undefined;
+    const context = {
+        surface: clean(req.body?.surface, 60) || 'frontdesk',
+        pagePath: clean(req.body?.pagePath, 240),
+        client: clean(req.crmClient, 24) || (req.crmIsNativeClient ? 'ios' : 'web'),
+        appVersion: clean(req.get('x-marketel-app-version'), 80),
+        userAgent: clean(req.get('user-agent'), 500),
+    };
+    return Object.fromEntries(Object.entries(context).filter(([, value]) => value !== undefined));
+}
+
+function supportUnreadCount(messages, sender, lastReadAt) {
+    const readTime = lastReadAt ? new Date(lastReadAt).getTime() : 0;
+    return (messages || []).filter((message) => (
+        message.sender === sender && new Date(message.createdAt).getTime() > readTime
+    )).length;
+}
+
+function serializeSupportThread(thread, viewer = 'owner') {
+    if (!thread) return null;
+    const messages = (thread.messages || [])
+        .slice()
+        .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt))
+        .map((message) => ({
+            id: message.id,
+            sender: message.sender,
+            body: message.body,
+            context: viewer === 'support' ? (message.context || null) : undefined,
+            createdAt: message.createdAt,
+        }));
+    return {
+        id: thread.id,
+        hotelId: thread.hotelId,
+        hotel: thread.hotel ? {
+            id: thread.hotel.id,
+            name: thread.hotel.name || thread.hotel.id,
+            ownerEmail: thread.hotel.ownerEmail || '',
+            ownerPhone: thread.hotel.ownerPhone || '',
+            subscribed: !!thread.hotel.subscribed,
+        } : undefined,
+        status: thread.status,
+        lastMessageAt: thread.lastMessageAt,
+        createdAt: thread.createdAt,
+        updatedAt: thread.updatedAt,
+        unread: viewer === 'support'
+            ? supportUnreadCount(messages, 'owner', thread.supportLastReadAt)
+            : supportUnreadCount(messages, 'support', thread.ownerLastReadAt),
+        messages,
+    };
+}
+
+function supportAdminLink(req, threadId) {
+    return `${marketelFrontdeskOrigin(req)}/funnel?view=support&thread=${encodeURIComponent(threadId)}`;
+}
+
+function supportOwnerLink(req, hotelId) {
+    return `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotelId)}&openSupport=1`;
+}
+
+async function loadOwnerSupportThread(hotelId) {
+    return withRetry(() => prisma.supportThread.findUnique({
+        where: { hotelId },
+        include: {
+            messages: { orderBy: { createdAt: 'desc' }, take: 200 },
+        },
+    }));
+}
+
+app.get('/api/crm/support', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const message = String(req.body?.message || '').trim();
+        const thread = await loadOwnerSupportThread(hotelId);
+        res.json({ success: true, thread: serializeSupportThread(thread, 'owner') });
+    } catch (e) {
+        console.error('crm:support:get error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load your support conversation.' });
+    }
+});
+
+app.post('/api/crm/support/read', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        await withRetry(() => prisma.supportThread.updateMany({
+            where: { hotelId },
+            data: { ownerLastReadAt: new Date() },
+        }));
+        res.json({ success: true });
+    } catch (e) {
+        console.error('crm:support:read error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not mark replies as read.' });
+    }
+});
+
+app.post('/api/crm/support', crmAuth, supportMessageRateLimit, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const message = normalizeSupportMessage(req.body?.message);
         if (!message) return res.status(400).json({ success: false, message: 'Message is required.' });
-        const hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, ownerEmail: true, ownerPhone: true } });
+        const hotel = await withRetry(() => prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { id: true, name: true, ownerEmail: true, ownerPhone: true },
+        }));
+        if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
+
+        const now = new Date();
+        const thread = await withRetry(() => prisma.$transaction(async (tx) => {
+            const current = await tx.supportThread.upsert({
+                where: { hotelId },
+                update: {
+                    status: 'open',
+                    lastMessageAt: now,
+                    ownerLastReadAt: now,
+                },
+                create: {
+                    hotelId,
+                    status: 'open',
+                    lastMessageAt: now,
+                    ownerLastReadAt: now,
+                },
+            });
+            await tx.supportMessage.create({
+                data: {
+                    threadId: current.id,
+                    sender: 'owner',
+                    body: message,
+                    context: supportMessageContext(req),
+                },
+            });
+            return tx.supportThread.findUnique({
+                where: { id: current.id },
+                include: { messages: { orderBy: { createdAt: 'desc' }, take: 200 } },
+            });
+        }));
+
         if (emailTransporter) {
-            await emailTransporter.sendMail({
+            emailTransporter.sendMail({
                 from: '"Marketel Support" <support@bookmarketel.com>',
                 to: 'support@bookmarketel.com',
-                replyTo: hotel?.ownerEmail || undefined,
-                subject: `Support: ${hotel?.name || hotelId}`,
-                text: `Hotel: ${hotel?.name || hotelId} (${hotelId})\nEmail: ${hotel?.ownerEmail || 'N/A'}\nPhone: ${hotel?.ownerPhone || 'N/A'}\n\nMessage:\n${message}`,
-            });
+                replyTo: hotel.ownerEmail || undefined,
+                subject: `Support: ${hotel.name || hotelId}`,
+                text: [
+                    `Property: ${hotel.name || hotelId} (${hotelId})`,
+                    `Email: ${hotel.ownerEmail || 'N/A'}`,
+                    `Phone: ${hotel.ownerPhone || 'N/A'}`,
+                    '',
+                    message,
+                    '',
+                    `Reply in Marketel: ${supportAdminLink(req, thread.id)}`,
+                ].join('\n'),
+            }).catch((error) => console.error('crm:support notification email:', error.message));
         }
-        console.log(`📩 Support message from ${hotel?.name || hotelId}: ${message}`);
-        res.json({ success: true });
+        console.log(`📩 Support message from ${hotel.name || hotelId}`);
+        res.json({ success: true, thread: serializeSupportThread(thread, 'owner') });
     } catch (e) {
         console.error('crm:support error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to send message.' });
+    }
+});
+
+app.get('/api/admin/support', adminAuth, async (req, res) => {
+    try {
+        const requestedStatus = String(req.query?.status || '').trim().toLowerCase();
+        const where = ['open', 'resolved'].includes(requestedStatus) ? { status: requestedStatus } : {};
+        const threads = await withRetry(() => prisma.supportThread.findMany({
+            where,
+            include: {
+                hotel: {
+                    select: {
+                        id: true,
+                        name: true,
+                        ownerEmail: true,
+                        ownerPhone: true,
+                        subscribed: true,
+                    },
+                },
+                messages: { orderBy: { createdAt: 'desc' }, take: 200 },
+            },
+            orderBy: { lastMessageAt: 'desc' },
+            take: 200,
+        }));
+        const data = threads.map((thread) => serializeSupportThread(thread, 'support'));
+        res.json({
+            success: true,
+            threads: data,
+            unread: data.reduce((total, thread) => total + Number(thread.unread || 0), 0),
+        });
+    } catch (e) {
+        console.error('admin:support:list error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load support conversations.' });
+    }
+});
+
+app.post('/api/admin/support/:threadId/read', adminAuth, async (req, res) => {
+    try {
+        const threadId = String(req.params.threadId || '').trim();
+        const result = await withRetry(() => prisma.supportThread.updateMany({
+            where: { id: threadId },
+            data: { supportLastReadAt: new Date() },
+        }));
+        if (!result.count) return res.status(404).json({ success: false, message: 'Conversation not found.' });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Could not mark the conversation as read.' });
+    }
+});
+
+app.post('/api/admin/support/:threadId/reply', adminAuth, async (req, res) => {
+    try {
+        const threadId = String(req.params.threadId || '').trim();
+        const message = normalizeSupportMessage(req.body?.message);
+        if (!message) return res.status(400).json({ success: false, message: 'Message is required.' });
+        const existing = await withRetry(() => prisma.supportThread.findUnique({
+            where: { id: threadId },
+            include: {
+                hotel: {
+                    select: { id: true, name: true, ownerEmail: true, ownerPhone: true, subscribed: true },
+                },
+            },
+        }));
+        if (!existing) return res.status(404).json({ success: false, message: 'Conversation not found.' });
+
+        const now = new Date();
+        const thread = await withRetry(() => prisma.$transaction(async (tx) => {
+            await tx.supportMessage.create({
+                data: { threadId, sender: 'support', body: message },
+            });
+            return tx.supportThread.update({
+                where: { id: threadId },
+                data: {
+                    status: 'open',
+                    lastMessageAt: now,
+                    supportLastReadAt: now,
+                },
+                include: {
+                    hotel: {
+                        select: { id: true, name: true, ownerEmail: true, ownerPhone: true, subscribed: true },
+                    },
+                    messages: { orderBy: { createdAt: 'desc' }, take: 200 },
+                },
+            });
+        }));
+
+        if (emailTransporter && existing.hotel?.ownerEmail) {
+            emailTransporter.sendMail({
+                from: '"Marketel Support" <support@bookmarketel.com>',
+                to: existing.hotel.ownerEmail,
+                replyTo: 'support@bookmarketel.com',
+                subject: `Marketel replied to ${existing.hotel.name || 'your property'}`,
+                text: [
+                    `Hi — Marketel replied to your support conversation:`,
+                    '',
+                    message,
+                    '',
+                    `Continue the conversation in Front Desk: ${supportOwnerLink(req, existing.hotel.id)}`,
+                ].join('\n'),
+            }).catch((error) => console.error('admin:support reply email:', error.message));
+        }
+        res.json({ success: true, thread: serializeSupportThread(thread, 'support') });
+    } catch (e) {
+        console.error('admin:support:reply error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not send that reply.' });
+    }
+});
+
+app.patch('/api/admin/support/:threadId', adminAuth, async (req, res) => {
+    try {
+        const threadId = String(req.params.threadId || '').trim();
+        const status = String(req.body?.status || '').trim().toLowerCase();
+        if (!['open', 'resolved'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Status must be open or resolved.' });
+        }
+        const thread = await withRetry(() => prisma.supportThread.update({
+            where: { id: threadId },
+            data: {
+                status,
+                ...(status === 'resolved' ? { supportLastReadAt: new Date() } : {}),
+            },
+            include: {
+                hotel: {
+                    select: { id: true, name: true, ownerEmail: true, ownerPhone: true, subscribed: true },
+                },
+                messages: { orderBy: { createdAt: 'desc' }, take: 200 },
+            },
+        }));
+        res.json({ success: true, thread: serializeSupportThread(thread, 'support') });
+    } catch (e) {
+        if (String(e.code || '') === 'P2025') {
+            return res.status(404).json({ success: false, message: 'Conversation not found.' });
+        }
+        res.status(500).json({ success: false, message: 'Could not update that conversation.' });
     }
 });
 

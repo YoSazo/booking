@@ -535,6 +535,60 @@
   .revenue-card .stat-value { color: white; }
   .revenue-card .stat-label { color: rgba(255,255,255,0.8); }
 
+  /* Founder support inbox */
+  .support-tab-badge {
+    display: none; min-width: 18px; height: 18px; padding: 0 5px;
+    align-items: center; justify-content: center; margin-left: 5px;
+    border-radius: 999px; background: var(--red); color: white;
+    font-size: 10px; font-weight: 700; vertical-align: middle;
+  }
+  .support-tab-badge.visible { display: inline-flex; }
+  .support-view { padding: 20px 24px 70px; }
+  .support-shell {
+    display: grid; grid-template-columns: minmax(230px, 310px) minmax(0, 1fr);
+    min-height: 620px; overflow: hidden; background: var(--card);
+    border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
+  }
+  .support-thread-list { overflow-y: auto; border-right: 1px solid var(--border); background: #fafcfb; }
+  .support-list-head { padding: 16px; border-bottom: 1px solid var(--border); }
+  .support-list-head strong { display: block; font-size: 15px; }
+  .support-list-head span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+  .support-thread-item {
+    width: 100%; display: block; padding: 14px 15px; text-align: left;
+    border: 0; border-bottom: 1px solid #edf0ee; background: transparent;
+    color: var(--text); font-family: inherit; cursor: pointer;
+  }
+  .support-thread-item:hover { background: #f1f7f3; }
+  .support-thread-item.active { background: var(--green-lt); }
+  .support-thread-top { display: flex; align-items: center; gap: 7px; }
+  .support-thread-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
+  .support-unread-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--red); }
+  .support-thread-time { color: var(--muted); font-size: 10px; }
+  .support-thread-preview { margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
+  .support-thread-meta { margin-top: 6px; color: #8b9891; font-size: 10px; }
+  .support-conversation { min-width: 0; display: flex; flex-direction: column; background: #f6f8f7; }
+  .support-conversation-empty { flex: 1; display: grid; place-items: center; padding: 30px; text-align: center; color: var(--muted); }
+  .support-conversation-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: white; border-bottom: 1px solid var(--border); }
+  .support-conversation-head-copy { min-width: 0; flex: 1; }
+  .support-conversation-head-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .support-conversation-head-copy span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+  .support-resolve-btn { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--muted); font: 600 11px inherit; cursor: pointer; }
+  .support-resolve-btn.reopen { border-color: var(--green); color: var(--green); }
+  .support-message-list { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 18px; }
+  .support-message-row { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 13px; }
+  .support-message-row.support { align-items: flex-end; }
+  .support-message-label { margin: 0 5px 4px; color: #84928a; font-size: 9px; font-weight: 600; }
+  .support-message-bubble { max-width: 82%; padding: 10px 12px; border: 1px solid #e0e6e2; border-radius: 15px 15px 15px 4px; background: white; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .support-message-row.support .support-message-bubble { border: 0; border-radius: 15px 15px 4px 15px; background: var(--green); color: white; }
+  .support-message-context { margin: 4px 5px 0; color: #98a39d; font-size: 9px; }
+  .support-composer { padding: 12px 14px; background: white; border-top: 1px solid var(--border); }
+  .support-composer textarea { width: 100%; min-height: 72px; max-height: 150px; padding: 11px 12px; resize: vertical; border: 1px solid var(--border); border-radius: 10px; outline: none; font: 400 14px/1.45 inherit; }
+  .support-composer textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-lt); }
+  .support-composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; }
+  .support-composer-note { color: var(--muted); font-size: 10px; }
+  .support-send-btn { padding: 9px 15px; border: 0; border-radius: 9px; background: var(--green); color: white; font: 700 12px inherit; cursor: pointer; }
+  .support-send-btn:disabled { opacity: .55; cursor: wait; }
+
   @media (max-width: 600px) {
     .header { padding: 12px 16px; }
     .header-right { justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
@@ -546,6 +600,9 @@
     .overview-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .stat-value { font-size: 22px; }
     .view-tabs { padding: 12px 16px 0; }
+    .support-view { padding: 14px 12px 80px; }
+    .support-shell { grid-template-columns: 1fr; min-height: 720px; }
+    .support-thread-list { max-height: 230px; border-right: 0; border-bottom: 1px solid var(--border); }
   }
 </style>
 </head>
@@ -565,7 +622,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span id="dateLabel">Last 7 days</span>
     </button>
-    <button class="refresh-btn" onclick="loadEvents()">Refresh</button>
+    <button class="refresh-btn" onclick="refreshCurrentAdminView()">Refresh</button>
     <button class="refresh-btn export-btn" onclick="downloadJourneyExport(event)">Export JSON</button>
 
     <!-- Calendar popup -->
@@ -589,6 +646,7 @@
 <div class="view-tabs">
   <button class="view-tab active" data-view="overview" onclick="switchView('overview')">Overview</button>
   <button class="view-tab" data-view="activity" onclick="switchView('activity')">Activity</button>
+  <button class="view-tab" data-view="support" onclick="switchView('support')">Support <span class="support-tab-badge" id="supportTabBadge">0</span></button>
 </div>
 
 <!-- OVERVIEW VIEW -->
@@ -674,6 +732,18 @@
 </div>
 </div>
 
+<!-- SUPPORT VIEW -->
+<div id="supportView" class="support-view" style="display:none">
+  <div class="support-shell">
+    <aside class="support-thread-list" id="supportThreadList">
+      <div class="loading">Loading support…</div>
+    </aside>
+    <section class="support-conversation" id="supportConversation">
+      <div class="support-conversation-empty"><p>Select a conversation.</p></div>
+    </section>
+  </div>
+</div>
+
 <!-- Detail Modal -->
 <div class="detail-overlay" id="detailOverlay" onclick="closeDetail(event)">
   <div class="detail-sheet" onclick="event.stopPropagation()">
@@ -691,6 +761,9 @@ let allCounts = {};
 let currentFilter = 'all';
 let currentView = 'overview';
 let adminToken = sessionStorage.getItem('marketelAdminToken') || '';
+let supportThreads = [];
+let selectedSupportThreadId = new URLSearchParams(window.location.search).get('thread') || '';
+let supportLoading = false;
 
 async function adminFetch(url, options = {}, allowRetry = true) {
   if (!adminToken) {
@@ -877,10 +950,217 @@ document.getElementById('calPopup').addEventListener('click', function(e) {
 });
 
 function switchView(view) {
-  currentView = view;
+  currentView = ['overview', 'activity', 'support'].includes(view) ? view : 'overview';
   document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
-  document.getElementById('overviewView').style.display = view === 'overview' ? 'block' : 'none';
-  document.getElementById('activityView').style.display = view === 'activity' ? 'block' : 'none';
+  document.getElementById('overviewView').style.display = currentView === 'overview' ? 'block' : 'none';
+  document.getElementById('activityView').style.display = currentView === 'activity' ? 'block' : 'none';
+  document.getElementById('supportView').style.display = currentView === 'support' ? 'block' : 'none';
+  const url = new URL(window.location);
+  if (currentView === 'support') url.searchParams.set('view', 'support');
+  else {
+    url.searchParams.delete('view');
+    url.searchParams.delete('thread');
+  }
+  window.history.replaceState({}, '', url);
+  if (currentView === 'support') loadSupportThreads();
+  else renderEvents();
+}
+
+function refreshCurrentAdminView() {
+  if (currentView === 'support') loadSupportThreads({ force: true });
+  else loadEvents();
+}
+
+function supportTime(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return date.toLocaleString([], sameDay
+    ? { hour: 'numeric', minute: '2-digit' }
+    : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function selectedSupportThread() {
+  return supportThreads.find(thread => thread.id === selectedSupportThreadId) || null;
+}
+
+function updateSupportBadge() {
+  const unread = supportThreads.reduce((total, thread) => total + Number(thread.unread || 0), 0);
+  const badge = document.getElementById('supportTabBadge');
+  if (!badge) return;
+  badge.textContent = unread > 99 ? '99+' : String(unread);
+  badge.classList.toggle('visible', unread > 0);
+}
+
+function supportThreadPreview(thread) {
+  const messages = thread.messages || [];
+  return messages.length ? messages[messages.length - 1].body : 'No messages yet';
+}
+
+function renderSupportThreads() {
+  const list = document.getElementById('supportThreadList');
+  if (!list) return;
+  if (!supportThreads.length) {
+    list.innerHTML = '<div class="support-list-head"><strong>Support</strong><span>0 conversations</span></div><div class="empty-state"><p>No support messages yet.</p></div>';
+    return;
+  }
+  list.innerHTML = `<div class="support-list-head"><strong>Support</strong><span>${supportThreads.length} conversation${supportThreads.length === 1 ? '' : 's'}</span></div>` + supportThreads.map(thread => {
+    const active = thread.id === selectedSupportThreadId;
+    const name = thread.hotel?.name || thread.hotelId;
+    const preview = supportThreadPreview(thread);
+    return `<button type="button" class="support-thread-item${active ? ' active' : ''}" onclick="selectSupportThread('${escapeHtml(thread.id)}')">
+      <span class="support-thread-top">
+        ${thread.unread ? '<i class="support-unread-dot"></i>' : ''}
+        <span class="support-thread-name">${escapeHtml(name)}</span>
+        <span class="support-thread-time">${escapeHtml(supportTime(thread.lastMessageAt))}</span>
+      </span>
+      <span class="support-thread-preview">${escapeHtml(preview)}</span>
+      <span class="support-thread-meta">${escapeHtml(thread.hotelId)} · ${thread.status === 'resolved' ? 'Resolved' : 'Open'}</span>
+    </button>`;
+  }).join('');
+}
+
+function supportContextLabel(message) {
+  const context = message.context || {};
+  return [context.surface, context.client, context.appVersion].filter(Boolean).join(' · ');
+}
+
+function renderSupportConversation() {
+  const root = document.getElementById('supportConversation');
+  if (!root) return;
+  const thread = selectedSupportThread();
+  if (!thread) {
+    root.innerHTML = '<div class="support-conversation-empty"><p>Select a conversation.</p></div>';
+    return;
+  }
+  const hotel = thread.hotel || {};
+  const messages = (thread.messages || []).map(message => {
+    const fromSupport = message.sender === 'support';
+    const context = !fromSupport ? supportContextLabel(message) : '';
+    return `<div class="support-message-row ${fromSupport ? 'support' : 'owner'}">
+      <div class="support-message-label">${fromSupport ? 'You' : escapeHtml(hotel.name || thread.hotelId)} · ${escapeHtml(supportTime(message.createdAt))}</div>
+      <div class="support-message-bubble">${escapeHtml(message.body)}</div>
+      ${context ? `<div class="support-message-context">${escapeHtml(context)}</div>` : ''}
+    </div>`;
+  }).join('');
+  const resolved = thread.status === 'resolved';
+  root.innerHTML = `
+    <div class="support-conversation-head">
+      <div class="support-conversation-head-copy">
+        <strong>${escapeHtml(hotel.name || thread.hotelId)}</strong>
+        <span>${escapeHtml(hotel.ownerEmail || 'No email')} · ${escapeHtml(thread.hotelId)}${hotel.subscribed ? ' · Active subscriber' : ''}</span>
+      </div>
+      <button type="button" class="support-resolve-btn${resolved ? ' reopen' : ''}" onclick="setSupportThreadStatus('${resolved ? 'open' : 'resolved'}')">${resolved ? 'Reopen' : 'Resolve'}</button>
+    </div>
+    <div class="support-message-list" id="supportMessageList">${messages || '<div class="empty-state"><p>No messages yet.</p></div>'}</div>
+    <div class="support-composer">
+      <textarea id="supportReplyInput" maxlength="4000" placeholder="Reply to ${escapeHtml(hotel.name || 'this property')}…"></textarea>
+      <div class="support-composer-actions">
+        <span class="support-composer-note">Your reply appears in Front Desk and is emailed to the owner.</span>
+        <button type="button" class="support-send-btn" id="supportReplyButton" onclick="sendSupportReply()">Send reply</button>
+      </div>
+    </div>`;
+  requestAnimationFrame(() => {
+    const messagesEl = document.getElementById('supportMessageList');
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+}
+
+function renderSupportInbox() {
+  if (selectedSupportThreadId && !selectedSupportThread()) selectedSupportThreadId = '';
+  if (!selectedSupportThreadId && supportThreads.length) selectedSupportThreadId = supportThreads[0].id;
+  renderSupportThreads();
+  renderSupportConversation();
+  updateSupportBadge();
+}
+
+async function markSupportThreadRead(threadId) {
+  const thread = supportThreads.find(item => item.id === threadId);
+  if (!thread || !thread.unread) return;
+  thread.unread = 0;
+  updateSupportBadge();
+  renderSupportThreads();
+  try {
+    await adminFetch('/api/admin/support/' + encodeURIComponent(threadId) + '/read', { method: 'POST' });
+  } catch (_) { /* a later refresh will restore unread if this failed */ }
+}
+
+function selectSupportThread(threadId) {
+  selectedSupportThreadId = String(threadId || '');
+  const url = new URL(window.location);
+  url.searchParams.set('view', 'support');
+  url.searchParams.set('thread', selectedSupportThreadId);
+  window.history.replaceState({}, '', url);
+  renderSupportInbox();
+  markSupportThreadRead(selectedSupportThreadId);
+  document.getElementById('supportReplyInput')?.focus();
+}
+
+async function loadSupportThreads(options = {}) {
+  if (supportLoading && !options.force) return;
+  supportLoading = true;
+  try {
+    const response = await adminFetch('/api/admin/support');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.message || 'Could not load support.');
+    supportThreads = data.threads || [];
+    renderSupportInbox();
+    if (currentView === 'support' && selectedSupportThreadId) markSupportThreadRead(selectedSupportThreadId);
+    const openCount = supportThreads.filter(thread => thread.status !== 'resolved').length;
+    if (currentView === 'support') document.getElementById('totalCount').textContent = `${openCount} open`;
+  } catch (error) {
+    if (currentView === 'support') {
+      document.getElementById('supportThreadList').innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message || 'Could not load support.')}</p></div>`;
+    }
+  } finally {
+    supportLoading = false;
+  }
+}
+
+async function sendSupportReply() {
+  const thread = selectedSupportThread();
+  const input = document.getElementById('supportReplyInput');
+  const button = document.getElementById('supportReplyButton');
+  const message = String(input?.value || '').trim();
+  if (!thread || !message) return;
+  if (button) { button.disabled = true; button.textContent = 'Sending…'; }
+  try {
+    const response = await adminFetch('/api/admin/support/' + encodeURIComponent(thread.id) + '/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.message || 'Could not send that reply.');
+    supportThreads = supportThreads.map(item => item.id === data.thread.id ? data.thread : item)
+      .sort((left, right) => new Date(right.lastMessageAt) - new Date(left.lastMessageAt));
+    selectedSupportThreadId = data.thread.id;
+    renderSupportInbox();
+    document.getElementById('supportReplyInput')?.focus();
+  } catch (error) {
+    alert(error.message || 'Could not send that reply.');
+  } finally {
+    const currentButton = document.getElementById('supportReplyButton');
+    if (currentButton) { currentButton.disabled = false; currentButton.textContent = 'Send reply'; }
+  }
+}
+
+async function setSupportThreadStatus(status) {
+  const thread = selectedSupportThread();
+  if (!thread) return;
+  try {
+    const response = await adminFetch('/api/admin/support/' + encodeURIComponent(thread.id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.message || 'Could not update that conversation.');
+    supportThreads = supportThreads.map(item => item.id === data.thread.id ? data.thread : item);
+    renderSupportInbox();
+  } catch (error) {
+    alert(error.message || 'Could not update that conversation.');
+  }
 }
 
 // Detail modal
@@ -1143,6 +1423,7 @@ async function loadEvents() {
     allEvents = data.recent || [];
     allCounts = data.counts || {};
     renderEvents();
+    if (currentView !== 'support') loadSupportThreads().catch(() => {});
   } catch (e) {
     document.getElementById('eventsList').innerHTML = '<div class="empty-state"><p>Failed to load events. Try refreshing.</p></div>';
   }
@@ -1176,10 +1457,18 @@ async function downloadJourneyExport(clickEvent) {
 
 // Load on page open
 updateDateLabel();
-loadEvents();
+if (new URLSearchParams(window.location.search).get('view') === 'support') {
+  switchView('support');
+} else {
+  loadEvents();
+}
 
 // Auto-refresh every 30 seconds
-setInterval(loadEvents, 30000);
+setInterval(() => {
+  if (document.hidden) return;
+  if (currentView === 'support') loadSupportThreads();
+  else loadEvents();
+}, 30000);
 </script>
 </body>
 </html>
