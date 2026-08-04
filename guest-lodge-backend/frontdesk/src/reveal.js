@@ -601,6 +601,10 @@ function showExpandedPreview() {
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
         <strong>${esc(bookingDisplayDomain())}</strong>
       </div>
+      <div class="mvr-challenge-timer" hidden aria-live="polite">
+        <span></span>
+        <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
+      </div>
     </div>
     <div class="mvr-live-switch" role="tablist" aria-label="Guest page and editor">
       <button type="button" data-live-preview-mode="guest" class="is-active">Guest booking page</button>
@@ -610,10 +614,6 @@ function showExpandedPreview() {
   <div class="mvr-live-stage">
     <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
     <div class="mvr-challenge-layer" aria-hidden="true"></div>
-    <div class="mvr-challenge-timer" hidden aria-live="polite">
-      <span></span>
-      <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
-    </div>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');

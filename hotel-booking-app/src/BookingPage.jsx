@@ -162,7 +162,7 @@ function BookingPage({
         )}
       </main>
 
-      {showInstallBanner && (
+      {showInstallBanner && !isCalendarOpen && (
         <InstallAppBanner
           hotelName={hotel.name}
           appIconUrl={hotel.appIconUrl || roomData?.[0]?.images?.[0]?.url || roomData?.[0]?.imageUrl}
