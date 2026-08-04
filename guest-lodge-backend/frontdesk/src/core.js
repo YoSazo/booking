@@ -2058,8 +2058,8 @@ function installEmbeddedEditorPreview() {
     editView.insertAdjacentHTML('afterbegin', `
       <div id="embeddedEditorNotice">
         <div>
-          <strong>Try your Front Desk.</strong>
-          <span>Explore every section and edit your first room now. Activate when you&apos;re ready to unlock every tool.</span>
+          <strong>This is where you control what guests see.</strong>
+          <span>Your property details, rooms, photos and prices publish to the booking page. Your first room is available to try.</span>
         </div>
         <div class="embedded-editor-locked" aria-label="Preview mode">
           <span>Preview mode</span>

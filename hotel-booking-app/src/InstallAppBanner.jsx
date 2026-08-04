@@ -126,7 +126,7 @@ function InstallAppBanner({
   const continueOwnerTour = () => {
     setShowOwnerPreviewInfo(false);
     if (window.parent !== window) {
-      window.parent.postMessage({ type: 'marketel:show-guest-app' }, '*');
+      window.parent.postMessage({ type: 'marketel:continue-owner-tour' }, '*');
     }
   };
 
@@ -234,7 +234,7 @@ function InstallAppBanner({
                 cursor: 'pointer',
               }}
             >
-              See how the guest app works →
+              Continue your walkthrough →
             </button>
           </div>
         </div>

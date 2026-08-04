@@ -302,7 +302,11 @@ function completeBookingChallenge(challenge) {
 
 function handleBookingPreviewMessage(event) {
   const messageType = event?.data?.type;
-  if (messageType !== 'marketel:show-guest-app' && messageType !== 'marketel:checkout-reached') return;
+  if (
+    messageType !== 'marketel:show-guest-app'
+    && messageType !== 'marketel:continue-owner-tour'
+    && messageType !== 'marketel:checkout-reached'
+  ) return;
   const reveal = document.getElementById('marketelValueReveal');
   if (!reveal) return;
   const knownFrame = Array.from(reveal.querySelectorAll('iframe'))
@@ -313,12 +317,14 @@ function handleBookingPreviewMessage(event) {
     completeBookingChallenge(activeBookingChallenge);
     return;
   }
-  stopBookingChallenge('guest-app-selected', true);
-  activeBookingChallenge = null;
-  document.getElementById('mvrLivePreview')?.remove();
+  if (activeBookingChallenge?.iframe?.contentWindow !== event.source) return;
   trackReveal('GuestAppPreviewRequestedFromBookingEngine');
-  trackJourney('JourneyBookingPreviewModeChanged', { action: 'guest-app-requested-from-booking-engine' });
-  moveToStep(1);
+  setLivePreviewMode(
+    activeBookingChallenge.modal,
+    'edit',
+    activeBookingChallenge.previewOpenedAt,
+    'booking-install-explainer-continued'
+  );
 }
 
 function progressHtml() {
@@ -365,9 +371,9 @@ function bookingPreviewCardHtml() {
         ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
-      <button type="button" id="mvrExpandPreview" aria-label="Expand your booking page preview">
-        <span class="mvr-expand-cue" aria-hidden="true"><i>←</i><strong>Expand</strong><i>→</i></span>
-        <small>See the full page right here</small>
+      <button type="button" id="mvrExpandPreview" aria-label="Try booking as a guest">
+        <span class="mvr-expand-cue" aria-hidden="true"><i>←</i><strong>Try booking as a guest</strong><i>→</i></span>
+        <small>See if you can reach payment in under 60 seconds</small>
       </button>
     </div>
   </div>`;
@@ -380,8 +386,8 @@ function bookingRevealHtml() {
       <h1>Your booking page is ready.</h1>
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
-        <span>And it is completely yours.</span>
-        Expand the preview to see what guests see, then switch to the real editor to change your details, first room, photo and price.
+        <span>Try it yourself.</span>
+        Reach payment as a guest, then see exactly where you control the page in Front Desk.
       </div>
       ${bookingPageStatusHtml()}
     </div>
@@ -550,6 +556,7 @@ function stepHtml() {
 }
 
 function footerHtml() {
+  if (currentStep === 0) return '';
   if (currentStep === 3) {
     return `<div class="mvr-footer mvr-footer-final">
       <button type="button" class="mvr-back" id="mvrBack">← Back</button>
@@ -557,7 +564,7 @@ function footerHtml() {
     </div>`;
   }
   const labels = [
-    'See how guests come back',
+    '',
     'See how Front Desk protects you',
     'See everything you’re getting',
   ];
@@ -591,9 +598,13 @@ function showExpandedPreview() {
   modal.className = 'mvr-live-preview';
   modal.innerHTML = `<div class="mvr-live-toolbar">
     <div class="mvr-live-topline">
-      <button type="button" id="mvrClosePreview">← Back to overview</button>
-      <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span>Live preview · changes in Edit save for real</span></div>
-      <i aria-hidden="true"></i>
+      <button type="button" class="mvr-live-exit" id="mvrClosePreview" aria-label="Exit preview">×</button>
+      <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span data-live-preview-context>Guest booking page</span></div>
+      <button type="button" class="mvr-live-forward" id="mvrLiveForward">
+        <span class="mvr-live-forward-long" data-live-forward-long>See how you edit this</span>
+        <span class="mvr-live-forward-short" data-live-forward-short>Edit this</span>
+        <b aria-hidden="true">→</b>
+      </button>
     </div>
     <div class="mvr-live-address-row" id="mvrLiveAddressRow">
       <span>Your booking link</span>
@@ -605,10 +616,6 @@ function showExpandedPreview() {
         <span></span>
         <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
       </div>
-    </div>
-    <div class="mvr-live-switch" role="tablist" aria-label="Guest page and editor">
-      <button type="button" data-live-preview-mode="guest" class="is-active">Guest booking page</button>
-      <button type="button" data-live-preview-mode="edit">Edit in Front Desk</button>
     </div>
   </div>
   <div class="mvr-live-stage">
@@ -632,7 +639,7 @@ function showExpandedPreview() {
     if (activeBookingChallenge?.modal !== modal || livePreviewMode !== 'guest') return;
     window.setTimeout(() => showBookingChallengePrompt(activeBookingChallenge), 250);
   });
-  document.getElementById('mvrClosePreview')?.addEventListener('click', () => {
+  modal.querySelector('#mvrClosePreview')?.addEventListener('click', () => {
     trackJourney('JourneyBookingPreviewModeChanged', {
       action: 'closed',
       mode: livePreviewMode,
@@ -641,12 +648,19 @@ function showExpandedPreview() {
     activeBookingChallenge = null;
     modal.remove();
   });
-  modal.querySelectorAll('[data-live-preview-mode]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const nextMode = button.dataset.livePreviewMode === 'edit' ? 'edit' : 'guest';
-      if (nextMode === livePreviewMode) return;
-      setLivePreviewMode(modal, nextMode, previewOpenedAt);
-    });
+  modal.querySelector('#mvrLiveForward')?.addEventListener('click', () => {
+    if (livePreviewMode === 'guest') {
+      setLivePreviewMode(modal, 'edit', previewOpenedAt, 'guided-forward');
+      return;
+    }
+    trackJourney('JourneyRevealNavigation', {
+      action: 'continued-from-editor-preview',
+      toStep: 1,
+    }, { durationMs: Date.now() - previewOpenedAt });
+    stopBookingChallenge('continued-to-guest-app', false);
+    activeBookingChallenge = null;
+    modal.remove();
+    moveToStep(1);
   });
   trackReveal('BookingEngineFullPreviewOpened');
   trackJourney('JourneyBookingPreviewOpened', {
@@ -660,10 +674,17 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (!modal?.isConnected) return;
   if (nextMode === 'edit') stopBookingChallenge('edit-mode-selected', true);
   livePreviewMode = nextMode === 'edit' ? 'edit' : 'guest';
-  modal.querySelectorAll('[data-live-preview-mode]').forEach((item) => {
-    item.classList.toggle('is-active', item.dataset.livePreviewMode === livePreviewMode);
-  });
   modal.querySelector('#mvrLiveAddressRow')?.classList.toggle('is-editor', livePreviewMode === 'edit');
+  const context = modal.querySelector('[data-live-preview-context]');
+  const forward = modal.querySelector('#mvrLiveForward');
+  const forwardLong = modal.querySelector('[data-live-forward-long]');
+  const forwardShort = modal.querySelector('[data-live-forward-short]');
+  if (context) context.textContent = livePreviewMode === 'edit' ? 'Front Desk editor · your first room saves' : 'Guest booking page';
+  if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Continue to Guest App' : 'See how you edit this';
+  if (forwardShort) forwardShort.textContent = livePreviewMode === 'edit' ? 'Continue' : 'Edit this';
+  if (forward) {
+    forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Continue to the Guest App' : 'See how you edit this booking page');
+  }
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
   if (iframe) {
     iframe.title = livePreviewMode === 'edit'
