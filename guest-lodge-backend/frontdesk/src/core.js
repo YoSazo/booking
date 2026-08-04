@@ -2053,17 +2053,22 @@ function finishTourHydration() {
 function installEmbeddedEditorPreview() {
   document.documentElement.classList.add('frontdesk-editor-preview');
   document.body.classList.add('frontdesk-editor-preview');
+  const header = document.querySelector('#app > .header');
+  if (header && !document.getElementById('embeddedPreviewScope')) {
+    header.insertAdjacentHTML('afterend', `
+      <div id="embeddedPreviewScope" role="note">
+        <strong>Interactive preview</strong>
+        <span>Explore every tab. Your first room is live to edit; the rest of the controls unlock after activation.</span>
+      </div>
+    `);
+  }
   const editView = document.getElementById('editView');
   if (editView && !document.getElementById('embeddedEditorNotice')) {
     editView.insertAdjacentHTML('afterbegin', `
       <div id="embeddedEditorNotice">
         <div>
-          <strong>This is where you control what guests see.</strong>
-          <span>Your property details, rooms, photos and prices publish to the booking page. Your first room is available to try.</span>
-        </div>
-        <div class="embedded-editor-locked" aria-label="Preview mode">
-          <span>Preview mode</span>
-          <small>Your first room saves</small>
+          <strong>This is where you control your booking page.</strong>
+          <span>Try changing your first room's name, photos, or details to see how editing works.</span>
         </div>
       </div>
     `);
@@ -2091,6 +2096,14 @@ function installEmbeddedEditorPreview() {
       if (isAllowedPreviewTarget(interactive)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (event.type === 'click' || event.type === 'keydown') {
+        const now = Date.now();
+        const lastNotice = Number(document.body.dataset.previewLockNoticeAt || 0);
+        if (now - lastNotice > 900) {
+          document.body.dataset.previewLockNoticeAt = String(now);
+          toast('Preview mode — this action unlocks after activation. Try editing your first room now.');
+        }
+      }
     };
     document.addEventListener('click', blockLockedPreviewAction, true);
     document.addEventListener('change', blockLockedPreviewAction, true);

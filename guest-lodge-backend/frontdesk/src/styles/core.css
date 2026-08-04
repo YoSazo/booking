@@ -2356,6 +2356,29 @@
       max-width: 1180px;
       padding: 18px clamp(12px, 3vw, 28px) 86px !important;
     }
+    .frontdesk-editor-preview #embeddedPreviewScope {
+      width: min(1180px, calc(100% - 24px));
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 12px auto 0;
+      padding: 10px 13px;
+      border: 1px solid #cfe2d6;
+      border-radius: 13px;
+      background: #f2f8f4;
+      color: #587066;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .frontdesk-editor-preview #embeddedPreviewScope strong {
+      flex: 0 0 auto;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #2e7d5b;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+    }
     .frontdesk-editor-preview #editView {
       margin-top: 0 !important;
       content-visibility: visible;
@@ -2386,31 +2409,8 @@
       font-size: 12px;
       line-height: 1.4;
     }
-    .frontdesk-editor-preview .embedded-editor-locked {
-      display: flex;
-      flex: 0 0 auto;
-      align-items: center;
-      gap: 6px;
-    }
-    .frontdesk-editor-preview .embedded-editor-locked span {
-      padding: 6px 9px;
-      color: #929c96;
-      border: 1px solid #e1e6e3;
-      border-radius: 999px;
-      background: #f4f6f5;
-      font-size: 10px;
-      font-weight: 700;
-    }
-    .frontdesk-editor-preview .embedded-editor-locked small {
-      color: #8a958e;
-      font-size: 9px;
-      font-weight: 700;
-    }
-
     /* All product actions are visibly present but inert in preview. The main
        tabs and read-only Bookings/Revenue view switches remain navigable. */
-    .frontdesk-editor-preview #app button:not(.tab):not(.mobile-nav-item):not(.subtab),
-    .frontdesk-editor-preview #app a,
     .frontdesk-editor-preview #app input,
     .frontdesk-editor-preview #app select,
     .frontdesk-editor-preview #app textarea,
@@ -2420,7 +2420,8 @@
     }
     .frontdesk-editor-preview #app button:not(.tab):not(.mobile-nav-item):not(.subtab),
     .frontdesk-editor-preview #app a {
-      cursor: default !important;
+      pointer-events: auto !important;
+      cursor: not-allowed !important;
     }
     .frontdesk-editor-preview #app #revenuePeriodBar button,
     .frontdesk-editor-preview #app #bookingsSubtabs .subtab,
@@ -2431,6 +2432,11 @@
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child label,
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child button {
       pointer-events: auto !important;
+      cursor: pointer !important;
+    }
+    .frontdesk-editor-preview #app #revenuePeriodBar button,
+    .frontdesk-editor-preview #app #bookingsSubtabs .subtab {
+      cursor: pointer !important;
     }
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child .room-edit-delete-btn {
       display: none !important;
@@ -2499,9 +2505,10 @@
         align-items: flex-start;
         flex-direction: column;
       }
-      .frontdesk-editor-preview .embedded-editor-locked {
-        width: 100%;
-        flex-wrap: wrap;
+      .frontdesk-editor-preview #embeddedPreviewScope {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
       }
       .frontdesk-editor-preview .embedded-example-booking-heading {
         padding: 14px;
