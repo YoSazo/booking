@@ -1517,6 +1517,11 @@
   visibility: visible;
 }
 
+.mvr-challenge-layer.is-prompt {
+  place-items: end center;
+  padding-bottom: 18px;
+}
+
 .mvr-challenge-card {
   width: min(340px, 100%);
   padding: 19px;
@@ -1529,6 +1534,21 @@
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   pointer-events: auto;
   animation: mvr-stage-in 180ms ease-out both;
+}
+
+.mvr-challenge-intro {
+  width: min(460px, 100%);
+  padding: 15px 16px;
+  border-radius: 16px;
+  box-shadow: 0 14px 38px rgba(22, 49, 34, 0.18);
+}
+
+.mvr-challenge-intro h2 {
+  font-size: clamp(17px, 1.8vw, 20px);
+}
+
+.mvr-challenge-intro p {
+  margin: 7px 0 12px;
 }
 
 .mvr-challenge-eyebrow {
@@ -1791,6 +1811,11 @@
     padding: 12px;
   }
 
+  .mvr-challenge-layer.is-prompt {
+    place-items: end center;
+    padding-bottom: 12px;
+  }
+
   .mvr-challenge-card {
     padding: 18px;
     border-radius: 17px;
@@ -1799,6 +1824,10 @@
   .mvr-challenge-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .mvr-challenge-intro .mvr-challenge-actions {
+    flex-direction: row;
   }
 
   .mvr-challenge-timer {

@@ -206,7 +206,7 @@ function formatChallengeTime(elapsedMs) {
 
 function hideBookingChallengeLayer(challenge) {
   if (!challenge?.layer) return;
-  challenge.layer.classList.remove('is-visible');
+  challenge.layer.classList.remove('is-visible', 'is-prompt');
   challenge.layer.setAttribute('aria-hidden', 'true');
   challenge.layer.innerHTML = '';
 }
@@ -273,16 +273,16 @@ function showBookingChallengePrompt(challenge) {
     challenge.promptFallbackId = 0;
   }
   setLivePreviewActionsVisible(challenge.modal, false);
-  challenge.layer.innerHTML = `<section class="mvr-challenge-card" role="dialog" aria-labelledby="mvrChallengeTitle">
-    <span class="mvr-challenge-eyebrow">Try it like a guest</span>
-    <h2 id="mvrChallengeTitle">Can you reach checkout in under 60 seconds?</h2>
-    <p>Choose a room and dates, then continue to checkout. Nothing you do here creates a real booking.</p>
+  challenge.layer.innerHTML = `<section class="mvr-challenge-card mvr-challenge-intro" role="dialog" aria-labelledby="mvrChallengeTitle">
+    <span class="mvr-challenge-eyebrow">Optional · Test the guest experience</span>
+    <h2 id="mvrChallengeTitle">Can you reach payment in under 60 seconds?</h2>
+    <p>Try the booking flow yourself. Nothing you do here creates a real booking.</p>
     <div class="mvr-challenge-actions">
-      <button type="button" class="mvr-challenge-start">Start 60-second challenge</button>
-      <button type="button" class="mvr-challenge-skip">Explore normally</button>
+      <button type="button" class="mvr-challenge-start">Start challenge</button>
+      <button type="button" class="mvr-challenge-skip">Not now</button>
     </div>
   </section>`;
-  challenge.layer.classList.add('is-visible');
+  challenge.layer.classList.add('is-visible', 'is-prompt');
   challenge.layer.setAttribute('aria-hidden', 'false');
   challenge.layer.querySelector('.mvr-challenge-start')?.addEventListener('click', () => startBookingChallenge(challenge));
   challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
@@ -415,12 +415,12 @@ function bookingPreviewCardHtml() {
         ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
-      <button type="button" id="mvrExpandPreview" aria-label="${url ? 'Expand booking page preview' : 'Check booking page preview'}" ${bookingPreviewUnavailable ? 'disabled' : ''}>
+      <button type="button" id="mvrExpandPreview" aria-label="${url ? 'View your booking page' : 'Check booking page preview'}" ${bookingPreviewUnavailable ? 'disabled' : ''}>
         <span class="mvr-expand-cue" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>
           </svg>
-          <strong>${bookingPreviewUnavailable ? 'Still publishing' : 'Expand'}</strong>
+          <strong>${bookingPreviewUnavailable ? 'Still publishing' : 'View your booking page →'}</strong>
         </span>
       </button>
     </div>
@@ -434,8 +434,8 @@ function bookingRevealHtml() {
       <h1>Your booking page is ready.</h1>
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
-        <span>Try it yourself.</span>
-        Reach payment as a guest, then see exactly where you control the page in Front Desk.
+        <span>See what guests will use.</span>
+        Open the booking page built for your property. Then continue to your Guest App and Front Desk.
       </div>
       ${bookingPageStatusHtml()}
     </div>
@@ -705,7 +705,7 @@ function showExpandedPreview() {
   }, 4000);
   iframe?.addEventListener('load', () => {
     if (activeBookingChallenge?.modal !== modal || livePreviewMode !== 'guest') return;
-    window.setTimeout(() => showBookingChallengePrompt(activeBookingChallenge), 250);
+    window.setTimeout(() => showBookingChallengePrompt(activeBookingChallenge), 1500);
   });
   modal.querySelector('#mvrClosePreview')?.addEventListener('click', () => {
     trackJourney('JourneyBookingPreviewModeChanged', {
