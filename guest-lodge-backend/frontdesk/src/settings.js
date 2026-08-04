@@ -833,6 +833,7 @@ async function loadEditRooms() {
     // Fetch rates
     let rates = { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 };
     if (res.rates) rates = res.rates;
+    crm.editRates = rates;
 
     // Render hotel info section + rates + PIN + rooms
     const bookingDomain = hotelRes?.domain || (crm.activeHotelId + '.mktel.co');

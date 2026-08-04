@@ -3228,6 +3228,74 @@ function renderBookingsWindow() {
     + `<div style="height:${bottomPad}px" aria-hidden="true"></div>`;
 }
 
+function embeddedExampleBookingHtml() {
+  const room = (crm.editRooms || [])[0] || {};
+  const roomName = room.name || 'Your first room';
+  const rateInput = document.getElementById('edit-rate-nightly');
+  const nightlyRate = Number(rateInput?.value || crm.editRates?.nightly);
+  const amount = Number.isFinite(nightlyRate) && nightlyRate > 0 ? nightlyRate : 99;
+  const checkin = new Date();
+  checkin.setHours(12, 0, 0, 0);
+  checkin.setDate(checkin.getDate() + 1);
+  const checkout = new Date(checkin);
+  checkout.setDate(checkout.getDate() + 1);
+  const formatDate = (date) => date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const formattedAmount = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+
+  return `
+    <section class="embedded-example-booking" aria-label="Example direct booking">
+      <div class="embedded-example-booking-heading">
+        <div>
+          <span class="embedded-example-kicker">Booking preview</span>
+          <strong>Direct bookings land here.</strong>
+          <p>This is an example of what you will see when a guest books your page.</p>
+        </div>
+        <span class="embedded-example-badge">Example</span>
+      </div>
+      <div class="booking-card embedded-example-booking-card">
+        <div class="card-accent"></div>
+        <div class="card-inner">
+          <div class="card-top">
+            <div class="guest-info">
+              <div class="guest-name">Example Guest</div>
+              <div class="guest-time">Just now</div>
+            </div>
+            <div class="card-amount">${formattedAmount}</div>
+          </div>
+          <div class="card-meta embedded-example-meta">
+            <div class="meta-chip">🛏 ${esc(roomName)}</div>
+            <div class="meta-chip">🌙 1 night</div>
+            <div class="meta-chip embedded-example-confirmed">✓ Confirmed · Direct booking</div>
+          </div>
+          <div class="card-dates">
+            <div class="date-block">
+              <div class="date-label">Check-in</div>
+              <div class="date-value">${formatDate(checkin)}</div>
+            </div>
+            <div class="date-block">
+              <div class="date-label">Check-out</div>
+              <div class="date-value">${formatDate(checkout)}</div>
+            </div>
+            <div class="date-block">
+              <div class="date-label">Guests</div>
+              <div class="date-value">2 guests</div>
+            </div>
+          </div>
+          <div class="embedded-example-booking-footnote">Stay details, payment total, and guest contact information appear here automatically.</div>
+        </div>
+      </div>
+    </section>`;
+}
+
 function renderBookings(fullList) {
   const el = document.getElementById('bookingsList');
   if (!el) return;
@@ -3235,6 +3303,15 @@ function renderBookings(fullList) {
   el.classList.remove('bookings-virtual');
   delete el.dataset.virtualBound;
   crm.bookingsVirtualList = [];
+
+  // The embedded sales preview should demonstrate the outcome of the booking
+  // engine, not onboard the prospect as though they already bought it. Keep the
+  // example entirely presentational so it can never enter real booking logic.
+  if (document.body.classList.contains('frontdesk-editor-preview')) {
+    renderBookingFilterChips({ all: 0, needs: 0, called: 0 });
+    el.innerHTML = embeddedExampleBookingHtml();
+    return;
+  }
 
   // D17: counts come from the full set; the chips apply a view filter.
   const counts = {
@@ -4856,7 +4933,8 @@ function renderBookingsNotices() {
   let host = document.getElementById('bookingsNotices');
   const suppressed = crm.currentFilter !== 'bookings'
     || crm.bookingsSubview !== 'bookings'
-    || crm.settingsTourActive;
+    || crm.settingsTourActive
+    || document.body.classList.contains('frontdesk-editor-preview');
   const html = suppressed ? '' : conflictBannerHtml();
 
   if (!html) {

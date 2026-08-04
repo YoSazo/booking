@@ -66,6 +66,7 @@ export const crm = {
   bookingConflicts: [],
   _magicLoginPending: false,
   editRooms: [],
+  editRates: null,
   editRoomsLoadPromise: null,
   messageUnreadCount: 0,
   messagesInboxOpen: false,
