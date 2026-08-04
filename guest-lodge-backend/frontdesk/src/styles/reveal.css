@@ -423,6 +423,15 @@
   transform: translate(-50%, calc(-50% - 2px));
 }
 
+.mvr-preview-teaser > button:disabled,
+.mvr-preview-teaser > button:disabled:hover {
+  color: #718078;
+  background: rgba(232, 239, 234, 0.96);
+  box-shadow: none;
+  cursor: default;
+  transform: translate(-50%, -50%);
+}
+
 .mvr-install-visual {
   width: 100%;
   align-content: center;
@@ -1087,20 +1096,58 @@
   line-height: 1.4;
 }
 
-.mvr-proof {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 5px;
-  margin: -4px auto 13px;
+.mvr-value-bridge {
+  display: grid;
+  gap: 4px;
+  margin: -4px auto 14px;
+  padding: 13px 15px;
   color: #68776f;
+  text-align: left;
+  border: 1px solid #d3e3d9;
+  border-radius: 14px;
+  background: #f3f8f5;
   font-size: 11px;
   line-height: 1.45;
 }
 
-.mvr-proof strong {
-  flex: 0 0 auto;
+.mvr-value-bridge > span {
+  color: #4e725f;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.mvr-value-bridge > strong {
   color: #1f6848;
+  font-size: 14px;
+}
+
+.mvr-value-bridge p {
+  margin: 0;
+}
+
+.mvr-value-bridge small {
+  margin-top: 3px;
+  padding-top: 7px;
+  color: #718078;
+  border-top: 1px solid #dce8e0;
+  font-size: 9px;
+}
+
+.mvr-value-bridge small b {
+  color: #53685c;
+}
+
+.mvr-value-bridge.is-proof-only {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.mvr-value-bridge.is-proof-only > strong {
   font-size: 12px;
 }
 
@@ -1263,6 +1310,14 @@
   min-width: min(330px, 70vw);
 }
 
+.mvr-footer-booking > span {
+  max-width: 390px;
+  color: #6c7b72;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .mvr-footer-final {
   min-height: 52px;
 }
@@ -1304,7 +1359,8 @@
 }
 
 .mvr-live-exit,
-.mvr-live-forward {
+.mvr-live-forward,
+.mvr-live-continue {
   border: 0;
   font: inherit;
   font-weight: 800;
@@ -1341,6 +1397,30 @@
   box-shadow: 0 7px 18px rgba(35, 101, 70, 0.2);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.mvr-live-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 8px;
+}
+
+.mvr-live-continue {
+  min-height: 40px;
+  padding: 9px 8px;
+  color: #617168;
+  background: transparent;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mvr-live-continue:hover {
+  color: #244b38;
+}
+
+.mvr-live-continue[hidden] {
+  display: none;
 }
 
 .mvr-live-forward b {
@@ -1671,9 +1751,8 @@
     border-radius: 22px;
   }
 
-  .mvr-proof {
-    max-width: 390px;
-    flex-wrap: wrap;
+  .mvr-value-bridge {
+    max-width: 420px;
   }
 
   .mvr-live-toolbar {
@@ -1718,8 +1797,21 @@
   }
 
   .mvr-live-topline {
-    grid-template-columns: 36px minmax(0, 1fr) auto;
+    grid-template-columns: 36px minmax(0, 1fr);
     gap: 5px;
+  }
+
+  .mvr-live-actions {
+    width: 100%;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .mvr-live-continue {
+    padding-right: 10px;
+    padding-left: 10px;
   }
 
   .mvr-live-exit {
@@ -1729,6 +1821,7 @@
   }
 
   .mvr-live-forward {
+    width: 100%;
     min-height: 36px;
     gap: 5px;
     padding: 8px 10px;
@@ -1740,6 +1833,10 @@
 
   .mvr-live-forward-short {
     display: inline;
+  }
+
+  .mvr-live-continue[hidden] + .mvr-live-forward {
+    grid-column: 1 / -1;
   }
 }
 

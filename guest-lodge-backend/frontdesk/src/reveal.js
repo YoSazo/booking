@@ -20,6 +20,9 @@ let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
 let activeBookingChallenge = null;
+let bookingPreviewOpened = false;
+let bookingPreviewUnavailable = false;
+let nextStageViewIsResume = false;
 
 const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
@@ -75,6 +78,26 @@ function firstRoomImage() {
 
 function nightlyRate() {
   return revealData.rates?.nightly || 99;
+}
+
+function directBookingValueHtml() {
+  const rate = Number(revealData.rates?.nightly);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return `<div class="mvr-value-bridge is-proof-only">
+      <strong>$5,800 booked direct</strong>
+      <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
+    </div>`;
+  }
+  const estimatedCommissionRate = 0.15;
+  const estimatedCommissionPerNight = rate * estimatedCommissionRate;
+  const breakEvenRoomNights = Math.max(1, Math.ceil(199 / estimatedCommissionPerNight));
+  const estimatedSavings = estimatedCommissionPerNight * breakEvenRoomNights;
+  return `<div class="mvr-value-bridge">
+    <span>Your potential break-even</span>
+    <strong>About ${breakEvenRoomNights} direct room-night${breakEvenRoomNights === 1 ? '' : 's'} could cover a month.</strong>
+    <p>At ${money(rate)} per night, shifting ${breakEvenRoomNights} room-night${breakEvenRoomNights === 1 ? '' : 's'} from an estimated 15% OTA fee to direct represents about ${money(estimatedSavings)} in commission savings.</p>
+    <small><b>Real result:</b> Suite Stay booked $5,800 direct in one recorded month through this booking engine. Estimates vary with your OTA fees.</small>
+  </div>`;
 }
 
 function bookingUrl() {
@@ -345,6 +368,9 @@ function roomPhotoHtml(className = '') {
 }
 
 function bookingPageStatusHtml() {
+  if (bookingPreviewUnavailable) {
+    return '<div class="mvr-page-status is-attention"><span>!</span>The live preview is still publishing. Your setup is saved, so you can continue without waiting.</div>';
+  }
   if (bookingPageState.ready) {
     return `<div class="mvr-page-status is-ready"><span>✓</span>${bookingPageState.reason === 'local'
       ? 'Local guest preview connected'
@@ -371,12 +397,12 @@ function bookingPreviewCardHtml() {
         ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
-      <button type="button" id="mvrExpandPreview" aria-label="Expand booking page preview">
+      <button type="button" id="mvrExpandPreview" aria-label="${url ? 'Expand booking page preview' : 'Check booking page preview'}" ${bookingPreviewUnavailable ? 'disabled' : ''}>
         <span class="mvr-expand-cue" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>
           </svg>
-          <strong>Expand</strong>
+          <strong>${bookingPreviewUnavailable ? 'Still publishing' : 'Expand'}</strong>
         </span>
       </button>
     </div>
@@ -534,20 +560,20 @@ function finaleHtml() {
         <div><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
         <div><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
       </div>
-      ${isSubscribed ? '' : `<div class="mvr-proof"><strong>$5,800 booked direct</strong><span>in one recorded month through this booking engine for Suite Stay, Alabama.</span></div>
+      ${isSubscribed ? '' : `${directBookingValueHtml()}
         <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">
           <button type="button" role="radio" aria-checked="${!isYearly}" class="${!isYearly ? 'is-active' : ''}" data-mvr-billing="month">Monthly</button>
           <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $398</span></button>
         </div>
         <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
         <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">Two months free · $398 saved</div>
-        <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Renews yearly at $1,990 unless canceled.' : 'Renews monthly at $199 unless canceled.'}</small></p></div>`}
+        <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>`}
       <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">
         ${isSubscribed ? 'Open Front Desk' : activationLabel}
       </button>
       <div class="mvr-secure-note">${isSubscribed
         ? 'You can replay this overview anytime from How it works.'
-        : 'Secure checkout powered by Stripe · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a>'}</div>
+        : 'Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a>'}</div>
     </div>
   </section>`;
 }
@@ -560,7 +586,13 @@ function stepHtml() {
 }
 
 function footerHtml() {
-  if (currentStep === 0) return '';
+  if (currentStep === 0) {
+    if (!bookingPreviewOpened && !bookingPreviewUnavailable) return '';
+    return `<div class="mvr-footer mvr-footer-booking">
+      <span>${bookingPreviewUnavailable ? 'Your setup is safe while publishing finishes.' : 'You’ve seen the guest experience. Explore more or keep going.'}</span>
+      <button type="button" class="mvr-primary" id="mvrNext">Continue to Guest App →</button>
+    </div>`;
+  }
   if (currentStep === 3) {
     return `<div class="mvr-footer mvr-footer-final">
       <button type="button" class="mvr-back" id="mvrBack">← Back</button>
@@ -570,7 +602,7 @@ function footerHtml() {
   const labels = [
     '',
     'See how Front Desk protects you',
-    'See everything you’re getting',
+    'Review plans and activation',
   ];
   return `<div class="mvr-footer">
     ${currentStep > 0 ? '<button type="button" class="mvr-back" id="mvrBack">← Back</button>' : '<span></span>'}
@@ -594,7 +626,18 @@ function renderReveal() {
 
 function showExpandedPreview() {
   const url = bookingUrl();
-  if (!url || document.getElementById('mvrLivePreview')) return;
+  if (document.getElementById('mvrLivePreview')) return;
+  if (!url) {
+    bookingPreviewUnavailable = true;
+    trackJourney('JourneyBookingPreviewOpened', {
+      mode: 'unavailable',
+      bookingPageReady: false,
+      bookingPageReason: bookingPageState.reason || 'missing-url',
+    });
+    renderReveal();
+    return;
+  }
+  bookingPreviewOpened = true;
   livePreviewMode = 'guest';
   const previewOpenedAt = Date.now();
   const modal = document.createElement('div');
@@ -607,11 +650,14 @@ function showExpandedPreview() {
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
         <strong data-live-location-text>${esc(bookingDisplayDomain())}</strong>
       </div>
-      <button type="button" class="mvr-live-forward" id="mvrLiveForward">
-        <span class="mvr-live-forward-long" data-live-forward-long>See how you edit this</span>
-        <span class="mvr-live-forward-short" data-live-forward-short>How to edit</span>
-        <b aria-hidden="true">→</b>
-      </button>
+      <div class="mvr-live-actions">
+        <button type="button" class="mvr-live-continue" id="mvrContinueTour">Continue tour</button>
+        <button type="button" class="mvr-live-forward" id="mvrLiveForward">
+          <span class="mvr-live-forward-long" data-live-forward-long>See how you edit this</span>
+          <span class="mvr-live-forward-short" data-live-forward-short>How to edit</span>
+          <b aria-hidden="true">→</b>
+        </button>
+      </div>
     </div>
     <div class="mvr-challenge-timer" hidden aria-live="polite">
       <span></span>
@@ -647,20 +693,17 @@ function showExpandedPreview() {
     stopBookingChallenge('preview-closed', true);
     activeBookingChallenge = null;
     modal.remove();
+    renderReveal();
+  });
+  modal.querySelector('#mvrContinueTour')?.addEventListener('click', () => {
+    continueFromBookingPreview(modal, previewOpenedAt, 'continued-without-editor');
   });
   modal.querySelector('#mvrLiveForward')?.addEventListener('click', () => {
     if (livePreviewMode === 'guest') {
       setLivePreviewMode(modal, 'edit', previewOpenedAt, 'guided-forward');
       return;
     }
-    trackJourney('JourneyRevealNavigation', {
-      action: 'continued-from-editor-preview',
-      toStep: 1,
-    }, { durationMs: Date.now() - previewOpenedAt });
-    stopBookingChallenge('continued-to-guest-app', false);
-    activeBookingChallenge = null;
-    modal.remove();
-    moveToStep(1);
+    continueFromBookingPreview(modal, previewOpenedAt, 'continued-from-editor-preview');
   });
   trackReveal('BookingEngineFullPreviewOpened');
   trackJourney('JourneyBookingPreviewOpened', {
@@ -670,6 +713,19 @@ function showExpandedPreview() {
   });
 }
 
+function continueFromBookingPreview(modal, previewOpenedAt, action) {
+  if (!modal?.isConnected) return;
+  trackJourney('JourneyRevealNavigation', {
+    action,
+    toStep: 1,
+    editorViewed: livePreviewMode === 'edit',
+  }, { durationMs: Date.now() - previewOpenedAt });
+  stopBookingChallenge('continued-to-guest-app', false);
+  activeBookingChallenge = null;
+  modal.remove();
+  moveToStep(1);
+}
+
 function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-selected') {
   if (!modal?.isConnected) return;
   if (nextMode === 'edit') stopBookingChallenge('edit-mode-selected', true);
@@ -677,6 +733,7 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   const location = modal.querySelector('#mvrLiveLocation');
   const locationText = modal.querySelector('[data-live-location-text]');
   const forward = modal.querySelector('#mvrLiveForward');
+  const continueTour = modal.querySelector('#mvrContinueTour');
   const forwardLong = modal.querySelector('[data-live-forward-long]');
   const forwardShort = modal.querySelector('[data-live-forward-short]');
   location?.classList.toggle('is-editor', livePreviewMode === 'edit');
@@ -687,6 +744,7 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (forward) {
     forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Continue to the Guest App' : 'See how you edit this booking page');
   }
+  if (continueTour) continueTour.hidden = livePreviewMode === 'edit';
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
   if (iframe) {
     iframe.title = livePreviewMode === 'edit'
@@ -725,9 +783,10 @@ function moveToStep(nextStep) {
   ];
   trackReveal(events[currentStep]);
   trackJourney('JourneyRevealStageViewed', {
-    resumed: revealStartedAt > 0 && now - revealStartedAt < 100,
+    resumed: nextStageViewIsResume,
     bookingPageReady: currentStep === 0 ? !!bookingPageState.ready : undefined,
   });
+  nextStageViewIsResume = false;
   renderReveal();
   document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
 }
@@ -772,12 +831,6 @@ async function activateMarketel(button) {
   button.disabled = true;
   button.textContent = 'Opening secure checkout…';
   trackReveal('ActivationCtaClicked');
-  trackJourney('JourneyCheckoutRequested', {
-    price: billingInterval === 'year' ? 1990 : 199,
-    currency: 'USD',
-    billingInterval,
-    subscribed: !!crm.hotelSubscribed,
-  }, { durationMs: stageStartedAt ? Date.now() - stageStartedAt : null, immediate: true });
   try {
     await window.goLive({ billingInterval });
   } finally {
@@ -953,6 +1006,7 @@ async function checkBookingPageStatus() {
       attempts: 1,
       domain: '',
     };
+    if (bookingUrl()) bookingPreviewUnavailable = false;
     trackJourney('JourneyBookingPageStatus', {
       ready: bookingPageState.ready,
       reason: bookingPageState.reason,
@@ -977,6 +1031,8 @@ async function checkBookingPageStatus() {
     bookingPageState.reason = 'unreachable';
   }
 
+  if (bookingUrl()) bookingPreviewUnavailable = false;
+
   trackJourney('JourneyBookingPageStatus', {
     ready: bookingPageState.ready,
     reason: bookingPageState.reason,
@@ -994,7 +1050,9 @@ export function showMarketelValueReveal(options = {}) {
   if (document.getElementById('marketelValueReveal')) return;
   const requestedStep = Number(options.startAt);
   let storedStep = 0;
+  let hadPendingReveal = false;
   try { storedStep = Number.parseInt(localStorage.getItem(STEP_KEY) || '0', 10); } catch (_) {}
+  try { hadPendingReveal = localStorage.getItem(PENDING_KEY) === '1'; } catch (_) {}
   try { billingInterval = localStorage.getItem(BILLING_KEY) === 'year' ? 'year' : 'month'; } catch (_) { billingInterval = 'month'; }
   currentStep = Number.isFinite(requestedStep)
     ? Math.max(0, Math.min(3, requestedStep))
@@ -1003,8 +1061,11 @@ export function showMarketelValueReveal(options = {}) {
   livePreviewMode = 'guest';
   homeScreenInstalled = false;
   guestAppDemoSlide = 0;
+  bookingPreviewOpened = false;
+  bookingPreviewUnavailable = false;
   revealStartedAt = Date.now();
   stageStartedAt = 0;
+  nextStageViewIsResume = !Number.isFinite(requestedStep) && hadPendingReveal;
   bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
@@ -1036,7 +1097,7 @@ export function showMarketelValueReveal(options = {}) {
   trackJourney('JourneyRevealStarted', {
     startStep: currentStep,
     replay: !!crm.hotelSubscribed,
-    pendingResume: !Number.isFinite(requestedStep) && storedStep > 0,
+    pendingResume: nextStageViewIsResume,
   });
   moveToStep(currentStep);
   void loadRevealData();
