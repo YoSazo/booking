@@ -599,23 +599,19 @@ function showExpandedPreview() {
   modal.innerHTML = `<div class="mvr-live-toolbar">
     <div class="mvr-live-topline">
       <button type="button" class="mvr-live-exit" id="mvrClosePreview" aria-label="Exit preview">×</button>
-      <div class="mvr-live-title"><strong>${esc(propertyName())}</strong><span data-live-preview-context>Guest booking page</span></div>
+      <div class="mvr-live-address" id="mvrLiveLocation" aria-label="Your live booking address">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
+        <strong data-live-location-text>${esc(bookingDisplayDomain())}</strong>
+      </div>
       <button type="button" class="mvr-live-forward" id="mvrLiveForward">
         <span class="mvr-live-forward-long" data-live-forward-long>See how you edit this</span>
-        <span class="mvr-live-forward-short" data-live-forward-short>Edit this</span>
+        <span class="mvr-live-forward-short" data-live-forward-short>How to edit</span>
         <b aria-hidden="true">→</b>
       </button>
     </div>
-    <div class="mvr-live-address-row" id="mvrLiveAddressRow">
-      <span>Your booking link</span>
-      <div class="mvr-live-address">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
-        <strong>${esc(bookingDisplayDomain())}</strong>
-      </div>
-      <div class="mvr-challenge-timer" hidden aria-live="polite">
-        <span></span>
-        <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
-      </div>
+    <div class="mvr-challenge-timer" hidden aria-live="polite">
+      <span></span>
+      <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
     </div>
   </div>
   <div class="mvr-live-stage">
@@ -674,14 +670,16 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (!modal?.isConnected) return;
   if (nextMode === 'edit') stopBookingChallenge('edit-mode-selected', true);
   livePreviewMode = nextMode === 'edit' ? 'edit' : 'guest';
-  modal.querySelector('#mvrLiveAddressRow')?.classList.toggle('is-editor', livePreviewMode === 'edit');
-  const context = modal.querySelector('[data-live-preview-context]');
+  const location = modal.querySelector('#mvrLiveLocation');
+  const locationText = modal.querySelector('[data-live-location-text]');
   const forward = modal.querySelector('#mvrLiveForward');
   const forwardLong = modal.querySelector('[data-live-forward-long]');
   const forwardShort = modal.querySelector('[data-live-forward-short]');
-  if (context) context.textContent = livePreviewMode === 'edit' ? 'Front Desk editor · your first room saves' : 'Guest booking page';
+  location?.classList.toggle('is-editor', livePreviewMode === 'edit');
+  if (locationText) locationText.textContent = livePreviewMode === 'edit' ? 'Front Desk editor' : bookingDisplayDomain();
+  if (location) location.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Front Desk editor' : 'Your live booking address');
   if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Continue to Guest App' : 'See how you edit this';
-  if (forwardShort) forwardShort.textContent = livePreviewMode === 'edit' ? 'Continue' : 'Edit this';
+  if (forwardShort) forwardShort.textContent = livePreviewMode === 'edit' ? 'Continue' : 'How to edit';
   if (forward) {
     forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Continue to the Guest App' : 'See how you edit this booking page');
   }
