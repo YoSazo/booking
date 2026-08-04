@@ -3239,17 +3239,23 @@ function embeddedExampleBookingHtml() {
   checkin.setDate(checkin.getDate() + 1);
   const checkout = new Date(checkin);
   checkout.setDate(checkout.getDate() + 1);
-  const formatDate = (date) => date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const formattedAmount = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  const exampleBooking = {
+    id: 'preview-example-booking',
+    guestFirstName: 'Example',
+    guestLastName: 'Guest',
+    guestPhone: '(555) 014-7284',
+    guestEmail: 'example@guest.com',
+    roomName,
+    nights: 1,
+    guests: 2,
+    grandTotal: amount,
+    checkinDate: checkin.toISOString(),
+    checkoutDate: checkout.toISOString(),
+    createdAt: new Date().toISOString(),
+    callStatus: 'not-called',
+    ownerReviewStatus: 'available',
+    notes: 'Arriving around 8 PM. Please send check-in details.',
+  };
 
   return `
     <section class="embedded-example-booking" aria-label="Example direct booking">
@@ -3261,38 +3267,7 @@ function embeddedExampleBookingHtml() {
         </div>
         <span class="embedded-example-badge">Example</span>
       </div>
-      <div class="booking-card embedded-example-booking-card">
-        <div class="card-accent"></div>
-        <div class="card-inner">
-          <div class="card-top">
-            <div class="guest-info">
-              <div class="guest-name">Example Guest</div>
-              <div class="guest-time">Just now</div>
-            </div>
-            <div class="card-amount">${formattedAmount}</div>
-          </div>
-          <div class="card-meta embedded-example-meta">
-            <div class="meta-chip">🛏 ${esc(roomName)}</div>
-            <div class="meta-chip">🌙 1 night</div>
-            <div class="meta-chip embedded-example-confirmed">✓ Confirmed · Direct booking</div>
-          </div>
-          <div class="card-dates">
-            <div class="date-block">
-              <div class="date-label">Check-in</div>
-              <div class="date-value">${formatDate(checkin)}</div>
-            </div>
-            <div class="date-block">
-              <div class="date-label">Check-out</div>
-              <div class="date-value">${formatDate(checkout)}</div>
-            </div>
-            <div class="date-block">
-              <div class="date-label">Guests</div>
-              <div class="date-value">2 guests</div>
-            </div>
-          </div>
-          <div class="embedded-example-booking-footnote">Stay details, payment total, and guest contact information appear here automatically.</div>
-        </div>
-      </div>
+      <div class="embedded-example-booking-card">${bookingCardHtml(exampleBooking)}</div>
     </section>`;
 }
 

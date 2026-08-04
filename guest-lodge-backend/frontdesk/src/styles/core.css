@@ -2485,27 +2485,10 @@
       font-size: 10px;
       font-weight: 800;
     }
-    .frontdesk-editor-preview .embedded-example-booking-card {
+    .frontdesk-editor-preview .embedded-example-booking-card > .booking-card {
       margin: 0;
       border-color: #dbe7df;
       box-shadow: 0 10px 30px rgba(28, 67, 45, 0.07);
-    }
-    .frontdesk-editor-preview .embedded-example-meta {
-      align-items: center;
-    }
-    .frontdesk-editor-preview .embedded-example-confirmed {
-      border: 1px solid #b9ddc5;
-      background: #edf8f1;
-      color: #1f6a48;
-      font-weight: 700;
-    }
-    .frontdesk-editor-preview .embedded-example-booking-footnote {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid #edf0ee;
-      color: var(--text-muted);
-      font-size: 11px;
-      line-height: 1.45;
     }
 
     @media (max-width: 760px) {
