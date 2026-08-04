@@ -227,6 +227,10 @@ function stopBookingChallenge(reason = '', shouldTrack = false) {
     window.clearTimeout(challenge.promptFallbackId);
     challenge.promptFallbackId = 0;
   }
+  if (challenge.promptDelayId) {
+    window.clearTimeout(challenge.promptDelayId);
+    challenge.promptDelayId = 0;
+  }
   if (shouldTrack && challenge.status === 'running') {
     const elapsedMs = Date.now() - challenge.startedAt;
     trackReveal('BookingChallengeAbandoned', reason);
@@ -698,14 +702,20 @@ function showExpandedPreview() {
     startedAt: 0,
     timerId: 0,
     promptFallbackId: 0,
+    promptDelayId: 0,
   };
   activeBookingChallenge.promptFallbackId = window.setTimeout(() => {
     if (activeBookingChallenge?.modal !== modal || activeBookingChallenge.status !== 'waiting') return;
     setLivePreviewActionsVisible(modal, true);
   }, 4000);
   iframe?.addEventListener('load', () => {
-    if (activeBookingChallenge?.modal !== modal || livePreviewMode !== 'guest') return;
-    window.setTimeout(() => showBookingChallengePrompt(activeBookingChallenge), 1500);
+    const challenge = activeBookingChallenge;
+    if (challenge?.modal !== modal || livePreviewMode !== 'guest') return;
+    if (challenge.promptDelayId) window.clearTimeout(challenge.promptDelayId);
+    challenge.promptDelayId = window.setTimeout(() => {
+      challenge.promptDelayId = 0;
+      showBookingChallengePrompt(challenge);
+    }, 1500);
   });
   modal.querySelector('#mvrClosePreview')?.addEventListener('click', () => {
     trackJourney('JourneyBookingPreviewModeChanged', {

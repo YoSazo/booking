@@ -2179,12 +2179,15 @@ async function startCrmApp(verification, options = {}) {
   const revealRequest = urlParams.get('reveal');
   let hasPendingValueReveal = false;
   try { hasPendingValueReveal = localStorage.getItem('marketelValueRevealPendingV1') === '1'; } catch (_) {}
+  const shouldResumeValueReveal = !(verification && verification.subscribed) && hasPendingValueReveal;
   const shouldShowValueReveal = !isEmbeddedEditorPreview && (
     revealRequest === '1'
       || revealRequest === 'checkout'
-      || (!(verification && verification.subscribed) && hasPendingValueReveal)
+      || shouldResumeValueReveal
   );
-  const revealStartAt = revealRequest === 'checkout' ? 3 : (revealRequest === '1' ? 0 : undefined);
+  const revealStartAt = revealRequest === 'checkout'
+    ? 3
+    : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined);
   if (isFirstWelcome) resetWalkthroughProgress();
 
   if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
