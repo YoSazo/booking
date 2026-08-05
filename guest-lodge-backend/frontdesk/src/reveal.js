@@ -410,9 +410,9 @@ function bookingPreviewCardHtml() {
   const url = bookingUrl();
   return `<div class="mvr-booking-preview-card">
     <div class="mvr-preview-browser-bar">
-      <span class="mvr-preview-live"><i></i>Live</span>
+      <span class="mvr-browser-dots"><i></i><i></i><i></i></span>
       <span class="mvr-preview-address"><b></b>${esc(bookingDisplayDomain())}</span>
-      <i aria-hidden="true"></i>
+      <span class="mvr-preview-live"><i></i>Live</span>
     </div>
     <div class="mvr-preview-teaser">
       ${url
@@ -554,9 +554,9 @@ function assistantRevealHtml() {
         <b>now</b>
       </div>
       <div class="mvr-chat">
-        <div class="mvr-bubble mvr-bubble-in">Is ${esc(roomName)} still available tomorrow?</div>
-        <div class="mvr-bubble mvr-bubble-out">No, a walk-in took it.</div>
-        <div class="mvr-bubble mvr-bubble-in success"><strong>Handled.</strong> Tomorrow is blocked, the $1 hold was released and the guest was notified.</div>
+        <div class="mvr-bubble mvr-bubble-in" style="--stagger:0">Is ${esc(roomName)} still available tomorrow?</div>
+        <div class="mvr-bubble mvr-bubble-out" style="--stagger:1">No, a walk-in took it.</div>
+        <div class="mvr-bubble mvr-bubble-in success" style="--stagger:2"><strong>Handled.</strong> Tomorrow is blocked, the $1 hold was released and the guest was notified.</div>
       </div>
       <div class="mvr-handled-row"><span>✓</span><div><strong>Front Desk asks. You answer.</strong><small>Marketel handles the rest.</small></div></div>
     </div>
@@ -578,9 +578,9 @@ function finaleHtml() {
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
       <p>${isSubscribed ? 'Your direct booking page, guest app and Front Desk work together as one system.' : 'Turn on the system you just saw and finish making it yours.'}</p>
       <div class="mvr-value-list">
-        <div><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-        <div><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
-        <div><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
+        <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
+        <div style="--stagger:1"><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
+        <div style="--stagger:2"><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
       </div>
       ${isSubscribed ? '' : `${directBookingValueHtml()}
         <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">

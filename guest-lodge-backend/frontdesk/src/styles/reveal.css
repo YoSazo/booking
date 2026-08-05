@@ -6,10 +6,14 @@
 
 .mvr-root {
   --mvr-green: #2e7d5b;
+  --mvr-green-light: #4caf7d;
   --mvr-dark: #17261f;
   --mvr-text: #16231d;
   --mvr-muted: #64736a;
   --mvr-line: #dce7e0;
+  --mvr-accent: #C9A84C;
+  --mvr-glass: rgba(255, 255, 255, 0.55);
+  --mvr-glass-border: rgba(255, 255, 255, 0.35);
   position: fixed;
   inset: 0;
   height: 100dvh;
@@ -17,10 +21,12 @@
   overflow: hidden;
   color: var(--mvr-text);
   background:
-    radial-gradient(circle at 85% 12%, rgba(120, 189, 154, 0.18), transparent 32%),
-    radial-gradient(circle at 8% 86%, rgba(217, 235, 224, 0.7), transparent 30%),
-    #f6f8f5;
+    radial-gradient(ellipse 120% 50% at 80% 5%, rgba(76, 175, 125, 0.12), transparent),
+    radial-gradient(ellipse 100% 60% at 10% 90%, rgba(200, 225, 210, 0.55), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255, 255, 255, 0.35), transparent),
+    linear-gradient(168deg, #f0f5f2 0%, #f6f9f7 40%, #edf3ef 100%);
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 .mvr-root *,
@@ -66,7 +72,12 @@
 .mvr-progress {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 999px;
+  background: rgba(216, 228, 221, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .mvr-progress-item {
@@ -75,10 +86,10 @@
 
 .mvr-progress-item > span {
   display: block;
-  height: 4px;
+  height: 5px;
   border-radius: 999px;
-  background: #d9e2dc;
-  transition: background 180ms ease, transform 180ms ease;
+  background: rgba(200, 214, 206, 0.55);
+  transition: background 280ms ease, transform 280ms ease, box-shadow 280ms ease;
 }
 
 .mvr-progress-item small {
@@ -94,11 +105,12 @@
 
 .mvr-progress-item.is-done > span,
 .mvr-progress-item.is-active > span {
-  background: var(--mvr-green);
+  background: linear-gradient(90deg, var(--mvr-green), var(--mvr-green-light));
 }
 
 .mvr-progress-item.is-active > span {
-  transform: scaleY(1.45);
+  transform: scaleY(1.6);
+  box-shadow: 0 0 14px rgba(46, 125, 91, 0.35), 0 0 4px rgba(46, 125, 91, 0.2);
 }
 
 .mvr-progress-item.is-active small {
@@ -125,25 +137,65 @@
   align-items: center;
   gap: clamp(34px, 6vw, 86px);
   padding: clamp(30px, 5vh, 64px) 0 26px;
-  animation: mvr-stage-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: mvr-stage-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes mvr-stage-in {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mvr-copy-in {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mvr-visual-in {
+  from { opacity: 0; transform: translateX(32px) scale(0.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes mvr-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes mvr-mark-in {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mvr-glow-pulse {
+  0%, 100% { box-shadow: 0 8px 20px rgba(46, 125, 91, 0.28), 0 0 0 6px rgba(46, 125, 91, 0.08); }
+  50% { box-shadow: 0 8px 20px rgba(46, 125, 91, 0.28), 0 0 22px 8px rgba(46, 125, 91, 0.16); }
+}
+
+@keyframes mvr-bubble-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mvr-value-in {
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .mvr-copy {
   max-width: 480px;
+  animation: mvr-copy-in 560ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
 }
 
 .mvr-eyebrow {
-  margin-bottom: 12px;
-  color: var(--mvr-green);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+  color: transparent;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
+  background: linear-gradient(135deg, var(--mvr-green), var(--mvr-green-light));
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .mvr-copy h1,
@@ -151,9 +203,10 @@
   margin: 0;
   color: var(--mvr-dark);
   font-size: clamp(34px, 4.2vw, 58px);
-  font-weight: 800;
+  font-weight: 850;
   letter-spacing: -0.045em;
   line-height: 1.02;
+  text-shadow: 0 1px 2px rgba(23, 38, 31, 0.04);
 }
 
 .mvr-copy > p,
@@ -171,14 +224,16 @@
 .mvr-control-proof,
 .mvr-callout {
   margin-top: 20px;
-  padding: 15px 17px;
-  color: #53635a;
-  border: 1px solid #d4e4da;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  padding: 16px 18px;
+  color: #4a5b52;
+  border: 1px solid rgba(212, 228, 218, 0.7);
+  border-radius: 16px;
+  background: var(--mvr-glass);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   font-size: 13px;
   line-height: 1.55;
-  box-shadow: 0 8px 28px rgba(40, 77, 58, 0.05);
+  box-shadow: 0 8px 32px rgba(40, 77, 58, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .mvr-control-proof span,
@@ -246,6 +301,7 @@
   min-height: 500px;
   display: grid;
   place-items: center;
+  animation: mvr-visual-in 640ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
 }
 
 .mvr-visual-booking {
@@ -267,24 +323,57 @@
   overflow: hidden;
   color: var(--mvr-text);
   text-align: left;
-  border: 1px solid #d3e0d8;
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 28px 70px rgba(24, 55, 38, 0.15);
+  border: 1px solid rgba(211, 224, 216, 0.7);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 2px 4px rgba(24, 55, 38, 0.04),
+    0 12px 28px rgba(24, 55, 38, 0.08),
+    0 32px 72px rgba(24, 55, 38, 0.14);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 320ms ease, box-shadow 320ms ease;
+}
+
+.mvr-booking-preview-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 4px rgba(24, 55, 38, 0.04),
+    0 16px 36px rgba(24, 55, 38, 0.1),
+    0 40px 80px rgba(24, 55, 38, 0.16);
 }
 
 .mvr-preview-browser-bar {
-  min-height: 42px;
+  min-height: 44px;
   display: grid;
   grid-template-columns: 62px minmax(0, 1fr) 62px;
   align-items: center;
   padding: 0 14px;
   color: #6f7d75;
-  border-bottom: 1px solid #e3eae6;
-  background: #f5f7f5;
+  border-bottom: 1px solid rgba(227, 234, 230, 0.7);
+  background: rgba(245, 248, 246, 0.85);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   font-size: 10px;
   font-weight: 700;
 }
+
+.mvr-browser-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mvr-browser-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: block;
+}
+
+.mvr-browser-dots i:nth-child(1) { background: #ff605c; }
+.mvr-browser-dots i:nth-child(2) { background: #ffbd44; }
+.mvr-browser-dots i:nth-child(3) { background: #00ca4e; }
 
 .mvr-preview-address {
   display: flex;
@@ -387,17 +476,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 13px 18px;
+  padding: 14px 22px;
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 15px;
-  background: rgba(37, 105, 75, 0.96);
-  box-shadow: 0 18px 44px rgba(24, 64, 44, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(76, 175, 125, 0.97), rgba(37, 105, 75, 0.97));
+  box-shadow:
+    0 8px 20px rgba(24, 64, 44, 0.2),
+    0 20px 48px rgba(24, 64, 44, 0.25);
   font: inherit;
   text-align: center;
   cursor: pointer;
   transform: translate(-50%, -50%);
-  transition: transform 160ms ease, background 160ms ease;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  overflow: hidden;
+}
+
+.mvr-preview-teaser > button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.2) 50%, transparent 62%);
+  animation: mvr-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .mvr-expand-cue {
@@ -419,8 +520,11 @@
 }
 
 .mvr-preview-teaser > button:hover {
-  background: #215f45;
-  transform: translate(-50%, calc(-50% - 2px));
+  background: linear-gradient(135deg, rgba(64, 155, 110, 0.97), rgba(33, 95, 69, 0.97));
+  transform: translate(-50%, calc(-50% - 3px));
+  box-shadow:
+    0 10px 24px rgba(24, 64, 44, 0.22),
+    0 24px 56px rgba(24, 64, 44, 0.28);
 }
 
 .mvr-preview-teaser > button:disabled,
@@ -489,11 +593,15 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 13px;
-  border: 1px solid #d8e4dc;
-  border-radius: 17px;
-  background: #fff;
-  box-shadow: 0 12px 34px rgba(26, 43, 34, 0.13);
+  padding: 14px;
+  border: 1px solid rgba(216, 228, 220, 0.6);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    0 4px 10px rgba(26, 43, 34, 0.06),
+    0 14px 38px rgba(26, 43, 34, 0.12);
 }
 
 .mvr-install-property-icon,
@@ -550,11 +658,18 @@
   color: #fff;
   border: 0;
   border-radius: 10px;
-  background: var(--mvr-green);
+  background: linear-gradient(135deg, var(--mvr-green-light), var(--mvr-green));
   font: inherit;
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(46, 125, 91, 0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.mvr-install-card button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(46, 125, 91, 0.28);
 }
 
 .mvr-install-context {
@@ -594,12 +709,16 @@
   justify-content: center;
   overflow: hidden;
   padding: 20px 18px 16px;
-  border: 1px solid rgba(32, 70, 51, 0.16);
+  border: 1px solid rgba(32, 70, 51, 0.12);
   border-radius: 26px;
   background:
-    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.65), transparent 36%),
-    linear-gradient(145deg, #3c7559, #a2d1b5);
-  box-shadow: 0 24px 60px rgba(22, 47, 34, 0.18);
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.7), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(46, 125, 91, 0.2), transparent 40%),
+    linear-gradient(145deg, #3a7356, #68b890, #a2d1b5);
+  box-shadow:
+    0 8px 20px rgba(22, 47, 34, 0.1),
+    0 28px 64px rgba(22, 47, 34, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .mvr-ios-dock {
@@ -608,12 +727,12 @@
   justify-content: center;
   gap: clamp(17px, 3vw, 24px);
   padding: 12px 15px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 25px;
-  background: rgba(225, 239, 229, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 10px 34px rgba(23, 50, 35, 0.16);
-  -webkit-backdrop-filter: saturate(1.4) blur(20px);
-  backdrop-filter: saturate(1.4) blur(20px);
+  background: rgba(225, 239, 229, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 12px 38px rgba(23, 50, 35, 0.18);
+  -webkit-backdrop-filter: saturate(1.5) blur(24px);
+  backdrop-filter: saturate(1.5) blur(24px);
 }
 
 .mvr-dock-icon {
@@ -669,10 +788,16 @@
 .mvr-installed-value {
   width: min(520px, 100%);
   padding: 18px;
-  border: 1px solid #d2e1d8;
+  border: 1px solid rgba(210, 225, 216, 0.6);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 28px 70px rgba(24, 55, 38, 0.16);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow:
+    0 4px 12px rgba(24, 55, 38, 0.06),
+    0 16px 40px rgba(24, 55, 38, 0.1),
+    0 30px 72px rgba(24, 55, 38, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .mvr-installed-value-head {
@@ -766,12 +891,12 @@
 
 .mvr-app-push-preview {
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 17px;
-  background: rgba(238, 242, 239, 0.92);
-  box-shadow: 0 10px 30px rgba(23, 47, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: saturate(1.35) blur(16px);
-  backdrop-filter: saturate(1.35) blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
+  background: rgba(238, 242, 239, 0.75);
+  box-shadow: 0 4px 12px rgba(23, 47, 34, 0.06), 0 12px 34px rgba(23, 47, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: saturate(1.5) blur(20px);
+  backdrop-filter: saturate(1.5) blur(20px);
 }
 
 .mvr-app-push-meta {
@@ -896,10 +1021,16 @@
   align-content: center;
   justify-items: stretch;
   padding: 28px;
-  border: 1px solid #d6e2da;
+  border: 1px solid rgba(214, 226, 218, 0.6);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 34px 80px rgba(24, 55, 38, 0.14);
+  background: var(--mvr-glass);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow:
+    0 2px 4px rgba(24, 55, 38, 0.03),
+    0 16px 40px rgba(24, 55, 38, 0.08),
+    0 36px 80px rgba(24, 55, 38, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .mvr-booking-alert {
@@ -907,11 +1038,13 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 13px;
-  border: 1px solid #dbe5df;
+  padding: 14px;
+  border: 1px solid rgba(219, 229, 223, 0.6);
+  border-left: 3px solid var(--mvr-green);
   border-radius: 17px;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(25, 54, 38, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(25, 54, 38, 0.05), 0 10px 26px rgba(25, 54, 38, 0.08);
+  animation: mvr-bubble-in 400ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both;
 }
 
 .mvr-booking-alert > div:nth-child(2) {
@@ -947,10 +1080,12 @@
 
 .mvr-bubble {
   max-width: 78%;
-  padding: 11px 13px;
-  border-radius: 16px;
+  padding: 12px 14px;
+  border-radius: 18px;
   font-size: 12px;
   line-height: 1.48;
+  animation: mvr-bubble-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--stagger, 0) * 120ms + 200ms);
 }
 
 .mvr-bubble-in {
@@ -963,7 +1098,7 @@
 .mvr-bubble-out {
   justify-self: end;
   border-bottom-right-radius: 5px;
-  background: var(--mvr-green);
+  background: linear-gradient(135deg, var(--mvr-green-light), var(--mvr-green));
   color: #fff;
 }
 
@@ -977,10 +1112,12 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 13px;
-  border-radius: 14px;
-  background: #183d2c;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #183d2c 0%, #1a4a35 50%, #16503a 100%);
   color: #fff;
+  box-shadow: 0 8px 24px rgba(24, 61, 44, 0.22);
+  animation: mvr-bubble-in 450ms cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
 }
 
 .mvr-handled-row > span {
@@ -1016,13 +1153,34 @@
 }
 
 .mvr-finale-card {
+  position: relative;
   width: min(620px, 100%);
-  padding: clamp(24px, 5vw, 42px);
+  padding: clamp(28px, 5vw, 46px);
   text-align: center;
-  border: 1px solid #d5e2da;
+  border: 1px solid rgba(213, 226, 218, 0.5);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 30px 80px rgba(24, 55, 38, 0.14);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow:
+    0 2px 4px rgba(24, 55, 38, 0.03),
+    0 12px 32px rgba(24, 55, 38, 0.08),
+    0 32px 80px rgba(24, 55, 38, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  animation: mvr-stage-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mvr-finale-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(145deg, rgba(46, 125, 91, 0.25), rgba(76, 175, 125, 0.1), rgba(201, 168, 76, 0.15));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .mvr-finale-card h1 {
@@ -1035,23 +1193,24 @@
 }
 
 .mvr-finale-mark {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   display: grid;
   place-items: center;
-  margin: 0 auto 14px;
+  margin: 0 auto 16px;
   color: #fff;
   border-radius: 50%;
-  background: var(--mvr-green);
-  font-size: 24px;
+  background: linear-gradient(145deg, var(--mvr-green-light), var(--mvr-green));
+  font-size: 25px;
   font-weight: 900;
-  box-shadow: 0 10px 24px rgba(46, 125, 91, 0.24);
+  box-shadow: 0 8px 20px rgba(46, 125, 91, 0.28), 0 0 0 6px rgba(46, 125, 91, 0.08);
+  animation: mvr-mark-in 500ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both, mvr-glow-pulse 3s ease-in-out 800ms infinite;
 }
 
 .mvr-value-list {
   display: grid;
   gap: 9px;
-  margin: 22px 0;
+  margin: 24px 0;
   text-align: left;
 }
 
@@ -1060,9 +1219,20 @@
   grid-template-columns: 28px 1fr;
   align-items: start;
   gap: 10px;
-  padding: 11px 13px;
-  border-radius: 13px;
-  background: #f4f8f5;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(244, 248, 245, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(228, 238, 232, 0.5);
+  animation: mvr-value-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--stagger, 0) * 80ms + 200ms);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.mvr-value-list > div:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(24, 55, 38, 0.08);
 }
 
 .mvr-value-list > div > span {
@@ -1100,12 +1270,15 @@
   display: grid;
   gap: 4px;
   margin: -4px auto 14px;
-  padding: 13px 15px;
+  padding: 14px 16px;
   color: #68776f;
   text-align: left;
-  border: 1px solid #d3e3d9;
+  border: 1px solid rgba(211, 227, 217, 0.6);
+  border-left: 3px solid var(--mvr-green);
   border-radius: 14px;
-  background: #f3f8f5;
+  background: rgba(243, 248, 245, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -1156,11 +1329,14 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3px;
-  margin: 0 auto 10px;
+  margin: 0 auto 12px;
   padding: 4px;
-  border: 1px solid #d7e3dc;
+  border: 1px solid rgba(215, 227, 220, 0.6);
   border-radius: 999px;
-  background: #edf2ef;
+  background: rgba(237, 242, 239, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .mvr-billing-toggle button {
@@ -1180,7 +1356,7 @@
 .mvr-billing-toggle button.is-active {
   color: var(--mvr-text);
   background: #fff;
-  box-shadow: 0 2px 8px rgba(30, 62, 45, 0.11);
+  box-shadow: 0 2px 8px rgba(30, 62, 45, 0.12), 0 0 0 1px rgba(46, 125, 91, 0.08);
 }
 
 .mvr-billing-toggle button span {
@@ -1198,8 +1374,9 @@
 
 .mvr-price strong {
   color: var(--mvr-dark);
-  font-size: 42px;
+  font-size: 44px;
   letter-spacing: -0.05em;
+  transition: transform 250ms ease;
 }
 
 .mvr-price span {
@@ -1227,12 +1404,14 @@
   align-items: center;
   gap: 10px;
   max-width: 360px;
-  margin: 12px auto 18px;
-  padding: 10px 12px;
+  margin: 14px auto 20px;
+  padding: 11px 13px;
   text-align: left;
-  border: 1px solid #cae1d3;
-  border-radius: 13px;
-  background: #eef8f2;
+  border: 1px solid rgba(202, 225, 211, 0.6);
+  border-radius: 14px;
+  background: rgba(238, 248, 242, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .mvr-guarantee > span {
@@ -1242,9 +1421,10 @@
   place-items: center;
   color: #fff;
   border-radius: 50%;
-  background: var(--mvr-green);
+  background: linear-gradient(145deg, var(--mvr-green-light), var(--mvr-green));
   font-size: 16px;
   font-weight: 900;
+  box-shadow: 0 4px 12px rgba(46, 125, 91, 0.2);
 }
 
 .mvr-primary,
@@ -1256,20 +1436,31 @@
 }
 
 .mvr-primary {
+  position: relative;
   min-height: 48px;
-  padding: 13px 20px;
+  padding: 13px 22px;
   color: #fff;
-  border-radius: 13px;
-  background: var(--mvr-green);
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--mvr-green-light) 0%, var(--mvr-green) 50%, #245f46 100%);
   font-size: 14px;
   font-weight: 800;
-  box-shadow: 0 10px 24px rgba(46, 125, 91, 0.21);
-  transition: transform 140ms ease, background 140ms ease;
+  box-shadow: 0 6px 16px rgba(46, 125, 91, 0.2), 0 12px 28px rgba(46, 125, 91, 0.15);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  overflow: hidden;
+}
+
+.mvr-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.18) 50%, transparent 62%);
+  animation: mvr-shimmer 3.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .mvr-primary:hover {
-  background: #246a4c;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(46, 125, 91, 0.25), 0 16px 36px rgba(46, 125, 91, 0.18);
 }
 
 .mvr-primary:disabled {
@@ -1278,10 +1469,16 @@
   transform: none;
 }
 
+.mvr-primary:disabled::after {
+  animation: none;
+}
+
 .mvr-final-cta {
   width: 100%;
-  min-height: 54px;
+  min-height: 56px;
   font-size: 15px;
+  letter-spacing: -0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .mvr-secure-note {
@@ -1324,6 +1521,11 @@
   background: transparent;
   font-size: 13px;
   font-weight: 800;
+  transition: color 150ms ease;
+}
+
+.mvr-back:hover {
+  color: var(--mvr-green);
 }
 
 .mvr-live-preview {
@@ -1342,8 +1544,10 @@
   align-items: stretch;
   gap: 0;
   padding: max(9px, env(safe-area-inset-top)) 12px 9px;
-  border-bottom: 1px solid #dbe4de;
-  background: rgba(250, 252, 250, 0.97);
+  border-bottom: 1px solid rgba(219, 228, 222, 0.6);
+  background: rgba(250, 252, 250, 0.85);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
 }
 
 .mvr-live-topline {
@@ -1990,8 +2194,18 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mvr-stage,
+  .mvr-copy,
+  .mvr-visual,
   .mvr-live-preview,
   .mvr-preview-live i,
+  .mvr-bubble,
+  .mvr-booking-alert,
+  .mvr-handled-row,
+  .mvr-finale-card,
+  .mvr-finale-mark,
+  .mvr-value-list > div,
+  .mvr-primary::after,
+  .mvr-preview-teaser > button::after,
   .mvr-challenge-timer,
   .mvr-challenge-timer > span {
     animation: none !important;
