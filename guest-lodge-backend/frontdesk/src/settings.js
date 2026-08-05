@@ -994,6 +994,15 @@ function renderEditRooms() {
   renderEditRoomsCards();
 }
 
+async function refreshEditRoomsData({ render = true } = {}) {
+  const res = await api('GET', '/api/crm/rooms');
+  if (!Array.isArray(res?.rooms)) throw new Error('Could not refresh rooms');
+  crm.editRooms = res.rooms;
+  if (res.rates) crm.editRates = res.rates;
+  if (render) renderEditRoomsCards();
+  return crm.editRooms;
+}
+
 function renderEditRoomsCards() {
   const cards = document.getElementById('editRoomsCards');
   if (!cards) return;
@@ -1157,6 +1166,11 @@ function openAmenityPicker(roomId) {
     document.getElementById('amenityPickerModal').addEventListener('click', closeAmenityPicker);
     modal = document.getElementById('amenityPickerModal');
   }
+
+  const firstRoom = crm.editRooms[0];
+  const isFirstRoomEditor = firstRoom && String(firstRoom.id) === String(roomId);
+  if (isFirstRoomEditor) modal.dataset.previewActionScope = 'first-room-editor';
+  else delete modal.dataset.previewActionScope;
 
   // Render preset pills
   const grid = document.getElementById('amenityPickerGrid');
@@ -1612,21 +1626,73 @@ function closeEditAddRoom() {
   window.setNativeModalOpen?.('edit-add-room', false);
 }
 
-function confirmEditAddRoom() {
+async function confirmEditAddRoom() {
   const input = document.getElementById('editNewRoomName');
+  const submit = document.querySelector('#editAddRoomModal .edit-add-room-actions .primary');
   const name = input?.value.trim() || '';
   if (!name) return;
   if (input) input.disabled = true;
-  api('POST', '/api/crm/rooms', { name, maxOccupancy: 4, totalUnits: 5 })
-    .then(() => {
-      closeEditAddRoom();
-      toast('Room added', 'success');
-      loadEditRooms();
-    })
-    .catch(() => {
-      if (input) input.disabled = false;
-      toast('Failed to add', 'error');
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Adding…';
+  }
+
+  const totalUnits = 5;
+  try {
+    const result = await api('POST', '/api/crm/rooms', {
+      name,
+      maxOccupancy: 4,
+      totalUnits,
     });
+    if (!result?.success || !result.room?.id) {
+      throw new Error(result?.message || 'Failed to add room');
+    }
+
+    const createdRoom = {
+      id: result.room.id,
+      name: result.room.name || name,
+      description: '',
+      amenities: '',
+      maxOccupancy: 4,
+      totalUnits,
+      imageUrl: null,
+      images: [],
+    };
+    const existingIndex = crm.editRooms.findIndex(room => room.id === createdRoom.id);
+    if (existingIndex >= 0) {
+      crm.editRooms = crm.editRooms.map((room, index) => index === existingIndex ? createdRoom : room);
+    } else {
+      crm.editRooms = [...crm.editRooms, createdRoom];
+    }
+
+    const availability = crm.manualAvailability || { rooms: [], overrides: {} };
+    if (!Array.isArray(availability.rooms)) availability.rooms = [];
+    if (!availability.overrides || typeof availability.overrides !== 'object') availability.overrides = {};
+    if (!availability.rooms.some(room => room.name === createdRoom.name)) {
+      availability.rooms = [...availability.rooms, { name: createdRoom.name, totalUnits }]
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }
+    crm.manualAvailability = availability;
+    if (!crm.manualSelectedRoom) crm.manualSelectedRoom = createdRoom.name;
+
+    closeEditAddRoom();
+    renderEditRoomsCards();
+    window.refreshRoomBadge?.();
+    toast('Room added', 'success');
+
+    // Reconcile the optimistic card with the complete server representation
+    // (including any defaults) after it is already visible to the owner.
+    refreshEditRoomsData({ render: true }).catch(() => {});
+    const availabilityRefresh = window.loadManualAvailability?.({ silent: true });
+    availabilityRefresh?.catch(() => {});
+  } catch (error) {
+    if (input) input.disabled = false;
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Add room';
+    }
+    toast(error.message || 'Failed to add room', 'error');
+  }
 }
 
 
@@ -1670,6 +1736,7 @@ const _settingsExports = {
   removeAmenity,
   renderEditRooms,
   renderEditRoomsCards,
+  refreshEditRoomsData,
   replayWalkthrough,
   resolveLiveTourElement,
   resolveTourHighlightEl,

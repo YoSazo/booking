@@ -2121,7 +2121,8 @@ function installEmbeddedEditorPreview() {
       );
       const firstRoomCard = interactive.closest('#editRoomsCards > .booking-card:first-child');
       const isFirstRoomEditor = !!firstRoomCard && !interactive.closest('.room-edit-delete-btn');
-      return isNavigation || isFirstRoomEditor;
+      const isFirstRoomEditorModal = !!interactive.closest('[data-preview-action-scope="first-room-editor"]');
+      return isNavigation || isFirstRoomEditor || isFirstRoomEditorModal;
     };
     const blockLockedPreviewAction = (event) => {
       const interactive = event.target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
@@ -4230,7 +4231,11 @@ function openAvailabilityDayPopover(event, dayIso) {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   if (!room || !pop || !title || !countEl) return;
 
-  setNativeModalOpen('availability-day', true);
+  // This is a compact editor inside the Availability screen, not a new
+  // full-screen destination. Hiding the UIKit shell here changes the web
+  // view's usable height and container padding, which makes iOS jump the
+  // document and removes the header/tab bar while a day is being edited.
+  // Leave the native shell anchored and layer this popover inside it.
   crm.availabilityEditingDay = dayIso;
   const bookedMap = bookingsByRoomDate();
   const result = availabilityForDay(room, dayIso, bookedMap);
@@ -4323,7 +4328,6 @@ function closeAvailabilityDayPopover() {
     pop.setAttribute('aria-hidden', 'true');
     pop.style.display = 'none';
   }
-  setNativeModalOpen('availability-day', false);
 }
 
 function closeAvailabilityPopoverIfOutside(event) {
@@ -4401,6 +4405,7 @@ async function saveAvailabilityDay() {
 async function saveRoomType() {
   const nameEl = document.getElementById('roomsAddNameInput');
   const unitsEl = document.getElementById('roomsAddUnitsInput');
+  const saveBtn = document.getElementById('roomsAddSaveBtn');
   if (!nameEl || !unitsEl) return;
   const roomName = nameEl.value.trim();
   const totalUnits = Math.max(1, parseInt(unitsEl.value, 10) || 1);
@@ -4409,17 +4414,49 @@ async function saveRoomType() {
     return;
   }
 
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Adding…';
+  }
+
   try {
     const data = await api('POST', '/api/crm/manual-availability/rooms', { roomName, totalUnits });
     if (!data.success) throw new Error(data.message || 'Failed to save room type');
-    crm.manualAvailability = data.data || crm.manualAvailability;
+
+    const nextAvailability = data.data && Array.isArray(data.data.rooms)
+      ? data.data
+      : crm.manualAvailability;
+    if (!Array.isArray(nextAvailability.rooms)) nextAvailability.rooms = [];
+    if (!nextAvailability.overrides || typeof nextAvailability.overrides !== 'object') {
+      nextAvailability.overrides = {};
+    }
+    // The successful response normally contains the new room. Keep a local
+    // fallback so a stale read replica can never leave the owner staring at an
+    // unchanged calendar after Marketel has already said the room was added.
+    if (!nextAvailability.rooms.some(room => room.name === roomName)) {
+      nextAvailability.rooms = [...nextAvailability.rooms, { name: roomName, totalUnits }]
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }
+    crm.manualAvailability = nextAvailability;
     crm.manualSelectedRoom = roomName;
     closeRoomsAddModal();
     refreshRoomBadge();
     renderAvailabilityView();
-    toast('Room type saved', 'success');
+    toast('Room added', 'success');
+
+    // Keep Your Page's room cards synchronized without waiting for an app
+    // background/foreground cycle. This is deliberately non-blocking because
+    // the Availability screen is already correct from the local update above.
+    loadSettingsModule()
+      .then(module => module.refreshEditRoomsData?.({ render: true }))
+      .catch(() => {});
   } catch (e) {
     toast(e.message || 'Failed to save room type', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
   }
 }
 
