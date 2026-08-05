@@ -525,11 +525,13 @@
   position: absolute;
   width: 9px;
   height: 9px;
-  opacity: .9;
-  transition: transform 200ms ease;
+  opacity: .78;
+  animation: mvr-expand-corner-pulse 1.45s cubic-bezier(.4, 0, .2, 1) infinite;
 }
 
 .mvr-expand-corners .is-top-left {
+  --mvr-expand-x: -3px;
+  --mvr-expand-y: -3px;
   top: 8px;
   left: 9px;
   border-top: 1.5px solid currentColor;
@@ -537,6 +539,8 @@
 }
 
 .mvr-expand-corners .is-top-right {
+  --mvr-expand-x: 3px;
+  --mvr-expand-y: -3px;
   top: 8px;
   right: 9px;
   border-top: 1.5px solid currentColor;
@@ -544,6 +548,8 @@
 }
 
 .mvr-expand-corners .is-bottom-left {
+  --mvr-expand-x: -3px;
+  --mvr-expand-y: 3px;
   bottom: 8px;
   left: 9px;
   border-bottom: 1.5px solid currentColor;
@@ -551,16 +557,28 @@
 }
 
 .mvr-expand-corners .is-bottom-right {
+  --mvr-expand-x: 3px;
+  --mvr-expand-y: 3px;
   right: 9px;
   bottom: 8px;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
 }
 
-.mvr-preview-teaser > button:hover .is-top-left { transform: translate(-2px, -2px); }
-.mvr-preview-teaser > button:hover .is-top-right { transform: translate(2px, -2px); }
-.mvr-preview-teaser > button:hover .is-bottom-left { transform: translate(-2px, 2px); }
-.mvr-preview-teaser > button:hover .is-bottom-right { transform: translate(2px, 2px); }
+@keyframes mvr-expand-corner-pulse {
+  0%, 100% {
+    opacity: .72;
+    transform: translate(0, 0);
+  }
+  48%, 62% {
+    opacity: 1;
+    transform: translate(var(--mvr-expand-x), var(--mvr-expand-y));
+  }
+}
+
+.mvr-preview-teaser > button:hover .mvr-expand-corners i {
+  animation-duration: .95s;
+}
 
 .mvr-preview-teaser > button:hover {
   background: linear-gradient(135deg, rgba(64, 155, 110, 0.97), rgba(33, 95, 69, 0.97));
@@ -577,6 +595,10 @@
   box-shadow: none;
   cursor: default;
   transform: translate(-50%, -50%);
+}
+
+.mvr-preview-teaser > button:disabled .mvr-expand-corners i {
+  animation: none;
 }
 
 .mvr-install-visual {
@@ -2249,6 +2271,7 @@
   .mvr-value-list > div,
   .mvr-primary::after,
   .mvr-preview-teaser > button::after,
+  .mvr-expand-corners i,
   .mvr-challenge-timer,
   .mvr-challenge-timer > span {
     animation: none !important;
