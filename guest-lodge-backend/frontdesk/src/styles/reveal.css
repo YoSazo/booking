@@ -472,11 +472,11 @@
   top: 50%;
   left: 50%;
   z-index: 2;
-  min-width: min(126px, calc(100% - 48px));
+  min-width: min(220px, calc(100% - 48px));
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px 22px;
+  padding: 16px 32px;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 16px;
@@ -505,19 +505,62 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  width: 100%;
 }
 
 .mvr-expand-cue strong {
+  position: relative;
+  z-index: 1;
   font-size: 14px;
   font-weight: 800;
 }
 
-.mvr-expand-cue svg {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
+.mvr-expand-corners {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
+
+.mvr-expand-corners i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  opacity: .9;
+  transition: transform 200ms ease;
+}
+
+.mvr-expand-corners .is-top-left {
+  top: 8px;
+  left: 9px;
+  border-top: 1.5px solid currentColor;
+  border-left: 1.5px solid currentColor;
+}
+
+.mvr-expand-corners .is-top-right {
+  top: 8px;
+  right: 9px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+}
+
+.mvr-expand-corners .is-bottom-left {
+  bottom: 8px;
+  left: 9px;
+  border-bottom: 1.5px solid currentColor;
+  border-left: 1.5px solid currentColor;
+}
+
+.mvr-expand-corners .is-bottom-right {
+  right: 9px;
+  bottom: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+}
+
+.mvr-preview-teaser > button:hover .is-top-left { transform: translate(-2px, -2px); }
+.mvr-preview-teaser > button:hover .is-top-right { transform: translate(2px, -2px); }
+.mvr-preview-teaser > button:hover .is-bottom-left { transform: translate(-2px, 2px); }
+.mvr-preview-teaser > button:hover .is-bottom-right { transform: translate(2px, 2px); }
 
 .mvr-preview-teaser > button:hover {
   background: linear-gradient(135deg, rgba(64, 155, 110, 0.97), rgba(33, 95, 69, 0.97));
@@ -1969,8 +2012,8 @@
   .mvr-footer {
     align-items: center;
     padding-top: 8px;
-    border-top: 1px solid rgba(213, 226, 218, 0.78);
-    background: rgba(246, 248, 245, 0.96);
+    border-top: 0;
+    background: transparent;
   }
 
   .mvr-footer .mvr-primary {
