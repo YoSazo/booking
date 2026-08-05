@@ -784,13 +784,16 @@
     .room-pill:hover { border-color: var(--green); color: var(--green); }
     .room-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
     .room-pill-action {
-      width: 28px;
-      height: 28px;
+      width: auto;
+      min-height: 30px;
       border-radius: 999px;
       border: 1.5px solid var(--border);
       background: var(--white);
       color: var(--text-muted);
-      font-size: 13px;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
       line-height: 1;
       cursor: pointer;
       display: inline-flex;
@@ -1630,6 +1633,93 @@
       background: var(--green-soft);
       color: var(--green);
     }
+    .revenue-custom-range {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+      padding: 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      background: var(--white);
+    }
+    .revenue-custom-field {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .revenue-custom-field input {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      min-height: 42px;
+      box-sizing: border-box;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-subtle);
+      color: var(--text);
+      padding: 8px 9px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .revenue-custom-apply {
+      min-height: 42px;
+      border: none;
+      border-radius: 10px;
+      background: var(--green);
+      color: #fff;
+      padding: 9px 13px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    @media (max-width: 520px) {
+      .revenue-custom-range {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        padding: 10px;
+      }
+      .revenue-custom-field input {
+        padding-inline: 6px;
+        font-size: 12px;
+      }
+      .revenue-custom-apply { grid-column: 1 / -1; width: 100%; }
+    }
+    .page-utility-tabs {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 4px;
+      margin: 6px;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+    .page-utility-tab {
+      min-width: 0;
+      min-height: 38px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .page-utility-tab.active {
+      background: var(--white);
+      color: var(--green);
+      box-shadow: 0 1px 4px rgba(26, 43, 34, .1);
+    }
+    .page-utility-body { padding: 10px 18px 18px; }
+    .page-utility-panel[hidden] { display: none !important; }
     .revenue-savings-pill {
       border: 2px solid #D3F2E2;
       background: linear-gradient(135deg, #F3FFF8 0%, #E9FFF3 100%);

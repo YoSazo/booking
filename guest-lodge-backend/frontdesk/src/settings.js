@@ -925,39 +925,35 @@ async function loadEditRooms() {
         </div>
       </div>
       <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
-        <div id="tour-rates-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Rates</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
+        <div class="page-utility-tabs" role="tablist" aria-label="Property tools">
+          <button type="button" id="tour-rates-header" class="page-utility-tab active" data-utility-tab="rates" role="tab" aria-selected="true" onclick="selectPageUtility('tour-rates-card','rates')">Rates</button>
+          <button type="button" id="tour-pin-header" class="page-utility-tab" data-utility-tab="pin" role="tab" aria-selected="false" onclick="selectPageUtility('tour-rates-card','pin')">Change PIN</button>
         </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div id="tour-rates-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
-              <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+        <div class="accordion-body page-utility-body" style="display:block;">
+          <div class="page-utility-panel" data-utility-panel="rates">
+            <div id="tour-rates-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div>
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
+                <input type="number" value="${rates.nightly}" id="edit-rate-nightly" min="1" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
+                <input type="number" value="${rates.weekly}" id="edit-rate-weekly" min="1" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
+                <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
+              </div>
             </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Weekly</div>
-              <input type="number" value="${rates.weekly}" id="edit-rate-weekly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Monthly</div>
-              <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
-            </div>
+            <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
           </div>
-          <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
-        </div>
-      </div>
-      <div class="booking-card" id="tour-pin-card" style="margin-bottom:14px;">
-        <div id="tour-pin-header" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Change PIN</div>
-          <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
-        </div>
-        <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <div style="margin-bottom:12px;">
-            <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 6 chars)'}" style="width:100%;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+          <div class="page-utility-panel" data-utility-panel="pin" hidden>
+            <div style="margin-bottom:12px;">
+              <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 6 chars)'}" style="width:100%;box-sizing:border-box;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+            </div>
+            <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>
           </div>
-          <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>
         </div>
       </div>
       ${hotelRes?.subscribed && !isNativeApp() ? `<div class="booking-card" style="margin-bottom:14px;">
@@ -992,6 +988,15 @@ async function loadEditRooms() {
 
 function renderEditRooms() {
   renderEditRoomsCards();
+}
+
+async function refreshEditRoomsData({ render = true } = {}) {
+  const res = await api('GET', '/api/crm/rooms');
+  if (!Array.isArray(res?.rooms)) throw new Error('Could not refresh rooms');
+  crm.editRooms = res.rooms;
+  if (res.rates) crm.editRates = res.rates;
+  if (render) renderEditRoomsCards();
+  return crm.editRooms;
 }
 
 function renderEditRoomsCards() {
@@ -1158,6 +1163,11 @@ function openAmenityPicker(roomId) {
     modal = document.getElementById('amenityPickerModal');
   }
 
+  const firstRoom = crm.editRooms[0];
+  const isFirstRoomEditor = firstRoom && String(firstRoom.id) === String(roomId);
+  if (isFirstRoomEditor) modal.dataset.previewActionScope = 'first-room-editor';
+  else delete modal.dataset.previewActionScope;
+
   // Render preset pills
   const grid = document.getElementById('amenityPickerGrid');
   grid.innerHTML = AMENITY_PRESETS.map(p => {
@@ -1268,6 +1278,19 @@ function copyBookingLink(url) {
     toast('Booking link copied!', 'success');
   }).catch(() => {
     toast('Failed to copy', 'error');
+  });
+}
+
+function selectPageUtility(cardId, panelName) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.querySelectorAll('[data-utility-tab]').forEach((tab) => {
+    const active = tab.dataset.utilityTab === panelName;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  card.querySelectorAll('[data-utility-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.utilityPanel !== panelName;
   });
 }
 
@@ -1579,10 +1602,28 @@ async function deleteEditImage(roomId, imageId) {
 
 async function deleteEditRoom(roomId) {
   if (!confirm('Delete this room from your booking page and Availability? Saved date changes will also be removed.')) return;
+  const room = crm.editRooms.find(item => item.id === roomId);
   try {
     await api('DELETE', `/api/crm/rooms/${roomId}`);
+    crm.editRooms = crm.editRooms.filter(item => item.id !== roomId);
+    if (room) {
+      const availability = crm.manualAvailability || { rooms: [], overrides: {} };
+      availability.rooms = (availability.rooms || []).filter(item => item.name !== room.name);
+      availability.overrides = Object.fromEntries(
+        Object.entries(availability.overrides || {}).filter(([key]) => !key.startsWith(`${room.name}|`))
+      );
+      crm.manualAvailability = availability;
+      if (crm.manualSelectedRoom === room.name) {
+        crm.manualSelectedRoom = availability.rooms[0]?.name || '';
+      }
+    }
+    renderEditRoomsCards();
+    window.refreshRoomBadge?.();
+    window.renderAvailabilityView?.();
     toast('Room deleted', 'success');
-    loadEditRooms();
+    refreshEditRoomsData({ render: true }).catch(() => {});
+    const availabilityRefresh = window.loadManualAvailability?.({ silent: true });
+    availabilityRefresh?.catch(() => {});
   } catch (e) {
     toast(e.message || 'Failed to delete', 'error');
   }
@@ -1612,21 +1653,73 @@ function closeEditAddRoom() {
   window.setNativeModalOpen?.('edit-add-room', false);
 }
 
-function confirmEditAddRoom() {
+async function confirmEditAddRoom() {
   const input = document.getElementById('editNewRoomName');
+  const submit = document.querySelector('#editAddRoomModal .edit-add-room-actions .primary');
   const name = input?.value.trim() || '';
   if (!name) return;
   if (input) input.disabled = true;
-  api('POST', '/api/crm/rooms', { name, maxOccupancy: 4, totalUnits: 5 })
-    .then(() => {
-      closeEditAddRoom();
-      toast('Room added', 'success');
-      loadEditRooms();
-    })
-    .catch(() => {
-      if (input) input.disabled = false;
-      toast('Failed to add', 'error');
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Adding…';
+  }
+
+  const totalUnits = 5;
+  try {
+    const result = await api('POST', '/api/crm/rooms', {
+      name,
+      maxOccupancy: 4,
+      totalUnits,
     });
+    if (!result?.success || !result.room?.id) {
+      throw new Error(result?.message || 'Failed to add room');
+    }
+
+    const createdRoom = {
+      id: result.room.id,
+      name: result.room.name || name,
+      description: '',
+      amenities: '',
+      maxOccupancy: 4,
+      totalUnits,
+      imageUrl: null,
+      images: [],
+    };
+    const existingIndex = crm.editRooms.findIndex(room => room.id === createdRoom.id);
+    if (existingIndex >= 0) {
+      crm.editRooms = crm.editRooms.map((room, index) => index === existingIndex ? createdRoom : room);
+    } else {
+      crm.editRooms = [...crm.editRooms, createdRoom];
+    }
+
+    const availability = crm.manualAvailability || { rooms: [], overrides: {} };
+    if (!Array.isArray(availability.rooms)) availability.rooms = [];
+    if (!availability.overrides || typeof availability.overrides !== 'object') availability.overrides = {};
+    if (!availability.rooms.some(room => room.name === createdRoom.name)) {
+      availability.rooms = [...availability.rooms, { name: createdRoom.name, totalUnits }]
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }
+    crm.manualAvailability = availability;
+    if (!crm.manualSelectedRoom) crm.manualSelectedRoom = createdRoom.name;
+
+    closeEditAddRoom();
+    renderEditRoomsCards();
+    window.refreshRoomBadge?.();
+    toast('Room added', 'success');
+
+    // Reconcile the optimistic card with the complete server representation
+    // (including any defaults) after it is already visible to the owner.
+    refreshEditRoomsData({ render: true }).catch(() => {});
+    const availabilityRefresh = window.loadManualAvailability?.({ silent: true });
+    availabilityRefresh?.catch(() => {});
+  } catch (error) {
+    if (input) input.disabled = false;
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Add room';
+    }
+    toast(error.message || 'Failed to add room', 'error');
+  }
 }
 
 
@@ -1670,6 +1763,7 @@ const _settingsExports = {
   removeAmenity,
   renderEditRooms,
   renderEditRoomsCards,
+  refreshEditRoomsData,
   replayWalkthrough,
   resolveLiveTourElement,
   resolveTourHighlightEl,
@@ -1677,6 +1771,7 @@ const _settingsExports = {
   saveEditRoom,
   saveHotelInfo,
   saveRates,
+  selectPageUtility,
   scrollTourTargetIntoView,
   sendSupportMessage,
   setAppIconPreviewImage,

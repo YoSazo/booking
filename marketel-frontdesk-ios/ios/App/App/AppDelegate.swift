@@ -271,6 +271,18 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             action: #selector(openPropertyPicker),
             for: .touchUpInside
         )
+        propertyHeaderControl.addTarget(
+            self,
+            action: #selector(propertyHeaderTouchDown),
+            for: [.touchDown, .touchDragEnter]
+        )
+        propertyHeaderControl.addTarget(
+            self,
+            action: #selector(propertyHeaderTouchUp),
+            for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit]
+        )
+        propertyHeaderControl.layer.cornerRadius = 18
+        propertyHeaderControl.layer.cornerCurve = .continuous
         propertyHeaderControl.accessibilityLabel = "Switch property"
         propertyHeaderControl.accessibilityTraits = .button
 
@@ -429,7 +441,32 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     @objc private func openPropertyPicker() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         sendWebAction("properties")
+    }
+
+    @objc private func propertyHeaderTouchDown() {
+        UIView.animate(
+            withDuration: 0.09,
+            delay: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            self.propertyHeaderControl.transform = CGAffineTransform(scaleX: 0.975, y: 0.975)
+            self.propertyHeaderControl.backgroundColor = UIColor.label.withAlphaComponent(0.07)
+        }
+    }
+
+    @objc private func propertyHeaderTouchUp() {
+        UIView.animate(
+            withDuration: 0.28,
+            delay: 0,
+            usingSpringWithDamping: 0.72,
+            initialSpringVelocity: 0.4,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            self.propertyHeaderControl.transform = .identity
+            self.propertyHeaderControl.backgroundColor = .clear
+        }
     }
 
     @objc private func showGuestQR() {

@@ -1,4 +1,5 @@
 import { crm } from './state.js';
+import QRCode from 'qrcode';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 
@@ -8,6 +9,29 @@ const isBundledNativeFrontdesk = window.location.protocol === 'capacitor:'
 const marketelLocalUrlBase = isBundledNativeFrontdesk ? window.location.href : window.location.origin;
 const FRONTDESK_STARTUP_TIMEOUT_MS = 8000;
 const NATIVE_ONBOARDING_DONE_KEY = 'marketelNativeOnboardingV1Done';
+const checkinQrDataUrlCache = new Map();
+
+function createCheckinQrDataUrl(url) {
+  const target = String(url || '').trim();
+  if (!target) return Promise.resolve('');
+  if (checkinQrDataUrlCache.has(target)) return checkinQrDataUrlCache.get(target);
+  const pending = QRCode.toDataURL(target, {
+    width: 320,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#0A0F0D', light: '#FFFFFF' },
+  }).catch(error => {
+    checkinQrDataUrlCache.delete(target);
+    throw error;
+  });
+  checkinQrDataUrlCache.set(target, pending);
+  return pending;
+}
+
+function warmGenericCheckinQr() {
+  const url = buildGuestInstallUrlForQr('', 'frontdesk-qr-generic');
+  if (url) createCheckinQrDataUrl(url).catch(() => {});
+}
 
 // The App Store build ships this JavaScript inside the IPA. Only API requests
 // cross the network; rewriting them here keeps every existing feature module
@@ -903,6 +927,7 @@ function applyLegacyHotelContext(hotelId, reason = '') {
     },
   };
   updateHotelChrome();
+  warmGenericCheckinQr();
   if (reason && window.console && typeof window.console.warn === 'function') {
     window.console.warn('Falling back to legacy CRM hotel resolution.', { hotelId: cleanHotelId, reason });
   }
@@ -1031,6 +1056,7 @@ function applyHotelContextData(data = {}) {
     ]);
   }
   updateHotelChrome();
+  warmGenericCheckinQr();
   return data;
 }
 
@@ -1156,7 +1182,7 @@ function addDaysIso(days) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toIsoDate(d);
 }
 
 function enumerateDates(startIso, endIso, maxDays = 180) {
@@ -1213,6 +1239,18 @@ function syncRevenueUi() {
             <button type="button" class="revenue-period-btn" data-period="7d">7 days</button>
             <button type="button" class="revenue-period-btn active" data-period="30d">30 days</button>
             <button type="button" class="revenue-period-btn" data-period="all">All time</button>
+            <button type="button" class="revenue-period-btn" data-period="custom">Custom</button>
+          </div>
+          <div class="revenue-custom-range" id="revenueCustomRange" style="display:none">
+            <label class="revenue-custom-field">
+              <span>From</span>
+              <input type="date" id="revenueCustomStart">
+            </label>
+            <label class="revenue-custom-field">
+              <span>To</span>
+              <input type="date" id="revenueCustomEnd">
+            </label>
+            <button type="button" class="revenue-custom-apply" id="revenueCustomApply">View revenue</button>
           </div>
           <div class="revenue-subhint" id="revenueSubhint">Last 30 days · check-in dates</div>
           <div id="revenueStatus"></div>
@@ -1255,9 +1293,28 @@ function syncRevenueUi() {
       if (!btn) return;
       const nextPeriod = normalizeRevenuePeriod(btn.dataset.period || '');
       if (!nextPeriod || nextPeriod === crm.revenuePeriod) return;
+      if (nextPeriod === 'custom') ensureRevenueCustomDates();
       crm.revenuePeriod = nextPeriod;
       renderRevenueView();
       if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'revenue') loadRevenueData();
+    });
+  }
+
+  const customApply = document.getElementById('revenueCustomApply');
+  if (customApply && !customApply.dataset.bound) {
+    customApply.dataset.bound = '1';
+    customApply.addEventListener('click', () => {
+      const first = String(document.getElementById('revenueCustomStart')?.value || '').trim();
+      const second = String(document.getElementById('revenueCustomEnd')?.value || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(first) || !/^\d{4}-\d{2}-\d{2}$/.test(second)) {
+        toast('Choose both dates', 'error');
+        return;
+      }
+      crm.revenueCustomStart = first <= second ? first : second;
+      crm.revenueCustomEnd = first <= second ? second : first;
+      crm.revenuePeriod = 'custom';
+      renderRevenueView();
+      loadRevenueData(true);
     });
   }
 
@@ -1270,7 +1327,30 @@ function revenuePeriodLabel(period) {
   if (period === 'all') return 'All time';
   if (period === 'today') return 'Today';
   if (period === '7d') return 'Last 7 days';
+  if (period === 'custom') {
+    const start = formatRevenueRangeDate(crm.revenueCustomStart);
+    const end = formatRevenueRangeDate(crm.revenueCustomEnd);
+    return start && end ? `${start} – ${end}` : 'Custom dates';
+  }
   return 'Last 30 days';
+}
+
+function formatRevenueRangeDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
+  const date = new Date(`${iso}T00:00:00`);
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function ensureRevenueCustomDates() {
+  if (!crm.revenueCustomEnd) crm.revenueCustomEnd = addDaysIso(0);
+  if (!crm.revenueCustomStart) crm.revenueCustomStart = addDaysIso(-29);
+}
+
+function revenueCacheKey(period = crm.revenuePeriod) {
+  if (period !== 'custom') return period;
+  ensureRevenueCustomDates();
+  return `custom:${crm.revenueCustomStart}:${crm.revenueCustomEnd}`;
 }
 
 function normalizeRevenuePeriod(period) {
@@ -1306,12 +1386,19 @@ function renderRevenueView() {
   const contentEl = document.getElementById('revenueContent');
   const subhintEl = document.getElementById('revenueSubhint');
   const periodButtons = document.querySelectorAll('.revenue-period-btn');
+  const customRange = document.getElementById('revenueCustomRange');
+  if (crm.revenuePeriod === 'custom') ensureRevenueCustomDates();
   const currentPeriodLabel = revenuePeriodLabel(crm.revenuePeriod);
   if (subhintEl) subhintEl.textContent = `${currentPeriodLabel} · check-in dates`;
+  if (customRange) customRange.style.display = crm.revenuePeriod === 'custom' ? 'grid' : 'none';
+  const customStart = document.getElementById('revenueCustomStart');
+  const customEnd = document.getElementById('revenueCustomEnd');
+  if (customStart) customStart.value = crm.revenueCustomStart || '';
+  if (customEnd) customEnd.value = crm.revenueCustomEnd || '';
   periodButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.period === crm.revenuePeriod);
   });
-  const data = crm.revenueCache[crm.revenuePeriod] || null;
+  const data = crm.revenueCache[revenueCacheKey()] || null;
 
   if (!data) {
     if (contentEl) contentEl.style.display = 'none';
@@ -1358,9 +1445,15 @@ async function loadRevenueData(force = false) {
     return;
   }
   crm.revenuePeriod = normalizeRevenuePeriod(crm.revenuePeriod);
+  if (crm.revenuePeriod === 'custom') ensureRevenueCustomDates();
+  const requestedPeriod = crm.revenuePeriod;
+  const requestedCacheKey = revenueCacheKey(requestedPeriod);
+  const requestId = (crm.revenueRequestId || 0) + 1;
+  crm.revenueRequestId = requestId;
 
-  const cached = crm.revenueCache[crm.revenuePeriod];
+  const cached = crm.revenueCache[requestedCacheKey];
   if (cached && !force) {
+    crm.revenueLoading = false;
     crm.revenueError = '';
     renderRevenueView();
     return;
@@ -1371,14 +1464,23 @@ async function loadRevenueData(force = false) {
   renderRevenueView();
 
   try {
-    const data = await api('GET', `/api/crm/revenue?period=${encodeURIComponent(crm.revenuePeriod)}`);
+    const params = new URLSearchParams({ period: requestedPeriod });
+    if (requestedPeriod === 'custom') {
+      params.set('startDate', crm.revenueCustomStart);
+      params.set('endDate', crm.revenueCustomEnd);
+    }
+    const data = await api('GET', `/api/crm/revenue?${params.toString()}`);
     if (!data.success) throw new Error(data.message || 'Failed to load revenue');
-    crm.revenueCache[crm.revenuePeriod] = data.data || {};
+    crm.revenueCache[requestedCacheKey] = data.data || {};
   } catch (e) {
-    crm.revenueError = e.message || 'Failed to load revenue';
+    if (requestId === crm.revenueRequestId) {
+      crm.revenueError = e.message || 'Failed to load revenue';
+    }
   } finally {
-    crm.revenueLoading = false;
-    renderRevenueView();
+    if (requestId === crm.revenueRequestId) {
+      crm.revenueLoading = false;
+      renderRevenueView();
+    }
   }
 }
 
@@ -1441,8 +1543,8 @@ function ensureAvailabilityUi() {
                 <div class="legend-item" style="width:100%;margin-top:4px;">Numbers on each day = <strong>rooms still available</strong> to book</div>
               </div>
               <div id="roomMobileActions" class="room-mobile-actions" style="display:none">
-                <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">✎ Edit room</button>
-                <button id="roomMobileDeleteBtn" class="room-mobile-action-btn danger" type="button">🗑 Delete room</button>
+                <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">Edit room</button>
+                <button id="roomMobileDeleteBtn" class="room-mobile-action-btn danger" type="button">Delete room</button>
               </div>
             </div>
           </div>
@@ -2024,8 +2126,9 @@ function reportFrontdeskInstalled() {
 function seedTourRevenueShell() {
   if (!crm.revenueEnabled) return;
   crm.revenuePeriod = normalizeRevenuePeriod(crm.revenuePeriod || '30d');
-  if (!crm.revenueCache[crm.revenuePeriod]) {
-    crm.revenueCache[crm.revenuePeriod] = { rev: 0, rooms: [{ name: 'Your rooms', rev: 0 }] };
+  const cacheKey = revenueCacheKey();
+  if (!crm.revenueCache[cacheKey]) {
+    crm.revenueCache[cacheKey] = { rev: 0, rooms: [{ name: 'Your rooms', rev: 0 }] };
   }
   crm.revenueLoading = false;
   crm.revenueError = '';
@@ -2121,7 +2224,8 @@ function installEmbeddedEditorPreview() {
       );
       const firstRoomCard = interactive.closest('#editRoomsCards > .booking-card:first-child');
       const isFirstRoomEditor = !!firstRoomCard && !interactive.closest('.room-edit-delete-btn');
-      return isNavigation || isFirstRoomEditor;
+      const isFirstRoomEditorModal = !!interactive.closest('[data-preview-action-scope="first-room-editor"]');
+      return isNavigation || isFirstRoomEditor || isFirstRoomEditorModal;
     };
     const blockLockedPreviewAction = (event) => {
       const interactive = event.target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
@@ -3543,7 +3647,7 @@ function setFilter(filter, btn) {
       if (crm.settingsTourActive) {
         seedTourRevenueShell();
         renderRevenueView();
-      } else if (crm.revenueCache[crm.revenuePeriod] && !crm.revenueLoading) {
+      } else if (crm.revenueCache[revenueCacheKey()] && !crm.revenueLoading) {
         renderRevenueView();
       } else {
         loadRevenueData(true);
@@ -3619,27 +3723,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function twoRoomExplainerHtml(context) {
   const isBookingPage = context === 'booking-page';
-  if (isBookingPage) {
-    return `<div class="two-room-explainer" id="tour-two-room-card">
-      <div class="two-room-text">
-        <div class="two-room-explainer-title">One room list, two simple views</div>
-        <div class="two-room-cols">
-          <div class="two-room-col two-room-col--here">
-            <div class="two-room-col-label">① Your page (here)</div>
-            What guests see when they book — photos, description, and rates.
-          </div>
-          <div class="two-room-col">
-            <div class="two-room-col-label">② Availability tab</div>
-            How many units you have open each day — your inventory calendar.
-          </div>
-        </div>
-        <p class="two-room-explainer-foot">Add each room once here. Marketel automatically carries its name and room count into <strong>Availability</strong>.</p>
-      </div>
-      <div class="two-room-explainer-actions two-room-actions">
-        <button type="button" class="two-room-btn two-room-btn--ghost" onclick="goToAvailabilityTab()">Next: set up Availability →</button>
-      </div>
-    </div>`;
-  }
+  if (isBookingPage) return '';
   const bookingNames = (crm.editRooms || []).map((r) => r.name).filter(Boolean);
   const namesHint = bookingNames.length
     ? `Your booking page has: <strong>${bookingNames.map((n) => esc(n)).join(', ')}</strong>. Refresh once; Marketel will restore a missing Availability row without deleting saved dates.`
@@ -3958,7 +4042,7 @@ function renderRoomPills() {
     editBtn.className = 'room-pill-action';
     editBtn.title = `Edit ${room.name}`;
     editBtn.setAttribute('aria-label', `Edit ${room.name}`);
-    editBtn.textContent = '✎';
+    editBtn.textContent = 'Edit room';
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       openRoomsEditModal(room.name);
@@ -3969,7 +4053,7 @@ function renderRoomPills() {
     delBtn.className = 'room-pill-action danger';
     delBtn.title = `Delete ${room.name}`;
     delBtn.setAttribute('aria-label', `Delete ${room.name}`);
-    delBtn.textContent = '🗑';
+    delBtn.textContent = 'Delete room';
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       deleteRoomType(room.name);
@@ -4230,7 +4314,11 @@ function openAvailabilityDayPopover(event, dayIso) {
   const closedInput = document.getElementById('availabilityDayClosedInput');
   if (!room || !pop || !title || !countEl) return;
 
-  setNativeModalOpen('availability-day', true);
+  // This is a compact editor inside the Availability screen, not a new
+  // full-screen destination. Hiding the UIKit shell here changes the web
+  // view's usable height and container padding, which makes iOS jump the
+  // document and removes the header/tab bar while a day is being edited.
+  // Leave the native shell anchored and layer this popover inside it.
   crm.availabilityEditingDay = dayIso;
   const bookedMap = bookingsByRoomDate();
   const result = availabilityForDay(room, dayIso, bookedMap);
@@ -4323,7 +4411,6 @@ function closeAvailabilityDayPopover() {
     pop.setAttribute('aria-hidden', 'true');
     pop.style.display = 'none';
   }
-  setNativeModalOpen('availability-day', false);
 }
 
 function closeAvailabilityPopoverIfOutside(event) {
@@ -4401,6 +4488,7 @@ async function saveAvailabilityDay() {
 async function saveRoomType() {
   const nameEl = document.getElementById('roomsAddNameInput');
   const unitsEl = document.getElementById('roomsAddUnitsInput');
+  const saveBtn = document.getElementById('roomsAddSaveBtn');
   if (!nameEl || !unitsEl) return;
   const roomName = nameEl.value.trim();
   const totalUnits = Math.max(1, parseInt(unitsEl.value, 10) || 1);
@@ -4409,17 +4497,49 @@ async function saveRoomType() {
     return;
   }
 
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Adding…';
+  }
+
   try {
     const data = await api('POST', '/api/crm/manual-availability/rooms', { roomName, totalUnits });
     if (!data.success) throw new Error(data.message || 'Failed to save room type');
-    crm.manualAvailability = data.data || crm.manualAvailability;
+
+    const nextAvailability = data.data && Array.isArray(data.data.rooms)
+      ? data.data
+      : crm.manualAvailability;
+    if (!Array.isArray(nextAvailability.rooms)) nextAvailability.rooms = [];
+    if (!nextAvailability.overrides || typeof nextAvailability.overrides !== 'object') {
+      nextAvailability.overrides = {};
+    }
+    // The successful response normally contains the new room. Keep a local
+    // fallback so a stale read replica can never leave the owner staring at an
+    // unchanged calendar after Marketel has already said the room was added.
+    if (!nextAvailability.rooms.some(room => room.name === roomName)) {
+      nextAvailability.rooms = [...nextAvailability.rooms, { name: roomName, totalUnits }]
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }
+    crm.manualAvailability = nextAvailability;
     crm.manualSelectedRoom = roomName;
     closeRoomsAddModal();
     refreshRoomBadge();
     renderAvailabilityView();
-    toast('Room type saved', 'success');
+    toast('Room added', 'success');
+
+    // Keep Your Page's room cards synchronized without waiting for an app
+    // background/foreground cycle. This is deliberately non-blocking because
+    // the Availability screen is already correct from the local update above.
+    loadSettingsModule()
+      .then(module => module.refreshEditRoomsData?.({ render: true }))
+      .catch(() => {});
   } catch (e) {
     toast(e.message || 'Failed to save room type', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
   }
 }
 
@@ -4479,6 +4599,9 @@ async function confirmDeleteRoomType() {
     refreshRoomBadge();
     renderAvailabilityView();
     toast('Room type deleted', 'success');
+    loadSettingsModule()
+      .then(module => module.refreshEditRoomsData?.({ render: true }))
+      .catch(() => {});
   } catch (e) {
     toast(e.message || 'Failed to delete room type', 'error');
   }
@@ -4698,12 +4821,12 @@ function promptUploadLogoBeforeQr(preselectedCode) {
   };
 }
 
-function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
+async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   const hName = crm.activeHotelName || 'Your Property';
   const domain = crm.activeHotelDomain || '';
   if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
-  setNativeShellVisible(false);
   if (!skipLogoGate && !preselectedCode && !crm.activeHotelAppIcon) {
+    setNativeShellVisible(false);
     promptUploadLogoBeforeQr(preselectedCode);
     return;
   }
@@ -4731,13 +4854,22 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   const overlay = document.createElement('div');
   overlay.id = 'checkinQrOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:102500;background:#0a0f0d;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;';
+  let renderSequence = 0;
 
   function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
-  function render() {
+  async function render() {
+    const sequence = ++renderSequence;
     const ref = mode === 'guest' && selectedCode ? 'frontdesk-qr-guest' : 'frontdesk-qr-generic';
     const url = buildGuestInstallUrlForQr(mode === 'guest' ? selectedCode : '', ref);
-    const qr = url ? 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=' + encodeURIComponent(url) : '';
+    let qr = '';
+    try {
+      qr = url ? await createCheckinQrDataUrl(url) : '';
+    } catch (_) {
+      if (sequence === renderSequence) toast('Could not create the QR code', 'error');
+      return;
+    }
+    if (sequence !== renderSequence) return;
 
     const guestOptions = arrivals.map(function(b) {
       const code = getBookingReservationCode(b);
@@ -4757,19 +4889,25 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
       + '<button type="button" data-qr-mode="guest" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'guest' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">This guest</button>'
       + '</div>'
       + (mode === 'guest' ? (
-          '<div style="margin-bottom:16px;text-align:left;">'
+          '<div style="width:min(280px,80vw);max-width:100%;margin:0 auto 16px;text-align:left;">'
           + '<label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;margin-bottom:6px;">Checking in today or tomorrow</label>'
           + (arrivals.length
             ? '<select id="checkinQrGuestSelect" style="width:100%;padding:12px;border-radius:10px;border:none;font-family:inherit;font-size:14px;">' + guestOptions + '</select>'
             : '<input id="checkinQrCodeInput" type="text" placeholder="Confirmation code" value="' + escAttr(selectedCode) + '" style="width:100%;padding:12px;border-radius:10px;border:none;font-family:inherit;font-size:14px;box-sizing:border-box;">')
           + '</div>'
         ) : '')
-      + (qr ? '<img src="' + qr + '" alt="QR code" width="280" height="280" style="border-radius:16px;background:#fff;padding:12px;max-width:min(280px,80vw);height:auto;">' : '')
+      + (qr ? '<img src="' + qr + '" alt="QR code" width="280" height="280" style="display:block;width:min(280px,80vw);max-width:100%;height:auto;box-sizing:border-box;margin:0 auto;border-radius:16px;background:#fff;padding:12px;">' : '')
       + '<p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">'
       + (mode === 'guest' && selectedCode ? 'Links to their reservation + install' : 'Generic install — good for room cards')
       + '</p></div>';
 
-    document.getElementById('checkinQrClose').onclick = closeCheckinQrOverlay;
+    if (!overlay.isConnected) {
+      setNativeShellVisible(false);
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+    }
+
+    overlay.querySelector('#checkinQrClose').onclick = closeCheckinQrOverlay;
     overlay.querySelectorAll('[data-qr-mode]').forEach(function(btn) {
       btn.onclick = function() {
         mode = btn.getAttribute('data-qr-mode');
@@ -4779,12 +4917,12 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
         render();
       };
     });
-    const sel = document.getElementById('checkinQrGuestSelect');
+    const sel = overlay.querySelector('#checkinQrGuestSelect');
     if (sel) {
       sel.onchange = function() { selectedCode = sel.value; render(); };
       if (!selectedCode && sel.value) selectedCode = sel.value;
     }
-    const inp = document.getElementById('checkinQrCodeInput');
+    const inp = overlay.querySelector('#checkinQrCodeInput');
     if (inp) {
       inp.oninput = function() { selectedCode = inp.value.trim(); };
     }
@@ -4797,9 +4935,7 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
     syncNativeShellState();
   }
 
-  document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
-  render();
+  await render();
 }
 
 function closeCheckinQrOverlay() {
