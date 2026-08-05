@@ -1593,10 +1593,28 @@ async function deleteEditImage(roomId, imageId) {
 
 async function deleteEditRoom(roomId) {
   if (!confirm('Delete this room from your booking page and Availability? Saved date changes will also be removed.')) return;
+  const room = crm.editRooms.find(item => item.id === roomId);
   try {
     await api('DELETE', `/api/crm/rooms/${roomId}`);
+    crm.editRooms = crm.editRooms.filter(item => item.id !== roomId);
+    if (room) {
+      const availability = crm.manualAvailability || { rooms: [], overrides: {} };
+      availability.rooms = (availability.rooms || []).filter(item => item.name !== room.name);
+      availability.overrides = Object.fromEntries(
+        Object.entries(availability.overrides || {}).filter(([key]) => !key.startsWith(`${room.name}|`))
+      );
+      crm.manualAvailability = availability;
+      if (crm.manualSelectedRoom === room.name) {
+        crm.manualSelectedRoom = availability.rooms[0]?.name || '';
+      }
+    }
+    renderEditRoomsCards();
+    window.refreshRoomBadge?.();
+    window.renderAvailabilityView?.();
     toast('Room deleted', 'success');
-    loadEditRooms();
+    refreshEditRoomsData({ render: true }).catch(() => {});
+    const availabilityRefresh = window.loadManualAvailability?.({ silent: true });
+    availabilityRefresh?.catch(() => {});
   } catch (e) {
     toast(e.message || 'Failed to delete', 'error');
   }

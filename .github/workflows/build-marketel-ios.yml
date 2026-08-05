@@ -102,6 +102,6 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               marketel-frontdesk-ios/ios/output/Marketel-Front-Desk.ipa \
               --title "Marketel Front Desk iOS ${GITHUB_REF_NAME#ios-v}" \
-              --notes "Device-testing build of Marketel Front Desk with stable Availability navigation, instant room creation, tactile property switching, locally generated guest QR codes, native first-run onboarding, an in-app founder support inbox, and booking-alert support. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
+              --notes "Device-testing build of Marketel Front Desk with instant room add/delete synchronization, custom Revenue date ranges, cleaner Availability controls, aligned guest QR details, tactile property switching, locally generated QR codes, native onboarding, and the in-app founder support inbox. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
               --prerelease
           fi

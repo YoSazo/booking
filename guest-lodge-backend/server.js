@@ -1787,10 +1787,30 @@ async function createManualBookingRecordWithInventory(hotelId, bookingData) {
     }, { maxWait: 5000, timeout: 15000 });
 }
 
-const MANUAL_REVENUE_PERIODS = new Set(['today', '7d', '30d', '90d', 'all']);
+const MANUAL_REVENUE_PERIODS = new Set(['today', '7d', '30d', '90d', 'all', 'custom']);
 
 function buildManualRevenueWindow(period, referenceIso, earliestIso = '', latestIso = '') {
     const endIso = normalizeIsoDate(referenceIso) || getReportingTodayIso();
+
+    if (period === 'custom') {
+        const customStart = normalizeIsoDate(earliestIso);
+        const customEnd = normalizeIsoDate(latestIso);
+        if (!customStart || !customEnd || customEnd < customStart) {
+            throw new Error('Choose a valid custom revenue date range.');
+        }
+        const spanDays = Math.floor(
+            (new Date(`${customEnd}T00:00:00.000Z`).getTime()
+                - new Date(`${customStart}T00:00:00.000Z`).getTime()) / 86400000
+        ) + 1;
+        if (spanDays > 5000) throw new Error('Custom revenue ranges cannot exceed 5,000 days.');
+        const prevEndIso = addDaysToIso(customStart, -1);
+        return {
+            startIso: customStart,
+            endIso: customEnd,
+            prevStartIso: addDaysToIso(prevEndIso, 1 - spanDays),
+            prevEndIso,
+        };
+    }
 
     if (period === 'all') {
         const normalizedEarliest = normalizeIsoDate(earliestIso);
@@ -11632,17 +11652,39 @@ app.get('/api/crm/revenue', crmAuth, async (req, res) => {
         if (!MANUAL_REVENUE_PERIODS.has(period)) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid revenue period. Use today, 7d, 30d, 90d, or all.',
+                message: 'Invalid revenue period. Use today, 7d, 30d, 90d, all, or custom.',
             });
+        }
+
+        let customStart = '';
+        let customEnd = '';
+        if (period === 'custom') {
+            const first = normalizeIsoDate(req.query?.startDate);
+            const second = normalizeIsoDate(req.query?.endDate);
+            if (!first || !second) {
+                return res.status(400).json({ success: false, message: 'Choose both custom revenue dates.' });
+            }
+            customStart = first <= second ? first : second;
+            customEnd = first <= second ? second : first;
+            const spanDays = Math.floor(
+                (new Date(`${customEnd}T00:00:00.000Z`).getTime()
+                    - new Date(`${customStart}T00:00:00.000Z`).getTime()) / 86400000
+            ) + 1;
+            if (spanDays > 5000) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Custom revenue ranges cannot exceed 5,000 days.',
+                });
+            }
         }
 
         const referenceIso = getReportingTodayIso();
         const earliestIso = period === 'all'
             ? await getEarliestManualRevenueStartIso(hotelId)
-            : referenceIso;
+            : period === 'custom' ? customStart : referenceIso;
         const latestIso = period === 'all'
             ? await getLatestManualRevenueEndIso(hotelId)
-            : referenceIso;
+            : period === 'custom' ? customEnd : referenceIso;
             
         const window = buildManualRevenueWindow(period, referenceIso, earliestIso, latestIso);
         const current = await computeManualRevenueMetrics(hotelId, window.startIso, window.endIso);
