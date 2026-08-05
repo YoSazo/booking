@@ -1655,8 +1655,10 @@
     }
     .revenue-custom-field input {
       width: 100%;
+      max-width: 100%;
       min-width: 0;
       min-height: 42px;
+      box-sizing: border-box;
       border: 1.5px solid var(--border);
       border-radius: 10px;
       background: var(--surface-subtle);
@@ -1679,9 +1681,45 @@
       cursor: pointer;
     }
     @media (max-width: 520px) {
-      .revenue-custom-range { grid-template-columns: 1fr 1fr; }
+      .revenue-custom-range {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        padding: 10px;
+      }
+      .revenue-custom-field input {
+        padding-inline: 6px;
+        font-size: 12px;
+      }
       .revenue-custom-apply { grid-column: 1 / -1; width: 100%; }
     }
+    .page-utility-tabs {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 4px;
+      margin: 6px;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+    .page-utility-tab {
+      min-width: 0;
+      min-height: 38px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .page-utility-tab.active {
+      background: var(--white);
+      color: var(--green);
+      box-shadow: 0 1px 4px rgba(26, 43, 34, .1);
+    }
+    .page-utility-body { padding: 10px 18px 18px; }
+    .page-utility-panel[hidden] { display: none !important; }
     .revenue-savings-pill {
       border: 2px solid #D3F2E2;
       background: linear-gradient(135deg, #F3FFF8 0%, #E9FFF3 100%);
