@@ -1,4 +1,5 @@
 import { crm } from './state.js';
+import QRCode from 'qrcode';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 
@@ -8,6 +9,29 @@ const isBundledNativeFrontdesk = window.location.protocol === 'capacitor:'
 const marketelLocalUrlBase = isBundledNativeFrontdesk ? window.location.href : window.location.origin;
 const FRONTDESK_STARTUP_TIMEOUT_MS = 8000;
 const NATIVE_ONBOARDING_DONE_KEY = 'marketelNativeOnboardingV1Done';
+const checkinQrDataUrlCache = new Map();
+
+function createCheckinQrDataUrl(url) {
+  const target = String(url || '').trim();
+  if (!target) return Promise.resolve('');
+  if (checkinQrDataUrlCache.has(target)) return checkinQrDataUrlCache.get(target);
+  const pending = QRCode.toDataURL(target, {
+    width: 320,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#0A0F0D', light: '#FFFFFF' },
+  }).catch(error => {
+    checkinQrDataUrlCache.delete(target);
+    throw error;
+  });
+  checkinQrDataUrlCache.set(target, pending);
+  return pending;
+}
+
+function warmGenericCheckinQr() {
+  const url = buildGuestInstallUrlForQr('', 'frontdesk-qr-generic');
+  if (url) createCheckinQrDataUrl(url).catch(() => {});
+}
 
 // The App Store build ships this JavaScript inside the IPA. Only API requests
 // cross the network; rewriting them here keeps every existing feature module
@@ -903,6 +927,7 @@ function applyLegacyHotelContext(hotelId, reason = '') {
     },
   };
   updateHotelChrome();
+  warmGenericCheckinQr();
   if (reason && window.console && typeof window.console.warn === 'function') {
     window.console.warn('Falling back to legacy CRM hotel resolution.', { hotelId: cleanHotelId, reason });
   }
@@ -1031,6 +1056,7 @@ function applyHotelContextData(data = {}) {
     ]);
   }
   updateHotelChrome();
+  warmGenericCheckinQr();
   return data;
 }
 
@@ -4735,12 +4761,12 @@ function promptUploadLogoBeforeQr(preselectedCode) {
   };
 }
 
-function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
+async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   const hName = crm.activeHotelName || 'Your Property';
   const domain = crm.activeHotelDomain || '';
   if (!domain) { toast('Your booking domain is still loading', 'error'); return; }
-  setNativeShellVisible(false);
   if (!skipLogoGate && !preselectedCode && !crm.activeHotelAppIcon) {
+    setNativeShellVisible(false);
     promptUploadLogoBeforeQr(preselectedCode);
     return;
   }
@@ -4768,13 +4794,22 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   const overlay = document.createElement('div');
   overlay.id = 'checkinQrOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:102500;background:#0a0f0d;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;';
+  let renderSequence = 0;
 
   function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
-  function render() {
+  async function render() {
+    const sequence = ++renderSequence;
     const ref = mode === 'guest' && selectedCode ? 'frontdesk-qr-guest' : 'frontdesk-qr-generic';
     const url = buildGuestInstallUrlForQr(mode === 'guest' ? selectedCode : '', ref);
-    const qr = url ? 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=' + encodeURIComponent(url) : '';
+    let qr = '';
+    try {
+      qr = url ? await createCheckinQrDataUrl(url) : '';
+    } catch (_) {
+      if (sequence === renderSequence) toast('Could not create the QR code', 'error');
+      return;
+    }
+    if (sequence !== renderSequence) return;
 
     const guestOptions = arrivals.map(function(b) {
       const code = getBookingReservationCode(b);
@@ -4806,7 +4841,13 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
       + (mode === 'guest' && selectedCode ? 'Links to their reservation + install' : 'Generic install — good for room cards')
       + '</p></div>';
 
-    document.getElementById('checkinQrClose').onclick = closeCheckinQrOverlay;
+    if (!overlay.isConnected) {
+      setNativeShellVisible(false);
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+    }
+
+    overlay.querySelector('#checkinQrClose').onclick = closeCheckinQrOverlay;
     overlay.querySelectorAll('[data-qr-mode]').forEach(function(btn) {
       btn.onclick = function() {
         mode = btn.getAttribute('data-qr-mode');
@@ -4816,12 +4857,12 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
         render();
       };
     });
-    const sel = document.getElementById('checkinQrGuestSelect');
+    const sel = overlay.querySelector('#checkinQrGuestSelect');
     if (sel) {
       sel.onchange = function() { selectedCode = sel.value; render(); };
       if (!selectedCode && sel.value) selectedCode = sel.value;
     }
-    const inp = document.getElementById('checkinQrCodeInput');
+    const inp = overlay.querySelector('#checkinQrCodeInput');
     if (inp) {
       inp.oninput = function() { selectedCode = inp.value.trim(); };
     }
@@ -4834,9 +4875,7 @@ function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
     syncNativeShellState();
   }
 
-  document.body.appendChild(overlay);
-  document.body.style.overflow = 'hidden';
-  render();
+  await render();
 }
 
 function closeCheckinQrOverlay() {
