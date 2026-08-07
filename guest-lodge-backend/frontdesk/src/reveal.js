@@ -572,31 +572,36 @@ function finaleHtml() {
   const activationLabel = isYearly
     ? 'Activate Marketel — $1,990/year'
     : 'Activate Marketel — $199/month';
+  const includedValueHtml = `<div class="mvr-value-list">
+    <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
+    <div style="--stagger:1"><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
+    <div style="--stagger:2"><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
+  </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
-      <p>${isSubscribed ? 'Your direct booking page, guest app and Front Desk work together as one system.' : 'Turn on the system you just saw and finish making it yours.'}</p>
-      <div class="mvr-value-list">
-        <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-        <div style="--stagger:1"><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
-        <div style="--stagger:2"><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
-      </div>
-      ${isSubscribed ? '' : `${directBookingValueHtml()}
-        <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">
+      <p>${isSubscribed ? 'Your direct booking page, guest app and Front Desk work together as one system.' : 'Your booking page, guest app and Front Desk are ready.'}</p>
+      ${isSubscribed ? `${includedValueHtml}
+        <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">Open Front Desk</button>
+        <div class="mvr-secure-note">You can replay this overview anytime from How it works.</div>` : `
+        <div class="mvr-activation-decision">
+          <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">
           <button type="button" role="radio" aria-checked="${!isYearly}" class="${!isYearly ? 'is-active' : ''}" data-mvr-billing="month">Monthly</button>
           <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $398</span></button>
+          </div>
+          <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
+          <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">${isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
+          <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
+          <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
+          <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>
         </div>
-        <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
-        <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">Two months free · $398 saved</div>
-        <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>`}
-      <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">
-        ${isSubscribed ? 'Open Front Desk' : activationLabel}
-      </button>
-      <div class="mvr-secure-note">${isSubscribed
-        ? 'You can replay this overview anytime from How it works.'
-        : 'Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a>'}</div>
+        <div class="mvr-activation-proof">
+          ${directBookingValueHtml()}
+          <div class="mvr-included-label">Everything included</div>
+          ${includedValueHtml}
+        </div>`}
     </div>
   </section>`;
 }

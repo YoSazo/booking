@@ -1279,6 +1279,34 @@
   text-align: left;
 }
 
+.mvr-activation-decision {
+  margin-top: 20px;
+}
+
+.mvr-activation-proof {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(211, 227, 217, 0.7);
+}
+
+.mvr-activation-proof .mvr-value-bridge {
+  margin: 0 auto 18px;
+}
+
+.mvr-included-label {
+  margin-bottom: 9px;
+  color: #5f7468;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.mvr-activation-proof .mvr-value-list {
+  margin: 0;
+}
+
 .mvr-value-list > div {
   display: grid;
   grid-template-columns: 28px 1fr;
@@ -1469,7 +1497,7 @@
   align-items: center;
   gap: 10px;
   max-width: 360px;
-  margin: 14px auto 20px;
+  margin: 10px auto 0;
   padding: 11px 13px;
   text-align: left;
   border: 1px solid rgba(202, 225, 211, 0.6);
@@ -1547,7 +1575,7 @@
 }
 
 .mvr-secure-note {
-  margin-top: 9px;
+  margin-top: 8px;
   color: #849088;
   font-size: 10px;
   font-weight: 600;
@@ -2054,12 +2082,34 @@
   }
 
   .mvr-stage-finale {
-    padding-top: 18px;
+    padding-top: 12px;
   }
 
   .mvr-finale-card {
-    padding: 22px 18px;
+    padding: 18px;
     border-radius: 22px;
+  }
+
+  .mvr-finale-mark {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 11px;
+    font-size: 20px;
+    box-shadow: 0 6px 16px rgba(46, 125, 91, 0.24), 0 0 0 5px rgba(46, 125, 91, 0.07);
+  }
+
+  .mvr-finale-card > p {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .mvr-activation-decision {
+    margin-top: 14px;
+  }
+
+  .mvr-activation-proof {
+    margin-top: 20px;
+    padding-top: 17px;
   }
 
   .mvr-value-bridge {
@@ -2229,7 +2279,7 @@
   }
 
   .mvr-finale-card h1 {
-    font-size: 28px;
+    font-size: 26px;
   }
 
   .mvr-value-list {
@@ -2237,7 +2287,15 @@
   }
 
   .mvr-price strong {
-    font-size: 36px;
+    font-size: 38px;
+  }
+
+  .mvr-final-cta {
+    min-height: 52px;
+  }
+
+  .mvr-guarantee {
+    padding: 9px 11px;
   }
 
   .mvr-billing-toggle button {
