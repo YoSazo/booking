@@ -32,7 +32,7 @@ private final class MarketelMarkView: UIView {
         isUserInteractionEnabled = false
     }
 
-    override func draw(_ rect: CGRect) {
+    static func drawMark(in rect: CGRect) {
         let green = UIColor(red: 46 / 255, green: 125 / 255, blue: 91 / 255, alpha: 1)
         let scale = min(rect.width / 69, rect.height / 72)
         let drawingSize = CGSize(width: 69 * scale, height: 72 * scale)
@@ -70,6 +70,10 @@ private final class MarketelMarkView: UIView {
 
         UIColor.white.setFill()
         UIBezierPath(ovalIn: scaledRect(26.6, 29.93, 9.98, 10.81)).fill()
+    }
+
+    override func draw(_ rect: CGRect) {
+        Self.drawMark(in: rect)
     }
 }
 
@@ -666,8 +670,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     private func marketelContactImage() -> UIImage {
-        let size = CGSize(width: 512, height: 512)
-        let renderer = UIGraphicsImageRenderer(size: size)
+        // Render a deterministic 1024 px contact photo directly from the
+        // vector mark so Contacts never has to enlarge a softer bitmap.
+        let size = CGSize(width: 1024, height: 1024)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+
         return renderer.image { context in
             UIColor(
                 red: 238 / 255,
@@ -677,11 +687,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             ).setFill()
             context.fill(CGRect(origin: .zero, size: size))
 
-            let mark = MarketelMarkView(
-                frame: CGRect(x: 142, y: 134, width: 228, height: 244)
+            let markSize = CGSize(width: 456, height: 488)
+            let markRect = CGRect(
+                x: (size.width - markSize.width) / 2,
+                y: (size.height - markSize.height) / 2,
+                width: markSize.width,
+                height: markSize.height
             )
-            mark.backgroundColor = .clear
-            mark.layer.render(in: context.cgContext)
+            MarketelMarkView.drawMark(in: markRect)
         }
     }
 
