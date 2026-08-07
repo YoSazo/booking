@@ -134,11 +134,13 @@ function ensureStyles() {
 
     #${OVERLAY_ID} {
       --native-green: #2E7D5B;
+      --native-green-light: #4CAF7D;
       --native-green-dark: #205B43;
       --native-ink: #16231C;
       --native-muted: #65736B;
       --native-surface: #EEF2EF;
       --native-line: rgba(46, 77, 60, .13);
+      --native-glass: rgba(255, 255, 255, 0.55);
       position: fixed;
       inset: 0;
       z-index: 2147483000;
@@ -157,9 +159,10 @@ function ensureStyles() {
       flex-direction: column;
       overflow: hidden;
       background:
-        radial-gradient(circle at 85% 8%, rgba(132, 203, 166, .32), transparent 31%),
-        radial-gradient(circle at 4% 82%, rgba(225, 188, 120, .18), transparent 28%),
-        var(--native-surface);
+        radial-gradient(ellipse 120% 50% at 80% 5%, rgba(76, 175, 125, 0.12), transparent),
+        radial-gradient(ellipse 100% 60% at 10% 90%, rgba(200, 225, 210, 0.55), transparent),
+        radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255, 255, 255, 0.35), transparent),
+        linear-gradient(168deg, #f0f5f2 0%, #f6f9f7 40%, #edf3ef 100%);
       padding:
         max(18px, env(safe-area-inset-top))
         20px
@@ -169,16 +172,17 @@ function ensureStyles() {
     .mno-intro::before {
       content: "";
       position: absolute;
-      width: 220px;
-      height: 220px;
+      width: 260px;
+      height: 260px;
       border-radius: 999px;
-      border: 1px solid rgba(46, 125, 91, .12);
-      top: 17%;
-      right: -145px;
+      border: 1px solid rgba(46, 125, 91, .08);
+      top: 14%;
+      right: -155px;
       box-shadow:
-        0 0 0 34px rgba(46, 125, 91, .035),
-        0 0 0 72px rgba(46, 125, 91, .025);
+        0 0 0 38px rgba(46, 125, 91, .025),
+        0 0 0 80px rgba(46, 125, 91, .015);
       pointer-events: none;
+      animation: mno-float 8s ease-in-out infinite;
     }
 
     .mno-topline {
@@ -239,13 +243,16 @@ function ensureStyles() {
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      color: var(--native-green-dark);
-      font-size: 12px;
+      color: transparent;
+      font-size: 11px;
       line-height: 1;
-      font-weight: 800;
-      letter-spacing: .09em;
+      font-weight: 850;
+      letter-spacing: .13em;
       text-transform: uppercase;
       margin-bottom: 14px;
+      background: linear-gradient(135deg, var(--native-green), var(--native-green-light));
+      -webkit-background-clip: text;
+      background-clip: text;
     }
 
     .mno-kicker::before {
@@ -254,7 +261,7 @@ function ensureStyles() {
       height: 7px;
       border-radius: 50%;
       background: #55A67A;
-      box-shadow: 0 0 0 5px rgba(85, 166, 122, .13);
+      box-shadow: 0 0 0 5px rgba(85, 166, 122, .15), 0 0 12px rgba(85, 166, 122, .2);
     }
 
     .mno-title {
@@ -263,7 +270,8 @@ function ensureStyles() {
       font-size: clamp(34px, 9.2vw, 48px);
       line-height: .99;
       letter-spacing: -.052em;
-      font-weight: 810;
+      font-weight: 850;
+      text-shadow: 0 1px 2px rgba(23, 38, 31, 0.04);
     }
 
     .mno-copy {
@@ -277,13 +285,18 @@ function ensureStyles() {
 
     .mno-property-card {
       margin-top: 29px;
-      border: 1px solid rgba(255, 255, 255, .9);
+      border: 1px solid rgba(212, 228, 218, 0.5);
       border-radius: 24px;
       padding: 16px;
-      background: rgba(255, 255, 255, .61);
-      box-shadow: 0 20px 55px rgba(43, 73, 56, .10);
-      backdrop-filter: blur(22px) saturate(1.2);
-      -webkit-backdrop-filter: blur(22px) saturate(1.2);
+      background: var(--native-glass);
+      box-shadow:
+        0 2px 4px rgba(43, 73, 56, 0.03),
+        0 12px 28px rgba(43, 73, 56, 0.06),
+        0 24px 58px rgba(43, 73, 56, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(22px) saturate(1.3);
+      -webkit-backdrop-filter: blur(22px) saturate(1.3);
+      animation: mno-card-up .5s cubic-bezier(.16,1,.3,1) .15s both;
     }
 
     .mno-property-row {
@@ -299,8 +312,8 @@ function ensureStyles() {
       display: grid;
       place-items: center;
       color: #fff;
-      background: linear-gradient(145deg, #397F60, #235A43);
-      box-shadow: inset 0 1px rgba(255,255,255,.35), 0 8px 20px rgba(46,125,91,.2);
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green-dark));
+      box-shadow: inset 0 1px rgba(255,255,255,.35), 0 6px 16px rgba(46,125,91,.22), 0 0 0 3px rgba(46,125,91,.06);
       font-size: 19px;
       font-weight: 800;
     }
@@ -344,12 +357,20 @@ function ensureStyles() {
       min-width: 0;
       border-radius: 14px;
       padding: 11px 8px;
-      background: rgba(238, 242, 239, .78);
+      background: rgba(238, 242, 239, 0.6);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(228, 238, 232, 0.4);
       color: #4D5C53;
       text-align: center;
       font-size: 11px;
       line-height: 1.25;
       font-weight: 690;
+      transition: transform 200ms ease;
+    }
+
+    .mno-feature:active {
+      transform: scale(0.97);
     }
 
     .mno-feature strong {
@@ -364,10 +385,17 @@ function ensureStyles() {
       margin-top: 24px;
       padding: 16px 14px 15px;
       border-radius: 25px;
-      background: #F9FBF9;
-      border: 1px solid rgba(46, 77, 60, .11);
-      box-shadow: 0 22px 56px rgba(31, 61, 44, .12);
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(214, 226, 218, 0.5);
+      box-shadow:
+        0 2px 4px rgba(31, 61, 44, 0.03),
+        0 12px 28px rgba(31, 61, 44, 0.07),
+        0 26px 60px rgba(31, 61, 44, 0.11),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
       overflow: hidden;
+      animation: mno-card-up .5s cubic-bezier(.16,1,.3,1) .15s both;
     }
 
     .mno-assistant-card::before {
@@ -452,7 +480,7 @@ function ensureStyles() {
     .mno-bubble.owner {
       align-self: flex-end;
       border-bottom-right-radius: 5px;
-      background: var(--native-green);
+      background: linear-gradient(135deg, var(--native-green-light), var(--native-green));
       color: #fff;
       animation-delay: .72s;
     }
@@ -467,9 +495,12 @@ function ensureStyles() {
       gap: 11px;
       margin-top: 12px;
       padding: 11px 12px;
-      border: 1px solid var(--native-line);
+      border: 1px solid rgba(214, 226, 218, 0.5);
+      border-left: 3px solid var(--native-green);
       border-radius: 16px;
-      background: rgba(255,255,255,.8);
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
 
     .mno-contact-strip .mno-assistant-avatar {
@@ -499,9 +530,11 @@ function ensureStyles() {
       display: grid;
       place-items: center;
       color: #fff;
-      background: var(--native-green);
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green));
       font-size: 13px;
       font-weight: 900;
+      box-shadow: 0 4px 12px rgba(46, 125, 91, 0.2);
+      animation: mno-check-in .4s cubic-bezier(.16,1,.3,1) both;
     }
 
     .mno-ready-list {
@@ -516,8 +549,17 @@ function ensureStyles() {
       gap: 13px;
       border-radius: 17px;
       padding: 13px 14px;
-      border: 1px solid rgba(46, 77, 60, .1);
-      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(228, 238, 232, 0.5);
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      animation: mno-item-in .4s cubic-bezier(.16,1,.3,1) both;
+      animation-delay: calc(var(--i, 0) * 80ms + 150ms);
+      transition: transform 200ms ease, box-shadow 200ms ease;
+    }
+
+    .mno-ready-item:active {
+      transform: scale(0.98);
     }
 
     .mno-ready-number {
@@ -527,10 +569,11 @@ function ensureStyles() {
       display: grid;
       place-items: center;
       border-radius: 10px;
-      background: #DCEAE2;
+      background: linear-gradient(145deg, rgba(220, 234, 226, 0.8), rgba(200, 222, 210, 0.6));
       color: var(--native-green-dark);
       font-size: 12px;
       font-weight: 850;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     .mno-ready-item strong {
@@ -569,13 +612,28 @@ function ensureStyles() {
     }
 
     .mno-primary {
+      position: relative;
       color: #fff;
-      background: linear-gradient(180deg, #357F60, #27694D);
-      box-shadow: 0 13px 28px rgba(46,125,91,.24), inset 0 1px rgba(255,255,255,.2);
+      background: linear-gradient(135deg, var(--native-green-light) 0%, var(--native-green) 50%, var(--native-green-dark) 100%);
+      box-shadow: 0 6px 16px rgba(46,125,91,.2), 0 13px 32px rgba(46,125,91,.18);
+      overflow: hidden;
+    }
+
+    .mno-primary::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.18) 50%, transparent 62%);
+      animation: mno-shimmer 3.5s ease-in-out infinite;
+      pointer-events: none;
     }
 
     .mno-primary:active {
       transform: scale(.985);
+    }
+
+    .mno-primary:disabled::after {
+      animation: none;
     }
 
     .mno-secondary {
@@ -598,13 +656,14 @@ function ensureStyles() {
       width: 6px;
       height: 6px;
       border-radius: 999px;
-      background: rgba(70, 91, 79, .22);
-      transition: width .2s ease, background .2s ease;
+      background: rgba(70, 91, 79, .18);
+      transition: width .28s ease, background .28s ease, box-shadow .28s ease;
     }
 
     .mno-dot.active {
-      width: 19px;
-      background: var(--native-green);
+      width: 22px;
+      background: linear-gradient(90deg, var(--native-green), var(--native-green-light));
+      box-shadow: 0 0 10px rgba(46, 125, 91, 0.3);
     }
 
     .mno-status-note {
@@ -650,14 +709,18 @@ function ensureStyles() {
       position: relative;
       width: min(100%, 520px);
       margin: 0 auto;
-      border: 1px solid rgba(255,255,255,.78);
+      border: 1px solid rgba(213, 226, 218, 0.5);
       border-radius: 24px;
       padding: 18px 17px 15px;
-      background: rgba(249, 251, 249, .95);
-      box-shadow: 0 24px 70px rgba(0,0,0,.25);
-      backdrop-filter: blur(28px) saturate(1.2);
-      -webkit-backdrop-filter: blur(28px) saturate(1.2);
-      animation: mno-card-up .38s cubic-bezier(.2,.8,.2,1) both;
+      background: rgba(249, 251, 249, .85);
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.03),
+        0 12px 32px rgba(0,0,0,0.10),
+        0 28px 72px rgba(0,0,0,0.20),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+      backdrop-filter: blur(28px) saturate(1.4);
+      -webkit-backdrop-filter: blur(28px) saturate(1.4);
+      animation: mno-card-up .42s cubic-bezier(.16,1,.3,1) both;
     }
 
     .mno-coach-card::after {
@@ -682,11 +745,14 @@ function ensureStyles() {
     }
 
     .mno-coach-eyebrow {
-      color: var(--native-green-dark);
+      color: transparent;
       font-size: 11px;
       font-weight: 850;
-      letter-spacing: .085em;
+      letter-spacing: .12em;
       text-transform: uppercase;
+      background: linear-gradient(135deg, var(--native-green), var(--native-green-light));
+      -webkit-background-clip: text;
+      background-clip: text;
     }
 
     .mno-coach-count {
@@ -720,7 +786,10 @@ function ensureStyles() {
       border-radius: 12px;
       padding: 9px 10px;
       color: #355844;
-      background: #E8F1EB;
+      background: rgba(232, 241, 235, 0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(202, 225, 211, 0.4);
       font-size: 11px;
       line-height: 1.35;
       font-weight: 670;
@@ -735,9 +804,10 @@ function ensureStyles() {
       place-items: center;
       border-radius: 50%;
       color: #fff;
-      background: var(--native-green);
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green));
       font-size: 10px;
       font-weight: 900;
+      box-shadow: 0 3px 8px rgba(46, 125, 91, 0.18);
     }
 
     .mno-coach-actions {
@@ -770,8 +840,29 @@ function ensureStyles() {
     }
 
     @keyframes mno-card-up {
-      from { opacity: 0; transform: translateY(16px) scale(.985); }
+      from { opacity: 0; transform: translateY(18px) scale(.985); }
       to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes mno-shimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
+    }
+
+    @keyframes mno-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes mno-check-in {
+      0% { opacity: 0; transform: scale(0.5); }
+      60% { transform: scale(1.15); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes mno-item-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @media (max-height: 720px) {
@@ -792,7 +883,13 @@ function ensureStyles() {
     @media (prefers-reduced-motion: reduce) {
       .mno-stage,
       .mno-coach-card,
-      .mno-bubble {
+      .mno-bubble,
+      .mno-property-card,
+      .mno-assistant-card,
+      .mno-ready-item,
+      .mno-contact-check,
+      .mno-intro::before,
+      .mno-primary::after {
         animation-duration: .01ms !important;
         animation-delay: 0ms !important;
       }
@@ -873,15 +970,15 @@ function introStageHtml(step) {
       <h1 class="mno-title">Four places. No maze.</h1>
       <p class="mno-copy">You already know what Marketel does. Here is where you run it.</p>
       <div class="mno-ready-list">
-        <div class="mno-ready-item">
+        <div class="mno-ready-item" style="--i:0">
           <div class="mno-ready-number">01</div>
           <div><strong>Shape the page</strong><span>Rooms, photos, rates and guest-facing details.</span></div>
         </div>
-        <div class="mno-ready-item">
+        <div class="mno-ready-item" style="--i:1">
           <div class="mno-ready-number">02</div>
           <div><strong>Run today</strong><span>Bookings and availability, without the clutter.</span></div>
         </div>
-        <div class="mno-ready-item">
+        <div class="mno-ready-item" style="--i:2">
           <div class="mno-ready-number">03</div>
           <div><strong>Bring guests back</strong><span>Share the app link or QR when they are ready.</span></div>
         </div>
