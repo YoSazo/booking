@@ -1,4 +1,4 @@
-import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Done",d="marketelNativeOnboardingV1State",c="marketelNativeFrontDeskContactV1",A="+18339830801",f="marketelNativeOnboardingStyles",r="marketelNativeOnboarding",a=[{filter:"settings",eyebrow:"Your Page",title:"Make it yours.",body:"Change rooms, photos, prices and the details guests see. Your direct booking page stays live while you manage it here.",note:"This is the control room for your booking page.",tabPosition:"12.5%"},{filter:"bookings",eyebrow:"Bookings",title:"Start every day here.",body:"New reservations, guest details and anything that needs your attention arrive in one place.",note:"Review or cancel a booking without hunting through menus.",tabPosition:"37.5%"},{filter:"availability",eyebrow:"Availability",title:"Keep the real world in sync.",body:"Block a room when a walk-in takes it, or let Front Desk Assistant update availability from your reply.",note:"If Front Desk knows, the booking page knows.",tabPosition:"62.5%"},{filter:"apps",eyebrow:"Guest App",title:"Get on their phone. Then reach it.",body:"Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone whenever you want.",note:"Share the QR or link, then use Show installation steps to guide them through the exact Safari buttons.",tabPosition:"87.5%"}];let b=!1,e=null;function k(){return window.location.protocol==="capacitor:"||window.location.protocol==="ionic:"||new URLSearchParams(window.location.search).get("native")==="ios"}function p(t){try{const n=window.webkit?.messageHandlers?.marketelShell;return!n||typeof n.postMessage!="function"?!1:(n.postMessage(t),!0)}catch{return!1}}function l(t){if(typeof window.setNativeShellVisible=="function"){window.setNativeShellVisible(t);return}p({type:"visibility",visible:t})}function m(t){p({type:"tourMode",active:!!t})}function D(){p({type:"requestNotifications"})}function i(t){return String(t??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function h(){return String(N.activeHotelName||"your property").trim()||"your property"}function g(t){try{return localStorage.getItem(t)==="1"}catch{return!1}}function u(){if(e)try{localStorage.setItem(d,JSON.stringify({phase:e.phase,step:e.step,contactSaved:e.contactSaved}))}catch{}}function C(){try{const t=JSON.parse(localStorage.getItem(d)||"null");if(!t||!["intro","tour"].includes(t.phase))return null;const n=t.phase==="intro"?2:a.length-1;return{phase:t.phase,step:Math.max(0,Math.min(Number(t.step)||0,n)),contactSaved:t.contactSaved===!0||g(c)}}catch{return null}}function O(){if(document.getElementById(f))return;const t=document.createElement("style");t.id=f,t.textContent=`
+import{c as F}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Done",d="marketelNativeOnboardingV1State",l="marketelNativeFrontDeskContactV1",A="+18339830801",x="marketelNativeOnboardingStyles",r="marketelNativeOnboarding",o=[{filter:"settings",eyebrow:"Your Page",title:"Make it yours.",body:"Change rooms, photos, prices and the details guests see. Your direct booking page stays live while you manage it here.",note:"This is the control room for your booking page.",tabPosition:"12.5%"},{filter:"bookings",eyebrow:"Bookings",title:"Start every day here.",body:"New reservations, guest details and anything that needs your attention arrive in one place.",note:"Review or cancel a booking without hunting through menus.",tabPosition:"37.5%"},{filter:"availability",eyebrow:"Availability",title:"Keep the real world in sync.",body:"Block a room when a walk-in takes it, or let Front Desk Assistant update availability from your reply.",note:"If Front Desk knows, the booking page knows.",tabPosition:"62.5%"},{filter:"apps",eyebrow:"Guest App",title:"Get on their phone. Then reach it.",body:"Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone whenever you want.",note:"Share the QR or link, then use Show installation steps to guide them through the exact Safari buttons.",tabPosition:"87.5%"}];let f=!1,e=null;function k(){return window.location.protocol==="capacitor:"||window.location.protocol==="ionic:"||new URLSearchParams(window.location.search).get("native")==="ios"}function p(t){try{const a=window.webkit?.messageHandlers?.marketelShell;return!a||typeof a.postMessage!="function"?!1:(a.postMessage(t),!0)}catch{return!1}}function c(t){if(typeof window.setNativeShellVisible=="function"){window.setNativeShellVisible(t);return}p({type:"visibility",visible:t})}function m(t){p({type:"tourMode",active:!!t})}function D(){p({type:"requestNotifications"})}function i(t){return String(t??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function h(){return String(F.activeHotelName||"your property").trim()||"your property"}function g(t){try{return localStorage.getItem(t)==="1"}catch{return!1}}function b(){if(e)try{localStorage.setItem(d,JSON.stringify({phase:e.phase,step:e.step,contactSaved:e.contactSaved}))}catch{}}function C(){try{const t=JSON.parse(localStorage.getItem(d)||"null");if(!t||!["intro","tour"].includes(t.phase))return null;const a=t.phase==="intro"?2:o.length-1;return{phase:t.phase,step:Math.max(0,Math.min(Number(t.step)||0,a)),contactSaved:t.contactSaved===!0||g(l)}}catch{return null}}function O(){if(document.getElementById(x))return;const t=document.createElement("style");t.id=x,t.textContent=`
     html.marketel-native-tour-open,
     html.marketel-native-tour-open body {
       overflow: hidden !important;
@@ -7,11 +7,13 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
 
     #${r} {
       --native-green: #2E7D5B;
+      --native-green-light: #4CAF7D;
       --native-green-dark: #205B43;
       --native-ink: #16231C;
       --native-muted: #65736B;
       --native-surface: #EEF2EF;
       --native-line: rgba(46, 77, 60, .13);
+      --native-glass: rgba(255, 255, 255, 0.55);
       position: fixed;
       inset: 0;
       z-index: 2147483000;
@@ -30,9 +32,10 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       flex-direction: column;
       overflow: hidden;
       background:
-        radial-gradient(circle at 85% 8%, rgba(132, 203, 166, .32), transparent 31%),
-        radial-gradient(circle at 4% 82%, rgba(225, 188, 120, .18), transparent 28%),
-        var(--native-surface);
+        radial-gradient(ellipse 120% 50% at 80% 5%, rgba(76, 175, 125, 0.12), transparent),
+        radial-gradient(ellipse 100% 60% at 10% 90%, rgba(200, 225, 210, 0.55), transparent),
+        radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255, 255, 255, 0.35), transparent),
+        linear-gradient(168deg, #f0f5f2 0%, #f6f9f7 40%, #edf3ef 100%);
       padding:
         max(18px, env(safe-area-inset-top))
         20px
@@ -42,16 +45,17 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
     .mno-intro::before {
       content: "";
       position: absolute;
-      width: 220px;
-      height: 220px;
+      width: 260px;
+      height: 260px;
       border-radius: 999px;
-      border: 1px solid rgba(46, 125, 91, .12);
-      top: 17%;
-      right: -145px;
+      border: 1px solid rgba(46, 125, 91, .08);
+      top: 14%;
+      right: -155px;
       box-shadow:
-        0 0 0 34px rgba(46, 125, 91, .035),
-        0 0 0 72px rgba(46, 125, 91, .025);
+        0 0 0 38px rgba(46, 125, 91, .025),
+        0 0 0 80px rgba(46, 125, 91, .015);
       pointer-events: none;
+      animation: mno-float 8s ease-in-out infinite;
     }
 
     .mno-topline {
@@ -112,13 +116,16 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      color: var(--native-green-dark);
-      font-size: 12px;
+      color: transparent;
+      font-size: 11px;
       line-height: 1;
-      font-weight: 800;
-      letter-spacing: .09em;
+      font-weight: 850;
+      letter-spacing: .13em;
       text-transform: uppercase;
       margin-bottom: 14px;
+      background: linear-gradient(135deg, var(--native-green), var(--native-green-light));
+      -webkit-background-clip: text;
+      background-clip: text;
     }
 
     .mno-kicker::before {
@@ -127,7 +134,7 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       height: 7px;
       border-radius: 50%;
       background: #55A67A;
-      box-shadow: 0 0 0 5px rgba(85, 166, 122, .13);
+      box-shadow: 0 0 0 5px rgba(85, 166, 122, .15), 0 0 12px rgba(85, 166, 122, .2);
     }
 
     .mno-title {
@@ -136,7 +143,8 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       font-size: clamp(34px, 9.2vw, 48px);
       line-height: .99;
       letter-spacing: -.052em;
-      font-weight: 810;
+      font-weight: 850;
+      text-shadow: 0 1px 2px rgba(23, 38, 31, 0.04);
     }
 
     .mno-copy {
@@ -150,13 +158,18 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
 
     .mno-property-card {
       margin-top: 29px;
-      border: 1px solid rgba(255, 255, 255, .9);
+      border: 1px solid rgba(212, 228, 218, 0.5);
       border-radius: 24px;
       padding: 16px;
-      background: rgba(255, 255, 255, .61);
-      box-shadow: 0 20px 55px rgba(43, 73, 56, .10);
-      backdrop-filter: blur(22px) saturate(1.2);
-      -webkit-backdrop-filter: blur(22px) saturate(1.2);
+      background: var(--native-glass);
+      box-shadow:
+        0 2px 4px rgba(43, 73, 56, 0.03),
+        0 12px 28px rgba(43, 73, 56, 0.06),
+        0 24px 58px rgba(43, 73, 56, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(22px) saturate(1.3);
+      -webkit-backdrop-filter: blur(22px) saturate(1.3);
+      animation: mno-card-up .5s cubic-bezier(.16,1,.3,1) .15s both;
     }
 
     .mno-property-row {
@@ -172,8 +185,8 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       display: grid;
       place-items: center;
       color: #fff;
-      background: linear-gradient(145deg, #397F60, #235A43);
-      box-shadow: inset 0 1px rgba(255,255,255,.35), 0 8px 20px rgba(46,125,91,.2);
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green-dark));
+      box-shadow: inset 0 1px rgba(255,255,255,.35), 0 6px 16px rgba(46,125,91,.22), 0 0 0 3px rgba(46,125,91,.06);
       font-size: 19px;
       font-weight: 800;
     }
@@ -217,12 +230,20 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       min-width: 0;
       border-radius: 14px;
       padding: 11px 8px;
-      background: rgba(238, 242, 239, .78);
+      background: rgba(238, 242, 239, 0.6);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(228, 238, 232, 0.4);
       color: #4D5C53;
       text-align: center;
       font-size: 11px;
       line-height: 1.25;
       font-weight: 690;
+      transition: transform 200ms ease;
+    }
+
+    .mno-feature:active {
+      transform: scale(0.97);
     }
 
     .mno-feature strong {
@@ -237,10 +258,17 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       margin-top: 24px;
       padding: 16px 14px 15px;
       border-radius: 25px;
-      background: #F9FBF9;
-      border: 1px solid rgba(46, 77, 60, .11);
-      box-shadow: 0 22px 56px rgba(31, 61, 44, .12);
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(214, 226, 218, 0.5);
+      box-shadow:
+        0 2px 4px rgba(31, 61, 44, 0.03),
+        0 12px 28px rgba(31, 61, 44, 0.07),
+        0 26px 60px rgba(31, 61, 44, 0.11),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
       overflow: hidden;
+      animation: mno-card-up .5s cubic-bezier(.16,1,.3,1) .15s both;
     }
 
     .mno-assistant-card::before {
@@ -325,7 +353,7 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
     .mno-bubble.owner {
       align-self: flex-end;
       border-bottom-right-radius: 5px;
-      background: var(--native-green);
+      background: linear-gradient(135deg, var(--native-green-light), var(--native-green));
       color: #fff;
       animation-delay: .72s;
     }
@@ -340,9 +368,12 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       gap: 11px;
       margin-top: 12px;
       padding: 11px 12px;
-      border: 1px solid var(--native-line);
+      border: 1px solid rgba(214, 226, 218, 0.5);
+      border-left: 3px solid var(--native-green);
       border-radius: 16px;
-      background: rgba(255,255,255,.8);
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
 
     .mno-contact-strip .mno-assistant-avatar {
@@ -372,9 +403,11 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       display: grid;
       place-items: center;
       color: #fff;
-      background: var(--native-green);
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green));
       font-size: 13px;
       font-weight: 900;
+      box-shadow: 0 4px 12px rgba(46, 125, 91, 0.2);
+      animation: mno-check-in .4s cubic-bezier(.16,1,.3,1) both;
     }
 
     .mno-ready-list {
@@ -389,8 +422,17 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       gap: 13px;
       border-radius: 17px;
       padding: 13px 14px;
-      border: 1px solid rgba(46, 77, 60, .1);
-      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(228, 238, 232, 0.5);
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      animation: mno-item-in .4s cubic-bezier(.16,1,.3,1) both;
+      animation-delay: calc(var(--i, 0) * 80ms + 150ms);
+      transition: transform 200ms ease, box-shadow 200ms ease;
+    }
+
+    .mno-ready-item:active {
+      transform: scale(0.98);
     }
 
     .mno-ready-number {
@@ -400,10 +442,11 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       display: grid;
       place-items: center;
       border-radius: 10px;
-      background: #DCEAE2;
+      background: linear-gradient(145deg, rgba(220, 234, 226, 0.8), rgba(200, 222, 210, 0.6));
       color: var(--native-green-dark);
       font-size: 12px;
       font-weight: 850;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     .mno-ready-item strong {
@@ -442,13 +485,28 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
     }
 
     .mno-primary {
+      position: relative;
       color: #fff;
-      background: linear-gradient(180deg, #357F60, #27694D);
-      box-shadow: 0 13px 28px rgba(46,125,91,.24), inset 0 1px rgba(255,255,255,.2);
+      background: linear-gradient(135deg, var(--native-green-light) 0%, var(--native-green) 50%, var(--native-green-dark) 100%);
+      box-shadow: 0 6px 16px rgba(46,125,91,.2), 0 13px 32px rgba(46,125,91,.18);
+      overflow: hidden;
+    }
+
+    .mno-primary::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.18) 50%, transparent 62%);
+      animation: mno-shimmer 3.5s ease-in-out infinite;
+      pointer-events: none;
     }
 
     .mno-primary:active {
       transform: scale(.985);
+    }
+
+    .mno-primary:disabled::after {
+      animation: none;
     }
 
     .mno-secondary {
@@ -471,13 +529,14 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       width: 6px;
       height: 6px;
       border-radius: 999px;
-      background: rgba(70, 91, 79, .22);
-      transition: width .2s ease, background .2s ease;
+      background: rgba(70, 91, 79, .18);
+      transition: width .28s ease, background .28s ease, box-shadow .28s ease;
     }
 
     .mno-dot.active {
-      width: 19px;
-      background: var(--native-green);
+      width: 22px;
+      background: linear-gradient(90deg, var(--native-green), var(--native-green-light));
+      box-shadow: 0 0 10px rgba(46, 125, 91, 0.3);
     }
 
     .mno-status-note {
@@ -523,14 +582,18 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       position: relative;
       width: min(100%, 520px);
       margin: 0 auto;
-      border: 1px solid rgba(255,255,255,.78);
+      border: 1px solid rgba(213, 226, 218, 0.5);
       border-radius: 24px;
       padding: 18px 17px 15px;
-      background: rgba(249, 251, 249, .95);
-      box-shadow: 0 24px 70px rgba(0,0,0,.25);
-      backdrop-filter: blur(28px) saturate(1.2);
-      -webkit-backdrop-filter: blur(28px) saturate(1.2);
-      animation: mno-card-up .38s cubic-bezier(.2,.8,.2,1) both;
+      background: rgba(249, 251, 249, .85);
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.03),
+        0 12px 32px rgba(0,0,0,0.10),
+        0 28px 72px rgba(0,0,0,0.20),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+      backdrop-filter: blur(28px) saturate(1.4);
+      -webkit-backdrop-filter: blur(28px) saturate(1.4);
+      animation: mno-card-up .42s cubic-bezier(.16,1,.3,1) both;
     }
 
     .mno-coach-card::after {
@@ -555,11 +618,14 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
     }
 
     .mno-coach-eyebrow {
-      color: var(--native-green-dark);
+      color: transparent;
       font-size: 11px;
       font-weight: 850;
-      letter-spacing: .085em;
+      letter-spacing: .12em;
       text-transform: uppercase;
+      background: linear-gradient(135deg, var(--native-green), var(--native-green-light));
+      -webkit-background-clip: text;
+      background-clip: text;
     }
 
     .mno-coach-count {
@@ -593,7 +659,10 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       border-radius: 12px;
       padding: 9px 10px;
       color: #355844;
-      background: #E8F1EB;
+      background: rgba(232, 241, 235, 0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(202, 225, 211, 0.4);
       font-size: 11px;
       line-height: 1.35;
       font-weight: 670;
@@ -608,9 +677,10 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       place-items: center;
       border-radius: 50%;
       color: #fff;
-      background: var(--native-green);
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green));
       font-size: 10px;
       font-weight: 900;
+      box-shadow: 0 3px 8px rgba(46, 125, 91, 0.18);
     }
 
     .mno-coach-actions {
@@ -643,8 +713,29 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
     }
 
     @keyframes mno-card-up {
-      from { opacity: 0; transform: translateY(16px) scale(.985); }
+      from { opacity: 0; transform: translateY(18px) scale(.985); }
       to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes mno-shimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
+    }
+
+    @keyframes mno-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes mno-check-in {
+      0% { opacity: 0; transform: scale(0.5); }
+      60% { transform: scale(1.15); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes mno-item-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @media (max-height: 720px) {
@@ -665,21 +756,27 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
     @media (prefers-reduced-motion: reduce) {
       .mno-stage,
       .mno-coach-card,
-      .mno-bubble {
+      .mno-bubble,
+      .mno-property-card,
+      .mno-assistant-card,
+      .mno-ready-item,
+      .mno-contact-check,
+      .mno-intro::before,
+      .mno-primary::after {
         animation-duration: .01ms !important;
         animation-delay: 0ms !important;
       }
     }
-  `,document.head.appendChild(t)}function v(t,n){return Array.from({length:n},(o,x)=>`<span class="mno-dot${x===t?" active":""}" aria-hidden="true"></span>`).join("")}function $(t){const n=i(h()),o=i(h().charAt(0).toUpperCase());return t===0?`
+  `,document.head.appendChild(t)}function v(t,a){return Array.from({length:a},(n,u)=>`<span class="mno-dot${u===t?" active":""}" aria-hidden="true"></span>`).join("")}function $(t){const a=i(h()),n=i(h().charAt(0).toUpperCase());return t===0?`
       <div class="mno-stage">
         <div class="mno-kicker">Connected</div>
         <h1 class="mno-title">Front Desk is ready.</h1>
-        <p class="mno-copy">Everything you need to run ${n} now lives on this phone.</p>
+        <p class="mno-copy">Everything you need to run ${a} now lives on this phone.</p>
         <div class="mno-property-card">
           <div class="mno-property-row">
-            <div class="mno-property-icon">${o}</div>
+            <div class="mno-property-icon">${n}</div>
             <div style="min-width:0;flex:1;">
-              <div class="mno-property-name">${n}</div>
+              <div class="mno-property-name">${a}</div>
               <div class="mno-property-status">Booking page connected</div>
             </div>
           </div>
@@ -723,15 +820,15 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       <h1 class="mno-title">Four places. No maze.</h1>
       <p class="mno-copy">You already know what Marketel does. Here is where you run it.</p>
       <div class="mno-ready-list">
-        <div class="mno-ready-item">
+        <div class="mno-ready-item" style="--i:0">
           <div class="mno-ready-number">01</div>
           <div><strong>Shape the page</strong><span>Rooms, photos, rates and guest-facing details.</span></div>
         </div>
-        <div class="mno-ready-item">
+        <div class="mno-ready-item" style="--i:1">
           <div class="mno-ready-number">02</div>
           <div><strong>Run today</strong><span>Bookings and availability, without the clutter.</span></div>
         </div>
-        <div class="mno-ready-item">
+        <div class="mno-ready-item" style="--i:2">
           <div class="mno-ready-number">03</div>
           <div><strong>Bring guests back</strong><span>Share the app link or QR when they are ready.</span></div>
         </div>
@@ -742,7 +839,7 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       <div class="mno-status-note">${e.contactAttempted?"No problem — you can save it later from Assistant.":"Save it now so you recognize Marketel when messages begin."}</div>
       <div class="mno-progress">${v(t,3)}</div>`:`
     <button class="mno-primary" type="button" data-mno-action="next">${t===0?"Set up Front Desk":t===1?"Continue":"Show me the app"}</button>
-    <div class="mno-progress">${v(t,3)}</div>`}function T(){m(!1),l(!1);const t=S();t.innerHTML=`
+    <div class="mno-progress">${v(t,3)}</div>`}function T(){m(!1),c(!1);const t=S();t.innerHTML=`
     <section class="mno-intro" role="dialog" aria-modal="true" aria-label="Front Desk setup">
       <div class="mno-topline">
         <div class="mno-wordmark"><img class="mno-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</div>
@@ -752,20 +849,20 @@ import{c as N}from"./settings-DzmlfyYA.js";const y="marketelNativeOnboardingV1Do
       <footer class="mno-footer">
         ${I(e.step)}
       </footer>
-    </section>`}function w(t){typeof window.marketelNativeSelectTab=="function"&&window.marketelNativeSelectTab(t)}function B(){const t=a[e.step]||a[0];l(!0),m(!0),w(t.filter);const n=S();n.innerHTML=`
+    </section>`}function w(t){typeof window.marketelNativeSelectTab=="function"&&window.marketelNativeSelectTab(t)}function Y(){const t=o[e.step]||o[0];c(!0),m(!0),w(t.filter);const a=S();a.innerHTML=`
     <section class="mno-tour" role="dialog" aria-modal="true" aria-label="Front Desk walkthrough">
       <button class="mno-tour-skip" type="button" data-mno-action="skip">Skip tour</button>
       <div class="mno-coach-card" style="--tab-x:${t.tabPosition}">
         <div class="mno-coach-top">
           <span class="mno-coach-eyebrow">${i(t.eyebrow)}</span>
-          <span class="mno-coach-count">${e.step+1} of ${a.length}</span>
+          <span class="mno-coach-count">${e.step+1} of ${o.length}</span>
         </div>
         <h2 class="mno-coach-title">${i(t.title)}</h2>
         <p class="mno-coach-body">${i(t.body)}</p>
         <div class="mno-coach-note">${i(t.note)}</div>
         <div class="mno-coach-actions">
           <button class="mno-secondary" type="button" data-mno-action="back">Back</button>
-          <button class="mno-primary" type="button" data-mno-action="next">${e.step===a.length-1?"Open Front Desk":"Next"}</button>
+          <button class="mno-primary" type="button" data-mno-action="next">${e.step===o.length-1?"Open Front Desk":"Next"}</button>
         </div>
       </div>
-    </section>`}function S(){let t=document.getElementById(r);return t||(t=document.createElement("div"),t.id=r,t.addEventListener("click",M),document.body.appendChild(t)),t}function s(){e&&(O(),document.documentElement.classList.add("marketel-native-tour-open"),u(),e.phase==="tour"?B():T())}function M(t){const n=t.target?.closest?.("[data-mno-action]");if(!n||!e)return;const o=n.getAttribute("data-mno-action");o==="next"?_():o==="back"?Y():o==="skip"?E({skipped:!0}):o==="save-contact"&&P()}function _(){if(e){if(e.phase==="intro")e.step<2?e.step+=1:(e.phase="tour",e.step=0);else if(e.step<a.length-1)e.step+=1;else{E();return}s()}}function Y(){e&&(e.phase==="tour"?e.step>0?e.step-=1:(e.phase="intro",e.step=2):e.step>0&&(e.step-=1),s())}function P(){if(!e)return;e.contactAttempted=!0,u(),p({type:"saveContact",phone:A})||s()}function z(){document.getElementById(r)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),m(!1),l(!0)}function E({skipped:t=!1}={}){try{localStorage.setItem(y,"1"),localStorage.removeItem(d)}catch{}e=null,z(),w("bookings"),D(),!t&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function R(t){if(e){if(e.contactAttempted=!0,e.contactSaved=t===!0,t)try{localStorage.setItem(c,"1")}catch{}u(),e.phase==="intro"&&e.step===1&&s()}}function F({replay:t=!1}={}){return k()?(e&&z(),e=(t?null:C())||{phase:"intro",step:0,contactSaved:g(c),contactAttempted:!1},s(),!0):!1}function L(){return!k()||g(y)?!1:F()}function j(){b||(b=!0,window.marketelNativeContactResult=R,window.startNativeOnboarding=F,window.maybeStartNativeOnboarding=L)}export{j as install,L as maybeStartNativeOnboarding,F as startNativeOnboarding};
+    </section>`}function S(){let t=document.getElementById(r);return t||(t=document.createElement("div"),t.id=r,t.addEventListener("click",M),document.body.appendChild(t)),t}function s(){e&&(O(),document.documentElement.classList.add("marketel-native-tour-open"),b(),e.phase==="tour"?Y():T())}function M(t){const a=t.target?.closest?.("[data-mno-action]");if(!a||!e)return;const n=a.getAttribute("data-mno-action");n==="next"?B():n==="back"?_():n==="skip"?N({skipped:!0}):n==="save-contact"&&P()}function B(){if(e){if(e.phase==="intro")e.step<2?e.step+=1:(e.phase="tour",e.step=0);else if(e.step<o.length-1)e.step+=1;else{N();return}s()}}function _(){e&&(e.phase==="tour"?e.step>0?e.step-=1:(e.phase="intro",e.step=2):e.step>0&&(e.step-=1),s())}function P(){if(!e)return;e.contactAttempted=!0,b(),p({type:"saveContact",phone:A})||s()}function z(){document.getElementById(r)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),m(!1),c(!0)}function N({skipped:t=!1}={}){try{localStorage.setItem(y,"1"),localStorage.removeItem(d)}catch{}e=null,z(),w("bookings"),D(),!t&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function R(t){if(e){if(e.contactAttempted=!0,e.contactSaved=t===!0,t)try{localStorage.setItem(l,"1")}catch{}b(),e.phase==="intro"&&e.step===1&&s()}}function E({replay:t=!1}={}){return k()?(e&&z(),e=(t?null:C())||{phase:"intro",step:0,contactSaved:g(l),contactAttempted:!1},s(),!0):!1}function L(){return!k()||g(y)?!1:E()}function j(){f||(f=!0,window.marketelNativeContactResult=R,window.startNativeOnboarding=E,window.maybeStartNativeOnboarding=L)}export{j as install,L as maybeStartNativeOnboarding,E as startNativeOnboarding};
