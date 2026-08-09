@@ -74,6 +74,7 @@ function createFrontDeskAssistant({
     enumerateDatesInclusive,
     manualBookingStayDates,
     cancelBookingByOwner,
+    applyBookingApprovalDecision,
     maybeNotifyRoomSoldOutToday,
     reportTimeZone = 'America/Chicago',
 }) {
@@ -347,7 +348,15 @@ function createFrontDeskAssistant({
             }),
             prisma.hotelConfig.findUnique({
                 where: { id: hotelId },
-                select: { id: true, name: true, pms: true, subscribed: true },
+                select: {
+                    id: true,
+                    name: true,
+                    pms: true,
+                    subscribed: true,
+                    bookingApprovalEnabled: true,
+                    bookingApprovalWindowMinutes: true,
+                    bookingApprovalNoResponseAction: true,
+                },
             }),
         ]);
         return {
@@ -382,7 +391,35 @@ function createFrontDeskAssistant({
                 maxRecipients: MAX_RECIPIENTS,
                 assistantPhone: twilioPhoneNumber || '',
             },
+            bookingApproval: {
+                enabled: hotel?.bookingApprovalEnabled === true,
+                windowMinutes: Math.min(60, Math.max(5, Number(hotel?.bookingApprovalWindowMinutes) || 20)),
+                noResponseAction: String(hotel?.bookingApprovalNoResponseAction || '').toLowerCase() === 'release'
+                    ? 'release'
+                    : 'confirm',
+            },
         };
+    }
+
+    async function countReachableBookingRecipients(hotelId) {
+        if ((!twilioReady && !smsDryRun) || !hotelId) return 0;
+        const [config, hotel] = await Promise.all([
+            ensureConfig(hotelId).catch(() => null),
+            prisma.hotelConfig.findUnique({
+                where: { id: hotelId },
+                select: { subscribed: true, pms: true },
+            }).catch(() => null),
+        ]);
+        if (!hotel?.subscribed || String(hotel.pms || '').toLowerCase() !== 'manual') return 0;
+        if (!config?.enabled || config.notifyNewBookings === false) return 0;
+        return prisma.frontDeskAssistantRecipient.count({
+            where: {
+                hotelId,
+                active: true,
+                verifiedAt: { not: null },
+                consentAt: { not: null },
+            },
+        });
     }
 
     function verificationCode() {
@@ -556,6 +593,16 @@ function createFrontDeskAssistant({
         if (!booking) return { ok: false, message: 'That booking no longer exists.' };
         if (DEAD_BOOKING_STATUSES.includes(String(booking.status || '').toLowerCase())) {
             return { ok: false, message: 'That booking has already been cancelled.' };
+        }
+        if (String(booking.status || '').toLowerCase() === 'pending' && applyBookingApprovalDecision) {
+            const decision = await applyBookingApprovalDecision(booking.id, 'confirm', 'assistant');
+            await prisma.frontDeskAssistantPendingAction.update({
+                where: { id: action.id },
+                data: { status: 'applied', appliedAt: new Date() },
+            }).catch(() => {});
+            return decision?.ok
+                ? { ok: true, message: `Confirmed — ${booking.roomName} is booked and the guest has been emailed.`, booking: decision.booking || booking }
+                : { ok: false, message: 'I could not safely confirm that booking. Open Front Desk to review it.' };
         }
         await Promise.all([
             prisma.booking.update({
@@ -1097,6 +1144,20 @@ function createFrontDeskAssistant({
             if (!action) {
                 return 'Tell me which room was taken and the dates, for example: “Queen Room tonight.”';
             }
+            const bookingId = String(action?.payload?.bookingId || '');
+            const booking = bookingId
+                ? await prisma.booking.findFirst({ where: { id: bookingId, hotelId: recipient.hotelId } })
+                : null;
+            if (String(booking?.status || '').toLowerCase() === 'pending' && applyBookingApprovalDecision) {
+                const decision = await applyBookingApprovalDecision(booking.id, 'release', 'assistant');
+                await prisma.frontDeskAssistantPendingAction.update({
+                    where: { id: action.id },
+                    data: { status: 'applied', appliedAt: new Date() },
+                }).catch(() => {});
+                return decision?.ok
+                    ? `Released — I freed ${booking.roomName}, voided the $1 hold, and notified the guest.`
+                    : 'I could not safely release that booking. Open Front Desk to review it.';
+            }
             const pending = await createBookingCancellationQuestion(action, recipient);
             if (!pending) return 'That booking is no longer available to review.';
             const guest = [pending.booking.guestFirstName, pending.booking.guestLastName]
@@ -1199,7 +1260,16 @@ function createFrontDeskAssistant({
             ? dateRangeLabel(stayDates[0], stayDates[stayDates.length - 1])
             : 'upcoming stay';
         const amount = Number(booking.grandTotal || 0).toFixed(2);
-        const body = `Marketel Front Desk — ${hotel.name || 'Your property'}\nNew booking: ${booking.roomName}, ${stay}, $${amount}.\nIs the room still available? Reply YES or NO.`;
+        const isPending = String(booking.status || '').toLowerCase() === 'pending';
+        const dueMs = new Date(booking.pendingUntil || 0).getTime() - Date.now();
+        const minutes = Math.max(1, Math.round(dueMs / 60000));
+        const fallbackRelease = String(booking.approvalNoResponseAction || '').toLowerCase() === 'release';
+        const fallbackLine = fallbackRelease
+            ? `No reply releases the request in ${minutes} min.`
+            : `No reply keeps the booking in ${minutes} min.`;
+        const body = isPending
+            ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNew request: ${booking.roomName}, ${stay}, $${amount}.\nStill free? Reply YES to keep it or NO to release it. ${fallbackLine}`
+            : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNew booking: ${booking.roomName}, ${stay}, $${amount}.\nIs the room still available? Reply YES or NO.`;
         return sendToVerifiedRecipients(hotel, body, {
             type: 'booking_alert',
             summary: `New ${booking.roomName} booking · ${stay}`,
@@ -1207,6 +1277,28 @@ function createFrontDeskAssistant({
                 bookingId: booking.id,
                 actionId: action.id,
             },
+        });
+    }
+
+    async function notifyBookingDecision(bookingOrId, outcome) {
+        const booking = typeof bookingOrId === 'string'
+            ? await prisma.booking.findUnique({ where: { id: bookingOrId } }).catch(() => null)
+            : bookingOrId;
+        if (!booking?.hotelId) return { sent: 0 };
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: booking.hotelId },
+            include: { frontDeskAssistant: true },
+        }).catch(() => null);
+        const config = hotel?.frontDeskAssistant;
+        if (!hotel || !hotel.subscribed || !config?.enabled || config.notifyNewBookings === false) return { sent: 0 };
+        const released = outcome === 'auto_released';
+        const body = released
+            ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was released, the $1 hold was voided, and the guest was notified.`
+            : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was confirmed and the guest was emailed.`;
+        return sendToVerifiedRecipients(hotel, body, {
+            type: 'booking_decision',
+            summary: released ? `${booking.roomName} auto-released` : `${booking.roomName} auto-confirmed`,
+            metadata: { bookingId: booking.id, outcome },
         });
     }
 
@@ -1723,7 +1815,9 @@ function createFrontDeskAssistant({
     return {
         registerRoutes,
         notifyNewBooking,
+        notifyBookingDecision,
         runScheduledChecks,
+        countReachableBookingRecipients,
         isMessagingConfigured: () => twilioReady || smsDryRun,
     };
 }

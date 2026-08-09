@@ -36,7 +36,15 @@ async function main() {
     }
     const hotel = await prisma.hotelConfig.findUnique({
         where: { id: HOTEL_ID },
-        select: { id: true, name: true, pms: true, setupToken: true, bookingApprovalEnabled: true, frontdeskInstalledAt: true },
+        select: {
+            id: true,
+            name: true,
+            pms: true,
+            setupToken: true,
+            bookingApprovalEnabled: true,
+            bookingApprovalNoResponseAction: true,
+            frontdeskInstalledAt: true,
+        },
     });
     if (!hotel) { console.error(`No hotel ${HOTEL_ID}`); process.exit(1); }
     if (!hotel.setupToken) { console.error('Hotel has no setupToken; cannot mint a return token.'); process.exit(1); }
@@ -44,6 +52,7 @@ async function main() {
     // Snapshot so we can restore whatever the hotel looked like before.
     const original = {
         bookingApprovalEnabled: hotel.bookingApprovalEnabled,
+        bookingApprovalNoResponseAction: hotel.bookingApprovalNoResponseAction,
         frontdeskInstalledAt: hotel.frontdeskInstalledAt,
     };
     const token = mintReturnToken(HOTEL_ID, hotel.setupToken);
@@ -67,16 +76,33 @@ async function main() {
     const authed = await call('GET', '/api/crm/booking-approval');
     check('minted return token is accepted', authed.httpStatus === 200, JSON.stringify(authed.body).slice(0, 200));
 
-    const devicesBefore = await prisma.pushSubscription.count({ where: { hotelId: HOTEL_ID, NOT: { source: 'guest' } } });
-    console.log(`\nSettings (owner push devices right now: ${devicesBefore})`);
+    const [webDevices, nativeDevices] = await Promise.all([
+        prisma.pushSubscription.count({ where: { hotelId: HOTEL_ID, NOT: { source: 'guest' } } }),
+        prisma.nativePushDevice.count({ where: { hotelId: HOTEL_ID, active: true } }),
+    ]);
+    const devicesBefore = webDevices + nativeDevices;
+    const reachableChannels = Number(authed.body.data.reachableChannels || 0);
+    console.log(`\nSettings (owner app devices: ${devicesBefore}; reachable app/text channels: ${reachableChannels})`);
     check('reports manual-PMS support correctly',
         authed.body.data.supported === (String(hotel.pms).toLowerCase() === 'manual'),
         `saw supported=${authed.body.data.supported}`);
     check('device count matches the database', authed.body.data.devices === devicesBefore,
         `saw ${authed.body.data.devices}`);
     check('exposes a missed-review count', typeof authed.body.data.missedReviews === 'number');
+    check('exposes the no-answer rule', ['confirm', 'release'].includes(authed.body.data.noResponseAction));
 
-    if (devicesBefore === 0) {
+    console.log('\nNo-answer policy');
+    const releaseRule = await call('POST', '/api/crm/booking-approval', { noResponseAction: 'release' });
+    check('release rule is accepted', releaseRule.httpStatus === 200, JSON.stringify(releaseRule.body));
+    const savedRule = await prisma.hotelConfig.findUnique({
+        where: { id: HOTEL_ID },
+        select: { bookingApprovalNoResponseAction: true },
+    });
+    check('release rule is persisted', savedRule.bookingApprovalNoResponseAction === 'release');
+    const invalidRule = await call('POST', '/api/crm/booking-approval', { noResponseAction: 'guess' });
+    check('invalid rule is rejected', invalidRule.httpStatus === 400, JSON.stringify(invalidRule.body));
+
+    if (reachableChannels === 0) {
         const refused = await call('POST', '/api/crm/booking-approval', { enabled: true });
         check('refuses to enable with no reachable device', refused.httpStatus === 400,
             `saw ${refused.httpStatus} ${JSON.stringify(refused.body)}`);
@@ -128,10 +154,11 @@ async function main() {
     await prisma.hotelConfig.update({ where: { id: HOTEL_ID }, data: original });
     const restored = await prisma.hotelConfig.findUnique({
         where: { id: HOTEL_ID },
-        select: { bookingApprovalEnabled: true, frontdeskInstalledAt: true },
+        select: { bookingApprovalEnabled: true, bookingApprovalNoResponseAction: true, frontdeskInstalledAt: true },
     });
     check('hotel settings restored',
         restored.bookingApprovalEnabled === original.bookingApprovalEnabled
+        && restored.bookingApprovalNoResponseAction === original.bookingApprovalNoResponseAction
         && String(restored.frontdeskInstalledAt) === String(original.frontdeskInstalledAt));
 
     console.log(`\n${failed === 0 ? 'ALL PASS' : 'FAILURES'}: ${passed} passed, ${failed} failed\n`);

@@ -133,6 +133,14 @@ function ensureStyles() {
     .fda-toggle::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.15s;}
     .fda-toggle:checked{background:#2e7d5b;}
     .fda-toggle:checked::after{transform:translateX(20px);}
+    .fda-policy-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+    .fda-policy-option{position:relative;display:block;cursor:pointer;}
+    .fda-policy-option input{position:absolute;opacity:0;pointer-events:none;}
+    .fda-policy-option-copy{height:100%;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:13px;padding:12px;background:#fafcfb;color:#5d7166;transition:border-color .15s,background .15s,box-shadow .15s;}
+    .fda-policy-option-copy strong{display:block;color:#1a2b22;font-size:12.5px;margin-bottom:4px;}
+    .fda-policy-option-copy span{display:block;font-size:10.5px;line-height:1.4;}
+    .fda-policy-option input:checked + .fda-policy-option-copy{border-color:#2e7d5b;background:#edf7f1;box-shadow:0 0 0 3px rgba(46,125,91,.07);}
+    .fda-policy-result{margin-top:9px;border-radius:11px;padding:10px 11px;background:#f1f5f3;color:#40574b;font-size:11px;line-height:1.45;}
     .fda-person{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid #edf1ef;}
     .fda-person:first-of-type{border-top:0;}
     .fda-avatar{width:36px;height:36px;border-radius:50%;background:#e8f4ed;color:#2e7d5b;display:flex;align-items:center;justify-content:center;font-weight:850;flex:0 0 auto;}
@@ -166,7 +174,7 @@ function ensureStyles() {
     .fda-note{font-size:10.5px;color:#7a8b81;line-height:1.45;margin-top:9px;}
     @keyframes fdaSheetIn{from{transform:translateY(18px);opacity:.8}to{transform:translateY(0);opacity:1}}
     @media(min-width:700px){.fda-overlay{align-items:center;padding:20px}.fda-sheet{border-radius:24px;max-height:90dvh}}
-    @media(max-width:420px){.fda-card-row{align-items:flex-start}.fda-card-btn{padding:9px 10px}.fda-grid{grid-template-columns:1fr}.fda-actions{grid-template-columns:1fr}.fda-sheet-body{padding:13px}}
+    @media(max-width:420px){.fda-card-row{align-items:flex-start}.fda-card-btn{padding:9px 10px}.fda-grid{grid-template-columns:1fr}.fda-actions{grid-template-columns:1fr}.fda-sheet-body{padding:13px}.fda-policy-options{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
 }
@@ -232,15 +240,19 @@ export function renderFrontDeskAssistantCard() {
 
   const recipients = verifiedRecipients();
   const config = crm.assistantData.config || {};
+  const approval = crm.assistantData.bookingApproval || {};
   if (config.enabled) {
     const next = config.nextCheckAt ? ` · next ${formatWhen(config.nextCheckAt, { relative: true })}` : '';
+    const bookingRule = approval.enabled
+      ? ` · no reply ${approval.noResponseAction === 'release' ? 'releases request' : 'keeps booking'}`
+      : '';
     panel.innerHTML = `<div class="fda-card">
       <div class="fda-card-row">
         <div class="fda-card-icon">💬</div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow fda-live">Assistant on</div>
           <div class="fda-card-title">Front Desk is watching ${recipients.length} phone${recipients.length === 1 ? '' : 's'}</div>
-          <div class="fda-card-sub">${esc(frequencyLabel(config.checkFrequency))}${esc(next)}</div>
+          <div class="fda-card-sub">${esc(frequencyLabel(config.checkFrequency))}${esc(next)}${esc(bookingRule)}</div>
         </div>
         <button type="button" class="fda-card-btn" onclick="openFrontDeskAssistant()">Manage</button>
       </div>
@@ -310,12 +322,14 @@ function sheetBodyHtml() {
     return '<div class="fda-section"><div class="loading"><div class="logo-sprite-bounce"></div> Opening assistant…</div></div>';
   }
   const config = data.config || {};
+  const approval = data.bookingApproval || {};
   const recipients = activeRecipients();
   const capabilities = data.capabilities || {};
   const subscribed = isSubscribed();
   const recipientLimit = Number(capabilities.maxRecipients || 3);
   const canAdd = recipients.length < recipientLimit;
   const settingsDisabled = subscribed ? '' : 'disabled';
+  const policyDisabled = subscribed && capabilities.manualAvailability ? '' : 'disabled';
   const zone = config.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
   const isNativeApp = typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
   const systemNote = capabilities.smsConfigured
@@ -332,6 +346,7 @@ function sheetBodyHtml() {
       <div class="fda-bubble assistant"><strong>Front Desk</strong><br>New booking: Queen Room, tonight. Is it still free?</div>
       <div class="fda-bubble owner">A walk-in took it.</div>
       <div class="fda-bubble assistant"><strong>Done.</strong> I updated availability. If an online guest is affected, I’ll ask before cancelling anything.</div>
+      <div class="fda-policy-result"><strong>You set the fallback.</strong> If nobody answers a new-booking alert, Front Desk either keeps the sale or releases the request—your choice.</div>
     </div>
 
     ${!subscribed && !isNativeApp ? `<div class="fda-section fda-lock">
@@ -350,6 +365,34 @@ function sheetBodyHtml() {
         </div>
         <input class="fda-toggle" id="assistant-enabled" type="checkbox" ${config.enabled ? 'checked' : ''} ${settingsDisabled} aria-label="Turn Front Desk Assistant on">
       </div>
+    </div>
+
+    <div class="fda-section">
+      <div class="fda-row fda-between">
+        <div>
+          <div class="fda-section-title">Review before a booking locks in</div>
+          <div class="fda-section-sub" style="margin:0;">Front Desk holds the room, asks connected phones, then follows your rule if nobody replies.</div>
+        </div>
+        <input class="fda-toggle" id="assistant-approval-enabled" type="checkbox" ${approval.enabled ? 'checked' : ''} ${policyDisabled} aria-label="Review new bookings before confirmation" onchange="updateAssistantPolicySummary()">
+      </div>
+      <div class="fda-field" style="margin-top:13px;">
+        <label for="assistant-approval-window">Time to answer</label>
+        <select id="assistant-approval-window" ${policyDisabled} onchange="updateAssistantPolicySummary()">
+          ${[5, 10, 15, 20, 30, 45, 60].map((minutes) => `<option value="${minutes}" ${Number(approval.windowMinutes || 20) === minutes ? 'selected' : ''}>${minutes} minutes</option>`).join('')}
+        </select>
+      </div>
+      <div class="fda-section-title" style="margin-top:2px;">If nobody answers</div>
+      <div class="fda-policy-options">
+        <label class="fda-policy-option">
+          <input type="radio" name="assistant-no-response" value="confirm" ${approval.noResponseAction !== 'release' ? 'checked' : ''} ${policyDisabled} onchange="updateAssistantPolicySummary()">
+          <span class="fda-policy-option-copy"><strong>Keep the booking</strong><span>Confirm it automatically. Best when saving the sale matters most.</span></span>
+        </label>
+        <label class="fda-policy-option">
+          <input type="radio" name="assistant-no-response" value="release" ${approval.noResponseAction === 'release' ? 'checked' : ''} ${policyDisabled} onchange="updateAssistantPolicySummary()">
+          <span class="fda-policy-option-copy"><strong>Release the request</strong><span>Void the $1 hold and notify the guest. Best when availability must be certain.</span></span>
+        </label>
+      </div>
+      <div class="fda-policy-result" id="assistant-policy-result"></div>
     </div>
 
     <div class="fda-section">
@@ -414,6 +457,22 @@ function renderSheet() {
     <button type="button" class="fda-close" onclick="closeFrontDeskAssistant()" aria-label="Close">×</button>
   </div>
   <div class="fda-sheet-body">${sheetBodyHtml()}</div>`;
+  updateAssistantPolicySummary();
+}
+
+export function updateAssistantPolicySummary() {
+  const target = document.getElementById('assistant-policy-result');
+  if (!target) return;
+  const enabled = !!document.getElementById('assistant-approval-enabled')?.checked;
+  const minutes = Number(document.getElementById('assistant-approval-window')?.value || 20);
+  const action = document.querySelector('input[name="assistant-no-response"]:checked')?.value || 'confirm';
+  if (!enabled) {
+    target.innerHTML = '<strong>Off.</strong> New direct bookings confirm immediately.';
+    return;
+  }
+  target.innerHTML = action === 'release'
+    ? `<strong>Your rule:</strong> no answer after ${minutes} minutes releases the request, voids the $1 hold and emails the guest.`
+    : `<strong>Your rule:</strong> no answer after ${minutes} minutes keeps the booking and emails the guest a confirmation.`;
 }
 
 export function openFrontDeskAssistant() {
@@ -527,8 +586,16 @@ export async function saveAssistantSettings() {
       || 'America/Chicago',
     notifyNewBookings: !!document.getElementById('assistant-booking-alerts')?.checked,
   };
+  const approvalPayload = {
+    enabled: !!document.getElementById('assistant-approval-enabled')?.checked,
+    windowMinutes: Number(document.getElementById('assistant-approval-window')?.value || 20),
+    noResponseAction: document.querySelector('input[name="assistant-no-response"]:checked')?.value || 'confirm',
+  };
   try {
-    applyResult(await api('PUT', '/api/crm/frontdesk-assistant', payload), 'Front Desk Assistant saved.');
+    applyResult(await api('PUT', '/api/crm/frontdesk-assistant', payload));
+    await api('POST', '/api/crm/booking-approval', approvalPayload);
+    await loadFrontDeskAssistant({ force: true });
+    toast('Front Desk Assistant and booking rule saved.', 'success');
   } catch (error) {
     toast(error.message || 'Could not save the assistant.', 'error');
   }
@@ -625,6 +692,7 @@ const exportsForWindow = {
   saveAssistantContact,
   saveAssistantSettings,
   sendAssistantTest,
+  updateAssistantPolicySummary,
   verifyAssistantRecipient,
 };
 

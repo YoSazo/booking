@@ -3,6 +3,7 @@ import { crm } from './state.js';
 const DONE_KEY = 'marketelNativeOnboardingV1Done';
 const STATE_KEY = 'marketelNativeOnboardingV1State';
 const CONTACT_KEY = 'marketelNativeFrontDeskContactV1';
+const POLICY_KEY = 'marketelNativeBookingFallbackV1';
 const FRONT_DESK_PHONE = '+18339830801';
 const STYLE_ID = 'marketelNativeOnboardingStyles';
 const OVERLAY_ID = 'marketelNativeOnboarding';
@@ -19,9 +20,9 @@ const OPERATIONAL_STEPS = [
   {
     filter: 'bookings',
     eyebrow: 'Bookings',
-    title: 'Start every day here.',
-    body: 'New reservations, guest details and anything that needs your attention arrive in one place.',
-    note: 'Review or cancel a booking without hunting through menus.',
+    title: 'You decide what happens.',
+    body: 'New room requests arrive here. Keep or release them in one tap, and your no-answer rule handles the moments you miss.',
+    note: 'Every pending card shows the countdown and your fallback before you act.',
     tabPosition: '37.5%',
   },
   {
@@ -95,6 +96,10 @@ function readBoolean(key) {
   try { return localStorage.getItem(key) === '1'; } catch (_) { return false; }
 }
 
+function readPolicy() {
+  try { return localStorage.getItem(POLICY_KEY) === 'release' ? 'release' : 'confirm'; } catch (_) { return 'confirm'; }
+}
+
 function saveSessionState() {
   if (!session) return;
   try {
@@ -102,6 +107,7 @@ function saveSessionState() {
       phase: session.phase,
       step: session.step,
       contactSaved: session.contactSaved,
+      noResponseAction: session.noResponseAction,
     }));
   } catch (_) {}
 }
@@ -115,6 +121,7 @@ function readSessionState() {
       phase: value.phase,
       step: Math.max(0, Math.min(Number(value.step) || 0, maxStep)),
       contactSaved: value.contactSaved === true || readBoolean(CONTACT_KEY),
+      noResponseAction: value.noResponseAction === 'release' ? 'release' : readPolicy(),
     };
   } catch (_) {
     return null;
@@ -227,13 +234,19 @@ function ensureStyles() {
       position: relative;
       z-index: 1;
       flex: 1;
+      min-height: 0;
       width: min(100%, 520px);
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: safe center;
       padding: 18px 0 12px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
     }
+
+    .mno-main::-webkit-scrollbar { display: none; }
 
     .mno-stage {
       animation: mno-enter .45s cubic-bezier(.2, .8, .2, 1) both;
@@ -406,6 +419,49 @@ function ensureStyles() {
       background: linear-gradient(180deg, rgba(114, 178, 143, .11), transparent);
       pointer-events: none;
     }
+
+    .mno-fallback {
+      position: relative;
+      display: grid;
+      gap: 8px;
+      margin-top: 13px;
+      padding-top: 13px;
+      border-top: 1px solid rgba(46, 77, 60, .1);
+    }
+
+    .mno-fallback > strong {
+      color: #34493e;
+      font-size: 11px;
+    }
+
+    .mno-fallback-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .mno-fallback-options button {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+      padding: 9px 8px;
+      text-align: left;
+      color: #64766c;
+      border: 1px solid rgba(46, 77, 60, .13);
+      border-radius: 12px;
+      background: rgba(246, 249, 247, .86);
+      font-family: inherit;
+    }
+
+    .mno-fallback-options button.is-selected {
+      color: var(--native-green-dark);
+      border-color: var(--native-green);
+      background: #e8f5ee;
+    }
+
+    .mno-fallback-options b { overflow:hidden;font-size:10px;text-overflow:ellipsis;white-space:nowrap; }
+    .mno-fallback-options span { font-size:8.5px; }
+    .mno-fallback > small { color:#718379;font-size:9px;line-height:1.35; }
 
     .mno-assistant-head {
       position: relative;
@@ -933,6 +989,7 @@ function introStageHtml(step) {
 
   if (step === 1) {
     const saved = !!session?.contactSaved;
+    const releases = session?.noResponseAction === 'release';
     return `
       <div class="mno-stage">
         <div class="mno-kicker">A real second set of eyes</div>
@@ -951,6 +1008,14 @@ function introStageHtml(step) {
             <div class="mno-bubble assistant">New direct booking: Queen Suite, tonight. Is it still free?</div>
             <div class="mno-bubble owner">A walk-in took it.</div>
             <div class="mno-bubble assistant final">Got it. I blocked tonight. I’ll ask before cancelling an existing guest.</div>
+          </div>
+          <div class="mno-fallback">
+            <strong>If nobody answers a new-booking alert</strong>
+            <div class="mno-fallback-options">
+              <button type="button" data-mno-action="policy" data-mno-policy="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep booking</b><span>Revenue first</span></button>
+              <button type="button" data-mno-action="policy" data-mno-policy="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
+            </div>
+            <small>${releases ? 'No reply voids the $1 hold and notifies the guest.' : 'No reply confirms the booking automatically.'} You can change this anytime.</small>
           </div>
           <div class="mno-contact-strip">
             <div class="mno-assistant-avatar">M</div>
@@ -1076,6 +1141,20 @@ function handleClick(event) {
   else if (action === 'back') back();
   else if (action === 'skip') finish({ skipped: true });
   else if (action === 'save-contact') saveContact();
+  else if (action === 'policy') selectNoResponsePolicy(target.getAttribute('data-mno-policy'));
+}
+
+function selectNoResponsePolicy(value) {
+  if (!session) return;
+  session.noResponseAction = value === 'release' ? 'release' : 'confirm';
+  try { localStorage.setItem(POLICY_KEY, session.noResponseAction); } catch (_) {}
+  saveSessionState();
+  if (typeof window.api === 'function') {
+    window.api('POST', '/api/crm/booking-approval', {
+      noResponseAction: session.noResponseAction,
+    }).catch(() => {});
+  }
+  render();
 }
 
 function next() {
@@ -1160,6 +1239,7 @@ export function startNativeOnboarding({ replay = false } = {}) {
     step: 0,
     contactSaved: readBoolean(CONTACT_KEY),
     contactAttempted: false,
+    noResponseAction: readPolicy(),
   };
   render();
   return true;

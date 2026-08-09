@@ -958,7 +958,7 @@ const handlePayLaterBooking = async (e) => {
 
                     if (bookingResult.success) {
                         sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
-                        onComplete(formData, error.payment_intent.id);
+                        onComplete(formData, error.payment_intent.id, bookingResult);
                         return;
                     }
                 }
@@ -1010,7 +1010,7 @@ const handlePayLaterBooking = async (e) => {
                     sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
                     
                     // Complete the booking
-                    onComplete(formData, paymentIntent.id);
+                    onComplete(formData, paymentIntent.id, bookingResult);
                 } else {
                     setErrorMessage(bookingResult.message || "Failed to create booking");
                     setIsProcessing(false);
@@ -1092,7 +1092,7 @@ const handlePayLaterBooking = async (e) => {
                         if (bookingResult.success) {
                             ev.complete('success');
                             sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
-                            onComplete(formData, confirmError.payment_intent.id);
+                            onComplete(formData, confirmError.payment_intent.id, bookingResult);
                             return;
                         }
                     }
@@ -1146,7 +1146,7 @@ const handlePayLaterBooking = async (e) => {
                         ev.complete('success');
                         
                         sessionStorage.setItem('finalBooking', JSON.stringify(payLaterBooking));
-                        onComplete(formData, paymentIntent.id);
+                        onComplete(formData, paymentIntent.id, bookingResult);
                     } else {
                         ev.complete('fail');
                         setErrorMessage(bookingResult.message);

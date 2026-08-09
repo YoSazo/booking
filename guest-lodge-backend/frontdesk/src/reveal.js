@@ -23,6 +23,7 @@ let activeBookingChallenge = null;
 let bookingPreviewOpened = false;
 let bookingPreviewUnavailable = false;
 let nextStageViewIsResume = false;
+let assistantNoResponseAction = 'confirm';
 
 const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
@@ -538,14 +539,15 @@ function guestAppRevealHtml() {
 
 function assistantRevealHtml() {
   const roomName = firstRoom().name || 'King Suite';
+  const releases = assistantNoResponseAction === 'release';
   return `<section class="mvr-stage mvr-stage-assistant">
     <div class="mvr-copy">
       <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
       <h1>Front Desk checks in before a room conflict becomes a guest problem.</h1>
       <p>When a direct booking arrives, Front Desk asks you and the people you choose whether the room is still available. If a walk-in or another booking took it, reply normally and Marketel handles the rest.</p>
       <div class="mvr-callout">
-        <strong>Front Desk follows up—you don't have to remember.</strong>
-        One reply can block the dates, release the guest's $1 hold and notify them automatically.
+        <strong>You stay in control—even when you miss the alert.</strong>
+        Choose whether silence keeps the sale or protects availability. You can change the rule anytime.
       </div>
     </div>
     <div class="mvr-visual mvr-assistant-visual">
@@ -559,7 +561,16 @@ function assistantRevealHtml() {
         <div class="mvr-bubble mvr-bubble-out" style="--stagger:1">No, a walk-in took it.</div>
         <div class="mvr-bubble mvr-bubble-in success" style="--stagger:2"><strong>Handled.</strong> Tomorrow is blocked, the $1 hold was released and the guest was notified.</div>
       </div>
-      <div class="mvr-handled-row"><span>✓</span><div><strong>Front Desk asks. You answer.</strong><small>Marketel handles the rest.</small></div></div>
+      <div class="mvr-fallback-control">
+        <strong>If nobody answers</strong>
+        <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
+          <button type="button" data-mvr-fallback="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep the booking</b><span>Revenue first</span></button>
+          <button type="button" data-mvr-fallback="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
+        </div>
+        <small>${releases
+          ? 'Your rule: void the $1 hold and notify the guest if nobody replies.'
+          : 'Your rule: confirm the booking automatically if nobody replies.'}</small>
+      </div>
     </div>
   </section>`;
 }
@@ -1011,17 +1022,34 @@ function bindRevealEvents() {
       if (nextSlide !== guestAppDemoSlide) setGuestAppDemoSlide(nextSlide, true);
     });
   });
+  document.querySelectorAll('[data-mvr-fallback]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const next = button.dataset.mvrFallback === 'release' ? 'release' : 'confirm';
+      if (next === assistantNoResponseAction) return;
+      assistantNoResponseAction = next;
+      trackReveal(next === 'release' ? 'AssistantReleaseFallbackSelected' : 'AssistantKeepFallbackSelected');
+      trackJourney('JourneyAssistantFallbackSelected', { noResponseAction: next });
+      if (typeof window.api === 'function') {
+        window.api('POST', '/api/crm/booking-approval', { noResponseAction: next }).catch(() => {});
+      }
+      renderReveal();
+    });
+  });
   scheduleGuestAppValueDemo();
 }
 
 async function loadRevealData() {
   if (dataPromise || typeof window.api !== 'function') return dataPromise;
-  dataPromise = window.api('GET', '/api/crm/rooms')
-    .then((result) => {
+  dataPromise = Promise.all([
+    window.api('GET', '/api/crm/rooms'),
+    window.api('GET', '/api/crm/booking-approval').catch(() => null),
+  ])
+    .then(([result, approvalResult]) => {
       revealData = {
         rooms: Array.isArray(result?.rooms) ? result.rooms : [],
         rates: result?.rates || null,
       };
+      assistantNoResponseAction = approvalResult?.data?.noResponseAction === 'release' ? 'release' : 'confirm';
       if (revealData.rooms.length) crm.editRooms = revealData.rooms;
       if (document.getElementById('marketelValueReveal') && !document.getElementById('mvrLivePreview')) renderReveal();
       return revealData;

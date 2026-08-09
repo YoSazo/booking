@@ -3294,6 +3294,12 @@ function bookingCardHtml(b) {
   const noteBtnClass = crm.currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
   const guestLabel = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'this guest';
   const reviewStatus = String(b.ownerReviewStatus || '').toLowerCase();
+  const isPendingApproval = String(b.status || '').toLowerCase() === 'pending';
+  const pendingMinutes = isPendingApproval ? approvalMinutesLeft(b.pendingUntil) : 0;
+  const pendingReleases = b.approvalNoResponseAction === 'release';
+  const pendingChip = isPendingApproval
+    ? `<div class="meta-chip" style="background:${pendingReleases ? '#FFF7ED' : '#EFF6FF'};color:${pendingReleases ? '#9A3412' : '#1D4ED8'};border-color:${pendingReleases ? '#FED7AA' : '#BFDBFE'};">⏳ ${pendingMinutes ? `${pendingMinutes} min` : 'Due now'} · ${pendingReleases ? 'releases' : 'keeps booking'} if unanswered</div>`
+    : '';
   const reviewChip = reviewStatus === 'unreviewed'
     ? '<div class="meta-chip" style="background:#FFF7ED;color:#9A3412;border-color:#FED7AA;">● Verify room</div>'
     : (reviewStatus === 'available'
@@ -3316,6 +3322,7 @@ function bookingCardHtml(b) {
         <div class="card-meta">
           <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
           <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
+          ${pendingChip}
           ${reviewChip}
           ${payChip}
         </div>
@@ -3348,12 +3355,16 @@ function bookingCardHtml(b) {
         </div>
         ` : ''}
         <div class="card-footer">
-          ${reviewStatus === 'unreviewed'
+          ${isPendingApproval
+            ? `<button class="btn btn-confirm" type="button" onclick="decideBookingFromCard('${b.id}', 'confirm')">Yes, keep it</button>`
+            : (reviewStatus === 'unreviewed'
             ? `<button class="btn btn-confirm" type="button" onclick="openBookingReviewFromCard('${b.id}')">Verify room</button>`
-            : (phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`)}
-          <button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>
+            : (phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`))}
+          ${isPendingApproval
+            ? `<button class="btn btn-note" type="button" style="color:#b91c1c;" onclick="decideBookingFromCard('${b.id}', 'release')">No, release</button>`
+            : `<button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>`}
         </div>
-        ${isDeclined ? '' : `<div style="margin-top:8px;text-align:right;">
+        ${isDeclined || isPendingApproval ? '' : `<div style="margin-top:8px;text-align:right;">
           <button type="button" onclick="promptCancelBooking('${b.id}', ${esc(JSON.stringify(guestLabel))})" style="padding:6px 10px;border-radius:8px;border:none;background:none;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">Cancel this booking</button>
         </div>`}
       </div>
@@ -5243,6 +5254,14 @@ function showBookingApprovalModal(token, booking) {
   };
   const mins = approvalMinutesLeft(booking.pendingUntil);
   const total = Number(booking.grandTotal || 0).toFixed(2);
+  const releasesOnSilence = booking.approvalNoResponseAction === 'release';
+  const fallbackCopy = releasesOnSilence
+    ? (mins > 0
+      ? `No answer in <strong>${mins} min</strong> releases this request, voids the $1 hold and tells the guest.`
+      : 'Your no-answer rule is about to release this request and notify the guest.')
+    : (mins > 0
+      ? `No answer in <strong>${mins} min</strong> keeps this booking and sends the confirmation.`
+      : 'Your no-answer rule is about to keep this booking and send the confirmation.');
 
   const overlay = document.createElement('div');
   overlay.id = 'bookingApprovalOverlay';
@@ -5251,11 +5270,9 @@ function showBookingApprovalModal(token, booking) {
     <div style="background:#fff;border-radius:20px;padding:24px 22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="text-align:center;margin-bottom:16px;">
         <div style="font-size:32px;margin-bottom:6px;">🛏</div>
-        <h2 style="font-size:18px;font-weight:800;color:#1a1a2e;margin:0 0 6px;">Keep this booking?</h2>
+        <h2 style="font-size:18px;font-weight:800;color:#1a1a2e;margin:0 0 6px;">Is this room still free?</h2>
         <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:0;">
-          ${mins > 0
-            ? `Do nothing and it confirms itself in <strong>${mins} min</strong>. Release it only if the room is already gone.`
-            : 'This is about to confirm itself. Release it only if the room is already gone.'}
+          ${fallbackCopy}
         </p>
       </div>
       <div style="background:#f8f9fa;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
@@ -5267,9 +5284,9 @@ function showBookingApprovalModal(token, booking) {
           <div>🌙 ${booking.nights} night${booking.nights !== 1 ? 's' : ''} · $${total}</div>
         </div>
       </div>
-      <button type="button" id="bookingApprovalConfirm" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Confirm booking</button>
-      <button type="button" id="bookingApprovalRelease" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid #dc2626;background:none;color:#dc2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Release the room</button>
-      <button type="button" id="bookingApprovalLater" style="width:100%;padding:11px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Decide later</button>
+      <button type="button" id="bookingApprovalConfirm" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Yes, keep the booking</button>
+      <button type="button" id="bookingApprovalRelease" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid #dc2626;background:none;color:#dc2626;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">No, release the request</button>
+      <button type="button" id="bookingApprovalLater" style="width:100%;padding:11px;border-radius:12px;border:none;background:none;color:#6b7280;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Close for now</button>
       <p style="font-size:11px;color:#9ca3af;line-height:1.5;margin:10px 0 0;text-align:center;">Releasing voids the $1 card hold and emails the guest that you couldn't take it.</p>
     </div>`;
   document.body.appendChild(overlay);
@@ -5314,6 +5331,20 @@ async function submitBookingApproval(token, action) {
   } catch (_) {
     toast('Could not apply that.', 'error');
     return false;
+  }
+}
+
+async function decideBookingFromCard(bookingId, action) {
+  try {
+    const body = await api('POST', `/api/crm/bookings/${encodeURIComponent(bookingId)}/approval`, { action });
+    if (!body?.success) throw new Error(body?.message || 'Could not apply that decision.');
+    if (body.alreadyDecided) toast(`That request was already ${body.status || 'decided'}.`, 'info');
+    else if (action === 'release') toast('Released — the hold was voided and the guest was notified.', 'success');
+    else toast('Kept — the guest is confirmed.', 'success');
+    await loadBookings();
+    await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
+  } catch (error) {
+    toast(error?.message || 'Could not apply that decision.', 'error');
   }
 }
 
@@ -5733,6 +5764,7 @@ exposeToWindow({
   bookingsByRoomDate,
   bootCrmApp,
   conflictBannerHtml,
+  decideBookingFromCard,
   loadBookingConflicts,
   maybeShowBookingApprovalCard,
   maybeShowBookingReviewCard,

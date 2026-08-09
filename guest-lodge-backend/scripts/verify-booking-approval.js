@@ -35,7 +35,7 @@ function signToken(bookingId, hotelId, expMs = Date.now() + 3600000) {
     return 'ba_' + encoded + '.' + sig;
 }
 
-async function makeBooking({ status, pendingUntil, roomName, checkin, checkout }) {
+async function makeBooking({ status, pendingUntil, roomName, checkin, checkout, noResponseAction = 'confirm' }) {
     const code = 'VERIFY-' + crypto.randomBytes(4).toString('hex').toUpperCase();
     const booking = await prisma.booking.create({
         data: {
@@ -47,6 +47,7 @@ async function makeBooking({ status, pendingUntil, roomName, checkin, checkout }
             status,
             pendingUntil: pendingUntil || null,
             approvalRequestedAt: status === 'pending' ? new Date() : null,
+            approvalNoResponseAction: status === 'pending' ? noResponseAction : null,
             checkinDate: new Date(checkin),
             checkoutDate: new Date(checkout),
             nights: 1,
@@ -172,17 +173,31 @@ async function main() {
         check('peek rejects a bad token', peekBad.status === 401);
     }
 
-    console.log('\nAuto-confirm sweep');
+    console.log('\nNo-answer sweep');
     const overdue = await makeBooking({ status: 'pending', pendingUntil: new Date(Date.now() - 60000), roomName, checkin, checkout });
+    const overdueRelease = await makeBooking({
+        status: 'pending',
+        pendingUntil: new Date(Date.now() - 60000),
+        roomName,
+        checkin,
+        checkout,
+        noResponseAction: 'release',
+    });
     console.log('  waiting up to 75s for the sweep interval...');
     let swept = null;
+    let sweptRelease = null;
     for (let i = 0; i < 25; i += 1) {
         await new Promise((r) => setTimeout(r, 3000));
-        swept = await prisma.booking.findUnique({ where: { id: overdue.id } });
-        if (swept.status !== 'pending') break;
+        [swept, sweptRelease] = await Promise.all([
+            prisma.booking.findUnique({ where: { id: overdue.id } }),
+            prisma.booking.findUnique({ where: { id: overdueRelease.id } }),
+        ]);
+        if (swept.status !== 'pending' && sweptRelease.status !== 'pending') break;
     }
     check('overdue pending booking auto-confirms', swept.status === 'confirmed', `saw ${swept.status}`);
     check('outcome recorded as auto_confirmed', swept.approvalOutcome === 'auto_confirmed', `saw ${swept.approvalOutcome}`);
+    check('release fallback auto-releases', sweptRelease.status === 'released', `saw ${sweptRelease.status}`);
+    check('release fallback records auto_released', sweptRelease.approvalOutcome === 'auto_released', `saw ${sweptRelease.approvalOutcome}`);
 
     console.log('\nCleanup');
     const deleted = await prisma.booking.deleteMany({ where: { id: { in: created } } });

@@ -102,6 +102,8 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
   const resolvedHotelId = hotelId || hotel?.id;
   const hotelName = hotel?.name || 'us';
   const stayMoney = getStayMoney(bookingDetails);
+  const confirmationPending = bookingDetails?.confirmationPending === true;
+  const reviewMinutes = Number(bookingDetails?.reviewWindowMinutes || 0);
 
   useEffect(() => () => {
     document.body.style.overflow = '';
@@ -111,7 +113,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
     if (!bookingDetails) return;
 
     const shouldShow =
-      bookingDetails.bookingType === 'payLater' && !callModalDismissed;
+      bookingDetails.bookingType === 'payLater' && !confirmationPending && !callModalDismissed;
 
     if (!shouldShow) {
       document.body.style.overflow = '';
@@ -127,7 +129,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
       clearTimeout(timer);
       document.body.style.overflow = '';
     };
-  }, [bookingDetails, callModalDismissed]);
+  }, [bookingDetails, callModalDismissed, confirmationPending]);
 
   useEffect(() => {
     if (reservationCode && bookingDetails?.checkout && guestInfo?.email) {
@@ -149,7 +151,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
 
   return (
     <>
-      {bookingDetails?.bookingType === 'payLater' && showCallModal && (
+      {bookingDetails?.bookingType === 'payLater' && !confirmationPending && showCallModal && (
         <div className="confirmation-call-modal-overlay" onClick={(e) => e.stopPropagation()}>
           <div className="confirmation-call-modal-sheet">
             <div className="confirmation-call-phone-pulse-wrapper">
@@ -234,17 +236,31 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
             </svg>
           </div>
           <div className="confirmation-header">
-            <h2>Booking confirmed</h2>
-            <p className="confirmation-code">Confirmation code <strong>#{reservationCode}</strong></p>
+            <h2>{confirmationPending ? 'Room request received' : 'Booking confirmed'}</h2>
+            <p className="confirmation-code">
+              {confirmationPending
+                ? `Your room is held${reviewMinutes ? ` for up to ${reviewMinutes} minutes` : ''} while the property checks availability.`
+                : <>Confirmation code <strong>#{reservationCode}</strong></>}
+            </p>
           </div>
         </div>
+
+        {confirmationPending && (
+          <div style={{
+            margin: '0 0 16px', padding: '14px 16px', borderRadius: '12px',
+            background: '#f0f7f3', border: '1px solid #cfe4d7', color: '#294638',
+            fontSize: '14px', lineHeight: 1.55,
+          }}>
+            <strong>Watch your email.</strong> You&apos;ll receive a confirmation as soon as the room is approved, or a notice if the property cannot take the request. The $1 authorization is temporary and you have not been charged.
+          </div>
+        )}
 
         {/* 2. YOUR STAY — always visible (was hidden in <details>). The money
             line is the trust payoff and must never be a tap away. */}
         <div className="stay-details-card stay-summary-card">
           <div className="stay-summary-card__head">
             <span className="stay-summary-card__title">{bookingDetails.name || 'Your room'}</span>
-            <span className="stay-summary-card__badge">Confirmed</span>
+            <span className="stay-summary-card__badge">{confirmationPending ? 'Room held' : 'Confirmed'}</span>
           </div>
 
           <div className="stay-summary-card__dates">
@@ -322,7 +338,8 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               <p className="confirmation-details__footnote">{hotel.cancellationPolicy}</p>
             )}
             <p className="confirmation-details__footnote" style={{ marginTop: 12 }}>
-              A confirmation email was sent to <strong style={{ color: '#374151' }}>{guestInfo.email}</strong>.
+              {confirmationPending ? 'Your decision email will be sent to ' : 'A confirmation email was sent to '}
+              <strong style={{ color: '#374151' }}>{guestInfo.email}</strong>.
               Questions? Call {hotelPhone} — we&apos;re happy to help.
             </p>
           </div>

@@ -920,6 +920,7 @@ async function getDbHotelConfig(hotelId) {
             domains: (row.domains || []).map(d => d.domain),
             bookingApprovalEnabled: row.bookingApprovalEnabled === true,
             bookingApprovalWindowMinutes: row.bookingApprovalWindowMinutes,
+            bookingApprovalNoResponseAction: row.bookingApprovalNoResponseAction,
             source: 'db',
         })
         : null;
@@ -1777,7 +1778,7 @@ async function createManualBookingRecordWithInventory(hotelId, bookingData) {
         const booking = await tx.booking.create({
             data: {
                 ...bookingData,
-                status: 'confirmed',
+                status: bookingData.status || 'confirmed',
                 inventoryOverrideDates: consumedOverrideDates.length
                     ? JSON.stringify(consumedOverrideDates)
                     : null,
@@ -2499,6 +2500,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
         // Manual PMS pay-later flow
         if (config.pms === 'manual') {
             const pmsResponse = await createManualBooking(hotelValidation.hotelId, bookingDetails);
+            const approvalPlan = await resolveBookingApprovalPlan(config);
 
             try {
                 const outcome = await createManualBookingRecordWithInventory(hotelValidation.hotelId, {
@@ -2523,25 +2525,37 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     holdStatus: holdStatus,
                     noShowFeePaid: holdStatus === 'captured',
                     holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
+                    ...bookingApprovalCreateFields(approvalPlan),
                 });
 
-                // Checkout is the confirmation. Push the owner an informational
-                // alert and email the guest immediately; cancellation remains
-                // available from the normal booking card if plans later change.
                 if (outcome.created) {
-                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
-                    notifyGuestBookingConfirmed({
-                        req,
-                        hotelId: hotelValidation.hotelId,
-                        guestInfo,
-                        bookingDetails,
-                        reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
-                    });
+                    if (approvalPlan.hold) {
+                        notifyBookingNeedsApproval(outcome.booking).catch(() => {});
+                    } else {
+                        triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
+                        notifyGuestBookingConfirmed({
+                            req,
+                            hotelId: hotelValidation.hotelId,
+                            guestInfo,
+                            bookingDetails,
+                            reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
+                        });
+                        handleBookingCreatedWithoutHold(outcome.booking, approvalPlan);
+                    }
                 }
 
+                const isPending = String(outcome.booking.status || '').toLowerCase() === 'pending';
+                const pendingPolicy = resolveApprovalNoResponseAction(
+                    outcome.booking.approvalNoResponseAction || approvalPlan.noResponseAction
+                );
                 return res.json({
                     success: true,
-                    message: 'Reservation confirmed. $1.00 hold placed on card.',
+                    pending: isPending,
+                    reviewWindowMinutes: isPending ? approvalPlan.windowMinutes : 0,
+                    noResponseAction: pendingPolicy,
+                    message: isPending
+                        ? 'Your room request is being reviewed. The $1 authorization is only a temporary hold.'
+                        : 'Reservation confirmed. $1.00 hold placed on card.',
                     reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
                 });
             } catch (dbError) {
@@ -5850,9 +5864,12 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
                 data: {
                     enabled: false,
                     windowMinutes: resolveApprovalWindowMinutes(null),
+                    noResponseAction: resolveApprovalNoResponseAction(null),
                     supported: true,
                     pushConfigured: ownerPushConfigured(),
                     devices: 0,
+                    assistantRecipients: 0,
+                    reachableChannels: 0,
                     installedAt: null,
                     missedReviews: 0,
                     pendingNow: 0,
@@ -5861,17 +5878,18 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
         }
 
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const [hotel, devices, missedReviews, pendingNow] = await Promise.all([
+        const [hotel, channels, missedReviews, pendingNow] = await Promise.all([
             withRetry(() => prisma.hotelConfig.findUnique({
                 where: { id: hotelId },
                 select: {
                     pms: true,
                     bookingApprovalEnabled: true,
                     bookingApprovalWindowMinutes: true,
+                    bookingApprovalNoResponseAction: true,
                     frontdeskInstalledAt: true,
                 },
             })).catch(() => null),
-            countOwnerPushDevices(hotelId),
+            countBookingApprovalChannels(hotelId),
             prisma.booking.count({
                 where: { hotelId, approvalOutcome: 'auto_no_alerts', approvalDecidedAt: { gte: since } },
             }).catch(() => 0),
@@ -5883,10 +5901,13 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
             data: {
                 enabled: hotel?.bookingApprovalEnabled === true,
                 windowMinutes: resolveApprovalWindowMinutes(hotel),
+                noResponseAction: resolveApprovalNoResponseAction(hotel),
                 // Only manual-PMS hotels hold bookings locally.
                 supported: String(hotel?.pms || '').toLowerCase() === 'manual',
                 pushConfigured: ownerPushConfigured(),
-                devices,
+                devices: channels.pushDevices,
+                assistantRecipients: channels.assistantRecipients,
+                reachableChannels: channels.total,
                 installedAt: hotel?.frontdeskInstalledAt || null,
                 missedReviews,
                 pendingNow,
@@ -5908,10 +5929,10 @@ app.post('/api/crm/booking-approval', crmAuth, async (req, res) => {
             const enabled = req.body.enabled === true;
             // Turning this on without a reachable device would hold every booking
             // for a prompt nobody sees, so refuse rather than silently degrade.
-            if (enabled && (await countOwnerPushDevices(hotelId)) < 1) {
+            if (enabled && (await countBookingApprovalChannels(hotelId)).total < 1) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Install Front Desk and turn on alerts first — otherwise there is nobody to ask.',
+                    message: 'Connect at least one phone for app alerts or Assistant texts first — otherwise there is nobody to ask.',
                 });
             }
             data.bookingApprovalEnabled = enabled;
@@ -5920,6 +5941,13 @@ app.post('/api/crm/booking-approval', crmAuth, async (req, res) => {
             data.bookingApprovalWindowMinutes = resolveApprovalWindowMinutes({
                 bookingApprovalWindowMinutes: req.body.windowMinutes,
             });
+        }
+        if (req.body?.noResponseAction !== undefined) {
+            const requested = String(req.body.noResponseAction || '').trim().toLowerCase();
+            if (!['confirm', 'release'].includes(requested)) {
+                return res.status(400).json({ success: false, message: 'Choose keep booking or release request.' });
+            }
+            data.bookingApprovalNoResponseAction = requested;
         }
         if (!Object.keys(data).length) {
             return res.status(400).json({ success: false, message: 'Nothing to update.' });
@@ -6716,11 +6744,12 @@ async function notifyGuestMessage(hotelId, guestName, preview, reservationCode =
 }
 
 // ── OWNER-APPROVED BOOKINGS ────────────────────────────────────────────
-// A direct booking lands as 'pending' and holds its room while the owner gets a
-// push with Confirm / Release. Silence auto-confirms, because most bookings are
-// fine — the owner only needs to intervene when they already sold that room on
-// an OTA. Holding is pointless if no device can receive the alert, so hotels
-// without push get an instant confirm plus a nudge to install Front Desk.
+// A direct booking lands as 'pending' and holds its room while Front Desk asks
+// the owner by app alert and/or Assistant text. Each property decides what
+// silence means: keep the booking or release the request. The rule is copied to
+// the booking so it cannot change halfway through a countdown. Holding is
+// pointless if no phone can receive the alert, so unreachable properties keep
+// the existing safe behavior: instant confirmation plus an install nudge.
 
 const BOOKING_APPROVAL_TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000;
 const BOOKING_APPROVAL_SWEEP_INTERVAL_MS = 60 * 1000;
@@ -6770,6 +6799,13 @@ function resolveApprovalWindowMinutes(config) {
     return Math.min(BOOKING_APPROVAL_MAX_WINDOW_MINUTES, Math.max(BOOKING_APPROVAL_MIN_WINDOW_MINUTES, raw));
 }
 
+function resolveApprovalNoResponseAction(configOrValue) {
+    const raw = typeof configOrValue === 'string'
+        ? configOrValue
+        : configOrValue?.bookingApprovalNoResponseAction;
+    return String(raw || '').trim().toLowerCase() === 'release' ? 'release' : 'confirm';
+}
+
 async function countOwnerPushDevices(hotelId) {
     if (!hotelId) return 0;
     try {
@@ -6787,14 +6823,26 @@ async function countOwnerPushDevices(hotelId) {
     }
 }
 
+async function countBookingApprovalChannels(hotelId) {
+    const [pushDevices, assistantRecipients] = await Promise.all([
+        ownerPushConfigured() ? countOwnerPushDevices(hotelId) : Promise.resolve(0),
+        frontDeskAssistant?.countReachableBookingRecipients
+            ? frontDeskAssistant.countReachableBookingRecipients(hotelId).catch(() => 0)
+            : Promise.resolve(0),
+    ]);
+    return { pushDevices, assistantRecipients, total: pushDevices + assistantRecipients };
+}
+
 async function resolveBookingApprovalPlan(config) {
-    const off = { hold: false, outcome: null, windowMinutes: 0, pendingUntil: null };
+    const noResponseAction = resolveApprovalNoResponseAction(config);
+    const off = { hold: false, outcome: null, windowMinutes: 0, pendingUntil: null, noResponseAction };
     if (!config?.bookingApprovalEnabled) return off;
     // Manual PMS only: the local Booking table is the inventory, so pending and
     // released rows are meaningful without an external reservation round-trip.
     if (String(config.pms || '').toLowerCase() !== 'manual') return off;
-    if (!ownerPushConfigured()) return { ...off, outcome: 'auto_no_alerts' };
-    if ((await countOwnerPushDevices(config.id)) < 1) return { ...off, outcome: 'auto_no_alerts' };
+    if ((await countBookingApprovalChannels(config.id)).total < 1) {
+        return { ...off, outcome: 'auto_no_alerts' };
+    }
 
     const windowMinutes = resolveApprovalWindowMinutes(config);
     return {
@@ -6802,6 +6850,7 @@ async function resolveBookingApprovalPlan(config) {
         outcome: null,
         windowMinutes,
         pendingUntil: new Date(Date.now() + windowMinutes * 60 * 1000),
+        noResponseAction,
     };
 }
 
@@ -6812,6 +6861,7 @@ function bookingApprovalCreateFields(plan) {
             status: 'pending',
             approvalRequestedAt: new Date(),
             pendingUntil: plan.pendingUntil,
+            approvalNoResponseAction: plan.noResponseAction,
         };
     }
     if (plan?.outcome) {
@@ -6857,7 +6907,7 @@ function formatApprovalStayRange(checkin, checkout) {
 }
 
 async function notifyBookingNeedsApproval(booking) {
-    if (!ownerPushConfigured() || !booking?.hotelId || !booking?.id) return 0;
+    if (!booking?.hotelId || !booking?.id) return 0;
     try {
         const token = signBookingActionToken({ bookingId: booking.id, hotelId: booking.hotelId });
         const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'A guest';
@@ -6865,21 +6915,36 @@ async function notifyBookingNeedsApproval(booking) {
         const minutes = Math.max(1, Math.round(dueMs / 60000));
         const stay = formatApprovalStayRange(booking.checkinDate, booking.checkoutDate);
 
-        const sent = await sendPushToHotel(booking.hotelId, {
-            title: 'New booking — confirm or release',
-            body: `${stay} · ${booking.roomName}\n${guestName} · auto-confirms in ${minutes} min`,
-            url: `/frontdesk?approve=${encodeURIComponent(token)}`,
-            icon: '/apple-touch-icon.png',
-            tag: `approval-${booking.id}`,
-            requireInteraction: true,
-            actions: [
-                { action: 'confirm', title: '✅ Confirm' },
-                { action: 'release', title: '🚫 Release' },
-            ],
-            data: { type: 'booking_approval', bookingId: booking.id, token },
-        }, { TTL: Math.max(60, minutes * 60), urgency: 'high' }, 'notifyBookingNeedsApproval');
-
-        console.log(`🕒 [push] approval request hotel=${booking.hotelId} booking=${booking.id} sent=${sent}`);
+        const noResponseAction = resolveApprovalNoResponseAction(booking.approvalNoResponseAction);
+        const fallback = noResponseAction === 'release'
+            ? `releases in ${minutes} min if nobody answers`
+            : `confirms in ${minutes} min if nobody answers`;
+        const [pushSent, smsResult] = await Promise.all([
+            ownerPushConfigured()
+                ? sendPushToHotel(booking.hotelId, {
+                    title: 'New room request — still free?',
+                    body: `${stay} · ${booking.roomName}\n${guestName} · ${fallback}`,
+                    url: `/frontdesk?approve=${encodeURIComponent(token)}`,
+                    icon: '/apple-touch-icon.png',
+                    tag: `approval-${booking.id}`,
+                    requireInteraction: true,
+                    actions: [
+                        { action: 'confirm', title: '✅ Keep booking' },
+                        { action: 'release', title: '🚫 Release request' },
+                    ],
+                    data: { type: 'booking_approval', bookingId: booking.id, token },
+                }, { TTL: Math.max(60, minutes * 60), urgency: 'high' }, 'notifyBookingNeedsApproval')
+                : Promise.resolve(0),
+            frontDeskAssistant?.notifyNewBooking
+                ? frontDeskAssistant.notifyNewBooking(booking).catch((error) => {
+                    console.error('frontdesk-assistant approval alert:', error.message);
+                    return { sent: 0 };
+                })
+                : Promise.resolve({ sent: 0 }),
+        ]);
+        const smsSent = Number(smsResult?.sent || 0);
+        const sent = Number(pushSent || 0) + smsSent;
+        console.log(`🕒 [approval] request hotel=${booking.hotelId} booking=${booking.id} push=${pushSent || 0} sms=${smsSent} fallback=${noResponseAction}`);
         return sent;
     } catch (e) {
         console.error('notifyBookingNeedsApproval:', e.message);
@@ -6889,29 +6954,41 @@ async function notifyBookingNeedsApproval(booking) {
 
 // Re-send on the same tag so a decided booking stops prompting on the owner's
 // other devices instead of leaving a stale "confirm or release" card behind.
-async function notifyBookingApprovalResolved(booking, outcome) {
-    if (!ownerPushConfigured() || !booking?.hotelId) return;
+async function notifyBookingApprovalResolved(booking, outcome, source = 'owner') {
+    if (!booking?.hotelId) return;
     try {
-        const released = outcome === 'owner_released';
-        const auto = outcome === 'auto_confirmed';
+        const released = outcome === 'owner_released' || outcome === 'auto_released';
+        const autoConfirmed = outcome === 'auto_confirmed';
+        const autoReleased = outcome === 'auto_released';
         const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'A guest';
         const stay = formatApprovalStayRange(booking.checkinDate, booking.checkoutDate);
-        const title = released
-            ? 'Booking released 🚫'
-            : (auto ? 'Booking auto-confirmed ✓' : 'Booking confirmed ✓');
-        const suffix = released
-            ? 'Room is back on sale and the hold was voided.'
-            : (auto ? 'No response in time, so it went through.' : 'Guest has been emailed.');
+        const title = autoReleased
+            ? 'Booking auto-released 🚫'
+            : (released
+                ? 'Booking released 🚫'
+                : (autoConfirmed ? 'Booking auto-confirmed ✓' : 'Booking confirmed ✓'));
+        const suffix = autoReleased
+            ? 'No response in time. The hold was voided and the guest was notified.'
+            : (released
+                ? 'Room is back on sale and the hold was voided.'
+                : (autoConfirmed ? 'No response in time, so it went through.' : 'Guest has been emailed.'));
 
-        await sendPushToHotel(booking.hotelId, {
-            title,
-            body: `${stay} · ${booking.roomName}\n${guestName} — ${suffix}`,
-            url: '/frontdesk?tab=bookings',
-            icon: '/apple-touch-icon.png',
-            tag: `approval-${booking.id}`,
-            requireInteraction: false,
-            actions: [],
-        }, { TTL: 6 * 60 * 60 }, 'notifyBookingApprovalResolved');
+        await Promise.all([
+            ownerPushConfigured()
+                ? sendPushToHotel(booking.hotelId, {
+                    title,
+                    body: `${stay} · ${booking.roomName}\n${guestName} — ${suffix}`,
+                    url: '/frontdesk?tab=bookings',
+                    icon: '/apple-touch-icon.png',
+                    tag: `approval-${booking.id}`,
+                    requireInteraction: false,
+                    actions: [],
+                }, { TTL: 6 * 60 * 60 }, 'notifyBookingApprovalResolved')
+                : Promise.resolve(0),
+            source === 'sweep' && frontDeskAssistant?.notifyBookingDecision
+                ? frontDeskAssistant.notifyBookingDecision(booking, outcome)
+                : Promise.resolve({ sent: 0 }),
+        ]);
     } catch (e) {
         console.error('notifyBookingApprovalResolved:', e.message);
     }
@@ -6941,7 +7018,7 @@ async function voidBookingHold(booking) {
     }
 }
 
-async function sendBookingReleasedEmail(booking) {
+async function sendBookingReleasedEmail(booking, outcome = 'owner_released') {
     if (!emailTransporter || !booking?.guestEmail) return;
     try {
         const hotel = await prisma.hotelConfig.findUnique({
@@ -6951,11 +7028,15 @@ async function sendBookingReleasedEmail(booking) {
         const hotelName = hotel?.name || 'the hotel';
         const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'there';
         const stay = formatApprovalStayRange(booking.checkinDate, booking.checkoutDate);
+        const automatic = outcome === 'auto_released';
+        const reasonCopy = automatic
+            ? `The property did not confirm availability for <strong>${booking.roomName}</strong>${stay ? ` (${stay})` : ''} before its review window ended, so your request was released automatically.`
+            : `Unfortunately <strong>${hotelName}</strong> can't honour your request for <strong>${booking.roomName}</strong>${stay ? ` (${stay})` : ''} — the room was taken just before your booking came through.`;
         const phoneLine = hotel?.phone
             ? `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Call ${hotelName} at ${hotel.phone} and they'll help you find another option.</p>`
             : `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Reply to this email and ${hotelName} will help you find another option.</p>`;
 
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">We couldn't confirm your room</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">Unfortunately <strong>${hotelName}</strong> can't honour your request for <strong>${booking.roomName}</strong>${stay ? ` (${stay})` : ''} — the room was taken just before your booking came through.</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>You have not been charged.</strong> The temporary $1 authorisation on your card has been voided and will disappear from your statement.</p>${phoneLine}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">We couldn't confirm your room</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">${reasonCopy}</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>You have not been charged.</strong> The temporary $1 authorisation on your card has been voided and will disappear from your statement.</p>${phoneLine}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
 
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
@@ -7039,17 +7120,41 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
     }
 
     const outcome = wantRelease
-        ? 'owner_released'
+        ? (source === 'sweep' ? 'auto_released' : 'owner_released')
         : (source === 'sweep' ? 'auto_confirmed' : 'owner_confirmed');
 
-    const result = await withRetry(() => prisma.booking.updateMany({
-        where: { id: booking.id, status: 'pending' },
-        data: {
-            status: wantRelease ? 'released' : 'confirmed',
-            approvalOutcome: outcome,
-            approvalDecidedAt: new Date(),
-        },
-    }));
+    const result = await withRetry(() => prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${booking.hotelId}), hashtext(${booking.roomName}))`;
+        const updated = await tx.booking.updateMany({
+            where: { id: booking.id, status: 'pending' },
+            data: {
+                status: wantRelease ? 'released' : 'confirmed',
+                approvalOutcome: outcome,
+                approvalDecidedAt: new Date(),
+            },
+        });
+        // Explicit availability overrides are remaining-unit counters. The
+        // booking creation path decremented them, so the one winning release
+        // must restore them in the same transaction that changes the status.
+        const overrideDates = parseInventoryOverrideDates(booking.inventoryOverrideDates);
+        if (wantRelease && updated.count === 1 && overrideDates.length) {
+            const room = await tx.manualRoom.findUnique({
+                where: { hotelId_name: { hotelId: booking.hotelId, name: booking.roomName } },
+                select: { id: true },
+            });
+            if (room) {
+                await tx.manualOverride.updateMany({
+                    where: {
+                        roomId: room.id,
+                        date: { in: overrideDates },
+                        availableUnits: { not: null },
+                    },
+                    data: { availableUnits: { increment: 1 } },
+                });
+            }
+        }
+        return updated;
+    }, { maxWait: 5000, timeout: 15000 }));
 
     if (result.count !== 1) {
         const fresh = await prisma.booking.findUnique({ where: { id: booking.id } }).catch(() => null);
@@ -7071,7 +7176,7 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
 
     if (wantRelease) {
         await voidBookingHold(decided);
-        sendBookingReleasedEmail(decided).catch(() => {});
+        sendBookingReleasedEmail(decided, outcome).catch(() => {});
     } else {
         // The confirmation email was deliberately withheld until now.
         notifyGuestBookingConfirmed({
@@ -7090,7 +7195,7 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
         ).catch(() => {});
     }
 
-    notifyBookingApprovalResolved(decided, outcome).catch(() => {});
+    notifyBookingApprovalResolved(decided, outcome, source).catch(() => {});
     console.log(`✅ [approval] ${outcome} booking=${decided.id} hotel=${decided.hotelId} via=${source}`);
 
     return { ok: true, code: 'applied', status: decided.status, outcome, booking: decided };
@@ -7099,32 +7204,38 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
 // DB-backed sweep rather than a per-booking setTimeout: Render restarts wipe
 // in-memory timers, and this self-heals by picking up everything overdue.
 async function runBookingApprovalSweep() {
-    if (!prisma.booking) return { confirmed: 0 };
+    if (!prisma.booking) return { confirmed: 0, released: 0 };
     let due = [];
     try {
         due = await prisma.booking.findMany({
             where: { status: 'pending', pendingUntil: { lte: new Date() } },
-            select: { id: true },
+            select: { id: true, approvalNoResponseAction: true },
             orderBy: { pendingUntil: 'asc' },
             take: 100,
         });
     } catch (e) {
         console.error('booking approval sweep query:', e.message);
-        return { confirmed: 0 };
+        return { confirmed: 0, released: 0 };
     }
-    if (!due.length) return { confirmed: 0 };
+    if (!due.length) return { confirmed: 0, released: 0 };
 
     let confirmed = 0;
+    let released = 0;
     for (const row of due) {
-        const outcome = await applyBookingApprovalDecision(row.id, 'confirm', 'sweep')
+        const action = resolveApprovalNoResponseAction(row.approvalNoResponseAction);
+        const outcome = await applyBookingApprovalDecision(row.id, action, 'sweep')
             .catch((e) => {
                 console.error('booking approval sweep:', e.message);
                 return null;
             });
-        if (outcome?.code === 'applied') confirmed += 1;
+        if (outcome?.code === 'applied') {
+            if (action === 'release') released += 1;
+            else confirmed += 1;
+        }
     }
     if (confirmed) console.log(`⏰ [approval] auto-confirmed ${confirmed} booking(s)`);
-    return { confirmed };
+    if (released) console.log(`⏰ [approval] auto-released ${released} booking(s)`);
+    return { confirmed, released };
 }
 
 // Notification actions and the in-app card both post here. Authenticated by the
@@ -7165,6 +7276,34 @@ app.post('/api/booking-approval/act', async (req, res) => {
     }
 });
 
+// Same decision from an authenticated booking card. The public notification
+// route uses a signed one-booking token; this one stays inside the scoped CRM.
+app.post('/api/crm/bookings/:id/approval', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const action = String(req.body?.action || '').trim().toLowerCase();
+        if (!['confirm', 'release'].includes(action)) {
+            return res.status(400).json({ success: false, message: 'Choose keep booking or release request.' });
+        }
+        const booking = await prisma.booking.findFirst({
+            where: { id: String(req.params.id || ''), hotelId },
+            select: { id: true },
+        });
+        if (!booking) return res.status(404).json({ success: false, message: 'Booking not found.' });
+        const outcome = await applyBookingApprovalDecision(booking.id, action, 'owner');
+        res.json({
+            success: outcome.ok,
+            alreadyDecided: outcome.code === 'already_decided',
+            status: outcome.status,
+            outcome: outcome.outcome,
+        });
+    } catch (e) {
+        console.error('crm booking approval:', e.message);
+        res.status(500).json({ success: false, message: 'Could not apply that decision.' });
+    }
+});
+
 // Lets the in-app card render booking details before the owner commits.
 app.get('/api/booking-approval/peek', async (req, res) => {
     try {
@@ -7182,6 +7321,7 @@ app.get('/api/booking-approval/peek', async (req, res) => {
                 id: booking.id,
                 status: booking.status,
                 approvalOutcome: booking.approvalOutcome || null,
+                approvalNoResponseAction: resolveApprovalNoResponseAction(booking.approvalNoResponseAction),
                 pendingUntil: booking.pendingUntil,
                 roomName: booking.roomName,
                 checkinDate: booking.checkinDate,
@@ -7540,6 +7680,7 @@ frontDeskAssistant = createFrontDeskAssistant({
     enumerateDatesInclusive,
     manualBookingStayDates,
     cancelBookingByOwner,
+    applyBookingApprovalDecision,
     maybeNotifyRoomSoldOutToday,
     reportTimeZone: REPORT_TIME_ZONE,
 });
@@ -12126,6 +12267,7 @@ const CRM_BOOKING_LIST_SELECT = {
     notes: true,
     status: true,
     pendingUntil: true,
+    approvalNoResponseAction: true,
     approvalOutcome: true,
     ownerReviewStatus: true,
     ownerReviewedAt: true,
