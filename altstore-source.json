@@ -12,11 +12,21 @@
       "bundleIdentifier": "com.bookmarketel.frontdesk",
       "developerName": "Marketel",
       "subtitle": "Run your property from your phone.",
-      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 3.14 makes guest emails and card-hold actions durable, visible, and safely retryable.",
+      "localizedDescription": "Marketel Front Desk for iPhone, connected to your live property data over Wi-Fi or cellular. Version 3.15 adds one-tap email-code AutoFill sign-in and a simpler paid-to-app handoff.",
       "iconURL": "https://raw.githubusercontent.com/YoSazo/booking/main/marketel-frontdesk-ios/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512%402x.png",
       "tintColor": "2E7D5B",
       "category": "utilities",
       "versions": [
+        {
+          "version": "3.15",
+          "buildVersion": "27",
+          "date": "2026-08-10",
+          "localizedDescription": "Adds automatic sign-in as soon as iOS fills the six-digit email code, keeps Property ID and PIN as a recovery path, and simplifies the paid activation return to the live booking URL, app download, and a muted web fallback.",
+          "downloadURL": "https://github.com/YoSazo/booking/releases/download/ios-v0.3.15/Marketel-Front-Desk.ipa",
+          "size": 1096029,
+          "sha256": "fb98c1513cf2c274b4ef83080a92cb58b0a0c26aaff08a1f25f0874ef36354f8",
+          "minOSVersion": "15.0"
+        },
         {
           "version": "3.14",
           "buildVersion": "26",
