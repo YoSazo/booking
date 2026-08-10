@@ -747,44 +747,27 @@ window.startPostActivationTabTour = startPostActivationTabTour;
 function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
   const bookingDomain = crm.activeHotelDomain || (crm.activeHotelId ? crm.activeHotelId + '.mktel.co' : '');
-  const unlockedTabs = 'Bookings and Guest App';
+  const bookingUrl = bookingDomain ? `https://${bookingDomain}` : '';
+  const appStoreUrl = String(crm.frontdeskAppStoreUrl || '').trim();
+  const appDownloadCta = appStoreUrl
+    ? `<a id="activatedModalDownload" href="${esc(appStoreUrl)}" target="_blank" rel="noopener" style="display:block;width:100%;padding:15px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;text-decoration:none;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;box-sizing:border-box;">Download Marketel Front Desk</a>`
+    : `<button type="button" disabled style="display:block;width:100%;padding:15px;border-radius:12px;border:none;background:#dce8e1;color:#527061;font-family:inherit;font-size:15px;font-weight:800;cursor:not-allowed;">Front Desk app coming soon</button>`;
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
   overlay.innerHTML = `
-    <div style="background:white;border-radius:20px;padding:28px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#2E7D5B 0%,#1a5c3f 100%);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;">🎉</div>
-      <h2 style="font-size:21px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">You're live — payment received</h2>
-      <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 18px;">Thank you! Your subscription is active and your booking page is now switched on.</p>
-      <div style="text-align:left;background:#f0f7f3;border:1px solid #d6e9df;border-radius:14px;padding:16px 18px;margin-bottom:18px;">
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
-          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>Guests can now book.</strong> The paywall is gone — reservations go through on your page immediately.</span>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
-          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>Next, connect the Front Desk app</strong> so booking alerts can reach you even when it is closed.</span>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
-          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>${unlockedTabs}</strong> are now part of your daily workflow.</span>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start;">
-          <span style="color:#2E7D5B;font-weight:700;flex-shrink:0;">✓</span>
-          <span style="font-size:13px;color:#1a1a2e;line-height:1.5;"><strong>A receipt is on its way</strong> to your email from Stripe.</span>
-        </div>
-      </div>
-      ${bookingDomain ? `<p style="font-size:12px;color:#6b7280;margin:0 0 16px;">Your booking page: <strong style="color:#2E7D5B;">${bookingDomain}</strong></p>` : ''}
-      <button id="activatedModalTour" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Quick tour →</button>
-      <button id="activatedModalSkip" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #d6e9df;background:#fff;color:#6b7280;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Skip — go to Bookings</button>
+    <div style="background:white;border-radius:22px;padding:32px 24px 22px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="width:56px;height:56px;border-radius:50%;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:29px;font-weight:900;">✓</div>
+      <h2 style="font-size:24px;font-weight:800;color:#1a1a2e;margin:0 0 8px;">You're live</h2>
+      <p style="font-size:14px;color:#6b7280;line-height:1.55;margin:0 0 8px;">Guests can now book directly at</p>
+      ${bookingUrl ? `<a href="${esc(bookingUrl)}" target="_blank" rel="noopener" style="display:block;color:#2E7D5B;font-size:15px;font-weight:800;text-decoration:none;word-break:break-word;margin:0 0 22px;">${esc(bookingDomain)}</a>` : '<div style="height:8px;"></div>'}
+      ${appDownloadCta}
+      <p style="font-size:12px;color:#7a857e;line-height:1.45;margin:10px 4px 4px;">Manage bookings, availability and alerts from your phone.</p>
+      <button id="activatedModalContinueWeb" type="button" style="width:100%;padding:11px;margin-top:6px;border:0;background:transparent;color:#8a948e;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;">Continue to Web Front Desk</button>
     </div>
   `;
   document.body.appendChild(overlay);
-  document.getElementById('activatedModalTour').onclick = () => {
-    overlay.remove();
-    startPostActivationTabTour();
-  };
-  document.getElementById('activatedModalSkip').onclick = () => {
+  document.getElementById('activatedModalContinueWeb').onclick = () => {
     overlay.remove();
     localStorage.setItem('postActivationTourDone', '1');
     try { setFilter('bookings'); } catch (e) { /* ignore */ }

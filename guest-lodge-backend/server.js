@@ -4291,6 +4291,21 @@ const CRM_RETURN_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // Aligns with Stripe Ch
 const NATIVE_SESSION_TOKEN_SECRET = process.env.NATIVE_SESSION_TOKEN_SECRET || CRM_RETURN_TOKEN_SECRET;
 const NATIVE_SESSION_TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
 
+function configuredFrontdeskAppStoreUrl() {
+    const raw = String(process.env.MARKETEL_FRONTDESK_APP_STORE_URL || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === 'https:' && parsed.hostname === 'apps.apple.com') {
+            return parsed.toString();
+        }
+    } catch (_) { /* invalid configuration stays unavailable */ }
+    console.warn('MARKETEL_FRONTDESK_APP_STORE_URL must be an https://apps.apple.com URL.');
+    return '';
+}
+
+const MARKETEL_FRONTDESK_APP_STORE_URL = configuredFrontdeskAppStoreUrl();
+
 if (!configuredCrmReturnTokenSecret) {
     console.warn('CRM_RETURN_TOKEN_SECRET, SESSION_SECRET, or MAGIC_LINK_SECRET is not set; using an ephemeral Front Desk return-token secret for this process.');
 }
@@ -10648,6 +10663,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             theme: dbHotel?.theme || 'light',
             appIconUrl: dbHotel?.appIconUrl || '',
             subscribed: dbHotel?.subscribed || false,
+            frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
         });
     } catch (e) {
         console.error('crm:verify failed:', e.message);
@@ -12941,6 +12957,7 @@ app.get('/api/crm/bootstrap', crmVerifyRateLimit, crmAuth, async (req, res) => {
                     theme: dbHotel?.theme || 'light',
                     appIconUrl: dbHotel?.appIconUrl || '',
                     subscribed: dbHotel?.subscribed || false,
+                    frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
                 },
                 bookings,
                 manualAvailability,

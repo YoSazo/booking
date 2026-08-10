@@ -692,6 +692,7 @@ async function requestNativeLoginCode() {
 }
 
 async function verifyNativeLoginCode() {
+  if (verifyNativeLoginCode.inFlight) return;
   const email = String(document.getElementById('nativePropertyEmail')?.value || '').trim().toLowerCase();
   const code = String(document.getElementById('nativePropertyCode')?.value || '').replace(/\D/g, '').slice(0, 6);
   const button = document.getElementById('nativeCodeVerifyBtn');
@@ -699,6 +700,7 @@ async function verifyNativeLoginCode() {
     setNativePropertyMessage('nativePropertyMessage', 'Enter the six-digit code.', 'error');
     return;
   }
+  verifyNativeLoginCode.inFlight = true;
   if (button) { button.disabled = true; button.textContent = 'Checking…'; }
   try {
     const res = await fetch('/api/auth/native-code/verify', {
@@ -724,6 +726,7 @@ async function verifyNativeLoginCode() {
   } catch (error) {
     setNativePropertyMessage('nativePropertyMessage', error.message || 'That code is invalid or expired.', 'error');
   } finally {
+    verifyNativeLoginCode.inFlight = false;
     if (button) { button.disabled = false; button.textContent = 'Continue'; }
   }
 }
@@ -2374,6 +2377,7 @@ async function startCrmApp(verification, options = {}) {
 
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
+  crm.frontdeskAppStoreUrl = String(verification?.frontdeskAppStoreUrl || '').trim();
   if (crm.hotelSubscribed) {
     try {
       localStorage.removeItem('marketelValueRevealPendingV1');
@@ -6099,8 +6103,20 @@ const nativeCodeVerifyBtn = document.getElementById('nativeCodeVerifyBtn');
 if (nativeCodeVerifyBtn) nativeCodeVerifyBtn.addEventListener('click', () => { void verifyNativeLoginCode(); });
 const nativeCodeInput = document.getElementById('nativePropertyCode');
 if (nativeCodeInput) {
+  let nativeCodeAutoSubmitTimer = null;
   nativeCodeInput.addEventListener('input', () => {
     nativeCodeInput.value = nativeCodeInput.value.replace(/\D/g, '').slice(0, 6);
+    if (nativeCodeAutoSubmitTimer) clearTimeout(nativeCodeAutoSubmitTimer);
+    if (nativeCodeInput.value.length === 6) {
+      // iOS 17.2+ can fill Mail/SMS codes into one-time-code fields in a
+      // WKWebView. Let that single tap finish sign-in without requiring a
+      // second tap on Continue. The short delay lets WebKit finish committing
+      // the AutoFill value before the request reads it.
+      nativeCodeAutoSubmitTimer = setTimeout(() => {
+        nativeCodeAutoSubmitTimer = null;
+        void verifyNativeLoginCode();
+      }, 120);
+    }
   });
   nativeCodeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') void verifyNativeLoginCode(); });
 }

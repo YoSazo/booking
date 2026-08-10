@@ -17,6 +17,7 @@ export const crm = {
   currentHotelPms: '',
   revenueEnabled: false,
   hotelSubscribed: false,
+  frontdeskAppStoreUrl: '',
   revenuePeriod: '30d',
   revenueCustomStart: '',
   revenueCustomEnd: '',
