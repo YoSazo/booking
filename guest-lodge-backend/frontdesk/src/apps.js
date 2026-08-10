@@ -854,6 +854,8 @@ async function loadGuestInstallStats() {
     const t = data.totals || {};
     const installed = data.installedBookings || 0;
     const views = t.views || 0;
+    const notificationPrompts = t.notification_prompts || 0;
+    const notificationSubscribers = data.guestPushSubscribers || 0;
     if (!installed && !views) {
       el.style.display = 'none';
       el.innerHTML = '';
@@ -886,7 +888,11 @@ async function loadGuestInstallStats() {
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
       + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + views + '</div>'
       + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">install page views</div></div>'
+      + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + notificationSubscribers + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">guests reachable now</div></div>'
       + '</div>'
+      + (notificationPrompts ? '<div style="font-size:11px;color:var(--text-muted);margin:-2px 0 10px;">Notification permission: ' + (t.notification_granted || 0) + ' granted · ' + (t.notification_denied || 0) + ' denied · ' + (t.notification_dismissed || 0) + ' dismissed · ' + (t.notification_failed || 0) + ' failed</div>' : '')
       + (rowHtml ? '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">By touchpoint</div>' + rowHtml : '');
   } catch (e) {
     crm.guestPushSubscriberCount = 0;

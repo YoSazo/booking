@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import { isStandalone } from './pwaUtils.js';
 import { enableGuestPush, guestPushStatus, prepareGuestPush } from './guestPushNotifications.js';
+import { trackGuestInstall } from './guestInstallTracking.js';
 
 export default function GuestNotificationPrompt({ apiBaseUrl = '', hotelId, guestStay }) {
   const [status, setStatus] = useState(() => guestPushStatus(hotelId, guestStay?.code));
@@ -28,7 +29,14 @@ export default function GuestNotificationPrompt({ apiBaseUrl = '', hotelId, gues
         // no permission prompt or new subscription is needed in that case.
         if (Notification.permission === 'granted' && result.subscription) {
           const refreshed = await enableGuestPush({ apiBaseUrl, hotelId, guestStay, prepared: result });
-          if (!cancelled && refreshed.enabled) setStatus('enabled');
+          if (!cancelled && refreshed.enabled) {
+            trackGuestInstall(apiBaseUrl, hotelId, {
+              touchpoint: 'guest-alerts',
+              eventType: 'notification_subscribed',
+              reservationCode: guestStay.code,
+            });
+            setStatus('enabled');
+          }
           return;
         }
         if (!cancelled) {
@@ -52,10 +60,38 @@ export default function GuestNotificationPrompt({ apiBaseUrl = '', hotelId, gues
   const handleEnable = async () => {
     setStatus('enabling');
     setError('');
+    trackGuestInstall(apiBaseUrl, hotelId, {
+      touchpoint: 'guest-alerts',
+      eventType: 'notification_prompt',
+      reservationCode: guestStay.code,
+    });
     try {
       const result = await enableGuestPush({ apiBaseUrl, hotelId, guestStay, prepared });
+      if (result.enabled) {
+        trackGuestInstall(apiBaseUrl, hotelId, {
+          touchpoint: 'guest-alerts',
+          eventType: 'notification_granted',
+          reservationCode: guestStay.code,
+        });
+        trackGuestInstall(apiBaseUrl, hotelId, {
+          touchpoint: 'guest-alerts',
+          eventType: 'notification_subscribed',
+          reservationCode: guestStay.code,
+        });
+      } else if (result.reason === 'denied' || result.reason === 'dismissed') {
+        trackGuestInstall(apiBaseUrl, hotelId, {
+          touchpoint: 'guest-alerts',
+          eventType: result.reason === 'denied' ? 'notification_denied' : 'notification_dismissed',
+          reservationCode: guestStay.code,
+        });
+      }
       setStatus(result.enabled ? 'enabled' : guestPushStatus(hotelId, guestStay.code));
     } catch (requestError) {
+      trackGuestInstall(apiBaseUrl, hotelId, {
+        touchpoint: 'guest-alerts',
+        eventType: 'notification_failed',
+        reservationCode: guestStay.code,
+      });
       setStatus(guestPushStatus(hotelId, guestStay.code));
       setError(requestError.message || 'Could not turn on reply alerts. Try again.');
     }

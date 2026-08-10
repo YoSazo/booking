@@ -2300,6 +2300,8 @@ async function startCrmApp(verification, options = {}) {
   crm.assistantError = '';
   crm.supportThread = null;
   crm.supportUnreadCount = 0;
+  crm.operationalReadiness = null;
+  crm.operationalReadinessLoading = false;
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
@@ -2444,6 +2446,7 @@ async function startCrmApp(verification, options = {}) {
     refreshMobileBottomNavIcons();
     const loadSecondaryData = () => {
       loadBookingConflicts().catch(() => {});
+      loadOperationalReadiness().catch(() => {});
     };
     if ('requestIdleCallback' in window) {
       requestIdleCallback(loadSecondaryData, { timeout: 2200 });
@@ -2466,6 +2469,7 @@ async function startCrmApp(verification, options = {}) {
     await Promise.allSettled([
       loadManualAvailability(),
       loadBookings({ deferMessages: true }),
+      loadOperationalReadiness(),
     ]);
 
     refreshMobileBottomNavIcons();
@@ -3271,6 +3275,7 @@ async function refreshCurrentView() {
     return;
   }
   const tasks = [loadBookings()];
+  if (crm.currentFilter === 'bookings') tasks.push(loadOperationalReadiness({ force: true }));
   if (crm.currentFilter === 'availability') {
     tasks.push(loadManualAvailability());
   }
@@ -3294,6 +3299,7 @@ function bookingCardHtml(b) {
   const noteBtnClass = crm.currentFilter === 'needs-call' ? 'btn btn-note btn-note-quiet' : 'btn btn-note';
   const guestLabel = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'this guest';
   const reviewStatus = String(b.ownerReviewStatus || '').toLowerCase();
+  const fulfillmentStatus = String(b.fulfillmentStatus || '').toLowerCase();
   const isPendingApproval = String(b.status || '').toLowerCase() === 'pending';
   const pendingMinutes = isPendingApproval ? approvalMinutesLeft(b.pendingUntil) : 0;
   const pendingReleases = b.approvalNoResponseAction === 'release';
@@ -3304,6 +3310,11 @@ function bookingCardHtml(b) {
     ? '<div class="meta-chip" style="background:#FFF7ED;color:#9A3412;border-color:#FED7AA;">● Verify room</div>'
     : (reviewStatus === 'available'
       ? '<div class="meta-chip" style="background:#F0FDF4;color:#166534;border-color:#BBF7D0;">✓ Room verified</div>'
+      : '');
+  const fulfillmentChip = fulfillmentStatus === 'pending'
+    ? '<div class="meta-chip" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;">↻ Finishing guest notification</div>'
+    : (fulfillmentStatus === 'attention'
+      ? '<div class="meta-chip" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA;">! Guest action needs attention</div>'
       : '');
   const payChip = isDeclined
     ? '<div class="declined-chip">⚠️ Card declined</div>'
@@ -3324,6 +3335,7 @@ function bookingCardHtml(b) {
           <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
           ${pendingChip}
           ${reviewChip}
+          ${fulfillmentChip}
           ${payChip}
         </div>
         <div class="card-dates">
@@ -5055,6 +5067,107 @@ async function loadBookingConflicts() {
   }
 }
 
+async function loadOperationalReadiness({ force = false } = {}) {
+  if (!crm.token || !crm.hotelSubscribed) {
+    crm.operationalReadiness = null;
+    renderBookingsNotices();
+    return null;
+  }
+  if (crm.operationalReadinessLoading && !force) return crm.operationalReadiness;
+  crm.operationalReadinessLoading = true;
+  try {
+    const result = await api('GET', '/api/crm/operational-readiness');
+    if (result?.success) crm.operationalReadiness = result.data || null;
+  } catch (_) {
+    // This check must never hold up the owner's bookings. Leave the last known
+    // state in place and try again on the next refresh.
+  } finally {
+    crm.operationalReadinessLoading = false;
+    renderBookingsNotices();
+  }
+  return crm.operationalReadiness;
+}
+
+function operationalReadinessAction(action) {
+  if (action === 'assistant') {
+    loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
+      toast('Could not open Front Desk Assistant.', 'error');
+    });
+    return;
+  }
+  if (action === 'page' || action === 'preview') {
+    openGuestBookingEngine();
+  }
+}
+
+async function retryBookingFulfillment(bookingId) {
+  const cleanId = String(bookingId || '').trim();
+  if (!cleanId) return;
+  const button = document.querySelector(`[data-booking-retry="${CSS.escape(cleanId)}"]`);
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Retrying…';
+  }
+  try {
+    const result = await api('POST', `/api/crm/booking-actions/${encodeURIComponent(cleanId)}/retry`);
+    if (!result?.success) throw new Error(result?.message || 'Could not retry that action.');
+    if (result.fulfillment?.status === 'completed') {
+      toast('Guest action completed.', 'success');
+    } else if (result.fulfillment?.status === 'attention') {
+      toast('It still needs attention. Check your email and payment settings.', 'error');
+    } else {
+      toast('Retry started. Front Desk will keep working on it.', 'info');
+    }
+    await Promise.allSettled([
+      loadOperationalReadiness({ force: true }),
+      loadBookings({ deferMessages: true }),
+    ]);
+  } catch (error) {
+    toast(error?.message || 'Could not retry that guest action.', 'error');
+    await loadOperationalReadiness({ force: true });
+  } finally {
+    if (button?.isConnected) button.disabled = false;
+  }
+}
+
+function operationalReadinessHtml() {
+  const readiness = crm.operationalReadiness;
+  if (!readiness?.visible) return '';
+  const issues = Array.isArray(readiness.issues) ? readiness.issues : [];
+  const items = Array.isArray(readiness.items) ? readiness.items : [];
+
+  if (readiness.complete) {
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:11px 13px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;">
+      <span aria-hidden="true" style="display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2E7D5B;color:#fff;font-size:13px;font-weight:900;">✓</span>
+      <div style="font-size:12px;line-height:1.35;"><strong style="display:block;font-size:13px;">Ready for live bookings</strong>Your page, alert path and fallback rule are verified.</div>
+    </div>`;
+  }
+
+  const rows = items.map((item) => {
+    const actionLabel = item.action === 'assistant' ? 'Set up' : item.action === 'preview' ? 'Test it' : 'Open';
+    const action = item.done ? '' : `<button type="button" onclick="operationalReadinessAction('${esc(item.action)}')" style="flex:0 0 auto;border:0;background:none;color:#2E7D5B;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;padding:8px;">${actionLabel}</button>`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(46,125,91,.11);">
+      <span aria-hidden="true" style="display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:${item.done ? '#2E7D5B' : '#eef2ef'};color:${item.done ? '#fff' : '#829087'};font-size:12px;font-weight:900;">${item.done ? '✓' : '·'}</span>
+      <div style="min-width:0;flex:1;"><div style="font-size:12px;font-weight:800;color:#1a1a2e;">${esc(item.label)}</div><div style="font-size:11px;color:#6b7280;line-height:1.35;">${esc(item.detail)}</div></div>
+      ${action}
+    </div>`;
+  }).join('');
+
+  const issueRows = issues.map((issue) => `<div style="margin-top:9px;padding:11px;border-radius:11px;background:#fff;border:1px solid #fecaca;">
+    <div style="font-size:12px;font-weight:800;color:#991b1b;">${esc(issue.guestName)} · ${esc(issue.roomName)}</div>
+    <div style="font-size:11px;color:#7f1d1d;line-height:1.4;margin:3px 0 8px;">${issue.status === 'failed' ? 'A guest email or card-hold update did not finish. Front Desk stopped after safe retries so you can review it.' : 'A guest email or card-hold update is taking longer than expected. Front Desk is still retrying it automatically.'}</div>
+    <button type="button" data-booking-retry="${esc(issue.bookingId)}" onclick="retryBookingFulfillment('${esc(issue.bookingId)}')" style="border:1px solid #dc2626;border-radius:9px;background:#fff;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:800;padding:7px 10px;cursor:pointer;">Retry guest action</button>
+  </div>`).join('');
+
+  return `<div style="margin-bottom:14px;padding:14px 15px;border:1px solid ${issues.length ? '#fca5a5' : '#d5e5db'};border-radius:15px;background:${issues.length ? '#fff7f7' : '#f8fcf9'};">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;">
+      <div><div style="font-size:13px;font-weight:850;color:#1a1a2e;">Finish your live-booking check</div><div style="font-size:11px;color:#6b7280;margin-top:2px;">${Number(readiness.readyCount) || 0} of ${Number(readiness.totalCount) || items.length} verified · each item protects a real guest.</div></div>
+      <button type="button" aria-label="Refresh readiness" onclick="loadOperationalReadiness({ force: true })" style="border:0;background:none;color:#6b7280;font-size:18px;line-height:1;cursor:pointer;padding:4px;">↻</button>
+    </div>
+    ${rows}${issueRows}
+  </div>`;
+}
+
 function conflictDateLabel(iso) {
   try {
     return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -5114,7 +5227,7 @@ function renderBookingsNotices() {
     || crm.bookingsSubview !== 'bookings'
     || crm.settingsTourActive
     || document.body.classList.contains('frontdesk-editor-preview');
-  const html = suppressed ? '' : conflictBannerHtml();
+  const html = suppressed ? '' : `${operationalReadinessHtml()}${conflictBannerHtml()}`;
 
   if (!html) {
     if (host) host.remove();
@@ -5166,7 +5279,11 @@ function promptCancelBooking(bookingId, guestName) {
     try {
       const res = await api('POST', '/api/crm/bookings/cancel', { id: bookingId, reason });
       if (res && res.success) {
-        toast(res.alreadyCancelled ? 'That booking was already cancelled.' : 'Cancelled — the room is back on sale.', 'success');
+        if (res.alreadyCancelled) {
+          toast('That booking was already cancelled.', 'info');
+        } else {
+          showBookingFulfillmentToast('release', res.fulfillment);
+        }
         close();
         await loadBookings();
         await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
@@ -5324,8 +5441,7 @@ async function submitBookingApproval(token, action) {
       return false;
     }
     if (body.alreadyDecided) toast(`Already ${body.status || 'decided'}.`, 'info');
-    else if (action === 'release') toast('Released — the room is back on sale.', 'success');
-    else toast('Confirmed — the guest has been emailed.', 'success');
+    else showBookingFulfillmentToast(action, body.fulfillment);
     if (crm.token) loadBookings().catch(() => {});
     return true;
   } catch (_) {
@@ -5334,13 +5450,35 @@ async function submitBookingApproval(token, action) {
   }
 }
 
+function showBookingFulfillmentToast(action, fulfillment) {
+  const state = String(fulfillment?.status || 'pending').toLowerCase();
+  if (state === 'completed') {
+    toast(
+      action === 'release'
+        ? 'Handled — room released, card hold cleared, and guest notified.'
+        : 'Handled — booking confirmed and guest emailed.',
+      'success'
+    );
+    return;
+  }
+  if (state === 'attention') {
+    toast('The room decision is saved, but a guest action needs attention. Front Desk will show the issue.', 'error');
+    return;
+  }
+  toast(
+    action === 'release'
+      ? 'Room released. Front Desk is finishing the card hold and guest email.'
+      : 'Booking confirmed. Front Desk is finishing the guest email.',
+    'info'
+  );
+}
+
 async function decideBookingFromCard(bookingId, action) {
   try {
     const body = await api('POST', `/api/crm/bookings/${encodeURIComponent(bookingId)}/approval`, { action });
     if (!body?.success) throw new Error(body?.message || 'Could not apply that decision.');
     if (body.alreadyDecided) toast(`That request was already ${body.status || 'decided'}.`, 'info');
-    else if (action === 'release') toast('Released — the hold was voided and the guest was notified.', 'success');
-    else toast('Kept — the guest is confirmed.', 'success');
+    else showBookingFulfillmentToast(action, body.fulfillment);
     await loadBookings();
     await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
   } catch (error) {
@@ -5766,11 +5904,14 @@ exposeToWindow({
   conflictBannerHtml,
   decideBookingFromCard,
   loadBookingConflicts,
+  loadOperationalReadiness,
   maybeShowBookingApprovalCard,
   maybeShowBookingReviewCard,
   openBookingReviewFromCard,
   promptCancelBooking,
+  operationalReadinessAction,
   renderBookingsNotices,
+  retryBookingFulfillment,
   reportFrontdeskInstalled,
   showBookingApprovalModal,
   showBookingReviewModal,

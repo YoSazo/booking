@@ -1,6 +1,6 @@
 {
   "name": "marketel-frontdesk-ios",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "private": true,
   "description": "Marketel Front Desk iOS companion app with native navigation and booking alerts.",
   "scripts": {

@@ -1,4 +1,4 @@
-/** Record guest PWA install funnel events (view, cta_click, installed). */
+/** Record guest PWA install and notification-permission funnel events. */
 
 function sessionKey(touchpoint, reservationCode, eventType) {
   return `guest_install_evt_${eventType}_${touchpoint}_${reservationCode || 'generic'}`;
@@ -8,7 +8,9 @@ export function trackGuestInstall(apiBaseUrl, hotelId, { touchpoint, eventType, 
   if (!apiBaseUrl || !hotelId || !touchpoint || !eventType) return;
 
   try {
-    const dedupeEvents = eventType === 'view' || eventType === 'installed';
+    const dedupeEvents = eventType === 'view'
+      || eventType === 'installed'
+      || eventType === 'notification_subscribed';
     if (dedupeEvents && sessionStorage.getItem(sessionKey(touchpoint, reservationCode, eventType))) {
       return;
     }

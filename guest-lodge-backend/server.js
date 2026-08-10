@@ -195,22 +195,26 @@ async function buildGuestInstallUrl(hotelId, code, req, ref = 'email') {
 
 function guestInstallEmailBlockHtml({ hotelName, installUrl }) {
     if (!installUrl) return '';
-    const safeName = hotelName || 'your hotel';
+    const safeName = escapeXml(hotelName || 'your hotel');
+    const safeInstallUrl = escapeXml(installUrl);
     return `<div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:12px;padding:20px;margin:0 0 20px;text-align:center;">
         <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">📱 Add ${safeName} to your phone</div>
         <p style="margin:0 0 16px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.55;">Message the front desk, get check-in updates, and book direct next time — like a real app, no app store.</p>
-        <a href="${installUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Add to Home Screen →</a>
+        <a href="${safeInstallUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Add to Home Screen →</a>
         <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:12px;line-height:1.5;">On iPhone: open the link in Safari → Share → Add to Home Screen</div>
     </div>`;
 }
 
-async function notifyGuestBookingConfirmed({ req, hotelId, guestInfo, bookingDetails, reservationCode }) {
-    if (!guestInfo?.email) return;
-    const hotelForEmail = await prisma.hotelConfig.findUnique({ where: { id: hotelId }, select: { name: true, phone: true } }).catch(() => null);
+async function notifyGuestBookingConfirmed({ req, hotelId, guestInfo, bookingDetails, reservationCode, messageId }) {
+    if (!guestInfo?.email || guestInfo.email === '-') return true;
+    const hotelForEmail = await prisma.hotelConfig.findUnique({
+        where: { id: hotelId },
+        select: { name: true, phone: true, ownerEmail: true },
+    }).catch(() => null);
     const emailCode = reservationCode || bookingDetails?.reservationCode;
     const bookingUrl = await buildGuestBookingUrl(hotelId, emailCode, req);
     const installUrl = await buildGuestInstallUrl(hotelId, emailCode, req, 'confirmation-email');
-    sendGuestConfirmationEmail({
+    return sendGuestConfirmationEmail({
         guestEmail: guestInfo.email,
         guestName: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' '),
         hotelName: hotelForEmail?.name || 'Your Hotel',
@@ -223,29 +227,40 @@ async function notifyGuestBookingConfirmed({ req, hotelId, guestInfo, bookingDet
         reservationCode: emailCode,
         bookingUrl,
         installUrl,
+        replyTo: hotelForEmail?.ownerEmail || undefined,
+        messageId,
     });
 }
 
-async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, checkout, nights, total, reservationCode, bookingUrl, installUrl }) {
-    if (!emailTransporter || !guestEmail) return;
+async function sendGuestConfirmationEmail({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, checkout, nights, total, reservationCode, bookingUrl, installUrl, replyTo, messageId }) {
+    if (!emailTransporter || !guestEmail) return false;
     try {
         const checkinStr = new Date(checkin).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
         const checkoutStr = new Date(checkout).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
         const totalStr = total ? `$${Number(total).toFixed(2)}` : '';
-        const phoneStr = hotelPhone ? ` — ${hotelPhone}` : '.';
+        const safeGuestName = escapeXml(guestName || 'there');
+        const safeHotelName = escapeXml(hotelName || 'Your Hotel');
+        const safeRoomName = escapeXml(roomName || 'Room');
+        const safeReservationCode = escapeXml(reservationCode || '');
+        const safeBookingUrl = bookingUrl ? escapeXml(bookingUrl) : '';
+        const phoneStr = hotelPhone ? ` — ${escapeXml(hotelPhone)}` : '.';
 
         const installBlock = guestInstallEmailBlockHtml({ hotelName, installUrl });
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Reservation Confirmed ✓</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.5;">Your reservation at <strong>${hotelName}</strong> is confirmed. Here are your details:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;"><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Room</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${roomName}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-in</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkinStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-out</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkoutStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Nights</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${nights}</div></td></tr>${totalStr ? `<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Total</div><div style="font-size:15px;font-weight:600;color:#2E7D5B;">${totalStr}</div></td></tr>` : ''}<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Confirmation #</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${reservationCode}</div></td></tr></table>${installBlock}${bookingUrl ? `<div style="text-align:center;margin:0 0 20px;"><a href="${bookingUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 26px;border-radius:10px;">View my reservation</a><div style="font-size:11px;color:#9ca3af;margin-top:8px;">Message the front desk, add to your calendar, or book again anytime.</div></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">If you have any questions, contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Reservation Confirmed ✓</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:15px;color:#1a1a2e;">Hi ${safeGuestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.5;">Your reservation at <strong>${safeHotelName}</strong> is confirmed. Here are your details:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:20px;"><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Room</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${safeRoomName}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-in</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkinStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Check-out</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${checkoutStr}</div></td></tr><tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Nights</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${Number(nights) || 1}</div></td></tr>${totalStr ? `<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Total</div><div style="font-size:15px;font-weight:600;color:#2E7D5B;">${totalStr}</div></td></tr>` : ''}<tr><td style="padding:8px 16px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;">Confirmation #</div><div style="font-size:15px;font-weight:600;color:#1a1a2e;">${safeReservationCode}</div></td></tr></table>${installBlock}${safeBookingUrl ? `<div style="text-align:center;margin:0 0 20px;"><a href="${safeBookingUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 26px;border-radius:10px;">View my reservation</a><div style="font-size:11px;color:#9ca3af;margin-top:8px;">Message the front desk, add to your calendar, or book again anytime.</div></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">If you have any questions, contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
 
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
             to: guestEmail,
+            ...(replyTo ? { replyTo } : {}),
+            ...(messageId ? { messageId } : {}),
             subject: `Reservation confirmed — ${hotelName}`,
             html,
         });
         console.log(`✅ Guest confirmation email sent to ${guestEmail}`);
+        return true;
     } catch (e) {
         console.error('❌ Guest confirmation email failed:', e.message);
+        return false;
     }
 }
 
@@ -1784,7 +1799,18 @@ async function createManualBookingRecordWithInventory(hotelId, bookingData) {
                     : null,
             },
         });
+        if (String(booking.status || '').toLowerCase() === 'confirmed') {
+            await enqueueBookingSideEffectsTx(tx, booking, ['confirmation_email']);
+        }
         return { booking, created: true };
+    }, { maxWait: 5000, timeout: 15000 });
+}
+
+async function createBookingRecordWithConfirmation(bookingData) {
+    return prisma.$transaction(async (tx) => {
+        const booking = await tx.booking.create({ data: bookingData });
+        await enqueueBookingSideEffectsTx(tx, booking, ['confirmation_email']);
+        return booking;
     }, { maxWait: 5000, timeout: 15000 });
 }
 
@@ -2453,8 +2479,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
 
             // Save to DB if possible (but don't fail booking if DB is down)
             try {
-                const savedBooking = await prisma.booking.create({
-                    data: {
+                const savedBooking = await createBookingRecordWithConfirmation({
                         stripePaymentIntentId: paymentIntentId,
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.reservationID,
@@ -2475,17 +2500,10 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         preAuthHoldAmount: 1.00,
                         holdStatus: holdStatus,
                         noShowFeePaid: holdStatus === 'captured',
-                        holdCapturedAt: holdStatus === 'captured' ? new Date() : null
-                    }
+                        holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
                 });
                 triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
-                notifyGuestBookingConfirmed({
-                    req,
-                    hotelId: hotelValidation.hotelId,
-                    guestInfo,
-                    bookingDetails,
-                    reservationCode: pmsResponse.reservationID,
-                });
+                runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
             }
@@ -2533,13 +2551,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         notifyBookingNeedsApproval(outcome.booking).catch(() => {});
                     } else {
                         triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
-                        notifyGuestBookingConfirmed({
-                            req,
-                            hotelId: hotelValidation.hotelId,
-                            guestInfo,
-                            bookingDetails,
-                            reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
-                        });
+                        runBookingSideEffectSweep({ bookingId: outcome.booking.id, limit: 5 }).catch(() => {});
                         handleBookingCreatedWithoutHold(outcome.booking, approvalPlan);
                     }
                 }
@@ -2630,8 +2642,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
             
             while (!dbSaveSuccess && retries > 0) {
                 try {
-                    const savedBooking = await prisma.booking.create({
-                        data: {
+                    const savedBooking = await createBookingRecordWithConfirmation({
                             stripePaymentIntentId: paymentIntentId,
                             ourReservationCode: bookingDetails.reservationCode,
                             pmsConfirmationCode: pmsResponse.data.reservationID,
@@ -2652,18 +2663,11 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                             preAuthHoldAmount: 1.00,
                             holdStatus: holdStatus,
                             noShowFeePaid: holdStatus === 'captured',
-                            holdCapturedAt: holdStatus === 'captured' ? new Date() : null
-                        }
+                            holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
                     });
                     dbSaveSuccess = true;
                     triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
-                    notifyGuestBookingConfirmed({
-                        req,
-                        hotelId: hotelValidation.hotelId,
-                        guestInfo,
-                        bookingDetails,
-                        reservationCode: pmsResponse.data.reservationID,
-                    });
+                    runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
                     console.log('✅ Booking saved to database');
                 } catch (dbError) {
                     retries--;
@@ -3179,8 +3183,7 @@ app.post('/api/stripe-webhook', async (req, res) => {
             if (pmsResponse.data.success) {
                 console.log('✅ Backup booking created in Cloudbeds via webhook:', pmsResponse.data.reservationID);
 
-                const savedBooking = await prisma.booking.create({
-                    data: {
+                const savedBooking = await createBookingRecordWithConfirmation({
                         stripePaymentIntentId: paymentIntent.id,
                         ourReservationCode: bookingDetails.reservationCode,
                         pmsConfirmationCode: pmsResponse.data.reservationID,
@@ -3196,10 +3199,10 @@ app.post('/api/stripe-webhook', async (req, res) => {
                         guestPhone: guestInfo.phone,
                         subtotal: bookingDetails.subtotal,
                         taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total
-                    }
+                        grandTotal: bookingDetails.total,
                 });
                 console.log('✅ Backup booking record saved to DB by webhook.');
+                runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
 
                 // 3. Send push notification
                 const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
@@ -3932,17 +3935,11 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                 };
                 const outcome = config.pms === 'manual'
                     ? await createManualBookingRecordWithInventory(hotelValidation.hotelId, bookingData)
-                    : { booking: await prisma.booking.create({ data: bookingData }), created: true };
+                    : { booking: await createBookingRecordWithConfirmation(bookingData), created: true };
 
                 if (outcome.created) {
                     triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
-                    notifyGuestBookingConfirmed({
-                        req,
-                        hotelId: hotelValidation.hotelId,
-                        guestInfo,
-                        bookingDetails,
-                        reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
-                    });
+                    runBookingSideEffectSweep({ bookingId: outcome.booking.id, limit: 5 }).catch(() => {});
                 }
             } catch (dbError) {
                 console.error("Failed to save to database:", dbError);
@@ -5306,14 +5303,26 @@ app.post('/api/guest-push-subscribe', guestPushSubscribeGlobalRateLimit, guestPu
     }
 });
 
-// Guest PWA install funnel — view, CTA click, installed (public).
+// Guest PWA install + notification funnel (public). Notification permission is
+// a separate conversion after installation, so measure it separately instead
+// of assuming every installed guest is reachable.
 app.post('/api/guest-install-event', async (req, res) => {
     try {
         const { hotelId, reservationCode, touchpoint, eventType } = req.body || {};
         if (!hotelId || !touchpoint || !eventType) {
             return res.status(400).json({ success: false, message: 'hotelId, touchpoint, and eventType are required.' });
         }
-        const allowed = ['view', 'cta_click', 'installed'];
+        const allowed = [
+            'view',
+            'cta_click',
+            'installed',
+            'notification_prompt',
+            'notification_granted',
+            'notification_denied',
+            'notification_dismissed',
+            'notification_subscribed',
+            'notification_failed',
+        ];
         if (!allowed.includes(eventType)) {
             return res.status(400).json({ success: false, message: 'Invalid eventType.' });
         }
@@ -5865,6 +5874,7 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
                     enabled: false,
                     windowMinutes: resolveApprovalWindowMinutes(null),
                     noResponseAction: resolveApprovalNoResponseAction(null),
+                    policyChosen: false,
                     supported: true,
                     pushConfigured: ownerPushConfigured(),
                     devices: 0,
@@ -5886,6 +5896,7 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
                     bookingApprovalEnabled: true,
                     bookingApprovalWindowMinutes: true,
                     bookingApprovalNoResponseAction: true,
+                    bookingApprovalPolicyChosenAt: true,
                     frontdeskInstalledAt: true,
                 },
             })).catch(() => null),
@@ -5902,6 +5913,7 @@ app.get('/api/crm/booking-approval', crmAuth, async (req, res) => {
                 enabled: hotel?.bookingApprovalEnabled === true,
                 windowMinutes: resolveApprovalWindowMinutes(hotel),
                 noResponseAction: resolveApprovalNoResponseAction(hotel),
+                policyChosen: !!hotel?.bookingApprovalPolicyChosenAt,
                 // Only manual-PMS hotels hold bookings locally.
                 supported: String(hotel?.pms || '').toLowerCase() === 'manual',
                 pushConfigured: ownerPushConfigured(),
@@ -5947,7 +5959,14 @@ app.post('/api/crm/booking-approval', crmAuth, async (req, res) => {
             if (!['confirm', 'release'].includes(requested)) {
                 return res.status(400).json({ success: false, message: 'Choose keep booking or release request.' });
             }
+            if (requested === 'release' && (await countBookingApprovalChannels(hotelId)).total < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Connect at least one phone for app alerts or Assistant texts before choosing safety-first release.',
+                });
+            }
             data.bookingApprovalNoResponseAction = requested;
+            data.bookingApprovalPolicyChosenAt = new Date();
         }
         if (!Object.keys(data).length) {
             return res.status(400).json({ success: false, message: 'Nothing to update.' });
@@ -5959,6 +5978,178 @@ app.post('/api/crm/booking-approval', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('crm/booking-approval POST:', e.message);
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Compact post-activation health check. This is deliberately operational—not
+// another onboarding tour—so an owner can see whether the system is actually
+// ready to accept and safely handle a live guest.
+app.get('/api/crm/operational-readiness', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        if (isStaticOnlyHotelId(hotelId)) {
+            return res.json({ success: true, data: { visible: false, items: [], issues: [] } });
+        }
+
+        const [hotel, primaryDomain, channels, directBookings, failedJobs] = await Promise.all([
+            prisma.hotelConfig.findUnique({
+                where: { id: hotelId },
+                select: {
+                    subscribed: true,
+                    setupComplete: true,
+                    bookingApprovalEnabled: true,
+                    bookingApprovalNoResponseAction: true,
+                    bookingApprovalPolicyChosenAt: true,
+                },
+            }),
+            prisma.hotelDomain.findFirst({
+                where: { hotelId, isPrimary: true },
+                select: { domain: true },
+            }),
+            countBookingApprovalChannels(hotelId),
+            prisma.booking.count({
+                where: {
+                    hotelId,
+                    bookingType: { not: 'manual' },
+                    status: ACTIVE_BOOKING_STATUS_FILTER,
+                },
+            }).catch(() => 0),
+            prisma.bookingSideEffectJob.findMany({
+                where: {
+                    hotelId,
+                    OR: [
+                        { status: 'failed' },
+                        { status: 'retrying', attempts: { gte: 3 } },
+                    ],
+                },
+                include: {
+                    booking: {
+                        select: {
+                            id: true,
+                            roomName: true,
+                            guestFirstName: true,
+                            guestLastName: true,
+                            status: true,
+                        },
+                    },
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 5,
+            }).catch(() => []),
+        ]);
+        if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
+
+        const live = !!hotel.subscribed && !!primaryDomain?.domain;
+        const alertReachable = channels.total > 0;
+        const policyChosen = !!hotel.bookingApprovalPolicyChosenAt;
+        const testCompleted = directBookings > 0;
+        const items = [
+            {
+                key: 'booking_page',
+                label: 'Booking page live',
+                done: live,
+                detail: live ? primaryDomain.domain : 'Activation or booking domain is not ready.',
+                action: 'page',
+            },
+            {
+                key: 'front_desk',
+                label: 'Front Desk reachable',
+                done: alertReachable,
+                detail: alertReachable
+                    ? `${channels.total} alert ${channels.total === 1 ? 'channel' : 'channels'} connected`
+                    : 'Turn on app alerts or connect an Assistant phone.',
+                action: 'assistant',
+            },
+            {
+                key: 'fallback_rule',
+                label: 'No-answer rule chosen',
+                done: policyChosen,
+                detail: policyChosen
+                    ? (resolveApprovalNoResponseAction(hotel) === 'release' ? 'Safety-first: release request' : 'Revenue-first: keep booking')
+                    : 'Choose what happens when nobody answers.',
+                action: 'assistant',
+            },
+            {
+                key: 'test_booking',
+                label: 'Booking path verified',
+                done: testCompleted,
+                detail: testCompleted ? 'A direct booking reached Front Desk.' : 'Complete one real end-to-end test booking.',
+                action: 'preview',
+            },
+        ];
+        const issues = failedJobs.map((job) => ({
+            id: job.id,
+            bookingId: job.bookingId,
+            type: job.type,
+            error: job.lastError || 'This guest action needs attention.',
+            roomName: job.booking?.roomName || 'Booking',
+            guestName: [job.booking?.guestFirstName, job.booking?.guestLastName].filter(Boolean).join(' ') || 'Guest',
+            bookingStatus: job.booking?.status || '',
+            status: job.status,
+            attempts: job.attempts,
+            updatedAt: job.updatedAt,
+        }));
+        const complete = items.every((item) => item.done) && issues.length === 0;
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            success: true,
+            data: {
+                visible: !!hotel.subscribed,
+                complete,
+                readyCount: items.filter((item) => item.done).length,
+                totalCount: items.length,
+                items,
+                issues,
+                bookingApprovalEnabled: hotel.bookingApprovalEnabled,
+            },
+        });
+    } catch (error) {
+        console.error('operational-readiness:', error.message);
+        res.status(500).json({ success: false, message: 'Could not check launch readiness.' });
+    }
+});
+
+app.post('/api/crm/booking-actions/:bookingId/retry', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const bookingId = String(req.params.bookingId || '').trim();
+        const booking = await prisma.booking.findFirst({
+            where: { id: bookingId, hotelId },
+            select: { id: true },
+        });
+        if (!booking) return res.status(404).json({ success: false, message: 'Booking not found.' });
+
+        const reset = await prisma.bookingSideEffectJob.updateMany({
+            where: { bookingId, hotelId, status: { in: ['failed', 'retrying'] } },
+            data: {
+                status: 'retrying',
+                attempts: 0,
+                nextAttemptAt: new Date(),
+                lockedAt: null,
+                lastError: null,
+            },
+        });
+        if (reset.count) {
+            await prisma.booking.update({
+                where: { id: bookingId },
+                data: {
+                    fulfillmentStatus: 'pending',
+                    fulfillmentLastError: null,
+                    fulfillmentUpdatedAt: new Date(),
+                },
+            });
+        }
+        const result = await runBookingSideEffectSweep({ bookingId, limit: 10 });
+        res.json({
+            success: true,
+            retried: reset.count,
+            fulfillment: result.fulfillment || await refreshBookingFulfillmentStatus(bookingId),
+        });
+    } catch (error) {
+        console.error('booking-actions retry:', error.message);
+        res.status(500).json({ success: false, message: 'Could not retry that guest action.' });
     }
 });
 
@@ -6050,18 +6241,50 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
         const byTouchpoint = {};
         for (const ev of events) {
             const tp = ev.touchpoint || 'unknown';
-            if (!byTouchpoint[tp]) byTouchpoint[tp] = { views: 0, cta_clicks: 0, installed: 0 };
+            if (!byTouchpoint[tp]) byTouchpoint[tp] = {
+                views: 0,
+                cta_clicks: 0,
+                installed: 0,
+                notification_prompts: 0,
+                notification_granted: 0,
+                notification_denied: 0,
+                notification_dismissed: 0,
+                notification_subscribed: 0,
+                notification_failed: 0,
+            };
             if (ev.eventType === 'view') byTouchpoint[tp].views++;
             else if (ev.eventType === 'cta_click') byTouchpoint[tp].cta_clicks++;
             else if (ev.eventType === 'installed') byTouchpoint[tp].installed++;
+            else if (ev.eventType === 'notification_prompt') byTouchpoint[tp].notification_prompts++;
+            else if (ev.eventType === 'notification_granted') byTouchpoint[tp].notification_granted++;
+            else if (ev.eventType === 'notification_denied') byTouchpoint[tp].notification_denied++;
+            else if (ev.eventType === 'notification_dismissed') byTouchpoint[tp].notification_dismissed++;
+            else if (ev.eventType === 'notification_subscribed') byTouchpoint[tp].notification_subscribed++;
+            else if (ev.eventType === 'notification_failed') byTouchpoint[tp].notification_failed++;
         }
 
         const totals = events.reduce((acc, ev) => {
             if (ev.eventType === 'view') acc.views++;
             else if (ev.eventType === 'cta_click') acc.cta_clicks++;
             else if (ev.eventType === 'installed') acc.installed++;
+            else if (ev.eventType === 'notification_prompt') acc.notification_prompts++;
+            else if (ev.eventType === 'notification_granted') acc.notification_granted++;
+            else if (ev.eventType === 'notification_denied') acc.notification_denied++;
+            else if (ev.eventType === 'notification_dismissed') acc.notification_dismissed++;
+            else if (ev.eventType === 'notification_subscribed') acc.notification_subscribed++;
+            else if (ev.eventType === 'notification_failed') acc.notification_failed++;
             return acc;
-        }, { views: 0, cta_clicks: 0, installed: 0 });
+        }, {
+            views: 0,
+            cta_clicks: 0,
+            installed: 0,
+            notification_prompts: 0,
+            notification_granted: 0,
+            notification_denied: 0,
+            notification_dismissed: 0,
+            notification_subscribed: 0,
+            notification_failed: 0,
+        });
 
         const installRate = recentBookings > 0
             ? Math.round((installedBookings / recentBookings) * 100)
@@ -6748,8 +6971,9 @@ async function notifyGuestMessage(hotelId, guestName, preview, reservationCode =
 // the owner by app alert and/or Assistant text. Each property decides what
 // silence means: keep the booking or release the request. The rule is copied to
 // the booking so it cannot change halfway through a countdown. Holding is
-// pointless if no phone can receive the alert, so unreachable properties keep
-// the existing safe behavior: instant confirmation plus an install nudge.
+// pointless if no phone can receive the alert. Revenue-first properties keep
+// the sale immediately; safety-first properties still honor their explicit
+// release rule instead of silently changing it behind the owner's back.
 
 const BOOKING_APPROVAL_TOKEN_EXPIRY_MS = 6 * 60 * 60 * 1000;
 const BOOKING_APPROVAL_SWEEP_INTERVAL_MS = 60 * 1000;
@@ -6757,6 +6981,208 @@ const BOOKING_APPROVAL_DEFAULT_WINDOW_MINUTES = 20;
 const BOOKING_APPROVAL_MIN_WINDOW_MINUTES = 1;
 const BOOKING_APPROVAL_MAX_WINDOW_MINUTES = 180;
 const BOOKING_APPROVAL_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const BOOKING_SIDE_EFFECT_SWEEP_INTERVAL_MS = 60 * 1000;
+const BOOKING_SIDE_EFFECT_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const BOOKING_SIDE_EFFECT_MAX_ATTEMPTS = 8;
+const BOOKING_SIDE_EFFECT_TYPES = new Set([
+    'confirmation_email',
+    'release_hold',
+    'release_email',
+    'cancellation_email',
+]);
+const BOOKING_SIDE_EFFECT_PRIORITY = {
+    release_hold: 0,
+    release_email: 1,
+    cancellation_email: 1,
+    confirmation_email: 2,
+};
+
+function bookingSideEffectRetryDelayMs(attempts) {
+    const delays = [30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000, 2 * 60 * 60_000, 6 * 60 * 60_000, 24 * 60 * 60_000];
+    return delays[Math.min(delays.length - 1, Math.max(0, Number(attempts || 1) - 1))];
+}
+
+function bookingSideEffectMessageId(job) {
+    const safeType = String(job?.type || 'action').replace(/[^a-z0-9_-]/gi, '-');
+    const safeBooking = String(job?.bookingId || 'booking').replace(/[^a-z0-9_-]/gi, '-');
+    return `<marketel-${safeType}-${safeBooking}@bookmarketel.com>`;
+}
+
+async function enqueueBookingSideEffectsTx(tx, booking, jobs) {
+    const normalized = (Array.isArray(jobs) ? jobs : [])
+        .map((job) => typeof job === 'string' ? { type: job } : job)
+        .filter((job) => BOOKING_SIDE_EFFECT_TYPES.has(job?.type));
+    if (!booking?.id || !booking?.hotelId || !normalized.length) return;
+
+    await tx.bookingSideEffectJob.createMany({
+        data: normalized.map((job) => ({
+            bookingId: booking.id,
+            hotelId: booking.hotelId,
+            type: job.type,
+            payload: job.payload === undefined ? undefined : job.payload,
+        })),
+        skipDuplicates: true,
+    });
+    await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+            fulfillmentStatus: 'pending',
+            fulfillmentLastError: null,
+            fulfillmentUpdatedAt: new Date(),
+        },
+    });
+}
+
+async function refreshBookingFulfillmentStatus(bookingId) {
+    if (!bookingId) return { status: 'none', pending: 0, failed: 0 };
+    const jobs = await prisma.bookingSideEffectJob.findMany({
+        where: { bookingId },
+        select: { status: true, lastError: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+    });
+    if (!jobs.length) return { status: 'none', pending: 0, failed: 0 };
+    const failedJobs = jobs.filter((job) => job.status === 'failed');
+    const pendingJobs = jobs.filter((job) => !['completed', 'failed'].includes(job.status));
+    const status = failedJobs.length ? 'attention' : (pendingJobs.length ? 'pending' : 'completed');
+    const lastError = failedJobs[0]?.lastError || null;
+    await prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+            fulfillmentStatus: status,
+            fulfillmentLastError: lastError,
+            fulfillmentUpdatedAt: new Date(),
+        },
+    }).catch(() => {});
+    return { status, pending: pendingJobs.length, failed: failedJobs.length, lastError };
+}
+
+async function performBookingSideEffect(job) {
+    const booking = await prisma.booking.findUnique({ where: { id: job.bookingId } });
+    if (!booking) return;
+    const messageId = bookingSideEffectMessageId(job);
+
+    if (job.type === 'release_hold') {
+        if (!(await voidBookingHold(booking))) throw new Error('The guest card hold could not be released yet.');
+        return;
+    }
+
+    // Never tell a guest their hold was released until Stripe has actually
+    // accepted the cancellation/refund. The hold job runs first; this guard is
+    // also safe when multiple Render workers overlap.
+    if (['release_email', 'cancellation_email'].includes(job.type)
+        && booking.stripePaymentIntentId
+        && booking.holdStatus !== 'released') {
+        throw new Error('Waiting for the card hold to be released before emailing the guest.');
+    }
+
+    if (job.type === 'release_email') {
+        if (!(await sendBookingReleasedEmail(booking, booking.approvalOutcome || 'owner_released', messageId))) {
+            throw new Error('The release email could not be sent yet.');
+        }
+        return;
+    }
+    if (job.type === 'cancellation_email') {
+        if (!(await sendBookingCancelledEmail(booking, booking.cancellationReason || '', messageId))) {
+            throw new Error('The cancellation email could not be sent yet.');
+        }
+        return;
+    }
+    if (job.type === 'confirmation_email') {
+        const sent = await notifyGuestBookingConfirmed({
+            req: null,
+            hotelId: booking.hotelId,
+            guestInfo: guestInfoFromBookingRow(booking),
+            bookingDetails: bookingDetailsFromBookingRow(booking),
+            reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
+            messageId,
+        });
+        if (!sent) throw new Error('The confirmation email could not be sent yet.');
+    }
+}
+
+async function claimBookingSideEffectJob(jobId) {
+    const now = new Date();
+    const staleBefore = new Date(now.getTime() - BOOKING_SIDE_EFFECT_LOCK_TIMEOUT_MS);
+    const claimed = await prisma.bookingSideEffectJob.updateMany({
+        where: {
+            id: jobId,
+            nextAttemptAt: { lte: now },
+            OR: [
+                { status: { in: ['pending', 'retrying'] } },
+                { status: 'processing', lockedAt: { lte: staleBefore } },
+            ],
+        },
+        data: {
+            status: 'processing',
+            lockedAt: now,
+            attempts: { increment: 1 },
+            lastError: null,
+        },
+    });
+    if (claimed.count !== 1) return null;
+    return prisma.bookingSideEffectJob.findUnique({ where: { id: jobId } });
+}
+
+async function processClaimedBookingSideEffect(job) {
+    try {
+        await performBookingSideEffect(job);
+        await prisma.bookingSideEffectJob.update({
+            where: { id: job.id },
+            data: {
+                status: 'completed',
+                completedAt: new Date(),
+                lockedAt: null,
+                lastError: null,
+            },
+        });
+    } catch (error) {
+        const message = String(error?.message || 'Booking action failed').slice(0, 1000);
+        const permanent = Number(job.attempts || 0) >= BOOKING_SIDE_EFFECT_MAX_ATTEMPTS;
+        await prisma.bookingSideEffectJob.update({
+            where: { id: job.id },
+            data: {
+                status: permanent ? 'failed' : 'retrying',
+                nextAttemptAt: new Date(Date.now() + bookingSideEffectRetryDelayMs(job.attempts)),
+                lockedAt: null,
+                lastError: message,
+            },
+        });
+        console.error(`booking side effect ${job.type} booking=${job.bookingId} attempt=${job.attempts}:`, message);
+    }
+    return refreshBookingFulfillmentStatus(job.bookingId);
+}
+
+async function runBookingSideEffectSweep({ bookingId = '', limit = 100 } = {}) {
+    if (!prisma.bookingSideEffectJob) return { processed: 0 };
+    const now = new Date();
+    const staleBefore = new Date(now.getTime() - BOOKING_SIDE_EFFECT_LOCK_TIMEOUT_MS);
+    const candidates = await prisma.bookingSideEffectJob.findMany({
+        where: {
+            ...(bookingId ? { bookingId } : {}),
+            nextAttemptAt: { lte: now },
+            OR: [
+                { status: { in: ['pending', 'retrying'] } },
+                { status: 'processing', lockedAt: { lte: staleBefore } },
+            ],
+        },
+        orderBy: { createdAt: 'asc' },
+        take: Math.max(1, Math.min(500, Number(limit) || 100)),
+    });
+    candidates.sort((left, right) =>
+        (BOOKING_SIDE_EFFECT_PRIORITY[left.type] ?? 10) - (BOOKING_SIDE_EFFECT_PRIORITY[right.type] ?? 10)
+        || left.createdAt.getTime() - right.createdAt.getTime()
+    );
+    let processed = 0;
+    let latest = null;
+    for (const candidate of candidates) {
+        const claimed = await claimBookingSideEffectJob(candidate.id).catch(() => null);
+        if (!claimed) continue;
+        latest = await processClaimedBookingSideEffect(claimed);
+        processed += 1;
+    }
+    if (bookingId && !latest) latest = await refreshBookingFulfillmentStatus(bookingId);
+    return { processed, fulfillment: latest };
+}
 
 function signBookingActionPayload(encoded) {
     return crypto.createHmac('sha256', CRM_RETURN_TOKEN_SECRET).update(encoded).digest('base64url');
@@ -6840,11 +7266,21 @@ async function resolveBookingApprovalPlan(config) {
     // Manual PMS only: the local Booking table is the inventory, so pending and
     // released rows are meaningful without an external reservation round-trip.
     if (String(config.pms || '').toLowerCase() !== 'manual') return off;
+    const windowMinutes = resolveApprovalWindowMinutes(config);
     if ((await countBookingApprovalChannels(config.id)).total < 1) {
-        return { ...off, outcome: 'auto_no_alerts' };
+        if (noResponseAction === 'confirm') return { ...off, outcome: 'auto_no_alerts' };
+        // A phone can disappear after the policy was saved. Preserve the review
+        // window and the owner's safety-first choice rather than confirming.
+        return {
+            hold: true,
+            outcome: null,
+            windowMinutes,
+            pendingUntil: new Date(Date.now() + windowMinutes * 60 * 1000),
+            noResponseAction,
+            noAlertChannels: true,
+        };
     }
 
-    const windowMinutes = resolveApprovalWindowMinutes(config);
     return {
         hold: true,
         outcome: null,
@@ -6957,6 +7393,8 @@ async function notifyBookingNeedsApproval(booking) {
 async function notifyBookingApprovalResolved(booking, outcome, source = 'owner') {
     if (!booking?.hotelId) return;
     try {
+        const current = await prisma.booking.findUnique({ where: { id: booking.id } }).catch(() => null);
+        if (current) booking = current;
         const released = outcome === 'owner_released' || outcome === 'auto_released';
         const autoConfirmed = outcome === 'auto_confirmed';
         const autoReleased = outcome === 'auto_released';
@@ -6967,11 +7405,18 @@ async function notifyBookingApprovalResolved(booking, outcome, source = 'owner')
             : (released
                 ? 'Booking released 🚫'
                 : (autoConfirmed ? 'Booking auto-confirmed ✓' : 'Booking confirmed ✓'));
+        const fulfillmentDone = booking.fulfillmentStatus === 'completed';
         const suffix = autoReleased
-            ? 'No response in time. The hold was voided and the guest was notified.'
+            ? (fulfillmentDone
+                ? 'No response in time. The hold was voided and the guest was notified.'
+                : 'No response in time. Front Desk is finishing the hold release and guest email.')
             : (released
-                ? 'Room is back on sale and the hold was voided.'
-                : (autoConfirmed ? 'No response in time, so it went through.' : 'Guest has been emailed.'));
+                ? (fulfillmentDone
+                    ? 'Room is back on sale, the hold was voided, and the guest was notified.'
+                    : 'Room is back on sale. Front Desk is finishing the hold release and guest email.')
+                : (autoConfirmed
+                    ? (fulfillmentDone ? 'No response in time, so it went through and the guest was emailed.' : 'No response in time, so it went through. Front Desk is finishing the guest email.')
+                    : (fulfillmentDone ? 'Guest has been emailed.' : 'Front Desk is finishing the guest email.')));
 
         await Promise.all([
             ownerPushConfigured()
@@ -6997,7 +7442,7 @@ async function notifyBookingApprovalResolved(booking, outcome, source = 'owner')
 // Release an uncaptured authorization or refund a captured payment when the
 // owner turns a confirmed booking away. Idempotency protects repeat taps.
 async function voidBookingHold(booking) {
-    if (!booking?.stripePaymentIntentId) return;
+    if (!booking?.stripePaymentIntentId) return true;
     try {
         const intent = await stripe.paymentIntents.retrieve(booking.stripePaymentIntentId);
         const cancellable = ['requires_capture', 'requires_confirmation', 'requires_payment_method', 'requires_action'];
@@ -7013,40 +7458,52 @@ async function voidBookingHold(booking) {
             where: { id: booking.id },
             data: { holdStatus: 'released', holdReleasedAt: new Date() },
         }));
+        return true;
     } catch (e) {
         console.error('voidBookingHold:', e.message);
+        return false;
     }
 }
 
-async function sendBookingReleasedEmail(booking, outcome = 'owner_released') {
-    if (!emailTransporter || !booking?.guestEmail) return;
+async function sendBookingReleasedEmail(booking, outcome = 'owner_released', messageId = '') {
+    if (!booking?.guestEmail || booking.guestEmail === '-') return true;
+    if (!emailTransporter) return false;
     try {
         const hotel = await prisma.hotelConfig.findUnique({
             where: { id: booking.hotelId },
-            select: { name: true, phone: true },
+            select: { name: true, phone: true, ownerEmail: true },
         }).catch(() => null);
         const hotelName = hotel?.name || 'the hotel';
         const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'there';
         const stay = formatApprovalStayRange(booking.checkinDate, booking.checkoutDate);
+        const safeHotelName = escapeXml(hotelName);
+        const safeGuestName = escapeXml(guestName);
+        const safeRoomName = escapeXml(booking.roomName || 'room');
         const automatic = outcome === 'auto_released';
         const reasonCopy = automatic
-            ? `The property did not confirm availability for <strong>${booking.roomName}</strong>${stay ? ` (${stay})` : ''} before its review window ended, so your request was released automatically.`
-            : `Unfortunately <strong>${hotelName}</strong> can't honour your request for <strong>${booking.roomName}</strong>${stay ? ` (${stay})` : ''} — the room was taken just before your booking came through.`;
+            ? `The property did not confirm availability for <strong>${safeRoomName}</strong>${stay ? ` (${escapeXml(stay)})` : ''} before its review window ended, so your request was released automatically.`
+            : `Unfortunately <strong>${safeHotelName}</strong> can't honour your request for <strong>${safeRoomName}</strong>${stay ? ` (${escapeXml(stay)})` : ''} — the room was taken just before your booking came through.`;
         const phoneLine = hotel?.phone
-            ? `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Call ${hotelName} at ${hotel.phone} and they'll help you find another option.</p>`
-            : `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Reply to this email and ${hotelName} will help you find another option.</p>`;
+            ? `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Call ${escapeXml(hotelName)} at ${escapeXml(hotel.phone)} and they'll help you find another option.</p>`
+            : (hotel?.ownerEmail
+                ? `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Reply to this email and ${escapeXml(hotelName)} will help you find another option.</p>`
+                : `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Contact ${escapeXml(hotelName)} directly if you need help finding another option.</p>`);
 
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">We couldn't confirm your room</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">${reasonCopy}</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>You have not been charged.</strong> The temporary $1 authorisation on your card has been voided and will disappear from your statement.</p>${phoneLine}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">We couldn't confirm your room</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${safeGuestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">${reasonCopy}</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>You have not been charged.</strong> The temporary $1 authorisation on your card has been voided and will disappear from your statement.</p>${phoneLine}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
 
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
             to: booking.guestEmail,
+            ...(hotel?.ownerEmail ? { replyTo: hotel.ownerEmail } : {}),
+            ...(messageId ? { messageId } : {}),
             subject: `Unable to confirm your reservation — ${hotelName}`,
             html,
         });
         console.log(`📧 released-booking email sent to ${booking.guestEmail}`);
+        return true;
     } catch (e) {
         console.error('sendBookingReleasedEmail:', e.message);
+        return false;
     }
 }
 
@@ -7116,6 +7573,7 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
             status: booking.status,
             outcome: booking.approvalOutcome || null,
             booking,
+            fulfillment: await refreshBookingFulfillmentStatus(booking.id).catch(() => ({ status: booking.fulfillmentStatus || 'none' })),
         };
     }
 
@@ -7153,6 +7611,11 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
                 });
             }
         }
+        if (updated.count === 1) {
+            await enqueueBookingSideEffectsTx(tx, booking, wantRelease
+                ? ['release_hold', 'release_email']
+                : ['confirmation_email']);
+        }
         return updated;
     }, { maxWait: 5000, timeout: 15000 }));
 
@@ -7174,18 +7637,7 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
         approvalDecidedAt: new Date(),
     };
 
-    if (wantRelease) {
-        await voidBookingHold(decided);
-        sendBookingReleasedEmail(decided, outcome).catch(() => {});
-    } else {
-        // The confirmation email was deliberately withheld until now.
-        notifyGuestBookingConfirmed({
-            req: null,
-            hotelId: decided.hotelId,
-            guestInfo: guestInfoFromBookingRow(decided),
-            bookingDetails: bookingDetailsFromBookingRow(decided),
-            reservationCode: decided.pmsConfirmationCode || decided.ourReservationCode,
-        }).catch(() => {});
+    if (!wantRelease) {
         // Only the sold-out signal is genuinely new here — the owner already got
         // the approval push, so notifyNewBooking would just be noise.
         maybeNotifyRoomSoldOutToday(
@@ -7195,10 +7647,25 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
         ).catch(() => {});
     }
 
+    // Try immediately for a fast happy path. Any provider outage stays in the
+    // durable outbox and the background sweep resumes it after a restart.
+    const fulfillmentRun = await runBookingSideEffectSweep({ bookingId: decided.id, limit: 10 })
+        .catch((error) => ({
+            processed: 0,
+            fulfillment: { status: 'pending', lastError: error.message },
+        }));
+
     notifyBookingApprovalResolved(decided, outcome, source).catch(() => {});
     console.log(`✅ [approval] ${outcome} booking=${decided.id} hotel=${decided.hotelId} via=${source}`);
 
-    return { ok: true, code: 'applied', status: decided.status, outcome, booking: decided };
+    return {
+        ok: true,
+        code: 'applied',
+        status: decided.status,
+        outcome,
+        booking: decided,
+        fulfillment: fulfillmentRun.fulfillment || { status: 'pending' },
+    };
 }
 
 // DB-backed sweep rather than a per-booking setTimeout: Render restarts wipe
@@ -7267,6 +7734,7 @@ app.post('/api/booking-approval/act', async (req, res) => {
             alreadyDecided: outcome.code === 'already_decided',
             status: outcome.status,
             outcome: outcome.outcome,
+            fulfillment: outcome.fulfillment || null,
             roomName: outcome.booking?.roomName || '',
             guestName: [outcome.booking?.guestFirstName, outcome.booking?.guestLastName].filter(Boolean).join(' '),
         });
@@ -7297,6 +7765,7 @@ app.post('/api/crm/bookings/:id/approval', crmAuth, async (req, res) => {
             alreadyDecided: outcome.code === 'already_decided',
             status: outcome.status,
             outcome: outcome.outcome,
+            fulfillment: outcome.fulfillment || null,
         });
     } catch (e) {
         console.error('crm booking approval:', e.message);
@@ -7346,12 +7815,13 @@ app.get('/api/booking-approval/peek', async (req, res) => {
 // so the owner needs a plain way to turn the booking away afterwards — freeing
 // the room, voiding the hold, and telling the guest.
 
-async function sendBookingCancelledEmail(booking, reason) {
-    if (!emailTransporter || !booking?.guestEmail || booking.guestEmail === '-') return;
+async function sendBookingCancelledEmail(booking, reason, messageId = '') {
+    if (!booking?.guestEmail || booking.guestEmail === '-') return true;
+    if (!emailTransporter) return false;
     try {
         const hotel = await prisma.hotelConfig.findUnique({
             where: { id: booking.hotelId },
-            select: { name: true, phone: true },
+            select: { name: true, phone: true, ownerEmail: true },
         }).catch(() => null);
         const hotelName = hotel?.name || 'the hotel';
         const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'there';
@@ -7362,7 +7832,9 @@ async function sendBookingCancelledEmail(booking, reason) {
             : '';
         const contactLine = hotel?.phone
             ? `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Please call ${hotelName} on ${escapeXml(hotel.phone)} and they'll help you sort out somewhere to stay.</p>`
-            : `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Reply to this email and ${hotelName} will help you sort out somewhere to stay.</p>`;
+            : (hotel?.ownerEmail
+                ? `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Reply to this email and ${hotelName} will help you sort out somewhere to stay.</p>`
+                : `<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Please contact ${hotelName} directly if you need help finding another place to stay.</p>`);
 
         // This guest already received a "Reservation confirmed" email, so the copy
         // has to acknowledge that directly rather than pretend it never happened.
@@ -7371,12 +7843,16 @@ async function sendBookingCancelledEmail(booking, reason) {
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
             to: booking.guestEmail,
+            ...(hotel?.ownerEmail ? { replyTo: hotel.ownerEmail } : {}),
+            ...(messageId ? { messageId } : {}),
             subject: `Your reservation was cancelled — ${hotelName}`,
             html,
         });
         console.log(`📧 cancellation email sent to ${booking.guestEmail}`);
+        return true;
     } catch (e) {
         console.error('sendBookingCancelledEmail:', e.message);
+        return false;
     }
 }
 
@@ -7389,7 +7865,14 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
     if (!booking) return { ok: false, code: 'not_found' };
 
     if (isDeadBookingStatus(booking.status)) {
-        return { ok: true, code: 'already_cancelled', status: booking.status, booking };
+        return {
+            ok: true,
+            code: 'already_cancelled',
+            status: booking.status,
+            booking,
+            fulfillment: await refreshBookingFulfillmentStatus(booking.id)
+                .catch(() => ({ status: booking.fulfillmentStatus || 'none' })),
+        };
     }
 
     const result = await withRetry(() => prisma.$transaction(async (tx) => {
@@ -7430,11 +7913,24 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
                 });
             }
         }
+        if (updated.count === 1) {
+            await enqueueBookingSideEffectsTx(tx, booking, [
+                'release_hold',
+                { type: 'cancellation_email', payload: { reason: String(reason || '').trim().slice(0, 500) } },
+            ]);
+        }
         return updated;
     }, { maxWait: 5000, timeout: 15000 }));
     if (result.count !== 1) {
         const fresh = await prisma.booking.findUnique({ where: { id: booking.id } }).catch(() => null);
-        return { ok: true, code: 'already_cancelled', status: fresh?.status || booking.status, booking: fresh || booking };
+        return {
+            ok: true,
+            code: 'already_cancelled',
+            status: fresh?.status || booking.status,
+            booking: fresh || booking,
+            fulfillment: await refreshBookingFulfillmentStatus(booking.id)
+                .catch(() => ({ status: fresh?.fulfillmentStatus || booking.fulfillmentStatus || 'none' })),
+        };
     }
 
     const cancelled = {
@@ -7444,11 +7940,20 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
         ownerReviewedAt: new Date(),
         ownerReviewNextReminderAt: null,
     };
-    await voidBookingHold(cancelled);
-    sendBookingCancelledEmail(cancelled, reason).catch(() => {});
+    const fulfillmentRun = await runBookingSideEffectSweep({ bookingId: cancelled.id, limit: 10 })
+        .catch((error) => ({
+            processed: 0,
+            fulfillment: { status: 'pending', lastError: error.message },
+        }));
     console.log(`🚫 [cancel] booking=${booking.id} hotel=${hotelId} was=${booking.status} reason=${reason || 'none'}`);
 
-    return { ok: true, code: 'cancelled', status: 'cancelled', booking: cancelled };
+    return {
+        ok: true,
+        code: 'cancelled',
+        status: 'cancelled',
+        booking: cancelled,
+        fulfillment: fulfillmentRun.fulfillment || { status: 'pending' },
+    };
 }
 
 async function buildBookingAvailabilityCorrection(booking) {
@@ -7592,6 +8097,7 @@ app.post('/api/booking-review/act', async (req, res) => {
             success: true,
             status: outcome.status,
             alreadyCancelled: outcome.code === 'already_cancelled',
+            fulfillment: outcome.fulfillment || null,
             calendarCorrection: await buildBookingAvailabilityCorrection(outcome.booking),
         });
     } catch (e) {
@@ -7665,6 +8171,7 @@ app.post('/api/crm/bookings/cancel', crmAuth, async (req, res) => {
             cancelled: outcome.code === 'cancelled',
             alreadyCancelled: outcome.code === 'already_cancelled',
             status: outcome.status,
+            fulfillment: outcome.fulfillment || null,
             calendarCorrection: await buildBookingAvailabilityCorrection(outcome.booking),
         });
     } catch (e) {
@@ -12269,6 +12776,9 @@ const CRM_BOOKING_LIST_SELECT = {
     pendingUntil: true,
     approvalNoResponseAction: true,
     approvalOutcome: true,
+    fulfillmentStatus: true,
+    fulfillmentLastError: true,
+    fulfillmentUpdatedAt: true,
     ownerReviewStatus: true,
     ownerReviewedAt: true,
     ownerReviewReminderCount: true,
@@ -12781,6 +13291,16 @@ app.listen(PORT, () => {
         const sweep = () => runBookingApprovalSweep().catch((e) => console.error('Booking approval sweep:', e.message));
         setTimeout(sweep, 15_000);
         setInterval(sweep, BOOKING_APPROVAL_SWEEP_INTERVAL_MS);
+    }
+
+    // Durable provider work (Stripe hold release and guest email) is separate
+    // from the booking decision itself. Retrying from the database means a
+    // Render restart or short provider outage cannot leave a guest uninformed.
+    if (process.env.ENABLE_BOOKING_SIDE_EFFECT_SWEEP !== 'false') {
+        const sideEffectSweep = () => runBookingSideEffectSweep()
+            .catch((e) => console.error('Booking side-effect sweep:', e.message));
+        setTimeout(sideEffectSweep, 10_000);
+        setInterval(sideEffectSweep, BOOKING_SIDE_EFFECT_SWEEP_INTERVAL_MS);
     }
 
     if (process.env.ENABLE_BOOKING_REVIEW_REMINDERS !== 'false') {

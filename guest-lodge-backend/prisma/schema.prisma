@@ -51,11 +51,11 @@ model Booking {
   // Owner approval window. While status='pending' the room stays held. The
   // unanswered action is copied onto the booking so changing the property
   // setting never changes a decision that is already counting down.
-  approvalRequestedAt       DateTime?
-  pendingUntil              DateTime?
-  approvalNoResponseAction  String? // confirm | release
-  approvalOutcome           String? // owner_confirmed | owner_released | auto_confirmed | auto_released | auto_no_alerts
-  approvalDecidedAt         DateTime?
+  approvalRequestedAt      DateTime?
+  pendingUntil             DateTime?
+  approvalNoResponseAction String? // confirm | release
+  approvalOutcome          String? // owner_confirmed | owner_released | auto_confirmed | auto_released | auto_no_alerts
+  approvalDecidedAt        DateTime?
 
   // Owner turned the booking away after it was already confirmed — usually
   // because a walk-in took the room. Frees inventory and voids the card hold.
@@ -75,9 +75,43 @@ model Booking {
   // restore exactly those counters without touching legacy bookings.
   inventoryOverrideDates String?
 
+  // External work triggered by a booking decision must finish even if Render
+  // restarts or Stripe/email is briefly unavailable. The aggregate status is
+  // shown in Front Desk; individual retryable work lives in sideEffectJobs.
+  fulfillmentStatus    String                 @default("none") // none | pending | completed | attention
+  fulfillmentLastError String?
+  fulfillmentUpdatedAt DateTime?
+  sideEffectJobs       BookingSideEffectJob[]
+
   @@index([status, pendingUntil])
   @@index([hotelId, status, checkinDate])
   @@index([ownerReviewStatus, ownerReviewNextReminderAt])
+}
+
+// Durable outbox for guest confirmation/release emails and card-hold actions.
+// The unique booking/type pair makes every consequence idempotent at the app
+// layer, while Stripe idempotency keys and deterministic email Message-IDs
+// protect the provider layer when a worker is interrupted mid-attempt.
+model BookingSideEffectJob {
+  id            String    @id @default(cuid())
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId     String
+  hotelId       String
+  type          String // confirmation_email | release_hold | release_email | cancellation_email
+  status        String    @default("pending") // pending | processing | retrying | completed | failed
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lockedAt      DateTime?
+  completedAt   DateTime?
+  lastError     String?
+  payload       Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([bookingId, type])
+  @@index([status, nextAttemptAt])
+  @@index([bookingId, status])
+  @@index([hotelId, status, updatedAt])
 }
 
 model GuestInstallEvent {
@@ -245,10 +279,11 @@ model HotelConfig {
   // Owner approval: hold new bookings briefly so the owner can catch a room
   // they already sold on an OTA. Useless without push, so it stays off until
   // the owner installs Front Desk and enables alerts.
-  bookingApprovalEnabled       Boolean   @default(false)
-  bookingApprovalWindowMinutes Int       @default(20)
-  bookingApprovalNoResponseAction String @default("confirm")
-  frontdeskInstalledAt         DateTime?
+  bookingApprovalEnabled          Boolean   @default(false)
+  bookingApprovalWindowMinutes    Int       @default(20)
+  bookingApprovalNoResponseAction String    @default("confirm")
+  bookingApprovalPolicyChosenAt   DateTime?
+  frontdeskInstalledAt            DateTime?
 
   // Follow-up reminders for confirmed online bookings. Zero means the first
   // notification only; otherwise Front Desk sends at most three reminders.

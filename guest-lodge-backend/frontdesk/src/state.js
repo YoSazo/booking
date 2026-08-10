@@ -69,6 +69,8 @@ export const crm = {
   guestPushSubscriberCount: 0,
   bookingReviewSettings: { reminderMinutes: 15, maxReminders: 3 },
   bookingConflicts: [],
+  operationalReadiness: null,
+  operationalReadinessLoading: false,
   _magicLoginPending: false,
   editRooms: [],
   editRates: null,

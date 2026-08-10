@@ -48,3 +48,31 @@ test('an explicit walk-in message resolves the room and relative date', () => {
         }
     );
 });
+
+test('a room name the property does not have is never turned into an inventory action', () => {
+    assert.equal(
+        classifyDeterministicIntent(
+            'A walk-in took Presidential Suite tomorrow',
+            [{ name: 'Queen Room', totalUnits: 2 }],
+            '2026-07-31',
+            'inventory_check'
+        ),
+        null
+    );
+});
+
+test('cancel requires the explicit follow-up word instead of conversational language', () => {
+    assert.equal(
+        classifyDeterministicIntent(
+            'I think we may need to cancel something',
+            [{ name: 'Queen Room', totalUnits: 2 }],
+            '2026-07-31',
+            'booking_alert'
+        ),
+        null
+    );
+    assert.deepEqual(
+        classifyDeterministicIntent('CANCEL', [], '2026-07-31', 'booking_alert'),
+        { intent: 'cancel_booking' }
+    );
+});

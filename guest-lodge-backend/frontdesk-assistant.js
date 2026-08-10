@@ -356,6 +356,7 @@ function createFrontDeskAssistant({
                     bookingApprovalEnabled: true,
                     bookingApprovalWindowMinutes: true,
                     bookingApprovalNoResponseAction: true,
+                    bookingApprovalPolicyChosenAt: true,
                 },
             }),
         ]);
@@ -397,6 +398,7 @@ function createFrontDeskAssistant({
                 noResponseAction: String(hotel?.bookingApprovalNoResponseAction || '').toLowerCase() === 'release'
                     ? 'release'
                     : 'confirm',
+                policyChosen: !!hotel?.bookingApprovalPolicyChosenAt,
             },
         };
     }
@@ -584,6 +586,14 @@ function createFrontDeskAssistant({
         });
     }
 
+    function fulfillmentFinished(outcome) {
+        return String(outcome?.fulfillment?.status || '').toLowerCase() === 'completed';
+    }
+
+    function fulfillmentNeedsAttention(outcome) {
+        return String(outcome?.fulfillment?.status || '').toLowerCase() === 'attention';
+    }
+
     async function markBookingAvailable(action) {
         const bookingId = String(action?.payload?.bookingId || '');
         if (!bookingId) return { ok: false, message: 'I could not identify that booking.' };
@@ -601,7 +611,13 @@ function createFrontDeskAssistant({
                 data: { status: 'applied', appliedAt: new Date() },
             }).catch(() => {});
             return decision?.ok
-                ? { ok: true, message: `Confirmed — ${booking.roomName} is booked and the guest has been emailed.`, booking: decision.booking || booking }
+                ? {
+                    ok: true,
+                    message: fulfillmentFinished(decision)
+                        ? `Confirmed — ${booking.roomName} is booked and the guest has been emailed.`
+                        : `Confirmed — ${booking.roomName} is booked. I’m finishing the guest email and will keep retrying if needed.`,
+                    booking: decision.booking || booking,
+                }
                 : { ok: false, message: 'I could not safely confirm that booking. Open Front Desk to review it.' };
         }
         await Promise.all([
@@ -883,6 +899,11 @@ function createFrontDeskAssistant({
         }).catch(() => {});
 
         const guest = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'the guest';
+        const guestAction = fulfillmentFinished(outcome)
+            ? 'The card hold is released and the guest was notified.'
+            : (fulfillmentNeedsAttention(outcome)
+                ? 'The booking is cancelled, but the card or guest notification needs attention in Front Desk.'
+                : 'The booking is cancelled; I’m finishing the card release and guest notification.');
         if (!inventoryResult?.ok) {
             await createActivity({
                 hotelId: booking.hotelId,
@@ -895,12 +916,12 @@ function createFrontDeskAssistant({
             });
             return {
                 ok: true,
-                message: `I cancelled ${guest}'s booking and notified them, but availability changed at the same time. Open Availability now and make sure ${booking.roomName} is closed for the walk-in.`,
+                message: `I cancelled ${guest}'s booking. ${guestAction} Availability changed at the same time, so open Availability and make sure ${booking.roomName} is closed for the walk-in.`,
             };
         }
         return {
             ok: true,
-            message: `Done — I cancelled ${guest}'s ${booking.roomName} booking, notified them, released the payment hold, and kept those dates unavailable for the walk-in.`,
+            message: `Done — I cancelled ${guest}'s ${booking.roomName} booking and kept those dates unavailable for the walk-in. ${guestAction}`,
         };
     }
 
@@ -1155,7 +1176,9 @@ function createFrontDeskAssistant({
                     data: { status: 'applied', appliedAt: new Date() },
                 }).catch(() => {});
                 return decision?.ok
-                    ? `Released — I freed ${booking.roomName}, voided the $1 hold, and notified the guest.`
+                    ? (fulfillmentFinished(decision)
+                        ? `Handled — I freed ${booking.roomName}, released the $1 hold, and notified the guest.`
+                        : `Released — I freed ${booking.roomName}. I’m finishing the $1 hold and guest notification now.`)
                     : 'I could not safely release that booking. Open Front Desk to review it.';
             }
             const pending = await createBookingCancellationQuestion(action, recipient);
@@ -1281,8 +1304,9 @@ function createFrontDeskAssistant({
     }
 
     async function notifyBookingDecision(bookingOrId, outcome) {
-        const booking = typeof bookingOrId === 'string'
-            ? await prisma.booking.findUnique({ where: { id: bookingOrId } }).catch(() => null)
+        const bookingId = typeof bookingOrId === 'string' ? bookingOrId : bookingOrId?.id;
+        const booking = bookingId
+            ? await prisma.booking.findUnique({ where: { id: bookingId } }).catch(() => bookingOrId)
             : bookingOrId;
         if (!booking?.hotelId) return { sent: 0 };
         const hotel = await prisma.hotelConfig.findUnique({
@@ -1292,9 +1316,14 @@ function createFrontDeskAssistant({
         const config = hotel?.frontDeskAssistant;
         if (!hotel || !hotel.subscribed || !config?.enabled || config.notifyNewBookings === false) return { sent: 0 };
         const released = outcome === 'auto_released';
+        const finished = String(booking.fulfillmentStatus || '').toLowerCase() === 'completed';
         const body = released
-            ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was released, the $1 hold was voided, and the guest was notified.`
-            : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was confirmed and the guest was emailed.`;
+            ? (finished
+                ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was released, the $1 hold was voided, and the guest was notified.`
+                : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I released ${booking.roomName}. I’m finishing the card release and guest notification now.`)
+            : (finished
+                ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was confirmed and the guest was emailed.`
+                : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I confirmed ${booking.roomName}. I’m finishing the guest email now.`);
         return sendToVerifiedRecipients(hotel, body, {
             type: 'booking_decision',
             summary: released ? `${booking.roomName} auto-released` : `${booking.roomName} auto-confirmed`,
