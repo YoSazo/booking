@@ -855,6 +855,11 @@ function openNativeNotificationSettings() {
 
 function marketelNativeNotificationState(state) {
   crm.nativeNotificationState = String(state || '');
+  if (document.getElementById('frontDeskAssistantOverlay')) {
+    loadAssistantModule()
+      .then(module => module.refreshFrontDeskAssistantSheet?.())
+      .catch(() => {});
+  }
   if (crm.currentFilter === 'apps') {
     loadAppsModule()
       .then(module => module.ensureAppsViewRendered(true))
@@ -1545,10 +1550,6 @@ function ensureAvailabilityUi() {
                 <div class="legend-item"><div class="legend-dot" style="background:#f2f4f3;border:1px solid #d0d7d3"></div>Closed</div>
                 <div class="legend-item" style="width:100%;margin-top:4px;">Numbers on each day = <strong>rooms still available</strong> to book</div>
               </div>
-              <div id="roomMobileActions" class="room-mobile-actions" style="display:none">
-                <button id="roomMobileEditBtn" class="room-mobile-action-btn" type="button">Edit room</button>
-                <button id="roomMobileDeleteBtn" class="room-mobile-action-btn danger" type="button">Delete room</button>
-              </div>
             </div>
           </div>
 
@@ -1868,7 +1869,7 @@ async function loadLaunchStatus() {
   } catch (e) { /* non-fatal */ }
 }
 
-// ── GROWTH ("Get found") — Bookings-tab segmented view ─────────────
+// ── GROWTH ("Get found") — Your Page acquisition workspace ───────────
 function ensureGrowthStyles() {
   if (document.getElementById('growthStyles')) return;
   const s = document.createElement('style');
@@ -1912,22 +1913,14 @@ function ensureGrowthStyles() {
   document.head.appendChild(s);
 }
 
-function growthTriedCount() {
-  if (crm.growthFunnel && Number.isFinite(crm.growthFunnel.blockedAttempts)) return crm.growthFunnel.blockedAttempts;
-  return (crm.blockedDemand && crm.blockedDemand.total) || 0;
-}
-
 function renderBookingsSubtabs() {
   const wrap = document.getElementById('bookingsSubtabs');
   if (!wrap) return;
   if (crm.currentFilter !== 'bookings' || crm.settingsTourActive) { wrap.style.display = 'none'; return; }
   ensureGrowthStyles();
   wrap.style.display = 'block';
-  const tried = growthTriedCount();
-  const badge = (crm.bookingsSubview !== 'growth' && tried > 0) ? `<span class="subtab-badge">${tried}</span>` : '';
   const onBookings = crm.bookingsSubview === 'bookings';
   const onRevenue = crm.bookingsSubview === 'revenue' && crm.revenueEnabled;
-  const onGrowth = crm.bookingsSubview === 'growth';
   const revenueTab = crm.revenueEnabled
     ? `<button type="button" role="tab" class="subtab ${onRevenue ? 'active' : ''}" aria-selected="${onRevenue}" onclick="setBookingsSubview('revenue')">Revenue</button>`
     : '';
@@ -1935,17 +1928,35 @@ function renderBookingsSubtabs() {
     <div class="subtab-group" role="tablist">
       <button type="button" role="tab" class="subtab ${onBookings ? 'active' : ''}" aria-selected="${onBookings}" onclick="setBookingsSubview('bookings')">Bookings</button>
       ${revenueTab}
-      <button type="button" role="tab" class="subtab ${onGrowth ? 'active' : ''}" aria-selected="${onGrowth}" onclick="setBookingsSubview('growth')">Get found${badge}</button>
     </div>`;
 }
 
 function setBookingsSubview(view) {
+  // Preserve older links while keeping Bookings focused on reservations and revenue.
+  if (view === 'growth') {
+    openGrowthWorkspace();
+    return;
+  }
   if (view === 'revenue' && !crm.revenueEnabled) view = 'bookings';
-  crm.bookingsSubview = ['bookings', 'revenue', 'growth'].includes(view) ? view : 'bookings';
+  crm.bookingsSubview = ['bookings', 'revenue'].includes(view) ? view : 'bookings';
   renderBookingsSubtabs();
   applyBookingsSubview();
   if (crm.bookingsSubview === 'revenue') loadRevenueData();
-  if (crm.bookingsSubview === 'growth') loadGrowthData();
+}
+
+async function openGrowthWorkspace() {
+  crm.bookingsSubview = 'bookings';
+  const settingsButton = document.querySelector('.tab[data-nav-filter="settings"]')
+    || document.querySelector('.mobile-nav-item[data-nav-filter="settings"]');
+  setFilter('settings', settingsButton);
+  try {
+    await loadSettingsModule();
+    if (typeof window.invokeLoadEditRooms === 'function') await window.invokeLoadEditRooms();
+    await loadGrowthData();
+  } catch (_) {
+    // Your Page remains useful if acquisition metrics are temporarily unavailable.
+  }
+  document.getElementById('yourPageGrowthPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderEmbeddedAssistantPreviewCard() {
@@ -1965,24 +1976,19 @@ function renderEmbeddedAssistantPreviewCard() {
 }
 
 function applyBookingsSubview() {
-  const isGrowth = crm.bookingsSubview === 'growth';
   const isRevenue = crm.bookingsSubview === 'revenue' && crm.revenueEnabled;
-  const isBookings = !isGrowth && !isRevenue;
+  const isBookings = !isRevenue;
   const listEl = document.getElementById('bookingsList');
   const chipsEl = document.getElementById('bookingFilterChips');
   const msgPanel = document.getElementById('messagesPanel');
-  const growthEl = document.getElementById('growthPanel');
   const revenueEl = document.getElementById('revenueView');
   const assistantEl = document.getElementById('frontDeskAssistantPanel');
   if (listEl) listEl.style.display = isBookings ? '' : 'none';
   if (msgPanel) msgPanel.style.display = 'none';
   if (!isBookings && chipsEl) chipsEl.style.display = 'none';
-  if (growthEl) growthEl.style.display = isGrowth ? 'block' : 'none';
   if (revenueEl) revenueEl.style.display = isRevenue ? 'flex' : 'none';
   if (assistantEl) assistantEl.style.display = (isBookings && !isNativeFrontdeskApp()) ? 'block' : 'none';
-  if (isGrowth) {
-    renderGrowthPanel();
-  } else if (isRevenue) {
+  if (isRevenue) {
     renderRevenueView();
   } else {
     renderBookings(crm.bookings);
@@ -2008,8 +2014,8 @@ async function loadGrowthData() {
       if (funnel && funnel.success) crm.growthFunnel = funnel;
       if (checklist && checklist.success) crm.growthChecklist = checklist.checklist || {};
       renderBookingsSubtabs();
-      if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'growth') renderGrowthPanel();
-      else renderBookingsNotices();
+      renderGrowthPanel();
+      renderBookingsNotices();
     } catch (e) { /* non-fatal */ }
   })();
   try {
@@ -2040,8 +2046,8 @@ function growthCheckDone(key) {
 
 function renderGrowthPanel() {
   ensureGrowthStyles();
-  const el = document.getElementById('growthPanel');
-  if (!el) return;
+  const targets = [document.getElementById('yourPageGrowthPanel')].filter(Boolean);
+  if (!targets.length) return;
   const domain = crm.activeHotelDomain || (crm.activeHotelId ? crm.activeHotelId + '.mktel.co' : '');
   const bookingUrl = domain ? 'https://' + domain : '';
   const urlAttr = bookingUrl.replace(/'/g, "\\'");
@@ -2101,7 +2107,7 @@ function renderGrowthPanel() {
 
   const openGoogleBtn = bookingUrl ? `<a class="growth-btn growth-btn-ghost" href="https://business.google.com/" target="_blank" rel="noopener">Open Google Business &#8599;</a>` : '';
   const textBtn = bookingUrl ? `<button type="button" class="growth-btn growth-btn-ghost" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy link to text</button>` : '';
-  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="showCheckinQrOverlay()">Show QR</button>`;
+  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="openGuestAppSharing()">Open Guest App</button>`;
 
   const gbpStep = step('gbp', 'Biggest lever', 'Add your link to Google', 'Most guests find motels on Google Maps. Paste your booking link into your Google Business Profile so they book direct instead of through an OTA.', openGoogleBtn + linkBoxHtml);
   const qrStep = step('qr', '', 'Share a QR at check-in', 'Guests can scan it to save your property and book direct next time. Print it or show it during check-in.', qrBtn);
@@ -2114,7 +2120,23 @@ function renderGrowthPanel() {
       ${gbpStep}${qrStep}${textStep}
     </div>`;
 
-  el.innerHTML = `<div class="growth-wrap">${funnelCard}${checklistCard}</div>`;
+  const html = `<div class="growth-wrap">${funnelCard}${checklistCard}</div>`;
+  targets.forEach((target) => { target.innerHTML = html; });
+}
+
+async function openGuestAppSharing() {
+  const appsButton = document.querySelector('.tab[data-nav-filter="apps"]')
+    || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]');
+  setFilter('apps', appsButton);
+  try {
+    const module = await loadAppsModule();
+    module.ensureAppsViewRendered(true);
+  } catch (_) {}
+  requestAnimationFrame(() => {
+    const shareCard = document.getElementById('guest-app-share-card')
+      || document.getElementById('tour-native-guest-share');
+    shareCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
 }
 
 // Server-side install signal, mirroring the guest install funnel. Lets the growth
@@ -3520,7 +3542,7 @@ function renderBookings(fullList) {
           <div class="empty-text">You&apos;re live — waiting for bookings</div>
           <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting direct reservations.</div>
           <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
-          <div style="margin-top:12px;"><button onclick="setBookingsSubview('growth')" style="background:none;border:none;color:#2E7D5B;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline;">See how to get found →</button></div>
+          <div style="margin-top:12px;"><button onclick="openGrowthWorkspace()" style="background:none;border:none;color:#2E7D5B;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline;">See how to get found →</button></div>
         </div>`;
     } else if (allDone && !crm.hotelSubscribed) {
       el.innerHTML = `
@@ -3915,8 +3937,6 @@ function applyFilter() {
   if (appsEl) appsEl.style.display = 'none';
   const subtabsEl = document.getElementById('bookingsSubtabs');
   if (subtabsEl) subtabsEl.style.display = 'none';
-  const growthPanelEl = document.getElementById('growthPanel');
-  if (growthPanelEl) growthPanelEl.style.display = 'none';
   const assistantPanelEl = document.getElementById('frontDeskAssistantPanel');
   if (assistantPanelEl) assistantPanelEl.style.display = 'none';
   const previewBar = document.getElementById('previewSiteBar');
@@ -4002,9 +4022,9 @@ function applyFilter() {
   const editEl = document.getElementById('editView');
   if (editEl) editEl.style.display = 'none';
   closeAvailabilityDayPopover();
-  // Bookings-tab segmented control: Bookings | Revenue | Get found
+  // Bookings stays focused on the daily workflow: reservations and revenue.
+  if (crm.bookingsSubview === 'growth') crm.bookingsSubview = 'bookings';
   renderBookingsSubtabs();
-  if (crm.bookingsSubview === 'growth') loadGrowthData();
   applyBookingsSubview();
 }
 
@@ -4055,41 +4075,12 @@ function renderRoomPills() {
 
   bar.innerHTML = '';
   rooms.forEach((room) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'room-pill-wrap';
-
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = `room-pill ${crm.manualSelectedRoom === room.name ? 'active' : ''}`;
     pill.textContent = `${room.name} (${Math.max(0, parseInt(room.totalUnits, 10) || 0)})`;
     pill.addEventListener('click', () => setActiveManualRoom(room.name));
-
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'room-pill-action';
-    editBtn.title = `Edit ${room.name}`;
-    editBtn.setAttribute('aria-label', `Edit ${room.name}`);
-    editBtn.textContent = 'Edit room';
-    editBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openRoomsEditModal(room.name);
-    });
-
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'room-pill-action danger';
-    delBtn.title = `Delete ${room.name}`;
-    delBtn.setAttribute('aria-label', `Delete ${room.name}`);
-    delBtn.textContent = 'Delete room';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteRoomType(room.name);
-    });
-
-    wrap.appendChild(pill);
-    wrap.appendChild(editBtn);
-    wrap.appendChild(delBtn);
-    bar.appendChild(wrap);
+    bar.appendChild(pill);
   });
 
   const addBtn = document.createElement('button');
@@ -4101,24 +4092,6 @@ function renderRoomPills() {
   if (bar.querySelectorAll('.room-pill').length === 0) {
     bar.appendChild(addBtn);
   }
-}
-
-function renderMobileRoomActions() {
-  const row = document.getElementById('roomMobileActions');
-  const editBtn = document.getElementById('roomMobileEditBtn');
-  const delBtn = document.getElementById('roomMobileDeleteBtn');
-  const room = getManualRoomByName(crm.manualSelectedRoom);
-  const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
-  if (!row || !editBtn || !delBtn) return;
-
-  if (!isMobile || !room) {
-    row.style.display = 'none';
-    return;
-  }
-
-  row.style.display = 'flex';
-  editBtn.onclick = () => openRoomsEditModal(room.name);
-  delBtn.onclick = () => deleteRoomType(room.name);
 }
 
 function openRoomsAddModal() {
@@ -4240,8 +4213,6 @@ function renderAvailabilityView() {
   if (crm.manualSelectedRoom && !rooms.some(r => r.name === crm.manualSelectedRoom)) {
     crm.manualSelectedRoom = rooms.length ? rooms[0].name : '';
   }
-  renderMobileRoomActions();
-
   const noRoom = document.getElementById('availabilityNoRoom');
   const calWrap = document.getElementById('availabilityCalendarWrap');
   const activeLabel = document.getElementById('availabilityActiveRoomLabel');
@@ -5956,7 +5927,6 @@ exposeToWindow({
   goLiveInlineCardHtml,
   goToAvailabilityTab,
   growthCheckDone,
-  growthTriedCount,
   guestBroadcastCardHtml,
   handleInstallFrontdesk,
   hydrateCrmAfterTour,
@@ -5991,6 +5961,8 @@ exposeToWindow({
   needsEditPageLoad,
   normalizeRevenuePeriod,
   openAvailabilityDayPopover,
+  openGrowthWorkspace,
+  openGuestAppSharing,
   openInAppBrowser,
   openMarketelSupport,
   openMessagesWorkspace,
@@ -6021,7 +5993,6 @@ exposeToWindow({
   renderMessageThreadDetail,
   renderMessageThreadPicker,
   renderMessages,
-  renderMobileRoomActions,
   renderRevenueRooms,
   renderRevenueView,
   renderRoomPills,

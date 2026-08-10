@@ -61,6 +61,39 @@ function isSubscribed() {
   return !!crm.assistantData?.hotel?.subscribed || !!crm.isMasterPin;
 }
 
+function nativeBookingAlertsHtml() {
+  const native = typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
+  if (!native) return '';
+  const state = String(crm.nativeNotificationState || '');
+  const connected = state === 'registered';
+  const connecting = state === 'authorized';
+  const unavailable = state === 'unavailable';
+  const title = connected
+    ? 'Booking alerts are on'
+    : connecting
+      ? 'Connecting this iPhone'
+      : unavailable
+        ? 'Booking alerts need attention'
+        : 'Turn on booking alerts';
+  const copy = connected
+    ? 'This iPhone can receive new-booking and room-check alerts even when Front Desk is closed.'
+    : connecting
+      ? 'Notification access is allowed. Refresh once to finish connecting this iPhone.'
+      : unavailable
+        ? 'Front Desk could not register this iPhone for alerts. Check notification settings, then refresh.'
+        : 'Allow notifications so Front Desk can warn you when a booking or room check needs attention.';
+  const action = connected
+    ? '<button type="button" class="fda-btn secondary full" onclick="toggleAppNotifications()">Send a test booking alert</button>'
+    : connecting
+      ? '<button type="button" class="fda-btn primary full" onclick="window.location.reload()">Finish connecting</button>'
+      : '<button type="button" class="fda-btn primary full" onclick="openNativeNotificationSettings()">Open iPhone notification settings</button>';
+  return `<div class="fda-section">
+    <div class="fda-section-title">${title}</div>
+    <div class="fda-section-sub">${copy}</div>
+    ${action}
+  </div>`;
+}
+
 function formatWhen(value, options = {}) {
   if (!value) return '';
   const date = new Date(value);
@@ -356,6 +389,7 @@ function sheetBodyHtml() {
     </div>` : ''}
     ${systemNote}
     ${inventoryNote}
+    ${nativeBookingAlertsHtml()}
 
     <div class="fda-section">
       <div class="fda-row fda-between">
@@ -458,6 +492,10 @@ function renderSheet() {
   </div>
   <div class="fda-sheet-body">${sheetBodyHtml()}</div>`;
   updateAssistantPolicySummary();
+}
+
+export function refreshFrontDeskAssistantSheet() {
+  if (document.getElementById('frontDeskAssistantSheet')) renderSheet();
 }
 
 export function updateAssistantPolicySummary() {
@@ -685,6 +723,7 @@ const exportsForWindow = {
   loadFrontDeskAssistant,
   openFrontDeskAssistant,
   removeAssistantRecipient,
+  refreshFrontDeskAssistantSheet,
   renderFrontDeskAssistantCard,
   retryFrontDeskAssistant,
   resendAssistantCode,

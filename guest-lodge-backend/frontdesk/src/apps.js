@@ -603,7 +603,7 @@ function renderAppsView() {
       ${logoBlockHtml}
     </div>`;
   const guestPhonesCardHtml = `
-    <div class="apps-step-card">
+    <div class="apps-step-card" id="guest-app-share-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Guests can save <strong>${hName}</strong> to their phone — one tap, no app store. Then they can book and message you direct.</p>
       ${checkinActionsHtml}
@@ -636,21 +636,6 @@ function renderAppsView() {
         <b aria-hidden="true">›</b>
       </button>
     </div>`;
-  const nativeAlertsCardHtml = `
-    <div class="apps-step-card">
-      <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your iPhone</div>
-      <div class="apps-step-title">${nativeAlertsOn ? 'Booking alerts are on' : (nativePermissionGranted ? 'Connecting booking alerts' : 'Turn on booking alerts')}</div>
-      <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin:0 0 ${nativeAlertsOn ? '0' : '12px'};">${nativeAlertsOn
-        ? 'Front Desk can alert you about new bookings and room checks even when the app is closed.'
-        : (nativePermissionGranted
-          ? 'Front Desk has notification permission and is registering this iPhone. Refresh once if this message remains.'
-          : 'Notifications are what let Front Desk warn you before an online booking conflicts with a walk-in or outside booking.')}</p>
-      ${nativeAlertsOn
-        ? '<button type="button" onclick="toggleAppNotifications()" style="width:100%;padding:11px;border:1.5px solid var(--green);border-radius:11px;background:#fff;color:var(--green);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;margin-top:12px;">Send a test booking alert</button>'
-        : (nativePermissionGranted
-        ? '<button type="button" onclick="window.location.reload()" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Retry booking alerts</button>'
-        : '<button type="button" onclick="openNativeNotificationSettings()" style="width:100%;padding:12px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Open iPhone notification settings</button>')}
-    </div>`;
   const guestMessagesPanelHtml = '<div id="messagesPanel"></div>';
   const nativeGuestToolsHtml = `
     <div class="apps-native-title">Guest App</div>
@@ -658,8 +643,7 @@ function renderAppsView() {
     ${guestMessagesPanelHtml}
     ${guestBroadcastCardHtml({ compact: true })}
     ${nativeGuestShareHtml}
-    ${guestIconCardHtml()}
-    ${nativeAlertsCardHtml}`;
+    ${guestIconCardHtml()}`;
   const unlockedToolsHtml = `
     ${deviceCardHtml(true)}
     ${guestPhonesCardHtml}

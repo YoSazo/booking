@@ -102,6 +102,6 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               marketel-frontdesk-ios/ios/output/Marketel-Front-Desk.ipa \
               --title "Marketel Front Desk iOS ${GITHUB_REF_NAME#ios-v}" \
-              --notes "Device-testing build of Marketel Front Desk 3.15 with one-tap email-code AutoFill sign-in and the streamlined paid activation handoff. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
+              --notes "Device-testing build of Marketel Front Desk 3.16 with a simpler four-area workspace: acquisition under Your Page, reservations and revenue together, date-only Availability, guest sharing in Guest App, and owner alerts alongside Front Desk Assistant. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
               --prerelease
           fi

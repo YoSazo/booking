@@ -768,7 +768,6 @@
     .availability-view { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
     .rooms-shell { display: flex; flex-direction: column; gap: 12px; }
     .room-pill-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .room-pill-wrap { display: inline-flex; align-items: center; gap: 6px; }
     .room-pill {
       padding: 8px 14px;
       border-radius: 999px;
@@ -783,26 +782,6 @@
     }
     .room-pill:hover { border-color: var(--green); color: var(--green); }
     .room-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
-    .room-pill-action {
-      width: auto;
-      min-height: 30px;
-      border-radius: 999px;
-      border: 1.5px solid var(--border);
-      background: var(--white);
-      color: var(--text-muted);
-      padding: 5px 10px;
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all .15s;
-    }
-    .room-pill-action:hover { border-color: var(--green); color: var(--green); }
-    .room-pill-action.danger:hover { border-color: var(--red); color: var(--red); }
     .room-pill-add {
       padding: 8px 12px;
       border-radius: 999px;
@@ -816,27 +795,6 @@
       transition: all .15s;
     }
     .room-pill-add:hover { border-color: var(--green); color: var(--green); }
-    .room-mobile-actions {
-      display: none;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .room-mobile-action-btn {
-      flex: 1;
-      border: 1.5px solid var(--border);
-      border-radius: 999px;
-      background: var(--white);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: all .15s;
-    }
-    .room-mobile-action-btn:hover { border-color: var(--green); color: var(--green); }
-    .room-mobile-action-btn.danger:hover { border-color: var(--red); color: var(--red); }
-
     .availability-card {
       background: var(--white);
       border: 2px solid var(--border);
@@ -1414,15 +1372,13 @@
       -webkit-overflow-scrolling: touch;
     }
     .room-pill-bar::-webkit-scrollbar { display: none; }
-    .room-pill-wrap { flex-shrink: 0; }
     .room-pill {
+      flex-shrink: 0;
       padding: 13px 18px;
       border-width: 2px;
       font-size: 15px;
       min-height: 48px;
     }
-    .room-pill-action { display: none; }
-    .room-mobile-actions { display: flex; }
     .room-pill-add {
       flex-shrink: 0;
       min-height: 48px;
@@ -2130,8 +2086,7 @@
       }
       #editView, #bookingsList, .availability-view, 
       .revenue-view, #appsView, #settingsView,
-      #bookingsSubtabs, #messagesPanel, #bookingFilterChips,
-      #growthPanel {
+      #bookingsSubtabs, #messagesPanel, #bookingFilterChips {
         grid-column: 2;
         grid-row: 1;
       }
@@ -2158,22 +2113,19 @@
       #app.has-go-live-banner #settingsView,
       #app.has-go-live-banner #bookingsSubtabs,
       #app.has-go-live-banner #messagesPanel,
-      #app.has-go-live-banner #bookingFilterChips,
-      #app.has-go-live-banner #growthPanel {
+      #app.has-go-live-banner #bookingFilterChips {
         grid-row: 2;
         margin-top: 0;
       }
 
       /* Bookings has multiple visible siblings; keep them stacked on desktop. */
       #bookingsSubtabs { grid-row: 1; }
-      #messagesPanel,
-      #growthPanel { grid-row: 2; }
+      #messagesPanel { grid-row: 2; }
       #bookingFilterChips { grid-row: 3; }
       #bookingsList { grid-row: 4; }
 
       #app.has-go-live-banner #bookingsSubtabs { grid-row: 2; }
-      #app.has-go-live-banner #messagesPanel,
-      #app.has-go-live-banner #growthPanel { grid-row: 3; }
+      #app.has-go-live-banner #messagesPanel { grid-row: 3; }
       #app.has-go-live-banner #bookingFilterChips { grid-row: 4; }
       #app.has-go-live-banner #bookingsList { grid-row: 5; }
 
@@ -2185,9 +2137,8 @@
         contain-intrinsic-size: auto;
       }
 
-      /* Settings → two-column dashboard. dash-a (preview + header) and
-         dash-c (the other config cards) stack in column 1; dash-b
-         (rooms + explainer) fills column 2. */
+      /* Your Page keeps editing in two columns, then gives acquisition its own
+         full-width workspace instead of burying it under Bookings. */
       .settings-dashboard-grid {
         display: grid;
         grid-template-columns: 360px minmax(0, 1fr);
@@ -2196,10 +2147,16 @@
       }
       .settings-dashboard-grid > .dash-a { grid-column: 1; grid-row: 1; }
       .settings-dashboard-grid > .dash-c { grid-column: 1; grid-row: 2; }
+      .settings-dashboard-grid > .dash-d { grid-column: 1; grid-row: 3; }
       .settings-dashboard-grid > .dash-b {
         grid-column: 2;
-        grid-row: 1 / span 2;
+        grid-row: 1 / span 3;
         align-self: start;
+      }
+      .settings-dashboard-grid > .dash-growth {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        margin-top: 10px;
       }
       .settings-dashboard-grid > div { min-width: 0; }
 
@@ -2243,7 +2200,9 @@
     @media (max-width: 1023px) {
       .settings-dashboard-grid > .dash-a,
       .settings-dashboard-grid > .dash-b,
-      .settings-dashboard-grid > .dash-c { display: contents; }
+      .settings-dashboard-grid > .dash-c,
+      .settings-dashboard-grid > .dash-d,
+      .settings-dashboard-grid > .dash-growth { display: contents; }
     }
 
     /* ── NATIVE IOS SHELL ──────────────────────────────────────

@@ -820,7 +820,6 @@ async function loadEditRooms() {
     // Render hotel info section + rates + PIN + rooms
     const bookingDomain = hotelRes?.domain || (crm.activeHotelId + '.mktel.co');
     const bookingUrl = 'https://' + bookingDomain;
-    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(bookingUrl);
     let html = `
       <div class="settings-dashboard-grid">
       <div class="dash-a">
@@ -901,12 +900,16 @@ async function loadEditRooms() {
             <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
             <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
           </div>
-          <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
-            <i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR
-          </button>
-          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Add this to your Google Business, website, or text it to guests.</p>
+          <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Use this link on your website, Google Business Profile, or in a message.</p>
         </div>
       </div>
+      </div>
+      <div class="dash-growth">
+        <div id="yourPageGrowthPanel" style="scroll-margin-top:96px;">
+          <div class="loading" style="padding:24px 0;"><div class="logo-sprite-bounce"></div> Loading direct-booking activity…</div>
+        </div>
+      </div>
+      <div class="dash-d">
       <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
         <div class="page-utility-tabs" role="tablist" aria-label="Property tools">
           <button type="button" id="tour-rates-header" class="page-utility-tab active" data-utility-tab="rates" role="tab" aria-selected="true" onclick="selectPageUtility('tour-rates-card','rates')">Rates</button>
@@ -956,6 +959,8 @@ async function loadEditRooms() {
     `;
     list.innerHTML = html;
     renderEditRoomsCards();
+    window.renderGrowthPanel?.();
+    window.loadGrowthData?.().catch(() => {});
     window.refreshSupportSummary?.();
     if (typeof lucide !== 'undefined') lucide.createIcons();
   } catch (e) {
