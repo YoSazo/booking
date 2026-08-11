@@ -172,7 +172,7 @@ function ensureStyles() {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background: #f5f8f6;
+      background: #eff4f0;
       padding:
         max(18px, env(safe-area-inset-top))
         20px
@@ -184,10 +184,7 @@ function ensureStyles() {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background:
-        radial-gradient(circle 280px at 85% 8%, rgba(76, 175, 125, 0.10), transparent 70%),
-        radial-gradient(circle 240px at 10% 85%, rgba(160, 210, 185, 0.14), transparent 70%),
-        radial-gradient(circle 200px at 50% 45%, rgba(255, 255, 255, 0.50), transparent 70%);
+      background: transparent;
       animation: mno-float 8s ease-in-out infinite;
     }
 

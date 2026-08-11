@@ -30,7 +30,7 @@ function ensureSupportStyles() {
   style.textContent = `
     body.marketel-support-open{overflow:hidden!important;}
     .marketel-support-overlay{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
-    .marketel-support-dialog{width:min(620px,100%);height:min(720px,calc(100dvh - 36px));display:flex;flex-direction:column;overflow:hidden;background:#f5f8f6;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
+    .marketel-support-dialog{width:min(620px,100%);height:min(720px,calc(100dvh - 36px));display:flex;flex-direction:column;overflow:hidden;background:#eff4f0;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
     .marketel-support-head{display:flex;align-items:center;gap:12px;padding:16px 18px;background:rgba(255,255,255,.92);border-bottom:1px solid #e3ebe6;}
     .marketel-support-mark{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:12px;background:#e8f5ee;overflow:hidden;}
     .marketel-support-mark img{width:27px;height:27px;object-fit:contain;}

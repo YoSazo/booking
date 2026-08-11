@@ -10511,7 +10511,7 @@ app.get('/api/hotel/:hotelId/frontdesk-manifest.webmanifest', async (req, res) =
             start_url: '/frontdesk?homescreen=1',
             scope: '/',
             display: 'standalone',
-            background_color: '#F5F8F6',
+            background_color: '#EFF4F0',
             theme_color: '#2E7D5B',
             orientation: 'portrait',
             icons,

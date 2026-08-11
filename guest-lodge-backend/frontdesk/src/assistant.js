@@ -153,6 +153,24 @@ function frequencyLabel(value) {
   })[value] || 'Smart daily check';
 }
 
+function clockTimeLabel(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return 'Not set';
+  const hour = Number(match[1]);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return 'Not set';
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${match[2]} ${suffix}`;
+}
+
+function timeControlHtml(id, value, disabled = '') {
+  const safeValue = esc(value || '');
+  return `<div class="fda-time-control${disabled ? ' is-disabled' : ''}">
+    <span class="fda-time-value">${esc(clockTimeLabel(value))}</span>
+    <input id="${esc(id)}" type="time" value="${safeValue}" ${disabled} oninput="updateAssistantTimeDisplay(this)">
+  </div>`;
+}
+
 function assistantEnabled() {
   return !!crm.assistantData?.config?.enabled;
 }
@@ -187,7 +205,7 @@ function ensureStyles() {
     .fda-native-result-time{display:block;margin-top:3px;font-size:10.5px;line-height:1.3;color:#75857c;}
     .fda-native-result-arrow{flex:0 0 auto;color:#8aa095;font-size:20px;font-weight:500;line-height:1;}
     .fda-overlay{position:fixed;inset:0;z-index:110000;background:rgba(13,27,20,.48);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:flex-end;justify-content:center;padding:0;}
-    .fda-sheet{width:100%;max-width:620px;max-height:min(92dvh,860px);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#f5f8f6;border-radius:24px 24px 0 0;box-shadow:0 -18px 60px rgba(13,27,20,.25);padding:0 0 max(22px,env(safe-area-inset-bottom));animation:fdaSheetIn .2s ease-out;}
+    .fda-sheet{width:100%;max-width:620px;max-height:min(92dvh,860px);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#eff4f0;border-radius:24px 24px 0 0;box-shadow:0 -18px 60px rgba(13,27,20,.25);padding:0 0 max(22px,env(safe-area-inset-bottom));animation:fdaSheetIn .2s ease-out;}
     .fda-sheet-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:17px 18px 13px;background:rgba(245,248,246,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(209,222,214,.8);}
     .fda-sheet-title{flex:1;min-width:0;font-size:18px;font-weight:850;color:#1a2b22;}
     .fda-close{border:0;width:34px;height:34px;border-radius:50%;background:#e4ebe7;color:#456054;font-size:20px;cursor:pointer;}
@@ -234,10 +252,13 @@ function ensureStyles() {
     .fda-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;min-width:0;}
     .fda-field{display:flex;flex-direction:column;min-width:0;width:100%;gap:5px;margin-bottom:10px;}
     .fda-field label{font-size:10.5px;font-weight:800;color:#5e7267;}
-    .fda-field input,.fda-field select{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:10px;background:#fff;color:#1a2b22;padding:11px;font-family:inherit;font-size:16px!important;line-height:1.25;outline:none;}
-    .fda-field input[type="time"]{min-height:46px;padding-inline:10px;}
-    .fda-field input[type="time"]::-webkit-date-and-time-value{min-width:0;text-align:left;}
-    .fda-field input[type="time"]::-webkit-datetime-edit{min-width:0;padding:0;}
+    .fda-field input,.fda-field select{display:block;width:100%;min-width:0;max-width:100%;height:46px;min-height:46px;max-height:46px;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:10px;background:#fff;color:#1a2b22;padding:0 11px;font-family:inherit;font-size:16px!important;line-height:normal;outline:none;}
+    .fda-time-control{position:relative;display:flex;width:100%;min-width:0;max-width:100%;height:46px;min-height:46px;align-items:center;overflow:hidden;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:10px;background:#fff;color:#1a2b22;padding:0 38px 0 11px;}
+    .fda-time-control::after{content:"";position:absolute;right:15px;top:17px;width:7px;height:7px;border-right:1.5px solid #65776d;border-bottom:1.5px solid #65776d;transform:rotate(45deg);pointer-events:none;}
+    .fda-time-value{display:flex;min-width:0;align-items:center;font-size:16px;line-height:1;white-space:nowrap;}
+    .fda-time-control>input[type="time"]{position:absolute;inset:0;z-index:1;width:100%!important;min-width:0!important;max-width:100%!important;height:46px!important;min-height:46px!important;max-height:46px!important;margin:0!important;padding:0!important;border:0!important;opacity:0;cursor:pointer;}
+    .fda-time-control:focus-within{border-color:#2e7d5b;box-shadow:0 0 0 3px rgba(46,125,91,.09);}
+    .fda-time-control.is-disabled{opacity:.62;}
     .fda-field input:focus,.fda-field select:focus{border-color:#2e7d5b;box-shadow:0 0 0 3px rgba(46,125,91,.09);}
     .fda-btn{border:0;border-radius:11px;padding:11px 14px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;}
     .fda-btn.primary{background:#2e7d5b;color:#fff;}
@@ -535,12 +556,12 @@ function sheetBodyHtml() {
         </select>
       </div>
       <div class="fda-grid">
-        <div class="fda-field"><label for="assistant-check-time">Daily check time</label><input id="assistant-check-time" type="time" value="${esc(config.dailyCheckTime || '18:00')}" ${settingsDisabled}></div>
+        <div class="fda-field"><label for="assistant-check-time">Daily check time</label>${timeControlHtml('assistant-check-time', config.dailyCheckTime || '18:00', settingsDisabled)}</div>
         <div class="fda-field"><label for="assistant-time-zone">Time zone</label><input id="assistant-time-zone" type="text" value="${esc(zone)}" ${settingsDisabled}></div>
       </div>
       <div class="fda-grid">
-        <div class="fda-field"><label for="assistant-quiet-start">Quiet hours start</label><input id="assistant-quiet-start" type="time" value="${esc(config.quietHoursStart || '')}" ${settingsDisabled}></div>
-        <div class="fda-field"><label for="assistant-quiet-end">Quiet hours end</label><input id="assistant-quiet-end" type="time" value="${esc(config.quietHoursEnd || '')}" ${settingsDisabled}></div>
+        <div class="fda-field"><label for="assistant-quiet-start">Quiet hours start</label>${timeControlHtml('assistant-quiet-start', config.quietHoursStart || '', settingsDisabled)}</div>
+        <div class="fda-field"><label for="assistant-quiet-end">Quiet hours end</label>${timeControlHtml('assistant-quiet-end', config.quietHoursEnd || '', settingsDisabled)}</div>
       </div>
       <label class="fda-row" style="font-size:12px;color:#40574b;margin-top:2px;cursor:pointer;">
         <input id="assistant-booking-alerts" type="checkbox" ${config.notifyNewBookings !== false ? 'checked' : ''} ${settingsDisabled}>
@@ -588,6 +609,11 @@ export function updateAssistantPolicySummary() {
   target.innerHTML = action === 'release'
     ? `<strong>Your rule:</strong> no answer after ${minutes} minutes releases the request, voids the $1 hold and emails the guest.`
     : `<strong>Your rule:</strong> no answer after ${minutes} minutes keeps the booking and emails the guest a confirmation.`;
+}
+
+export function updateAssistantTimeDisplay(input) {
+  const valueNode = input?.closest?.('.fda-time-control')?.querySelector('.fda-time-value');
+  if (valueNode) valueNode.textContent = clockTimeLabel(input.value);
 }
 
 export function openFrontDeskAssistant() {
@@ -809,6 +835,7 @@ const exportsForWindow = {
   saveAssistantSettings,
   sendAssistantTest,
   updateAssistantPolicySummary,
+  updateAssistantTimeDisplay,
   verifyAssistantRecipient,
 };
 

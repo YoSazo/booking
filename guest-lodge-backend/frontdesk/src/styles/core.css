@@ -1,6 +1,6 @@
     :root {
       --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
-      --green-mint: #C8EDD9; --green-dark: #245F46; --bg: #F5F8F6; --white: #FFFFFF;
+      --green-mint: #C8EDD9; --green-dark: #245F46; --bg: #EFF4F0; --white: #FFFFFF;
       --surface-subtle: #F4F8F5; --text: #1A2B22; --text-muted: #6B7D72;
       --text-soft: #4B5D52; --border: #D8E4DC; --border-soft: #E6EEE9;
       --red: #E05252; --amber: #F59E0B;
@@ -12,11 +12,6 @@
     body {
       font-family: 'DM Sans', sans-serif; color: var(--text); min-height: 100vh; overflow-x: hidden;
       background: var(--bg);
-      background-image:
-        radial-gradient(circle 720px at 90% 2%, rgba(76, 175, 125, 0.09), transparent 70%),
-        radial-gradient(circle 620px at 6% 88%, rgba(160, 210, 185, 0.12), transparent 70%),
-        radial-gradient(circle 520px at 50% 42%, rgba(255, 255, 255, 0.56), transparent 72%);
-      background-attachment: fixed;
       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility; letter-spacing: -0.01em;
     }
@@ -34,11 +29,7 @@
     .login-screen {
       min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
       padding: 16px;
-      background-color: var(--bg);
-      background-image:
-        radial-gradient(circle 520px at 88% 8%, rgba(76, 175, 125, 0.16), transparent 68%),
-        radial-gradient(circle 460px at 8% 88%, rgba(160, 210, 185, 0.20), transparent 70%),
-        radial-gradient(circle 360px at 50% 45%, rgba(255, 255, 255, 0.68), transparent 72%);
+      background: var(--bg);
     }
     .login-card {
       background: rgba(255, 255, 255, 0.88); border: 1px solid rgba(255, 255, 255, 0.82); border-radius: 20px;
