@@ -1,6 +1,6 @@
     :root {
       --green: #2E7D5B; --green-light: #4CAF7D; --green-pale: #E8F5EE;
-      --green-mint: #C8EDD9; --green-dark: #245F46; --bg: #EEF2EF; --white: #FFFFFF;
+      --green-mint: #C8EDD9; --green-dark: #245F46; --bg: #F5F8F6; --white: #FFFFFF;
       --surface-subtle: #F4F8F5; --text: #1A2B22; --text-muted: #6B7D72;
       --text-soft: #4B5D52; --border: #D8E4DC; --border-soft: #E6EEE9;
       --red: #E05252; --amber: #F59E0B;
@@ -12,7 +12,10 @@
     body {
       font-family: 'DM Sans', sans-serif; color: var(--text); min-height: 100vh; overflow-x: hidden;
       background: var(--bg);
-      background-image: radial-gradient(1200px 600px at 50% -10%, #FBFDFC 0%, rgba(251,253,252,0) 60%), linear-gradient(180deg, #F2F7F4 0%, var(--bg) 220px);
+      background-image:
+        radial-gradient(circle 720px at 90% 2%, rgba(76, 175, 125, 0.09), transparent 70%),
+        radial-gradient(circle 620px at 6% 88%, rgba(160, 210, 185, 0.12), transparent 70%),
+        radial-gradient(circle 520px at 50% 42%, rgba(255, 255, 255, 0.56), transparent 72%);
       background-attachment: fixed;
       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility; letter-spacing: -0.01em;
@@ -31,13 +34,18 @@
     .login-screen {
       min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
       padding: 16px;
-      background: linear-gradient(135deg, #1a2b22 0%, #2E7D5B 100%);
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle 520px at 88% 8%, rgba(76, 175, 125, 0.16), transparent 68%),
+        radial-gradient(circle 460px at 8% 88%, rgba(160, 210, 185, 0.20), transparent 70%),
+        radial-gradient(circle 360px at 50% 45%, rgba(255, 255, 255, 0.68), transparent 72%);
     }
     .login-card {
-      background: white; border-radius: 20px;
+      background: rgba(255, 255, 255, 0.88); border: 1px solid rgba(255, 255, 255, 0.82); border-radius: 20px;
       padding: clamp(28px, 8vw, 40px) clamp(22px, 6vw, 36px);
       width: min(340px, 100%); max-width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+      box-shadow: 0 22px 64px rgba(35, 83, 59, 0.14); text-align: center;
+      -webkit-backdrop-filter: blur(20px) saturate(1.12); backdrop-filter: blur(20px) saturate(1.12);
     }
     .status-card {
       width: min(420px, calc(100vw - 32px));
@@ -52,7 +60,7 @@
     .login-hotel-icon {
       width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 14px;
       display: flex; align-items: center; justify-content: center; overflow: hidden;
-      background: var(--green); color: #fff; font-size: 26px; font-weight: 800;
+      background: linear-gradient(145deg, var(--green-light), var(--green)); color: #fff; font-size: 26px; font-weight: 800;
       box-shadow: 0 6px 18px rgba(46,125,91,0.25);
     }
     .login-hotel-icon img { width: 100%; height: 100%; object-fit: cover; }

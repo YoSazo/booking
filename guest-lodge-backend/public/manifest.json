@@ -4,7 +4,7 @@
   "description": "Real-time booking funnel analytics and notifications",
   "start_url": "/simple-crm",
   "display": "standalone",
-  "background_color": "#EEF2EF",
+  "background_color": "#F5F8F6",
   "theme_color": "#2E7D5B",
   "orientation": "portrait",
   "icons": [

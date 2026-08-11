@@ -125,7 +125,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 238 / 255, green: 242 / 255, blue: 239 / 255, alpha: 1)
+        view.backgroundColor = UIColor(red: 245 / 255, green: 248 / 255, blue: 246 / 255, alpha: 1)
         view.tintColor = UIColor(red: 46 / 255, green: 125 / 255, blue: 91 / 255, alpha: 1)
         configureTopBar()
         configureTabBar()
@@ -205,9 +205,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
     private func configureTopBar() {
         let shellBackground = UIColor(
-            red: 238 / 255,
-            green: 242 / 255,
-            blue: 239 / 255,
+            red: 245 / 255,
+            green: 248 / 255,
+            blue: 246 / 255,
             alpha: 1
         )
         statusBarBackdrop.backgroundColor = shellBackground
@@ -217,9 +217,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         if #available(iOS 26.0, *) {
             let glass = UIGlassEffect(style: .regular)
             glass.tintColor = UIColor(
-                red: 238 / 255,
-                green: 242 / 255,
-                blue: 239 / 255,
+                red: 245 / 255,
+                green: 248 / 255,
+                blue: 246 / 255,
                 alpha: 0.12
             )
             topBar.effect = glass
@@ -680,9 +680,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         return renderer.image { context in
             UIColor(
-                red: 238 / 255,
-                green: 242 / 255,
-                blue: 239 / 255,
+                red: 245 / 255,
+                green: 248 / 255,
+                blue: 246 / 255,
                 alpha: 1
             ).setFill()
             context.fill(CGRect(origin: .zero, size: size))
