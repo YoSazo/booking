@@ -23,6 +23,23 @@ function isNativeApp() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
 
+function isEmbeddedEditorPreview() {
+  return document.body.classList.contains('frontdesk-editor-preview')
+    || new URLSearchParams(window.location.search).get('previewEditor') === '1';
+}
+
+function notifyEmbeddedEditorSaved(kind, detail = {}) {
+  if (!isEmbeddedEditorPreview() || window.parent === window) return;
+  try {
+    window.parent.postMessage({
+      type: 'marketel:editor-saved',
+      kind: String(kind || 'booking-page'),
+      hotelId: crm.activeHotelId || '',
+      ...detail,
+    }, window.location.origin);
+  } catch (_) {}
+}
+
 function supportCardHtml() {
   return `<div class="booking-card" style="margin-bottom:14px;">
     <div style="padding:18px;display:flex;align-items:center;gap:14px;">
@@ -820,6 +837,7 @@ async function loadEditRooms() {
     // Render hotel info section + rates + PIN + rooms
     const bookingDomain = hotelRes?.domain || (crm.activeHotelId + '.mktel.co');
     const bookingUrl = 'https://' + bookingDomain;
+    const embeddedPreview = isEmbeddedEditorPreview();
     let html = `
       <div class="settings-dashboard-grid">
       <div class="dash-a">
@@ -833,7 +851,7 @@ async function loadEditRooms() {
             <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Add a short description (optional)" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="Add your guest phone number (optional)" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
           </div>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
+          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">${embeddedPreview ? 'Save &amp; see changes' : 'Save'}</button>
         </div>
       </div>
       </div>
@@ -1047,7 +1065,7 @@ function renderEditRoomsCards() {
           </div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Changes</button>
+          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isEmbeddedEditorPreview() ? 'Save &amp; see changes' : 'Save Changes'}</button>
           <button class="room-edit-delete-btn" onclick="deleteEditRoom('${r.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
         </div>
       </div>
@@ -1221,7 +1239,9 @@ async function saveHotelInfo() {
   const cancellationPolicy = document.getElementById('edit-hotel-policy')?.value.trim();
   try {
     await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone, cancellationPolicy });
+    if (name) crm.activeHotelName = name;
     toast('Property info saved!', 'success');
+    notifyEmbeddedEditorSaved('header', { hotelName: name || '' });
   } catch (e) {
     toast('Failed to save', 'error');
   }
@@ -1422,6 +1442,7 @@ async function saveEditRoom(roomId) {
     room.maxOccupancy = maxOccupancy;
     room.totalUnits = totalUnits;
     toast('Room saved!', 'success');
+    notifyEmbeddedEditorSaved('room', { roomId, roomName: body.name });
   } catch (e) {
     toast('Failed to save: ' + (e.message || ''), 'error');
   }
@@ -1463,6 +1484,7 @@ async function uploadEditImages(event, roomId) {
   if (uploaded > 0) crm.launchStatus = null; // re-derive launch checklist from fresh server truth
   advanceTourIfNeeded();
   if (uploaded > 0) {
+    notifyEmbeddedEditorSaved('room-photos', { roomId });
     toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
   } else {
     toast(lastError || 'Upload failed', 'error');
@@ -1583,6 +1605,7 @@ async function deleteEditImage(roomId, imageId) {
     }
     renderEditRoomsCards();
     toast('Photo deleted', 'success');
+    notifyEmbeddedEditorSaved('room-photo-deleted', { roomId });
   } catch (e) {
     toast('Failed to delete', 'error');
   }

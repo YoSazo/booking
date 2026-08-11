@@ -2474,6 +2474,9 @@
     }
     .frontdesk-editor-preview #app #revenuePeriodBar button,
     .frontdesk-editor-preview #app #bookingsSubtabs .subtab,
+    .frontdesk-editor-preview #app #tour-header-preview-card,
+    .frontdesk-editor-preview #app #tour-header-preview-card input,
+    .frontdesk-editor-preview #app #tour-header-preview-card button,
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child,
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child input,
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child select,

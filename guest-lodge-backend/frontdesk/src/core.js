@@ -2227,7 +2227,7 @@ function installEmbeddedEditorPreview() {
       <div id="embeddedEditorNotice">
         <div>
           <strong>This is where you control your booking page.</strong>
-          <span>Try changing your first room's name, photos, or details to see how editing works.</span>
+          <span>Edit your header or first room, then choose Save &amp; see changes to view the live result.</span>
         </div>
       </div>
     `);
@@ -2248,7 +2248,8 @@ function installEmbeddedEditorPreview() {
       const firstRoomCard = interactive.closest('#editRoomsCards > .booking-card:first-child');
       const isFirstRoomEditor = !!firstRoomCard && !interactive.closest('.room-edit-delete-btn');
       const isFirstRoomEditorModal = !!interactive.closest('[data-preview-action-scope="first-room-editor"]');
-      return isNavigation || isFirstRoomEditor || isFirstRoomEditorModal;
+      const isHeaderEditor = !!interactive.closest('#tour-header-preview-card');
+      return isNavigation || isHeaderEditor || isFirstRoomEditor || isFirstRoomEditorModal;
     };
     const blockLockedPreviewAction = (event) => {
       const interactive = event.target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');

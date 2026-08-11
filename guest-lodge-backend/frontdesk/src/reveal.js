@@ -352,12 +352,30 @@ function handleBookingPreviewMessage(event) {
     messageType !== 'marketel:show-guest-app'
     && messageType !== 'marketel:continue-owner-tour'
     && messageType !== 'marketel:checkout-reached'
+    && messageType !== 'marketel:editor-saved'
   ) return;
   const reveal = document.getElementById('marketelValueReveal');
   if (!reveal) return;
   const knownFrame = Array.from(reveal.querySelectorAll('iframe'))
     .some((frame) => frame.contentWindow === event.source);
   if (!knownFrame) return;
+  if (messageType === 'marketel:editor-saved') {
+    if (activeBookingChallenge?.iframe?.contentWindow !== event.source || livePreviewMode !== 'edit') return;
+    if (event.data?.hotelName) crm.activeHotelName = String(event.data.hotelName);
+    activeBookingChallenge.modal.dataset.editorSaved = '1';
+    trackJourney('JourneyBookingPreviewEdited', {
+      kind: String(event.data?.kind || 'booking-page'),
+    });
+    void loadRevealData();
+    setLivePreviewMode(
+      activeBookingChallenge.modal,
+      'guest',
+      activeBookingChallenge.previewOpenedAt,
+      'saved-and-returned-to-booking-page'
+    );
+    showSavedPreviewConfirmation(activeBookingChallenge.modal);
+    return;
+  }
   if (messageType === 'marketel:checkout-reached') {
     if (activeBookingChallenge?.iframe?.contentWindow !== event.source || livePreviewMode !== 'guest') return;
     completeBookingChallenge(activeBookingChallenge);
@@ -752,7 +770,7 @@ function showExpandedPreview() {
       setLivePreviewMode(modal, 'edit', previewOpenedAt, 'guided-forward');
       return;
     }
-    continueFromBookingPreview(modal, previewOpenedAt, 'continued-from-editor-preview');
+    setLivePreviewMode(modal, 'guest', previewOpenedAt, 'returned-to-booking-page');
   });
   trackReveal('BookingEngineFullPreviewOpened');
   trackJourney('JourneyBookingPreviewOpened', {
@@ -760,6 +778,17 @@ function showExpandedPreview() {
     bookingPageReady: !!bookingPageState.ready,
     bookingPageReason: bookingPageState.reason || '',
   });
+}
+
+function showSavedPreviewConfirmation(modal) {
+  if (!modal?.isConnected) return;
+  modal.querySelector('.mvr-live-saved-confirmation')?.remove();
+  const confirmation = document.createElement('div');
+  confirmation.className = 'mvr-live-saved-confirmation';
+  confirmation.setAttribute('role', 'status');
+  confirmation.innerHTML = '<span aria-hidden="true">✓</span><strong>Saved</strong><small>You’re viewing your changes.</small>';
+  modal.querySelector('.mvr-live-stage')?.appendChild(confirmation);
+  window.setTimeout(() => confirmation.remove(), 2600);
 }
 
 function continueFromBookingPreview(modal, previewOpenedAt, action) {
@@ -784,21 +813,32 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   const forward = modal.querySelector('#mvrLiveForward');
   const continueGuestApp = modal.querySelector('#mvrContinueGuestApp');
   const forwardLong = modal.querySelector('[data-live-forward-long]');
+  const forwardArrow = forward?.querySelector('b');
   location?.classList.toggle('is-editor', livePreviewMode === 'edit');
   if (locationText) locationText.textContent = livePreviewMode === 'edit' ? 'Front Desk editor' : bookingDisplayDomain();
   if (location) location.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Front Desk editor' : 'Your live booking address');
-  if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Continue to Guest App' : 'See how to edit your booking page';
+  if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Back to your booking page' : 'See how to edit your booking page';
+  if (forwardArrow) forwardArrow.textContent = livePreviewMode === 'edit' ? '↩' : '→';
   if (forward) {
-    forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Continue to the Guest App' : 'See how you edit this booking page');
+    forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Back to your direct booking page' : 'See how you edit this booking page');
   }
-  if (continueGuestApp) continueGuestApp.hidden = livePreviewMode === 'edit';
+  if (continueGuestApp) continueGuestApp.hidden = false;
   setLivePreviewActionsVisible(modal, true);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
   if (iframe) {
     iframe.title = livePreviewMode === 'edit'
       ? `${propertyName()} Front Desk editor`
       : `${propertyName()} booking-page preview`;
-    iframe.src = livePreviewMode === 'edit' ? frontdeskEditorUrl() : bookingUrl();
+    if (livePreviewMode === 'edit') {
+      iframe.src = frontdeskEditorUrl();
+    } else {
+      const guestUrl = new URL(bookingUrl());
+      if (modal.dataset.editorSaved === '1') {
+        guestUrl.searchParams.set('previewRefresh', String(Date.now()));
+        delete modal.dataset.editorSaved;
+      }
+      iframe.src = guestUrl.toString();
+    }
   }
   trackJourney('JourneyBookingPreviewModeChanged', {
     action,
