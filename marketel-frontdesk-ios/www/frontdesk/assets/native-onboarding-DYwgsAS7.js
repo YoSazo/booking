@@ -16,6 +16,10 @@ import{c as $}from"./settings-CsnKIiEZ.js";const k="marketelNativeOnboardingV1Do
       --native-glass: rgba(255, 255, 255, 0.55);
       position: fixed;
       inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
       z-index: 2147483000;
       color: var(--native-ink);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, sans-serif;
@@ -27,7 +31,10 @@ import{c as $}from"./settings-CsnKIiEZ.js";const k="marketelNativeOnboardingV1Do
     }
 
     .mno-intro {
-      min-height: 100%;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -65,6 +72,7 @@ import{c as $}from"./settings-CsnKIiEZ.js";const k="marketelNativeOnboardingV1Do
       min-height: 42px;
       position: relative;
       z-index: 2;
+      flex: 0 0 auto;
     }
 
     .mno-wordmark {
@@ -99,7 +107,7 @@ import{c as $}from"./settings-CsnKIiEZ.js";const k="marketelNativeOnboardingV1Do
     .mno-main {
       position: relative;
       z-index: 1;
-      flex: 1;
+      flex: 1 1 auto;
       min-height: 0;
       width: min(100%, 520px);
       margin: 0 auto;
@@ -517,6 +525,7 @@ import{c as $}from"./settings-CsnKIiEZ.js";const k="marketelNativeOnboardingV1Do
       z-index: 2;
       width: min(100%, 520px);
       margin: 0 auto;
+      flex: 0 0 auto;
     }
 
     .mno-primary,
@@ -799,6 +808,8 @@ import{c as $}from"./settings-CsnKIiEZ.js";const k="marketelNativeOnboardingV1Do
       .mno-assistant-head { padding-bottom: 8px; }
       .mno-contact-strip { margin-top: 8px; padding: 8px 10px; }
       .mno-primary { min-height: 49px; }
+      .mno-secondary { min-height: 36px; margin-top: 1px; padding-top: 8px; padding-bottom: 8px; }
+      .mno-status-note { margin-top: 3px; font-size: 10px; }
       .mno-progress { margin-top: 8px; }
     }
 

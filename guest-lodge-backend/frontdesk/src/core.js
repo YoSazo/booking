@@ -1987,14 +1987,12 @@ function applyBookingsSubview() {
   if (msgPanel) msgPanel.style.display = 'none';
   if (!isBookings && chipsEl) chipsEl.style.display = 'none';
   if (revenueEl) revenueEl.style.display = isRevenue ? 'flex' : 'none';
-  if (assistantEl) assistantEl.style.display = (isBookings && !isNativeFrontdeskApp()) ? 'block' : 'none';
+  if (assistantEl) assistantEl.style.display = isBookings ? 'block' : 'none';
   if (isRevenue) {
     renderRevenueView();
   } else {
     renderBookings(crm.bookings);
-    if (isNativeFrontdeskApp()) {
-      if (assistantEl) assistantEl.innerHTML = '';
-    } else if (document.body.classList.contains('frontdesk-editor-preview')) {
+    if (document.body.classList.contains('frontdesk-editor-preview')) {
       renderEmbeddedAssistantPreviewCard();
     } else {
       loadAssistantModule().then((module) => module.renderFrontDeskAssistantCard()).catch(() => {});

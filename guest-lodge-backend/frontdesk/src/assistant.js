@@ -61,6 +61,34 @@ function isSubscribed() {
   return !!crm.assistantData?.hotel?.subscribed || !!crm.isMasterPin;
 }
 
+function isNativeFrontDesk() {
+  return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
+}
+
+function latestMeaningfulActivity() {
+  const meaningfulTypes = new Set([
+    'availability_update',
+    'booking_decision',
+    'availability_warning',
+  ]);
+  return (crm.assistantData?.activities || []).find((activity) =>
+    meaningfulTypes.has(String(activity?.type || ''))
+  ) || null;
+}
+
+function activityAge(value) {
+  const timestamp = new Date(value || 0).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return 'Saved in Assistant activity';
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (elapsedMinutes < 1) return 'Just now';
+  if (elapsedMinutes < 60) return `${elapsedMinutes} min ago`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours} hr${elapsedHours === 1 ? '' : 's'} ago`;
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  if (elapsedDays < 7) return `${elapsedDays} day${elapsedDays === 1 ? '' : 's'} ago`;
+  return formatWhen(value);
+}
+
 function nativeBookingAlertsHtml() {
   const native = typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
   if (!native) return '';
@@ -147,6 +175,16 @@ function ensureStyles() {
     .fda-card.is-off .fda-card-btn{background:#2e7d5b;color:#fff;}
     .fda-live{display:inline-flex;align-items:center;gap:5px;}
     .fda-live::before{content:"";width:7px;height:7px;border-radius:50%;background:#65d69a;box-shadow:0 0 0 4px rgba(101,214,154,.14);}
+    .fda-native-result{width:100%;display:flex;align-items:center;gap:12px;margin:0 0 13px;padding:13px 14px;border:1px solid #d7e8de;border-radius:15px;background:linear-gradient(145deg,#f5fbf7,#fff);box-shadow:0 4px 16px rgba(25,70,45,.055);color:#1a2b22;font-family:inherit;text-align:left;cursor:pointer;}
+    .fda-native-result.attention{border-color:#efd3a4;background:linear-gradient(145deg,#fff8eb,#fff);}
+    .fda-native-result-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;background:#dff2e7;color:#23714f;font-size:16px;font-weight:900;}
+    .fda-native-result.attention .fda-native-result-icon{background:#fff0d2;color:#a15c0b;}
+    .fda-native-result-copy{min-width:0;flex:1;}
+    .fda-native-result-label{display:block;font-size:9.5px;font-weight:850;letter-spacing:.075em;text-transform:uppercase;color:#39745a;margin-bottom:3px;}
+    .fda-native-result.attention .fda-native-result-label{color:#9a5a12;}
+    .fda-native-result-title{display:block;font-size:13px;font-weight:800;line-height:1.35;color:#1a2b22;}
+    .fda-native-result-time{display:block;margin-top:3px;font-size:10.5px;line-height:1.3;color:#75857c;}
+    .fda-native-result-arrow{flex:0 0 auto;color:#8aa095;font-size:20px;font-weight:500;line-height:1;}
     .fda-overlay{position:fixed;inset:0;z-index:110000;background:rgba(13,27,20,.48);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:flex-end;justify-content:center;padding:0;}
     .fda-sheet{width:100%;max-width:620px;max-height:min(92dvh,860px);overflow:auto;overscroll-behavior:contain;background:#f5f8f6;border-radius:24px 24px 0 0;box-shadow:0 -18px 60px rgba(13,27,20,.25);padding:0 0 max(22px,env(safe-area-inset-bottom));animation:fdaSheetIn .2s ease-out;}
     .fda-sheet-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:17px 18px 13px;background:rgba(245,248,246,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(209,222,214,.8);}
@@ -254,6 +292,29 @@ export function renderFrontDeskAssistantCard() {
     && !crm.settingsTourActive;
   panel.style.display = visible ? 'block' : 'none';
   if (!visible) return;
+  if (isNativeFrontDesk()) {
+    const activity = latestMeaningfulActivity();
+    if (!crm.assistantData || !activity) {
+      panel.innerHTML = '';
+      panel.style.display = 'none';
+      if (!crm.assistantData && !crm.assistantLoading && !crm.assistantError) {
+        loadFrontDeskAssistant().catch(() => {});
+      }
+      return;
+    }
+    const attention = activity.type === 'availability_warning' || activity.status === 'attention';
+    panel.style.display = 'block';
+    panel.innerHTML = `<button type="button" class="fda-native-result${attention ? ' attention' : ''}" onclick="openFrontDeskAssistant()" aria-label="Open Front Desk Assistant activity">
+      <span class="fda-native-result-icon" aria-hidden="true">${attention ? '!' : '✓'}</span>
+      <span class="fda-native-result-copy">
+        <span class="fda-native-result-label">${attention ? 'Front Desk needs your review' : 'Front Desk handled this'}</span>
+        <span class="fda-native-result-title">${esc(activity.summary || 'Assistant updated your property')}</span>
+        <span class="fda-native-result-time">${esc(activityAge(activity.createdAt))} · View activity</span>
+      </span>
+      <span class="fda-native-result-arrow" aria-hidden="true">›</span>
+    </button>`;
+    return;
+  }
   if (!crm.assistantData) {
     const loadFailed = !!crm.assistantError && !crm.assistantLoading;
     panel.innerHTML = `<div class="fda-card is-off">

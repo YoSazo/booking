@@ -594,6 +594,11 @@ function createFrontDeskAssistant({
         return String(outcome?.fulfillment?.status || '').toLowerCase() === 'attention';
     }
 
+    function bookingOutcomeActivityStatus(outcome) {
+        if (fulfillmentNeedsAttention(outcome)) return 'attention';
+        return fulfillmentFinished(outcome) ? 'completed' : 'processing';
+    }
+
     async function markBookingAvailable(action) {
         const bookingId = String(action?.payload?.bookingId || '');
         if (!bookingId) return { ok: false, message: 'I could not identify that booking.' };
@@ -610,6 +615,17 @@ function createFrontDeskAssistant({
                 where: { id: action.id },
                 data: { status: 'applied', appliedAt: new Date() },
             }).catch(() => {});
+            if (decision?.ok) {
+                await createActivity({
+                    hotelId: action.hotelId,
+                    recipientId: action.recipientId || null,
+                    direction: 'system',
+                    type: 'booking_decision',
+                    summary: `${booking.roomName} confirmed from your reply`,
+                    status: bookingOutcomeActivityStatus(decision),
+                    metadata: { bookingId: booking.id, outcome: 'owner_confirmed' },
+                });
+            }
             return decision?.ok
                 ? {
                     ok: true,
@@ -634,6 +650,15 @@ function createFrontDeskAssistant({
                 data: { status: 'applied', appliedAt: new Date() },
             }),
         ]);
+        await createActivity({
+            hotelId: action.hotelId,
+            recipientId: action.recipientId || null,
+            direction: 'system',
+            type: 'booking_decision',
+            summary: `${booking.roomName} marked available from your reply`,
+            status: 'completed',
+            metadata: { bookingId: booking.id, outcome: 'owner_marked_available' },
+        });
         return {
             ok: true,
             message: `Perfect — ${booking.roomName} is confirmed as available for this booking.`,
@@ -919,6 +944,15 @@ function createFrontDeskAssistant({
                 message: `I cancelled ${guest}'s booking. ${guestAction} Availability changed at the same time, so open Availability and make sure ${booking.roomName} is closed for the walk-in.`,
             };
         }
+        await createActivity({
+            hotelId: booking.hotelId,
+            recipientId: recipient?.id || null,
+            direction: 'system',
+            type: 'booking_decision',
+            summary: `Cancelled ${guest}'s ${booking.roomName} booking and kept the dates unavailable`,
+            status: bookingOutcomeActivityStatus(outcome),
+            metadata: { bookingId: booking.id, outcome: 'owner_cancelled_for_walk_in' },
+        });
         return {
             ok: true,
             message: `Done — I cancelled ${guest}'s ${booking.roomName} booking and kept those dates unavailable for the walk-in. ${guestAction}`,
@@ -1175,6 +1209,17 @@ function createFrontDeskAssistant({
                     where: { id: action.id },
                     data: { status: 'applied', appliedAt: new Date() },
                 }).catch(() => {});
+                if (decision?.ok) {
+                    await createActivity({
+                        hotelId: recipient.hotelId,
+                        recipientId: recipient.id,
+                        direction: 'system',
+                        type: 'booking_decision',
+                        summary: `${booking.roomName} released from your reply`,
+                        status: bookingOutcomeActivityStatus(decision),
+                        metadata: { bookingId: booking.id, outcome: 'owner_released' },
+                    });
+                }
                 return decision?.ok
                     ? (fulfillmentFinished(decision)
                         ? `Handled — I freed ${booking.roomName}, released the $1 hold, and notified the guest.`
