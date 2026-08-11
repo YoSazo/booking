@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import { trackPageView, trackHotelFunnel } from './trackingService.js';
@@ -32,6 +32,47 @@ function BookingPage({
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).has('preview') || window !== window.parent;
   }, []);
+  const initialSavedHighlight = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('preview')) return null;
+    const target = params.get('previewHighlight');
+    const allowed = new Set(['header', 'header-name', 'header-subtitle', 'header-address', 'room', 'room-photo']);
+    if (!allowed.has(target)) return null;
+    return {
+      target,
+      roomId: params.get('previewHighlightRoom') || '',
+    };
+  }, []);
+  const [savedHighlight, setSavedHighlight] = useState(initialSavedHighlight);
+
+  useEffect(() => {
+    if (!savedHighlight?.target) return undefined;
+    const selector = `[data-preview-highlight="${savedHighlight.target}"]`;
+    let attempts = 0;
+    const revealChangedElement = () => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
+    };
+    const initialTimer = window.setTimeout(revealChangedElement, 260);
+    const retryTimer = window.setInterval(() => {
+      attempts += 1;
+      if (revealChangedElement() || attempts >= 16) window.clearInterval(retryTimer);
+    }, 250);
+    const clearTimer = window.setTimeout(() => setSavedHighlight(null), 5600);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(retryTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [savedHighlight]);
+
+  const savedTargetClass = (target) => savedHighlight?.target === target ? 'preview-saved-target' : '';
+  const savedBadge = (target) => savedHighlight?.target === target
+    ? <span className="preview-saved-badge" role="status">✓ Saved</span>
+    : null;
 
   useEffect(() => {
     if (!ownerPreview) trackPageView();
@@ -80,10 +121,20 @@ function BookingPage({
 
   return (
     <div className="container" style={{ paddingBottom: showInstallBanner ? '120px' : undefined }}>
-      <header className="header">
-        <p className="header-address">{hotel.address}</p>
-        <h1>{hotel.name}</h1>
-        <p>{hotel.subtitle}</p>
+      <header className={`header ${savedTargetClass('header')}`.trim()} data-preview-highlight="header">
+        {savedBadge('header')}
+        <p className={`header-address ${savedTargetClass('header-address')}`.trim()} data-preview-highlight="header-address">
+          {hotel.address}
+          {savedBadge('header-address')}
+        </p>
+        <h1 className={savedTargetClass('header-name')} data-preview-highlight="header-name">
+          {hotel.name}
+          {savedBadge('header-name')}
+        </h1>
+        <p className={savedTargetClass('header-subtitle')} data-preview-highlight="header-subtitle">
+          {hotel.subtitle}
+          {savedBadge('header-subtitle')}
+        </p>
       </header>
 
       <main className="rooms-list">
@@ -136,6 +187,10 @@ function BookingPage({
                   checkoutDate={checkoutDate}
                   isEditMode={false}
                   hotelId={hotelId}
+                  previewSavedPart={(
+                    savedHighlight?.target?.startsWith('room')
+                    && (!savedHighlight.roomId || String(savedHighlight.roomId) === String(room.id))
+                  ) ? savedHighlight.target : null}
                 />
               );
             })}

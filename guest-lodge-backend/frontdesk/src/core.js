@@ -2216,8 +2216,8 @@ function installEmbeddedEditorPreview() {
   if (header && !document.getElementById('embeddedPreviewScope')) {
     header.insertAdjacentHTML('afterend', `
       <div id="embeddedPreviewScope" role="note">
-        <strong>Interactive preview</strong>
-        <span>Explore every tab. Your first room is live to edit; the rest of the controls unlock after activation.</span>
+        <strong>Make it yours</strong>
+        <span>Your header and first room are ready to edit. The softly faded areas unlock after activation.</span>
       </div>
     `);
   }
@@ -2233,23 +2233,19 @@ function installEmbeddedEditorPreview() {
     `);
   }
 
-  // Navigation remains usable so the owner can inspect the complete product.
-  // Actions are locked at capture time as a safety net behind the CSS lock;
-  // the first room card is the one deliberate exception and keeps its real
-  // editing/save behavior.
+  // Keep the complete product visible for context, but focus this preview on
+  // the two things the owner can change and immediately see on their page.
+  // Capture-time locking remains a safety net behind the visual treatment.
   if (document.body.dataset.previewActionGuard !== '1') {
     document.body.dataset.previewActionGuard = '1';
     const isAllowedPreviewTarget = (target) => {
       const interactive = target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
       if (!interactive) return true;
-      const isNavigation = !!interactive.closest(
-        '.tab, .mobile-nav-item, #bookingsSubtabs .subtab, #revenuePeriodBar button'
-      );
       const firstRoomCard = interactive.closest('#editRoomsCards > .booking-card:first-child');
       const isFirstRoomEditor = !!firstRoomCard && !interactive.closest('.room-edit-delete-btn');
       const isFirstRoomEditorModal = !!interactive.closest('[data-preview-action-scope="first-room-editor"]');
       const isHeaderEditor = !!interactive.closest('#tour-header-preview-card');
-      return isNavigation || isHeaderEditor || isFirstRoomEditor || isFirstRoomEditorModal;
+      return isHeaderEditor || isFirstRoomEditor || isFirstRoomEditorModal;
     };
     const blockLockedPreviewAction = (event) => {
       const interactive = event.target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
@@ -2262,7 +2258,7 @@ function installEmbeddedEditorPreview() {
         const lastNotice = Number(document.body.dataset.previewLockNoticeAt || 0);
         if (now - lastNotice > 900) {
           document.body.dataset.previewLockNoticeAt = String(now);
-          toast('Preview mode — this action unlocks after activation. Try editing your first room now.');
+          toast('For now, edit your header or first room. Everything else unlocks after activation.');
         }
       }
     };

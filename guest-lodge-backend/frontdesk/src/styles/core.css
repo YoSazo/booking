@@ -2370,9 +2370,8 @@
       font-weight: 800;
     }
 
-    /* Complete Front Desk used inside the onboarding reveal. Navigation stays
-       live so owners can inspect every section; actions are read-only except
-       the first real room editor. */
+    /* Complete Front Desk used inside the onboarding reveal. The full product
+       remains perceptible, while the two live editing surfaces stay in focus. */
     html.frontdesk-editor-preview,
     body.frontdesk-editor-preview {
       min-height: 100%;
@@ -2432,6 +2431,25 @@
       margin-top: 0 !important;
       content-visibility: visible;
     }
+    .frontdesk-editor-preview #app > .header,
+    .frontdesk-editor-preview #app .tabs-container,
+    .frontdesk-editor-preview #editView .dash-c > *,
+    .frontdesk-editor-preview #editView .dash-d > *,
+    .frontdesk-editor-preview #editView .dash-growth > *,
+    .frontdesk-editor-preview #editRoomsCards > .booking-card:not(:first-child) {
+      opacity: 0.34;
+      filter: grayscale(0.72) blur(0.8px);
+      pointer-events: none !important;
+      user-select: none;
+      transition: opacity 180ms ease, filter 180ms ease;
+    }
+    .frontdesk-editor-preview #tour-header-preview-card,
+    .frontdesk-editor-preview #editRoomsCards > .booking-card:first-child {
+      position: relative;
+      z-index: 2;
+      border-color: rgba(46, 125, 91, 0.42) !important;
+      box-shadow: 0 0 0 3px rgba(46, 125, 91, 0.10), 0 14px 36px rgba(28, 67, 45, 0.10) !important;
+    }
     .frontdesk-editor-preview #embeddedEditorNotice {
       display: flex;
       align-items: center;
@@ -2458,8 +2476,7 @@
       font-size: 12px;
       line-height: 1.4;
     }
-    /* All product actions are visibly present but inert in preview. The main
-       tabs and read-only Bookings/Revenue view switches remain navigable. */
+    /* All product actions are visibly present but inert in preview. */
     .frontdesk-editor-preview #app input,
     .frontdesk-editor-preview #app select,
     .frontdesk-editor-preview #app textarea,
@@ -2472,8 +2489,13 @@
       pointer-events: auto !important;
       cursor: not-allowed !important;
     }
+    .frontdesk-editor-preview #app .tab,
+    .frontdesk-editor-preview #app .mobile-nav-item,
     .frontdesk-editor-preview #app #revenuePeriodBar button,
-    .frontdesk-editor-preview #app #bookingsSubtabs .subtab,
+    .frontdesk-editor-preview #app #bookingsSubtabs .subtab {
+      pointer-events: none !important;
+      cursor: default !important;
+    }
     .frontdesk-editor-preview #app #tour-header-preview-card,
     .frontdesk-editor-preview #app #tour-header-preview-card input,
     .frontdesk-editor-preview #app #tour-header-preview-card button,
@@ -2484,10 +2506,6 @@
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child label,
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child button {
       pointer-events: auto !important;
-      cursor: pointer !important;
-    }
-    .frontdesk-editor-preview #app #revenuePeriodBar button,
-    .frontdesk-editor-preview #app #bookingsSubtabs .subtab {
       cursor: pointer !important;
     }
     .frontdesk-editor-preview #app #editRoomsCards > .booking-card:first-child .room-edit-delete-btn {

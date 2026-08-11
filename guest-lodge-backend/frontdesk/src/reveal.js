@@ -363,8 +363,31 @@ function handleBookingPreviewMessage(event) {
     if (activeBookingChallenge?.iframe?.contentWindow !== event.source || livePreviewMode !== 'edit') return;
     if (event.data?.hotelName) crm.activeHotelName = String(event.data.hotelName);
     activeBookingChallenge.modal.dataset.editorSaved = '1';
+    const changedFields = Array.isArray(event.data?.changedFields)
+      ? event.data.changedFields.map((field) => String(field))
+      : [];
+    const kind = String(event.data?.kind || 'booking-page');
+    let highlightTarget = 'header';
+    if (kind === 'header') {
+      const exactHeaderTargets = new Set(['name', 'subtitle', 'address']);
+      highlightTarget = changedFields.length === 1 && exactHeaderTargets.has(changedFields[0])
+        ? `header-${changedFields[0]}`
+        : 'header';
+    } else if (kind.includes('photo')) {
+      highlightTarget = 'room-photo';
+    } else if (kind === 'room') {
+      highlightTarget = 'room';
+    }
+    activeBookingChallenge.modal.dataset.editorHighlight = highlightTarget;
+    if (event.data?.roomId) {
+      activeBookingChallenge.modal.dataset.editorHighlightRoom = String(event.data.roomId);
+    } else {
+      delete activeBookingChallenge.modal.dataset.editorHighlightRoom;
+    }
     trackJourney('JourneyBookingPreviewEdited', {
-      kind: String(event.data?.kind || 'booking-page'),
+      kind,
+      changedFields,
+      highlightTarget,
     });
     void loadRevealData();
     setLivePreviewMode(
@@ -373,7 +396,6 @@ function handleBookingPreviewMessage(event) {
       activeBookingChallenge.previewOpenedAt,
       'saved-and-returned-to-booking-page'
     );
-    showSavedPreviewConfirmation(activeBookingChallenge.modal);
     return;
   }
   if (messageType === 'marketel:checkout-reached') {
@@ -780,17 +802,6 @@ function showExpandedPreview() {
   });
 }
 
-function showSavedPreviewConfirmation(modal) {
-  if (!modal?.isConnected) return;
-  modal.querySelector('.mvr-live-saved-confirmation')?.remove();
-  const confirmation = document.createElement('div');
-  confirmation.className = 'mvr-live-saved-confirmation';
-  confirmation.setAttribute('role', 'status');
-  confirmation.innerHTML = '<span aria-hidden="true">✓</span><strong>Saved</strong><small>You’re viewing your changes.</small>';
-  modal.querySelector('.mvr-live-stage')?.appendChild(confirmation);
-  window.setTimeout(() => confirmation.remove(), 2600);
-}
-
 function continueFromBookingPreview(modal, previewOpenedAt, action) {
   if (!modal?.isConnected) return;
   trackJourney('JourneyRevealNavigation', {
@@ -835,7 +846,13 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
       const guestUrl = new URL(bookingUrl());
       if (modal.dataset.editorSaved === '1') {
         guestUrl.searchParams.set('previewRefresh', String(Date.now()));
+        guestUrl.searchParams.set('previewHighlight', modal.dataset.editorHighlight || 'header');
+        if (modal.dataset.editorHighlightRoom) {
+          guestUrl.searchParams.set('previewHighlightRoom', modal.dataset.editorHighlightRoom);
+        }
         delete modal.dataset.editorSaved;
+        delete modal.dataset.editorHighlight;
+        delete modal.dataset.editorHighlightRoom;
       }
       iframe.src = guestUrl.toString();
     }

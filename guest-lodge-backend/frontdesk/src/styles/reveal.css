@@ -1860,57 +1860,6 @@
   background: #fff;
 }
 
-.mvr-live-saved-confirmation {
-  position: absolute;
-  z-index: 5;
-  top: 14px;
-  left: 50%;
-  display: grid;
-  grid-template-columns: 28px auto;
-  align-items: center;
-  column-gap: 9px;
-  min-width: min(280px, calc(100% - 28px));
-  padding: 11px 14px;
-  color: #173f2d;
-  border: 1px solid #cce3d5;
-  border-radius: 14px;
-  background: rgba(247, 252, 249, 0.96);
-  box-shadow: 0 12px 34px rgba(24, 65, 43, 0.18);
-  backdrop-filter: blur(18px) saturate(1.25);
-  -webkit-backdrop-filter: blur(18px) saturate(1.25);
-  transform: translateX(-50%);
-  animation: mvr-saved-in 220ms ease-out both;
-  pointer-events: none;
-}
-
-.mvr-live-saved-confirmation > span {
-  grid-row: 1 / span 2;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  border-radius: 50%;
-  background: var(--mvr-green);
-  font-weight: 900;
-}
-
-.mvr-live-saved-confirmation strong {
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.mvr-live-saved-confirmation small {
-  color: #687a70;
-  font-size: 10.5px;
-  line-height: 1.25;
-}
-
-@keyframes mvr-saved-in {
-  from { opacity: 0; transform: translate(-50%, -8px) scale(.98); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
-}
-
 .mvr-challenge-layer {
   position: absolute;
   inset: 0;

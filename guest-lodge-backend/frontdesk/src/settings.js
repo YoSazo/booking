@@ -28,6 +28,12 @@ function isEmbeddedEditorPreview() {
     || new URLSearchParams(window.location.search).get('previewEditor') === '1';
 }
 
+let embeddedHeaderSnapshot = null;
+
+function normalizedPreviewValue(value) {
+  return String(value ?? '').trim();
+}
+
 function notifyEmbeddedEditorSaved(kind, detail = {}) {
   if (!isEmbeddedEditorPreview() || window.parent === window) return;
   try {
@@ -824,6 +830,12 @@ async function loadEditRooms() {
     const hotelSubtitle = hotelRes?.hotelSubtitle || '';
     const hotelAddress = hotelRes?.hotelAddress || '';
     const hotelPhone = hotelRes?.hotelPhone || '';
+    embeddedHeaderSnapshot = {
+      name: normalizedPreviewValue(hotelName),
+      subtitle: normalizedPreviewValue(hotelSubtitle),
+      address: normalizedPreviewValue(hotelAddress),
+      phone: normalizedPreviewValue(hotelPhone),
+    };
     const hotelAppIcon = hotelRes?.appIconUrl || '';
     // Sync the home-screen icon/title with the freshest values from verify.
     crm.activeHotelAppIcon = hotelAppIcon;
@@ -1237,11 +1249,21 @@ async function saveHotelInfo() {
   const address = document.getElementById('edit-hotel-address')?.value.trim();
   const phone = document.getElementById('edit-hotel-phone')?.value.trim();
   const cancellationPolicy = document.getElementById('edit-hotel-policy')?.value.trim();
+  const nextHeader = { name, subtitle, address, phone };
+  const changedFields = Object.keys(nextHeader).filter((field) => (
+    normalizedPreviewValue(nextHeader[field]) !== normalizedPreviewValue(embeddedHeaderSnapshot?.[field])
+  ));
   try {
     await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone, cancellationPolicy });
     if (name) crm.activeHotelName = name;
     toast('Property info saved!', 'success');
-    notifyEmbeddedEditorSaved('header', { hotelName: name || '' });
+    embeddedHeaderSnapshot = Object.fromEntries(
+      Object.entries(nextHeader).map(([field, value]) => [field, normalizedPreviewValue(value)])
+    );
+    notifyEmbeddedEditorSaved('header', {
+      hotelName: name || '',
+      changedFields: changedFields.length ? changedFields : ['header'],
+    });
   } catch (e) {
     toast('Failed to save', 'error');
   }
@@ -1434,6 +1456,9 @@ async function saveEditRoom(roomId) {
   const maxOccupancy = parseInt(document.getElementById('edit-occ-' + roomId)?.value) || 4;
   const totalUnits = parseInt(document.getElementById('edit-units-' + roomId)?.value) || 1;
   const body = { id: roomId, name: name || room.name, description: description || '', amenities: room.amenities || '', maxOccupancy, totalUnits };
+  const changedFields = ['name', 'description', 'amenities', 'maxOccupancy', 'totalUnits'].filter((field) => (
+    normalizedPreviewValue(body[field]) !== normalizedPreviewValue(room[field])
+  ));
   try {
     const res = await api('POST', '/api/crm/rooms', body);
     if (res && res.success === false) { toast(res.message || 'Failed to save', 'error'); return; }
@@ -1442,7 +1467,11 @@ async function saveEditRoom(roomId) {
     room.maxOccupancy = maxOccupancy;
     room.totalUnits = totalUnits;
     toast('Room saved!', 'success');
-    notifyEmbeddedEditorSaved('room', { roomId, roomName: body.name });
+    notifyEmbeddedEditorSaved('room', {
+      roomId,
+      roomName: body.name,
+      changedFields: changedFields.length ? changedFields : ['room'],
+    });
   } catch (e) {
     toast('Failed to save: ' + (e.message || ''), 'error');
   }
@@ -1484,7 +1513,7 @@ async function uploadEditImages(event, roomId) {
   if (uploaded > 0) crm.launchStatus = null; // re-derive launch checklist from fresh server truth
   advanceTourIfNeeded();
   if (uploaded > 0) {
-    notifyEmbeddedEditorSaved('room-photos', { roomId });
+    notifyEmbeddedEditorSaved('room-photos', { roomId, changedFields: ['photos'] });
     toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
   } else {
     toast(lastError || 'Upload failed', 'error');
@@ -1605,7 +1634,7 @@ async function deleteEditImage(roomId, imageId) {
     }
     renderEditRoomsCards();
     toast('Photo deleted', 'success');
-    notifyEmbeddedEditorSaved('room-photo-deleted', { roomId });
+    notifyEmbeddedEditorSaved('room-photo-deleted', { roomId, changedFields: ['photos'] });
   } catch (e) {
     toast('Failed to delete', 'error');
   }

@@ -221,7 +221,7 @@ function RoomEditFields({ room, onRoomUpdate, onRoomDelete, hotelId, onDirty }) 
   );
 }
 
-function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded, onRoomUpdate, onRoomDelete, hotelId, onDirty  }) {
+function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSelected, bookingDetails, onGuestsChange, onPetsChange, onBookNow, nights, subtotal, taxes, payToday, balanceDue, isProcessing, roomsAvailable, checkinDate, checkoutDate, isEditMode, onPhotosAdded, onRoomUpdate, onRoomDelete, hotelId, onDirty, previewSavedPart }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showAmenityPicker, setShowAmenityPicker] = useState(false);
   const [localAmenities, setLocalAmenities] = useState(room.amenities || '');
@@ -302,9 +302,17 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
   const amenityList = getAmenityList();
 
   return (
-  <div className="room-card">
+  <div
+    className={`room-card ${previewSavedPart === 'room' ? 'preview-saved-target' : ''}`.trim()}
+    data-preview-highlight="room"
+  >
+    {previewSavedPart === 'room' && <span className="preview-saved-badge" role="status">✓ Saved</span>}
     {/* Image Gallery */}
-    <div className="room-image-container">
+    <div
+      className={`room-image-container ${previewSavedPart === 'room-photo' ? 'preview-saved-target' : ''}`.trim()}
+      data-preview-highlight="room-photo"
+    >
+      {previewSavedPart === 'room-photo' && <span className="preview-saved-badge" role="status">✓ Saved</span>}
       <img 
         src={imageUrls[currentImageIndex]}
         alt={`${room.name} preview`} 
