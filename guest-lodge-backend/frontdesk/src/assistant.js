@@ -187,31 +187,37 @@ function ensureStyles() {
     .fda-native-result-time{display:block;margin-top:3px;font-size:10.5px;line-height:1.3;color:#75857c;}
     .fda-native-result-arrow{flex:0 0 auto;color:#8aa095;font-size:20px;font-weight:500;line-height:1;}
     .fda-overlay{position:fixed;inset:0;z-index:110000;background:rgba(13,27,20,.48);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:flex-end;justify-content:center;padding:0;}
-    .fda-sheet{width:100%;max-width:620px;max-height:min(92dvh,860px);overflow:auto;overscroll-behavior:contain;background:#f5f8f6;border-radius:24px 24px 0 0;box-shadow:0 -18px 60px rgba(13,27,20,.25);padding:0 0 max(22px,env(safe-area-inset-bottom));animation:fdaSheetIn .2s ease-out;}
+    .fda-sheet{width:100%;max-width:620px;max-height:min(92dvh,860px);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#f5f8f6;border-radius:24px 24px 0 0;box-shadow:0 -18px 60px rgba(13,27,20,.25);padding:0 0 max(22px,env(safe-area-inset-bottom));animation:fdaSheetIn .2s ease-out;}
     .fda-sheet-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:17px 18px 13px;background:rgba(245,248,246,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(209,222,214,.8);}
     .fda-sheet-title{flex:1;min-width:0;font-size:18px;font-weight:850;color:#1a2b22;}
     .fda-close{border:0;width:34px;height:34px;border-radius:50%;background:#e4ebe7;color:#456054;font-size:20px;cursor:pointer;}
-    .fda-sheet-body{padding:16px 16px 24px;}
-    .fda-section{background:#fff;border:1px solid #dfe8e3;border-radius:17px;padding:16px;margin-bottom:13px;box-shadow:0 3px 14px rgba(26,43,34,.035);}
-    .fda-section-title{font-size:14px;font-weight:850;color:#1a2b22;margin-bottom:4px;}
-    .fda-section-sub{font-size:12px;color:#687b70;line-height:1.5;margin-bottom:13px;}
+    .fda-sheet-body{width:100%;min-width:0;max-width:100%;padding:16px 16px 24px;}
+    .fda-section{width:100%;min-width:0;max-width:100%;background:#fff;border:1px solid #dfe8e3;border-radius:17px;padding:16px;margin-bottom:13px;box-shadow:0 3px 14px rgba(26,43,34,.035);}
+    .fda-section-title{min-width:0;font-size:14px;font-weight:850;color:#1a2b22;margin-bottom:4px;overflow-wrap:anywhere;}
+    .fda-section-sub{min-width:0;font-size:12px;color:#687b70;line-height:1.5;margin-bottom:13px;overflow-wrap:anywhere;}
     .fda-story{background:linear-gradient(145deg,#e9f7ef,#f6fbf8);border-color:#cae5d5;}
     .fda-bubble{max-width:88%;border-radius:15px;padding:10px 12px;margin:8px 0;font-size:12.5px;line-height:1.45;}
     .fda-bubble.assistant{background:#fff;color:#294638;border:1px solid #d9e8df;border-bottom-left-radius:5px;}
     .fda-bubble.owner{background:#2e7d5b;color:#fff;margin-left:auto;border-bottom-right-radius:5px;}
-    .fda-row{display:flex;align-items:center;gap:10px;}
+    .fda-row{display:flex;align-items:center;gap:10px;min-width:0;}
     .fda-between{justify-content:space-between;}
-    .fda-toggle{appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:16px;background:#cfd9d3;position:relative;cursor:pointer;transition:.15s;flex:0 0 auto;}
-    .fda-toggle::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.15s;}
-    .fda-toggle:checked{background:#2e7d5b;}
-    .fda-toggle:checked::after{transform:translateX(20px);}
-    .fda-policy-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
-    .fda-policy-option{position:relative;display:block;cursor:pointer;}
-    .fda-policy-option input{position:absolute;opacity:0;pointer-events:none;}
-    .fda-policy-option-copy{height:100%;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:13px;padding:12px;background:#fafcfb;color:#5d7166;transition:border-color .15s,background .15s,box-shadow .15s;}
+    .fda-between>div:first-child{flex:1;min-width:0;}
+    .fda-switch{position:relative;display:block;width:48px;height:28px;flex:0 0 48px;cursor:pointer;}
+    .fda-switch input{position:absolute;width:1px!important;height:1px!important;opacity:0;pointer-events:none;}
+    .fda-switch-track{position:absolute;inset:0;border-radius:16px;background:#cfd9d3;transition:background .15s,opacity .15s;}
+    .fda-switch-track::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:transform .15s;}
+    .fda-switch input:checked+.fda-switch-track{background:#2e7d5b;}
+    .fda-switch input:checked+.fda-switch-track::after{transform:translateX(20px);}
+    .fda-switch input:focus-visible+.fda-switch-track{box-shadow:0 0 0 3px rgba(46,125,91,.18);}
+    .fda-switch input:disabled+.fda-switch-track{opacity:.5;cursor:not-allowed;}
+    .fda-policy-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;}
+    .fda-policy-option{position:relative;display:block;min-width:0;cursor:pointer;}
+    .fda-policy-option input{position:absolute;width:1px!important;height:1px!important;opacity:0;pointer-events:none;}
+    .fda-policy-option-copy{display:block;width:100%;min-width:0;height:100%;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:13px;padding:12px;background:#fafcfb;color:#5d7166;overflow-wrap:anywhere;transition:border-color .15s,background .15s,box-shadow .15s;}
     .fda-policy-option-copy strong{display:block;color:#1a2b22;font-size:12.5px;margin-bottom:4px;}
     .fda-policy-option-copy span{display:block;font-size:10.5px;line-height:1.4;}
     .fda-policy-option input:checked + .fda-policy-option-copy{border-color:#2e7d5b;background:#edf7f1;box-shadow:0 0 0 3px rgba(46,125,91,.07);}
+    .fda-policy-option input:disabled + .fda-policy-option-copy{opacity:.62;cursor:not-allowed;}
     .fda-policy-result{margin-top:9px;border-radius:11px;padding:10px 11px;background:#f1f5f3;color:#40574b;font-size:11px;line-height:1.45;}
     .fda-person{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid #edf1ef;}
     .fda-person:first-of-type{border-top:0;}
@@ -225,10 +231,13 @@ function ensureStyles() {
     .fda-icon-btn.danger{color:#b42318;background:#fff1f0;}
     .fda-verify{display:flex;gap:7px;margin:1px 0 10px 46px;}
     .fda-verify input{min-width:0;flex:1;letter-spacing:.18em;text-align:center;font-weight:800;}
-    .fda-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
-    .fda-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+    .fda-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;min-width:0;}
+    .fda-field{display:flex;flex-direction:column;min-width:0;width:100%;gap:5px;margin-bottom:10px;}
     .fda-field label{font-size:10.5px;font-weight:800;color:#5e7267;}
-    .fda-field input,.fda-field select{width:100%;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:10px;background:#fff;color:#1a2b22;padding:11px;font-family:inherit;font-size:13px;outline:none;}
+    .fda-field input,.fda-field select{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;border:1.5px solid #dbe5df;border-radius:10px;background:#fff;color:#1a2b22;padding:11px;font-family:inherit;font-size:16px!important;line-height:1.25;outline:none;}
+    .fda-field input[type="time"]{min-height:46px;padding-inline:10px;}
+    .fda-field input[type="time"]::-webkit-date-and-time-value{min-width:0;text-align:left;}
+    .fda-field input[type="time"]::-webkit-datetime-edit{min-width:0;padding:0;}
     .fda-field input:focus,.fda-field select:focus{border-color:#2e7d5b;box-shadow:0 0 0 3px rgba(46,125,91,.09);}
     .fda-btn{border:0;border-radius:11px;padding:11px 14px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;}
     .fda-btn.primary{background:#2e7d5b;color:#fff;}
@@ -246,7 +255,7 @@ function ensureStyles() {
     .fda-note{font-size:10.5px;color:#7a8b81;line-height:1.45;margin-top:9px;}
     @keyframes fdaSheetIn{from{transform:translateY(18px);opacity:.8}to{transform:translateY(0);opacity:1}}
     @media(min-width:700px){.fda-overlay{align-items:center;padding:20px}.fda-sheet{border-radius:24px;max-height:90dvh}}
-    @media(max-width:420px){.fda-card-row{align-items:flex-start}.fda-card-btn{padding:9px 10px}.fda-grid{grid-template-columns:1fr}.fda-actions{grid-template-columns:1fr}.fda-sheet-body{padding:13px}.fda-policy-options{grid-template-columns:1fr}}
+    @media(max-width:560px){.fda-card-row{align-items:flex-start}.fda-card-btn{padding:9px 10px}.fda-grid{grid-template-columns:minmax(0,1fr)}.fda-actions{grid-template-columns:minmax(0,1fr)}.fda-sheet-body{padding:13px}.fda-policy-options{grid-template-columns:minmax(0,1fr)}}
   `;
   document.head.appendChild(style);
 }
@@ -459,7 +468,10 @@ function sheetBodyHtml() {
           <div class="fda-section-title">Front Desk Assistant</div>
           <div class="fda-section-sub" style="margin:0;">Turn texting and automatic check-ins on or off.</div>
         </div>
-        <input class="fda-toggle" id="assistant-enabled" type="checkbox" ${config.enabled ? 'checked' : ''} ${settingsDisabled} aria-label="Turn Front Desk Assistant on">
+        <label class="fda-switch" aria-label="Turn Front Desk Assistant on">
+          <input id="assistant-enabled" type="checkbox" ${config.enabled ? 'checked' : ''} ${settingsDisabled} aria-label="Turn Front Desk Assistant on">
+          <span class="fda-switch-track" aria-hidden="true"></span>
+        </label>
       </div>
     </div>
 
@@ -469,7 +481,10 @@ function sheetBodyHtml() {
           <div class="fda-section-title">Review before a booking locks in</div>
           <div class="fda-section-sub" style="margin:0;">Front Desk holds the room, asks connected phones, then follows your rule if nobody replies.</div>
         </div>
-        <input class="fda-toggle" id="assistant-approval-enabled" type="checkbox" ${approval.enabled ? 'checked' : ''} ${policyDisabled} aria-label="Review new bookings before confirmation" onchange="updateAssistantPolicySummary()">
+        <label class="fda-switch" aria-label="Review new bookings before confirmation">
+          <input id="assistant-approval-enabled" type="checkbox" ${approval.enabled ? 'checked' : ''} ${policyDisabled} aria-label="Review new bookings before confirmation" onchange="updateAssistantPolicySummary()">
+          <span class="fda-switch-track" aria-hidden="true"></span>
+        </label>
       </div>
       <div class="fda-field" style="margin-top:13px;">
         <label for="assistant-approval-window">Time to answer</label>
