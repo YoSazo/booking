@@ -1,145 +1,11 @@
-import { crm } from './state.js';
-
-const DONE_KEY = 'marketelNativeOnboardingV1Done';
-const STATE_KEY = 'marketelNativeOnboardingV1State';
-const CONTACT_KEY = 'marketelNativeFrontDeskContactV1';
-const POLICY_KEY = 'marketelNativeBookingFallbackV1';
-const FRONT_DESK_PHONE = '+18339830801';
-const STYLE_ID = 'marketelNativeOnboardingStyles';
-const OVERLAY_ID = 'marketelNativeOnboarding';
-
-const OPERATIONAL_STEPS = [
-  {
-    filter: 'settings',
-    eyebrow: 'Your Page',
-    title: 'Make it yours.',
-    body: 'Change rooms, photos, prices and the details guests see. Your direct booking page stays live while you manage it here.',
-    note: 'This is the control room for your booking page.',
-    tabPosition: '12.5%',
-  },
-  {
-    filter: 'bookings',
-    eyebrow: 'Bookings',
-    title: 'You decide what happens.',
-    body: 'New room requests arrive here. Keep or release them in one tap, and your no-answer rule handles the moments you miss.',
-    note: 'Every pending card shows the countdown and your fallback before you act.',
-    tabPosition: '37.5%',
-  },
-  {
-    filter: 'availability',
-    eyebrow: 'Availability',
-    title: 'Keep the real world in sync.',
-    body: 'Block a room when a walk-in takes it, or let Front Desk Assistant update availability from your reply.',
-    note: 'If Front Desk knows, the booking page knows.',
-    tabPosition: '62.5%',
-  },
-  {
-    filter: 'apps',
-    eyebrow: 'Guest App',
-    title: 'Get on their phone. Then reach it.',
-    body: 'Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone whenever you want.',
-    note: 'Share the QR or link, then use Show installation steps to guide them through the exact Safari buttons.',
-    tabPosition: '87.5%',
-  },
-];
-
-let installed = false;
-let session = null;
-
-function isNativeApp() {
-  return window.location.protocol === 'capacitor:'
-    || window.location.protocol === 'ionic:'
-    || new URLSearchParams(window.location.search).get('native') === 'ios';
-}
-
-function postNative(message) {
-  try {
-    const handler = window.webkit?.messageHandlers?.marketelShell;
-    if (!handler || typeof handler.postMessage !== 'function') return false;
-    handler.postMessage(message);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function setShellVisible(visible) {
-  if (typeof window.setNativeShellVisible === 'function') {
-    window.setNativeShellVisible(visible);
-    return;
-  }
-  postNative({ type: 'visibility', visible });
-}
-
-function setTourMode(active) {
-  postNative({ type: 'tourMode', active: !!active });
-}
-
-function requestNativeNotifications() {
-  postNative({ type: 'requestNotifications' });
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function propertyName() {
-  return String(crm.activeHotelName || 'your property').trim() || 'your property';
-}
-
-function readBoolean(key) {
-  try { return localStorage.getItem(key) === '1'; } catch (_) { return false; }
-}
-
-function readPolicy() {
-  try { return localStorage.getItem(POLICY_KEY) === 'release' ? 'release' : 'confirm'; } catch (_) { return 'confirm'; }
-}
-
-function saveSessionState() {
-  if (!session) return;
-  try {
-    localStorage.setItem(STATE_KEY, JSON.stringify({
-      phase: session.phase,
-      step: session.step,
-      contactSaved: session.contactSaved,
-      noResponseAction: session.noResponseAction,
-    }));
-  } catch (_) {}
-}
-
-function readSessionState() {
-  try {
-    const value = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
-    if (!value || !['intro', 'tour'].includes(value.phase)) return null;
-    const maxStep = value.phase === 'intro' ? 2 : OPERATIONAL_STEPS.length - 1;
-    return {
-      phase: value.phase,
-      step: Math.max(0, Math.min(Number(value.step) || 0, maxStep)),
-      contactSaved: value.contactSaved === true || readBoolean(CONTACT_KEY),
-      noResponseAction: value.noResponseAction === 'release' ? 'release' : readPolicy(),
-    };
-  } catch (_) {
-    return null;
-  }
-}
-
-function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
+import{c as $}from"./settings-BScQqWYt.js";const k="marketelNativeOnboardingV1Done",m="marketelNativeOnboardingV1State",g="marketelNativeFrontDeskContactV1",w="marketelNativeBookingFallbackV1",C="+18339830801",x="marketelNativeOnboardingStyles",s="marketelNativeOnboarding",o=[{filter:"settings",eyebrow:"Your Page",title:"Make it yours.",body:"Change rooms, photos, prices and the details guests see. Your direct booking page stays live while you manage it here.",note:"This is the control room for your booking page.",tabPosition:"12.5%"},{filter:"bookings",eyebrow:"Bookings",title:"You decide what happens.",body:"New room requests arrive here. Keep or release them in one tap, and your no-answer rule handles the moments you miss.",note:"Every pending card shows the countdown and your fallback before you act.",tabPosition:"37.5%"},{filter:"availability",eyebrow:"Availability",title:"Keep the real world in sync.",body:"Block a room when a walk-in takes it, or let Front Desk Assistant update availability from your reply.",note:"If Front Desk knows, the booking page knows.",tabPosition:"62.5%"},{filter:"apps",eyebrow:"Guest App",title:"Get on their phone. Then reach it.",body:"Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone whenever you want.",note:"Share the QR or link, then use Show installation steps to guide them through the exact Safari buttons.",tabPosition:"87.5%"}];let h=!1,t=null;function S(){return window.location.protocol==="capacitor:"||window.location.protocol==="ionic:"||new URLSearchParams(window.location.search).get("native")==="ios"}function p(e){try{const n=window.webkit?.messageHandlers?.marketelShell;return!n||typeof n.postMessage!="function"?!1:(n.postMessage(e),!0)}catch{return!1}}function b(e){if(typeof window.setNativeShellVisible=="function"){window.setNativeShellVisible(e);return}p({type:"visibility",visible:e})}function u(e){p({type:"tourMode",active:!!e})}function O(){p({type:"requestNotifications"})}function i(e){return String(e??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function v(){return String($.activeHotelName||"your property").trim()||"your property"}function f(e){try{return localStorage.getItem(e)==="1"}catch{return!1}}function z(){try{return localStorage.getItem(w)==="release"?"release":"confirm"}catch{return"confirm"}}function l(){if(t)try{localStorage.setItem(m,JSON.stringify({phase:t.phase,step:t.step,contactSaved:t.contactSaved,noResponseAction:t.noResponseAction}))}catch{}}function R(){try{const e=JSON.parse(localStorage.getItem(m)||"null");if(!e||!["intro","tour"].includes(e.phase))return null;const n=e.phase==="intro"?2:o.length-1;return{phase:e.phase,step:Math.max(0,Math.min(Number(e.step)||0,n)),contactSaved:e.contactSaved===!0||f(g),noResponseAction:e.noResponseAction==="release"?"release":z()}}catch{return null}}function I(){if(document.getElementById(x))return;const e=document.createElement("style");e.id=x,e.textContent=`
     html.marketel-native-tour-open,
     html.marketel-native-tour-open body {
       overflow: hidden !important;
       overscroll-behavior: none;
     }
 
-    #${OVERLAY_ID} {
+    #${s} {
       --native-green: #2E7D5B;
       --native-green-light: #4CAF7D;
       --native-green-dark: #205B43;
@@ -160,7 +26,7 @@ function ensureStyles() {
       -webkit-font-smoothing: antialiased;
     }
 
-    #${OVERLAY_ID} * {
+    #${s} * {
       box-sizing: border-box;
     }
 
@@ -966,31 +832,16 @@ function ensureStyles() {
         animation-delay: 0ms !important;
       }
     }
-  `;
-  document.head.appendChild(style);
-}
-
-function progressDots(active, count) {
-  return Array.from({ length: count }, (_, index) =>
-    `<span class="mno-dot${index === active ? ' active' : ''}" aria-hidden="true"></span>`
-  ).join('');
-}
-
-function introStageHtml(step) {
-  const name = escapeHtml(propertyName());
-  const initial = escapeHtml(propertyName().charAt(0).toUpperCase());
-
-  if (step === 0) {
-    return `
+  `,document.head.appendChild(e)}function y(e,n){return Array.from({length:n},(a,c)=>`<span class="mno-dot${c===e?" active":""}" aria-hidden="true"></span>`).join("")}function Y(e){const n=i(v()),a=i(v().charAt(0).toUpperCase());if(e===0)return`
       <div class="mno-stage">
         <div class="mno-kicker">Connected</div>
         <h1 class="mno-title">Front Desk is ready.</h1>
-        <p class="mno-copy">Everything you need to run ${name} now lives on this phone.</p>
+        <p class="mno-copy">Everything you need to run ${n} now lives on this phone.</p>
         <div class="mno-property-card">
           <div class="mno-property-row">
-            <div class="mno-property-icon">${initial}</div>
+            <div class="mno-property-icon">${a}</div>
             <div style="min-width:0;flex:1;">
-              <div class="mno-property-name">${name}</div>
+              <div class="mno-property-name">${n}</div>
               <div class="mno-property-status">Booking page connected</div>
             </div>
           </div>
@@ -1000,13 +851,7 @@ function introStageHtml(step) {
             <div class="mno-feature"><strong>Ready</strong>Guest app</div>
           </div>
         </div>
-      </div>`;
-  }
-
-  if (step === 1) {
-    const saved = !!session?.contactSaved;
-    const releases = session?.noResponseAction === 'release';
-    return `
+      </div>`;if(e===1){const c=!!t?.contactSaved,d=t?.noResponseAction==="release";return`
       <div class="mno-stage">
         <div class="mno-kicker">A real second set of eyes</div>
         <h1 class="mno-title">Meet Front Desk Assistant.</h1>
@@ -1028,10 +873,10 @@ function introStageHtml(step) {
           <div class="mno-fallback">
             <strong>If nobody answers a new-booking alert</strong>
             <div class="mno-fallback-options">
-              <button type="button" data-mno-action="policy" data-mno-policy="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep booking</b><span>Revenue first</span></button>
-              <button type="button" data-mno-action="policy" data-mno-policy="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
+              <button type="button" data-mno-action="policy" data-mno-policy="confirm" class="${d?"":"is-selected"}"><b>Keep booking</b><span>Revenue first</span></button>
+              <button type="button" data-mno-action="policy" data-mno-policy="release" class="${d?"is-selected":""}"><b>Release request</b><span>Availability first</span></button>
             </div>
-            <small>${releases ? 'No reply voids the $1 hold and notifies the guest.' : 'No reply confirms the booking automatically.'} You can change this anytime.</small>
+            <small>${d?"No reply voids the $1 hold and notifies the guest.":"No reply confirms the booking automatically."} You can change this anytime.</small>
           </div>
           <div class="mno-contact-strip">
             <div class="mno-assistant-avatar">M</div>
@@ -1039,13 +884,10 @@ function introStageHtml(step) {
               <div class="mno-contact-title">Marketel Front Desk</div>
               <div class="mno-contact-number">(833) 983-0801</div>
             </div>
-            ${saved ? '<div class="mno-contact-check" aria-label="Contact saved">✓</div>' : ''}
+            ${c?'<div class="mno-contact-check" aria-label="Contact saved">✓</div>':""}
           </div>
         </div>
-      </div>`;
-  }
-
-  return `
+      </div>`}return`
     <div class="mno-stage">
       <div class="mno-kicker">The essentials</div>
       <h1 class="mno-title">Four places. No maze.</h1>
@@ -1064,212 +906,36 @@ function introStageHtml(step) {
           <div><strong>Bring guests back</strong><span>Share the app link or QR when they are ready.</span></div>
         </div>
       </div>
-    </div>`;
-}
-
-function introFooterHtml(step) {
-  if (step === 1 && !session.contactSaved) {
-    return `
+    </div>`}function T(e){return e===1&&!t.contactSaved?`
       <button class="mno-primary" type="button" data-mno-action="save-contact">Save Front Desk to Contacts</button>
       <button class="mno-secondary" type="button" data-mno-action="next">Continue without saving</button>
-      <div class="mno-status-note">${session.contactAttempted ? 'No problem — you can save it later from Assistant.' : 'Save it now so you recognize Marketel when messages begin.'}</div>
-      <div class="mno-progress">${progressDots(step, 3)}</div>`;
-  }
-  const label = step === 0 ? 'Set up Front Desk' : step === 1 ? 'Continue' : 'Show me the app';
-  return `
-    <button class="mno-primary" type="button" data-mno-action="next">${label}</button>
-    <div class="mno-progress">${progressDots(step, 3)}</div>`;
-}
-
-function renderIntro() {
-  setTourMode(false);
-  setShellVisible(false);
-  const overlay = getOverlay();
-  overlay.innerHTML = `
+      <div class="mno-status-note">${t.contactAttempted?"No problem — you can save it later from Assistant.":"Save it now so you recognize Marketel when messages begin."}</div>
+      <div class="mno-progress">${y(e,3)}</div>`:`
+    <button class="mno-primary" type="button" data-mno-action="next">${e===0?"Set up Front Desk":e===1?"Continue":"Show me the app"}</button>
+    <div class="mno-progress">${y(e,3)}</div>`}function _(){u(!1),b(!1);const e=N();e.innerHTML=`
     <section class="mno-intro" role="dialog" aria-modal="true" aria-label="Front Desk setup">
       <div class="mno-topline">
         <div class="mno-wordmark"><img class="mno-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</div>
         <button class="mno-skip" type="button" data-mno-action="skip">Skip</button>
       </div>
-      <main class="mno-main">${introStageHtml(session.step)}</main>
+      <main class="mno-main">${Y(t.step)}</main>
       <footer class="mno-footer">
-        ${introFooterHtml(session.step)}
+        ${T(t.step)}
       </footer>
-    </section>`;
-}
-
-function selectOperationalTab(filter) {
-  if (typeof window.marketelNativeSelectTab === 'function') {
-    window.marketelNativeSelectTab(filter);
-  }
-}
-
-function renderOperationalTour() {
-  const step = OPERATIONAL_STEPS[session.step] || OPERATIONAL_STEPS[0];
-  setShellVisible(true);
-  setTourMode(true);
-  selectOperationalTab(step.filter);
-  const overlay = getOverlay();
-  overlay.innerHTML = `
+    </section>`}function A(e){typeof window.marketelNativeSelectTab=="function"&&window.marketelNativeSelectTab(e)}function B(){const e=o[t.step]||o[0];b(!0),u(!0),A(e.filter);const n=N();n.innerHTML=`
     <section class="mno-tour" role="dialog" aria-modal="true" aria-label="Front Desk walkthrough">
       <button class="mno-tour-skip" type="button" data-mno-action="skip">Skip tour</button>
-      <div class="mno-coach-card" style="--tab-x:${step.tabPosition}">
+      <div class="mno-coach-card" style="--tab-x:${e.tabPosition}">
         <div class="mno-coach-top">
-          <span class="mno-coach-eyebrow">${escapeHtml(step.eyebrow)}</span>
-          <span class="mno-coach-count">${session.step + 1} of ${OPERATIONAL_STEPS.length}</span>
+          <span class="mno-coach-eyebrow">${i(e.eyebrow)}</span>
+          <span class="mno-coach-count">${t.step+1} of ${o.length}</span>
         </div>
-        <h2 class="mno-coach-title">${escapeHtml(step.title)}</h2>
-        <p class="mno-coach-body">${escapeHtml(step.body)}</p>
-        <div class="mno-coach-note">${escapeHtml(step.note)}</div>
+        <h2 class="mno-coach-title">${i(e.title)}</h2>
+        <p class="mno-coach-body">${i(e.body)}</p>
+        <div class="mno-coach-note">${i(e.note)}</div>
         <div class="mno-coach-actions">
           <button class="mno-secondary" type="button" data-mno-action="back">Back</button>
-          <button class="mno-primary" type="button" data-mno-action="next">${session.step === OPERATIONAL_STEPS.length - 1 ? 'Open Front Desk' : 'Next'}</button>
+          <button class="mno-primary" type="button" data-mno-action="next">${t.step===o.length-1?"Open Front Desk":"Next"}</button>
         </div>
       </div>
-    </section>`;
-}
-
-function getOverlay() {
-  let overlay = document.getElementById(OVERLAY_ID);
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = OVERLAY_ID;
-    overlay.addEventListener('click', handleClick);
-    document.body.appendChild(overlay);
-  }
-  return overlay;
-}
-
-function render() {
-  if (!session) return;
-  ensureStyles();
-  document.documentElement.classList.add('marketel-native-tour-open');
-  saveSessionState();
-  if (session.phase === 'tour') renderOperationalTour();
-  else renderIntro();
-}
-
-function handleClick(event) {
-  const target = event.target?.closest?.('[data-mno-action]');
-  if (!target || !session) return;
-  const action = target.getAttribute('data-mno-action');
-  if (action === 'next') next();
-  else if (action === 'back') back();
-  else if (action === 'skip') finish({ skipped: true });
-  else if (action === 'save-contact') saveContact();
-  else if (action === 'policy') selectNoResponsePolicy(target.getAttribute('data-mno-policy'));
-}
-
-function selectNoResponsePolicy(value) {
-  if (!session) return;
-  session.noResponseAction = value === 'release' ? 'release' : 'confirm';
-  try { localStorage.setItem(POLICY_KEY, session.noResponseAction); } catch (_) {}
-  saveSessionState();
-  if (typeof window.api === 'function') {
-    window.api('POST', '/api/crm/booking-approval', {
-      noResponseAction: session.noResponseAction,
-    }).catch(() => {});
-  }
-  render();
-}
-
-function next() {
-  if (!session) return;
-  if (session.phase === 'intro') {
-    if (session.step < 2) {
-      session.step += 1;
-    } else {
-      session.phase = 'tour';
-      session.step = 0;
-    }
-  } else if (session.step < OPERATIONAL_STEPS.length - 1) {
-    session.step += 1;
-  } else {
-    finish();
-    return;
-  }
-  render();
-}
-
-function back() {
-  if (!session) return;
-  if (session.phase === 'tour') {
-    if (session.step > 0) {
-      session.step -= 1;
-    } else {
-      session.phase = 'intro';
-      session.step = 2;
-    }
-  } else if (session.step > 0) {
-    session.step -= 1;
-  }
-  render();
-}
-
-function saveContact() {
-  if (!session) return;
-  session.contactAttempted = true;
-  saveSessionState();
-  const opened = postNative({ type: 'saveContact', phone: FRONT_DESK_PHONE });
-  if (!opened) render();
-}
-
-function cleanUp() {
-  document.getElementById(OVERLAY_ID)?.remove();
-  document.documentElement.classList.remove('marketel-native-tour-open');
-  setTourMode(false);
-  setShellVisible(true);
-}
-
-function finish({ skipped = false } = {}) {
-  try {
-    localStorage.setItem(DONE_KEY, '1');
-    localStorage.removeItem(STATE_KEY);
-  } catch (_) {}
-  session = null;
-  cleanUp();
-  selectOperationalTab('bookings');
-  requestNativeNotifications();
-  if (!skipped && typeof window.toast === 'function') {
-    window.toast('Front Desk is ready', 'success');
-  }
-}
-
-function handleContactResult(saved) {
-  if (!session) return;
-  session.contactAttempted = true;
-  session.contactSaved = saved === true;
-  if (saved) {
-    try { localStorage.setItem(CONTACT_KEY, '1'); } catch (_) {}
-  }
-  saveSessionState();
-  if (session.phase === 'intro' && session.step === 1) render();
-}
-
-export function startNativeOnboarding({ replay = false } = {}) {
-  if (!isNativeApp()) return false;
-  if (session) cleanUp();
-  const saved = !replay ? readSessionState() : null;
-  session = saved || {
-    phase: 'intro',
-    step: 0,
-    contactSaved: readBoolean(CONTACT_KEY),
-    contactAttempted: false,
-    noResponseAction: readPolicy(),
-  };
-  render();
-  return true;
-}
-
-export function maybeStartNativeOnboarding() {
-  if (!isNativeApp() || readBoolean(DONE_KEY)) return false;
-  return startNativeOnboarding();
-}
-
-export function install() {
-  if (installed) return;
-  installed = true;
-  window.marketelNativeContactResult = handleContactResult;
-  window.startNativeOnboarding = startNativeOnboarding;
-  window.maybeStartNativeOnboarding = maybeStartNativeOnboarding;
-}
+    </section>`}function N(){let e=document.getElementById(s);return e||(e=document.createElement("div"),e.id=s,e.addEventListener("click",M),document.body.appendChild(e)),e}function r(){t&&(I(),document.documentElement.classList.add("marketel-native-tour-open"),l(),t.phase==="tour"?B():_())}function M(e){const n=e.target?.closest?.("[data-mno-action]");if(!n||!t)return;const a=n.getAttribute("data-mno-action");a==="next"?L():a==="back"?H():a==="skip"?F({skipped:!0}):a==="save-contact"?K():a==="policy"&&P(n.getAttribute("data-mno-policy"))}function P(e){if(t){t.noResponseAction=e==="release"?"release":"confirm";try{localStorage.setItem(w,t.noResponseAction)}catch{}l(),typeof window.api=="function"&&window.api("POST","/api/crm/booking-approval",{noResponseAction:t.noResponseAction}).catch(()=>{}),r()}}function L(){if(t){if(t.phase==="intro")t.step<2?t.step+=1:(t.phase="tour",t.step=0);else if(t.step<o.length-1)t.step+=1;else{F();return}r()}}function H(){t&&(t.phase==="tour"?t.step>0?t.step-=1:(t.phase="intro",t.step=2):t.step>0&&(t.step-=1),r())}function K(){if(!t)return;t.contactAttempted=!0,l(),p({type:"saveContact",phone:C})||r()}function E(){document.getElementById(s)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),u(!1),b(!0)}function F({skipped:e=!1}={}){try{localStorage.setItem(k,"1"),localStorage.removeItem(m)}catch{}t=null,E(),A("bookings"),O(),!e&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function V(e){if(t){if(t.contactAttempted=!0,t.contactSaved=e===!0,e)try{localStorage.setItem(g,"1")}catch{}l(),t.phase==="intro"&&t.step===1&&r()}}function D({replay:e=!1}={}){return S()?(t&&E(),t=(e?null:R())||{phase:"intro",step:0,contactSaved:f(g),contactAttempted:!1,noResponseAction:z()},r(),!0):!1}function j(){return!S()||f(k)?!1:D()}function G(){h||(h=!0,window.marketelNativeContactResult=V,window.startNativeOnboarding=D,window.maybeStartNativeOnboarding=j)}export{G as install,j as maybeStartNativeOnboarding,D as startNativeOnboarding};

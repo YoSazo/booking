@@ -38,11 +38,7 @@ import{c as $}from"./settings-BScQqWYt.js";const k="marketelNativeOnboardingV1Do
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background:
-        radial-gradient(ellipse 120% 50% at 80% 5%, rgba(76, 175, 125, 0.12), transparent),
-        radial-gradient(ellipse 100% 60% at 10% 90%, rgba(200, 225, 210, 0.55), transparent),
-        radial-gradient(ellipse 70% 50% at 50% 40%, rgba(255, 255, 255, 0.35), transparent),
-        linear-gradient(168deg, #f0f5f2 0%, #f6f9f7 40%, #edf3ef 100%);
+      background: #f5f8f6;
       padding:
         max(18px, env(safe-area-inset-top))
         20px
@@ -52,17 +48,25 @@ import{c as $}from"./settings-BScQqWYt.js";const k="marketelNativeOnboardingV1Do
     .mno-intro::before {
       content: "";
       position: absolute;
-      width: 260px;
-      height: 260px;
-      border-radius: 999px;
-      border: 1px solid rgba(46, 125, 91, .08);
-      top: 14%;
-      right: -155px;
-      box-shadow:
-        0 0 0 38px rgba(46, 125, 91, .025),
-        0 0 0 80px rgba(46, 125, 91, .015);
+      inset: 0;
       pointer-events: none;
+      background:
+        radial-gradient(circle 280px at 85% 8%, rgba(76, 175, 125, 0.10), transparent 70%),
+        radial-gradient(circle 240px at 10% 85%, rgba(160, 210, 185, 0.14), transparent 70%),
+        radial-gradient(circle 200px at 50% 45%, rgba(255, 255, 255, 0.50), transparent 70%);
       animation: mno-float 8s ease-in-out infinite;
+    }
+
+    .mno-intro::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.35;
+      background:
+        radial-gradient(circle 120px at 78% 22%, rgba(46, 125, 91, 0.08), transparent 70%),
+        radial-gradient(circle 100px at 22% 72%, rgba(46, 125, 91, 0.06), transparent 70%);
+      animation: mno-float 12s ease-in-out infinite reverse;
     }
 
     .mno-topline {
@@ -822,6 +826,7 @@ import{c as $}from"./settings-BScQqWYt.js";const k="marketelNativeOnboardingV1Do
       .mno-ready-item,
       .mno-contact-check,
       .mno-intro::before,
+      .mno-intro::after,
       .mno-primary::after {
         animation-duration: .01ms !important;
         animation-delay: 0ms !important;
