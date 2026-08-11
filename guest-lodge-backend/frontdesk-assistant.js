@@ -335,7 +335,7 @@ function createFrontDeskAssistant({
     }
 
     async function serializeAssistant(hotelId) {
-        const [config, recipients, activities, hotel] = await Promise.all([
+        const [config, recipients, activities, latestResult, hotel] = await Promise.all([
             ensureConfig(hotelId),
             prisma.frontDeskAssistantRecipient.findMany({
                 where: { hotelId },
@@ -345,6 +345,13 @@ function createFrontDeskAssistant({
                 where: { hotelId },
                 orderBy: { createdAt: 'desc' },
                 take: 30,
+            }),
+            prisma.frontDeskAssistantActivity.findFirst({
+                where: {
+                    hotelId,
+                    type: { in: ['availability_update', 'booking_decision', 'availability_warning'] },
+                },
+                orderBy: { createdAt: 'desc' },
             }),
             prisma.hotelConfig.findUnique({
                 where: { id: hotelId },
@@ -385,6 +392,15 @@ function createFrontDeskAssistant({
                 status: activity.status,
                 createdAt: activity.createdAt,
             })),
+            latestResult: latestResult ? {
+                id: latestResult.id,
+                recipientId: latestResult.recipientId,
+                direction: latestResult.direction,
+                type: latestResult.type,
+                summary: latestResult.summary || latestResult.body || '',
+                status: latestResult.status,
+                createdAt: latestResult.createdAt,
+            } : null,
             capabilities: {
                 smsConfigured: twilioReady || smsDryRun,
                 aiConfigured: !!openai,

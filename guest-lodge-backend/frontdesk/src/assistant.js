@@ -66,6 +66,7 @@ function isNativeFrontDesk() {
 }
 
 function latestMeaningfulActivity() {
+  if (crm.assistantData?.latestResult) return crm.assistantData.latestResult;
   const meaningfulTypes = new Set([
     'availability_update',
     'booking_decision',
