@@ -118,23 +118,34 @@ function BookingPage({
   return (
     <div className="container" style={{ paddingBottom: showInstallBanner ? '120px' : undefined }}>
       <header className={`header ${savedTargetClass('header')}`.trim()} data-preview-highlight="header">
-        <p className={`header-address ${savedTargetClass('header-address')}`.trim()} data-preview-highlight="header-address">
-          {hotel.address}
-        </p>
-        <h1 className={savedTargetClass('header-name')} data-preview-highlight="header-name">
-          {hotel.name}
-        </h1>
-        <p className={savedTargetClass('header-subtitle')} data-preview-highlight="header-subtitle">
-          {hotel.subtitle}
-        </p>
-        {hotel.phone && (
-          <a
-            className={`header-phone ${savedTargetClass('header-phone')}`.trim()}
-            data-preview-highlight="header-phone"
-            href={`tel:${hotel.phone}`}
-          >
-            {hotel.phone}
-          </a>
+        <div className="header-identity">
+          <h1 className={savedTargetClass('header-name')} data-preview-highlight="header-name">
+            {hotel.name}
+          </h1>
+          {hotel.subtitle && (
+            <p className={`header-subtitle ${savedTargetClass('header-subtitle')}`.trim()} data-preview-highlight="header-subtitle">
+              {hotel.subtitle}
+            </p>
+          )}
+        </div>
+        {(hotel.address || hotel.phone) && (
+          <div className="header-meta" aria-label="Property contact information">
+            {hotel.address && (
+              <p className={`header-address ${savedTargetClass('header-address')}`.trim()} data-preview-highlight="header-address">
+                {hotel.address}
+              </p>
+            )}
+            {hotel.address && hotel.phone && <span className="header-meta-separator" aria-hidden="true">·</span>}
+            {hotel.phone && (
+              <a
+                className={`header-phone ${savedTargetClass('header-phone')}`.trim()}
+                data-preview-highlight="header-phone"
+                href={`tel:${hotel.phone}`}
+              >
+                {hotel.phone}
+              </a>
+            )}
+          </div>
         )}
       </header>
 

@@ -3310,8 +3310,23 @@ async function refreshCurrentView() {
 }
 
 // ── RENDER ─────────────────────────────────────────────
-const BOOKING_CARD_EST_HEIGHT = 300;
+const BOOKING_CARD_EST_HEIGHT = 156;
 const BOOKING_VIRTUAL_THRESHOLD = 25;
+const expandedBookingCards = new Set();
+
+function toggleBookingDetails(bookingId) {
+  const id = String(bookingId || '');
+  const details = document.getElementById(`booking-details-${id}`);
+  const card = document.getElementById(`booking-card-${id}`);
+  const button = document.getElementById(`booking-toggle-${id}`);
+  if (!details) return;
+  const opening = details.hidden;
+  details.hidden = !opening;
+  card?.classList.toggle('is-expanded', opening);
+  button?.setAttribute('aria-expanded', String(opening));
+  if (opening) expandedBookingCards.add(id);
+  else expandedBookingCards.delete(id);
+}
 
 function bookingCardHtml(b) {
   const isDeclined = b.notes && b.notes.includes('PAYMENT DECLINED');
@@ -3327,59 +3342,82 @@ function bookingCardHtml(b) {
   const isPendingApproval = String(b.status || '').toLowerCase() === 'pending';
   const pendingMinutes = isPendingApproval ? approvalMinutesLeft(b.pendingUntil) : 0;
   const pendingReleases = b.approvalNoResponseAction === 'release';
-  const pendingChip = isPendingApproval
-    ? `<div class="meta-chip" style="background:${pendingReleases ? '#FFF7ED' : '#EFF6FF'};color:${pendingReleases ? '#9A3412' : '#1D4ED8'};border-color:${pendingReleases ? '#FED7AA' : '#BFDBFE'};">⏳ ${pendingMinutes ? `${pendingMinutes} min` : 'Due now'} · ${pendingReleases ? 'releases' : 'keeps booking'} if unanswered</div>`
-    : '';
-  const reviewChip = reviewStatus === 'unreviewed'
-    ? '<div class="meta-chip" style="background:#FFF7ED;color:#9A3412;border-color:#FED7AA;">● Verify room</div>'
-    : (reviewStatus === 'available'
-      ? '<div class="meta-chip" style="background:#F0FDF4;color:#166534;border-color:#BBF7D0;">✓ Room verified</div>'
-      : '');
-  const fulfillmentChip = fulfillmentStatus === 'pending'
-    ? '<div class="meta-chip" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;">↻ Finishing guest notification</div>'
+  const needsAttention = isDeclined
+    || isPendingApproval
+    || reviewStatus === 'unreviewed'
+    || fulfillmentStatus === 'attention';
+  const isExample = String(b.id) === 'preview-example-booking';
+  const isExpanded = needsAttention || isExample || expandedBookingCards.has(String(b.id));
+  const status = isDeclined
+    ? { label: 'Card needs attention', tone: 'danger' }
     : (fulfillmentStatus === 'attention'
-      ? '<div class="meta-chip" style="background:#FEF2F2;color:#B91C1C;border-color:#FECACA;">! Guest action needs attention</div>'
-      : '');
-  const payChip = isDeclined
-    ? '<div class="declined-chip">⚠️ Card declined</div>'
-    : `<div class="pay-chip" title="Guest&apos;s card was verified only (small hold may apply). Collect $${Number(b.grandTotal).toFixed(2)} at check-in — nothing charged online.">💳 Collect at check-in</div>`;
+      ? { label: 'Guest action needed', tone: 'danger' }
+      : (isPendingApproval
+        ? { label: pendingMinutes ? `Decision due in ${pendingMinutes} min` : 'Decision due now', tone: 'attention' }
+        : (reviewStatus === 'unreviewed'
+          ? { label: 'Verify availability', tone: 'attention' }
+          : (fulfillmentStatus === 'pending'
+            ? { label: 'Sending guest update', tone: 'info' }
+            : { label: 'Confirmed', tone: 'confirmed' }))));
+  const detailNotice = isPendingApproval
+    ? `<div class="reservation-notice reservation-notice--${pendingReleases ? 'attention' : 'info'}">
+        <strong>Is this room still free?</strong>
+        <span>No reply ${pendingReleases ? 'releases this request' : 'keeps this booking'}.</span>
+      </div>`
+    : (reviewStatus === 'unreviewed'
+      ? '<div class="reservation-notice reservation-notice--attention"><strong>Check this room.</strong><span>Confirm it is still available before the guest arrives.</span></div>'
+      : (fulfillmentStatus === 'attention'
+        ? '<div class="reservation-notice reservation-notice--danger"><strong>The guest update needs attention.</strong><span>Open this booking to finish the handoff.</span></div>'
+        : (isDeclined
+          ? '<div class="reservation-notice reservation-notice--danger"><strong>The guest card could not be verified.</strong><span>Contact the guest before relying on this booking.</span></div>'
+          : '')));
+  const roomName = esc(b.roomName || 'Room');
+  const nights = Number(b.nights) || 1;
+  const guests = Number(b.guests) || 1;
+  const fullName = [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'Guest';
+  const amount = Number(b.grandTotal || 0).toFixed(2);
   return `
-    <div class="booking-card">
-      <div class="card-accent ${isDeclined ? 'declined' : ''}"></div>
-      <div class="card-inner">
-        <div class="card-top">
-          <div class="guest-info">
-            <div class="guest-name">${esc(b.guestFirstName)} ${esc(b.guestLastName)}</div>
-            <div class="guest-time">${ago}</div>
+    <article class="booking-card reservation-card reservation-card--${status.tone}${isExpanded ? ' is-expanded' : ''}${isExample ? ' reservation-card--example' : ''}" id="booking-card-${esc(b.id)}">
+      <button class="reservation-summary" id="booking-toggle-${esc(b.id)}" type="button" aria-expanded="${isExpanded}" aria-controls="booking-details-${esc(b.id)}" onclick="toggleBookingDetails('${b.id}')">
+        <span class="reservation-summary-copy">
+          <span class="reservation-primary-row">
+            <span class="guest-name">${esc(fullName)}</span>
+            <span class="card-amount">$${amount}</span>
+          </span>
+          <span class="reservation-trip-line">
+            <span>${roomName}</span><span aria-hidden="true">·</span><span>${ci} – ${co}</span><span aria-hidden="true">·</span><span>${nights} night${nights !== 1 ? 's' : ''}</span><span aria-hidden="true">·</span><span>${guests} guest${guests !== 1 ? 's' : ''}</span>
+          </span>
+          <span class="reservation-status-row">
+            <span class="reservation-status reservation-status--${status.tone}"><span class="reservation-status-dot" aria-hidden="true"></span>${status.label}</span>
+            <span class="reservation-payment">${isDeclined ? 'Payment not verified' : 'Collect at check-in'} · ${ago}</span>
+          </span>
+        </span>
+        <span class="reservation-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="reservation-details" id="booking-details-${esc(b.id)}" ${isExpanded ? '' : 'hidden'}>
+        ${detailNotice}
+        <div class="reservation-detail-grid">
+          <div class="reservation-detail-item">
+            <span>Check-in</span>
+            <strong>${ci}</strong>
           </div>
-          <div class="card-amount">$${Number(b.grandTotal).toFixed(2)}</div>
+          <div class="reservation-detail-item">
+            <span>Check-out</span>
+            <strong>${co}</strong>
+          </div>
+          <div class="reservation-detail-item">
+            <span>Guests</span>
+            <strong>${guests}</strong>
+          </div>
         </div>
-        <div class="card-meta">
-          <div class="meta-chip">🛏 ${esc(b.roomName || 'Room')}</div>
-          <div class="meta-chip">🌙 ${b.nights} night${b.nights !== 1 ? 's' : ''}</div>
-          ${pendingChip}
-          ${reviewChip}
-          ${fulfillmentChip}
-          ${payChip}
-        </div>
-        <div class="card-dates">
-          <div class="date-block">
-            <div class="date-label">Check-in</div>
-            <div class="date-value">${ci}</div>
+        <div class="reservation-contact">
+          <div>
+            <span>Phone</span>
+            ${phoneHref ? `<a href="${phoneHref}">${esc(b.guestPhone)}</a>` : '<strong>No phone provided</strong>'}
           </div>
-          <div class="date-block">
-            <div class="date-label">Check-out</div>
-            <div class="date-value">${co}</div>
-          </div>
-          <div class="date-block">
-            <div class="date-label">Guests</div>
-            <div class="date-value">${b.guests || 1} guest${(b.guests || 1) !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
-        <div class="card-contact">
-          <div class="contact-details">
-            <div class="contact-phone">${esc(b.guestPhone)}</div>
-            <div class="contact-email">${esc(b.guestEmail)}</div>
+          <div>
+            <span>Email</span>
+            ${b.guestEmail ? `<a href="mailto:${esc(b.guestEmail)}">${esc(b.guestEmail)}</a>` : '<strong>No email provided</strong>'}
           </div>
         </div>
         ${b.notes ? `
@@ -3395,16 +3433,16 @@ function bookingCardHtml(b) {
             ? `<button class="btn btn-confirm" type="button" onclick="decideBookingFromCard('${b.id}', 'confirm')">Yes, keep it</button>`
             : (reviewStatus === 'unreviewed'
             ? `<button class="btn btn-confirm" type="button" onclick="openBookingReviewFromCard('${b.id}')">Verify room</button>`
-            : (phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">📞 Call Now</a>` : `<button class="btn btn-confirm" disabled>📞 No Phone</button>`))}
+            : (phoneHref ? `<a class="btn btn-confirm" href="${phoneHref}" style="text-decoration:none;text-align:center;">Call guest</a>` : `<button class="btn btn-confirm" disabled>No phone</button>`))}
           ${isPendingApproval
             ? `<button class="btn btn-note" type="button" style="color:#b91c1c;" onclick="decideBookingFromCard('${b.id}', 'release')">No, release</button>`
-            : `<button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">📝 ${b.notes ? 'Edit' : 'Add'} Note</button>`}
+            : `<button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">${b.notes ? 'Edit note' : 'Add note'}</button>`}
         </div>
         ${isDeclined || isPendingApproval ? '' : `<div style="margin-top:8px;text-align:right;">
           <button type="button" onclick="promptCancelBooking('${b.id}', ${esc(JSON.stringify(guestLabel))})" style="padding:6px 10px;border-radius:8px;border:none;background:none;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">Cancel this booking</button>
         </div>`}
       </div>
-    </div>`;
+    </article>`;
 }
 
 function ensureBookingsVirtualScroll() {
@@ -5912,6 +5950,7 @@ exposeToWindow({
   showAvailabilityCorrectionModal,
   submitBookingApproval,
   submitBookingReview,
+  toggleBookingDetails,
   buildGuestInstallUrlForQr,
   buildHotelContextUrl,
   buildMessageThreads,

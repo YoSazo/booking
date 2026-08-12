@@ -78,9 +78,12 @@ body {
 /* --- Header --- */
 .header {
     grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border-color);
+    padding: 8px 20px 23px;
+    border-bottom: 1px solid rgba(46, 125, 91, 0.13);
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
@@ -88,23 +91,69 @@ body {
 
 .header h1 {
     margin: 0;
-    color: var(--primary-color);
-    font-size: 2.5em; /* Adjusted from default */
-    line-height: 1.2;
+    color: #1d2922;
+    font-size: clamp(2rem, 5vw, 2.7rem);
+    font-weight: 760;
+    letter-spacing: -0.04em;
+    line-height: 1.08;
     width: 100%;
     max-width: 100%;
     word-wrap: break-word;
 }
 
+.header-identity {
+    width: 100%;
+    max-width: 720px;
+}
+
+.header-subtitle {
+    max-width: 640px;
+    margin: 8px auto 0;
+    color: #5c6962;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    font-weight: 450;
+    line-height: 1.5;
+}
+
+.header-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    color: #748078;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.header-meta-separator {
+    color: #b1bbb5;
+}
+
 /* Mobile header adjustments */
 @media (max-width: 768px) {
   .header {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding: 5px 6px 18px;
   }
-  
+
   .header h1 {
-    font-size: 1.8em;
+    font-size: clamp(1.8rem, 9vw, 2.25rem);
+  }
+
+  .header-subtitle {
+    margin-top: 7px;
+    font-size: 0.9rem;
+  }
+
+  .header-meta {
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 10px;
+  }
+
+  .header-meta-separator {
+    display: none;
   }
 }
 
@@ -2272,18 +2321,23 @@ body {
 
 /* --- NEW Style for Header Address --- */
 .header-address {
-  font-size: 0.9em;
-  color: #555;
-  margin-bottom: 7px;
+  margin: 0;
+  color: inherit;
+  font: inherit;
 }
 
 .header-phone {
-  display: inline-block;
-  margin-top: 7px;
+  margin: 0;
   color: #386a52;
-  font-size: 0.86em;
-  font-weight: 650;
+  font: inherit;
+  font-weight: 700;
   text-decoration: none;
+}
+
+.header-phone:hover,
+.header-phone:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Owner preview save handoff: attach confirmation to the exact content that
