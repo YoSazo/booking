@@ -49,6 +49,63 @@ test('an explicit walk-in message resolves the room and relative date', () => {
     );
 });
 
+test('a question about a taken room is read-only and infers the only room type', () => {
+    assert.deepEqual(
+        classifyDeterministicIntent(
+            'I only have 1 room and for tomorrow has anybody taken anything?',
+            [{ name: 'Queen Suite', totalUnits: 1 }],
+            '2026-08-12',
+            ''
+        ),
+        {
+            intent: 'availability_query',
+            roomName: 'Queen Suite',
+            startDate: '2026-08-13',
+            endDate: '2026-08-13',
+            units: null,
+            clarification: '',
+        }
+    );
+});
+
+test('a broad booking engine question requests a read-only status summary', () => {
+    assert.deepEqual(
+        classifyDeterministicIntent(
+            "Well, how's it doing?",
+            [{ name: 'Queen Suite', totalUnits: 1 }],
+            '2026-08-12',
+            ''
+        ),
+        {
+            intent: 'engine_status',
+            roomName: 'Queen Suite',
+            startDate: null,
+            endDate: null,
+            units: null,
+            clarification: '',
+        }
+    );
+});
+
+test('availability without a date asks only for the missing date', () => {
+    assert.deepEqual(
+        classifyDeterministicIntent(
+            "What's my availability?",
+            [{ name: 'Queen Suite', totalUnits: 1 }],
+            '2026-08-12',
+            ''
+        ),
+        {
+            intent: 'availability_query',
+            roomName: 'Queen Suite',
+            startDate: null,
+            endDate: null,
+            units: null,
+            clarification: 'Which date should I check?',
+        }
+    );
+});
+
 test('a room name the property does not have is never turned into an inventory action', () => {
     assert.equal(
         classifyDeterministicIntent(

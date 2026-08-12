@@ -22,7 +22,21 @@ TWILIO_VALIDATE_SIGNATURES=true
 `OPENAI_API_KEY` is optional. Without it, exact replies such as `YES`, `NO`,
 `CANCEL`, `KEEP`, and `UNDO` still work, as do simple updates such as
 “A walk-in took Queen Room tonight.” With it, less structured availability
-updates can be extracted using `OPENAI_ASSISTANT_MODEL`.
+updates and conversational follow-ups can be extracted using
+`OPENAI_ASSISTANT_MODEL`.
+
+The assistant also supports read-only questions without changing inventory:
+
+- “What is available tomorrow?”
+- “Has anybody booked the Queen Suite for Friday?”
+- “How is my booking engine doing?”
+
+Availability answers come from the same rooms, overrides, and active bookings
+used by the booking engine. Broad status answers include recent bookings,
+upcoming stay value, pending decisions, and tomorrow's availability. Successful
+model interpretations are recorded as hidden `assistant_interpretation`
+activities with the model and response ID for debugging; they are not shown in
+the owner-facing activity feed.
 
 In the Twilio number or Messaging Service, configure:
 
@@ -40,6 +54,7 @@ sending production application-to-person traffic in the United States.
 - A property can connect at most three active phones.
 - Natural-language extraction may reduce availability, but it cannot cancel an
   existing guest by itself.
+- Questions are read-only and can never be classified as availability changes.
 - If a walk-in conflicts with an online booking, Front Desk asks for an
   explicit `CANCEL` or `KEEP`.
 - Availability reductions can be undone for ten minutes unless inventory or a

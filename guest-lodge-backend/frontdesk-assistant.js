@@ -51,6 +51,46 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
         return { intent: 'booking_taken' };
     }
 
+    // Read-only questions must be recognized before "taken" and "booked"
+    // language is considered an inventory change. Otherwise a question such as
+    // "has anybody taken anything tomorrow?" can be mistaken for a walk-in.
+    const asksHowEngineIsDoing = /\bhow(?:['’]s| is)\s+(?:the\s+)?(?:booking\s+)?(?:engine|page|site|marketel|it)\s+(?:doing|looking|running)\b/.test(lower)
+        || /\b(?:booking\s+)?(?:engine|page|site)\s+(?:status|performance)\b/.test(lower);
+    if (asksHowEngineIsDoing) {
+        return {
+            intent: 'engine_status',
+            roomName: rooms.length === 1 ? rooms[0].name : null,
+            startDate: null,
+            endDate: null,
+            units: null,
+            clarification: '',
+        };
+    }
+
+    const asksForAvailability = /\b(?:availability|available|vacant|open rooms?|rooms? left|bookings?|booked|taken|occupied)\b/.test(lower)
+        && (/\?$/.test(lower)
+            || /\b(?:what|what's|which|how|is|are|has|have|did|do|does|anyone|anybody|show|check|tell)\b/.test(lower)
+            || /^(?:availability|bookings?)\b/.test(lower));
+    if (asksForAvailability) {
+        const namedRoom = rooms.find((entry) => lower.includes(String(entry.name || '').toLowerCase()));
+        const startDate = /\btomorrow\b/.test(lower)
+            ? addIsoDays(todayIso, 1)
+            : (/\b(?:today|tonight)\b/.test(lower) ? todayIso : null);
+        const hasSpecificDateLanguage = /\b\d{4}-\d{2}-\d{2}\b/.test(lower)
+            || /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(lower)
+            || /\b(?:sun|mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat)(?:day)?\b/.test(lower)
+            || /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/.test(lower);
+        if (!startDate && hasSpecificDateLanguage) return null;
+        return {
+            intent: 'availability_query',
+            roomName: namedRoom?.name || (rooms.length === 1 ? rooms[0].name : null),
+            startDate,
+            endDate: startDate,
+            units: null,
+            clarification: startDate ? '' : 'Which date should I check?',
+        };
+    }
+
     const room = rooms.find((entry) => lower.includes(String(entry.name || '').toLowerCase()));
     const walkInLanguage = /\b(walk[- ]?in|took|taken|gave|sold|occupied|checked in|booked outside|outside booking)\b/.test(lower);
     if (room && walkInLanguage) {
@@ -342,7 +382,7 @@ function createFrontDeskAssistant({
                 orderBy: [{ active: 'desc' }, { priority: 'asc' }, { createdAt: 'asc' }],
             }),
             prisma.frontDeskAssistantActivity.findMany({
-                where: { hotelId },
+                where: { hotelId, type: { not: 'assistant_interpretation' } },
                 orderBy: { createdAt: 'desc' },
                 take: 30,
             }),
@@ -698,6 +738,189 @@ function createFrontDeskAssistant({
             day: 'numeric',
         });
         return `${start}–${end}`;
+    }
+
+    function describeBookingCount(day) {
+        const count = Number(day?.bookingCount || 0);
+        const pending = Number(day?.pendingCount || 0);
+        if (!count) return 'no Marketel bookings';
+        if (pending === count) return `${count} pending ${count === 1 ? 'booking' : 'bookings'}`;
+        if (!pending) return `${count} confirmed ${count === 1 ? 'booking' : 'bookings'}`;
+        return `${count} Marketel bookings (${pending} pending)`;
+    }
+
+    async function getAvailabilitySnapshot({ hotelId, roomName = '', startDate, endDate }) {
+        const normalizedStart = normalizeIsoDate(startDate);
+        const normalizedEnd = normalizeIsoDate(endDate || startDate);
+        const dates = enumerateDatesInclusive(normalizedStart, normalizedEnd, 31);
+        if (!dates.length || dates.length > 31) return { ok: false, code: 'invalid_dates' };
+
+        const checkinDate = new Date(`${dates[0]}T00:00:00.000Z`);
+        const checkoutDate = new Date(`${addDaysIso(dates[dates.length - 1], 1)}T00:00:00.000Z`);
+        const [allRooms, bookings] = await Promise.all([
+            prisma.manualRoom.findMany({
+                where: { hotelId },
+                include: { overrides: { where: { date: { in: dates } } } },
+                orderBy: { name: 'asc' },
+            }),
+            prisma.booking.findMany({
+                where: {
+                    hotelId,
+                    status: { notIn: DEAD_BOOKING_STATUSES },
+                    checkinDate: { lt: checkoutDate },
+                    checkoutDate: { gt: checkinDate },
+                },
+                select: {
+                    id: true,
+                    roomName: true,
+                    status: true,
+                    bookingType: true,
+                    checkinDate: true,
+                    checkoutDate: true,
+                },
+            }),
+        ]);
+
+        const requested = String(roomName || '').trim().toLowerCase();
+        const rooms = requested
+            ? allRooms.filter((room) => String(room.name || '').trim().toLowerCase() === requested)
+            : allRooms;
+        if (requested && !rooms.length) return { ok: false, code: 'room_not_found' };
+
+        const bookingsByRoomDate = {};
+        for (const booking of bookings) {
+            const bookingRoom = String(booking.roomName || '').trim();
+            for (const date of manualBookingStayDates(booking.checkinDate, booking.checkoutDate)) {
+                if (!dates.includes(date)) continue;
+                const key = `${bookingRoom}|${date}`;
+                if (!bookingsByRoomDate[key]) bookingsByRoomDate[key] = [];
+                bookingsByRoomDate[key].push(booking);
+            }
+        }
+
+        return {
+            ok: true,
+            startDate: dates[0],
+            endDate: dates[dates.length - 1],
+            dates,
+            rooms: rooms.map((room) => {
+                const totalUnits = Math.max(0, Number(room.totalUnits || 0));
+                const overrideByDate = Object.fromEntries(
+                    (room.overrides || []).map((override) => [override.date, override])
+                );
+                return {
+                    name: room.name,
+                    totalUnits,
+                    days: dates.map((date) => {
+                        const dayBookings = bookingsByRoomDate[`${room.name}|${date}`] || [];
+                        const override = overrideByDate[date];
+                        const availableUnits = override?.closed
+                            ? 0
+                            : (override && override.availableUnits !== null
+                                ? Math.max(0, Number(override.availableUnits))
+                                : Math.max(0, totalUnits - dayBookings.length));
+                        return {
+                            date,
+                            availableUnits,
+                            bookingCount: dayBookings.length,
+                            pendingCount: dayBookings.filter((booking) =>
+                                String(booking.status || '').toLowerCase() === 'pending'
+                            ).length,
+                        };
+                    }),
+                };
+            }),
+        };
+    }
+
+    function formatAvailabilitySnapshot(snapshot, { prefix = 'Availability' } = {}) {
+        if (!snapshot?.ok) {
+            return snapshot?.code === 'room_not_found'
+                ? 'I could not find that room in Availability.'
+                : 'I could not read availability for those dates.';
+        }
+        if (!snapshot.rooms.length) return 'I do not see any rooms set up in Availability yet.';
+
+        const label = dateRangeLabel(snapshot.startDate, snapshot.endDate);
+        if (snapshot.dates.length === 1) {
+            const lines = snapshot.rooms.slice(0, 8).map((room) => {
+                const day = room.days[0];
+                return `${room.name}: ${day.availableUnits}/${room.totalUnits} available; ${describeBookingCount(day)}.`;
+            });
+            if (snapshot.rooms.length > 8) lines.push(`Plus ${snapshot.rooms.length - 8} more room types in Front Desk.`);
+            return `${prefix} for ${label}:\n${lines.join('\n')}`;
+        }
+
+        const lines = snapshot.rooms.slice(0, 8).map((room) => {
+            const availability = room.days.map((day) => day.availableUnits);
+            const lowest = Math.min(...availability);
+            const highest = Math.max(...availability);
+            const bookingNights = room.days.reduce((sum, day) => sum + day.bookingCount, 0);
+            const soldOutNights = room.days.filter((day) => day.availableUnits < 1).length;
+            const availableLabel = lowest === highest
+                ? `${lowest}/${room.totalUnits} available each night`
+                : `${lowest}–${highest}/${room.totalUnits} available by night`;
+            const bookingLabel = `${bookingNights} Marketel ${bookingNights === 1 ? 'room-night' : 'room-nights'}`;
+            const soldOutLabel = soldOutNights ? `; sold out ${soldOutNights} ${soldOutNights === 1 ? 'night' : 'nights'}` : '';
+            return `${room.name}: ${availableLabel}; ${bookingLabel}${soldOutLabel}.`;
+        });
+        if (snapshot.rooms.length > 8) lines.push(`Plus ${snapshot.rooms.length - 8} more room types in Front Desk.`);
+        return `${prefix} for ${label}:\n${lines.join('\n')}`;
+    }
+
+    async function describeEngineStatus(recipient, intent) {
+        const todayIso = intent.todayIso;
+        const tomorrowIso = addDaysIso(todayIso, 1);
+        const nextMonthIso = addDaysIso(todayIso, 31);
+        const todayDate = new Date(`${todayIso}T00:00:00.000Z`);
+        const nextMonthDate = new Date(`${nextMonthIso}T00:00:00.000Z`);
+        const [hotel, upcomingBookings, recentBookings, tomorrow] = await Promise.all([
+            prisma.hotelConfig.findUnique({
+                where: { id: recipient.hotelId },
+                select: { active: true, subscribed: true },
+            }),
+            prisma.booking.findMany({
+                where: {
+                    hotelId: recipient.hotelId,
+                    bookingType: { not: 'manual' },
+                    status: { notIn: DEAD_BOOKING_STATUSES },
+                    checkinDate: { gte: todayDate, lt: nextMonthDate },
+                },
+                select: { grandTotal: true, status: true },
+            }),
+            prisma.booking.findMany({
+                where: {
+                    hotelId: recipient.hotelId,
+                    bookingType: { not: 'manual' },
+                    status: { notIn: DEAD_BOOKING_STATUSES },
+                    createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+                },
+                select: { grandTotal: true },
+            }),
+            getAvailabilitySnapshot({
+                hotelId: recipient.hotelId,
+                roomName: intent.roomName || '',
+                startDate: tomorrowIso,
+                endDate: tomorrowIso,
+            }),
+        ]);
+        const bookingValue = upcomingBookings.reduce((sum, booking) => sum + Number(booking.grandTotal || 0), 0);
+        const pending = upcomingBookings.filter((booking) =>
+            String(booking.status || '').toLowerCase() === 'pending'
+        ).length;
+        const recentValue = recentBookings.reduce((sum, booking) => sum + Number(booking.grandTotal || 0), 0);
+        const liveLine = hotel?.active && hotel?.subscribed
+            ? 'Your booking engine is live.'
+            : 'Your booking engine is not currently live.';
+        const recentLine = recentBookings.length
+            ? `Last 24 hours: ${recentBookings.length} new ${recentBookings.length === 1 ? 'booking' : 'bookings'} worth $${recentValue.toFixed(2)}.`
+            : 'Last 24 hours: no new Marketel bookings.';
+        const upcomingLine = upcomingBookings.length
+            ? `Next 30 days: ${upcomingBookings.length} upcoming ${upcomingBookings.length === 1 ? 'stay' : 'stays'} worth $${bookingValue.toFixed(2)}${pending ? `; ${pending} awaiting a decision` : ''}.`
+            : 'Next 30 days: no upcoming Marketel stays yet.';
+        const tomorrowLine = formatAvailabilitySnapshot(tomorrow)
+            .replace(/^Availability for ([^:]+):/, 'Tomorrow ($1):');
+        return `${liveLine}\n${recentLine}\n${upcomingLine}\n${tomorrowLine}`;
     }
 
     async function consumeWalkInInventory({
@@ -1084,7 +1307,31 @@ function createFrontDeskAssistant({
         return activity?.type || '';
     }
 
-    async function extractIntentWithOpenAI({ body, rooms, timeZone, recipientId }) {
+    async function getRecentConversation(recipient, currentBody) {
+        const activities = await prisma.frontDeskAssistantActivity.findMany({
+            where: {
+                hotelId: recipient.hotelId,
+                recipientId: recipient.id,
+                type: { in: ['reply', 'assistant_reply'] },
+                createdAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) },
+            },
+            select: { direction: true, body: true, summary: true },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+        });
+        const chronological = activities.reverse();
+        const last = chronological[chronological.length - 1];
+        if (last?.direction === 'inbound'
+            && String(last.body || last.summary || '').trim() === String(currentBody || '').trim()) {
+            chronological.pop();
+        }
+        return chronological.map((activity) => ({
+            role: activity.direction === 'inbound' ? 'Owner' : 'Front Desk',
+            text: clampText(activity.body || activity.summary, 500),
+        })).filter((entry) => entry.text);
+    }
+
+    async function extractIntentWithOpenAI({ body, rooms, timeZone, recipientId, hotelId, recentConversation = [] }) {
         if (!openai) return null;
         const todayIso = localTodayIso(timeZone);
         const roomNames = rooms.map((room) => room.name);
@@ -1094,7 +1341,7 @@ function createFrontDeskAssistant({
             properties: {
                 intent: {
                     type: 'string',
-                    enum: ['no_change', 'block_room', 'unknown', 'help'],
+                    enum: ['no_change', 'block_room', 'availability_query', 'engine_status', 'unknown', 'help'],
                 },
                 roomName: {
                     type: ['string', 'null'],
@@ -1124,9 +1371,17 @@ function createFrontDeskAssistant({
                         `Today is ${todayIso} in ${timeZone}.`,
                         `Valid room names: ${roomNames.join(', ') || 'none'}.`,
                         'block_room means an unrecorded walk-in or outside booking consumed one or more sellable rooms.',
+                        'availability_query is a read-only question about which rooms are open, occupied, taken, or booked for a date or date range.',
+                        'engine_status is a broad read-only question such as “how is my booking engine doing?” or “what is happening with my page?”',
+                        'A question must never become block_room. Read-only questions never change inventory.',
                         'Dates are occupied nights, inclusive. Resolve tonight/today/tomorrow to ISO dates.',
+                        'For availability_query, select the only room automatically when the property has one room type. Leave roomName null to summarize every room type.',
+                        'Use the recent conversation only to resolve follow-up references such as “it,” “that room,” or a previously supplied date.',
                         'Never infer cancellation of an existing guest. Never invent a room or date.',
-                        'If room or dates are missing, use unknown and write one short clarification question.',
+                        'For a write action, if room or dates are missing, use unknown and write one short clarification question.',
+                        recentConversation.length
+                            ? `Recent conversation, oldest first:\n${recentConversation.map((entry) => `${entry.role}: ${entry.text}`).join('\n')}`
+                            : 'There is no recent conversation.',
                     ].join('\n'),
                 },
                 { role: 'user', content: clampText(body, 1000) },
@@ -1142,7 +1397,20 @@ function createFrontDeskAssistant({
         });
         const raw = response.output_text || '';
         if (!raw) return null;
-        return JSON.parse(raw);
+        const extracted = JSON.parse(raw);
+        await createActivity({
+            hotelId,
+            recipientId,
+            direction: 'system',
+            type: 'assistant_interpretation',
+            summary: `AI interpreted the message as ${extracted.intent}`,
+            metadata: {
+                model: openaiModel,
+                responseId: response.id || null,
+                intent: extracted.intent,
+            },
+        });
+        return { ...extracted, interpretedBy: 'openai', model: openaiModel };
     }
 
     async function understandInbound(recipient, body) {
@@ -1157,14 +1425,17 @@ function createFrontDeskAssistant({
         ]);
         const todayIso = localTodayIso(config.timeZone || reportTimeZone);
         const deterministic = deterministicIntent(body, rooms, todayIso, contextType);
-        if (deterministic) return { ...deterministic, todayIso, rooms };
+        if (deterministic) return { ...deterministic, todayIso, rooms, interpretedBy: 'deterministic' };
 
         try {
+            const recentConversation = await getRecentConversation(recipient, body);
             const extracted = await extractIntentWithOpenAI({
                 body,
                 rooms,
                 timeZone: config.timeZone || reportTimeZone,
                 recipientId: recipient.id,
+                hotelId: recipient.hotelId,
+                recentConversation,
             });
             return extracted ? { ...extracted, todayIso, rooms } : {
                 intent: 'unknown',
@@ -1251,8 +1522,26 @@ function createFrontDeskAssistant({
         if (intent.intent === 'no_change') {
             return 'Got it — no availability changes recorded.';
         }
+        if (intent.intent === 'availability_query') {
+            const startDate = normalizeIsoDate(intent.startDate);
+            const endDate = normalizeIsoDate(intent.endDate || intent.startDate);
+            if (!startDate || !endDate || endDate < startDate) {
+                const oneRoom = intent.rooms.length === 1 ? ` for ${intent.rooms[0].name}` : '';
+                return `Which date should I check${oneRoom}? You can say “tomorrow” or send a date range.`;
+            }
+            const snapshot = await getAvailabilitySnapshot({
+                hotelId: recipient.hotelId,
+                roomName: intent.roomName || '',
+                startDate,
+                endDate,
+            });
+            return formatAvailabilitySnapshot(snapshot);
+        }
+        if (intent.intent === 'engine_status') {
+            return describeEngineStatus(recipient, intent);
+        }
         if (intent.intent !== 'block_room') {
-            return intent.clarification || 'Tell me which room was taken and which night.';
+            return intent.clarification || 'Ask me what is available, or tell me which room was taken and which night.';
         }
 
         const room = intent.rooms.find((entry) =>
