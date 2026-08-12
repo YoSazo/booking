@@ -25,6 +25,7 @@ const nodemailer = require('nodemailer');
 const sharp = require('sharp');
 const telemetry = require('./marketel-signal-extractor');
 const { createFrontDeskAssistant } = require('./frontdesk-assistant');
+const { buildFrontdeskReturnPath } = require('./frontdesk-return');
 
 let frontDeskAssistant = null;
 
@@ -684,13 +685,9 @@ function marketelFrontdeskOrigin(req, preferredOrigin = '') {
     return 'https://bookmarketel.com';
 }
 
-function frontdeskReturnHtml({ token = '', activated = false, reveal = '' } = {}) {
+function frontdeskReturnHtml({ token = '', hotelId = '', activated = false, reveal = '' } = {}) {
     const cleanToken = String(token || '').trim();
-    const nextPath = activated
-        ? '/frontdesk?activated=1'
-        : reveal === 'checkout'
-            ? '/frontdesk?welcome=1&reveal=checkout'
-            : '/frontdesk';
+    const nextPath = buildFrontdeskReturnPath({ hotelId, activated, reveal });
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening Front Desk...</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f5;color:#1a2b22}.box{text-align:center;padding:24px}.mark{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:4px solid #d8e4dc;border-top-color:#2E7D5B;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.title{font-size:15px;font-weight:800}.sub{margin-top:6px;font-size:12px;color:#66756c}</style></head><body><div class="box"><div class="mark"></div><div class="title">Opening Front Desk</div><div class="sub">Finishing activation...</div></div><script>!function(){var token=${JSON.stringify(cleanToken)};var next=${JSON.stringify(nextPath)};try{console.info("[FrontDesk return] bridge loaded",{hasToken:!!token,tokenKind:token&&token.indexOf("fd_")===0?"return-token":token?"pin":"none"});}catch(e){}try{if(token){localStorage.setItem("crmToken",token);document.cookie="frontdeskReturnToken="+encodeURIComponent(token)+"; path=/; max-age=86400; SameSite=Lax; Secure";}}catch(e){try{console.warn("[FrontDesk return] token storage failed",e&&e.message?e.message:e);}catch(_){}}location.replace(next);}();</script></body></html>`;
 }
 
@@ -700,6 +697,7 @@ function redactFrontdeskAuthUrl(url) {
 
 app.get('/frontdesk-return', (req, res) => {
     const token = String(req.query.pin || req.query.returnToken || '').trim();
+    const hotelId = String(req.query.hotelId || '').trim();
     const activated = String(req.query.activated || '') === '1';
     const reveal = String(req.query.reveal || '').trim() === 'checkout' ? 'checkout' : '';
     res.setHeader('Cache-Control', 'no-store');
@@ -707,10 +705,11 @@ app.get('/frontdesk-return', (req, res) => {
         host: req.get('host'),
         hasToken: !!token,
         tokenKind: token.startsWith('fd_') ? 'return-token' : (token ? 'pin' : 'none'),
+        hotelId,
         activated,
         reveal,
     });
-    res.send(frontdeskReturnHtml({ token, activated, reveal }));
+    res.send(frontdeskReturnHtml({ token, hotelId, activated, reveal }));
 });
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
 app.get('/simple-crm.html', (req, res) => {
@@ -11358,6 +11357,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
         const cancelParams = new URLSearchParams({
             returnToken,
+            hotelId,
             reveal: 'checkout',
         });
         const cancelUrl = `${frontdeskOrigin}/frontdesk-return?${cancelParams.toString()}`;
