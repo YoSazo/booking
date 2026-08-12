@@ -18,12 +18,13 @@ function InstallAppBanner({
   touchpoint = 'booking-page',
   apiBaseUrl = '',
   guidedBookingInstall = false,
+  hotelSubscribed = true,
 }) {
   const navigate = useNavigate();
   const [installed, setInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showBookingCoach, setShowBookingCoach] = useState(false);
-  const [showOwnerPreviewInfo, setShowOwnerPreviewInfo] = useState(false);
+  const [showUnavailableInfo, setShowUnavailableInfo] = useState(false);
   const ios = isIos();
 
   const markInstalled = useCallback(() => {
@@ -72,15 +73,17 @@ function InstallAppBanner({
 
   const installPath = `/install?ref=${encodeURIComponent(touchpoint)}`;
   const handleInstall = async () => {
-    if (ownerPreview) {
-      setShowOwnerPreviewInfo(true);
+    if (hotelSubscribed !== true) {
+      setShowUnavailableInfo(true);
       return;
     }
 
-    trackGuestInstall(apiBaseUrl, hotelId, {
-      touchpoint,
-      eventType: 'cta_click',
-    });
+    if (!ownerPreview) {
+      trackGuestInstall(apiBaseUrl, hotelId, {
+        touchpoint,
+        eventType: 'cta_click',
+      });
+    }
 
     if (ios) {
       setShowBookingCoach(true);
@@ -121,14 +124,9 @@ function InstallAppBanner({
     maxWidth: sticky ? 520 : undefined,
     pointerEvents: 'auto',
   };
-  const buttonLocked = ownerPreview;
-
-  const continueOwnerTour = () => {
-    setShowOwnerPreviewInfo(false);
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: 'marketel:continue-owner-tour' }, '*');
-    }
-  };
+  // `preview=1` only keeps an owner's visit out of guest analytics. It must
+  // not disable a paid property's real install experience.
+  const buttonLocked = hotelSubscribed !== true;
 
   return (
     <>
@@ -143,8 +141,8 @@ function InstallAppBanner({
               {guidedBookingInstall ? `Get the ${hotelName || 'property'} app` : `Add ${hotelName || 'us'} to your home screen`}
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
-              {ownerPreview
-                ? 'Available when you activate Marketel.'
+              {buttonLocked
+                ? 'Available once this property finishes setup.'
                 : guidedBookingInstall
                   ? 'Keep us one tap away for future stays. No app store.'
                   : 'Book direct in one tap next time.'}
@@ -172,10 +170,10 @@ function InstallAppBanner({
           </button>
         </div>
       </div>
-      {showOwnerPreviewInfo && (
+      {showUnavailableInfo && (
         <div
           role="presentation"
-          onClick={() => setShowOwnerPreviewInfo(false)}
+          onClick={() => setShowUnavailableInfo(false)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -212,14 +210,14 @@ function InstallAppBanner({
               id="owner-install-preview-title"
               style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}
             >
-              Your guests get this button.
+              This app isn&apos;t live yet.
             </h2>
             <p style={{ margin: '11px 0 18px', color: '#66756c', fontSize: 14, lineHeight: 1.55 }}>
-              Guests tap Install to add <strong>{hotelName || 'your property'}</strong> to their Home Screen and book direct again. It turns on when you activate Marketel.
+              <strong>{hotelName || 'This property'}</strong> will be available to add to your Home Screen once the property finishes activating it.
             </p>
             <button
               type="button"
-              onClick={continueOwnerTour}
+              onClick={() => setShowUnavailableInfo(false)}
               style={{
                 width: '100%',
                 minHeight: 48,
@@ -234,7 +232,7 @@ function InstallAppBanner({
                 cursor: 'pointer',
               }}
             >
-              Continue your walkthrough →
+              Got it
             </button>
           </div>
         </div>

@@ -323,6 +323,20 @@ export function renderFrontDeskAssistantCard() {
     && !crm.settingsTourActive;
   panel.style.display = visible ? 'block' : 'none';
   if (!visible) return;
+  if (!isNativeFrontDesk()) {
+    panel.innerHTML = `<div class="fda-card is-off">
+      <div class="fda-card-row">
+        <div class="fda-card-icon">↗</div>
+        <div class="fda-card-copy">
+          <div class="fda-eyebrow">Front Desk app</div>
+          <div class="fda-card-title">Assistant lives on your phone.</div>
+          <div class="fda-card-sub">Download Front Desk to connect phone numbers, choose your no-answer rule and manage Assistant activity.</div>
+        </div>
+        <button type="button" class="fda-card-btn" onclick="openFrontdeskAppDownload()">Download</button>
+      </div>
+    </div>`;
+    return;
+  }
   if (isNativeFrontDesk()) {
     const activity = latestMeaningfulActivity();
     if (!crm.assistantData || !activity) {
@@ -617,6 +631,10 @@ export function updateAssistantTimeDisplay(input) {
 }
 
 export function openFrontDeskAssistant() {
+  if (!isNativeFrontDesk()) {
+    window.openFrontdeskAppDownload?.();
+    return;
+  }
   // Hide native chrome before any lazy rendering or network work so it can
   // never sit above the web sheet.
   setNativeShellForAssistant(false);

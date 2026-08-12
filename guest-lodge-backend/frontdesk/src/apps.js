@@ -363,7 +363,7 @@ function ensureAppsViewRendered(force) {
   if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
     renderAppsView();
     el.dataset.appsKey = key;
-  } else {
+  } else if (isNativeFrontdeskApp() || embeddedNativePreview) {
     loadGuestInstallStats();
   }
 }
@@ -644,19 +644,21 @@ function renderAppsView() {
     ${guestBroadcastCardHtml({ compact: true })}
     ${nativeGuestShareHtml}
     ${guestIconCardHtml()}`;
-  const unlockedToolsHtml = `
-    ${deviceCardHtml(true)}
-    ${guestPhonesCardHtml}
-    ${guestBroadcastCardHtml()}
-    ${guestIconCardHtml()}
-    ${helpFoldHtml}`;
+  const appStoreReady = !!String(crm.frontdeskAppStoreUrl || '').trim();
+  const webAppLockHtml = `
+    <section style="min-height:52vh;display:grid;place-items:center;padding:34px 0;">
+      <div style="width:min(100%,430px);padding:28px 24px;border:1.5px solid var(--border);border-radius:22px;background:#fff;text-align:center;box-shadow:0 14px 40px rgba(26,43,34,.09);">
+        <div style="width:58px;height:58px;display:grid;place-items:center;margin:0 auto 16px;border-radius:17px;background:var(--green-pale);color:var(--green);font-size:25px;">↗</div>
+        <div style="font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--green);">Front Desk app</div>
+        <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Guest App tools live on your phone.</h2>
+        <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Front Desk to show the guest QR, manage your app icon, reply to guests and send notifications directly to their phones.</p>
+        <button type="button" onclick="openFrontdeskAppDownload()" ${appStoreReady ? '' : 'aria-disabled="true"'} style="width:100%;min-height:50px;border:0;border-radius:13px;background:${appStoreReady ? 'var(--green)' : '#dce8e1'};color:${appStoreReady ? '#fff' : '#527061'};font-family:inherit;font-size:15px;font-weight:800;cursor:${appStoreReady ? 'pointer' : 'default'};">${appStoreReady ? 'Download Marketel Front Desk' : 'Front Desk app coming soon'}</button>
+      </div>
+    </section>`;
 
   const appsMainHtml = nativePresentation
     ? nativeGuestToolsHtml
-    : `${appsStoryHtml}
-      ${loopDiagramHtml}
-      ${guestMessagesPanelHtml}
-      ${fdInApp ? unlockedToolsHtml : `${reminderCardHtml}${guestIconCardHtml()}`}`;
+    : webAppLockHtml;
 
   const appsFootnoteHtml = nativePresentation
     ? ''
@@ -788,10 +790,12 @@ function renderAppsView() {
   </div>`;
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
-  if (crm.guestMessages.length) renderMessages();
-  else loadMessages();
-  loadGuestInstallStats();
-  loadBookingReviewSettings();
+  if (nativePresentation) {
+    if (crm.guestMessages.length) renderMessages();
+    else loadMessages();
+    loadGuestInstallStats();
+    loadBookingReviewSettings();
+  }
 }
 
 async function loadBookingReviewSettings() {

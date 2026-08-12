@@ -306,13 +306,11 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     className={`room-card ${previewSavedPart === 'room' ? 'preview-saved-target' : ''}`.trim()}
     data-preview-highlight="room"
   >
-    {previewSavedPart === 'room' && <span className="preview-saved-badge" role="status">✓ Saved</span>}
     {/* Image Gallery */}
     <div
       className={`room-image-container ${previewSavedPart === 'room-photo' ? 'preview-saved-target' : ''}`.trim()}
       data-preview-highlight="room-photo"
     >
-      {previewSavedPart === 'room-photo' && <span className="preview-saved-badge" role="status">✓ Saved</span>}
       <img 
         src={imageUrls[currentImageIndex]}
         alt={`${room.name} preview`} 

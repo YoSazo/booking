@@ -8,9 +8,9 @@
   inset: 0;
   z-index: 12000;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+  padding: max(18px, env(safe-area-inset-top)) 12px max(18px, env(safe-area-inset-bottom));
   color: #1c1c1e;
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif;
   font-optical-sizing: auto;
@@ -36,7 +36,8 @@
   z-index: 1;
   width: min(100%, 410px);
   overflow: hidden;
-  padding: 8px 16px 16px;
+  min-height: 270px;
+  padding: 8px 16px 22px;
   border: 0.5px solid rgba(255, 255, 255, 0.78);
   border-radius: 28px;
   background: rgba(246, 246, 248, 0.88);
@@ -133,7 +134,7 @@
 }
 
 .booking-install-panel--preview .booking-install-single-action {
-  padding-top: 8px;
+  padding-top: 50px;
 }
 
 .booking-install-choice-heading {
@@ -247,7 +248,7 @@
 }
 
 .booking-install-single-action {
-  padding: 18px 12px 2px;
+  padding: 52px 12px 8px;
   text-align: center;
 }
 

@@ -369,7 +369,7 @@ function handleBookingPreviewMessage(event) {
     const kind = String(event.data?.kind || 'booking-page');
     let highlightTarget = 'header';
     if (kind === 'header') {
-      const exactHeaderTargets = new Set(['name', 'subtitle', 'address']);
+      const exactHeaderTargets = new Set(['name', 'subtitle', 'address', 'phone']);
       highlightTarget = changedFields.length === 1 && exactHeaderTargets.has(changedFields[0])
         ? `header-${changedFields[0]}`
         : 'header';

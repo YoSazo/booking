@@ -405,13 +405,23 @@ async function settingsSendSupport() {
   window.openMarketelSupport?.();
 }
 
-function openPreviewSite() {
+function openPreviewSite(options = {}) {
   const domain = crm.activeHotelDomain || (crm.activeHotelId + '.mktel.co');
   const isLocal = !isNativeApp()
     && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const url = isLocal ? 'http://localhost:5173/?hotelId=' + encodeURIComponent(crm.activeHotelId) + '&preview=1' : 'https://' + domain + '?preview=1';
-  if (typeof window.openInAppBrowser === 'function') window.openInAppBrowser(url);
-  else window.open(url, '_blank', 'noopener');
+  const url = new URL(isLocal ? 'http://localhost:5173/' : 'https://' + domain + '/');
+  if (isLocal) url.searchParams.set('hotelId', crm.activeHotelId);
+  url.searchParams.set('preview', '1');
+  if (options.highlight) url.searchParams.set('previewHighlight', String(options.highlight));
+  if (options.roomId) url.searchParams.set('previewHighlightRoom', String(options.roomId));
+  if (options.refresh) url.searchParams.set('previewRefresh', String(Date.now()));
+  if (typeof window.openInAppBrowser === 'function') window.openInAppBrowser(url.toString());
+  else window.open(url.toString(), '_blank', 'noopener');
+}
+
+function previewSavedVisual(highlight, roomId = '') {
+  if (!crm.hotelSubscribed || isEmbeddedEditorPreview()) return;
+  openPreviewSite({ highlight, roomId, refresh: true });
 }
 
 function guestBookingEngineUrl() {
@@ -863,7 +873,7 @@ async function loadEditRooms() {
             <input type="text" value="${hotelSubtitle}" id="edit-hotel-subtitle" placeholder="Add a short description (optional)" style="width:100%;text-align:center;font-size:14px;color:#333;border:none;background:transparent;outline:none;margin-bottom:6px;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
             <input type="tel" value="${hotelPhone}" id="edit-hotel-phone" placeholder="Add your guest phone number (optional)" style="width:100%;text-align:center;font-size:13px;color:#6b7280;border:none;background:transparent;outline:none;font-family:inherit;border-bottom:1.5px dashed var(--border);padding-bottom:4px;">
           </div>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">${embeddedPreview ? 'Save &amp; see changes' : 'Save'}</button>
+          <button onclick="saveHotelInfo('header')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">${embeddedPreview || crm.hotelSubscribed ? 'Save &amp; see changes' : 'Save'}</button>
         </div>
       </div>
       </div>
@@ -920,7 +930,7 @@ async function loadEditRooms() {
             </div>
           </div>
           <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
-          <button onclick="saveHotelInfo()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
+          <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
         </div>
       </div>
       <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
@@ -961,7 +971,7 @@ async function loadEditRooms() {
                 <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
               </div>
             </div>
-            <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save Rates</button>
+            <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${crm.hotelSubscribed && !embeddedPreview ? 'Save &amp; see changes' : 'Save Rates'}</button>
           </div>
           <div class="page-utility-panel" data-utility-panel="pin" hidden>
             <div style="margin-bottom:12px;">
@@ -1077,7 +1087,7 @@ function renderEditRoomsCards() {
           </div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isEmbeddedEditorPreview() ? 'Save &amp; see changes' : 'Save Changes'}</button>
+          <button onclick="saveEditRoom('${r.id}')" style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isEmbeddedEditorPreview() || crm.hotelSubscribed ? 'Save &amp; see changes' : 'Save Changes'}</button>
           <button class="room-edit-delete-btn" onclick="deleteEditRoom('${r.id}')" style="padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:none;font-family:inherit;font-size:14px;color:var(--text-muted);cursor:pointer;" onmouseover="this.style.borderColor='#E05252';this.style.color='#E05252'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">Delete</button>
         </div>
       </div>
@@ -1243,7 +1253,7 @@ function removeAmenity(roomId, amenity) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-async function saveHotelInfo() {
+async function saveHotelInfo(source = 'header') {
   const name = document.getElementById('edit-hotel-name')?.value.trim();
   const subtitle = document.getElementById('edit-hotel-subtitle')?.value.trim();
   const address = document.getElementById('edit-hotel-address')?.value.trim();
@@ -1264,6 +1274,13 @@ async function saveHotelInfo() {
       hotelName: name || '',
       changedFields: changedFields.length ? changedFields : ['header'],
     });
+    if (source === 'header') {
+      const exactHeaderTargets = new Set(['name', 'subtitle', 'address', 'phone']);
+      const highlight = changedFields.length === 1 && exactHeaderTargets.has(changedFields[0])
+        ? `header-${changedFields[0]}`
+        : 'header';
+      previewSavedVisual(highlight);
+    }
   } catch (e) {
     toast('Failed to save', 'error');
   }
@@ -1279,6 +1296,7 @@ async function saveRates() {
     crm.launchStatus = null; // re-derive launch checklist from fresh server truth
     advanceTourIfNeeded();
     toast('Rates saved!', 'success');
+    previewSavedVisual('room', crm.editRooms[0]?.id || '');
   } catch (e) {
     toast('Failed to save rates', 'error');
   }
@@ -1496,6 +1514,7 @@ async function saveEditRoom(roomId) {
       roomName: body.name,
       changedFields: changedFields.length ? changedFields : ['room'],
     });
+    previewSavedVisual('room', roomId);
   } catch (e) {
     toast('Failed to save: ' + (e.message || ''), 'error');
   }
@@ -1539,6 +1558,7 @@ async function uploadEditImages(event, roomId) {
   if (uploaded > 0) {
     notifyEmbeddedEditorSaved('room-photos', { roomId, changedFields: ['photos'] });
     toast(uploaded + ' photo' + (uploaded !== 1 ? 's' : '') + ' added. Check the Bookings tab to continue your launch checklist!', 'success');
+    previewSavedVisual('room-photo', roomId);
   } else {
     toast(lastError || 'Upload failed', 'error');
   }
@@ -1659,6 +1679,7 @@ async function deleteEditImage(roomId, imageId) {
     renderEditRoomsCards();
     toast('Photo deleted', 'success');
     notifyEmbeddedEditorSaved('room-photo-deleted', { roomId, changedFields: ['photos'] });
+    previewSavedVisual('room-photo', roomId);
   } catch (e) {
     toast('Failed to delete', 'error');
   }

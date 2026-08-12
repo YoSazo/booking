@@ -2883,7 +2883,10 @@ async function loadMessages() {
 }
 
 function updateMessageBadges() {
-  const unread = crm.guestMessages.length
+  const appOnlySurface = isNativeFrontdeskApp()
+    || document.body.classList.contains('frontdesk-editor-preview')
+    || new URLSearchParams(window.location.search).get('previewEditor') === '1';
+  const unread = !appOnlySurface ? 0 : crm.guestMessages.length
     ? crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
     : crm.messageUnreadCount;
   const badge = document.getElementById('msgUnreadBadge');
@@ -3936,6 +3939,10 @@ function applyFilter() {
   if (assistantPanelEl) assistantPanelEl.style.display = 'none';
   const previewBar = document.getElementById('previewSiteBar');
   if (previewBar) previewBar.style.display = (crm.currentFilter === 'settings') ? 'block' : 'none';
+  // Remove Bookings-only notices immediately when leaving Bookings. Several
+  // branches below return early, so waiting until applyBookingsSubview() left
+  // the old readiness card stranded on unrelated tabs.
+  renderBookingsNotices();
   // Remove any checklist pointer when switching tabs
   const ptr = document.getElementById('checklistPointer');
   if (ptr) ptr.remove();
@@ -4000,10 +4007,14 @@ function applyFilter() {
     loadAppsModule().then(() => {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
-      const guestMessagesPanel = document.getElementById('messagesPanel');
-      if (guestMessagesPanel) guestMessagesPanel.style.display = 'block';
-      if (!crm.guestMessages.length) loadMessages();
-      else renderMessages();
+      const embeddedNativePreview = document.body.classList.contains('frontdesk-editor-preview')
+        || new URLSearchParams(window.location.search).get('previewEditor') === '1';
+      if (isNativeFrontdeskApp() || embeddedNativePreview) {
+        const guestMessagesPanel = document.getElementById('messagesPanel');
+        if (guestMessagesPanel) guestMessagesPanel.style.display = 'block';
+        if (!crm.guestMessages.length) loadMessages();
+        else renderMessages();
+      }
     }).catch(() => {
       if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest App</div></div>';
     });
@@ -5060,6 +5071,10 @@ async function loadOperationalReadiness({ force = false } = {}) {
 
 function operationalReadinessAction(action) {
   if (action === 'assistant') {
+    if (!isNativeFrontdeskApp()) {
+      openFrontdeskAppDownload();
+      return;
+    }
     loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
       toast('Could not open Front Desk Assistant.', 'error');
     });
@@ -5068,6 +5083,15 @@ function operationalReadinessAction(action) {
   if (action === 'page' || action === 'preview') {
     openGuestBookingEngine();
   }
+}
+
+function openFrontdeskAppDownload() {
+  const appStoreUrl = String(crm.frontdeskAppStoreUrl || '').trim();
+  if (appStoreUrl) {
+    window.open(appStoreUrl, '_blank', 'noopener');
+    return;
+  }
+  toast('The Front Desk app download will appear here as soon as the App Store listing is live.', 'info');
 }
 
 async function retryBookingFulfillment(bookingId) {
@@ -5915,6 +5939,7 @@ exposeToWindow({
   getBookingReservationCode,
   guestBookingEngineUrl,
   openGuestBookingEngine,
+  openFrontdeskAppDownload,
   getContextParam,
   getDetectedHostname,
   getManualRoomByName,
