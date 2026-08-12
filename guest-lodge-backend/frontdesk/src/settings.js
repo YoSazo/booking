@@ -1349,6 +1349,28 @@ function hideGoLiveOverlay() {
   const ov = document.getElementById('goLiveOverlay');
   if (ov) ov.remove();
 }
+function showGoLiveError(onRetry) {
+  let ov = document.getElementById('goLiveOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'goLiveOverlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100020;background:rgba(15,23,20,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+  ov.innerHTML = `<div role="alertdialog" aria-modal="true" aria-labelledby="goLiveErrorTitle" style="width:min(100%,420px);background:#fff;border:1px solid #d8e4dc;border-radius:22px;padding:24px;box-shadow:0 24px 70px rgba(15,23,20,.28);text-align:center;box-sizing:border-box;">
+    <div aria-hidden="true" style="width:44px;height:44px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;background:#fff7ed;color:#9a3412;font-size:22px;font-weight:800;">!</div>
+    <div id="goLiveErrorTitle" style="font-size:20px;font-weight:800;color:#1a2b22;line-height:1.2;">Checkout couldn't open</div>
+    <div style="font-size:14px;line-height:1.55;color:#5f7066;margin:9px auto 18px;max-width:330px;">Your setup is saved. Try again, or contact us if secure checkout still won't open.</div>
+    <button type="button" id="goLiveRetry" style="width:100%;min-height:48px;border:0;border-radius:14px;background:#2e7d5b;color:#fff;font:700 15px inherit;cursor:pointer;">Try secure checkout again</button>
+    <button type="button" id="goLiveDismiss" style="width:100%;min-height:44px;margin-top:5px;border:0;background:transparent;color:#607168;font:700 13px inherit;cursor:pointer;">Back to activation</button>
+    <a href="mailto:support@bookmarketel.com?subject=Marketel%20checkout%20help" style="display:inline-block;margin-top:8px;color:#2e7d5b;font-size:12px;font-weight:700;text-decoration:none;">Contact support</a>
+  </div>`;
+  ov.querySelector('#goLiveDismiss')?.addEventListener('click', hideGoLiveOverlay);
+  ov.querySelector('#goLiveRetry')?.addEventListener('click', () => {
+    hideGoLiveOverlay();
+    onRetry?.();
+  });
+}
 async function goLive(options = {}) {
   if (isNativeApp()) {
     toast('Front Desk app access is managed with your Marketel account.', 'info');
@@ -1387,18 +1409,20 @@ async function goLive(options = {}) {
     journey?.track('JourneyCheckoutFailed', {
       stage: 'create-checkout-session',
       reason: 'server-rejected',
+      serverMessage: String(res?.message || '').slice(0, 160),
     }, { immediate: true });
-    hideGoLiveOverlay();
     goLiveInFlight = false;
-    toast(res.message || 'Failed to start checkout', 'error');
+    console.warn('Marketel checkout was rejected:', res?.message || 'Unknown server response');
+    showGoLiveError(() => goLive(options));
   } catch (e) {
     journey?.track('JourneyCheckoutFailed', {
       stage: 'create-checkout-session',
       reason: 'network-or-server-error',
+      errorName: String(e?.name || '').slice(0, 80),
     }, { immediate: true });
-    hideGoLiveOverlay();
     goLiveInFlight = false;
-    toast('Failed to start checkout. Try again.', 'error');
+    console.warn('Marketel checkout could not start:', e);
+    showGoLiveError(() => goLive(options));
   }
 }
 
