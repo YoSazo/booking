@@ -9752,9 +9752,26 @@ const MARKETEL_STRIPE_KEY_MODE = process.env.STRIPE_MARKETEL_SECRET_KEY?.startsW
     : process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_test_')
         ? 'test'
         : 'unknown';
+// Explicit launch-QA escape hatch. This must be removed or set to false before
+// paid traffic starts; production otherwise requires live Stripe objects.
+const MARKETEL_ALLOW_TEST_BILLING = process.env.MARKETEL_ALLOW_TEST_BILLING === 'true';
 const MARKETEL_ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
-if (process.env.NODE_ENV === 'production' && MARKETEL_STRIPE_KEY_MODE !== 'live') {
+if (
+    process.env.NODE_ENV === 'production'
+    && MARKETEL_STRIPE_KEY_MODE === 'test'
+    && MARKETEL_ALLOW_TEST_BILLING
+) {
+    console.warn('⚠️  Marketel checkout is using Stripe test mode in production for launch QA.');
+} else if (process.env.NODE_ENV === 'production' && MARKETEL_STRIPE_KEY_MODE !== 'live') {
     console.error('❌ Marketel checkout disabled: production requires STRIPE_MARKETEL_SECRET_KEY in live mode.');
+}
+
+function marketelStripeModeAllowed(livemode) {
+    if (process.env.NODE_ENV !== 'production') return true;
+    if (livemode && MARKETEL_STRIPE_KEY_MODE === 'live') return true;
+    return !livemode
+        && MARKETEL_STRIPE_KEY_MODE === 'test'
+        && MARKETEL_ALLOW_TEST_BILLING;
 }
 
 function marketelSubscriptionHasAccess(status) {
@@ -9789,7 +9806,7 @@ function validateMarketelStripePrice(price, plan) {
     if (amountUsd !== plan.amountUsd) {
         throw new Error(`Marketel ${plan.interval}ly subscription price must be $${plan.amountUsd}/${plan.interval}`);
     }
-    if (process.env.NODE_ENV === 'production' && (!price.livemode || MARKETEL_STRIPE_KEY_MODE !== 'live')) {
+    if (!marketelStripeModeAllowed(!!price.livemode)) {
         throw new Error('Live Marketel Stripe billing is not configured');
     }
     return {
@@ -9868,7 +9885,7 @@ async function getMarketelSubscriptionPrice(billingInterval = 'month') {
         // once STRIPE_MARKETEL_YEARLY_PRICE_ID exists it is used automatically.
         if (!price && plan.interval === 'year') {
             if (!productId) throw new Error('Marketel Stripe product is not configured');
-            if (process.env.NODE_ENV === 'production' && MARKETEL_STRIPE_KEY_MODE !== 'live') {
+            if (!marketelStripeModeAllowed(MARKETEL_STRIPE_KEY_MODE === 'live')) {
                 throw new Error('Live Marketel Stripe billing is not configured');
             }
             return {
@@ -9902,6 +9919,7 @@ app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
             success: false,
             configured: false,
             keyMode: MARKETEL_STRIPE_KEY_MODE,
+            testModeAllowed: MARKETEL_ALLOW_TEST_BILLING,
             message: 'STRIPE_MARKETEL_SECRET_KEY is not configured',
         });
     }
@@ -9914,6 +9932,7 @@ app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
             success: true,
             configured: true,
             keyMode: MARKETEL_STRIPE_KEY_MODE,
+            testModeAllowed: MARKETEL_ALLOW_TEST_BILLING,
             webhookConfigured: !!process.env.STRIPE_MARKETEL_WEBHOOK_SECRET,
             price: monthlyPrice,
             prices: { month: monthlyPrice, year: yearlyPrice },
@@ -9923,6 +9942,7 @@ app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
             success: false,
             configured: true,
             keyMode: MARKETEL_STRIPE_KEY_MODE,
+            testModeAllowed: MARKETEL_ALLOW_TEST_BILLING,
             webhookConfigured: !!process.env.STRIPE_MARKETEL_WEBHOOK_SECRET,
             message: e.message,
         });
