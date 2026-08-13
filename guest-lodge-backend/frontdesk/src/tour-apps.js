@@ -555,8 +555,8 @@ function startAppsTour(opts) {
     {
       target: '#tour-apps-first',
       kicker: 'Your side',
-      title: 'Put Front Desk on your phone in 3 steps.',
-      text: 'There is no App Store. Save this page to your home screen so new bookings can reach you before they confirm — even when Front Desk is closed.',
+      title: 'Download Marketel Front Desk.',
+      text: 'The owner app receives new-booking alerts even when the web dashboard is closed. Guests do not download this app.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,

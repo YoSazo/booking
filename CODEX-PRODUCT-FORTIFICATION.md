@@ -15,7 +15,7 @@ and marketel-frontdesk-ios/app-store/submission-checklist.md.
 
 Context:
 - Product: Marketel — direct booking SaaS for independent hotels/lodges at $199/mo.
-- Goal: ~$20k cash collected (not MRR) after iOS Front Desk is live, then Meta ads.
+- Goal: $18k cash collected (not MRR) after iOS Front Desk is live, then Meta ads.
 - Funnel: landing.html → setup.html → Front Desk reveal → go live → activated modal → Download app.
 - Thesis: acquire (direct page) → retain (guest hotel PWA) → defend (Front Desk + Assistant SMS).
 
@@ -33,7 +33,7 @@ If only asked to plan: output ordered fix list with file paths. Do not expand sc
 
 ## 1. Verdict (honest)
 
-**Yes, it will work for ~$20k cash** if: App Store live → store URL on activated modal → proven Booking.com / 60s ad → Assistant as challenger. PWA/Airbnb are not cold-lead angles.
+**The product is strong enough to test seriously for the $18k cash goal.** The result is not guaranteed by the code or funnel; the decision sequence is App Store live → store URL on activated modal → full production smoke test → proven Booking.com / 60s ad as control → Assistant as challenger. PWA/Airbnb are not the initial cold-lead angles.
 
 **Product thesis is well designed.** Acquire → retain → defend matches how independents actually operate.
 
@@ -158,7 +158,7 @@ See also `OPUS-JUMP-GUIDE.md` §1, §1B, §1E.
 
 **Park Airbnb cold ads** — wrong ICP + ToS/brand risk. Product is hotel/lodge Front Desk.
 
-**Cash math:** $20k ≈ ~100 × $199 first payments. Activation (Front Desk install + first booking) still matters for month-2 cash.
+**Cash math:** $18k requires 91 × $199 monthly first payments before refunds, fees, or taxes. Annual payments can shorten the calendar, but activation (Front Desk install + first booking) still matters for month-2 cash.
 
 ---
 
@@ -220,6 +220,20 @@ Manual inventory `pg_advisory_xact_lock`, Marketel go-live Stripe verification, 
 5. **App live → `MARKETEL_FRONTDESK_APP_STORE_URL`** on activated modal (founder already sequencing this).
 
 Then: two-app copy pass + stay-first confirmation + replace `alert()` on guest checkout + align tax display.
+
+### Implementation update — Aug 12, 2026
+
+This status supersedes the original read-only findings above:
+
+- Server-priced booking quotes now own dates, nights, subtotal, tax, and total for new guest PaymentIntents; the obsolete client-priced half-total intent was removed.
+- Standard-payment webhook recovery is idempotent for manual inventory, rejects legacy underpayment, returns 5xx on unsafe failure, and ignores unrelated Stripe intents.
+- BookingCenter/Cloudbeds pay-later confirmations are written to Stripe metadata before the database write; a reconciliation sweep can restore a missing Front Desk row without booking the PMS twice.
+- The alternate `$997` public landing now redirects to the canonical `$199/month` funnel.
+- Completed setup credentials rotate after the reveal handoff; return credentials moved from query strings to URL fragments.
+- Account deletion now releases active `$1` holds and cancels only the property-scoped Stripe subscription.
+- Forgot-PIN is rate-limited, new setup PINs use the keyed hash path, the open browser-diagnostics endpoint was removed, availability is rate-limited, guest room cards include tax, and blocking guest `alert()` calls were replaced with in-page feedback.
+- The activated screen has a working web fallback when the App Store URL is not configured; after Apple publishes the listing, `MARKETEL_FRONTDESK_APP_STORE_URL` remains a required manual Render setting.
+- Still manual before App Review/ads: stable distinct production secrets, App Review demo credentials/screenshots, Apple/APNs credentials, App Store URL, live Stripe object verification, production migrations, and device smoke testing.
 
 ---
 

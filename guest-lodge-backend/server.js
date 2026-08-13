@@ -26,6 +26,7 @@ const sharp = require('sharp');
 const telemetry = require('./marketel-signal-extractor');
 const { createFrontDeskAssistant } = require('./frontdesk-assistant');
 const { buildFrontdeskReturnPath } = require('./frontdesk-return');
+const { buildBookingQuote } = require('./booking-pricing');
 
 let frontDeskAssistant = null;
 
@@ -688,18 +689,22 @@ function marketelFrontdeskOrigin(req, preferredOrigin = '') {
 function frontdeskReturnHtml({ token = '', hotelId = '', activated = false, reveal = '' } = {}) {
     const cleanToken = String(token || '').trim();
     const nextPath = buildFrontdeskReturnPath({ hotelId, activated, reveal });
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening Front Desk...</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f5;color:#1a2b22}.box{text-align:center;padding:24px}.mark{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:4px solid #d8e4dc;border-top-color:#2E7D5B;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.title{font-size:15px;font-weight:800}.sub{margin-top:6px;font-size:12px;color:#66756c}</style></head><body><div class="box"><div class="mark"></div><div class="title">Opening Front Desk</div><div class="sub">Finishing activation...</div></div><script>!function(){var token=${JSON.stringify(cleanToken)};var next=${JSON.stringify(nextPath)};try{console.info("[FrontDesk return] bridge loaded",{hasToken:!!token,tokenKind:token&&token.indexOf("fd_")===0?"return-token":token?"pin":"none"});}catch(e){}try{if(token){localStorage.setItem("crmToken",token);document.cookie="frontdeskReturnToken="+encodeURIComponent(token)+"; path=/; max-age=86400; SameSite=Lax; Secure";}}catch(e){try{console.warn("[FrontDesk return] token storage failed",e&&e.message?e.message:e);}catch(_){}}location.replace(next);}();</script></body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening Front Desk...</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f5;color:#1a2b22}.box{text-align:center;padding:24px}.mark{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:4px solid #d8e4dc;border-top-color:#2E7D5B;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.title{font-size:15px;font-weight:800}.sub{margin-top:6px;font-size:12px;color:#66756c}</style></head><body><div class="box"><div class="mark"></div><div class="title">Opening Front Desk</div><div class="sub">Finishing activation...</div></div><script>!function(){var embedded=${JSON.stringify(cleanToken)};var fragment=new URLSearchParams(location.hash.slice(1));var token=embedded||fragment.get("pin")||fragment.get("returnToken")||"";var next=${JSON.stringify(nextPath)};try{console.info("[FrontDesk return] bridge loaded",{hasToken:!!token,tokenKind:token&&token.indexOf("fd_")===0?"return-token":token?"pin":"none"});}catch(e){}try{if(token){localStorage.setItem("crmToken",token);document.cookie="frontdeskReturnToken="+encodeURIComponent(token)+"; path=/; max-age=86400; SameSite=Lax; Secure";}}catch(e){try{console.warn("[FrontDesk return] token storage failed",e&&e.message?e.message:e);}catch(_){}}location.replace(next);}();</script></body></html>`;
 }
 
 function redactFrontdeskAuthUrl(url) {
-    return String(url || '').replace(/([?&](?:returnToken|pin)=)[^&]+/g, '$1[redacted]');
+    return String(url || '').replace(/([?&#](?:returnToken|pin)=)[^&#]+/g, '$1[redacted]');
 }
 
 app.get('/frontdesk-return', (req, res) => {
+    // Query-token support remains for old emailed links. New activation and
+    // cancellation redirects put credentials in the URL fragment, which is
+    // never sent to servers, logs, Stripe, analytics or Referer headers.
     const token = String(req.query.pin || req.query.returnToken || '').trim();
     const hotelId = String(req.query.hotelId || '').trim();
     const activated = String(req.query.activated || '') === '1';
-    const reveal = String(req.query.reveal || '').trim() === 'checkout' ? 'checkout' : '';
+    const requestedReveal = String(req.query.reveal || '').trim();
+    const reveal = requestedReveal === 'checkout' || requestedReveal === '1' ? requestedReveal : '';
     res.setHeader('Cache-Control', 'no-store');
     console.log('frontdesk-return bridge served:', {
         host: req.get('host'),
@@ -774,6 +779,7 @@ const hotelConfig = {
     'suite-stay': {
         pms: 'manual',
         propertyId: '100080519237760',
+        bookingRates: { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 },
         roomIDMapping: {
             'King Room': {
                 roomTypeIDs: [
@@ -802,6 +808,7 @@ const hotelConfig = {
     'home-place-suites': {
         pms: 'cloudbeds',
         propertyId: '113548817731712',
+        bookingRates: { nightly: 69, weekly: 299, monthly: 1099, taxRate: 0.10 },
         roomIDMapping: {
             'Single King Room': {
                 roomTypeID: '117057244229790',
@@ -831,11 +838,14 @@ const hotelConfig = {
     },
     'guest-lodge-minot': {
         pms: 'manual',
+        bookingRates: { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 },
         // Manual front-desk managed availability (simple-crm.html)
         roomIDMapping: {}
     },
     'st-croix-wisconsin': {
         pms: 'bookingcenter',
+        bookingRates: { nightly: 72, weekly: 301, monthly: 999, taxRate: 0.10 },
+        bookingRoomNames: ['Queen Suite', '2 Queen Suite'],
         siteId: process.env.BOOKINGCENTER_STCROIX_SITE_ID || 'STCROIX',
         sitePassword: process.env.BOOKINGCENTER_STCROIX_SITE_PASSWORD,
         chainCode: process.env.BOOKINGCENTER_STCROIX_CHAIN_CODE || process.env.BOOKINGCENTER_CHAIN_CODE || 'BC',
@@ -1152,15 +1162,73 @@ function findBookingSnapshotMismatch(submitted, stored) {
 
 function getExpectedStandardChargeAmountsCents(bookingDetails) {
     const snapshot = normalizeBookingSnapshot(bookingDetails);
-    const amounts = new Set();
-    if (snapshot.totalCents !== null && snapshot.totalCents > 0) {
-        amounts.add(snapshot.totalCents);
-        amounts.add(Math.round(snapshot.totalCents / 2));
+    return snapshot.totalCents !== null && snapshot.totalCents > 0
+        ? [snapshot.totalCents]
+        : [];
+}
+
+async function getServerBookingQuote(hotelId, bookingDetails = {}) {
+    const cleanHotelId = String(hotelId || '').trim();
+    const roomName = String(bookingDetails.roomName || bookingDetails.name || '').trim();
+    if (!cleanHotelId || !roomName) {
+        const error = new Error('A valid property and room are required.');
+        error.status = 400;
+        throw error;
     }
-    if (snapshot.amountPaidNowCents !== null && snapshot.amountPaidNowCents > 0) {
-        amounts.add(snapshot.amountPaidNowCents);
+
+    let [rates, room] = await Promise.all([
+        withRetry(() => prisma.hotelRates.findUnique({ where: { hotelId: cleanHotelId } })),
+        withRetry(() => prisma.room.findFirst({
+            where: { hotelId: cleanHotelId, name: roomName },
+            select: { id: true, name: true },
+        })),
+    ]);
+    if ((!rates || !room) && isStaticOnlyHotelId(cleanHotelId)) {
+        const staticConfig = hotelConfig[cleanHotelId] || {};
+        rates ||= staticConfig.bookingRates || null;
+        const allowedRoomNames = new Set([
+            ...Object.keys(staticConfig.roomIDMapping || {}),
+            ...(staticConfig.bookingRoomNames || []),
+        ]);
+        if (!room && allowedRoomNames.has(roomName)) room = { name: roomName };
     }
-    return [...amounts];
+    if (!room) {
+        const error = new Error('That room is not part of this property.');
+        error.status = 400;
+        throw error;
+    }
+    if (!rates) {
+        const error = new Error('Online payment pricing is not configured for this property.');
+        error.status = 409;
+        throw error;
+    }
+
+    const quote = buildBookingQuote({
+        checkin: bookingDetails.checkin,
+        checkout: bookingDetails.checkout,
+        rates,
+    });
+    if (!quote) {
+        const error = new Error('Choose a valid stay between 1 and 180 nights.');
+        error.status = 400;
+        throw error;
+    }
+
+    return {
+        ...quote,
+        bookingDetails: {
+            ...bookingDetails,
+            name: room.name,
+            roomName: room.name,
+            nights: quote.nights,
+            subtotal: quote.subtotal,
+            taxes: quote.taxes,
+            total: quote.total,
+            amountPaidNow: quote.total,
+            amountDueAtArrival: 0,
+            bookingType: 'standard',
+        },
+    };
 }
 
 function validateStripeIntentAgainstBooking(paymentIntent, {
@@ -2245,6 +2313,11 @@ const createPaymentIntentRateLimit = createRouteRateLimiter('create-payment-inte
 const createPreauthHoldRateLimit = createRouteRateLimiter('create-preauth-hold', { windowMs: 60 * 1000, max: 12 });
 const completePayLaterRateLimit = createRouteRateLimiter('complete-pay-later-booking', { windowMs: 60 * 1000, max: 12 });
 const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1000, max: 12 });
+const availabilityRateLimit = createRouteRateLimiter('availability', {
+    windowMs: 5 * 60 * 1000,
+    max: 80,
+    scope: req => req.body?.hotelId,
+});
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 10 });
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
@@ -2252,6 +2325,11 @@ const journeyEventRateLimit = createRouteRateLimiter('marketel-journey', { windo
 const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
+const forgotPinRateLimit = createRouteRateLimiter('forgot-pin', {
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    scope: req => String(req.body?.email || '').trim().toLowerCase(),
+});
 const supportMessageRateLimit = createRouteRateLimiter('marketel-support-message', {
     windowMs: 5 * 60 * 1000,
     max: 10,
@@ -2313,70 +2391,281 @@ async function findGuestBooking(hotelId, reservationCode, select) {
     });
 }
 
-app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
-    const { amount, bookingDetails, guestInfo, hotelId, preview } = req.body;
-    console.log('💳 create-payment-intent called. hotelId:', hotelId, 'preview:', preview);
-    const amountInCents = Math.round(amount * 100);
+const EXTERNAL_PMS_RECONCILIATION_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
 
-    if (typeof amount !== 'number' || amount <= 0) {
-        return res.status(400).send({ error: { message: "Invalid amount provided." } });
+function externalPmsReceipt(paymentIntent, expectedProvider = '') {
+    const metadata = paymentIntent?.metadata || {};
+    const provider = String(metadata.externalPmsProvider || '').trim().toLowerCase();
+    const reservationId = String(metadata.externalPmsReservationId || '').trim();
+    if (!provider || !reservationId) return null;
+    if (expectedProvider && provider !== String(expectedProvider).trim().toLowerCase()) return null;
+    return { provider, reservationId, state: String(metadata.externalPmsState || '').trim().toLowerCase() };
+}
+
+async function updateExternalPmsReceipt(paymentIntentId, data) {
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+            return await stripe.paymentIntents.update(paymentIntentId, {
+                metadata: {
+                    externalPmsProvider: String(data.provider || '').trim().toLowerCase(),
+                    externalPmsReservationId: String(data.reservationId || '').trim(),
+                    externalPmsState: String(data.state || 'pms_created').trim().toLowerCase(),
+                },
+            });
+        } catch (error) {
+            lastError = error;
+            if (attempt < 3) await new Promise(resolve => setTimeout(resolve, attempt * 350));
+        }
+    }
+    throw lastError || new Error('Could not persist external PMS receipt.');
+}
+
+async function persistExternalPayLaterBooking({
+    paymentIntent,
+    provider,
+    reservationId,
+    hotelId,
+    bookingDetails,
+    guestInfo,
+}) {
+    const existing = await withRetry(() => prisma.booking.findUnique({
+        where: { stripePaymentIntentId: paymentIntent.id },
+    }));
+    if (existing) {
+        await updateExternalPmsReceipt(paymentIntent.id, {
+            provider,
+            reservationId,
+            state: 'recorded',
+        }).catch(error => console.error('Could not mark external PMS receipt recorded:', error.message));
+        return { booking: existing, created: false };
     }
 
+    const holdStatus = String(paymentIntent.status || '').trim().toLowerCase() === 'succeeded'
+        ? 'captured'
+        : 'active';
+    let savedBooking;
     try {
-        // Skip hotel active check in preview mode (setup wizard)
-        let resolvedHotelId = hotelId;
-        if (!preview) {
-            const hotelValidation = await getActiveHotelValidation(hotelId);
-            if (!hotelValidation.ok) {
-                return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
-            }
-            resolvedHotelId = hotelValidation.hotelId;
+        savedBooking = await withRetry(() => createBookingRecordWithConfirmation({
+            stripePaymentIntentId: paymentIntent.id,
+            ourReservationCode: bookingDetails.reservationCode,
+            pmsConfirmationCode: reservationId,
+            hotelId,
+            roomName: bookingDetails.name || bookingDetails.roomName,
+            bookingType: 'payLater',
+            checkinDate: new Date(bookingDetails.checkin),
+            checkoutDate: new Date(bookingDetails.checkout),
+            nights: bookingDetails.nights,
+            guestFirstName: guestInfo.firstName,
+            guestLastName: guestInfo.lastName,
+            guestEmail: guestInfo.email,
+            guestPhone: guestInfo.phone,
+            subtotal: bookingDetails.subtotal,
+            taxesAndFees: bookingDetails.taxes,
+            grandTotal: bookingDetails.total,
+            amountPaidNow: 0,
+            preAuthHoldAmount: 1.00,
+            holdStatus,
+            noShowFeePaid: holdStatus === 'captured',
+            holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
+        }));
+    } catch (error) {
+        if (error?.code !== 'P2002') throw error;
+        savedBooking = await withRetry(() => prisma.booking.findFirst({
+            where: {
+                OR: [
+                    { stripePaymentIntentId: paymentIntent.id },
+                    { ourReservationCode: bookingDetails.reservationCode },
+                ],
+            },
+        }));
+        if (!savedBooking) throw error;
+        await updateExternalPmsReceipt(paymentIntent.id, {
+            provider,
+            reservationId,
+            state: 'recorded',
+        }).catch(markError => console.error('Could not mark duplicate external PMS receipt recorded:', markError.message));
+        return { booking: savedBooking, created: false };
+    }
+
+    await updateExternalPmsReceipt(paymentIntent.id, {
+        provider,
+        reservationId,
+        state: 'recorded',
+    }).catch(error => console.error('Could not mark external PMS receipt recorded:', error.message));
+    triggerBookingNotifications(
+        hotelId,
+        [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null,
+        bookingDetails.name || bookingDetails.roomName,
+        bookingDetails.total,
+        bookingDetails.checkin,
+        guestInfo.email,
+        savedBooking.id
+    );
+    runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
+    return { booking: savedBooking, created: true };
+}
+
+async function reconcileExternalPmsPaymentIntent(paymentIntent) {
+    const receipt = externalPmsReceipt(paymentIntent);
+    if (!receipt || receipt.state !== 'pms_created') return { skipped: true };
+
+    const snapshot = getStripeIntentSnapshot(paymentIntent);
+    const bookingDetails = parseJsonObject(paymentIntent.metadata?.bookingDetails);
+    const guestInfo = parseJsonObject(paymentIntent.metadata?.guestInfo);
+    if (
+        snapshot.holdType !== 'pre_authorization'
+        || !snapshot.hotelId
+        || !bookingDetails?.reservationCode
+        || !bookingDetails?.roomName
+        || !guestInfo?.email
+    ) {
+        throw new Error(`External PMS receipt ${paymentIntent.id} is missing booking metadata.`);
+    }
+    const config = await resolveHotelConfig(snapshot.hotelId);
+    if (config.pms !== receipt.provider) {
+        throw new Error(`External PMS receipt ${paymentIntent.id} does not match the property provider.`);
+    }
+
+    return persistExternalPayLaterBooking({
+        paymentIntent,
+        provider: receipt.provider,
+        reservationId: receipt.reservationId,
+        hotelId: snapshot.hotelId,
+        bookingDetails,
+        guestInfo,
+    });
+}
+
+async function runExternalPmsReconciliation() {
+    const createdAfter = Math.floor(Date.now() / 1000) - EXTERNAL_PMS_RECONCILIATION_LOOKBACK_SECONDS;
+    const pending = [];
+    let startingAfter = '';
+    for (let pageNumber = 0; pageNumber < 10; pageNumber += 1) {
+        const page = await stripe.paymentIntents.list({
+            created: { gte: createdAfter },
+            limit: 100,
+            ...(startingAfter ? { starting_after: startingAfter } : {}),
+        });
+        pending.push(...page.data.filter(intent => externalPmsReceipt(intent)?.state === 'pms_created'));
+        if (!page.has_more || !page.data.length) break;
+        startingAfter = page.data[page.data.length - 1].id;
+    }
+    let recovered = 0;
+    for (const paymentIntent of pending) {
+        try {
+            const outcome = await reconcileExternalPmsPaymentIntent(paymentIntent);
+            if (outcome?.booking) recovered += 1;
+        } catch (error) {
+            console.error(`External PMS reconciliation failed for ${paymentIntent.id}:`, error.message);
         }
+    }
+    if (recovered) console.log(`✅ External PMS reconciliation recorded ${recovered} booking(s).`);
+    return { checked: pending.length, recovered };
+}
+
+async function persistManualPayLaterBooking({ paymentIntent, hotelId, bookingDetails, guestInfo, config }) {
+    const pmsResponse = await createManualBooking(hotelId, bookingDetails);
+    const approvalPlan = await resolveBookingApprovalPlan(config);
+    const holdStatus = String(paymentIntent.status || '').trim().toLowerCase() === 'succeeded'
+        ? 'captured'
+        : 'active';
+    const outcome = await createManualBookingRecordWithInventory(hotelId, {
+        stripePaymentIntentId: paymentIntent.id,
+        ourReservationCode: bookingDetails.reservationCode || pmsResponse.reservationID,
+        pmsConfirmationCode: pmsResponse.reservationID,
+        hotelId,
+        roomName: bookingDetails.name || bookingDetails.roomName,
+        bookingType: 'payLater',
+        checkinDate: new Date(bookingDetails.checkin),
+        checkoutDate: new Date(bookingDetails.checkout),
+        nights: bookingDetails.nights,
+        guestFirstName: guestInfo.firstName,
+        guestLastName: guestInfo.lastName,
+        guestEmail: guestInfo.email,
+        guestPhone: guestInfo.phone,
+        subtotal: bookingDetails.subtotal,
+        taxesAndFees: bookingDetails.taxes,
+        grandTotal: bookingDetails.total,
+        amountPaidNow: 0,
+        preAuthHoldAmount: 1.00,
+        holdStatus,
+        noShowFeePaid: holdStatus === 'captured',
+        holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
+        ...bookingApprovalCreateFields(approvalPlan),
+    });
+
+    if (outcome.created) {
+        if (approvalPlan.hold) {
+            notifyBookingNeedsApproval(outcome.booking).catch(() => {});
+        } else {
+            triggerBookingNotifications(
+                hotelId,
+                [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null,
+                bookingDetails.name || bookingDetails.roomName,
+                bookingDetails.total,
+                bookingDetails.checkin,
+                guestInfo.email,
+                outcome.booking.id
+            );
+            runBookingSideEffectSweep({ bookingId: outcome.booking.id, limit: 5 }).catch(() => {});
+            handleBookingCreatedWithoutHold(outcome.booking, approvalPlan);
+        }
+    }
+
+    return { outcome, approvalPlan, pmsResponse };
+}
+
+app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req, res) => {
+    const { bookingDetails, guestInfo, hotelId, preview } = req.body;
+    console.log('💳 create-payment-intent called. hotelId:', hotelId, 'preview:', preview);
+    try {
+        // Owner previews never need a real PaymentIntent. Keeping this route
+        // transaction-only prevents a preview URL from becoming a money API.
+        if (preview) {
+            return res.status(400).send({ error: { message: 'Preview checkout does not create a payment.' } });
+        }
+        const hotelValidation = await getActiveHotelValidation(hotelId);
+        if (!hotelValidation.ok) {
+            return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
+        }
+        const config = await resolveHotelConfig(hotelValidation.hotelId);
+        // Standard full-charge checkout is not exposed by the current guest UI.
+        // If it is restored later, keep it on the transactional manual inventory
+        // path until external PMS recovery has an idempotency guarantee.
+        if (config.pms !== 'manual') {
+            return res.status(409).send({
+                error: { message: 'Full online payment is not enabled for this property. Reserve with the $1 verification instead.' },
+            });
+        }
+        const quote = await getServerBookingQuote(hotelValidation.hotelId, bookingDetails);
 
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: amountInCents,
+            amount: quote.totalCents,
             currency: 'usd',
             automatic_payment_methods: {
                 enabled: true,
             },
             metadata: buildStripeIntentMetadata({
-                bookingDetails,
+                bookingDetails: quote.bookingDetails,
                 guestInfo,
-                hotelId: resolvedHotelId,
+                hotelId: hotelValidation.hotelId,
+                extra: { pricingSource: 'server-hotel-rates' },
             }),
         });
-        res.send({ clientSecret: paymentIntent.client_secret });
+        res.send({
+            clientSecret: paymentIntent.client_secret,
+            quote: {
+                subtotal: quote.subtotal,
+                taxes: quote.taxes,
+                total: quote.total,
+                nights: quote.nights,
+            },
+        });
     } catch (error) {
         console.error("Stripe API Error creating payment intent:", error.message);
-        res.status(400).send({ error: { message: error.message || "Failed to create payment intent due to an API error." } });
+        res.status(error.status || 400).send({ error: { message: error.message || "Failed to create payment intent due to an API error." } });
     }
-});
-
-app.post('/api/update-payment-intent', async (req, res) => {
-  const { clientSecret, guestInfo } = req.body;
-
-  if (!clientSecret || !String(clientSecret).includes('_secret')) {
-    return res.status(400).send({
-      success: false,
-      error: { message: 'Valid clientSecret is required' }
-    });
-  }
-
-  // The clientSecret contains the Payment Intent ID
-  const paymentIntentId = String(clientSecret).split('_secret')[0];
-
-  try {
-    await stripe.paymentIntents.update(paymentIntentId, {
-      metadata: {
-        // We only need to update the guestInfo, the bookingDetails are already there
-        guestInfo: JSON.stringify(guestInfo)
-      }
-    });
-    res.send({ success: true });
-  } catch (error) {
-    console.error("Failed to update payment intent:", error.message);
-    res.status(400).send({ success: false, error: { message: error.message } });
-  }
 });
 
 // NEW: Create pre-authorization hold for "Reserve Now, Pay Later"
@@ -2390,6 +2679,7 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
         if (!hotelValidation.ok) {
             return res.status(hotelValidation.status).json({ success: false, message: hotelValidation.message });
         }
+        const quote = await getServerBookingQuote(hotelValidation.hotelId, bookingDetails);
 
         // Create a PaymentIntent with manual capture
         // This places a hold on the card without charging
@@ -2401,7 +2691,13 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
                 enabled: true,
             },
             metadata: buildStripeIntentMetadata({
-                bookingDetails,
+                bookingDetails: {
+                    ...quote.bookingDetails,
+                    bookingType: 'payLater',
+                    amountPaidNow: 0,
+                    amountDueAtArrival: quote.total,
+                    preAuthHoldAmount: 1,
+                },
                 guestInfo,
                 hotelId: hotelValidation.hotelId,
                 extra: {
@@ -2410,7 +2706,7 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
                     holdType: 'pre_authorization',
                 },
             }),
-            description: `Pre-authorization hold for ${bookingDetails.roomName} - ${bookingDetails.nights} nights`
+            description: `Pre-authorization hold for ${quote.bookingDetails.roomName} - ${quote.nights} nights`
         });
         
         res.send({ 
@@ -2427,7 +2723,7 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
 
 // NEW: Complete pay later booking after pre-auth hold succeeds
 app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (req, res) => {
-    const { paymentIntentId, guestInfo, bookingDetails, hotelId } = req.body;
+    const { paymentIntentId, guestInfo, bookingDetails: submittedBookingDetails, hotelId } = req.body;
 
     try {
         if (!paymentIntentId) {
@@ -2444,7 +2740,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
 
         const paymentValidation = validateStripeIntentAgainstBooking(paymentIntent, {
             hotelId: hotelValidation.hotelId,
-            bookingDetails,
+            bookingDetails: submittedBookingDetails,
             allowedStatuses: ['requires_capture', 'succeeded'],
             allowedAmountsCents: [100],
             requireManualCapture: true,
@@ -2456,6 +2752,13 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                 message: paymentValidation,
             });
         }
+        const bookingDetails = parseJsonObject(paymentIntent.metadata?.bookingDetails);
+        if (!bookingDetails?.rateID || !bookingDetails?.roomName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment authorization is missing its server booking quote.',
+            });
+        }
 
         // Create booking in PMS with "Pay at Hotel" status
         const holdStatus = String(paymentIntent.status || '').trim().toLowerCase() === 'succeeded' ? 'captured' : 'active';
@@ -2463,7 +2766,10 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
 
         // BookingCenter pay-later: we still save a booking (guarantee/verification handled by $1 hold on Stripe)
         if (config.pms === 'bookingcenter') {
-            const pmsResponse = await createBookingCenterBooking(hotelValidation.hotelId, bookingDetails, guestInfo);
+            const existingReceipt = externalPmsReceipt(paymentIntent, 'bookingcenter');
+            const pmsResponse = existingReceipt
+                ? { success: true, reservationID: existingReceipt.reservationId, recovered: true }
+                : await createBookingCenterBooking(hotelValidation.hotelId, bookingDetails, guestInfo);
 
             if (!pmsResponse.success) {
                 // If booking fails, cancel the hold
@@ -2476,84 +2782,60 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                 });
             }
 
-            // Save to DB if possible (but don't fail booking if DB is down)
+            let receiptRecorded = !!existingReceipt;
+            if (!receiptRecorded) {
+                try {
+                    await updateExternalPmsReceipt(paymentIntentId, {
+                        provider: 'bookingcenter',
+                        reservationId: pmsResponse.reservationID,
+                        state: 'pms_created',
+                    });
+                    receiptRecorded = true;
+                } catch (receiptError) {
+                    console.error('CRITICAL: BookingCenter reservation exists but its Stripe receipt could not be stored:', receiptError.message);
+                }
+            }
+
+            let syncPending = false;
             try {
-                const savedBooking = await createBookingRecordWithConfirmation({
-                        stripePaymentIntentId: paymentIntentId,
-                        ourReservationCode: bookingDetails.reservationCode,
-                        pmsConfirmationCode: pmsResponse.reservationID,
-                        hotelId: hotelValidation.hotelId,
-                        roomName: bookingDetails.name || bookingDetails.roomName,
-                        bookingType: 'payLater',
-                        checkinDate: new Date(bookingDetails.checkin),
-                        checkoutDate: new Date(bookingDetails.checkout),
-                        nights: bookingDetails.nights,
-                        guestFirstName: guestInfo.firstName,
-                        guestLastName: guestInfo.lastName,
-                        guestEmail: guestInfo.email,
-                        guestPhone: guestInfo.phone,
-                        subtotal: bookingDetails.subtotal,
-                        taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total,
-                        amountPaidNow: 0,
-                        preAuthHoldAmount: 1.00,
-                        holdStatus: holdStatus,
-                        noShowFeePaid: holdStatus === 'captured',
-                        holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
+                await persistExternalPayLaterBooking({
+                    paymentIntent,
+                    provider: 'bookingcenter',
+                    reservationId: pmsResponse.reservationID,
+                    hotelId: hotelValidation.hotelId,
+                    bookingDetails,
+                    guestInfo,
                 });
-                triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
-                runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
+                syncPending = true;
+                if (receiptRecorded) {
+                    setTimeout(() => runExternalPmsReconciliation().catch(error => {
+                        console.error('Immediate external PMS reconciliation failed:', error.message);
+                    }), 5000).unref?.();
+                }
             }
 
             return res.json({
                 success: true,
-                message: 'Reservation created successfully. $1.00 hold placed on card.',
-                reservationCode: pmsResponse.reservationID
+                syncPending,
+                message: syncPending
+                    ? 'Reservation received. Front Desk is finishing its sync.'
+                    : 'Reservation created successfully. $1.00 hold placed on card.',
+                reservationCode: pmsResponse.reservationID,
             });
         }
 
         // Manual PMS pay-later flow
         if (config.pms === 'manual') {
-            const pmsResponse = await createManualBooking(hotelValidation.hotelId, bookingDetails);
-            const approvalPlan = await resolveBookingApprovalPlan(config);
-
             try {
-                const outcome = await createManualBookingRecordWithInventory(hotelValidation.hotelId, {
-                    stripePaymentIntentId: paymentIntentId,
-                    ourReservationCode: bookingDetails.reservationCode || pmsResponse.reservationID,
-                    pmsConfirmationCode: pmsResponse.reservationID,
+                const { outcome, approvalPlan, pmsResponse } = await persistManualPayLaterBooking({
+                    paymentIntent,
                     hotelId: hotelValidation.hotelId,
-                    roomName: bookingDetails.name || bookingDetails.roomName,
-                    bookingType: 'payLater',
-                    checkinDate: new Date(bookingDetails.checkin),
-                    checkoutDate: new Date(bookingDetails.checkout),
-                    nights: bookingDetails.nights,
-                    guestFirstName: guestInfo.firstName,
-                    guestLastName: guestInfo.lastName,
-                    guestEmail: guestInfo.email,
-                    guestPhone: guestInfo.phone,
-                    subtotal: bookingDetails.subtotal,
-                    taxesAndFees: bookingDetails.taxes,
-                    grandTotal: bookingDetails.total,
-                    amountPaidNow: 0,
-                    preAuthHoldAmount: 1.00,
-                    holdStatus: holdStatus,
-                    noShowFeePaid: holdStatus === 'captured',
-                    holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
-                    ...bookingApprovalCreateFields(approvalPlan),
+                    bookingDetails,
+                    guestInfo,
+                    config,
                 });
-
-                if (outcome.created) {
-                    if (approvalPlan.hold) {
-                        notifyBookingNeedsApproval(outcome.booking).catch(() => {});
-                    } else {
-                        triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, outcome.booking.id);
-                        runBookingSideEffectSweep({ bookingId: outcome.booking.id, limit: 5 }).catch(() => {});
-                        handleBookingCreatedWithoutHold(outcome.booking, approvalPlan);
-                    }
-                }
 
                 const isPending = String(outcome.booking.status || '').toLowerCase() === 'pending';
                 const pendingPolicy = resolveApprovalNoResponseAction(
@@ -2622,73 +2904,63 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
             }]),
         };
 
-        const pmsResponse = await axios.post(
-            'https://api.cloudbeds.com/api/v1.3/postReservation',
-            new URLSearchParams(reservationData),
-            {
-                headers: {
-                    'accept': 'application/json',
-                    'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
-                    'content-type': 'application/x-www-form-urlencoded',
+        const existingReceipt = externalPmsReceipt(paymentIntent, 'cloudbeds');
+        const pmsResponse = existingReceipt
+            ? { data: { success: true, reservationID: existingReceipt.reservationId }, recovered: true }
+            : await axios.post(
+                'https://api.cloudbeds.com/api/v1.3/postReservation',
+                new URLSearchParams(reservationData),
+                {
+                    headers: {
+                        'accept': 'application/json',
+                        'authorization': `Bearer ${CLOUDBEDS_API_KEY}`,
+                        'content-type': 'application/x-www-form-urlencoded',
+                    }
                 }
-            }
-        );
+            );
 
         if (pmsResponse.data.success) {
-            // Save to database with retry logic for cold starts
-            let dbSaveSuccess = false;
-            let retries = 2; // Reduced from 3 to 2 for faster booking
-            
-            while (!dbSaveSuccess && retries > 0) {
+            let receiptRecorded = !!existingReceipt;
+            if (!receiptRecorded) {
                 try {
-                    const savedBooking = await createBookingRecordWithConfirmation({
-                            stripePaymentIntentId: paymentIntentId,
-                            ourReservationCode: bookingDetails.reservationCode,
-                            pmsConfirmationCode: pmsResponse.data.reservationID,
-                            hotelId: hotelValidation.hotelId,
-                            roomName: bookingDetails.name || bookingDetails.roomName,
-                            bookingType: 'payLater',
-                            checkinDate: new Date(bookingDetails.checkin),
-                            checkoutDate: new Date(bookingDetails.checkout),
-                            nights: bookingDetails.nights,
-                            guestFirstName: guestInfo.firstName,
-                            guestLastName: guestInfo.lastName,
-                            guestEmail: guestInfo.email,
-                            guestPhone: guestInfo.phone,
-                            subtotal: bookingDetails.subtotal,
-                            taxesAndFees: bookingDetails.taxes,
-                            grandTotal: bookingDetails.total,
-                            amountPaidNow: 0,
-                            preAuthHoldAmount: 1.00,
-                            holdStatus: holdStatus,
-                            noShowFeePaid: holdStatus === 'captured',
-                            holdCapturedAt: holdStatus === 'captured' ? new Date() : null,
+                    await updateExternalPmsReceipt(paymentIntentId, {
+                        provider: 'cloudbeds',
+                        reservationId: pmsResponse.data.reservationID,
+                        state: 'pms_created',
                     });
-                    dbSaveSuccess = true;
-                    triggerBookingNotifications(hotelValidation.hotelId, [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null, bookingDetails.name || bookingDetails.roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
-                    runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
-                    console.log('✅ Booking saved to database');
-                } catch (dbError) {
-                    retries--;
-                    if (dbError.code === 'P2002') {
-                        // Unique constraint - booking already exists, that's OK
-                        console.log('ℹ️ Booking already in database (duplicate prevented)');
-                        dbSaveSuccess = true;
-                    } else if (retries > 0) {
-                        console.log(`⚠️ DB save failed, retrying... (${retries} attempts left)`);
-                        await new Promise(r => setTimeout(r, 500)); // Wait 0.5 seconds before retry
-                    } else {
-                        console.error('❌ Failed to save to database after retries:', dbError.message);
-                        // Don't fail the whole booking - Cloudbeds booking succeeded
-                        // Webhook will handle saving to DB as backup
-                    }
+                    receiptRecorded = true;
+                } catch (receiptError) {
+                    console.error('CRITICAL: Cloudbeds reservation exists but its Stripe receipt could not be stored:', receiptError.message);
+                }
+            }
+
+            let syncPending = false;
+            try {
+                await persistExternalPayLaterBooking({
+                    paymentIntent,
+                    provider: 'cloudbeds',
+                    reservationId: pmsResponse.data.reservationID,
+                    hotelId: hotelValidation.hotelId,
+                    bookingDetails,
+                    guestInfo,
+                });
+            } catch (dbError) {
+                console.error('❌ Failed to save Cloudbeds booking to database:', dbError.message);
+                syncPending = true;
+                if (receiptRecorded) {
+                    setTimeout(() => runExternalPmsReconciliation().catch(error => {
+                        console.error('Immediate external PMS reconciliation failed:', error.message);
+                    }), 5000).unref?.();
                 }
             }
 
             res.json({
                 success: true,
-                message: 'Reservation created successfully. $1.00 hold placed on card.',
-                reservationCode: pmsResponse.data.reservationID
+                syncPending,
+                message: syncPending
+                    ? 'Reservation received. Front Desk is finishing its sync.'
+                    : 'Reservation created successfully. $1.00 hold placed on card.',
+                reservationCode: pmsResponse.data.reservationID,
             });
         } else {
             // If booking fails, cancel the hold
@@ -3057,9 +3329,127 @@ app.post('/api/capture-no-show-fee', requireCrmAuthDeferred, async (req, res) =>
     }
 });
 
+async function recoverGuestPaymentIntent(paymentIntent) {
+    const snapshot = getStripeIntentSnapshot(paymentIntent);
+    const metadata = paymentIntent.metadata || {};
+    const submittedBooking = parseJsonObject(metadata.bookingDetails);
+    const guestInfo = parseJsonObject(metadata.guestInfo);
+    const hotelId = String(metadata.hotelId || '').trim();
+    if (!hotelId) throw new Error('Payment metadata is missing hotelId.');
 
+    const existingBooking = await prisma.booking.findFirst({
+        where: {
+            OR: [
+                { stripePaymentIntentId: paymentIntent.id },
+                ...(snapshot.booking.reservationCode
+                    ? [{ ourReservationCode: snapshot.booking.reservationCode }]
+                    : []),
+            ],
+        },
+    });
+    if (existingBooking) return { booking: existingBooking, created: false };
 
-// REPLACE your entire webhook with this one:
+    // A failed inventory commit refunds the charge before returning the guest
+    // to the room picker. Stripe can deliver the original succeeded event
+    // again later; never turn that refunded payment into a reservation.
+    const latestChargeId = stripeObjectId(paymentIntent.latest_charge);
+    if (latestChargeId) {
+        const latestCharge = typeof paymentIntent.latest_charge === 'object'
+            ? paymentIntent.latest_charge
+            : await stripe.charges.retrieve(latestChargeId);
+        const amountReceived = Number(paymentIntent.amount_received || paymentIntent.amount || 0);
+        const amountRefunded = Number(latestCharge?.amount_refunded || 0);
+        if (latestCharge?.refunded || (amountReceived > 0 && amountRefunded >= amountReceived)) {
+            return { booking: null, created: false, ignored: 'refunded' };
+        }
+    }
+
+    // A captured $1 hold is a no-show action on a booking that must already
+    // exist. Never reinterpret it as payment for a new room.
+    if (snapshot.holdType === 'pre_authorization') {
+        throw new Error(`Captured $1 hold ${paymentIntent.id} has no matching booking.`);
+    }
+
+    const hotelValidation = await getActiveHotelValidation(hotelId);
+    if (!hotelValidation.ok) throw new Error(hotelValidation.message);
+    const config = await resolveHotelConfig(hotelValidation.hotelId);
+    if (config.pms !== 'manual') {
+        throw new Error(
+            `Automatic recovery for standard payments is disabled for ${config.pms}; `
+            + 'the payment requires operator review before creating an external PMS reservation.'
+        );
+    }
+
+    // New intents carry a quote stamped by this server. Preserve that quoted
+    // price even if the owner edits rates between payment and webhook retry.
+    // Legacy intents lack the stamp, so they must still match today's stored
+    // catalog or fail closed for operator review.
+    const serverStampedQuote = metadata.pricingSource === 'server-hotel-rates';
+    const quote = serverStampedQuote
+        ? {
+            bookingDetails: submittedBooking,
+            totalCents: normalizeBookingSnapshot(submittedBooking).totalCents,
+        }
+        : await getServerBookingQuote(hotelValidation.hotelId, submittedBooking);
+    if (!quote.totalCents || Number(paymentIntent.amount || 0) !== quote.totalCents) {
+        throw new Error(
+            `Payment ${paymentIntent.id} amount does not match the server booking quote; operator review required.`
+        );
+    }
+    const bookingDetails = quote.bookingDetails;
+    const reservationCode = String(bookingDetails.reservationCode || '').trim();
+    if (!reservationCode) throw new Error('Payment metadata is missing a reservation code.');
+
+    const pmsResponse = await createManualBooking(hotelValidation.hotelId, bookingDetails);
+    const outcome = await createManualBookingRecordWithInventory(hotelValidation.hotelId, {
+        stripePaymentIntentId: paymentIntent.id,
+        ourReservationCode: reservationCode,
+        pmsConfirmationCode: pmsResponse.reservationID,
+        hotelId: hotelValidation.hotelId,
+        roomName: bookingDetails.roomName || bookingDetails.name,
+        bookingType: 'standard',
+        checkinDate: new Date(bookingDetails.checkin),
+        checkoutDate: new Date(bookingDetails.checkout),
+        nights: bookingDetails.nights,
+        guestFirstName: String(guestInfo.firstName || '').trim(),
+        guestLastName: String(guestInfo.lastName || '').trim(),
+        guestEmail: String(guestInfo.email || '').trim(),
+        guestPhone: String(guestInfo.phone || '').trim(),
+        subtotal: bookingDetails.subtotal,
+        taxesAndFees: bookingDetails.taxes,
+        grandTotal: bookingDetails.total,
+        amountPaidNow: bookingDetails.total,
+        holdStatus: 'captured',
+    });
+
+    if (outcome.created) {
+        const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
+        triggerBookingNotifications(
+            hotelValidation.hotelId,
+            guestName,
+            bookingDetails.roomName || bookingDetails.name,
+            bookingDetails.total,
+            bookingDetails.checkin,
+            guestInfo.email,
+            outcome.booking.id
+        );
+        runBookingSideEffectSweep({ bookingId: outcome.booking.id, limit: 5 }).catch(() => {});
+        sendToMetaCAPI('Purchase', {
+            value: bookingDetails.total,
+            currency: 'USD',
+            content_name: bookingDetails.roomName || bookingDetails.name,
+            event_source_url: 'https://bookmarketel.com',
+            user_data: {
+                em: guestInfo.email,
+                ph: guestInfo.phone,
+                fn: guestInfo.firstName,
+                ln: guestInfo.lastName,
+            },
+        }).catch(error => console.error('Meta CAPI Purchase (webhook recovery) failed:', error.message));
+    }
+    return outcome;
+}
+
 app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -3072,163 +3462,71 @@ app.post('/api/stripe-webhook', async (req, res) => {
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Auto-provision hotel when $997 payment link is completed
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        // Only process if this is from our hotel onboarding product (check metadata)
-        if (session.metadata?.product === 'hotel-onboarding') {
-            try {
-                const email = session.customer_details?.email || session.customer_email || '';
-                const hotelSlug = 'hotel-' + crypto.randomBytes(4).toString('hex');
-                const setupToken = crypto.randomBytes(16).toString('hex');
-
-                await prisma.hotelConfig.create({
-                    data: {
-                        id: hotelSlug,
-                        name: '',
-                        pms: 'manual',
-                        active: false,
-                        setupToken,
-                        ownerEmail: email,
-                        setupComplete: false,
-                    }
-                });
-
-                console.log(`✅ New hotel provisioned: ${hotelSlug}, setup token: ${setupToken}, email: ${email}`);
-                // TODO: Send email with setup link to customer
-                // For now, log it. The customer gets redirected to /setup/:token after payment via Stripe's success_url.
-            } catch (e) {
-                console.error('Failed to auto-provision hotel from checkout:', e.message);
+    if (event.type === 'payment_intent.amount_capturable_updated') {
+        const eventIntent = event.data.object;
+        if (!eventIntent.metadata?.hotelId || !eventIntent.metadata?.bookingDetails) {
+            return res.json({ received: true, ignored: true });
+        }
+        try {
+            // Retrieve the current object so metadata written just after the
+            // original event (for an external PMS receipt) is visible here.
+            const paymentIntent = await stripe.paymentIntents.retrieve(eventIntent.id);
+            const snapshot = getStripeIntentSnapshot(paymentIntent);
+            if (snapshot.holdType !== 'pre_authorization' || paymentIntent.status !== 'requires_capture') {
+                return res.json({ received: true, ignored: true });
             }
+            const hotelValidation = await getActiveHotelValidation(snapshot.hotelId);
+            if (!hotelValidation.ok) throw new Error(hotelValidation.message);
+            const config = await resolveHotelConfig(hotelValidation.hotelId);
+            if (config.pms !== 'manual') {
+                // External PMS creation stays in the synchronous route. Once
+                // it succeeds, its Stripe receipt is reconciled separately;
+                // calling the provider from this early event could duplicate it.
+                return res.json({ received: true, deferred: 'external-pms' });
+            }
+            const bookingDetails = parseJsonObject(paymentIntent.metadata?.bookingDetails);
+            const guestInfo = parseJsonObject(paymentIntent.metadata?.guestInfo);
+            if (!bookingDetails?.reservationCode || !bookingDetails?.roomName || !guestInfo?.email) {
+                throw new Error(`Pay-later authorization ${paymentIntent.id} is missing booking metadata.`);
+            }
+            const { outcome } = await persistManualPayLaterBooking({
+                paymentIntent,
+                hotelId: hotelValidation.hotelId,
+                bookingDetails,
+                guestInfo,
+                config,
+            });
+            console.log(`✅ Pay-later authorization webhook settled (${outcome.created ? 'recovered' : 'already recorded'}).`);
+        } catch (error) {
+            console.error('❌ Pay-later authorization webhook recovery failed:', error);
+            if (error?.code === 'MANUAL_INVENTORY_UNAVAILABLE') {
+                await stripe.paymentIntents.cancel(eventIntent.id).catch(cancelError => {
+                    console.error('Could not release unavailable-room authorization:', cancelError.message);
+                });
+                return res.json({ received: true, released: 'room-unavailable' });
+            }
+            return res.status(500).json({ received: false });
         }
     }
 
     if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
+        if (!paymentIntent.metadata?.hotelId || !paymentIntent.metadata?.bookingDetails) {
+            console.warn(`Ignoring unrelated Stripe PaymentIntent ${paymentIntent.id} on the guest-booking webhook.`);
+            return res.json({ received: true, ignored: true });
+        }
         console.log('💰 Payment succeeded via webhook:', paymentIntent.id);
-
         try {
-            // --- THIS IS THE CRUCIAL FIX ---
-            // Parse metadata first so we can check by reservation code
-            const metadata = paymentIntent.metadata;
-            const bookingDetails = JSON.parse(metadata.bookingDetails);
-            const guestInfo = JSON.parse(metadata.guestInfo);
-            const hotelId = metadata.hotelId;
-
-            // Wait for 5 seconds while keeping the DB connection alive
-            console.log('Webhook is pausing for 5 seconds to allow frontend to complete...');
-            for (let i = 1; i <= 5; i++) {
-                await prisma.$queryRaw`SELECT 1`; // Keep connection alive
-                console.log(`Webhook waiting... ${i}/5 seconds`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-
-            // Now, check if the frontend already created the booking record.
-            // Check by BOTH PaymentIntent ID AND reservation code to catch race conditions
-            const existingBooking = await prisma.booking.findFirst({
-                where: {
-                    OR: [
-                        { stripePaymentIntentId: paymentIntent.id },
-                        { ourReservationCode: bookingDetails.reservationCode }
-                    ]
-                }
-            });
-
-            if (existingBooking) {
-                // If the record exists, the frontend was successful. Our job is done.
-                console.log('✅ Frontend call was successful. Webhook signing off. No duplicates created.');
-                
-                return res.json({ received: true });
-            }
-
-            // If no record exists, it means the frontend call failed.
-            // The webhook must now create the booking as a backup.
-            console.log('⚠️ Frontend booking record not found. Creating backup booking...');
-
-            // Get hotel config for this booking
-            const config = await resolveHotelConfig(hotelId);
-            
-            // Only process Cloudbeds hotels in webhook backup (BookingCenter will be added later)
-            if (config.pms !== 'cloudbeds') {
-                console.log(`⚠️ Webhook backup not yet implemented for ${config.pms}`);
-                return res.json({ received: true });
-            }
-
-            // 1. Create the booking in Cloudbeds
-            const reservationData = {
-                propertyID: config.propertyId,
-                startDate: new Date(bookingDetails.checkin).toISOString().split('T')[0],
-                endDate: new Date(bookingDetails.checkout).toISOString().split('T')[0],
-                guestFirstName: guestInfo.firstName,
-                guestLastName: guestInfo.lastName,
-                guestCountry: 'US',
-                guestZip: guestInfo.zip,
-                guestEmail: guestInfo.email,
-                guestPhone: guestInfo.phone,
-                paymentMethod: "cash",
-                sendEmailConfirmation: "true",
-                rooms: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 1, roomRateID: bookingDetails.rateID }]),
-                adults: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: bookingDetails.guests }]),
-                children: JSON.stringify([{ roomTypeID: bookingDetails.roomTypeID, quantity: 0 }]),
-            };
-
-            const pmsResponse = await axios.post(
-                'https://api.cloudbeds.com/api/v1.3/postReservation',
-                new URLSearchParams(reservationData),
-                { headers: { 'accept': 'application/json', 'authorization': `Bearer ${CLOUDBEDS_API_KEY}`, 'content-type': 'application/x-www-form-urlencoded' } }
-            );
-
-            // 2. If Cloudbeds booking is successful, save the record to our database.
-            if (pmsResponse.data.success) {
-                console.log('✅ Backup booking created in Cloudbeds via webhook:', pmsResponse.data.reservationID);
-
-                const savedBooking = await createBookingRecordWithConfirmation({
-                        stripePaymentIntentId: paymentIntent.id,
-                        ourReservationCode: bookingDetails.reservationCode,
-                        pmsConfirmationCode: pmsResponse.data.reservationID,
-                        hotelId: hotelId,
-                        roomName: bookingDetails.name || bookingDetails.roomName,
-                        bookingType: bookingDetails.bookingType || 'standard', // 🆕 Save booking type
-                        checkinDate: new Date(bookingDetails.checkin),
-                        checkoutDate: new Date(bookingDetails.checkout),
-                        nights: bookingDetails.nights,
-                        guestFirstName: guestInfo.firstName,
-                        guestLastName: guestInfo.lastName,
-                        guestEmail: guestInfo.email,
-                        guestPhone: guestInfo.phone,
-                        subtotal: bookingDetails.subtotal,
-                        taxesAndFees: bookingDetails.taxes,
-                        grandTotal: bookingDetails.total,
-                });
-                console.log('✅ Backup booking record saved to DB by webhook.');
-                runBookingSideEffectSweep({ bookingId: savedBooking.id, limit: 5 }).catch(() => {});
-
-                // 3. Send push notification
-                const guestName = [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ') || null;
-                const roomName = bookingDetails.roomName || bookingDetails.name;
-                triggerBookingNotifications(hotelId, guestName, roomName, bookingDetails.total, bookingDetails.checkin, guestInfo.email, savedBooking.id);
-
-                // 4. Fire purchase event via Meta CAPI since the webhook did the work.
-                sendToMetaCAPI('Purchase', {
-                    value: bookingDetails.total,
-                    currency: 'USD',
-                    content_name: bookingDetails.roomName || bookingDetails.name,
-                    event_source_url: 'https://suitestay.clickinns.com',
-                    user_data: {
-                        em: guestInfo.email,
-                        ph: guestInfo.phone,
-                        fn: guestInfo.firstName,
-                        ln: guestInfo.lastName,
-                    },
-                }).catch(err => console.error('Meta CAPI Purchase (webhook backup) failed:', err.message));
-            }
+            const outcome = await recoverGuestPaymentIntent(paymentIntent);
+            console.log(`✅ Guest payment webhook settled (${outcome.ignored || (outcome.created ? 'recovered' : 'already recorded')}).`);
         } catch (error) {
-            // This will catch any unexpected errors during the backup process.
             console.error('❌ A critical error occurred in the webhook backup process:', error);
+            // A 5xx tells Stripe the event was not safely handled. Stripe can
+            // retry instead of losing a paid guest behind a misleading 200.
+            return res.status(500).json({ received: false });
         }
     }
 
-    // Always respond with 200 to Stripe to prevent retries.
     res.json({ received: true });
 });
 
@@ -3636,7 +3934,7 @@ async function getBookingCenterAvailability(hotelId, checkin, checkout) {
     }).filter(r => r.available && r.rateID && r.roomTypeID);
 }
 
-app.post('/api/availability', async (req, res) => {
+app.post('/api/availability', availabilityRateLimit, async (req, res) => {
     const { hotelId, checkin, checkout } = req.body;
     
     try {
@@ -3871,9 +4169,9 @@ async function createBookingCenterBooking(hotelId, bookingDetails, guestInfo) {
 }
 
 app.post('/api/book', publicBookingRateLimit, async (req, res) => {
-    const { hotelId, bookingDetails, guestInfo, paymentIntentId } = req.body;
+    const { hotelId, bookingDetails: submittedBookingDetails, guestInfo, paymentIntentId } = req.body;
     
-    if (!bookingDetails?.rateID) {
+    if (!submittedBookingDetails?.rateID) {
         return res.status(400).json({ success: false, message: 'Invalid room name provided.' });
     }
 
@@ -3890,15 +4188,31 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
         const paymentValidation = validateStripeIntentAgainstBooking(paymentIntent, {
             hotelId: hotelValidation.hotelId,
-            bookingDetails,
+            bookingDetails: submittedBookingDetails,
             allowedStatuses: ['succeeded'],
-            allowedAmountsCents: getExpectedStandardChargeAmountsCents(bookingDetails),
+            allowedAmountsCents: getExpectedStandardChargeAmountsCents(
+                parseJsonObject(paymentIntent.metadata?.bookingDetails)
+            ),
         });
         if (paymentValidation) {
             return res.status(400).json({ success: false, message: paymentValidation });
         }
 
+        // Price, dates, room and stay length come back from the signed Stripe
+        // metadata written by the server. Guest contact fields remain editable
+        // through checkout, but the browser never gets to rewrite money here.
+        const bookingDetails = parseJsonObject(paymentIntent.metadata?.bookingDetails);
+        if (!bookingDetails?.rateID) {
+            return res.status(400).json({ success: false, message: 'Payment is missing its server booking quote.' });
+        }
+
         const config = await resolveHotelConfig(hotelValidation.hotelId);
+        if (config.pms !== 'manual') {
+            return res.status(409).json({
+                success: false,
+                message: 'Full online payment is not enabled for this property. Reserve with the $1 verification instead.',
+            });
+        }
         let pmsResponse;
 
         if (config.pms === 'cloudbeds') {
@@ -3974,42 +4288,6 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
     }
 });
 
-
-// Browser diagnostics endpoint — logs in-app browser details
-app.post('/api/browser-diagnostics', (req, res) => {
-    const d = req.body;
-    console.log('\n========== BROWSER DIAGNOSTICS ==========');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('--- User Agent ---');
-    console.log(d.userAgent);
-    console.log('--- Viewport ---');
-    console.log(`window.innerWidth: ${d.innerWidth}`);
-    console.log(`window.innerHeight: ${d.innerHeight}`);
-    console.log(`document.documentElement.clientWidth: ${d.clientWidth}`);
-    console.log(`document.documentElement.clientHeight: ${d.clientHeight}`);
-    console.log(`screen.width: ${d.screenWidth}`);
-    console.log(`screen.height: ${d.screenHeight}`);
-    console.log(`screen.availWidth: ${d.screenAvailWidth}`);
-    console.log(`screen.availHeight: ${d.screenAvailHeight}`);
-    console.log(`devicePixelRatio: ${d.devicePixelRatio}`);
-    console.log(`visualViewport.width: ${d.visualViewportWidth}`);
-    console.log(`visualViewport.height: ${d.visualViewportHeight}`);
-    console.log(`visualViewport.offsetTop: ${d.visualViewportOffsetTop}`);
-    console.log('--- Computed Values ---');
-    console.log(`--real-vh: ${d.realVh}`);
-    console.log(`1vh in px: ${d.oneVhPx}`);
-    console.log(`Height diff (screen - innerHeight): ${d.heightDiff}px`);
-    console.log('--- Detection ---');
-    console.log(`Classes on <html>: ${d.htmlClasses}`);
-    console.log(`FBAV version: ${d.fbavVersion}`);
-    console.log(`Is FB browser: ${d.isFbBrowser}`);
-    console.log(`Is Business Suite: ${d.isBusinessSuite}`);
-    console.log('--- Safe Areas ---');
-    console.log(`safe-area-inset-top: ${d.safeAreaTop}`);
-    console.log(`safe-area-inset-bottom: ${d.safeAreaBottom}`);
-    console.log('==========================================\n');
-    res.json({ success: true });
-});
 
 app.post('/api/track', async (req, res) => {
     let body;
@@ -9948,6 +10226,69 @@ app.get('/api/admin/marketel-billing-status', adminAuth, async (_req, res) => {
     }
 });
 
+function productionLaunchReadiness() {
+    const clean = name => String(process.env[name] || '').trim();
+    const present = (name, minimumLength = 1) => {
+        const value = clean(name);
+        return value.length >= minimumLength && !/replace|example|your[-_]?/i.test(value);
+    };
+    const item = (id, label, ok, action, critical = true) => ({ id, label, ok: !!ok, action, critical });
+    const authSecretNames = [
+        'MAGIC_LINK_SECRET',
+        'CRM_RETURN_TOKEN_SECRET',
+        'CRM_PIN_HASH_SECRET',
+        'NATIVE_SESSION_TOKEN_SECRET',
+    ];
+    const authSecretValues = authSecretNames.map(clean);
+    const distinctAuthSecrets = authSecretValues.every(value => value.length >= 32)
+        && new Set(authSecretValues).size === authSecretValues.length;
+    const appStoreUrl = configuredFrontdeskAppStoreUrl();
+    const backendUrl = clean('BACKEND_URL');
+    const twilioSenderReady = present('TWILIO_PHONE_NUMBER') || present('TWILIO_MESSAGING_SERVICE_SID');
+
+    const checks = [
+        item('database-url', 'Pooled production database', present('DATABASE_URL'), 'Set DATABASE_URL on Render.'),
+        item('database-direct-url', 'Direct migration database', present('DIRECT_URL'), 'Set DIRECT_URL on Render.'),
+        item('auth-secrets', 'Stable distinct auth secrets', distinctAuthSecrets, `Set distinct 32+ character values for ${authSecretNames.join(', ')}.`),
+        item('admin-token', 'Protected admin endpoints', present('ADMIN_TOKEN', 24), 'Set a long ADMIN_TOKEN on Render.'),
+        item('guest-stripe-live', 'Guest $1 verification billing', clean('STRIPE_SECRET_KEY').startsWith('sk_live_'), 'Replace STRIPE_SECRET_KEY with the live guest-booking key.'),
+        item('guest-stripe-webhook', 'Guest Stripe recovery webhook', clean('STRIPE_WEBHOOK_SECRET').startsWith('whsec_'), 'Set the signing secret for /api/stripe-webhook.'),
+        item('marketel-stripe-live', 'Marketel subscription billing', MARKETEL_STRIPE_KEY_MODE === 'live', 'Set STRIPE_MARKETEL_SECRET_KEY to the live Marketel key.'),
+        item('marketel-stripe-price', '$199 monthly Stripe object', present('STRIPE_MARKETEL_PRICE_ID') || present('STRIPE_MARKETEL_PRODUCT_ID'), 'Set STRIPE_MARKETEL_PRICE_ID or STRIPE_MARKETEL_PRODUCT_ID.'),
+        item('marketel-stripe-webhook', 'Marketel subscription webhook', clean('STRIPE_MARKETEL_WEBHOOK_SECRET').startsWith('whsec_'), 'Set the signing secret for /api/marketel-stripe-webhook.'),
+        item('test-billing-disabled', 'Launch billing is not in QA mode', !MARKETEL_ALLOW_TEST_BILLING, 'Remove MARKETEL_ALLOW_TEST_BILLING=true before ads.'),
+        item('frontdesk-app-store', 'Front Desk App Store handoff', !!appStoreUrl, 'Set MARKETEL_FRONTDESK_APP_STORE_URL after Apple publishes the listing.'),
+        item('backend-url', 'Public backend URL', /^https:\/\//i.test(backendUrl), 'Set BACKEND_URL to the public https Render origin.'),
+        item('vercel-domains', 'Automatic property domains', present('VERCEL_TOKEN') && present('VERCEL_PROJECT_ID'), 'Set VERCEL_TOKEN and VERCEL_PROJECT_ID.'),
+        item('image-storage', 'Durable property image storage', ['R2_ENDPOINT', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL'].every(name => present(name)), 'Set all R2 storage values; Render disk is not durable.'),
+        item('email', 'Owner and guest email delivery', present('BREVO_SMTP_LOGIN') && present('BREVO_SMTP_KEY'), 'Set BREVO_SMTP_LOGIN and BREVO_SMTP_KEY.'),
+        item('guest-web-push', 'Guest app push notifications', present('VAPID_PUBLIC_KEY') && present('VAPID_PRIVATE_KEY'), 'Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.'),
+        item('ios-push', 'Front Desk native push notifications', ['APNS_TEAM_ID', 'APNS_KEY_ID', 'APNS_PRIVATE_KEY'].every(name => present(name)) && clean('APNS_BUNDLE_ID') === 'com.bookmarketel.frontdesk', 'Set APNs team, key, private key, and the exact bundle ID.'),
+        item('assistant-sms', 'Front Desk Assistant SMS', present('TWILIO_ACCOUNT_SID') && present('TWILIO_AUTH_TOKEN') && twilioSenderReady && clean('TWILIO_VALIDATE_SIGNATURES') === 'true', 'Set Twilio credentials/sender and keep signature validation true.'),
+        item('assistant-intelligence', 'Front Desk Assistant language model', present('OPENAI_API_KEY'), 'Set OPENAI_API_KEY.', false),
+        item('meta-attribution', 'Meta Pixel/CAPI attribution', present('MARKETEL_META_PIXEL_ID') && present('MARKETEL_META_ACCESS_TOKEN'), 'Set Marketel Meta Pixel and CAPI credentials.', false),
+    ];
+    const critical = checks.filter(check => check.critical);
+    return {
+        ready: critical.every(check => check.ok),
+        passed: checks.filter(check => check.ok).length,
+        total: checks.length,
+        checks,
+        manualOutsideRuntime: [
+            'Deploy Prisma migrations and confirm /health returns 200.',
+            'Replace App Review demo-account placeholders and keep the review property subscribed.',
+            'Upload privacy-safe App Store screenshots and complete privacy/export declarations.',
+            'Run the signed build on a real iPhone over Wi-Fi and cellular, then test TestFlight.',
+            'Smoke monthly and annual live Checkout, guest $1 authorization, webhook activation, email, SMS, and push before ads.',
+        ],
+    };
+}
+
+app.get('/api/admin/launch-readiness', adminAuth, (_req, res) => {
+    const readiness = productionLaunchReadiness();
+    res.status(readiness.ready ? 200 : 503).json({ success: readiness.ready, ...readiness });
+});
+
 app.post('/api/setup/:token/checkout', async (req, res) => {
     try {
         if (!marketelStripe) return res.status(503).json({ error: 'Payment not configured' });
@@ -10086,7 +10427,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Create default CRM PIN
         const defaultPin = generateCrmOwnerPin();
-        const pinHash = crypto.createHash('sha256').update(defaultPin).digest('hex');
+        const pinHash = hashCrmPin(defaultPin);
         try {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore */ }
@@ -10124,6 +10465,15 @@ app.get('/setup/:token/success', async (req, res) => {
 
 // Finalize the preview handoff. This happens before payment, so every message
 // must describe preview access rather than implying that activation occurred.
+async function rotateCompletedSetupCredential(hotelId) {
+    const replacement = crypto.randomBytes(32).toString('hex');
+    await prisma.hotelConfig.update({
+        where: { id: hotelId },
+        data: { setupToken: replacement },
+    });
+    hotelConfigCache.delete(hotelId);
+}
+
 app.post('/api/setup/:token/finalize', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
@@ -10212,6 +10562,11 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             activationEmailSent,
         });
 
+        // The URL credential has finished its job. Rotate instead of clearing:
+        // setupToken also marks an unpaid self-serve property as preview-only,
+        // so nulling it would accidentally open public booking APIs. The old
+        // setup URL loses every read/write permission immediately.
+        await rotateCompletedSetupCredential(hotel.id);
         res.json({ success: true, domain: assignedDomain, previewEmailSent, activationEmailSent });
     } catch (e) {
         console.error('Finalize error:', e.message);
@@ -10267,7 +10622,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
 
         // Create a default CRM PIN
         const defaultPin = generateCrmOwnerPin();
-        const pinHash = crypto.createHash('sha256').update(defaultPin).digest('hex');
+        const pinHash = hashCrmPin(defaultPin);
         try {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore duplicate */ }
@@ -10762,7 +11117,7 @@ app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
 });
 
 // Forgot PIN — email a new PIN to the owner (no auth required)
-app.post('/api/forgot-pin', async (req, res) => {
+app.post('/api/forgot-pin', forgotPinRateLimit, async (req, res) => {
     try {
         const email = String(req.body?.email || '').trim().toLowerCase();
         if (email) {
@@ -11356,11 +11711,11 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const { amountUsd } = billing;
         const returnToken = await generateCrmReturnTokenForHotel(hotelId, hotel?.setupToken);
         const cancelParams = new URLSearchParams({
-            returnToken,
             hotelId,
             reveal: 'checkout',
         });
-        const cancelUrl = `${frontdeskOrigin}/frontdesk-return?${cancelParams.toString()}`;
+        const cancelAuth = new URLSearchParams({ returnToken });
+        const cancelUrl = `${frontdeskOrigin}/frontdesk-return?${cancelParams.toString()}#${cancelAuth.toString()}`;
         const clickEventId = `marketel-go-live.${hotelId}.${Date.now()}`;
         await prisma.funnelEvent.create({
             data: {
@@ -11412,7 +11767,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                     ...(journeySessionId ? { journeySessionId } : {}),
                 },
             },
-            success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&returnToken=${encodeURIComponent(returnToken)}&frontdeskOrigin=${encodeURIComponent(frontdeskOrigin)}`,
+            success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&frontdeskOrigin=${encodeURIComponent(frontdeskOrigin)}`,
             cancel_url: cancelUrl,
         });
         const checkoutEventId = `marketel-checkout.${session.id}`;
@@ -11544,9 +11899,11 @@ app.get('/api/crm/go-live-success', async (req, res) => {
         if (!hotelId) return `${frontdeskOrigin}/frontdesk?activation_error=1`;
         const params = new URLSearchParams({ hotelId, ...activationParams });
         if (frontdeskReturnToken) {
-            params.set('returnToken', frontdeskReturnToken);
-            params.set('pin', frontdeskActivationPin || frontdeskReturnToken);
-            const target = `${frontdeskOrigin}/frontdesk-return?${params.toString()}`;
+            const authFragment = new URLSearchParams({
+                returnToken: frontdeskReturnToken,
+                pin: frontdeskActivationPin || frontdeskReturnToken,
+            });
+            const target = `${frontdeskOrigin}/frontdesk-return?${params.toString()}#${authFragment.toString()}`;
             console.log('go-live-success redirect target:', {
                 hotelId,
                 target: redactFrontdeskAuthUrl(target),
@@ -11557,8 +11914,8 @@ app.get('/api/crm/go-live-success', async (req, res) => {
             return target;
         }
         else if (frontdeskActivationPin) {
-            params.set('pin', frontdeskActivationPin);
-            const target = `${frontdeskOrigin}/frontdesk-return?${params.toString()}`;
+            const authFragment = new URLSearchParams({ pin: frontdeskActivationPin });
+            const target = `${frontdeskOrigin}/frontdesk-return?${params.toString()}#${authFragment.toString()}`;
             console.log('go-live-success redirect target:', {
                 hotelId,
                 target: redactFrontdeskAuthUrl(target),
@@ -12015,31 +12372,40 @@ async function cancelStripeSubscriptionsForDeletion(hotel) {
     }
 
     const subscriptionIds = new Set();
-    const customerIds = new Set();
-    if (hotel.marketelStripeSubscriptionId) subscriptionIds.add(hotel.marketelStripeSubscriptionId);
-    if (hotel.marketelStripeCustomerId) customerIds.add(hotel.marketelStripeCustomerId);
-
-    if (!customerIds.size && hotel.ownerEmail) {
-        const customers = await marketelStripe.customers.list({
-            email: hotel.ownerEmail,
-            limit: 10,
-        });
-        customers.data.forEach(customer => customerIds.add(customer.id));
-    }
-
-    for (const customerId of customerIds) {
+    if (hotel.marketelStripeSubscriptionId) {
+        subscriptionIds.add(hotel.marketelStripeSubscriptionId);
+    } else if (hotel.marketelStripeCustomerId) {
         const subscriptions = await marketelStripe.subscriptions.list({
-            customer: customerId,
+            customer: hotel.marketelStripeCustomerId,
             status: 'all',
             limit: 100,
         });
         subscriptions.data
-            .filter(subscription => subscription.status !== 'canceled')
+            .filter(subscription => (
+                subscription.status !== 'canceled'
+                && String(subscription.metadata?.hotelId || '') === String(hotel.id || '')
+            ))
             .forEach(subscription => subscriptionIds.add(subscription.id));
     }
 
     for (const subscriptionId of subscriptionIds) {
         await cancelStripeSubscriptionForDeletion(subscriptionId);
+    }
+}
+
+async function releaseStripeHoldsForDeletion(bookings = []) {
+    if (!stripe) throw new Error('Stripe is unavailable; guest card holds could not be released.');
+    const intentIds = [...new Set(
+        bookings
+            .filter(booking => booking.holdStatus === 'active')
+            .map(booking => String(booking.stripePaymentIntentId || '').trim())
+            .filter(Boolean)
+    )];
+    for (const paymentIntentId of intentIds) {
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (paymentIntent.status === 'requires_capture') {
+            await stripe.paymentIntents.cancel(paymentIntentId);
+        }
     }
 }
 
@@ -12129,6 +12495,11 @@ async function completeAccountDeletion(request) {
 
     try {
         await cancelStripeSubscriptionsForDeletion(hotel);
+        const activeHoldBookings = await prisma.booking.findMany({
+            where: { hotelId: hotel.id, holdStatus: 'active' },
+            select: { stripePaymentIntentId: true, holdStatus: true },
+        });
+        await releaseStripeHoldsForDeletion(activeHoldBookings);
 
         const mediaUrls = [
             hotel.appIconUrl,
@@ -13338,6 +13709,17 @@ app.listen(PORT, () => {
             .catch((e) => console.error('Booking side-effect sweep:', e.message));
         setTimeout(sideEffectSweep, 10_000);
         setInterval(sideEffectSweep, BOOKING_SIDE_EFFECT_SWEEP_INTERVAL_MS);
+    }
+
+    // BookingCenter/Cloudbeds may accept a reservation while Neon is briefly
+    // unavailable. The PMS confirmation is first written to Stripe metadata;
+    // this sweep turns that durable receipt into the missing Front Desk row
+    // without ever calling the PMS a second time.
+    if (process.env.ENABLE_EXTERNAL_PMS_RECONCILIATION !== 'false' && process.env.STRIPE_SECRET_KEY) {
+        const externalPmsSweep = () => runExternalPmsReconciliation()
+            .catch((e) => console.error('External PMS reconciliation sweep:', e.message));
+        setTimeout(externalPmsSweep, 60_000);
+        setInterval(externalPmsSweep, 15 * 60 * 1000);
     }
 
     if (process.env.ENABLE_BOOKING_REVIEW_REMINDERS !== 'false') {

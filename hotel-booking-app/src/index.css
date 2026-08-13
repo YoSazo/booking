@@ -5847,6 +5847,43 @@ padding: 6px 16px;
   min-height: 100vh;
 }
 
+.booking-notice {
+  position: fixed;
+  z-index: 10020;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(92vw, 520px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 15px 14px 17px;
+  border: 1px solid rgba(137, 45, 45, 0.2);
+  border-radius: 14px;
+  background: #fff7f6;
+  color: #672b29;
+  box-shadow: 0 14px 36px rgba(34, 45, 39, 0.18);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.booking-notice button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  margin: -4px -4px -4px 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(103, 43, 41, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .page-transition-enter {
   animation: slideInFromRight 0.35s ease-out forwards;
 }

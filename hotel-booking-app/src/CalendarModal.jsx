@@ -122,8 +122,6 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       trackSearch(startDate, endDate);
       onDatesChange({ start: startDate, end: endDate });
       onClose();
-    } else {
-      alert("Please select check-in and check-out dates.");
     }
   };
 

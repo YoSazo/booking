@@ -385,7 +385,7 @@ function renderAppsView() {
 
   const homeScreenItems = [
     { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Two phone apps', title: 'Your app and theirs — same home screen',
-      caption: `You get <strong>Front Desk</strong> — check bookings and reply to guests. Your guests get <strong>${hName}</strong> — they tap it to book you or text you. No app store.` },
+      caption: `You download <strong>Marketel Front Desk</strong> from the App Store. Guests save <strong>${hName}</strong> from your booking page — no Guest App Store download.` },
   ];
   const guestItems = [
     { type: 'image', src: APPS_SHOWCASE.guestHome, alt: 'Guest home screen', title: 'What your guests see — Home',
@@ -452,9 +452,10 @@ function renderAppsView() {
     fdCtaHtml = `<div id="tour-fd-installed-badge"><p style="font-size:13px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">Front Desk is on this device. Turn on alerts so confirmed bookings and guest messages reach your phone.</p>
       <button onclick="enableBookingAlerts()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;">Turn on booking alerts</button></div>`;
   } else {
-    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Put Front Desk on this phone first. There is no App Store — follow 3 quick steps and it appears on your home screen like an app.</p>
-      <button type="button" disabled style="width:100%;padding:15px;border-radius:12px;border:none;background:#cbd5d1;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:not-allowed;margin-bottom:10px;">Put Front Desk on this phone</button>
-      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Locked until Front Desk is installed on your phone</div>`;
+    const appStoreReady = !!String(crm.frontdeskAppStoreUrl || '').trim();
+    fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Download <strong>Marketel Front Desk</strong> on the owner’s iPhone to receive booking alerts when the web dashboard is closed.</p>
+      <button type="button" onclick="openFrontdeskAppDownload()" ${appStoreReady ? '' : 'aria-disabled="true"'} style="width:100%;padding:15px;border-radius:12px;border:none;background:${appStoreReady ? 'var(--green)' : '#cbd5d1'};color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:${appStoreReady ? 'pointer' : 'default'};margin-bottom:10px;">${appStoreReady ? 'Download Marketel Front Desk' : 'App Store link not connected'}</button>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Guest installs are different: guests save your property from its booking page.</div>`;
   }
 
   const storyFrontdeskActionHtml = fdNativeApp
@@ -542,8 +543,8 @@ function renderAppsView() {
 
       <div class="apps-story-line" id="tour-apps-first">
         <div class="apps-story-step">First</div>
-        <h3 class="apps-story-line-title">Put Front Desk on your phone.</h3>
-        <p>No App Store. Tap the button below, follow 3 quick steps, and Front Desk appears on your home screen. Then new bookings can reach you even when Front Desk is closed — a normal browser tab cannot reliably do that.</p>
+        <h3 class="apps-story-line-title">Download Marketel Front Desk.</h3>
+        <p>The owner app receives new-booking alerts even when the web dashboard is closed.</p>
         <div class="apps-story-actions">${storyFrontdeskActionHtml}</div>
       </div>
 
@@ -664,7 +665,7 @@ function renderAppsView() {
     ? ''
     : fdInApp
     ? 'Front Desk is installed. Guests can install your property from the direct booking page.'
-    : 'Install Front Desk first. Then guests can install your property from the direct booking page.';
+    : 'Download Marketel Front Desk for the owner. Guests save your property from its direct booking page.';
 
   el.innerHTML = `
   <style>

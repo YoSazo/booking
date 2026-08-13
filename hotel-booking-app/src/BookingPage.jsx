@@ -163,14 +163,16 @@ function BookingPage({
                 ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24))
                 : 0;
 
-              let grandTotal, payToday, balanceDue;
+              let grandTotal, payToday, balanceDue, taxes;
               if (room.totalRate !== undefined && room.totalRate !== null) {
                 grandTotal = room.totalRate;
+                taxes = Number(room.taxes ?? room.apiTaxes ?? 0);
                 payToday = 0;
                 balanceDue = grandTotal;
               } else {
                 const subtotalBeforeTax = calculateTieredPrice(nightsCalc, rates);
-                grandTotal = subtotalBeforeTax;
+                taxes = subtotalBeforeTax * Number(rates?.taxRate ?? 0.10);
+                grandTotal = subtotalBeforeTax + taxes;
                 payToday = 0;
                 balanceDue = grandTotal;
               }
@@ -190,7 +192,7 @@ function BookingPage({
                   nights={nightsCalc}
                   onOpenLightbox={onOpenLightbox}
                   subtotal={grandTotal}
-                  taxes={0}
+                  taxes={taxes}
                   payToday={payToday}
                   balanceDue={balanceDue}
                   isProcessing={isProcessingBooking}

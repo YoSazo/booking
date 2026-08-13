@@ -130,7 +130,7 @@ function getBookingTotals(room, nights, fallbackRates) {
   const taxes =
     toFiniteNumber(room?.taxes) ??
     toFiniteNumber(room?.apiTaxes) ??
-    subtotal * 0.10;
+    subtotal * (toFiniteNumber(fallbackRates?.taxRate) ?? 0.10);
   const total =
     toFiniteNumber(room?.totalRate) ??
     toFiniteNumber(room?.total) ??
@@ -213,7 +213,18 @@ function App() {
   const navigate = useNavigate();
   const [currentHotel, setCurrentHotel] = useState(staticHotel || fallbackHotel);
   const [hotelLoading, setHotelLoading] = useState(!staticHotel);
+  const [bookingNotice, setBookingNotice] = useState(null);
   const RATES = currentHotel.rates;
+
+  const showBookingNotice = (message, tone = 'error') => {
+    setBookingNotice({ message, tone, id: Date.now() });
+  };
+
+  useEffect(() => {
+    if (!bookingNotice) return undefined;
+    const timer = window.setTimeout(() => setBookingNotice(null), 6500);
+    return () => window.clearTimeout(timer);
+  }, [bookingNotice]);
 
   // Fetch dynamic hotel config from API if not in static hotelData
   useEffect(() => {
@@ -574,11 +585,11 @@ function App() {
 
         setAvailableRooms(mergedRooms);
       } else {
-        alert('Error checking availability: ' + result.message);
+        showBookingNotice(result.message || 'We could not check those dates. Please try again.');
       }
     } catch (error) {
       console.error('Failed to fetch availability:', error);
-      alert('Could not connect to the booking server. Please try again later.');
+      showBookingNotice('We could not reach the booking server. Please try again.');
     }
     setIsLoading(false);
 };
@@ -624,7 +635,7 @@ function App() {
 // In App.jsx, update handleConfirmBooking to go to guest-info first:
 const handleConfirmBooking = async (bookingDetails) => {
   if (!selectedRoom) {
-    alert("Please select a room first.");
+    showBookingNotice('Choose a room before continuing.');
     return;
   }
 
@@ -680,62 +691,28 @@ const handleConfirmBooking = async (bookingDetails) => {
     return;
   }
 
-  const stripeMetadata = {
-    roomTypeID: newBooking.roomTypeID,
-    rateID: newBooking.rateID,
-    roomName: newBooking.name,
-    checkin: newBooking.checkin.toISOString(),
-    checkout: newBooking.checkout.toISOString(),
-    nights: newBooking.nights,
-    guests: newBooking.guests,
-    subtotal: newBooking.subtotal,
-    taxes: newBooking.taxes,
-    total: newBooking.total,
-    reservationCode: ourReservationCode
-  };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/create-payment-intent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        amount: newBooking.total / 2,
-        bookingDetails: stripeMetadata,
-        guestInfo: { firstName: '', lastName: '', email: '', phone: '', zip: '' },
-        hotelId: currentHotel.id || hotelId
-      }),
-    });
-    
-    const data = await response.json();
-    
-    if (data.clientSecret) {
-      setClientSecret(data.clientSecret);
-      
-      // ALWAYS navigate to guest-info first (starts at step 1)
-      navigate('/guest-info', {
-        state: {
-          room: {
-            name: selectedRoom.name,
-            beds: selectedRoom.beds || 'N/A',
-          },
-          totalPrice: total,
-          searchParams: {
-            checkIn: checkinDate,
-            checkOut: checkoutDate,
-            nights,
-            guests: selectedRoom.guests,
-          },
-        },
-      });
-    } else {
-      alert("Failed to load payment form. Please try again.");
-      setIsProcessingBooking(false);
-    }
-  } catch (error) {
-    console.error("Failed to pre-fetch client secret:", error);
-    alert("Failed to load payment form. Please try again.");
-    setIsProcessingBooking(false);
-  }
+  // GuestInfoPage creates the real server-fixed $1 authorization only after
+  // the guest submits their card. The old flow created an unused half-price
+  // PaymentIntent here, adding latency and leaving a client-priced money path.
+  const checkoutReady = 'marketel_pay_later_checkout';
+  setClientSecret(checkoutReady);
+  writeSessionValue('clientSecret', checkoutReady);
+  setIsProcessingBooking(false);
+  navigate('/guest-info', {
+    state: {
+      room: {
+        name: selectedRoom.name,
+        beds: selectedRoom.beds || 'N/A',
+      },
+      totalPrice: total,
+      searchParams: {
+        checkIn: checkinDate,
+        checkOut: checkoutDate,
+        nights,
+        guests: selectedRoom.guests,
+      },
+    },
+  });
 };
 
 
@@ -746,7 +723,7 @@ const handleConfirmBooking = async (bookingDetails) => {
     // ✅ Get the latest booking details from sessionStorage (in case trial booking modified it)
     const currentBooking = readSessionJson('finalBooking') || finalBooking;
     if (!currentBooking) {
-      alert('Booking details are missing. Please restart your reservation.');
+      showBookingNotice('Your booking details expired. Please choose your room again.');
       navigate('/');
       return;
     }
@@ -817,11 +794,11 @@ const handleConfirmBooking = async (bookingDetails) => {
         window.scrollTo(0, 0);
       } else {
         console.error('❌ Booking failed:', result.message);
-        alert('Booking failed: ' + (result.message || 'An unknown error occurred.'));
+        showBookingNotice(result.message || 'We could not finish the booking. Please try again.');
       }
     } catch (error) {
       console.error('❌ Failed to create booking:', error);
-      alert('Could not connect to the booking server to finalize your reservation.');
+      showBookingNotice('We could not reach the booking server to finish your reservation. Please try again.');
     }
     setIsLoading(false);
 };
@@ -854,6 +831,16 @@ const handleConfirmBooking = async (bookingDetails) => {
     <GuestLayout>
     <>
     <ScrollToTop />
+      {bookingNotice && (
+        <div
+          className={`booking-notice booking-notice--${bookingNotice.tone}`}
+          role="alert"
+          aria-live="assertive"
+        >
+          <span>{bookingNotice.message}</span>
+          <button type="button" onClick={() => setBookingNotice(null)} aria-label="Dismiss message">×</button>
+        </div>
+      )}
       <PageTransition>
         <Routes>
           <Route path="/" element={

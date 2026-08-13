@@ -759,7 +759,7 @@ async function addRoomAndFinish() {
     
     // Front Desk lives on the stable Marketel origin; the property domain is
     // reserved for guests. The hotel id scopes this one-time PIN login.
-    var dashboardUrl = window.location.origin + '/frontdesk?pin=' + encodeURIComponent(completeData.crmPin || '') + '&hotelId=' + encodeURIComponent(hotelData.id || '') + '&welcome=1&reveal=1';
+    var dashboardUrl = window.location.origin + '/frontdesk-return?hotelId=' + encodeURIComponent(hotelData.id || '') + '&reveal=1#pin=' + encodeURIComponent(completeData.crmPin || '');
     window._dashboardUrl = dashboardUrl;
     document.getElementById('successLink').href = dashboardUrl;
     window.MarketelJourney?.configure({ hotelId: hotelData.id || '' });

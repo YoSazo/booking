@@ -802,7 +802,7 @@ function showActivatedModal() {
   const appStoreUrl = String(crm.frontdeskAppStoreUrl || '').trim();
   const appDownloadCta = appStoreUrl
     ? `<a id="activatedModalDownload" href="${esc(appStoreUrl)}" target="_blank" rel="noopener" style="display:block;width:100%;padding:15px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;text-decoration:none;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;box-sizing:border-box;">Download Marketel Front Desk</a>`
-    : `<button type="button" disabled style="display:block;width:100%;padding:15px;border-radius:12px;border:none;background:#dce8e1;color:#527061;font-family:inherit;font-size:15px;font-weight:800;cursor:not-allowed;">Front Desk app coming soon</button>`;
+    : `<button id="activatedModalContinueWebPrimary" type="button" style="display:block;width:100%;padding:15px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Open Web Front Desk</button>`;
   const overlay = document.createElement('div');
   overlay.id = 'activatedModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
@@ -813,16 +813,18 @@ function showActivatedModal() {
       <p style="font-size:14px;color:#6b7280;line-height:1.55;margin:0 0 8px;">Guests can now book directly at</p>
       ${bookingUrl ? `<a href="${esc(bookingUrl)}" target="_blank" rel="noopener" style="display:block;color:#2E7D5B;font-size:15px;font-weight:800;text-decoration:none;word-break:break-word;margin:0 0 22px;">${esc(bookingDomain)}</a>` : '<div style="height:8px;"></div>'}
       ${appDownloadCta}
-      <p style="font-size:12px;color:#7a857e;line-height:1.45;margin:10px 4px 4px;">Manage bookings, availability and alerts from your phone.</p>
-      <button id="activatedModalContinueWeb" type="button" style="width:100%;padding:11px;margin-top:6px;border:0;background:transparent;color:#8a948e;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;">Continue to Web Front Desk</button>
+      <p style="font-size:12px;color:#7a857e;line-height:1.45;margin:10px 4px 4px;">${appStoreUrl ? 'Manage bookings, availability and alerts from your phone.' : 'Your booking page is live. The web Front Desk is ready now.'}</p>
+      ${appStoreUrl ? '<button id="activatedModalContinueWeb" type="button" style="width:100%;padding:11px;margin-top:6px;border:0;background:transparent;color:#8a948e;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;">Continue to Web Front Desk</button>' : ''}
     </div>
   `;
   document.body.appendChild(overlay);
-  document.getElementById('activatedModalContinueWeb').onclick = () => {
+  const continueToWeb = () => {
     overlay.remove();
     localStorage.setItem('postActivationTourDone', '1');
     try { setFilter('bookings'); } catch (e) { /* ignore */ }
   };
+  document.getElementById('activatedModalContinueWeb')?.addEventListener('click', continueToWeb);
+  document.getElementById('activatedModalContinueWebPrimary')?.addEventListener('click', continueToWeb);
 }
 
 

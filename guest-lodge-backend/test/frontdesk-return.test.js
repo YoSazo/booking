@@ -20,3 +20,10 @@ test('cancelled checkout preserves property context and reopens activation', () 
 test('ordinary Front Desk returns remain unchanged without context', () => {
     assert.equal(buildFrontdeskReturnPath(), '/frontdesk');
 });
+
+test('setup handoff preserves the initial value reveal without putting auth in the path', () => {
+    assert.equal(
+        buildFrontdeskReturnPath({ hotelId: 'hotel-cf88314d', reveal: '1' }),
+        '/frontdesk?hotelId=hotel-cf88314d&welcome=1&reveal=1'
+    );
+});
