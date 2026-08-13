@@ -5,6 +5,8 @@ const {
     classifyDeterministicIntent,
     deterministicSocialReply,
     sanitizeAssistantSocialReply,
+    bookingDateContext,
+    formatRecentBookingStatus,
 } = require('../frontdesk-assistant');
 
 test('NO after an inventory check records no change', () => {
@@ -50,6 +52,102 @@ test('an explicit walk-in message resolves the room and relative date', () => {
             units: 1,
             clarification: '',
         }
+    );
+});
+
+test('a week-long walk-in consumes every occupied night instead of only today', () => {
+    assert.deepEqual(
+        classifyDeterministicIntent(
+            'A walk-in just took Queen Suite for a week',
+            [{ name: 'Queen Suite', totalUnits: 5 }],
+            '2026-08-13',
+            ''
+        ),
+        {
+            intent: 'block_room',
+            roomName: 'Queen Suite',
+            startDate: '2026-08-13',
+            endDate: '2026-08-19',
+            units: 1,
+            clarification: '',
+        }
+    );
+});
+
+test('a natural NO with context answers the booking alert instead of mutating one day', () => {
+    assert.deepEqual(
+        classifyDeterministicIntent(
+            'No, a walk-in just took Queen Suite for a week',
+            [{ name: 'Queen Suite', totalUnits: 5 }],
+            '2026-08-13',
+            'booking_alert'
+        ),
+        { intent: 'booking_taken' }
+    );
+});
+
+test('recent-booking follow-ups are read-only status questions', () => {
+    for (const message of [
+        'Booking was kept right?',
+        'For that msg you sent, it was kept?',
+        'Was it kept?',
+        'The most recent booking',
+        'Bro, the most recent bookings',
+    ]) {
+        assert.equal(
+            classifyDeterministicIntent(
+                message,
+                [{ name: 'Queen Suite', totalUnits: 5 }],
+                '2026-08-13',
+                'booking_alert'
+            ).intent,
+            'booking_status',
+            message
+        );
+    }
+});
+
+test('natural correction and cancellation replies retain safe deterministic meanings', () => {
+    assert.deepEqual(
+        classifyDeterministicIntent('change that back', [], '2026-08-13', ''),
+        { intent: 'undo' }
+    );
+    assert.deepEqual(
+        classifyDeterministicIntent('yes', [], '2026-08-13', 'cancel_question'),
+        { intent: 'cancel_booking' }
+    );
+    assert.deepEqual(
+        classifyDeterministicIntent('leave it alone', [], '2026-08-13', 'cancel_question'),
+        { intent: 'keep_booking' }
+    );
+});
+
+test('booking dates distinguish guest checkout from the final occupied night', () => {
+    assert.deepEqual(
+        bookingDateContext({
+            checkinDate: new Date('2026-08-13T00:00:00.000Z'),
+            checkoutDate: new Date('2026-08-20T00:00:00.000Z'),
+        }),
+        {
+            startDate: '2026-08-13',
+            checkoutDate: '2026-08-20',
+            lastOccupiedDate: '2026-08-19',
+            stayLabel: 'Aug 13–Aug 20',
+        }
+    );
+});
+
+test('recent booking status explains an automatic keep directly', () => {
+    assert.equal(
+        formatRecentBookingStatus({
+            status: 'confirmed',
+            approvalOutcome: 'auto_confirmed',
+            fulfillmentStatus: 'completed',
+            roomName: 'Queen Suite',
+            checkinDate: new Date('2026-08-13T00:00:00.000Z'),
+            checkoutDate: new Date('2026-08-20T00:00:00.000Z'),
+        }),
+        'Yes — the most recent booking was kept automatically because nobody answered: Queen Suite, Aug 13–Aug 20. The guest confirmation was sent.'
     );
 });
 

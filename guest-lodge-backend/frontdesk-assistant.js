@@ -113,6 +113,109 @@ function addIsoDays(iso, days) {
     return date.toISOString().slice(0, 10);
 }
 
+function isoDatePart(value) {
+    if (!value) return '';
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : '';
+}
+
+function dateRangeLabel(startDate, endDate) {
+    const startIso = isoDatePart(startDate);
+    const endIso = isoDatePart(endDate || startDate);
+    if (!startIso || !endIso) return 'those dates';
+    const format = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+    });
+    return startIso === endIso ? format(startIso) : `${format(startIso)}–${format(endIso)}`;
+}
+
+// Guest-facing stay ranges use the checkout date. Inventory mutations use the
+// final occupied night, which is the day before checkout.
+function bookingDateContext(booking) {
+    const startDate = isoDatePart(booking?.checkinDate);
+    const checkoutDate = isoDatePart(booking?.checkoutDate);
+    return {
+        startDate,
+        checkoutDate,
+        lastOccupiedDate: checkoutDate ? addIsoDays(checkoutDate, -1) : startDate,
+        stayLabel: startDate && checkoutDate
+            ? dateRangeLabel(startDate, checkoutDate)
+            : 'an upcoming stay',
+    };
+}
+
+function naturalDurationEndDate(text, startDate) {
+    const lower = String(text || '').toLowerCase();
+    const weekMatch = lower.match(/\bfor\s+(?:(?:a|one)\s+)?(\d+)?\s*weeks?\b/);
+    if (weekMatch) {
+        const weeks = Math.min(26, Math.max(1, Number(weekMatch[1] || 1)));
+        return addIsoDays(startDate, weeks * 7 - 1);
+    }
+    const durationMatch = lower.match(/\bfor\s+(?:(?:a|one)\s+)?(\d+)?\s*(nights?|days?)\b/);
+    if (!durationMatch) return startDate;
+    const units = Math.min(180, Math.max(1, Number(durationMatch[1] || 1)));
+    return addIsoDays(startDate, units - 1);
+}
+
+function formatRecentBookingStatus(booking) {
+    if (!booking) return 'I could not find a recent Marketel booking for this property.';
+    const status = String(booking.status || '').toLowerCase();
+    const outcome = String(booking.approvalOutcome || '').toLowerCase();
+    const room = String(booking.roomName || 'the room');
+    const stay = bookingDateContext(booking).stayLabel;
+    const details = `${room}, ${stay}`;
+    const fulfillment = String(booking.fulfillmentStatus || '').toLowerCase();
+    const wasReleased = outcome === 'auto_released'
+        || outcome === 'owner_released'
+        || DEAD_BOOKING_STATUSES.includes(status);
+    const guestUpdate = fulfillment === 'completed'
+        ? (wasReleased
+            ? ' The $1 hold was voided and the guest was notified.'
+            : ' The guest confirmation was sent.')
+        : (fulfillment === 'attention'
+            ? ' The decision is saved, but its guest update needs attention in Front Desk.'
+            : (wasReleased
+                ? ' I am still finishing the card-hold and guest updates.'
+                : ' I am still finishing the guest confirmation.'));
+
+    if (status === 'pending') {
+        const deadline = new Date(booking.pendingUntil || 0);
+        const deadlineMs = deadline.getTime();
+        const fallback = String(booking.approvalNoResponseAction || '').toLowerCase() === 'release'
+            ? 'release it'
+            : 'keep it';
+        if (Number.isFinite(deadlineMs) && deadlineMs > Date.now()) {
+            const minutes = Math.max(1, Math.ceil((deadlineMs - Date.now()) / 60000));
+            return `The most recent request is still waiting: ${details}. If nobody answers, I’ll ${fallback} in about ${minutes} min.`;
+        }
+        return `The most recent request is still being settled: ${details}. Its no-answer rule is to ${fallback}.`;
+    }
+    if (outcome === 'auto_confirmed') {
+        return `Yes — the most recent booking was kept automatically because nobody answered: ${details}.${guestUpdate}`;
+    }
+    if (outcome === 'owner_confirmed') {
+        return `Yes — the most recent booking was kept after an owner reply: ${details}.${guestUpdate}`;
+    }
+    if (outcome === 'auto_no_alerts') {
+        return `Yes — the most recent booking was confirmed immediately because no booking-alert phone was connected: ${details}.${guestUpdate}`;
+    }
+    if (outcome === 'auto_released') {
+        return `No — the most recent request was released automatically because nobody answered: ${details}.${guestUpdate}`;
+    }
+    if (outcome === 'owner_released') {
+        return `No — the most recent request was released after an owner reply: ${details}.${guestUpdate}`;
+    }
+    if (DEAD_BOOKING_STATUSES.includes(status)) {
+        return `No — the most recent request is ${status}: ${details}.${guestUpdate}`;
+    }
+    if (status === 'confirmed') {
+        return `Yes — the most recent booking is confirmed: ${details}.${guestUpdate}`;
+    }
+    return `The most recent booking is ${status || 'recorded'}: ${details}.${guestUpdate}`;
+}
+
 // Short replies only have meaning in the context of the message they answer.
 // In particular, "NO" after an inventory check means nothing changed, while
 // "NO" after a booking alert means the room is not available.
@@ -120,10 +223,17 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
     const text = String(body || '').trim();
     const lower = text.toLowerCase();
     if (/^(help|\?)$/.test(lower)) return { intent: 'help' };
-    if (/^(undo|undo that|revert|revert that)$/.test(lower)) return { intent: 'undo' };
-    if (/^(cancel|cancel it|cancel booking)$/.test(lower)) return { intent: 'cancel_booking' };
-    if (/^(keep|keep it|do not cancel|don't cancel)$/.test(lower)) return { intent: 'keep_booking' };
+    if (/^(undo|undo that|undo the last change|revert|revert that|reverse that|change that back|put it back|restore it|that was wrong)$/.test(lower)) {
+        return { intent: 'undo' };
+    }
+    if (/^(cancel|cancel it|cancel booking|yes cancel|go ahead and cancel(?: it)?|cancel the online booking)$/.test(lower)) {
+        return { intent: 'cancel_booking' };
+    }
+    if (/^(keep|keep it|leave it|leave it alone|do not cancel|don't cancel|don't cancel it|no leave it)$/.test(lower)) {
+        return { intent: 'keep_booking' };
+    }
     if (/^(yes|y|available|still available|it is available)$/.test(lower)) {
+        if (contextType === 'cancel_question') return { intent: 'cancel_booking' };
         return contextType === 'inventory_check'
             ? { intent: 'no_change' }
             : { intent: 'booking_available' };
@@ -132,6 +242,7 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
         return { intent: 'no_change' };
     }
     if (/^(no|n|nope)$/.test(lower)) {
+        if (contextType === 'cancel_question') return { intent: 'keep_booking' };
         if (contextType === 'inventory_check') return { intent: 'no_change' };
         if (contextType === 'booking_alert') return { intent: 'booking_taken' };
         return {
@@ -141,6 +252,26 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
     }
     if (/^(not available|room taken|it's taken|it is taken)$/.test(lower)) {
         return { intent: 'booking_taken' };
+    }
+    if (contextType === 'booking_alert'
+        && /^(?:no|nope|not available)\b/.test(lower)
+        && !/^(?:no change|no changes|nothing changed)\b/.test(lower)) {
+        return { intent: 'booking_taken' };
+    }
+
+    const asksRecentBookingStatus = /\b(?:most recent|latest|last)\s+(?:online\s+)?(?:bookings?|requests?)\b/.test(lower)
+        || /\b(?:was|is|did|has)\s+(?:it|that|the\s+(?:booking|request|message|msg))\s+(?:been\s+)?(?:kept|confirmed|released|cancelled|canceled)\b/.test(lower)
+        || /\b(?:booking|request|message|msg)\b[^?]{0,60}\b(?:kept|confirmed|released|cancelled|canceled)\b/.test(lower)
+        || /\bwhat happened (?:to|with)\s+(?:it|that|the\s+(?:booking|request))\b/.test(lower);
+    if (asksRecentBookingStatus) {
+        return {
+            intent: 'booking_status',
+            roomName: null,
+            startDate: null,
+            endDate: null,
+            units: null,
+            clarification: '',
+        };
     }
 
     // Read-only questions must be recognized before "taken" and "booked"
@@ -191,7 +322,7 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
             intent: 'block_room',
             roomName: room.name,
             startDate,
-            endDate: startDate,
+            endDate: naturalDurationEndDate(lower, startDate),
             units: 1,
             clarification: '',
         };
@@ -722,6 +853,36 @@ function createFrontDeskAssistant({
         return actions[0] || null;
     }
 
+    async function getMostRecentBooking(recipient) {
+        const activities = await prisma.frontDeskAssistantActivity.findMany({
+            where: {
+                hotelId: recipient.hotelId,
+                recipientId: recipient.id,
+                type: { in: ['booking_alert', 'booking_decision'] },
+                createdAt: { gte: new Date(Date.now() - BOOKING_ACTION_TTL_MS) },
+            },
+            select: { metadata: true },
+            orderBy: { createdAt: 'desc' },
+            take: 12,
+        });
+        const linkedId = activities
+            .map((activity) => String(activity.metadata?.bookingId || ''))
+            .find(Boolean);
+        if (linkedId) {
+            const linked = await prisma.booking.findFirst({
+                where: { id: linkedId, hotelId: recipient.hotelId },
+            });
+            if (linked) return linked;
+        }
+        return prisma.booking.findFirst({
+            where: {
+                hotelId: recipient.hotelId,
+                bookingType: { not: 'manual' },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
     async function getPendingCancelAction(hotelId) {
         return prisma.frontDeskAssistantPendingAction.findFirst({
             where: {
@@ -812,24 +973,6 @@ function createFrontDeskAssistant({
             message: `Perfect — ${booking.roomName} is confirmed as available for this booking.`,
             booking,
         };
-    }
-
-    function dateRangeLabel(startDate, endDate) {
-        if (startDate === endDate) {
-            return new Date(`${startDate}T12:00:00Z`).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-            });
-        }
-        const start = new Date(`${startDate}T12:00:00Z`).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-        });
-        const end = new Date(`${endDate}T12:00:00Z`).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-        });
-        return `${start}–${end}`;
     }
 
     function describeBookingCount(day) {
@@ -1385,17 +1528,30 @@ function createFrontDeskAssistant({
     }
 
     async function getRecentOutboundContext(recipient) {
-        const activity = await prisma.frontDeskAssistantActivity.findFirst({
-            where: {
-                hotelId: recipient.hotelId,
-                recipientId: recipient.id,
-                direction: 'outbound',
-                type: { in: ['booking_alert', 'inventory_check'] },
-                createdAt: { gte: new Date(Date.now() - BOOKING_ACTION_TTL_MS) },
-            },
-            select: { type: true },
-            orderBy: { createdAt: 'desc' },
-        });
+        const [cancelQuestion, activity] = await Promise.all([
+            prisma.frontDeskAssistantPendingAction.findFirst({
+                where: {
+                    hotelId: recipient.hotelId,
+                    kind: 'cancel_booking',
+                    status: 'pending',
+                    expiresAt: { gt: new Date() },
+                },
+                select: { id: true },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.frontDeskAssistantActivity.findFirst({
+                where: {
+                    hotelId: recipient.hotelId,
+                    recipientId: recipient.id,
+                    direction: 'outbound',
+                    type: { in: ['booking_alert', 'inventory_check'] },
+                    createdAt: { gte: new Date(Date.now() - BOOKING_ACTION_TTL_MS) },
+                },
+                select: { type: true },
+                orderBy: { createdAt: 'desc' },
+            }),
+        ]);
+        if (cancelQuestion) return 'cancel_question';
         return activity?.type || '';
     }
 
@@ -1404,7 +1560,7 @@ function createFrontDeskAssistant({
             where: {
                 hotelId: recipient.hotelId,
                 recipientId: recipient.id,
-                type: { in: ['reply', 'assistant_reply'] },
+                type: { in: ['reply', 'assistant_reply', 'booking_alert', 'booking_decision', 'inventory_check'] },
                 createdAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) },
             },
             select: { direction: true, body: true, summary: true },
@@ -1433,7 +1589,7 @@ function createFrontDeskAssistant({
             properties: {
                 intent: {
                     type: 'string',
-                    enum: ['no_change', 'block_room', 'availability_query', 'engine_status', 'social', 'out_of_scope', 'unknown', 'help'],
+                    enum: ['no_change', 'block_room', 'availability_query', 'booking_status', 'engine_status', 'social', 'out_of_scope', 'unknown', 'help'],
                 },
                 roomName: {
                     type: ['string', 'null'],
@@ -1469,6 +1625,7 @@ function createFrontDeskAssistant({
                         `Valid room names: ${roomNames.join(', ') || 'none'}.`,
                         'block_room means an unrecorded walk-in or outside booking consumed one or more sellable rooms.',
                         'availability_query is a read-only question about which rooms are open, occupied, taken, or booked for a date or date range.',
+                        'booking_status is a read-only question about what happened to the latest or previously discussed booking, including whether it was kept, confirmed, released, or cancelled.',
                         'engine_status is a broad read-only question such as “how is my booking engine doing?” or “what is happening with my page?”',
                         'social is casual conversation with no property action or property question: greetings, thanks, praise, light humor, feelings, or ordinary pleasantries.',
                         'out_of_scope is a request for unrelated research, news, professional advice, trivia, or a task outside the Front Desk role.',
@@ -1476,7 +1633,8 @@ function createFrontDeskAssistant({
                         'A question must never become block_room. Read-only questions never change inventory.',
                         'Dates are occupied nights, inclusive. Resolve tonight/today/tomorrow to ISO dates.',
                         'For availability_query, select the only room automatically when the property has one room type. Leave roomName null to summarize every room type.',
-                        'Use the recent conversation only to resolve follow-up references such as “it,” “that room,” or a previously supplied date.',
+                        'Use the recent conversation to resolve follow-up references such as “it,” “that room,” “that message,” or the booking Front Desk most recently mentioned.',
+                        'A question about whether a booking was kept is booking_status, never availability_query.',
                         'Never infer cancellation of an existing guest. Never invent a room or date.',
                         'For a write action, if room or dates are missing, use unknown and write one short clarification question.',
                         'For social, write a warm, natural Front Desk reply in socialReply. Keep it under 160 characters and at most two short sentences.',
@@ -1529,7 +1687,9 @@ function createFrontDeskAssistant({
         ]);
         const todayIso = localTodayIso(config.timeZone || reportTimeZone);
         const deterministic = deterministicIntent(body, rooms, todayIso, contextType);
-        if (deterministic) return { ...deterministic, todayIso, rooms, interpretedBy: 'deterministic' };
+        if (deterministic) {
+            return { ...deterministic, todayIso, rooms, contextType, interpretedBy: 'deterministic' };
+        }
 
         try {
             const recentConversation = await getRecentConversation(recipient, body);
@@ -1541,11 +1701,12 @@ function createFrontDeskAssistant({
                 hotelId: recipient.hotelId,
                 recentConversation,
             });
-            return extracted ? { ...extracted, todayIso, rooms } : {
+            return extracted ? { ...extracted, todayIso, rooms, contextType } : {
                 intent: 'unknown',
                 clarification: 'Tell me which room was taken and which night.',
                 todayIso,
                 rooms,
+                contextType,
             };
         } catch (error) {
             console.error('frontdesk-assistant extraction:', error.message);
@@ -1554,14 +1715,31 @@ function createFrontDeskAssistant({
                 clarification: 'Tell me which room was taken and which night.',
                 todayIso,
                 rooms,
+                contextType,
             };
         }
     }
 
     async function handleInbound(recipient, body) {
         const intent = await understandInbound(recipient, body);
+        if (intent.intent === 'block_room' && intent.contextType === 'booking_alert') {
+            const action = await getRecentBookingAction(recipient.hotelId, recipient.id);
+            const bookingId = String(action?.payload?.bookingId || '');
+            const booking = bookingId
+                ? await prisma.booking.findFirst({ where: { id: bookingId, hotelId: recipient.hotelId } })
+                : null;
+            const bookingDates = booking ? manualBookingStayDates(booking.checkinDate, booking.checkoutDate) : [];
+            const reportedDates = enumerateDatesInclusive(
+                normalizeIsoDate(intent.startDate),
+                normalizeIsoDate(intent.endDate || intent.startDate),
+                180
+            );
+            const sameRoom = String(booking?.roomName || '').toLowerCase() === String(intent.roomName || '').toLowerCase();
+            const overlaps = reportedDates.some((date) => bookingDates.includes(date));
+            if (sameRoom && overlaps) intent.intent = 'booking_taken';
+        }
         if (intent.intent === 'help') {
-            return 'Tell me what changed, for example: “A walk-in took the Queen Room tonight.” Reply YES or NO to a booking check, or UNDO after an availability update.';
+            return 'Talk to me normally. Ask about a booking or availability, or tell me what changed, like “A walk-in took Queen Room tonight.” If I get an update wrong, tell me to change it back within 10 minutes.';
         }
         if (intent.intent === 'social') {
             const fallback = deterministicSocialReply(intent, recipient);
@@ -1621,20 +1799,73 @@ function createFrontDeskAssistant({
                         metadata: { bookingId: booking.id, outcome: 'owner_released' },
                     });
                 }
-                return decision?.ok
-                    ? (fulfillmentFinished(decision)
-                        ? `Handled — I freed ${booking.roomName}, released the $1 hold, and notified the guest.`
-                        : `Released — I freed ${booking.roomName}. I’m finishing the $1 hold and guest notification now.`)
-                    : 'I could not safely release that booking. Open Front Desk to review it.';
+                if (!decision?.ok) {
+                    return 'I could not safely release that booking. Open Front Desk to review it.';
+                }
+
+                // A NO means the room is physically unavailable. Releasing the
+                // online request restores its inventory, so immediately consume
+                // the same stay for the walk-in/outside booking that caused NO.
+                const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+                const inventoryResult = stayDates.length
+                    ? await consumeWalkInInventory({
+                        hotelId: booking.hotelId,
+                        recipientId: recipient.id,
+                        roomName: booking.roomName,
+                        startDate: stayDates[0],
+                        endDate: stayDates[stayDates.length - 1],
+                        units: 1,
+                        createUndo: false,
+                    }).catch(() => ({ ok: false, code: 'update_failed' }))
+                    : { ok: false, code: 'invalid_dates' };
+                const releaseLine = fulfillmentFinished(decision)
+                    ? 'I released the online request, voided the $1 hold, and notified the guest.'
+                    : 'I released the online request and I’m finishing the card-hold and guest updates.';
+                if (inventoryResult.ok) {
+                    const stay = bookingDateContext(booking).stayLabel;
+                    await createActivity({
+                        hotelId: recipient.hotelId,
+                        recipientId: recipient.id,
+                        direction: 'system',
+                        type: 'availability_update',
+                        summary: `${booking.roomName} kept unavailable for the outside stay ${stay}`,
+                        metadata: {
+                            bookingId: booking.id,
+                            roomName: booking.roomName,
+                            startDate: stayDates[0],
+                            endDate: stayDates[stayDates.length - 1],
+                            units: 1,
+                            source: 'released_booking_reply',
+                        },
+                    });
+                    return `${releaseLine} I also blocked one ${booking.roomName} for the same ${stay} stay.`;
+                }
+                if (inventoryResult.code === 'conflict') {
+                    return `${releaseLine} ${booking.roomName} was already unavailable for that stay, so I did not subtract another room.`;
+                }
+                await createActivity({
+                    hotelId: recipient.hotelId,
+                    recipientId: recipient.id,
+                    direction: 'system',
+                    type: 'availability_warning',
+                    summary: `Released ${booking.roomName}, but the outside stay needs an availability update`,
+                    status: 'attention',
+                    metadata: { bookingId: booking.id, inventoryCode: inventoryResult.code || 'unknown' },
+                });
+                return `${releaseLine} I could not record the walk-in safely, so open Availability and block ${booking.roomName} for that stay.`;
             }
             const pending = await createBookingCancellationQuestion(action, recipient);
             if (!pending) return 'That booking is no longer available to review.';
             const guest = [pending.booking.guestFirstName, pending.booking.guestLastName]
                 .filter(Boolean).join(' ') || 'the guest';
-            return `${pending.booking.roomName} is marked as taken. Reply CANCEL to cancel ${guest}'s online booking, notify them, release the payment hold, and keep the dates unavailable. Reply KEEP to leave it unchanged.`;
+            const stay = bookingDateContext(pending.booking).stayLabel;
+            return `That ${pending.booking.roomName} booking for ${stay} was already kept when the timer ended. It now overlaps the walk-in. Should I cancel ${guest}'s online booking and block the room for the walk-in, or leave it alone?`;
         }
         if (intent.intent === 'no_change') {
             return 'Got it — no availability changes recorded.';
+        }
+        if (intent.intent === 'booking_status') {
+            return formatRecentBookingStatus(await getMostRecentBooking(recipient));
         }
         if (intent.intent === 'availability_query') {
             const startDate = normalizeIsoDate(intent.startDate);
@@ -1686,7 +1917,7 @@ function createFrontDeskAssistant({
                 summary: `${room.name} reduced by ${result.units} for ${dateRangeLabel(startDate, endDate)}`,
                 metadata: { roomName: room.name, startDate, endDate, units: result.units },
             });
-            return `Done — I removed ${result.units} ${result.units === 1 ? 'room' : 'rooms'} from ${room.name} for ${dateRangeLabel(startDate, endDate)}. Reply UNDO within 10 minutes if that was wrong.`;
+            return `Done — I removed ${result.units} ${result.units === 1 ? 'room' : 'rooms'} from ${room.name} for ${dateRangeLabel(startDate, endDate)}. If that was wrong, just tell me to change it back within 10 minutes.`;
         }
         if (result.code === 'conflict' && result.bookings?.length) {
             const action = await createCancellationQuestion({
@@ -1697,7 +1928,7 @@ function createFrontDeskAssistant({
             const booking = result.bookings[0];
             const guest = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ') || 'an online guest';
             return action
-                ? `That room already overlaps ${guest}'s confirmed booking. Reply CANCEL to cancel and notify the guest, or KEEP to leave the booking unchanged.`
+                ? `That room already overlaps ${guest}'s confirmed booking. Should I cancel and notify the guest, or leave the booking alone?`
                 : 'That room already has a confirmed online booking. Open Bookings to review the conflict.';
         }
         if (result.code === 'conflict') {
@@ -1742,21 +1973,19 @@ function createFrontDeskAssistant({
             });
         }
 
-        const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
-        const stay = stayDates.length
-            ? dateRangeLabel(stayDates[0], stayDates[stayDates.length - 1])
-            : 'upcoming stay';
+        const stay = bookingDateContext(booking).stayLabel;
         const amount = Number(booking.grandTotal || 0).toFixed(2);
         const isPending = String(booking.status || '').toLowerCase() === 'pending';
         const dueMs = new Date(booking.pendingUntil || 0).getTime() - Date.now();
         const minutes = Math.max(1, Math.round(dueMs / 60000));
         const fallbackRelease = String(booking.approvalNoResponseAction || '').toLowerCase() === 'release';
         const fallbackLine = fallbackRelease
-            ? `No reply releases the request in ${minutes} min.`
-            : `No reply keeps the booking in ${minutes} min.`;
+            ? `If I don’t hear from you, I’ll release it in ${minutes} min.`
+            : `If I don’t hear from you, I’ll keep it in ${minutes} min.`;
+        const propertyName = hotel.name || 'your property';
         const body = isPending
-            ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNew request: ${booking.roomName}, ${stay}, $${amount}.\nStill free? Reply YES to keep it or NO to release it. ${fallbackLine}`
-            : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNew booking: ${booking.roomName}, ${stay}, $${amount}.\nIs the room still available? Reply YES or NO.`;
+            ? `New request at ${propertyName}: ${booking.roomName}, ${stay}, $${amount}.\nIs it still free? Say yes to keep it, or tell me what changed. ${fallbackLine}`
+            : `New booking at ${propertyName}: ${booking.roomName}, ${stay}, $${amount}.\nIs the room still free? Tell me what changed, or say it’s available.`;
         return sendToVerifiedRecipients(hotel, body, {
             type: 'booking_alert',
             summary: `New ${booking.roomName} booking · ${stay}`,
@@ -1781,13 +2010,14 @@ function createFrontDeskAssistant({
         if (!hotel || !hotel.subscribed || !config?.enabled || config.notifyNewBookings === false) return { sent: 0 };
         const released = outcome === 'auto_released';
         const finished = String(booking.fulfillmentStatus || '').toLowerCase() === 'completed';
+        const propertyName = hotel.name || 'your property';
         const body = released
             ? (finished
-                ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was released, the $1 hold was voided, and the guest was notified.`
-                : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I released ${booking.roomName}. I’m finishing the card release and guest notification now.`)
+                ? `I didn’t hear back about ${booking.roomName} at ${propertyName}, so I followed your rule: I released the request, voided the $1 hold, and notified the guest.`
+                : `I didn’t hear back about ${booking.roomName} at ${propertyName}, so I released the request. I’m finishing the card and guest updates now.`)
             : (finished
-                ? `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I followed your rule: ${booking.roomName} was confirmed and the guest was emailed.`
-                : `Marketel Front Desk — ${hotel.name || 'Your property'}\nNobody answered, so I confirmed ${booking.roomName}. I’m finishing the guest email now.`);
+                ? `I didn’t hear back about ${booking.roomName} at ${propertyName}, so I followed your rule: I kept the booking and emailed the guest.`
+                : `I didn’t hear back about ${booking.roomName} at ${propertyName}, so I kept the booking. I’m finishing the guest email now.`);
         return sendToVerifiedRecipients(hotel, body, {
             type: 'booking_decision',
             summary: released ? `${booking.roomName} auto-released` : `${booking.roomName} auto-confirmed`,
@@ -1796,7 +2026,7 @@ function createFrontDeskAssistant({
     }
 
     async function sendInventoryCheck(hotel, config) {
-        const body = `Marketel Front Desk — ${hotel.name || 'Your property'}\nAny walk-ins or outside bookings since our last check? Reply NO if nothing changed, or tell me the room and dates.`;
+        const body = `Quick check for ${hotel.name || 'your property'}: any walk-ins or outside bookings since we last spoke? If nothing changed, just say so. Otherwise, tell me the room and dates.`;
         const result = await sendToVerifiedRecipients(hotel, body, {
             type: 'inventory_check',
             summary: 'Availability check sent',
@@ -2320,4 +2550,6 @@ module.exports = {
     classifyDeterministicIntent,
     deterministicSocialReply,
     sanitizeAssistantSocialReply,
+    bookingDateContext,
+    formatRecentBookingStatus,
 };
