@@ -458,7 +458,8 @@ html.marketel-keyboard-open .guest-messages-page {
   padding-bottom: 0 !important;
 }
 html.marketel-keyboard-open .guest-message-composer {
-  padding-bottom: 8px !important;
+  padding-bottom: calc(var(--marketel-keyboard-inset, 0px) + 8px) !important;
+  background: #f4f7f9 !important;
 }
 `;
 
@@ -476,23 +477,22 @@ const styles = {
   page: {
     display: 'flex',
     flexDirection: 'column',
-    height: 'var(--marketel-visual-height, 100dvh)',
-    maxHeight: 'var(--marketel-visual-height, 100dvh)',
+    height: 'auto',
+    maxHeight: 'none',
     background: '#f4f7f9',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',
     position: 'fixed',
     top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
     width: '100%',
     boxSizing: 'border-box',
     overflow: 'hidden',
     paddingBottom: 'var(--guest-nav-clearance, 0px)',
-    transform: 'translate3d(0, var(--marketel-visual-top, 0px), 0)',
     transition: 'padding-bottom 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-    willChange: 'height, transform',
     contain: 'layout',
     boxShadow: '0 0 0 200vmax #f4f7f9',
   },
@@ -696,8 +696,8 @@ const styles = {
     animation: 'guestMsgSpinner 0.8s linear infinite',
   },
 
-  // Composer is part of the chat flex layout, so the visual viewport moves it
-  // directly above the keyboard instead of moving the entire document.
+  // The composer grows an opaque bottom inset equal to the keyboard height.
+  // Its input row stays above the keyboard without moving the route itself.
   composeBar: {
     position: 'relative',
     flexShrink: 0,

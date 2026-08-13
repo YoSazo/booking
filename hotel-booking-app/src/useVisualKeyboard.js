@@ -7,10 +7,9 @@ function isEditable(element) {
 }
 
 /**
- * Tracks the complete keyboard transition, not only its final open state.
- * Focus starts the transition before iOS animates; blur does not release it
- * until VisualViewport is full-sized again. This avoids exposing the route
- * underneath during Safari's asynchronous viewport updates.
+ * Tracks the keyboard without resizing or translating the route. Messaging
+ * composers consume the exposed bottom inset; ordinary forms keep Safari's
+ * standard focused-field scrolling behavior.
  */
 export default function useVisualKeyboard() {
   const [keyboardActive, setKeyboardActive] = useState(false);
@@ -20,9 +19,11 @@ export default function useVisualKeyboard() {
     const viewport = window.visualViewport;
     const timers = new Set();
     let frame = 0;
-    let settleFrame = 0;
-    let fullHeight = Math.max(window.innerHeight || 0, viewport?.height || 0);
-    let savedScrollY = window.scrollY || 0;
+    let fullViewportBottom = Math.max(
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      (viewport?.height || 0) + (viewport?.offsetTop || 0)
+    );
 
     const setActive = (active) => {
       if (activeRef.current === active) return;
@@ -31,56 +32,45 @@ export default function useVisualKeyboard() {
       setKeyboardActive(active);
     };
 
-    const readViewport = () => ({
-      height: Math.max(1, Math.round(
+    const viewportBottom = () => {
+      const height = Math.max(1, Math.round(
         viewport?.height || window.innerHeight || document.documentElement.clientHeight
-      )),
-      top: Math.max(0, Math.round(viewport?.offsetTop || 0)),
-    });
+      ));
+      const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
+      return top + height;
+    };
 
-    const finish = (height) => {
-      document.documentElement.style.setProperty('--marketel-visual-height', `${height}px`);
-      document.documentElement.style.setProperty('--marketel-visual-top', '0px');
+    const finish = () => {
+      document.documentElement.style.setProperty('--marketel-keyboard-inset', '0px');
       document.documentElement.classList.remove('marketel-keyboard-open');
       setActive(false);
-      window.scrollTo(0, savedScrollY);
     };
 
     const apply = () => {
       frame = 0;
-      const current = readViewport();
+      const currentBottom = viewportBottom();
       const focused = isEditable(document.activeElement);
 
       if (!activeRef.current && !focused) {
-        fullHeight = Math.max(current.height, window.innerHeight || 0);
+        fullViewportBottom = Math.max(
+          currentBottom,
+          window.innerHeight || 0,
+          document.documentElement.clientHeight || 0
+        );
       }
-      if (focused && !activeRef.current) {
-        savedScrollY = window.scrollY || 0;
-        setActive(true);
-      }
+      if (focused && !activeRef.current) setActive(true);
 
-      const hiddenHeight = Math.max(0, fullHeight - current.height);
-      const open = activeRef.current && hiddenHeight > 80;
-      document.documentElement.style.setProperty('--marketel-visual-height', `${current.height}px`);
+      const keyboardInset = activeRef.current
+        ? Math.max(0, fullViewportBottom - currentBottom)
+        : 0;
+      const open = activeRef.current && keyboardInset > 80;
       document.documentElement.style.setProperty(
-        '--marketel-visual-top',
-        `${activeRef.current ? current.top : 0}px`
+        '--marketel-keyboard-inset',
+        `${open ? Math.round(keyboardInset) : 0}px`
       );
       document.documentElement.classList.toggle('marketel-keyboard-open', open);
 
-      if (activeRef.current && !focused && hiddenHeight <= 80) {
-        if (settleFrame) cancelAnimationFrame(settleFrame);
-        settleFrame = requestAnimationFrame(() => {
-          settleFrame = requestAnimationFrame(() => {
-            settleFrame = 0;
-            if (!isEditable(document.activeElement)) {
-              const settled = readViewport();
-              fullHeight = Math.max(settled.height, window.innerHeight || 0);
-              finish(settled.height);
-            }
-          });
-        });
-      }
+      if (activeRef.current && !focused && keyboardInset <= 80) finish();
     };
 
     const schedule = () => {
@@ -101,20 +91,18 @@ export default function useVisualKeyboard() {
       scheduleAfter(70);
       scheduleAfter(180);
       scheduleAfter(360);
+      scheduleAfter(520);
     };
 
     const onFocusIn = (event) => {
       if (!isEditable(event.target)) return;
-      savedScrollY = window.scrollY || 0;
       setActive(true);
       settle();
     };
 
     const onFocusOut = (event) => {
       if (!isEditable(event.target)) return;
-      // Remain active until the keyboard and viewport finish dismissing.
       settle();
-      scheduleAfter(520);
     };
 
     window.addEventListener('resize', schedule);
@@ -127,7 +115,6 @@ export default function useVisualKeyboard() {
 
     return () => {
       if (frame) cancelAnimationFrame(frame);
-      if (settleFrame) cancelAnimationFrame(settleFrame);
       timers.forEach((timer) => window.clearTimeout(timer));
       timers.clear();
       window.removeEventListener('resize', schedule);
@@ -137,8 +124,7 @@ export default function useVisualKeyboard() {
       viewport?.removeEventListener('resize', schedule);
       viewport?.removeEventListener('scroll', schedule);
       document.documentElement.classList.remove('marketel-keyboard-active', 'marketel-keyboard-open');
-      document.documentElement.style.removeProperty('--marketel-visual-height');
-      document.documentElement.style.removeProperty('--marketel-visual-top');
+      document.documentElement.style.removeProperty('--marketel-keyboard-inset');
     };
   }, []);
 

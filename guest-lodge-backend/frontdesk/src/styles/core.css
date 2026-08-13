@@ -3235,20 +3235,14 @@
 .messages-workspace {
   position: fixed;
   z-index: 100060;
-  top: 0;
-  right: 0;
-  bottom: auto;
-  left: 0;
+  inset: 0;
   width: 100%;
-  height: var(--marketel-chat-viewport-height, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
   box-shadow: 0 0 0 200vmax var(--bg);
   contain: layout;
-  transform: translate3d(0, var(--marketel-chat-viewport-top, 0px), 0);
-  will-change: height, transform;
   backface-visibility: hidden;
 }
 .messages-workspace-header {
@@ -3427,7 +3421,8 @@
   border-top: 1px solid var(--border-soft);
 }
 .messages-workspace.marketel-chat-keyboard-open .message-composer {
-  padding-bottom: 8px;
+  padding-bottom: calc(var(--marketel-chat-keyboard-inset, 0px) + 8px);
+  background: var(--white);
 }
 
 /* Shared full-screen modal behavior. Native UIKit chrome is hidden while

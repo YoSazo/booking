@@ -19,10 +19,9 @@ function syncBodyKeyboardClasses() {
 }
 
 /**
- * Keeps a full-screen chat attached to the visual viewport while the software
- * keyboard animates. The active phase starts on focus (before Safari changes
- * its viewport) and survives blur until the viewport is restored, preventing
- * the one-frame flash of the page underneath on both presentation and dismiss.
+ * Keeps chat chrome fixed and grows only its composer beneath the visible
+ * input row. The keyboard covers that extra opaque area, so the composer sits
+ * directly above it without translating or resizing the whole application.
  */
 export function bindChatKeyboardViewport(root, {
   fieldSelector = EDITABLE_SELECTOR,
@@ -37,15 +36,15 @@ export function bindChatKeyboardViewport(root, {
   const visualViewport = window.visualViewport;
   const timers = new Set();
   let animationFrame = 0;
-  let secondAnimationFrame = 0;
-  let fullViewportHeight = Math.max(
-    window.innerHeight || 0,
-    visualViewport?.height || 0
-  );
   let keyboardActive = false;
   let keyboardOpen = false;
+  let nativeKeyboardHeight = 0;
   let touchStartY = null;
-  let savedScrollY = window.scrollY || 0;
+  let fullViewportBottom = Math.max(
+    window.innerHeight || 0,
+    document.documentElement.clientHeight || 0,
+    (visualViewport?.height || 0) + (visualViewport?.offsetTop || 0)
+  );
 
   const activeScroller = () => (
     scrollSelector ? root.querySelector(scrollSelector) : null
@@ -63,49 +62,47 @@ export function bindChatKeyboardViewport(root, {
     syncBodyKeyboardClasses();
   };
 
-  const visibleViewport = () => ({
-    height: Math.max(1, Math.round(
+  const viewportBottom = () => {
+    const height = Math.max(1, Math.round(
       visualViewport?.height || window.innerHeight || document.documentElement.clientHeight
-    )),
-    top: Math.max(0, Math.round(visualViewport?.offsetTop || 0)),
-  });
+    ));
+    const top = Math.max(0, Math.round(visualViewport?.offsetTop || 0));
+    return top + height;
+  };
 
-  const finishKeyboardTransition = (height) => {
+  const finishKeyboardTransition = () => {
     keyboardOpen = false;
+    nativeKeyboardHeight = 0;
     root.classList.remove('marketel-chat-keyboard-open');
-    root.style.setProperty('--marketel-chat-viewport-height', `${height}px`);
-    root.style.setProperty('--marketel-chat-viewport-top', '0px');
+    root.style.setProperty('--marketel-chat-keyboard-inset', '0px');
     setKeyboardActive(false);
-    // WebKit can leave the layout viewport panned after keyboard dismissal.
-    // Restore the page only once the visual viewport is full-sized again.
-    window.scrollTo(0, savedScrollY);
     syncBodyKeyboardClasses();
   };
 
   const applyViewport = () => {
     animationFrame = 0;
-    const viewport = visibleViewport();
+    const currentBottom = viewportBottom();
     const hasFocusedField = editableInside(root, fieldSelector);
 
     if (!keyboardActive && !hasFocusedField) {
-      fullViewportHeight = Math.max(viewport.height, window.innerHeight || 0);
+      fullViewportBottom = Math.max(
+        currentBottom,
+        window.innerHeight || 0,
+        document.documentElement.clientHeight || 0
+      );
     }
-    if (hasFocusedField && !keyboardActive) {
-      savedScrollY = window.scrollY || 0;
-      setKeyboardActive(true);
-    }
+    if (hasFocusedField && !keyboardActive) setKeyboardActive(true);
 
-    const occludedHeight = Math.max(0, fullViewportHeight - viewport.height);
-    const nextKeyboardOpen = keyboardActive && occludedHeight > 80;
+    const visualInset = Math.max(0, fullViewportBottom - currentBottom);
+    const keyboardInset = keyboardActive
+      ? Math.max(visualInset, nativeKeyboardHeight)
+      : 0;
+    const nextKeyboardOpen = keyboardActive && keyboardInset > 80;
 
-    if (keyboardActive) {
-      root.style.setProperty('--marketel-chat-viewport-height', `${viewport.height}px`);
-      root.style.setProperty('--marketel-chat-viewport-top', `${viewport.top}px`);
-    } else {
-      root.style.setProperty('--marketel-chat-viewport-height', `${viewport.height}px`);
-      root.style.setProperty('--marketel-chat-viewport-top', '0px');
-    }
-
+    root.style.setProperty(
+      '--marketel-chat-keyboard-inset',
+      `${nextKeyboardOpen ? Math.round(keyboardInset) : 0}px`
+    );
     root.classList.toggle('marketel-chat-keyboard-open', nextKeyboardOpen);
     syncBodyKeyboardClasses();
 
@@ -114,19 +111,8 @@ export function bindChatKeyboardViewport(root, {
     }
     keyboardOpen = nextKeyboardOpen;
 
-    if (keyboardActive && !hasFocusedField && occludedHeight <= 80) {
-      // A second animation frame is intentional: installed iOS web apps can
-      // fire resize before visualViewport reflects its final restored height.
-      secondAnimationFrame = requestAnimationFrame(() => {
-        secondAnimationFrame = requestAnimationFrame(() => {
-          secondAnimationFrame = 0;
-          if (!editableInside(root, fieldSelector)) {
-            const settled = visibleViewport();
-            fullViewportHeight = Math.max(settled.height, window.innerHeight || 0);
-            finishKeyboardTransition(settled.height);
-          }
-        });
-      });
+    if (keyboardActive && !hasFocusedField && keyboardInset <= 80) {
+      finishKeyboardTransition();
     }
   };
 
@@ -148,11 +134,11 @@ export function bindChatKeyboardViewport(root, {
     scheduleAfter(70);
     scheduleAfter(180);
     scheduleAfter(360);
+    scheduleAfter(520);
   };
 
   const onFocusIn = (event) => {
     if (!event.target?.matches?.(fieldSelector)) return;
-    savedScrollY = window.scrollY || 0;
     setKeyboardActive(true);
     requestAnimationFrame(scrollConversationToBottom);
     settleViewport();
@@ -160,25 +146,30 @@ export function bindChatKeyboardViewport(root, {
 
   const onFocusOut = (event) => {
     if (!event.target?.matches?.(fieldSelector)) return;
-    // Keep the opaque chat surface active while the keyboard animates away.
     settleViewport();
-    scheduleAfter(520);
   };
 
-  const onKeyboardWillShow = () => {
+  const eventKeyboardHeight = (event) => Math.max(0, Number(
+    event?.keyboardHeight || event?.detail?.keyboardHeight || 0
+  ));
+
+  const onKeyboardWillShow = (event) => {
     if (!editableInside(root, fieldSelector)) return;
+    nativeKeyboardHeight = eventKeyboardHeight(event);
     setKeyboardActive(true);
     settleViewport();
   };
 
   const onKeyboardWillHide = () => {
     if (!keyboardActive) return;
+    nativeKeyboardHeight = 0;
     settleViewport();
   };
 
   const onKeyboardDidHide = () => {
-    if (!keyboardActive || editableInside(root, fieldSelector)) return;
-    settleViewport();
+    nativeKeyboardHeight = 0;
+    if (!editableInside(root, fieldSelector)) finishKeyboardTransition();
+    else settleViewport();
   };
 
   const onTouchStart = (event) => {
@@ -206,6 +197,7 @@ export function bindChatKeyboardViewport(root, {
   root.addEventListener('touchmove', onTouchMove, { passive: true });
   root.addEventListener('touchend', onTouchEnd, { passive: true });
   window.addEventListener('resize', scheduleViewport);
+  window.addEventListener('orientationchange', settleViewport);
   window.addEventListener('keyboardWillShow', onKeyboardWillShow);
   window.addEventListener('keyboardWillHide', onKeyboardWillHide);
   window.addEventListener('keyboardDidHide', onKeyboardDidHide);
@@ -215,7 +207,6 @@ export function bindChatKeyboardViewport(root, {
 
   const cleanup = () => {
     if (animationFrame) cancelAnimationFrame(animationFrame);
-    if (secondAnimationFrame) cancelAnimationFrame(secondAnimationFrame);
     timers.forEach((timer) => window.clearTimeout(timer));
     timers.clear();
     root.removeEventListener('focusin', onFocusIn);
@@ -224,14 +215,14 @@ export function bindChatKeyboardViewport(root, {
     root.removeEventListener('touchmove', onTouchMove);
     root.removeEventListener('touchend', onTouchEnd);
     window.removeEventListener('resize', scheduleViewport);
+    window.removeEventListener('orientationchange', settleViewport);
     window.removeEventListener('keyboardWillShow', onKeyboardWillShow);
     window.removeEventListener('keyboardWillHide', onKeyboardWillHide);
     window.removeEventListener('keyboardDidHide', onKeyboardDidHide);
     visualViewport?.removeEventListener('resize', scheduleViewport);
     visualViewport?.removeEventListener('scroll', scheduleViewport);
     root.classList.remove('marketel-chat-keyboard-active', 'marketel-chat-keyboard-open');
-    root.style.removeProperty('--marketel-chat-viewport-height');
-    root.style.removeProperty('--marketel-chat-viewport-top');
+    root.style.removeProperty('--marketel-chat-keyboard-inset');
     boundChatRoots.delete(root);
     delete root.__marketelChatKeyboardCleanup;
     syncBodyKeyboardClasses();
