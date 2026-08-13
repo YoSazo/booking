@@ -256,7 +256,20 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
     if (contextType === 'booking_alert'
         && /^(?:no|nope|not available)\b/.test(lower)
         && !/^(?:no change|no changes|nothing changed)\b/.test(lower)) {
-        return { intent: 'booking_taken' };
+        const namedRoom = rooms.find((entry) => lower.includes(String(entry.name || '').toLowerCase()));
+        const hasDateDetail = /\b(?:today|tonight|tomorrow)\b/.test(lower)
+            || /\bfor\s+(?:(?:a|one)\s+)?\d*\s*(?:nights?|days?|weeks?)\b/.test(lower);
+        const startDate = hasDateDetail
+            ? (/\btomorrow\b/.test(lower) ? addIsoDays(todayIso, 1) : todayIso)
+            : null;
+        return {
+            intent: 'booking_taken',
+            roomName: namedRoom?.name || null,
+            startDate,
+            endDate: startDate ? naturalDurationEndDate(lower, startDate) : null,
+            units: 1,
+            clarification: '',
+        };
     }
 
     const asksRecentBookingStatus = /\b(?:most recent|latest|last)\s+(?:online\s+)?(?:bookings?|requests?)\b/.test(lower)
@@ -1322,7 +1335,7 @@ function createFrontDeskAssistant({
         });
     }
 
-    async function createBookingCancellationQuestion(reviewAction, recipient) {
+    async function createBookingCancellationQuestion(reviewAction, recipient, outsideStay = {}) {
         const bookingId = String(reviewAction?.payload?.bookingId || '');
         if (!bookingId) return null;
         const booking = await prisma.booking.findFirst({
@@ -1336,6 +1349,9 @@ function createFrontDeskAssistant({
             return { action: existing, booking };
         }
         const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+        const outsideStart = normalizeIsoDate(outsideStay.startDate);
+        const outsideEnd = normalizeIsoDate(outsideStay.endDate || outsideStay.startDate);
+        const useOutsideStay = outsideStart && outsideEnd && outsideEnd >= outsideStart;
         const action = await prisma.frontDeskAssistantPendingAction.create({
             data: {
                 hotelId: recipient.hotelId,
@@ -1344,8 +1360,8 @@ function createFrontDeskAssistant({
                 payload: {
                     bookingId: booking.id,
                     roomName: booking.roomName,
-                    startDate: stayDates[0] || null,
-                    endDate: stayDates[stayDates.length - 1] || null,
+                    startDate: useOutsideStay ? outsideStart : (stayDates[0] || null),
+                    endDate: useOutsideStay ? outsideEnd : (stayDates[stayDates.length - 1] || null),
                     units: 1,
                     reason: 'Room was given to a walk-in',
                 },
@@ -1380,14 +1396,18 @@ function createFrontDeskAssistant({
         if (!outcome?.ok) return { ok: false, message: 'I could not cancel that booking.' };
 
         const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+        const payloadStart = normalizeIsoDate(payload.startDate);
+        const payloadEnd = normalizeIsoDate(payload.endDate || payload.startDate);
+        const inventoryStart = payloadStart || stayDates[0];
+        const inventoryEnd = payloadEnd || stayDates[stayDates.length - 1];
         let inventoryResult = { ok: true };
-        if (stayDates.length) {
+        if (inventoryStart && inventoryEnd) {
             inventoryResult = await consumeWalkInInventory({
                 hotelId: booking.hotelId,
                 recipientId: recipient?.id || null,
                 roomName: booking.roomName,
-                startDate: stayDates[0],
-                endDate: stayDates[stayDates.length - 1],
+                startDate: inventoryStart,
+                endDate: inventoryEnd,
                 units: 1,
                 createUndo: false,
             }).catch(() => ({ ok: false, code: 'update_failed' }));
@@ -1782,6 +1802,21 @@ function createFrontDeskAssistant({
             const booking = bookingId
                 ? await prisma.booking.findFirst({ where: { id: bookingId, hotelId: recipient.hotelId } })
                 : null;
+            if (!booking) return 'I could not find the booking from that message. Open Front Desk to review it.';
+            const bookingStayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+            const reportedStart = normalizeIsoDate(intent.startDate);
+            const reportedEnd = normalizeIsoDate(intent.endDate || intent.startDate);
+            const reportedRoom = String(intent.roomName || '').trim();
+            if (reportedRoom && reportedRoom.toLowerCase() !== String(booking.roomName || '').toLowerCase()) {
+                return `The request I asked about is ${booking.roomName}, but you mentioned ${reportedRoom}. Is ${booking.roomName} still free for ${bookingDateContext(booking).stayLabel}?`;
+            }
+            if (reportedStart && reportedEnd) {
+                const reportedDates = enumerateDatesInclusive(reportedStart, reportedEnd, 180);
+                const overlaps = reportedDates.some((date) => bookingStayDates.includes(date));
+                if (!overlaps) {
+                    return `The request I asked about is ${booking.roomName} for ${bookingDateContext(booking).stayLabel}, but those walk-in dates don’t overlap it. Is this booking’s room still free?`;
+                }
+            }
             if (String(booking?.status || '').toLowerCase() === 'pending' && applyBookingApprovalDecision) {
                 const decision = await applyBookingApprovalDecision(booking.id, 'release', 'assistant');
                 await prisma.frontDeskAssistantPendingAction.update({
@@ -1806,14 +1841,15 @@ function createFrontDeskAssistant({
                 // A NO means the room is physically unavailable. Releasing the
                 // online request restores its inventory, so immediately consume
                 // the same stay for the walk-in/outside booking that caused NO.
-                const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
-                const inventoryResult = stayDates.length
+                const inventoryStart = reportedStart || bookingStayDates[0];
+                const inventoryEnd = reportedEnd || bookingStayDates[bookingStayDates.length - 1];
+                const inventoryResult = inventoryStart && inventoryEnd
                     ? await consumeWalkInInventory({
                         hotelId: booking.hotelId,
                         recipientId: recipient.id,
                         roomName: booking.roomName,
-                        startDate: stayDates[0],
-                        endDate: stayDates[stayDates.length - 1],
+                        startDate: inventoryStart,
+                        endDate: inventoryEnd,
                         units: 1,
                         createUndo: false,
                     }).catch(() => ({ ok: false, code: 'update_failed' }))
@@ -1822,23 +1858,25 @@ function createFrontDeskAssistant({
                     ? 'I released the online request, voided the $1 hold, and notified the guest.'
                     : 'I released the online request and I’m finishing the card-hold and guest updates.';
                 if (inventoryResult.ok) {
-                    const stay = bookingDateContext(booking).stayLabel;
+                    const outsideLabel = reportedStart && reportedEnd
+                        ? dateRangeLabel(reportedStart, reportedEnd)
+                        : bookingDateContext(booking).stayLabel;
                     await createActivity({
                         hotelId: recipient.hotelId,
                         recipientId: recipient.id,
                         direction: 'system',
                         type: 'availability_update',
-                        summary: `${booking.roomName} kept unavailable for the outside stay ${stay}`,
+                        summary: `${booking.roomName} kept unavailable for the outside stay ${outsideLabel}`,
                         metadata: {
                             bookingId: booking.id,
                             roomName: booking.roomName,
-                            startDate: stayDates[0],
-                            endDate: stayDates[stayDates.length - 1],
+                            startDate: inventoryStart,
+                            endDate: inventoryEnd,
                             units: 1,
                             source: 'released_booking_reply',
                         },
                     });
-                    return `${releaseLine} I also blocked one ${booking.roomName} for the same ${stay} stay.`;
+                    return `${releaseLine} I also blocked one ${booking.roomName} for ${outsideLabel}.`;
                 }
                 if (inventoryResult.code === 'conflict') {
                     return `${releaseLine} ${booking.roomName} was already unavailable for that stay, so I did not subtract another room.`;
@@ -1854,7 +1892,10 @@ function createFrontDeskAssistant({
                 });
                 return `${releaseLine} I could not record the walk-in safely, so open Availability and block ${booking.roomName} for that stay.`;
             }
-            const pending = await createBookingCancellationQuestion(action, recipient);
+            const pending = await createBookingCancellationQuestion(action, recipient, {
+                startDate: reportedStart,
+                endDate: reportedEnd,
+            });
             if (!pending) return 'That booking is no longer available to review.';
             const guest = [pending.booking.guestFirstName, pending.booking.guestLastName]
                 .filter(Boolean).join(' ') || 'the guest';

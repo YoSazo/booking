@@ -82,7 +82,14 @@ test('a natural NO with context answers the booking alert instead of mutating on
             '2026-08-13',
             'booking_alert'
         ),
-        { intent: 'booking_taken' }
+        {
+            intent: 'booking_taken',
+            roomName: 'Queen Suite',
+            startDate: '2026-08-13',
+            endDate: '2026-08-19',
+            units: 1,
+            clarification: '',
+        }
     );
 });
 
