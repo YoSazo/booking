@@ -5,10 +5,85 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function collectReferencedWebAssets(outDir) {
+  const found = new Set();
+  const queue = [];
+  const add = (file) => {
+    const normalized = String(file || '').replace(/^\.\//, '').replace(/^assets\//, '');
+    if (!/\.(?:js|css)$/.test(normalized)) return;
+    const key = `assets/${normalized}`;
+    if (found.has(key)) return;
+    found.add(key);
+    if (normalized.endsWith('.js')) queue.push(normalized);
+  };
+  const indexPath = path.join(outDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    const html = fs.readFileSync(indexPath, 'utf8');
+    for (const match of html.matchAll(/(?:\/frontdesk\/)?assets\/([^"'?]+\.(?:js|css))/g)) add(match[1]);
+  }
+  while (queue.length) {
+    const filename = queue.shift();
+    const assetPath = path.join(outDir, 'assets', filename);
+    if (!fs.existsSync(assetPath)) continue;
+    const source = fs.readFileSync(assetPath, 'utf8');
+    for (const match of source.matchAll(/["']\.\/([^"']+\.(?:js|css))["']/g)) add(match[1]);
+  }
+  return found;
+}
+
+function loadWebAssetHistory(historyPath, outDir) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+    return {
+      current: new Set(Array.isArray(parsed.current) ? parsed.current : []),
+      previous: new Set(Array.isArray(parsed.previous) ? parsed.previous : []),
+    };
+  } catch (_) {
+    return { current: collectReferencedWebAssets(outDir), previous: new Set() };
+  }
+}
+
+function sameAssetSet(left, right) {
+  return left.size === right.size && [...left].every((file) => right.has(file));
+}
+
+function rollingWebAssetsPlugin(outDir, historyPath, assetHistory) {
+  let emittedAssets = new Set();
+  return {
+    name: 'marketel-rolling-web-assets',
+    generateBundle(_options, bundle) {
+      emittedAssets = new Set(Object.keys(bundle).filter((name) => /\.(?:js|css)$/.test(name)));
+    },
+    closeBundle() {
+      // Render can briefly serve old and new instances during a deploy. Keep
+      // the complete previous bundle in the new release so old HTML never
+      // points at an asset that has already disappeared.
+      const unchangedBuild = sameAssetSet(assetHistory.current, emittedAssets);
+      const previousAssets = unchangedBuild ? assetHistory.previous : assetHistory.current;
+      const keep = new Set([...previousAssets, ...emittedAssets]);
+      const assetDir = path.join(outDir, 'assets');
+      if (!fs.existsSync(assetDir)) return;
+      for (const filename of fs.readdirSync(assetDir)) {
+        if (!/\.(?:js|css)$/.test(filename)) continue;
+        if (!keep.has(`assets/${filename}`)) fs.rmSync(path.join(assetDir, filename));
+      }
+      fs.writeFileSync(historyPath, `${JSON.stringify({
+        current: [...emittedAssets].sort(),
+        previous: [...previousAssets].sort(),
+      }, null, 2)}\n`);
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '');
   const isNativeBuild = mode === 'native';
   const nativeWwwRoot = path.resolve(__dirname, '../../marketel-frontdesk-ios/www');
+  const webOutDir = path.resolve(__dirname, '../public/frontdesk');
+  const webAssetHistoryPath = path.resolve(__dirname, '.web-asset-history.json');
+  const webAssetHistory = isNativeBuild
+    ? { current: new Set(), previous: new Set() }
+    : loadWebAssetHistory(webAssetHistoryPath, webOutDir);
   const apiTarget = process.env.FRONTDESK_API_PROXY
     || env.FRONTDESK_API_PROXY
     || 'http://localhost:3001';
@@ -19,8 +94,8 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: isNativeBuild
         ? path.join(nativeWwwRoot, 'frontdesk')
-        : path.resolve(__dirname, '../public/frontdesk'),
-      emptyOutDir: true,
+        : webOutDir,
+      emptyOutDir: isNativeBuild,
       target: 'es2020',
       rollupOptions: {
         output: {
@@ -53,7 +128,8 @@ export default defineConfig(({ mode }) => {
       transformIndexHtml(html) {
         return html
           .replace(/<script id="marketel-web-analytics">[\s\S]*?<\/script>/, '')
-          .replace(/\s*<script(?:\s+vite-ignore)?\s+src="\/marketel-journey\.js"><\/script>/, '')
+          .replace(/\s*<script[^>]*src="\/marketel-journey\.js"[^>]*><\/script>/, '')
+          .replace(/\s*<script id="frontdesk-boot-guard">[\s\S]*?<\/script>/, '')
           .replace(/\s*<link rel="manifest"[^>]*>/, '');
       },
       closeBundle() {
@@ -68,7 +144,7 @@ export default defineConfig(({ mode }) => {
           fs.copyFileSync(path.join(publicRoot, filename), path.join(nativeWwwRoot, filename));
         }
       },
-    }] : [],
+    }] : [rollingWebAssetsPlugin(webOutDir, webAssetHistoryPath, webAssetHistory)],
     server: {
       port: 5174,
       proxy: {

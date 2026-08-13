@@ -28,7 +28,67 @@
     else setTimeout(loadClarity, 3000);
   })();
   </script>
-  <script vite-ignore src="/marketel-journey.js"></script>
+  <script vite-ignore defer src="/marketel-journey.js"></script>
+  <script id="frontdesk-boot-guard">
+  (function () {
+    var retryKey = 'marketelFrontdeskAssetRetries';
+    var readyEvent = 'marketel:frontdesk-bundle-ready';
+    var recoveryStarted = false;
+
+    function clearRetries() {
+      try { sessionStorage.removeItem(retryKey); } catch (_) {}
+    }
+
+    function showRetry() {
+      function render() {
+        var title = document.getElementById('bootTitle');
+        var message = document.getElementById('bootMessage');
+        var spinner = document.getElementById('bootSpinnerWrap');
+        var button = document.getElementById('bootRetryBtn');
+        if (title) title.textContent = 'Front Desk was just updated';
+        if (message) message.textContent = 'The update is ready. Reload once to connect to your property.';
+        if (spinner) spinner.style.display = 'none';
+        if (button) {
+          button.style.display = '';
+          button.textContent = 'Reload Front Desk';
+          button.onclick = function () {
+            clearRetries();
+            window.location.reload();
+          };
+        }
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, { once: true });
+      else render();
+    }
+
+    function recoverFromMixedDeploy() {
+      if (recoveryStarted || window.__MARKETEL_FRONTDESK_BUNDLE_READY__) return;
+      recoveryStarted = true;
+      var attempts = 0;
+      try { attempts = Number(sessionStorage.getItem(retryKey) || 0); } catch (_) {}
+      if (attempts >= 3) {
+        showRetry();
+        return;
+      }
+      try { sessionStorage.setItem(retryKey, String(attempts + 1)); } catch (_) {}
+      window.setTimeout(function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('_frontdesk_update', String(Date.now()));
+        window.location.replace(url.toString());
+      }, 900 + (attempts * 700));
+    }
+
+    window.addEventListener(readyEvent, clearRetries, { once: true });
+    window.addEventListener('error', function (event) {
+      var target = event && event.target;
+      var assetUrl = target && (target.src || target.href || '');
+      if (assetUrl && assetUrl.indexOf('/frontdesk/assets/') !== -1) recoverFromMixedDeploy();
+    }, true);
+    window.setTimeout(function () {
+      if (!window.__MARKETEL_FRONTDESK_BUNDLE_READY__) recoverFromMixedDeploy();
+    }, 15000);
+  })();
+  </script>
 </head>
 <body>
 
