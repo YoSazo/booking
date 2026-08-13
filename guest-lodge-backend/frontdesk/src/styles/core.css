@@ -3235,7 +3235,7 @@
 .messages-workspace {
   position: fixed;
   z-index: 100060;
-  top: var(--marketel-chat-viewport-top, 0px);
+  top: 0;
   right: 0;
   bottom: auto;
   left: 0;
@@ -3245,6 +3245,11 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
+  box-shadow: 0 0 0 200vmax var(--bg);
+  contain: layout;
+  transform: translate3d(0, var(--marketel-chat-viewport-top, 0px), 0);
+  will-change: height, transform;
+  backface-visibility: hidden;
 }
 .messages-workspace-header {
   display: grid;
@@ -3544,10 +3549,4 @@
   .messages-workspace-thread-context { display: none; }
   .messages-workspace .message-thread-heading { flex: 0 0 auto; }
   .messages-workspace .message-conversation { padding-bottom: 14px; }
-  .messages-workspace.marketel-chat-keyboard-open .messages-workspace-body {
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .messages-workspace.marketel-chat-keyboard-open .messages-workspace-sidebar {
-    display: none;
-  }
 }

@@ -31,7 +31,7 @@ function ensureSupportStyles() {
   style.id = 'marketelSupportStyles';
   style.textContent = `
     body.marketel-support-open{overflow:hidden!important;}
-    .marketel-support-overlay{position:fixed;top:var(--marketel-chat-viewport-top,0px);right:0;bottom:auto;left:0;width:100%;height:var(--marketel-chat-viewport-height,100dvh);z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-sizing:border-box;overflow:hidden;}
+    .marketel-support-overlay{position:fixed;top:0;right:0;bottom:auto;left:0;width:100%;height:var(--marketel-chat-viewport-height,100dvh);z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-sizing:border-box;overflow:hidden;box-shadow:0 0 0 200vmax #eff4f0;contain:layout;transform:translate3d(0,var(--marketel-chat-viewport-top,0px),0);will-change:height,transform;backface-visibility:hidden;}
     .marketel-support-dialog{width:min(620px,100%);height:min(720px,calc(100dvh - 36px));display:flex;flex-direction:column;overflow:hidden;background:#eff4f0;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
     .marketel-support-head{display:flex;align-items:center;gap:12px;padding:16px 18px;background:rgba(255,255,255,.92);border-bottom:1px solid #e3ebe6;}
     .marketel-support-mark{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:12px;background:#e8f5ee;overflow:hidden;}
@@ -62,7 +62,6 @@ function ensureSupportStyles() {
     .marketel-support-foot{margin:8px 2px 0;text-align:center;color:#84928a;font-size:10px;line-height:1.35;}
     .marketel-support-foot a{color:#587166;text-decoration:none;}
     .marketel-support-overlay.marketel-chat-keyboard-open .marketel-support-composer{padding-bottom:8px;}
-    .marketel-support-overlay.marketel-chat-keyboard-open .marketel-support-foot{display:none;}
     .marketel-support-loading{height:100%;display:grid;place-items:center;color:#6b7d72;font-size:13px;}
     .marketel-support-unread{display:none;min-width:19px;height:19px;padding:0 6px;align-items:center;justify-content:center;border-radius:999px;background:#e05252;color:#fff;font-size:10px;font-weight:800;line-height:19px;}
     .marketel-support-unread.visible{display:inline-flex;}

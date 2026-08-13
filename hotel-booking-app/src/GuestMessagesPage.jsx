@@ -283,29 +283,6 @@ export default function GuestMessagesPage({ hotel }) {
         <p style={styles.headerSubtitle}>Front Desk</p>
       </div>
 
-      {!isStandalone() && (
-        <div className="guest-message-onboarding" style={{ padding: '0 16px', marginBottom: 8 }}>
-          <GuestInstallCard
-            hotelName={hotel?.name}
-            appIconUrl={hotel?.appIconUrl}
-            hotelId={hotelId}
-            reservationCode={guestStay?.code}
-            apiBaseUrl={apiBaseUrl}
-            touchpoint="messages-card"
-            variant="card"
-            subline="Install to get reply notifications on your phone — like a text from the hotel."
-          />
-        </div>
-      )}
-
-      <div className="guest-message-onboarding" style={{ padding: '0 16px' }}>
-        <GuestNotificationPrompt
-          apiBaseUrl={apiBaseUrl}
-          hotelId={hotelId}
-          guestStay={guestStay}
-        />
-      </div>
-
       {/* Message area */}
       <div
         ref={scrollContainerRef}
@@ -315,6 +292,27 @@ export default function GuestMessagesPage({ hotel }) {
         onTouchMove={handleMessagesTouchMove}
         onTouchEnd={() => { touchStartYRef.current = null; }}
       >
+        {!isStandalone() && (
+          <div style={{ marginBottom: 8 }}>
+            <GuestInstallCard
+              hotelName={hotel?.name}
+              appIconUrl={hotel?.appIconUrl}
+              hotelId={hotelId}
+              reservationCode={guestStay?.code}
+              apiBaseUrl={apiBaseUrl}
+              touchpoint="messages-card"
+              variant="card"
+              subline="Install to get reply notifications on your phone — like a text from the hotel."
+            />
+          </div>
+        )}
+
+        <GuestNotificationPrompt
+          apiBaseUrl={apiBaseUrl}
+          hotelId={hotelId}
+          guestStay={guestStay}
+        />
+
         {loading ? (
           <div style={styles.emptyContainer}>
             <div style={styles.spinner} />
@@ -459,10 +457,6 @@ const spinnerKeyframes = `
 html.marketel-keyboard-open .guest-messages-page {
   padding-bottom: 0 !important;
 }
-html.marketel-keyboard-open .guest-message-onboarding,
-html.marketel-keyboard-open .guest-message-quick-chips {
-  display: none !important;
-}
 html.marketel-keyboard-open .guest-message-composer {
   padding-bottom: 8px !important;
 }
@@ -489,13 +483,18 @@ const styles = {
     maxWidth: 540,
     margin: '0 auto',
     position: 'fixed',
-    top: 'var(--marketel-visual-top, 0px)',
+    top: 0,
     left: 0,
     right: 0,
     width: '100%',
     boxSizing: 'border-box',
     overflow: 'hidden',
     paddingBottom: 'var(--guest-nav-clearance, 0px)',
+    transform: 'translate3d(0, var(--marketel-visual-top, 0px), 0)',
+    transition: 'padding-bottom 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+    willChange: 'height, transform',
+    contain: 'layout',
+    boxShadow: '0 0 0 200vmax #f4f7f9',
   },
 
   // Header

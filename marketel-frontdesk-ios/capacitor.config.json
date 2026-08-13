@@ -6,5 +6,10 @@
     "contentInset": "never",
     "preferredContentMode": "mobile",
     "backgroundColor": "#EFF4F0FF"
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "native"
+    }
   }
 }
