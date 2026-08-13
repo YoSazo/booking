@@ -121,6 +121,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         webView?.scrollView.contentInsetAdjustmentBehavior = .never
         webView?.scrollView.verticalScrollIndicatorInsets = .zero
         webView?.scrollView.alwaysBounceVertical = true
+        webView?.scrollView.keyboardDismissMode = .interactive
     }
 
     override func viewDidLoad() {

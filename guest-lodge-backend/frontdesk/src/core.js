@@ -2,6 +2,7 @@ import { crm } from './state.js';
 import QRCode from 'qrcode';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
+import { bindChatKeyboardViewport } from './chatKeyboard.js';
 
 const MARKETEL_BACKEND_ORIGIN = 'https://guest-lodge-backend.onrender.com';
 const isBundledNativeFrontdesk = window.location.protocol === 'capacitor:'
@@ -88,6 +89,7 @@ let supportModulePromise = null;
 let revealModulePromise = null;
 let nativeOnboardingModulePromise = null;
 let messagesLoadPromise = null;
+let messagesKeyboardCleanup = null;
 let growthLoadPromise = null;
 let conflictsLoadPromise = null;
 const WALKTHROUGH_STORAGE_KEYS = [
@@ -3121,6 +3123,8 @@ function openMessagesWorkspace() {
 function closeMessagesWorkspace() {
   crm.messagesExpanded = false;
   crm.messagesThreadPickerOpen = false;
+  messagesKeyboardCleanup?.();
+  messagesKeyboardCleanup = null;
   document.getElementById('messagesWorkspace')?.remove();
   setNativeModalOpen('guest-messages', false);
   renderMessages();
@@ -3133,6 +3137,10 @@ function renderMessagesWorkspace(threadList, activeThread, unreadCount) {
     workspace.id = 'messagesWorkspace';
     workspace.className = 'messages-workspace';
     document.body.appendChild(workspace);
+    messagesKeyboardCleanup = bindChatKeyboardViewport(workspace, {
+      fieldSelector: '.message-composer input',
+      scrollSelector: '.message-conversation',
+    });
   }
   workspace.innerHTML = `
     <header class="messages-workspace-header">
@@ -3191,7 +3199,11 @@ function renderMessages() {
   const activeThread = threadList.find(t => t.key === crm.selectedMessageThread) || threadList[0];
 
   if (crm.messagesExpanded) renderMessagesWorkspace(threadList, activeThread, unreadCount);
-  else document.getElementById('messagesWorkspace')?.remove();
+  else {
+    messagesKeyboardCleanup?.();
+    messagesKeyboardCleanup = null;
+    document.getElementById('messagesWorkspace')?.remove();
+  }
 
   const inboxBody = crm.messagesInboxOpen && !crm.messagesExpanded ? `
     <div class="guest-messages-inline-body">

@@ -3235,9 +3235,15 @@
 .messages-workspace {
   position: fixed;
   z-index: 100060;
-  inset: 0;
+  top: var(--marketel-chat-viewport-top, 0px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: 100%;
+  height: var(--marketel-chat-viewport-height, 100dvh);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
 }
 .messages-workspace-header {
@@ -3411,8 +3417,12 @@
   flex: 1;
 }
 .messages-workspace .message-composer {
+  flex: 0 0 auto;
   padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border-soft);
+}
+.messages-workspace.marketel-chat-keyboard-open .message-composer {
+  padding-bottom: 8px;
 }
 
 /* Shared full-screen modal behavior. Native UIKit chrome is hidden while
@@ -3534,4 +3544,10 @@
   .messages-workspace-thread-context { display: none; }
   .messages-workspace .message-thread-heading { flex: 0 0 auto; }
   .messages-workspace .message-conversation { padding-bottom: 14px; }
+  .messages-workspace.marketel-chat-keyboard-open .messages-workspace-body {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .messages-workspace.marketel-chat-keyboard-open .messages-workspace-sidebar {
+    display: none;
+  }
 }

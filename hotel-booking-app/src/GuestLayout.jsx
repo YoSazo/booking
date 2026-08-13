@@ -4,6 +4,7 @@ import { Home, CalendarSearch, MessageCircle } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { isStandalone } from './pwaUtils.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
+import useVisualKeyboard from './useVisualKeyboard.js';
 
 const NAV_TABS = [
   { key: 'home', label: 'Home', icon: Home, path: '/guest/home' },
@@ -21,6 +22,7 @@ export default function GuestLayout({ children }) {
   );
   // Nav only after Add to Home Screen — re-check on install + display-mode change.
   const [installedApp, setInstalledApp] = useState(() => isStandalone());
+  const keyboardOpen = useVisualKeyboard();
 
   useEffect(() => {
     const syncInstalled = () => setInstalledApp(isStandalone());
@@ -88,7 +90,7 @@ export default function GuestLayout({ children }) {
 
   const isInstallPage = location.pathname === '/install';
   // Bottom nav: installed PWA only. Browser booking flow stays nav-free.
-  const showNav = installedApp && isMobile && !isInstallPage;
+  const showNav = installedApp && isMobile && !isInstallPage && !keyboardOpen;
 
   const activeTab = (() => {
     if (location.pathname.startsWith('/guest/messages')) return 'messages';
@@ -104,7 +106,7 @@ export default function GuestLayout({ children }) {
   })();
 
   return (
-    <div style={styles.wrapper}>
+    <div style={{ ...styles.wrapper, '--guest-nav-clearance': showNav ? '116px' : '0px' }}>
       <div style={{ ...styles.content, paddingBottom: showNav ? 110 : 0 }}>{children}</div>
 
       {showNav && (

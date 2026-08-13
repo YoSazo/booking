@@ -58,6 +58,7 @@ export default function GuestMessagesPage({ hotel }) {
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const touchStartYRef = useRef(null);
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -221,9 +222,29 @@ export default function GuestMessagesPage({ hotel }) {
     }
   };
 
+  const handleInputFocus = () => {
+    window.setTimeout(() => scrollToBottom('auto'), 120);
+    window.setTimeout(() => scrollToBottom('auto'), 320);
+  };
+
+  const handleMessagesTouchStart = (event) => {
+    if (!document.documentElement.classList.contains('marketel-keyboard-open')) return;
+    touchStartYRef.current = event.touches?.[0]?.clientY ?? null;
+  };
+
+  const handleMessagesTouchMove = (event) => {
+    if (touchStartYRef.current == null) return;
+    const currentY = event.touches?.[0]?.clientY;
+    if (currentY == null) return;
+    if (currentY - touchStartYRef.current > 52) {
+      inputRef.current?.blur();
+      touchStartYRef.current = null;
+    }
+  };
+
   if (!guestStay?.code) {
     return (
-      <div style={styles.page}>
+      <div className="guest-messages-page" style={styles.page}>
         <div style={styles.header}>
           <h1 style={styles.headerTitle}>Messages</h1>
           <p style={styles.headerSubtitle}>Front Desk</p>
@@ -255,7 +276,7 @@ export default function GuestMessagesPage({ hotel }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div className="guest-messages-page" style={styles.page}>
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.headerTitle}>Messages</h1>
@@ -263,7 +284,7 @@ export default function GuestMessagesPage({ hotel }) {
       </div>
 
       {!isStandalone() && (
-        <div style={{ padding: '0 16px', marginBottom: 8 }}>
+        <div className="guest-message-onboarding" style={{ padding: '0 16px', marginBottom: 8 }}>
           <GuestInstallCard
             hotelName={hotel?.name}
             appIconUrl={hotel?.appIconUrl}
@@ -277,7 +298,7 @@ export default function GuestMessagesPage({ hotel }) {
         </div>
       )}
 
-      <div style={{ padding: '0 16px' }}>
+      <div className="guest-message-onboarding" style={{ padding: '0 16px' }}>
         <GuestNotificationPrompt
           apiBaseUrl={apiBaseUrl}
           hotelId={hotelId}
@@ -286,7 +307,14 @@ export default function GuestMessagesPage({ hotel }) {
       </div>
 
       {/* Message area */}
-      <div ref={scrollContainerRef} style={styles.messagesArea}>
+      <div
+        ref={scrollContainerRef}
+        className="guest-message-scroll"
+        style={styles.messagesArea}
+        onTouchStart={handleMessagesTouchStart}
+        onTouchMove={handleMessagesTouchMove}
+        onTouchEnd={() => { touchStartYRef.current = null; }}
+      >
         {loading ? (
           <div style={styles.emptyContainer}>
             <div style={styles.spinner} />
@@ -366,9 +394,9 @@ export default function GuestMessagesPage({ hotel }) {
       </div>
 
       {/* Floating compose bar */}
-      <div style={styles.composeBar}>
+      <div className="guest-message-composer" style={styles.composeBar}>
         {/* Quick chips */}
-        <div style={styles.chipsScroll}>
+        <div className="guest-message-quick-chips" style={styles.chipsScroll}>
           {QUICK_CHIPS.map((chip) => {
             const active = selectedChips.includes(chip);
             return (
@@ -398,7 +426,9 @@ export default function GuestMessagesPage({ hotel }) {
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={handleInputFocus}
             placeholder="Type a message..."
+            enterKeyHint="send"
             style={styles.textInput}
           />
           <button
@@ -426,6 +456,16 @@ const spinnerKeyframes = `
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+html.marketel-keyboard-open .guest-messages-page {
+  padding-bottom: 0 !important;
+}
+html.marketel-keyboard-open .guest-message-onboarding,
+html.marketel-keyboard-open .guest-message-quick-chips {
+  display: none !important;
+}
+html.marketel-keyboard-open .guest-message-composer {
+  padding-bottom: 8px !important;
+}
 `;
 
 if (typeof document !== 'undefined') {
@@ -442,13 +482,20 @@ const styles = {
   page: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
-    maxHeight: '100vh',
+    height: 'var(--marketel-visual-height, 100dvh)',
+    maxHeight: 'var(--marketel-visual-height, 100dvh)',
     background: '#f4f7f9',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',
-    position: 'relative',
+    position: 'fixed',
+    top: 'var(--marketel-visual-top, 0px)',
+    left: 0,
+    right: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    paddingBottom: 'var(--guest-nav-clearance, 0px)',
   },
 
   // Header
@@ -472,9 +519,11 @@ const styles = {
   // Messages area — tight bottom padding to sit just above compose bar
   messagesArea: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
-    padding: '0 16px 140px',
+    padding: '0 16px 10px',
     WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorY: 'contain',
   },
   messagesList: {
     display: 'flex',
@@ -648,16 +697,17 @@ const styles = {
     animation: 'guestMsgSpinner 0.8s linear infinite',
   },
 
-  // Floating compose bar — no background box, transparent & floating
+  // Composer is part of the chat flex layout, so the visual viewport moves it
+  // directly above the keyboard instead of moving the entire document.
   composeBar: {
-    position: 'fixed',
-    bottom: 140,
-    left: 0,
-    right: 0,
-    padding: '0 12px',
+    position: 'relative',
+    flexShrink: 0,
+    padding: '8px 12px max(10px, env(safe-area-inset-bottom))',
     zIndex: 99,
-    maxWidth: 540,
-    margin: '0 auto',
+    borderTop: '1px solid rgba(0,0,0,0.06)',
+    background: 'rgba(244,247,249,0.94)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
   },
   chipsScroll: {
     display: 'flex',

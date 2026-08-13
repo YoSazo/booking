@@ -1,9 +1,11 @@
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
+import { bindChatKeyboardViewport } from './chatKeyboard.js';
 
 let supportPollTimer = null;
 let supportLoadPromise = null;
 let supportSending = false;
+let supportKeyboardCleanup = null;
 
 function escapeSupport(value) {
   return String(value == null ? '' : value)
@@ -29,7 +31,7 @@ function ensureSupportStyles() {
   style.id = 'marketelSupportStyles';
   style.textContent = `
     body.marketel-support-open{overflow:hidden!important;}
-    .marketel-support-overlay{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+    .marketel-support-overlay{position:fixed;top:var(--marketel-chat-viewport-top,0px);right:0;bottom:auto;left:0;width:100%;height:var(--marketel-chat-viewport-height,100dvh);z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-sizing:border-box;overflow:hidden;}
     .marketel-support-dialog{width:min(620px,100%);height:min(720px,calc(100dvh - 36px));display:flex;flex-direction:column;overflow:hidden;background:#eff4f0;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
     .marketel-support-head{display:flex;align-items:center;gap:12px;padding:16px 18px;background:rgba(255,255,255,.92);border-bottom:1px solid #e3ebe6;}
     .marketel-support-mark{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:12px;background:#e8f5ee;overflow:hidden;}
@@ -59,12 +61,14 @@ function ensureSupportStyles() {
     .marketel-support-send svg{width:19px;height:19px;}
     .marketel-support-foot{margin:8px 2px 0;text-align:center;color:#84928a;font-size:10px;line-height:1.35;}
     .marketel-support-foot a{color:#587166;text-decoration:none;}
+    .marketel-support-overlay.marketel-chat-keyboard-open .marketel-support-composer{padding-bottom:8px;}
+    .marketel-support-overlay.marketel-chat-keyboard-open .marketel-support-foot{display:none;}
     .marketel-support-loading{height:100%;display:grid;place-items:center;color:#6b7d72;font-size:13px;}
     .marketel-support-unread{display:none;min-width:19px;height:19px;padding:0 6px;align-items:center;justify-content:center;border-radius:999px;background:#e05252;color:#fff;font-size:10px;font-weight:800;line-height:19px;}
     .marketel-support-unread.visible{display:inline-flex;}
     @media(max-width:600px){
       .marketel-support-overlay{padding:0;align-items:stretch;}
-      .marketel-support-dialog{width:100%;height:100dvh;max-height:none;border:0;border-radius:0;}
+      .marketel-support-dialog{width:100%;height:100%;max-height:none;border:0;border-radius:0;}
       .marketel-support-head{padding-top:max(12px,env(safe-area-inset-top));}
       .marketel-support-bubble{max-width:88%;}
     }
@@ -184,6 +188,10 @@ function createSupportOverlay() {
     </footer>
   </section>`;
   document.body.appendChild(overlay);
+  supportKeyboardCleanup = bindChatKeyboardViewport(overlay, {
+    fieldSelector: '.marketel-support-input',
+    scrollSelector: '.marketel-support-messages',
+  });
   const input = document.getElementById('marketelSupportInput');
   if (input) {
     input.addEventListener('input', () => {
@@ -211,6 +219,8 @@ export async function openSupportConversation() {
 
 export function closeSupportConversation() {
   stopSupportPolling();
+  supportKeyboardCleanup?.();
+  supportKeyboardCleanup = null;
   document.getElementById('marketelSupportOverlay')?.remove();
   document.body.classList.remove('marketel-support-open');
   window.setNativeModalOpen?.('marketel-support', false);
