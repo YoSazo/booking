@@ -417,7 +417,7 @@ function handleBookingPreviewMessage(event) {
 }
 
 function progressHtml() {
-  const labels = ['Booking page', 'Guest app', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
+  const labels = ['Booking page', 'Home Screen', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
   return `<div class="mvr-progress" aria-label="Marketel overview progress">
     ${labels.map((label, index) => `<div class="mvr-progress-item ${index === currentStep ? 'is-active' : ''} ${index < currentStep ? 'is-done' : ''}">
       <span></span><small>${esc(label)}</small>
@@ -484,7 +484,7 @@ function bookingRevealHtml() {
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
         <span>See what guests will use.</span>
-        Open the booking page built for your property. Then continue to your Guest App and Front Desk.
+        Open the booking page built for your property. Then see how guests save it to their Home Screen and how you run it from Front Desk.
       </div>
       ${bookingPageStatusHtml()}
     </div>
@@ -501,11 +501,11 @@ function iosSystemIcon(url, label) {
 function guestAppRevealHtml() {
   return `<section class="mvr-stage mvr-stage-app">
     <div class="mvr-copy">
-      <div class="mvr-eyebrow">2 · Your guest app</div>
+      <div class="mvr-eyebrow">2 · Guests’ Home Screens</div>
       <h1>Stay on their Home Screen. Reach them again.</h1>
-      <p>Guests install <strong>${esc(propertyName())}</strong> from your booking page. After that, they can book direct in one tap and receive notifications you send from Front Desk.</p>
+      <p>Guests save <strong>${esc(propertyName())}</strong> to their Home Screen from your booking page—no App Store download. Then they can return in one tap and receive notifications you send from Marketel Front Desk.</p>
       <div class="mvr-callout">
-        <strong>One install. Two lasting advantages.</strong>
+        <strong>One Home Screen save. Two lasting advantages.</strong>
         A direct path back for them and a direct line from Front Desk for you.
       </div>
     </div>
@@ -520,12 +520,12 @@ function guestAppRevealHtml() {
                   <div class="mvr-install-card">
                     <div class="mvr-install-property-icon">${appIconHtml()}</div>
                     <div>
-                      <strong>Get the ${esc(propertyName())} app</strong>
-                      <span>Keep us one tap away for future stays. No app store.</span>
+                      <strong>Save ${esc(propertyName())} to your Home Screen</strong>
+                      <span>Return to this booking page in one tap. No App Store.</span>
                     </div>
-                    <button type="button" id="mvrInstallDemo" ${homeScreenInstalled ? 'disabled' : ''}>${homeScreenInstalled ? 'Installed ✓' : 'Install'}</button>
+                    <button type="button" id="mvrInstallDemo" ${homeScreenInstalled ? 'disabled' : ''}>${homeScreenInstalled ? 'Saved ✓' : 'Add'}</button>
                   </div>
-                  <div class="mvr-install-arrow"><span>${homeScreenInstalled ? 'Now on their Home Screen' : 'Tap Install'}</span><b>↓</b></div>
+                  <div class="mvr-install-arrow"><span>${homeScreenInstalled ? 'Saved to their Home Screen' : 'Tap Add to Home Screen'}</span><b>↓</b></div>
                   <div class="mvr-ios-crop">
                     <div class="mvr-ios-dock">
                       <div class="mvr-dock-icon mvr-dock-property">${appIconHtml()}</div>
@@ -567,13 +567,13 @@ function guestAppRevealHtml() {
             </div>
           </div>
         </div>
-        <div class="mvr-app-carousel-controls" aria-label="Guest app demonstration">
-          <button type="button" data-mvr-app-slide="0" aria-label="Show how guests install the app" ${guestAppDemoSlide === 0 ? 'disabled' : ''}>‹</button>
+        <div class="mvr-app-carousel-controls" aria-label="Guest Home Screen demonstration">
+          <button type="button" data-mvr-app-slide="0" aria-label="Show how guests save the property to their Home Screen" ${guestAppDemoSlide === 0 ? 'disabled' : ''}>‹</button>
           <div class="mvr-app-carousel-dots">
-            <button type="button" data-mvr-app-slide="0" class="${guestAppDemoSlide === 0 ? 'is-active' : ''}" aria-label="Installation" aria-current="${guestAppDemoSlide === 0 ? 'step' : 'false'}"></button>
-            <button type="button" data-mvr-app-slide="1" class="${guestAppDemoSlide === 1 ? 'is-active' : ''}" aria-label="What the app unlocks" aria-current="${guestAppDemoSlide === 1 ? 'step' : 'false'}"></button>
+            <button type="button" data-mvr-app-slide="0" class="${guestAppDemoSlide === 0 ? 'is-active' : ''}" aria-label="Save to Home Screen" aria-current="${guestAppDemoSlide === 0 ? 'step' : 'false'}"></button>
+            <button type="button" data-mvr-app-slide="1" class="${guestAppDemoSlide === 1 ? 'is-active' : ''}" aria-label="What Home Screen access unlocks" aria-current="${guestAppDemoSlide === 1 ? 'step' : 'false'}"></button>
           </div>
-          <button type="button" data-mvr-app-slide="1" aria-label="Show what the guest app unlocks" ${guestAppDemoSlide === 1 ? 'disabled' : ''}>›</button>
+          <button type="button" data-mvr-app-slide="1" aria-label="Show what saving the property unlocks" ${guestAppDemoSlide === 1 ? 'disabled' : ''}>›</button>
         </div>
       </div>
     </div>
@@ -587,7 +587,7 @@ function assistantRevealHtml() {
     <div class="mvr-copy">
       <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
       <h1>Front Desk checks in before a room conflict becomes a guest problem.</h1>
-      <p>When a direct booking arrives, Front Desk asks you and the people you choose whether the room is still available. If a walk-in or another booking took it, reply normally and Marketel handles the rest.</p>
+      <p>When a direct booking arrives, Front Desk asks whether the room is still available. If a walk-in or another channel took it, reply with what happened. Marketel updates Availability and reduces what remains available on your direct booking page.</p>
       <div class="mvr-callout">
         <strong>You stay in control—even when you miss the alert.</strong>
         Choose whether silence keeps the sale or protects availability. You can change the rule anytime.
@@ -628,15 +628,15 @@ function finaleHtml() {
     : 'Activate Marketel — $199/month';
   const includedValueHtml = `<div class="mvr-value-list">
     <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-    <div style="--stagger:1"><span>✓</span><p><strong>Your guest Home Screen app</strong><small>Book direct again and receive notifications from Front Desk</small></p></div>
-    <div style="--stagger:2"><span>✓</span><p><strong>Front Desk and Assistant</strong><small>Keep outside changes from becoming surprises</small></p></div>
+    <div style="--stagger:1"><span>✓</span><p><strong>Your property on guests’ Home Screens</strong><small>No second App Store app—guests save it from your booking page</small></p></div>
+    <div style="--stagger:2"><span>✓</span><p><strong>Marketel Front Desk and Assistant</strong><small>Tell it when a walk-in takes a room; it updates remaining availability</small></p></div>
   </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
-      <p>${isSubscribed ? 'Your direct booking page, guest app and Front Desk work together as one system.' : 'Your booking page, guest app and Front Desk are ready.'}</p>
+      <p>Guests use your direct booking page and can save your property to their Home Screen. You use Marketel Front Desk to manage bookings and availability.</p>
       ${isSubscribed ? `${includedValueHtml}
         <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">Open Front Desk</button>
         <div class="mvr-secure-note">You can replay this overview anytime from How it works.</div>` : `
@@ -671,7 +671,7 @@ function footerHtml() {
   if (currentStep === 0) {
     if (!bookingPreviewOpened && !bookingPreviewUnavailable) return '';
     return `<div class="mvr-footer mvr-footer-booking">
-      <button type="button" class="mvr-primary" id="mvrNext">Continue to Guest App →</button>
+      <button type="button" class="mvr-primary" id="mvrNext">See the Home Screen experience →</button>
     </div>`;
   }
   if (currentStep === 3) {
@@ -747,7 +747,7 @@ function showExpandedPreview() {
       <span data-live-forward-long>See how to edit your booking page</span>
       <b aria-hidden="true">→</b>
     </button>
-    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp">Continue to Guest App</button>
+    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp">See the Home Screen experience</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
@@ -972,11 +972,11 @@ function setGuestAppInstallVisual(installed) {
   visual?.classList.toggle('is-installed', homeScreenInstalled);
   const button = document.getElementById('mvrInstallDemo');
   if (button) {
-    button.textContent = homeScreenInstalled ? 'Installed ✓' : 'Install';
+    button.textContent = homeScreenInstalled ? 'Saved ✓' : 'Add';
     button.disabled = homeScreenInstalled;
   }
   const arrowLabel = visual?.querySelector('.mvr-install-arrow span');
-  if (arrowLabel) arrowLabel.textContent = homeScreenInstalled ? 'Now on their Home Screen' : 'Tap Install';
+  if (arrowLabel) arrowLabel.textContent = homeScreenInstalled ? 'Saved to their Home Screen' : 'Tap Add to Home Screen';
 }
 
 function setGuestAppDemoSlide(nextSlide, manual = false) {

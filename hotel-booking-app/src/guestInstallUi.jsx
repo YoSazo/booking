@@ -266,7 +266,7 @@ export function IosInstallSheet({
   subtitle = 'Add it to your home screen — takes 3 seconds.',
   openUrl,
 }) {
-  const sheetTitle = title || `Install ${hotelName || 'our app'}`;
+  const sheetTitle = title || `Add ${hotelName || 'this property'} to your Home Screen`;
   // iOS 26: pin the instructions to the TOP of the screen. The Safari menus
   // and share sheet slide up over the bottom half, so a top-pinned card stays
   // visible the whole time the guest is following the steps.
@@ -384,5 +384,4 @@ export function IosInstallSheet({
     </div>
   );
 }
-
 

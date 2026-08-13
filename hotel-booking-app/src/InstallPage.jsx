@@ -139,8 +139,8 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   };
 
   const subtitle = ref === 'checkin-reminder'
-    ? "You're almost here — install now so you can message us and get updates."
-    : 'Works like an app. No app store. Message us anytime and book direct next time.';
+    ? "You're almost here—save this property now so you can message us and get updates."
+    : 'Save this property from the booking page. No App Store. Message us anytime and book direct next time.';
 
   if (!lookupDone) {
     return (
@@ -198,7 +198,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
           <Share size={18} color="#fff" strokeWidth={2.2} />
           Show me how
         </button>
-        <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
+        <p style={styles.hint}>Takes 3 seconds · opens from your Home Screen</p>
       </>
     );
   } else if (android && deferredPrompt) {
@@ -213,7 +213,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
           {installing ? (
             <>
               <Loader2 size={18} strokeWidth={2.2} style={{ animation: 'installSpin 0.8s linear infinite' }} />
-              Installing…
+              Adding…
             </>
           ) : (
             <>
@@ -222,7 +222,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
             </>
           )}
         </button>
-        <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
+        <p style={styles.hint}>Takes 3 seconds · opens from your Home Screen</p>
       </>
     );
   } else if (android) {
@@ -243,7 +243,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
             <AndroidInstallSteps />
           </div>
         )}
-        <p style={styles.hint}>Takes 3 seconds · works just like an app</p>
+        <p style={styles.hint}>Takes 3 seconds · opens from your Home Screen</p>
       </>
     );
   } else if (showQr) {
@@ -254,7 +254,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
           <img src={qrCodeUrl(installPageUrl, 170)} alt="QR code" width={170} height={170} style={{ borderRadius: 12, display: 'block', margin: '0 auto' }} />
         </div>
         <div style={styles.copyRow}>
-          <input readOnly value={installPageUrl} style={styles.copyInput} aria-label="Install page link" />
+          <input readOnly value={installPageUrl} style={styles.copyInput} aria-label="Home Screen page link" />
           <button type="button" onClick={handleCopyLink} style={styles.copyBtn}>
             {copied ? 'Copied!' : <><Copy size={14} strokeWidth={2.2} /> Copy</>}
           </button>
@@ -264,7 +264,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   } else {
     ctaBlock = (
       <p style={styles.hint}>
-        Open this page on your phone in Chrome or Safari to install.
+        Open this booking page on your phone in Chrome or Safari, then add the property to your Home Screen.
       </p>
     );
   }

@@ -262,10 +262,10 @@ function appsGuestInstallCoachMarkup() {
       @media (prefers-reduced-motion:reduce) { .agic-sheet { animation:none; } }
     </style>
     <button class="agic-backdrop" type="button" onclick="appsCloseGuestInstallCoach()" aria-label="Close installation guide"></button>
-    <section class="agic-sheet" role="dialog" aria-modal="true" aria-label="How guests install your app">
+    <section class="agic-sheet" role="dialog" aria-modal="true" aria-label="How guests save your property to their Home Screen">
       <div class="agic-header">
         ${modernIos && _guestInstallCoachLayout ? '<button type="button" onclick="appsGuestInstallCoachSelectLayout(null)" aria-label="Back">‹</button>' : '<span></span>'}
-        <div class="agic-header-title">Guest installation</div>
+        <div class="agic-header-title">Save to Home Screen</div>
         <button type="button" onclick="appsCloseGuestInstallCoach()" aria-label="Close">×</button>
       </div>
       <div class="agic-version" aria-label="iPhone version">
@@ -384,8 +384,8 @@ function renderAppsView() {
   const guestInstallPoster = appsCloudinaryImg(APPS_SHOWCASE.guestHome, 520);
 
   const homeScreenItems = [
-    { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Two phone apps', title: 'Your app and theirs — same home screen',
-      caption: `You download <strong>Marketel Front Desk</strong> from the App Store. Guests save <strong>${hName}</strong> from your booking page — no Guest App Store download.` },
+    { type: 'image', src: APPS_SHOWCASE.homeScreen, alt: 'Owner and guest Home Screens', title: 'Two different actions. Two different phones.',
+      caption: `You download <strong>Marketel Front Desk</strong> from the App Store. Guests never download Front Desk; they save <strong>${hName}</strong> from your booking page.` },
   ];
   const guestItems = [
     { type: 'image', src: APPS_SHOWCASE.guestHome, alt: 'Guest home screen', title: 'What your guests see — Home',
@@ -397,13 +397,13 @@ function renderAppsView() {
   ];
   const guestInstallItems = [
     { type: 'video', src: APPS_SHOWCASE.guestInstallVideo, poster: APPS_SHOWCASE.guestHome, alt: 'Guest adds property to phone', title: 'How guests put your property on their phone',
-      caption: 'They open your booking website and tap <strong>Add to Home Screen</strong>. Your property shows up on their phone like an app. You don\'t need to do anything.' },
+      caption: 'They open your booking page and tap <strong>Add to Home Screen</strong>. Your property gets its own icon. No App Store is involved.' },
   ];
   const messageItems = [
     { type: 'image', src: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest sends message', title: 'Your guest texts you',
-      caption: 'Like "How do I connect to WiFi?" — they type it in your guest app.' },
+      caption: 'Like “How do I connect to WiFi?” — they message you from the property they saved.' },
     { type: 'image', src: APPS_SHOWCASE.frontdeskMessages, alt: 'You reply', title: 'You text them back',
-      caption: 'Open <strong>Guest App</strong>, choose the conversation, and reply.' },
+      caption: 'Open <strong>Guest Reach</strong> in Marketel Front Desk, choose the conversation, and reply.' },
     { type: 'video', src: APPS_SHOWCASE.guestMessageNotifVideo, poster: APPS_SHOWCASE.guestMessagesImg, alt: 'Guest gets reply alert', title: 'Their phone buzzes with your answer',
       caption: 'They get your reply on their phone — like a text from you.' },
   ];
@@ -422,8 +422,7 @@ function renderAppsView() {
   const fdGranted = fdNativeApp
     ? nativeAlertsOn
     : fdAlertsAvailable && (typeof Notification !== 'undefined') && Notification.permission === 'granted';
-  const fdOnNarrowScreen = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
-  const fdInstallLabel = fdOnNarrowScreen ? 'Put Front Desk on this phone' : 'Put Front Desk on my phone';
+  const fdInstallLabel = 'Download Marketel Front Desk';
   const reminderMinutes = Number(crm.bookingReviewSettings?.reminderMinutes ?? 15);
   const reminderSettingsHtml = `
     <div id="bookingReviewReminderSetting" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -434,7 +433,7 @@ function renderAppsView() {
         <option value="60"${reminderMinutes === 60 ? ' selected' : ''}>Remind every 1 hour · up to 3 times</option>
         <option value="0"${reminderMinutes === 0 ? ' selected' : ''}>Send the first notification only</option>
       </select>
-      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdNativeApp ? (nativeAlertsOn ? 'Reminders can reach this iPhone even when Front Desk is closed.' : (nativePermissionGranted ? 'Front Desk is connecting this iPhone to booking alerts.' : 'Allow notifications in iPhone Settings to receive booking alerts.')) : (fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Front Desk to unlock this setting.')}</div>
+      <div id="bookingReviewReminderHint" style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-top:7px;">${fdNativeApp ? (nativeAlertsOn ? 'Reminders can reach this iPhone even when Front Desk is closed.' : (nativePermissionGranted ? 'Front Desk is connecting this iPhone to booking alerts.' : 'Allow notifications in iPhone Settings to receive booking alerts.')) : (fdInApp ? 'Reminders stop as soon as you verify the room or cancel the booking.' : 'Download Marketel Front Desk from the App Store to unlock this setting.')}</div>
     </div>`;
 
   let fdCtaHtml;
@@ -455,7 +454,7 @@ function renderAppsView() {
     const appStoreReady = !!String(crm.frontdeskAppStoreUrl || '').trim();
     fdCtaHtml = `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Download <strong>Marketel Front Desk</strong> on the owner’s iPhone to receive booking alerts when the web dashboard is closed.</p>
       <button type="button" onclick="openFrontdeskAppDownload()" ${appStoreReady ? '' : 'aria-disabled="true"'} style="width:100%;padding:15px;border-radius:12px;border:none;background:${appStoreReady ? 'var(--green)' : '#cbd5d1'};color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:${appStoreReady ? 'pointer' : 'default'};margin-bottom:10px;">${appStoreReady ? 'Download Marketel Front Desk' : 'App Store link not connected'}</button>
-      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">Guest installs are different: guests save your property from its booking page.</div>`;
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;text-align:center;">This is the owner app. Guests never download it; they save your property from its booking page.</div>`;
   }
 
   const storyFrontdeskActionHtml = fdNativeApp
@@ -471,7 +470,7 @@ function renderAppsView() {
     : `<button type="button" class="apps-story-primary" onclick="handleInstallFrontdesk()">${fdInstallLabel}</button>`;
   const storyBookingActionHtml = guestInstallUrl !== '#'
     ? `<button type="button" class="apps-story-secondary" onclick="openGuestBookingEngine({focusInstall:true})">Go to direct booking page</button>`
-    : `<div class="apps-story-domain-note">Your direct booking domain is still setting up. Once it is ready, guests install from that page.</div>`;
+    : `<div class="apps-story-domain-note">Your direct booking domain is still setting up. Once it is ready, guests can save your property from that page.</div>`;
 
   // Icon preview matches the loop tile: uploaded logos use the whole square,
   // while the generated letter icon is full-bleed green edge-to-edge.
@@ -484,7 +483,7 @@ function renderAppsView() {
     : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:14px;font-size:24px;font-weight:800;">${hotelInitial}</span>`;
   const iconButtonClick = fdInApp
     ? "document.getElementById('appsAppIconInput').click()"
-    : "toast('Please install Front Desk first. Then you can change your guest app icon.', 'error')";
+    : "toast('Download Marketel Front Desk first. Then you can change the Home Screen icon guests save.', 'error')";
   const logoBlockHtml = `
     <div class="apps-icon-card">
       <div id="appsAppIconPreview" style="${iconBoxStyle}">
@@ -492,25 +491,25 @@ function renderAppsView() {
       </div>
       <div style="flex:1;min-width:0;">
         <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this when they save <strong>${hName}</strong> to their phone.</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this icon after saving <strong>${hName}</strong> to their Home Screen.</div>
         <button type="button" id="tour-guest-icon-btn" onclick="${iconButtonClick}" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change picture' : 'Upload picture'}</button>
-        ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Install Front Desk first to upload this picture.</div>'}
+        ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Download Marketel Front Desk first to upload this picture.</div>'}
       </div>
     </div>`;
 
   const checkinActionsHtml = `
-      <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show check-in QR</button>
+      <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show guest QR</button>
       ${guestInstallUrl !== '#' ? `
       <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);color:var(--text);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Go to direct booking page</button>
-      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Guests use this page to save your property to their phone. Scroll to the Install button.</p>` : ''}
+      <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;line-height:1.5;">Guests use this page to save your property to their Home Screen. Scroll to Add to Home Screen.</p>` : ''}
       ${guestInstallUrl === '#' ? '<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0;">Your booking domain is still setting up.</p>' : ''}`;
 
   // Guest install link — promoted out of the Help fold so it's always reachable (§1D.2).
   const guestInstallLinkHtml = guestInstallUrl !== '#' ? `
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-        <div class="apps-step-title" style="font-size:13px;margin-bottom:8px;">Guest install link</div>
+        <div class="apps-step-title" style="font-size:13px;margin-bottom:8px;">Guest Home Screen link</div>
         <input type="text" value="${guestInstallUrl.replace('https://', '')}" readonly id="guest-install-url" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text);background:var(--bg);box-sizing:border-box;margin-bottom:8px;">
-        <button type="button" onclick="navigator.clipboard.writeText('https://' + document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy install link</button>
+        <button type="button" onclick="navigator.clipboard.writeText('https://' + document.getElementById('guest-install-url').value).then(()=>toast('Link copied!','success'))" style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy Home Screen link</button>
         <div id="guestInstallStats" style="display:none;margin-top:12px;"></div>
       </div>` : '<div id="guestInstallStats" style="display:none;"></div>';
 
@@ -536,29 +535,29 @@ function renderAppsView() {
   const appsStoryHtml = `
     <section class="apps-story">
       <div id="tour-apps-intro">
-        <div class="apps-story-kicker">Guest App</div>
+        <div class="apps-story-kicker">Guest Reach</div>
         <h2 class="apps-story-title" id="tour-apps-headline">Live on their Home Screen. Reach their phone directly.</h2>
-        <p class="apps-story-copy" id="tour-apps-copy">Guests install your property from the direct booking page—no App Store. If they turn on notifications, you can send a push notification directly to their phone whenever you want.</p>
+        <p class="apps-story-copy" id="tour-apps-copy">Guests save your property to their Home Screen from the direct booking page—no App Store. If they allow notifications, you can send a push notification directly to their phone whenever you want.</p>
       </div>
 
       <div class="apps-story-line" id="tour-apps-first">
         <div class="apps-story-step">First</div>
-        <h3 class="apps-story-line-title">Download Marketel Front Desk.</h3>
-        <p>The owner app receives new-booking alerts even when the web dashboard is closed.</p>
+        <h3 class="apps-story-line-title">You download Marketel Front Desk.</h3>
+        <p>This is the owner app. It manages bookings and availability and receives alerts when the web dashboard is closed.</p>
         <div class="apps-story-actions">${storyFrontdeskActionHtml}</div>
       </div>
 
       <div class="apps-story-line" id="tour-apps-then">
         <div class="apps-story-step">Then</div>
-        <h3 class="apps-story-line-title">Send guests to your direct booking page.</h3>
-        <p>When guests are booking, the Install button stays at the bottom of the page. They tap it, and your property is on their home screen.</p>
+        <h3 class="apps-story-line-title">Guests save your property—not Front Desk.</h3>
+        <p>From your booking page, guests tap Add to Home Screen. Your property gets its own icon on their phone; they never download the owner app.</p>
         <div class="apps-story-actions">${storyBookingActionHtml}</div>
       </div>
 
       <div class="apps-story-line" id="tour-apps-after">
         <div class="apps-story-step">After that</div>
         <h3 class="apps-story-line-title">You can reach them directly.</h3>
-        <p>Send one notification from Front Desk and it goes directly to every guest who has your app notifications turned on. They can tap it and return to your property.</p>
+        <p>Send one notification from Marketel Front Desk and it reaches every guest who saved your property and allowed notifications. They tap it to return to your booking page.</p>
       </div>
     </section>`;
 
@@ -567,20 +566,20 @@ function renderAppsView() {
         <div style="border-radius:12px;background:#f4f7f9;border:1px solid var(--border);margin:0 0 12px;padding:16px;text-align:center;">
           <img src="${guestInstallPoster}" alt="Guest saves property to phone" loading="eager" decoding="sync" style="max-width:140px;width:55%;height:auto;min-height:120px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,0.1);">
         </div>
-        <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(guestInstallItems)},0)" style="margin-bottom:12px;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how guests install (1 min)</span></button>
+        <button type="button" class="apps-video-teaser" onclick="appsOpenLightbox(${enc(guestInstallItems)},0)" style="margin-bottom:12px;"><span class="apps-video-teaser__play" aria-hidden="true"></span><span>Watch how guests save your property (1 min)</span></button>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;line-height:1.55;">Guests tap <strong>Add to Home Screen</strong> on your booking page or scan your QR. Then they can book and message you direct.</p>
         <div class="apps-q-list">
           ${appsQuestionRow('What guests see on their phone', '', enc(guestItems), 0, false)}
-          ${appsQuestionRow('How guests add your property', '', enc(guestInstallItems), 0, true)}
+          ${appsQuestionRow('How guests save your property', '', enc(guestInstallItems), 0, true)}
           ${appsQuestionRow('Guest texts you, you text back', '', enc(messageItems), 0, true)}
-          ${appsQuestionRow('Your app and theirs — side by side', '', enc(homeScreenItems), 0, false)}
+          ${appsQuestionRow('Your owner app and their saved property', '', enc(homeScreenItems), 0, false)}
         </div>
         ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}`;
 
   const deviceCardHtml = (tourId) => `
     <div class="apps-step-card"${tourId ? ' id="tour-fd-install-card"' : ''}>
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Your device</div>
-      <div class="apps-step-title">${fdInApp ? 'Front Desk — installed' : 'Install Front Desk'}</div>
+      <div class="apps-step-title">${fdInApp ? 'Marketel Front Desk — installed' : 'Download Marketel Front Desk'}</div>
       ${fdCtaHtml}
       ${reminderSettingsHtml}
     </div>`;
@@ -595,18 +594,18 @@ function renderAppsView() {
         </div>
       </div>
       ${reminderSettingsHtml}
-      <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;margin-top:14px;padding:13px 15px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Download Front Desk to unlock alerts</button>
+      <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;margin-top:14px;padding:13px 15px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Download Marketel Front Desk</button>
       <div style="font-size:11px;color:#737B76;line-height:1.45;text-align:center;margin-top:8px;">Booking notifications require the installed Front Desk on this device.</div>
     </div>`;
   const guestIconCardHtml = () => `
     <div class="apps-step-card" id="tour-guest-icon-section">
-      <div class="apps-step-title" style="margin-bottom:14px;">Your guest app icon</div>
+      <div class="apps-step-title" style="margin-bottom:14px;">Guest Home Screen icon</div>
       ${logoBlockHtml}
     </div>`;
   const guestPhonesCardHtml = `
     <div class="apps-step-card" id="guest-app-share-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
-      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Guests can save <strong>${hName}</strong> to their phone — one tap, no app store. Then they can book and message you direct.</p>
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;line-height:1.55;">Guests save <strong>${hName}</strong> to their Home Screen from your booking page—no App Store. Then they can book and message you directly.</p>
       ${checkinActionsHtml}
       ${guestInstallLinkHtml}
     </div>`;
@@ -622,11 +621,12 @@ function renderAppsView() {
     </details>`;
   const nativeGuestShareHtml = `
     <div class="apps-step-card" id="tour-native-guest-share">
-      <div class="apps-step-title" style="margin-bottom:14px;">Share guest app</div>
+      <div class="apps-step-title" style="margin-bottom:14px;">Help guests save your property</div>
+      <div style="margin:-4px 0 14px;padding:11px 12px;border-radius:11px;background:var(--green-pale);color:#245a40;font-size:12px;line-height:1.5;"><strong>What to say:</strong> “Scan this, then tap Add to Home Screen. It saves our property—not Marketel.”</div>
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show guest QR</button>
       ${guestInstallUrl !== '#' ? `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;">
-          <button type="button" onclick="navigator.clipboard.writeText('${guestInstallUrl}').then(()=>toast('Guest app link copied','success'))" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Copy link</button>
+          <button type="button" onclick="navigator.clipboard.writeText('${guestInstallUrl}').then(()=>toast('Home Screen link copied','success'))" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Copy Home Screen link</button>
           <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Open guest page</button>
         </div>
         <div id="guestInstallStats" style="display:none;margin-top:14px;"></div>`
@@ -639,8 +639,8 @@ function renderAppsView() {
     </div>`;
   const guestMessagesPanelHtml = '<div id="messagesPanel"></div>';
   const nativeGuestToolsHtml = `
-    <div class="apps-native-title">Guest App</div>
-    <p class="apps-native-lead">Guests who download your app and turn on notifications become directly reachable from Front Desk.</p>
+    <div class="apps-native-title">Guest Reach</div>
+    <p class="apps-native-lead">Guests save your property from its booking page—never from the App Store. If they allow notifications, you can reach their phone from Marketel Front Desk.</p>
     ${guestMessagesPanelHtml}
     ${guestBroadcastCardHtml({ compact: true })}
     ${nativeGuestShareHtml}
@@ -651,8 +651,8 @@ function renderAppsView() {
       <div style="width:min(100%,430px);padding:28px 24px;border:1.5px solid var(--border);border-radius:22px;background:#fff;text-align:center;box-shadow:0 14px 40px rgba(26,43,34,.09);">
         <div style="width:58px;height:58px;display:grid;place-items:center;margin:0 auto 16px;border-radius:17px;background:var(--green-pale);color:var(--green);font-size:25px;">↗</div>
         <div style="font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--green);">Front Desk app</div>
-        <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Guest App tools live on your phone.</h2>
-        <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Front Desk to show the guest QR, manage your app icon, reply to guests and send notifications directly to their phones.</p>
+        <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Guest Reach lives in the owner app.</h2>
+        <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Marketel Front Desk from the App Store to share your booking page, choose the Home Screen icon guests save, reply to guests, and send notifications.</p>
         <button type="button" onclick="openFrontdeskAppDownload()" ${appStoreReady ? '' : 'aria-disabled="true"'} style="width:100%;min-height:50px;border:0;border-radius:13px;background:${appStoreReady ? 'var(--green)' : '#dce8e1'};color:${appStoreReady ? '#fff' : '#527061'};font-family:inherit;font-size:15px;font-weight:800;cursor:${appStoreReady ? 'pointer' : 'default'};">${appStoreReady ? 'Download Marketel Front Desk' : 'Front Desk app coming soon'}</button>
       </div>
     </section>`;
@@ -665,7 +665,7 @@ function renderAppsView() {
     ? ''
     : fdInApp
     ? 'Front Desk is installed. Guests can install your property from the direct booking page.'
-    : 'Download Marketel Front Desk for the owner. Guests save your property from its direct booking page.';
+    : 'You download Marketel Front Desk from the App Store. Guests never download it; they save your property from its booking page.';
 
   el.innerHTML = `
   <style>
@@ -866,7 +866,7 @@ async function loadGuestInstallStats() {
     }).join('') : '';
 
     el.innerHTML = ''
-      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Guest installs — last 30 days</div>'
+      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Home Screen activity — last 30 days</div>'
       + '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">'
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
       + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + rate + '%</div>'

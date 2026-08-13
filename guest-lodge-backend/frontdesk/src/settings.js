@@ -674,7 +674,7 @@ function showWelcomeModal() {
       <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
         <div style="font-size:32px;margin-bottom:12px;">🏡</div>
         <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
-        <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">This is where you:<br><br>
+        <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">Guests use your direct booking page. This is the owner dashboard where you:<br><br>
           <strong>Set up</strong> your booking page<br>
           <strong>See bookings</strong> when they come in<br>
           <strong>Track revenue</strong> your page generates<br><br>
@@ -727,7 +727,7 @@ function startPostActivationTabTour() {
     {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Last step: open Guest App.</strong> Share your property with guests, choose its icon and turn on the alerts that keep your Front Desk app connected.',
+      text: '<strong>Last step: open Guest Reach.</strong> Guests save your property from its booking page; you use this tab in Marketel Front Desk to share the QR, choose their Home Screen icon and send notifications.',
     },
   ];
 
@@ -774,7 +774,7 @@ function startPostActivationTabTour() {
         <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
           <p style="margin:0 0 14px;">${s.text}</p>
-          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Open Guest App' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Open Guest Reach' : 'Next tab →'}</button>
           <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
         </div>`;
       document.body.appendChild(tooltip);
@@ -813,7 +813,7 @@ function showActivatedModal() {
       <p style="font-size:14px;color:#6b7280;line-height:1.55;margin:0 0 8px;">Guests can now book directly at</p>
       ${bookingUrl ? `<a href="${esc(bookingUrl)}" target="_blank" rel="noopener" style="display:block;color:#2E7D5B;font-size:15px;font-weight:800;text-decoration:none;word-break:break-word;margin:0 0 22px;">${esc(bookingDomain)}</a>` : '<div style="height:8px;"></div>'}
       ${appDownloadCta}
-      <p style="font-size:12px;color:#7a857e;line-height:1.45;margin:10px 4px 4px;">${appStoreUrl ? 'Manage bookings, availability and alerts from your phone.' : 'Your booking page is live. The web Front Desk is ready now.'}</p>
+      <p style="font-size:12px;color:#7a857e;line-height:1.45;margin:10px 4px 4px;">${appStoreUrl ? 'This is the App Store app for you and your staff. Guests never download it; they keep using your booking-page link.' : 'Your booking page is live. This web Front Desk is for you and your staff; guests keep using your booking-page link.'}</p>
       ${appStoreUrl ? '<button id="activatedModalContinueWeb" type="button" style="width:100%;padding:11px;margin-top:6px;border:0;background:transparent;color:#8a948e;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;">Continue to Web Front Desk</button>' : ''}
     </div>
   `;

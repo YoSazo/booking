@@ -577,7 +577,7 @@ function scrollTourTargetIntoView(el, stepDef, options) {
 
 function handoffToGuestAppsTour() {
   cleanupSettingsTourUi();
-  // Keep a marker so refresh mid–Guest App tour does not auto-mark settings tour done.
+  // Keep a marker so refresh mid–Guest Reach tour does not auto-mark settings tour done.
   localStorage.setItem('settingsTourStep', 'handoff');
   const go = () => {
     const tabBtn = document.querySelector('.tab[data-nav-filter="apps"]') || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]');
@@ -1364,11 +1364,11 @@ function startSettingsTour() {
             </div>
           </div>
           <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You're on their home screen</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">Guests can install <strong>${hName}</strong> as an app — right next to their other apps. No Safari, no searching <span style="text-decoration:line-through;color:#9ca3af;">Booking.com</span> or <span style="text-decoration:line-through;color:#9ca3af;">Airbnb</span>.</p>
+          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">Guests save <strong>${hName}</strong> to their Home Screen from your booking page. Your property sits beside their other icons—no App Store and no searching <span style="text-decoration:line-through;color:#9ca3af;">Booking.com</span> or <span style="text-decoration:line-through;color:#9ca3af;">Airbnb</span>.</p>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your property from your booking page or a QR — set that up under <strong>Guest App</strong>.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your property from your booking page or QR—never from the App Store. Share it under <strong>Guest Reach</strong>.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>
@@ -1634,7 +1634,7 @@ function startSettingsTour() {
         <div style="padding:20px 18px 0;text-align:center;">
           <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:5px;">Stay ahead of conflicts</div>
           <div style="font-size:17px;font-weight:800;color:#1a1a2e;">Remind, review, then correct availability.</div>
-          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">Choose how often to be reminded until you check. If a walk-in or another channel already took the room, cancel this booking and update Availability.</p>
+          <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:5px 0 13px;">If a walk-in or another channel took the room, tell Marketel Front Desk or block it in Availability. Marketel updates the dates shown on your direct booking page. If an online guest is affected, review that booking before cancelling it.</p>
         </div>
         <div style="padding:0 14px 14px;">
           <div style="background:#F8FAF9;border:1px solid #E1E9E4;border-radius:13px;padding:11px 12px;margin-bottom:9px;">

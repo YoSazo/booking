@@ -140,7 +140,7 @@ function BrowserHandoff({ onClose }) {
       <div className="booking-install-single-action">
         <span className="booking-install-plain-symbol"><ExternalLink aria-hidden /></span>
         <h2>Open in Safari</h2>
-        <p>Choose <strong>Open in Safari</strong> from this browser&apos;s menu, then tap Install again.</p>
+        <p>Choose <strong>Open in Safari</strong> from this browser&apos;s menu, then tap Add to Home Screen again.</p>
         <button className="booking-install-copy-link" type="button" onClick={copyCurrentUrl}>
           {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
           {copied ? 'Copied' : 'Copy link instead'}

@@ -138,13 +138,13 @@ function InstallAppBanner({
           <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={44} style={{ boxShadow: 'none' }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.25 }}>
-              {guidedBookingInstall ? `Get the ${hotelName || 'property'} app` : `Add ${hotelName || 'us'} to your home screen`}
+              {guidedBookingInstall ? `Save ${hotelName || 'this property'} to your Home Screen` : `Add ${hotelName || 'us'} to your Home Screen`}
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
               {buttonLocked
                 ? 'Available once this property finishes setup.'
                 : guidedBookingInstall
-                  ? 'Keep us one tap away for future stays. No app store.'
+                  ? 'Return to this booking page in one tap. No App Store.'
                   : 'Book direct in one tap next time.'}
             </div>
           </div>
@@ -166,7 +166,7 @@ function InstallAppBanner({
               opacity: 1,
             }}
           >
-            {buttonLocked ? '🔒 Install' : 'Install'}
+            {buttonLocked ? '🔒 Add' : 'Add'}
           </button>
         </div>
       </div>
@@ -210,10 +210,10 @@ function InstallAppBanner({
               id="owner-install-preview-title"
               style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}
             >
-              This app isn&apos;t live yet.
+              Home Screen access isn&apos;t live yet.
             </h2>
             <p style={{ margin: '11px 0 18px', color: '#66756c', fontSize: 14, lineHeight: 1.55 }}>
-              <strong>{hotelName || 'This property'}</strong> will be available to add to your Home Screen once the property finishes activating it.
+              Once the property activates, guests can save <strong>{hotelName || 'this property'}</strong> to their Home Screen directly from this booking page. No App Store is involved.
             </p>
             <button
               type="button"

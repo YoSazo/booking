@@ -28,17 +28,17 @@ const OPERATIONAL_STEPS = [
   {
     filter: 'availability',
     eyebrow: 'Availability',
-    title: 'Keep the real world in sync.',
-    body: 'Block a room when a walk-in takes it, or let Front Desk Assistant update availability from your reply.',
-    note: 'If Front Desk knows, the booking page knows.',
+    title: 'When a walk-in takes a room, tell Front Desk.',
+    body: 'Text “A walk-in took the Queen Room tonight,” or record it here in Availability. Marketel reduces the remaining availability on your direct booking page.',
+    note: 'One rule: if it happened outside Marketel, tell Front Desk.',
     tabPosition: '62.5%',
   },
   {
     filter: 'apps',
-    eyebrow: 'Guest App',
-    title: 'Get on their phone. Then reach it.',
-    body: 'Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone whenever you want.',
-    note: 'Share the QR or link, then use Show installation steps to guide them through the exact Safari buttons.',
+    eyebrow: 'Guest Reach',
+    title: 'Guests save your property—not Front Desk.',
+    body: 'Guests open your booking page and save your property to their Home Screen. There is no second App Store app. If they allow notifications, you can reach their phone from Marketel Front Desk.',
+    note: 'Tell a guest: “Open our booking link and tap Add to Home Screen. That saves our property—not Marketel.”',
     tabPosition: '87.5%',
   },
 ];
@@ -982,7 +982,7 @@ function introStageHtml(step) {
       <div class="mno-stage">
         <div class="mno-kicker">Connected</div>
         <h1 class="mno-title">Front Desk is ready.</h1>
-        <p class="mno-copy">Everything you need to run ${name} now lives on this phone.</p>
+        <p class="mno-copy">Guests use ${name}’s direct booking page and can save the property to their Home Screen. You use Marketel Front Desk to manage bookings and availability.</p>
         <div class="mno-property-card">
           <div class="mno-property-row">
             <div class="mno-property-icon">${initial}</div>
@@ -994,7 +994,7 @@ function introStageHtml(step) {
           <div class="mno-feature-row">
             <div class="mno-feature"><strong>Live</strong>Bookings</div>
             <div class="mno-feature"><strong>Synced</strong>Availability</div>
-            <div class="mno-feature"><strong>Ready</strong>Guest app</div>
+            <div class="mno-feature"><strong>Ready</strong>Guest reach</div>
           </div>
         </div>
       </div>`;
@@ -1007,7 +1007,7 @@ function introStageHtml(step) {
       <div class="mno-stage">
         <div class="mno-kicker">A real second set of eyes</div>
         <h1 class="mno-title">Meet Front Desk Assistant.</h1>
-        <p class="mno-copy">It checks in when a booking could collide with what happened at the property, then updates Front Desk from your reply.</p>
+        <p class="mno-copy">If a walk-in or another channel takes a room, tell it in a text. It reduces the remaining availability on your direct booking page.</p>
         <div class="mno-assistant-card">
           <div class="mno-assistant-head">
             <div class="mno-assistant-avatar">M</div>
@@ -1046,7 +1046,7 @@ function introStageHtml(step) {
     <div class="mno-stage">
       <div class="mno-kicker">The essentials</div>
       <h1 class="mno-title">Four places. No maze.</h1>
-      <p class="mno-copy">You already know what Marketel does. Here is where you run it.</p>
+      <p class="mno-copy">One owner app: Marketel Front Desk. Guests never download it; they use your booking page.</p>
       <div class="mno-ready-list">
         <div class="mno-ready-item" style="--i:0">
           <div class="mno-ready-number">01</div>
@@ -1058,7 +1058,7 @@ function introStageHtml(step) {
         </div>
         <div class="mno-ready-item" style="--i:2">
           <div class="mno-ready-number">03</div>
-          <div><strong>Bring guests back</strong><span>Share the app link or QR when they are ready.</span></div>
+          <div><strong>Bring guests back</strong><span>Share your booking-page QR or Home Screen link.</span></div>
         </div>
       </div>
     </div>`;
@@ -1072,7 +1072,7 @@ function introFooterHtml(step) {
       <div class="mno-status-note">${session.contactAttempted ? 'No problem — you can save it later from Assistant.' : 'Save it now so you recognize Marketel when messages begin.'}</div>
       <div class="mno-progress">${progressDots(step, 3)}</div>`;
   }
-  const label = step === 0 ? 'Set up Front Desk' : step === 1 ? 'Continue' : 'Show me the app';
+  const label = step === 0 ? 'Set up Front Desk' : step === 1 ? 'Continue' : 'Show me Front Desk';
   return `
     <button class="mno-primary" type="button" data-mno-action="next">${label}</button>
     <div class="mno-progress">${progressDots(step, 3)}</div>`;

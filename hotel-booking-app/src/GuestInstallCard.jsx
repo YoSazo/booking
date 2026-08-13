@@ -105,8 +105,8 @@ function GuestInstallCard({
     try { localStorage.setItem(storageKey, '1'); } catch (e) { /* ignore */ }
   };
 
-  const title = headline || `Add ${hotelName || 'us'} to your home screen`;
-  const subtitle = subline || 'Get check-in updates and message the front desk — lives on your home screen. No App Store.';
+  const title = headline || `Save ${hotelName || 'this property'} to your Home Screen`;
+  const subtitle = subline || 'Return here to book direct, get stay updates, and message the front desk. No App Store.';
 
   const installCoach = showInstallCoach && (
     <BookingInstallCoach
@@ -217,7 +217,7 @@ function GuestInstallCard({
             cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
           }}
         >
-          Install
+          Add
         </button>
         <button
           type="button"

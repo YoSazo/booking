@@ -1534,6 +1534,11 @@ function ensureAvailabilityUi() {
         <div class="rooms-shell">
           <div id="roomsPillBar" class="room-pill-bar"></div>
 
+          <div style="margin:0 0 12px;padding:12px 14px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;font-size:12px;line-height:1.5;">
+            <strong style="display:block;font-size:13px;margin-bottom:2px;">Walk-in or another channel took a room?</strong>
+            Tap the affected dates and set how many rooms are still available. Once saved, that is the number guests can book on your direct booking page. Or text the Marketel Front Desk contact what happened.
+          </div>
+
           <div class="availability-card mobile-cal-card">
             <div id="availabilityNoRoom" class="availability-empty"></div>
             <div id="availabilityCalendarWrap" style="display:none">
@@ -1727,7 +1732,7 @@ function blockedDemandLineHtml() {
 
 // D19: the persistent, every-tab surface is a CALM STATUS PILL — not a sales
 // banner. The full gradient CTA card (goLiveInlineCardHtml) is reserved for
-// high-intent moments (Bookings empty state, Your page, Guest App). When real
+// high-intent moments (Bookings empty state, Your page, Guest Reach). When real
 // blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
 // that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
@@ -2107,7 +2112,7 @@ function renderGrowthPanel() {
 
   const openGoogleBtn = bookingUrl ? `<a class="growth-btn growth-btn-ghost" href="https://business.google.com/" target="_blank" rel="noopener">Open Google Business &#8599;</a>` : '';
   const textBtn = bookingUrl ? `<button type="button" class="growth-btn growth-btn-ghost" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy link to text</button>` : '';
-  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="openGuestAppSharing()">Open Guest App</button>`;
+  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="openGuestAppSharing()">Open Guest Reach</button>`;
 
   const gbpStep = step('gbp', 'Biggest lever', 'Add your link to Google', 'Most guests find motels on Google Maps. Paste your booking link into your Google Business Profile so they book direct instead of through an OTA.', openGoogleBtn + linkBoxHtml);
   const qrStep = step('qr', '', 'Share a QR at check-in', 'Guests can scan it to save your property and book direct next time. Print it or show it during check-in.', qrBtn);
@@ -3894,7 +3899,7 @@ function applyGuestBroadcastAudienceUi() {
   const count = crm.guestPushSubscriberCount || 0;
   if (audience) {
     audience.textContent = count === 0
-      ? 'No guests have notifications on yet. Start by sharing your guest app.'
+      ? 'No guests have notifications on yet. Share your Home Screen link or QR first.'
       : count === 1
         ? '1 guest can receive this notification.'
         : count + ' guests can receive this notification.';
@@ -3943,7 +3948,7 @@ function guestBroadcastCardHtml(options = {}) {
     <div id="tour-guest-reach" class="guest-reach-intro">
       <div class="guest-reach-kicker">Direct to their phone</div>
       <div class="guest-reach-title">Reach guests whenever you want.</div>
-      <p>Once a guest downloads your app and turns on notifications, you can send a push notification directly to their phone.</p>
+      <p>Once a guest saves your property to their Home Screen and allows notifications, you can send a push notification directly to their phone from Marketel Front Desk.</p>
     </div>
     <div id="guest-broadcast-audience" style="font-size:12px;line-height:1.45;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);">Checking who can receive notifications…</div>
     <div class="guest-notification-demo" aria-label="Preview of the notification guests will receive">
@@ -3958,7 +3963,7 @@ function guestBroadcastCardHtml(options = {}) {
       </div>
       <div class="guest-notification-caption">This is what arrives on their phone.</div>
     </div>
-    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" class="guest-reach-suggestion">Suggest an app reminder</button>'}
+    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" class="guest-reach-suggestion">Suggest a Home Screen reminder</button>'}
     <div style="margin-bottom:8px;">
       <label for="guest-broadcast-title" style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;">Notification title</label>
       <input type="text" id="guest-broadcast-title" value="${hNameAttr}" maxlength="120" placeholder="e.g. Weekend dates just opened" oninput="updateGuestBroadcastPreview()" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
@@ -4066,7 +4071,7 @@ function applyFilter() {
         else renderMessages();
       }
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest App</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest Reach</div></div>';
     });
     return;
   }
@@ -4849,7 +4854,7 @@ function promptUploadLogoBeforeQr(preselectedCode) {
     <div style="background:white;border-radius:20px;padding:24px 22px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="font-size:28px;margin-bottom:10px;">🖼️</div>
       <h2 style="font-size:17px;font-weight:800;color:#1a1a2e;margin:0 0 8px;line-height:1.35;">Upload your property logo first?</h2>
-      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${crm.activeHotelName || 'your property'}</strong> to their phone. Takes 5 seconds.</p>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${crm.activeHotelName || 'your property'}</strong> to their Home Screen. Takes 5 seconds.</p>
       <input type="file" id="logoGateFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
       <button type="button" id="logoGateUploadBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Upload logo</button>
       <button type="button" id="logoGateSkipBtn" style="width:100%;padding:10px;border:none;background:transparent;color:#9ca3af;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Show QR without logo</button>
@@ -4936,8 +4941,8 @@ async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
       + '<button type="button" id="checkinQrClose" style="position:absolute;top:max(12px,env(safe-area-inset-top));right:16px;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,0.12);color:#fff;font-size:22px;cursor:pointer;font-family:inherit;">×</button>'
       + '<div style="text-align:center;max-width:400px;width:100%;">'
       + '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Guest scans this</div>'
-      + '<h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#fff;line-height:1.3;">Add ' + escAttr(hName) + ' to their phone</h2>'
-      + '<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.5;">Takes about 10 seconds. They can message you and book direct next time.</p>'
+      + '<h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#fff;line-height:1.3;">Save ' + escAttr(hName) + ' to their Home Screen</h2>'
+      + '<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.5;">This QR opens your booking page. Guests save the property from there—no App Store.</p>'
       + '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">'
       + '<button type="button" data-qr-mode="generic" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'generic' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">Any guest</button>'
       + '<button type="button" data-qr-mode="guest" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'guest' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">This guest</button>'
@@ -4952,7 +4957,7 @@ async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
         ) : '')
       + (qr ? '<img src="' + qr + '" alt="QR code" width="280" height="280" style="display:block;width:min(280px,80vw);max-width:100%;height:auto;box-sizing:border-box;margin:0 auto;border-radius:16px;background:#fff;padding:12px;">' : '')
       + '<p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">'
-      + (mode === 'guest' && selectedCode ? 'Links to their reservation + install' : 'Generic install — good for room cards')
+      + (mode === 'guest' && selectedCode ? 'Reservation + Home Screen link' : 'Home Screen link — good for room cards')
       + '</p></div>';
 
     if (!overlay.isConnected) {
@@ -5780,26 +5785,7 @@ function refreshAppsInstallSection() {
 }
 
 function handleInstallFrontdesk() {
-  if (isIosDevice()) {
-    showIosInstallSheet({
-      title: (crm.activeHotelName ? crm.activeHotelName + ' ' : '') + 'Front Desk',
-      subtitle: 'Add it to your home screen — takes 3 seconds.',
-      // iOS is the whole reason this step is mandatory rather than optional:
-      // web push simply does not exist for a Safari tab.
-      alertsNote: '<strong>iPhone needs this step.</strong> Confirmed-booking and guest-message alerts only work from the Home Screen app, never from a Safari tab.',
-    });
-    return;
-  }
-  if (crm.deferredInstallPrompt) {
-    crm.deferredInstallPrompt.prompt();
-    crm.deferredInstallPrompt.userChoice.then((choice) => {
-      if (choice && choice.outcome === 'accepted') { crm.frontdeskInstalled = true; }
-      crm.deferredInstallPrompt = null;
-      refreshAppsInstallSection();
-    }).catch(() => {});
-  } else {
-    toast('Use your browser menu → "Install app" / "Add to Home screen".', 'info');
-  }
+  openFrontdeskAppDownload();
 }
 
 async function toggleAppNotifications() {

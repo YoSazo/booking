@@ -110,7 +110,7 @@ export default function GuestLayout({ children }) {
       <div style={{ ...styles.content, paddingBottom: showNav ? 110 : 0 }}>{children}</div>
 
       {showNav && (
-        <nav className="guest-app-navigation" style={styles.pill} aria-label="Guest app">
+        <nav className="guest-app-navigation" style={styles.pill} aria-label="Property navigation">
           {NAV_TABS.map((tab) => {
             const isActive = activeTab === tab.key;
             const Icon = tab.icon;

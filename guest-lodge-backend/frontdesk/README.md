@@ -12,7 +12,7 @@ Front Desk is the modular Vite source for the `/frontdesk` app. Edit files in
 | `src/settings.js` | Settings and room editor |
 | `src/apps.js` | Phones/apps tab and tours, lazy-loaded |
 | `src/tour-settings.js` | Settings walkthrough logic |
-| `src/tour-apps.js` | Guest App walkthrough logic |
+| `src/tour-apps.js` | Guest Reach / Home Screen walkthrough logic |
 | `src/state.js` | Shared mutable Front Desk state |
 | `src/utils.js` | Shared helpers |
 | `src/styles/core.css` | Main Front Desk styles |

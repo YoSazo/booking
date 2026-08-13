@@ -6,13 +6,16 @@ BOOKINGS AT A GLANCE
 See new and upcoming stays, review guest details, track booking status, and take action when a reservation needs attention.
 
 AVAILABILITY THAT STAYS CLOSE
-Open or close room nights, record walk-ins, and keep the availability shown on your direct booking page aligned with what is happening at the property.
+If a walk-in or another channel takes a room, record it in Availability or tell Front Desk Assistant. Marketel reduces the remaining availability shown on your direct booking page.
 
 YOUR DIRECT BOOKING PAGE
 Update rooms, rates, property information, and photos from the same system that receives your bookings.
 
 NATIVE BOOKING ALERTS
 Receive timely iPhone notifications for booking activity. Supported alerts let you confirm, release, or review a booking without searching through the app.
+
+GUEST REACH, CLEARLY SEPARATED
+Marketel Front Desk is the App Store app for owners and staff. Guests never download it. Guests can save the property from its direct booking page to their Home Screen, while the owner shares the QR or link and sends guest notifications from Guest Reach inside Front Desk.
 
 BUILT FOR SMALL PROPERTIES
 The interface stays focused on the daily decisions an independent property actually makes, with quick property switching for owners who manage more than one location.

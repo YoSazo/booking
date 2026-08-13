@@ -330,7 +330,7 @@ export function renderFrontDeskAssistantCard() {
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk app</div>
           <div class="fda-card-title">Assistant lives on your phone.</div>
-          <div class="fda-card-sub">Download Front Desk to connect phone numbers, choose your no-answer rule and manage Assistant activity.</div>
+          <div class="fda-card-sub">Download Marketel Front Desk from the App Store to connect phone numbers, choose your no-answer rule and manage Assistant activity.</div>
         </div>
         <button type="button" class="fda-card-btn" onclick="openFrontdeskAppDownload()">Download</button>
       </div>
@@ -368,7 +368,7 @@ export function renderFrontDeskAssistantCard() {
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk Assistant</div>
           <div class="fda-card-title">${crm.assistantLoading ? 'Connecting your assistant…' : (loadFailed ? 'Assistant could not connect' : 'Tell Front Desk when a room is taken')}</div>
-          <div class="fda-card-sub">${loadFailed ? esc(crm.assistantError) : 'It updates availability for you and helps prevent outside bookings from colliding.'}</div>
+          <div class="fda-card-sub">${loadFailed ? esc(crm.assistantError) : 'Tell it when a walk-in or another channel takes a room. It updates Availability and your direct booking page.'}</div>
         </div>
         <button type="button" class="fda-card-btn" onclick="openFrontDeskAssistant()">${loadFailed ? 'Retry' : 'Open'}</button>
       </div>
@@ -406,7 +406,7 @@ export function renderFrontDeskAssistantCard() {
       <div class="fda-card-copy">
         <div class="fda-eyebrow">${locked ? 'Included when activated' : 'Front Desk Assistant'}</div>
         <div class="fda-card-title">Text Front Desk. It handles availability.</div>
-        <div class="fda-card-sub">${locked ? 'See how it protects your direct booking page before you go live.' : 'Connect your phone and tell it when a walk-in takes a room.'}</div>
+        <div class="fda-card-sub">${locked ? 'See how it protects your direct booking page before you go live.' : 'If a walk-in or another channel takes a room, text Front Desk what happened. It updates Availability for you.'}</div>
       </div>
       <button type="button" class="fda-card-btn" onclick="openFrontDeskAssistant()">${locked ? 'See it' : 'Set up'}</button>
     </div>
@@ -481,7 +481,7 @@ function sheetBodyHtml() {
   return `
     <div class="fda-section fda-story">
       <div class="fda-section-title">Your Front Desk becomes someone you can text</div>
-      <div class="fda-section-sub">No forms. Tell it what happened in plain English and it safely updates Marketel.</div>
+      <div class="fda-section-sub">If a walk-in or another channel takes a room, text what happened. Front Desk updates Availability and reduces what remains available on your direct booking page.</div>
       <div class="fda-bubble assistant"><strong>Front Desk</strong><br>New booking: Queen Room, tonight. Is it still free?</div>
       <div class="fda-bubble owner">A walk-in took it.</div>
       <div class="fda-bubble assistant"><strong>Done.</strong> I updated availability. If an online guest is affected, I’ll ask before cancelling anything.</div>
@@ -557,7 +557,7 @@ function sheetBodyHtml() {
 
     <div class="fda-section">
       <div class="fda-section-title">When should it check in?</div>
-      <div class="fda-section-sub">A booking text carries news. Availability check-ins ask whether a walk-in or outside booking changed anything.</div>
+      <div class="fda-section-sub">Front Desk asks whether a walk-in or another channel changed your rooms. Reply with what happened; it updates Availability for you.</div>
       <div class="fda-field">
         <label for="assistant-frequency">Check-in schedule</label>
         <select id="assistant-frequency" ${settingsDisabled}>
@@ -806,7 +806,7 @@ export function saveAssistantContact() {
     'FN:Marketel Front Desk',
     'ORG:Marketel',
     `TEL;TYPE=CELL:${phone}`,
-    'NOTE:Text this contact when a walk-in or outside booking changes your availability.',
+    'NOTE:If a walk-in or another channel takes a room, text what happened. Marketel Front Desk updates Availability and your direct booking page.',
     'END:VCARD',
   ].join('\r\n');
   const url = URL.createObjectURL(new Blob([vcard], { type: 'text/vcard;charset=utf-8' }));

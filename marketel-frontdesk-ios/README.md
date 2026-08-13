@@ -10,9 +10,12 @@ admits properties with an active Marketel subscription. Subscription purchase
 and billing management are intentionally unavailable in the iOS app. On iOS 26
 the UIKit navigation uses the system Liquid Glass appearance automatically.
 
-The app does not replace the existing PWA. Both clients use the same backend and
-property data, while the iOS HTML, JavaScript, CSS, fonts, and icons are packaged
-with the app rather than executed from a third-party CDN.
+Existing owner PWA installs remain supported, but new owners are directed to the
+Marketel Front Desk App Store app. Guests never download Marketel Front Desk;
+they save the individual property's booking page to their Home Screen. Both
+owner clients use the same backend and property data, while the iOS HTML,
+JavaScript, CSS, fonts, and icons are packaged with the app rather than executed
+from a third-party CDN.
 
 ## Install through AltStore Classic
 

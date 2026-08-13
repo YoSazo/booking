@@ -29,7 +29,7 @@ available for the entire review period.
 ## What to test
 
 1. Sign in with the review email or property ID and PIN.
-2. The four native tabs are Your Page, Bookings, Availability, and Guest App.
+2. The four native tabs are Your Page, Bookings, Availability, and Guest Reach. Guest Reach is where the property shares its booking-page QR or Home Screen link and communicates with guests; it is not a second App Store app.
 3. Open Bookings to inspect reservation and guest details.
 4. Open Availability to change a demonstration room-night.
 5. Open Your Page to edit demonstration property information and find Privacy,

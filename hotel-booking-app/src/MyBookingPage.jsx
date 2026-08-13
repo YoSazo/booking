@@ -180,7 +180,7 @@ function MyBookingPage({ hotel, apiBaseUrl = '', hotelId }) {
               touchpoint="booking-magic-link"
               variant="hero"
               headline={`Add ${hotel?.name || 'us'} to your phone`}
-              subline="You opened this from your confirmation email — tap to install and message the front desk."
+              subline="You opened this from your confirmation email—save the property to your Home Screen, then message the front desk anytime."
             />
 
             <GuestMessageCard

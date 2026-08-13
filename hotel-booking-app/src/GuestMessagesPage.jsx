@@ -302,7 +302,7 @@ export default function GuestMessagesPage({ hotel }) {
               apiBaseUrl={apiBaseUrl}
               touchpoint="messages-card"
               variant="card"
-              subline="Install to get reply notifications on your phone — like a text from the hotel."
+              subline="Save this property to your Home Screen to receive reply notifications on your phone."
             />
           </div>
         )}

@@ -106,8 +106,8 @@ Guests and owners share vague words — **“install”**, **“phones”**, **�
 
 **Install**
 - Guest: Add *this hotel* to Home Screen (Safari share).
-- Owner: Download *Marketel Front Desk* (App Store) or Add to Home Screen.
-Same verb, two products.
+- Owner: Download *Marketel Front Desk* from the App Store.
+Different verbs are deliberate: guests **save the property**; owners **download Front Desk**.
 
 **Phones / Guest App tab**
 Often mixes three meanings:
@@ -233,6 +233,7 @@ This status supersedes the original read-only findings above:
 - Account deletion now releases active `$1` holds and cancels only the property-scoped Stripe subscription.
 - Forgot-PIN is rate-limited, new setup PINs use the keyed hash path, the open browser-diagnostics endpoint was removed, availability is rate-limited, guest room cards include tax, and blocking guest `alert()` calls were replaced with in-page feedback.
 - The activated screen has a working web fallback when the App Store URL is not configured; after Apple publishes the listing, `MARKETEL_FRONTDESK_APP_STORE_URL` remains a required manual Render setting.
+- Owner/guest vocabulary is now locked in the live UI: owners download **Marketel Front Desk** from the App Store; guests save the **property** from its booking page to their Home Screen. The former Guest App tab is **Guest Reach**, and the Availability screen permanently explains the walk-in rule.
 - Still manual before App Review/ads: stable distinct production secrets, App Review demo credentials/screenshots, Apple/APNs credentials, App Store URL, live Stripe object verification, production migrations, and device smoke testing.
 
 ---

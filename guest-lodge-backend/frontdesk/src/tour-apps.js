@@ -415,7 +415,7 @@ function appsTourRender() {
     const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
     const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
     const backDisabled = _appsTourIdx <= 0;
-    const kicker = step.kicker || 'Guest App';
+    const kicker = step.kicker || 'Guest Reach';
     const tip = document.createElement('div');
     tip.id = 'appsTourTooltip';
     tip.style.cssText = `position:fixed;z-index:100003;left:12px;top:14px;width:${maxWidth}px;max-width:${maxWidth}px;visibility:hidden;`;
@@ -517,14 +517,14 @@ function startAppsTour(opts) {
       target: '#tour-guest-reach',
       kicker: 'Direct guest reach',
       title: 'Send a push notification directly to their phone.',
-      text: 'Every guest who downloads your app and turns on notifications can receive a message from you whenever you choose.',
+      text: 'Every guest who saves your property to their Home Screen and allows notifications can receive a message from you.',
       tooltipPosition: 'above',
     },
     {
       target: '#tour-native-guest-share',
       kicker: 'Build your audience',
-      title: 'Get your app onto their phone.',
-      text: 'Show the QR, copy the link, or open the guest page. They install it from there.',
+      title: 'Help guests save your property.',
+      text: 'Show the QR, copy the Home Screen link, or open the booking page. Guests save your property from there—never from the App Store.',
       tooltipPosition: 'above',
     },
     {
@@ -549,8 +549,8 @@ function startAppsTour(opts) {
     {
       target: '#tour-apps-intro',
       kicker: 'The loop',
-      title: 'Your property becomes the app—and the direct connection.',
-      text: 'Guests book direct, save your property to their phone, and can receive notifications from you.',
+      title: 'One system with a clear side for you and for guests.',
+      text: 'You use Marketel Front Desk. Guests use your booking page and can save your property to their Home Screen.',
     },
     {
       target: '#tour-apps-first',
@@ -564,8 +564,8 @@ function startAppsTour(opts) {
     {
       target: '#tour-apps-then',
       kicker: 'Their side',
-      title: 'Guests install from your booking page.',
-      text: 'One tap on Install and your icon is on their home screen.',
+      title: 'Guests save your property from the booking page.',
+      text: 'They tap Add to Home Screen and your property gets its own icon. They never download Marketel Front Desk.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
@@ -574,7 +574,7 @@ function startAppsTour(opts) {
       target: '#tour-apps-after',
       kicker: 'Direct reach',
       title: 'Send a notification to their phone whenever you want.',
-      text: 'Anyone who installs your app and turns on notifications becomes reachable directly from Front Desk.',
+      text: 'Anyone who saves your property and allows notifications becomes reachable from Marketel Front Desk.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
