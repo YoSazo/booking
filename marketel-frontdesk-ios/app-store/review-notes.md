@@ -14,21 +14,18 @@ the submitted executable.
 
 ## Review account
 
-Before submission, replace the fields below with a stable, paid review property
-that contains safe demonstration rooms, bookings, and availability:
+The private Property ID and Front Desk PIN are supplied in App Store Connect's
+App Review sign-in information. They open a dedicated, permanently entitled
+demonstration property containing only synthetic rooms, guests, bookings, and
+availability. No email-inbox access or one-time code is required for review.
 
-- Email: `REPLACE_WITH_REVIEW_EMAIL`
-- One-time email code: generated on demand, so App Review must have access to
-  the email inbox; alternatively provide the credentials below.
-- Property ID: `REPLACE_WITH_REVIEW_PROPERTY_ID`
-- Front Desk PIN: `REPLACE_WITH_REVIEW_PIN`
-
-Do not use a real customer's account. Keep the review account subscribed and
-available for the entire review period.
+Do not place those credentials in this repository. Keep the dedicated review
+property subscribed and available for the entire review period.
 
 ## What to test
 
-1. Sign in with the review email or property ID and PIN.
+1. On the sign-in screen, choose **Use property ID and PIN instead**, then use
+   the private credentials supplied in App Store Connect.
 2. The four native tabs are Your Page, Bookings, Availability, and Guest Reach. Guest Reach is where the property shares its booking-page QR or Home Screen link and communicates with guests; it is not a second App Store app.
 3. Open Bookings to inspect reservation and guest details.
 4. Open Availability to change a demonstration room-night.
