@@ -3385,7 +3385,7 @@ function bookingCardHtml(b) {
             <span class="card-amount">$${amount}</span>
           </span>
           <span class="reservation-trip-line">
-            <span>${roomName}</span><span aria-hidden="true">·</span><span>${ci} – ${co}</span><span aria-hidden="true">·</span><span>${nights} night${nights !== 1 ? 's' : ''}</span><span aria-hidden="true">·</span><span>${guests} guest${guests !== 1 ? 's' : ''}</span>
+            <span>${roomName}</span><span aria-hidden="true">·</span><span>${ci} – ${co}</span><span aria-hidden="true">·</span><span>${nights} night${nights !== 1 ? 's' : ''}</span>
           </span>
           <span class="reservation-status-row">
             <span class="reservation-status reservation-status--${status.tone}"><span class="reservation-status-dot" aria-hidden="true"></span>${status.label}</span>

@@ -419,7 +419,7 @@ Minimum version required to store current data is: `+S+`.
             <span class="card-amount">$${I}</span>
           </span>
           <span class="reservation-trip-line">
-            <span>${T}</span><span aria-hidden="true">·</span><span>${n} – ${o}</span><span aria-hidden="true">·</span><span>${B} night${B!==1?"s":""}</span><span aria-hidden="true">·</span><span>${N} guest${N!==1?"s":""}</span>
+            <span>${T}</span><span aria-hidden="true">·</span><span>${n} – ${o}</span><span aria-hidden="true">·</span><span>${B} night${B!==1?"s":""}</span>
           </span>
           <span class="reservation-status-row">
             <span class="reservation-status reservation-status--${k.tone}"><span class="reservation-status-dot" aria-hidden="true"></span>${k.label}</span>
