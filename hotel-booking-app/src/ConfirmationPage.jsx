@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuest } from './GuestProvider.jsx';
-import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon } from 'lucide-react';
+import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3 } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
@@ -226,38 +226,52 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
         </div>
       )}
 
-      <div className="confirmation-container">
-        {/* 1. Compact success + code (D4: success is a header, not a full-bleed hero) */}
-        <div className="confirmation-card confirmation-card--slim">
-          <div className="success-checkmark">
-            <svg className="checkmark-icon" viewBox="0 0 52 52">
-              <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-              <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-            </svg>
-          </div>
+      <div className="confirmation-page-shell">
+        <div className="confirmation-container">
+          {/* One outcome, one focal point. Pending stays visually distinct from confirmed. */}
+          <section
+            className={`confirmation-card confirmation-card--outcome ${confirmationPending ? 'is-pending' : 'is-confirmed'}`}
+            aria-live="polite"
+          >
+          {confirmationPending ? (
+            <div className="confirmation-status-icon confirmation-status-icon--pending" aria-hidden="true">
+              <Clock3 size={32} strokeWidth={2} />
+            </div>
+          ) : (
+            <div className="success-checkmark confirmation-status-icon" aria-hidden="true">
+              <svg className="checkmark-icon" viewBox="0 0 52 52">
+                <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+              </svg>
+            </div>
+          )}
+
           <div className="confirmation-header">
-            <h2>{confirmationPending ? 'Room request received' : 'Booking confirmed'}</h2>
-            <p className="confirmation-code">
+            <h1>{confirmationPending ? 'Your room is being held' : 'Your booking is confirmed'}</h1>
+            <p className="confirmation-status-copy">
               {confirmationPending
-                ? `Your room is held${reviewMinutes ? ` for up to ${reviewMinutes} minutes` : ''} while the property checks availability.`
-                : <>Confirmation code <strong>#{reservationCode}</strong></>}
+                ? (reviewMinutes
+                  ? `We’ll email you with the final status within ${reviewMinutes} minute${reviewMinutes === 1 ? '' : 's'}.`
+                  : 'We’ll email you as soon as the property responds.')
+                : <>A confirmation email was sent to <strong>{guestInfo.email}</strong>.</>}
             </p>
+            {reservationCode && (
+              <div className="confirmation-reference">
+                <span>{confirmationPending ? 'Request' : 'Confirmation'}</span>
+                <strong>#{reservationCode}</strong>
+              </div>
+            )}
+            {confirmationPending && bookingDetails?.bookingType === 'payLater' && (
+              <p className="confirmation-trust-line">
+                The $1 authorization is temporary. Nothing has been charged.
+              </p>
+            )}
           </div>
-        </div>
+          </section>
 
-        {confirmationPending && (
-          <div style={{
-            margin: '0 0 16px', padding: '14px 16px', borderRadius: '12px',
-            background: '#f0f7f3', border: '1px solid #cfe4d7', color: '#294638',
-            fontSize: '14px', lineHeight: 1.55,
-          }}>
-            <strong>Watch your email.</strong> You&apos;ll receive a confirmation as soon as the room is approved, or a notice if the property cannot take the request. The $1 authorization is temporary and you have not been charged.
-          </div>
-        )}
-
-        {/* 2. YOUR STAY — always visible (was hidden in <details>). The money
-            line is the trust payoff and must never be a tap away. */}
-        <div className="stay-details-card stay-summary-card">
+          {/* 2. YOUR STAY — always visible (was hidden in <details>). The money
+              line is the trust payoff and must never be a tap away. */}
+          <div className="stay-details-card stay-summary-card">
           <div className="stay-summary-card__head">
             <span className="stay-summary-card__title">{bookingDetails.name || 'Your room'}</span>
             <span className="stay-summary-card__badge">{confirmationPending ? 'Room held' : 'Confirmed'}</span>
@@ -314,23 +328,23 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               <CalendarClock size={17} /> Extend / rebook
             </button>
           </div>
-        </div>
+          </div>
 
-        {/* 3. STAY IN TOUCH — install is secondary, framed as how you reach us */}
-        <GuestInstallCard
+          {/* 3. STAY IN TOUCH — install is secondary, framed as how you reach us */}
+          <GuestInstallCard
           hotelName={hotelName}
           appIconUrl={hotel?.appIconUrl}
           hotelId={resolvedHotelId}
           reservationCode={reservationCode}
           apiBaseUrl={apiBaseUrl}
           touchpoint="confirmation-page"
-          variant="hero"
-          headline={`Stay in touch — add ${hotelName} to your home screen`}
-          subline="Message the front desk and get check-in updates. No app store, about 3 seconds."
-        />
+          variant="confirmation"
+          headline={`Keep ${hotelName} on your phone`}
+          subline="Get stay updates and message the front desk from your home screen."
+          />
 
-        {/* 4. Fine print — the only thing that stays collapsed */}
-        <details className="confirmation-details">
+          {/* 4. Fine print — the only thing that stays collapsed */}
+          <details className="confirmation-details">
           <summary>Payment breakdown &amp; policy</summary>
           <div className="confirmation-details__body">
             <PaymentSummary bookingDetails={bookingDetails} />
@@ -338,12 +352,13 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               <p className="confirmation-details__footnote">{hotel.cancellationPolicy}</p>
             )}
             <p className="confirmation-details__footnote" style={{ marginTop: 12 }}>
-              {confirmationPending ? 'Your decision email will be sent to ' : 'A confirmation email was sent to '}
+              {confirmationPending ? 'Your final status will be sent to ' : 'Your confirmation was sent to '}
               <strong style={{ color: '#374151' }}>{guestInfo.email}</strong>.
               Questions? Call {hotelPhone} — we&apos;re happy to help.
             </p>
           </div>
-        </details>
+          </details>
+        </div>
       </div>
     </>
   );

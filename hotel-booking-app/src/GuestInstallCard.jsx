@@ -26,6 +26,7 @@ function GuestInstallCard({
   const storageKey = `installDismissed_${hotelId || 'default'}`;
   const ios = isIos();
   const isHero = variant === 'hero';
+  const isConfirmation = variant === 'confirmation';
   const effectiveCode = reservationCode || undefined;
 
   const markInstalled = useCallback(() => {
@@ -158,6 +159,37 @@ function GuestInstallCard({
             </button>
           )}
         </div>
+        {installCoach}
+      </>
+    );
+  }
+
+  if (isConfirmation) {
+    return (
+      <>
+        <section className="guest-install-confirmation-card">
+          <div className="guest-install-confirmation-card__identity">
+            <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={46} />
+            <div className="guest-install-confirmation-card__copy">
+              <div className="guest-install-confirmation-card__title">{title}</div>
+              <div className="guest-install-confirmation-card__subtitle">{subtitle}</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handlePrimary}
+            className="guest-install-confirmation-card__button"
+          >
+            <Smartphone size={17} /> Add to Home Screen
+          </button>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="guest-install-confirmation-card__later"
+          >
+            Maybe later
+          </button>
+        </section>
         {installCoach}
       </>
     );
