@@ -10261,7 +10261,7 @@ function productionLaunchReadiness() {
         item('backend-url', 'Public backend URL', /^https:\/\//i.test(backendUrl), 'Set BACKEND_URL to the public https Render origin.'),
         item('vercel-domains', 'Automatic property domains', present('VERCEL_TOKEN') && present('VERCEL_PROJECT_ID'), 'Set VERCEL_TOKEN and VERCEL_PROJECT_ID.'),
         item('image-storage', 'Durable property image storage', ['R2_ENDPOINT', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL'].every(name => present(name)), 'Set all R2 storage values; Render disk is not durable.'),
-        item('email', 'Owner and guest email delivery', present('BREVO_SMTP_LOGIN') && present('BREVO_SMTP_KEY'), 'Set BREVO_SMTP_LOGIN and BREVO_SMTP_KEY.'),
+        item('email', 'Owner and guest email delivery', present('BREVO_SMTP_HOST') && present('BREVO_SMTP_LOGIN') && (present('BREVO_SMTP_KEY') || present('BREVO_SMTP')), 'Set BREVO_SMTP_HOST, BREVO_SMTP_LOGIN, and BREVO_SMTP_KEY (or the supported BREVO_SMTP alias).'),
         item('guest-web-push', 'Guest app push notifications', present('VAPID_PUBLIC_KEY') && present('VAPID_PRIVATE_KEY'), 'Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.'),
         item('ios-push', 'Front Desk native push notifications', ['APNS_TEAM_ID', 'APNS_KEY_ID', 'APNS_PRIVATE_KEY'].every(name => present(name)) && clean('APNS_BUNDLE_ID') === 'com.bookmarketel.frontdesk', 'Set APNs team, key, private key, and the exact bundle ID.'),
         item('assistant-sms', 'Front Desk Assistant SMS', present('TWILIO_ACCOUNT_SID') && present('TWILIO_AUTH_TOKEN') && twilioSenderReady && clean('TWILIO_VALIDATE_SIGNATURES') === 'true', 'Set Twilio credentials/sender and keep signature validation true.'),
