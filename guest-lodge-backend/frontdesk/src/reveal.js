@@ -377,6 +377,9 @@ function handleBookingPreviewMessage(event) {
       highlightTarget = 'room-photo';
     } else if (kind === 'room') {
       highlightTarget = 'room';
+    } else if (kind === 'checkout-policy') {
+      highlightTarget = 'checkout-policy';
+      activeBookingChallenge.modal.dataset.editorPreviewTarget = 'checkout';
     }
     activeBookingChallenge.modal.dataset.editorHighlight = highlightTarget;
     if (event.data?.roomId) {
@@ -846,13 +849,19 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
       const guestUrl = new URL(bookingUrl());
       if (modal.dataset.editorSaved === '1') {
         guestUrl.searchParams.set('previewRefresh', String(Date.now()));
-        guestUrl.searchParams.set('previewHighlight', modal.dataset.editorHighlight || 'header');
-        if (modal.dataset.editorHighlightRoom) {
+        const checkoutPreview = modal.dataset.editorPreviewTarget === 'checkout';
+        guestUrl.searchParams.set('previewHighlight', checkoutPreview
+          ? 'checkout-policy'
+          : (modal.dataset.editorHighlight || 'header'));
+        if (checkoutPreview) {
+          guestUrl.searchParams.set('previewCheckout', '1');
+        } else if (modal.dataset.editorHighlightRoom) {
           guestUrl.searchParams.set('previewHighlightRoom', modal.dataset.editorHighlightRoom);
         }
         delete modal.dataset.editorSaved;
         delete modal.dataset.editorHighlight;
         delete modal.dataset.editorHighlightRoom;
+        delete modal.dataset.editorPreviewTarget;
       }
       iframe.src = guestUrl.toString();
     }

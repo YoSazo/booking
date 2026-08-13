@@ -131,6 +131,8 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
     const CARD_DECLINE_MODAL_DELAY_MS = 800; // Let user see inline error briefly before modal
 
     const previewCheckoutSignalSent = useRef(false);
+    const highlightCheckoutPolicy = isPreviewMode
+      && new URLSearchParams(window.location.search).get('previewHighlight') === 'checkout-policy';
 
     // Payment is the actual finish line for the owner's booking-speed
     // challenge. Entering guest information alone does not count as checkout.
@@ -1387,7 +1389,7 @@ const handlePayLaterBooking = async (e) => {
                 </button>
                 
                 {hotel.cancellationPolicy && (
-                <div className="static-banner">
+                <div className={`static-banner ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
                     {hotel.cancellationPolicy}
                 </div>
                 )}

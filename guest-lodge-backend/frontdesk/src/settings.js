@@ -419,8 +419,26 @@ function openPreviewSite(options = {}) {
   else window.open(url.toString(), '_blank', 'noopener');
 }
 
+function openCheckoutPreview(options = {}) {
+  const domain = crm.activeHotelDomain || (crm.activeHotelId + '.mktel.co');
+  const isLocal = !isNativeApp()
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const url = new URL(isLocal ? 'http://localhost:5173/' : 'https://' + domain + '/');
+  if (isLocal) url.searchParams.set('hotelId', crm.activeHotelId);
+  url.searchParams.set('preview', '1');
+  url.searchParams.set('previewCheckout', '1');
+  url.searchParams.set('previewHighlight', 'checkout-policy');
+  if (options.refresh) url.searchParams.set('previewRefresh', String(Date.now()));
+  if (typeof window.openInAppBrowser === 'function') window.openInAppBrowser(url.toString());
+  else window.open(url.toString(), '_blank', 'noopener');
+}
+
 function previewSavedVisual(highlight, roomId = '') {
   if (!crm.hotelSubscribed || isEmbeddedEditorPreview()) return;
+  if (highlight === 'checkout-policy') {
+    openCheckoutPreview({ refresh: true });
+    return;
+  }
   openPreviewSite({ highlight, roomId, refresh: true });
 }
 
@@ -845,6 +863,7 @@ async function loadEditRooms() {
       subtitle: normalizedPreviewValue(hotelSubtitle),
       address: normalizedPreviewValue(hotelAddress),
       phone: normalizedPreviewValue(hotelPhone),
+      cancellationPolicy: normalizedPreviewValue(hotelRes?.cancellationPolicy),
     };
     const hotelAppIcon = hotelRes?.appIconUrl || '';
     // Sync the home-screen icon/title with the freshest values from verify.
@@ -930,7 +949,7 @@ async function loadEditRooms() {
             </div>
           </div>
           <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
-          <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">Save Banner</button>
+          <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">${embeddedPreview || crm.hotelSubscribed ? 'Save &amp; see changes' : 'Save Banner'}</button>
         </div>
       </div>
       <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
@@ -1263,16 +1282,23 @@ async function saveHotelInfo(source = 'header') {
   const changedFields = Object.keys(nextHeader).filter((field) => (
     normalizedPreviewValue(nextHeader[field]) !== normalizedPreviewValue(embeddedHeaderSnapshot?.[field])
   ));
+  const policyChanged = normalizedPreviewValue(cancellationPolicy)
+    !== normalizedPreviewValue(embeddedHeaderSnapshot?.cancellationPolicy);
   try {
     await api('POST', '/api/crm/hotel-info', { name, subtitle, address, phone, cancellationPolicy });
     if (name) crm.activeHotelName = name;
-    toast('Property info saved!', 'success');
-    embeddedHeaderSnapshot = Object.fromEntries(
-      Object.entries(nextHeader).map(([field, value]) => [field, normalizedPreviewValue(value)])
-    );
-    notifyEmbeddedEditorSaved('header', {
+    toast(source === 'policy' ? 'Checkout banner saved!' : 'Property info saved!', 'success');
+    embeddedHeaderSnapshot = {
+      ...Object.fromEntries(
+        Object.entries(nextHeader).map(([field, value]) => [field, normalizedPreviewValue(value)])
+      ),
+      cancellationPolicy: normalizedPreviewValue(cancellationPolicy),
+    };
+    notifyEmbeddedEditorSaved(source === 'policy' ? 'checkout-policy' : 'header', {
       hotelName: name || '',
-      changedFields: changedFields.length ? changedFields : ['header'],
+      changedFields: source === 'policy'
+        ? (policyChanged ? ['cancellationPolicy'] : ['checkout-policy'])
+        : (changedFields.length ? changedFields : ['header']),
     });
     if (source === 'header') {
       const exactHeaderTargets = new Set(['name', 'subtitle', 'address', 'phone']);
@@ -1280,6 +1306,8 @@ async function saveHotelInfo(source = 'header') {
         ? `header-${changedFields[0]}`
         : 'header';
       previewSavedVisual(highlight);
+    } else if (source === 'policy') {
+      previewSavedVisual('checkout-policy');
     }
   } catch (e) {
     toast('Failed to save', 'error');

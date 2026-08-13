@@ -375,6 +375,68 @@ function App() {
   const [guestInfo, setGuestInfo] = useState(() => readSessionJson('guestInfo'));
   const [reservationCode, setReservationCode] = useState(() => readSessionValue('reservationCode'));
   const [clientSecret, setClientSecret] = useState(() => readSessionValue('clientSecret'));
+  const checkoutPreviewBootstrapped = useRef(false);
+
+  // A Front Desk owner can jump straight from the editable checkout-banner
+  // preview into a complete, non-transactional checkout. Seed one local room
+  // night so GuestInfoPage has the same state it would receive from the normal
+  // booking flow; preview mode keeps Stripe, bookings, and guest analytics off.
+  useEffect(() => {
+    if (checkoutPreviewBootstrapped.current || hotelLoading || location.pathname !== '/') return;
+    const params = new URLSearchParams(location.search);
+    if (!ownerPreview || params.get('previewCheckout') !== '1') return;
+    const room = currentHotel?.rooms?.[0];
+    if (!room) return;
+
+    checkoutPreviewBootstrapped.current = true;
+    const checkin = new Date();
+    checkin.setHours(12, 0, 0, 0);
+    checkin.setDate(checkin.getDate() + 1);
+    const checkout = new Date(checkin);
+    checkout.setDate(checkout.getDate() + 1);
+    const previewRoom = { ...room, guests: 1, pets: 0 };
+    const { subtotal, taxes, total } = getBookingTotals(previewRoom, 1, currentHotel.rates || RATES);
+    const previewBooking = {
+      ...previewRoom,
+      checkin,
+      checkout,
+      nights: 1,
+      subtotal,
+      taxes,
+      total,
+      reservationCode: 'PREVIEW',
+    };
+    const previewClientSecret = 'marketel_owner_preview';
+    setCheckinDate(checkin);
+    setCheckoutDate(checkout);
+    setSelectedRoom(previewRoom);
+    setFinalBooking(previewBooking);
+    setClientSecret(previewClientSecret);
+    writeSessionJson('finalBooking', previewBooking);
+    writeSessionValue('clientSecret', previewClientSecret);
+
+    const nextParams = new URLSearchParams({
+      hotelId: currentHotel.id || hotelId,
+      preview: '1',
+      previewCheckout: '1',
+      previewHighlight: 'checkout-policy',
+    });
+    const refresh = params.get('previewRefresh');
+    if (refresh) nextParams.set('previewRefresh', refresh);
+    navigate(`/guest-info?${nextParams.toString()}`, {
+      replace: true,
+      state: {
+        room: { name: previewRoom.name, beds: previewRoom.beds || 'N/A' },
+        totalPrice: total,
+        searchParams: {
+          checkIn: checkin,
+          checkOut: checkout,
+          nights: 1,
+          guests: 1,
+        },
+      },
+    });
+  }, [currentHotel, hotelLoading, location.pathname, location.search, navigate, ownerPreview, RATES]);
 
   useEffect(() => {
     const today = new Date();

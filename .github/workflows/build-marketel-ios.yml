@@ -102,6 +102,6 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               marketel-frontdesk-ios/ios/output/Marketel-Front-Desk.ipa \
               --title "Marketel Front Desk iOS ${GITHUB_REF_NAME#ios-v}" \
-              --notes "Device-testing build of Marketel Front Desk 3.23 with the latest booking-card and property-header refinements, safer rolling-deployment recovery, and a more natural conversational Front Desk Assistant. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
+              --notes "Device-testing build of Marketel Front Desk 3.24 with a complete Save & see changes handoff from the editable checkout banner into a safe live checkout preview. APNs delivery requires a push-enabled Apple profile and the production backend APNs configuration." \
               --prerelease
           fi
