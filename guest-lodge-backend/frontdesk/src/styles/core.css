@@ -3425,6 +3425,64 @@
   background: var(--white);
 }
 
+/* Native chat surfaces manage their own composer. Regular forms instead fit
+   their sheet to the part of WKWebView that remains above the keyboard. */
+body.native-ios.marketel-form-keyboard-open {
+  overscroll-behavior: none;
+}
+body.native-ios .marketel-form-keyboard-surface {
+  top: var(--marketel-form-visible-top, 0px) !important;
+  bottom: auto !important;
+  height: var(--marketel-form-visible-height, 100dvh) !important;
+  min-height: 0 !important;
+  max-height: var(--marketel-form-visible-height, 100dvh) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+body.native-ios .marketel-form-keyboard-surface.login-screen {
+  align-items: center;
+  justify-content: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+body.native-ios .marketel-form-keyboard-surface .native-property-card,
+body.native-ios .marketel-form-keyboard-surface .login-card {
+  max-height: calc(var(--marketel-form-visible-height, 100dvh) - 20px);
+  overscroll-behavior: contain;
+  scroll-padding-block: 18px;
+}
+body.native-ios .rooms-modal-bg.marketel-form-keyboard-surface {
+  align-items: flex-end;
+}
+body.native-ios .marketel-form-keyboard-surface .rooms-modal {
+  max-height: calc(var(--marketel-form-visible-height, 100dvh) - 8px);
+  padding-bottom: 10px;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 76px;
+}
+body.native-ios .marketel-form-keyboard-surface .rooms-modal-row,
+body.native-ios .marketel-form-keyboard-surface .edit-add-room-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  padding-top: 9px;
+  padding-bottom: 2px;
+  background: var(--white);
+  box-shadow: 0 -10px 16px rgba(255, 255, 255, .92);
+}
+body.native-ios .edit-add-room-modal.marketel-form-keyboard-surface {
+  align-items: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
+  max-height: calc(var(--marketel-form-visible-height, 100dvh) - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 70px;
+}
+
 /* Shared full-screen modal behavior. Native UIKit chrome is hidden while
    these surfaces are open, so controls never land behind the tab bar. */
 .edit-add-room-modal {

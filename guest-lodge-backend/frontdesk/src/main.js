@@ -5,7 +5,10 @@ import '@fontsource/dm-sans/700.css';
 import '@fontsource/dm-mono/400.css';
 import '@fontsource/dm-mono/500.css';
 import './styles/core.css';
+import { bindFormKeyboardViewport } from './formKeyboard.js';
 import './core.js';
+
+bindFormKeyboardViewport();
 
 // The HTML boot guard uses this signal to distinguish a slow property lookup
 // from a JavaScript bundle that failed during a rolling deployment.
