@@ -109,10 +109,11 @@ export default function GuestMessagesPage({ hotel }) {
     };
   }, [guestStay?.code, refreshStayState, waitingForRequestedStay]);
 
-  // Treat the visible iOS viewport as the chat window. Safari may move the
-  // visual viewport when its keyboard opens; anchoring the shell to that
-  // viewport keeps the header and thread visually stationary while the
-  // composer alone follows the new bottom edge.
+  // Resize the chat to the visible iOS viewport while keeping its top edge
+  // fixed. Safari reports several temporary offsetTop values while it pans a
+  // focused field into view; applying those values to the entire page makes
+  // the header and thread bounce. Height is the only keyboard measurement the
+  // shell needs—the composer already sits on the shell's bottom edge.
   useEffect(() => {
     const page = pageRef.current;
     if (!page) return undefined;
@@ -132,12 +133,13 @@ export default function GuestMessagesPage({ hotel }) {
 
     const updateViewport = () => {
       frame = 0;
-      const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
       const height = Math.max(1, Math.round(viewport?.height || window.innerHeight));
       const inputFocused = document.activeElement === inputRef.current;
       if (!inputFocused) fullViewportHeight = Math.max(fullViewportHeight, height);
-      const keyboardVisible = inputFocused || height < fullViewportHeight - 80;
-      page.style.setProperty('--guest-message-viewport-top', `${top}px`);
+      // Focus arrives before the keyboard has moved a single pixel. Waiting
+      // for a real viewport reduction prevents the composer/chips from
+      // jumping ahead of the native keyboard animation.
+      const keyboardVisible = height < fullViewportHeight - 80;
       page.style.setProperty('--guest-message-viewport-height', `${height}px`);
       page.classList.toggle('has-guest-keyboard', keyboardVisible);
     };
@@ -177,6 +179,8 @@ export default function GuestMessagesPage({ hotel }) {
       document.removeEventListener('focusout', scheduleViewportUpdate);
       viewport?.removeEventListener('resize', scheduleViewportUpdate);
       viewport?.removeEventListener('scroll', scheduleViewportUpdate);
+      page.classList.remove('has-guest-keyboard');
+      page.style.removeProperty('--guest-message-viewport-height');
       html.style.overflow = previousHtmlOverflow;
       body.style.overflow = previousBodyOverflow;
       body.style.overscrollBehavior = previousBodyOverscroll;
@@ -392,7 +396,7 @@ export default function GuestMessagesPage({ hotel }) {
   };
 
   const handleMessagesTouchStart = (event) => {
-    if (!document.documentElement.classList.contains('marketel-keyboard-open')) return;
+    if (!pageRef.current?.classList.contains('has-guest-keyboard')) return;
     touchStartYRef.current = event.touches?.[0]?.clientY ?? null;
   };
 
@@ -730,7 +734,7 @@ const styles = {
     maxWidth: 540,
     margin: '0 auto',
     position: 'fixed',
-    top: 'var(--guest-message-viewport-top, 0px)',
+    top: 0,
     bottom: 'auto',
     left: 0,
     right: 0,
@@ -998,8 +1002,9 @@ const styles = {
     animation: 'guestMsgSpinner 0.8s linear infinite',
   },
 
-  // The page itself tracks the visual viewport, so the composer only needs to
-  // sit at that page's bottom edge. No keyboard height is added a second time.
+  // The page height tracks the visual viewport, so the composer only needs to
+  // sit at that page's bottom edge. It deliberately has no independent bottom
+  // transition—the native keyboard animation is the single source of motion.
   composeBar: {
     position: 'absolute',
     left: '50%',
@@ -1013,7 +1018,6 @@ const styles = {
     background: 'rgba(239,244,240,0.94)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    transition: 'bottom 180ms cubic-bezier(0.22, 1, 0.36, 1)',
   },
   chipsScroll: {
     display: 'flex',
