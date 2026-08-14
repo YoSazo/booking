@@ -61,6 +61,9 @@ export default function GuestMessagesPage({ hotel }) {
   const pageRef = useRef(null);
   const composerRef = useRef(null);
   const touchStartYRef = useRef(null);
+  const fetchInFlightRef = useRef(null);
+  const lastFetchAtRef = useRef(0);
+  const retryFetchAfterRef = useRef(0);
 
   // Treat the visible iOS viewport as the chat window. Safari may move the
   // visual viewport when its keyboard opens; anchoring the shell to that
@@ -76,14 +79,23 @@ export default function GuestMessagesPage({ hotel }) {
     const previousHtmlOverflow = html.style.overflow;
     const previousBodyOverflow = body.style.overflow;
     const previousBodyOverscroll = body.style.overscrollBehavior;
+    let fullViewportHeight = Math.max(
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      viewport?.height || 0
+    );
     let frame = 0;
 
     const updateViewport = () => {
       frame = 0;
       const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
       const height = Math.max(1, Math.round(viewport?.height || window.innerHeight));
+      const inputFocused = document.activeElement === inputRef.current;
+      if (!inputFocused) fullViewportHeight = Math.max(fullViewportHeight, height);
+      const keyboardVisible = inputFocused || height < fullViewportHeight - 80;
       page.style.setProperty('--guest-message-viewport-top', `${top}px`);
       page.style.setProperty('--guest-message-viewport-height', `${height}px`);
+      page.classList.toggle('has-guest-keyboard', keyboardVisible);
     };
 
     const scheduleViewportUpdate = () => {
@@ -108,6 +120,8 @@ export default function GuestMessagesPage({ hotel }) {
     if (composerRef.current) composerObserver?.observe(composerRef.current);
 
     window.addEventListener('resize', scheduleViewportUpdate);
+    document.addEventListener('focusin', scheduleViewportUpdate);
+    document.addEventListener('focusout', scheduleViewportUpdate);
     viewport?.addEventListener('resize', scheduleViewportUpdate);
     viewport?.addEventListener('scroll', scheduleViewportUpdate);
 
@@ -115,6 +129,8 @@ export default function GuestMessagesPage({ hotel }) {
       if (frame) cancelAnimationFrame(frame);
       composerObserver?.disconnect();
       window.removeEventListener('resize', scheduleViewportUpdate);
+      document.removeEventListener('focusin', scheduleViewportUpdate);
+      document.removeEventListener('focusout', scheduleViewportUpdate);
       viewport?.removeEventListener('resize', scheduleViewportUpdate);
       viewport?.removeEventListener('scroll', scheduleViewportUpdate);
       html.style.overflow = previousHtmlOverflow;
@@ -133,34 +149,53 @@ export default function GuestMessagesPage({ hotel }) {
   // Fetch messages
   const fetchMessages = useCallback(async (isInitial = false, omitTemporaryId = '') => {
     if (!guestStay?.code || !hotelId) return;
-    try {
-      const params = new URLSearchParams({
-        hotelId,
-        code: guestStay.code,
-        email: guestStay.email || '',
-      });
-      const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || 'Could not load messages.');
-      setLoadError('');
-      if (data.success) {
-        setMessages((prev) => {
-          const newMessages = data.messages || [];
-          const pendingMessages = prev.filter((message) => (
-            String(message.id || '').startsWith('temp-') && message.id !== omitTemporaryId
-          ));
-          const mergedMessages = [...newMessages, ...pendingMessages];
-          // Only update if message count or content changed
-          if (JSON.stringify(prev) !== JSON.stringify(mergedMessages)) {
-            return mergedMessages;
-          }
-          return prev;
+    const now = Date.now();
+    if (now < retryFetchAfterRef.current) return;
+    if (!isInitial && now - lastFetchAtRef.current < 5000) return;
+    if (fetchInFlightRef.current) return fetchInFlightRef.current;
+
+    lastFetchAtRef.current = now;
+    const request = (async () => {
+      try {
+        const params = new URLSearchParams({
+          hotelId,
+          code: guestStay.code,
+          email: guestStay.email || '',
         });
+        const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          const retrySeconds = Math.max(1, Number(res.headers.get('Retry-After')) || 15);
+          retryFetchAfterRef.current = Date.now() + (retrySeconds * 1000);
+          if (isInitial) setLoadError('Messages are catching up. Try again in a moment.');
+          return;
+        }
+        if (!res.ok || !data.success) throw new Error(data.message || 'Could not load messages.');
+        retryFetchAfterRef.current = 0;
+        setLoadError('');
+        if (data.success) {
+          setMessages((prev) => {
+            const newMessages = data.messages || [];
+            const pendingMessages = prev.filter((message) => (
+              String(message.id || '').startsWith('temp-') && message.id !== omitTemporaryId
+            ));
+            const mergedMessages = [...newMessages, ...pendingMessages];
+            // Only update if message count or content changed
+            if (JSON.stringify(prev) !== JSON.stringify(mergedMessages)) {
+              return mergedMessages;
+            }
+            return prev;
+          });
+        }
+      } catch (error) {
+        if (isInitial) setLoadError(error.message || 'Could not load messages.');
+      } finally {
+        if (isInitial) setLoading(false);
+        fetchInFlightRef.current = null;
       }
-    } catch (error) {
-      if (isInitial) setLoadError(error.message || 'Could not load messages.');
-    }
-    if (isInitial) setLoading(false);
+    })();
+    fetchInFlightRef.current = request;
+    return request;
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
 
   // Initial load
@@ -179,7 +214,7 @@ export default function GuestMessagesPage({ hotel }) {
     const refreshWhenVisible = () => {
       if (document.visibilityState !== 'hidden') fetchMessages(false);
     };
-    const interval = window.setInterval(refreshWhenVisible, 10000);
+    const interval = window.setInterval(refreshWhenVisible, 25000);
     window.addEventListener('focus', refreshWhenVisible);
     window.addEventListener('pageshow', refreshWhenVisible);
     window.addEventListener('online', refreshWhenVisible);
@@ -512,6 +547,7 @@ export default function GuestMessagesPage({ hotel }) {
           />
           <button
             type="button"
+            onPointerDown={(event) => event.preventDefault()}
             onClick={handleSend}
             disabled={sending || (!messageText.trim() && selectedChips.length === 0)}
             style={{
@@ -538,15 +574,15 @@ const spinnerKeyframes = `
 .guest-messages-page {
   --guest-message-composer-offset: var(--guest-nav-clearance, 0px);
 }
-html.marketel-keyboard-open .guest-message-composer {
+.guest-messages-page.has-guest-keyboard .guest-message-composer {
   bottom: 0 !important;
-  padding-bottom: 8px !important;
+  padding-bottom: 2px !important;
   background: #EFF4F0 !important;
 }
-html.marketel-keyboard-open .guest-messages-page {
+.guest-messages-page.has-guest-keyboard {
   --guest-message-composer-offset: 0px;
 }
-html.marketel-keyboard-open .guest-message-quick-chips {
+.guest-messages-page.has-guest-keyboard .guest-message-quick-chips {
   display: none !important;
 }
 .guest-message-scroll::-webkit-scrollbar {

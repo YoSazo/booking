@@ -93,7 +93,9 @@ export default function GuestLayout({ children }) {
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl, installedApp]);
 
   useEffect(() => {
-    if (!installedApp || !isGuest) return;
+    // The Messages route owns its thread refresh. Running this unread poll at
+    // the same time doubled requests to the same rate-limited endpoint.
+    if (!installedApp || !isGuest || location.pathname.startsWith('/guest/messages')) return;
     fetchUnread();
     const refreshWhenVisible = () => {
       if (document.visibilityState !== 'hidden') fetchUnread();
@@ -118,7 +120,7 @@ export default function GuestLayout({ children }) {
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('marketel:guest-messages-read', clearUnread);
     };
-  }, [installedApp, isGuest, fetchUnread]);
+  }, [installedApp, isGuest, fetchUnread, location.pathname]);
 
   useEffect(() => {
     if (!installedApp || !('serviceWorker' in navigator)) return undefined;
