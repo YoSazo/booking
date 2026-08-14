@@ -84,18 +84,25 @@ function nightlyRate() {
   return revealData.rates?.nightly || 99;
 }
 
-function directBookingValueHtml() {
+// One source for the break-even maths so the reveal's rebooking beat and the
+// activation screen can never quote different numbers.
+function breakEvenEstimate() {
   const rate = Number(revealData.rates?.nightly);
-  if (!Number.isFinite(rate) || rate <= 0) {
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  const commissionPerNight = rate * 0.15;
+  const roomNights = Math.max(1, Math.ceil(199 / commissionPerNight));
+  return { rate, roomNights, savings: commissionPerNight * roomNights };
+}
+
+function directBookingValueHtml() {
+  const estimate = breakEvenEstimate();
+  if (!estimate) {
     return `<div class="mvr-value-bridge is-proof-only">
       <strong>$5,800 booked direct</strong>
       <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
     </div>`;
   }
-  const estimatedCommissionRate = 0.15;
-  const estimatedCommissionPerNight = rate * estimatedCommissionRate;
-  const breakEvenRoomNights = Math.max(1, Math.ceil(199 / estimatedCommissionPerNight));
-  const estimatedSavings = estimatedCommissionPerNight * breakEvenRoomNights;
+  const { rate, roomNights: breakEvenRoomNights, savings: estimatedSavings } = estimate;
   return `<div class="mvr-value-bridge">
     <span>Your potential break-even</span>
     <strong>About ${breakEvenRoomNights} direct room-night${breakEvenRoomNights === 1 ? '' : 's'} could cover a month.</strong>
@@ -512,6 +519,13 @@ function guestAppRevealHtml() {
 // owner is looking at the thing itself instead of an illustration of it.
 function guestAppBeats() {
   const name = esc(propertyName());
+  // The rebooking beat is the money beat, so it carries her own break-even
+  // rather than a generic line — it starts the ROI argument one stage before
+  // the price screen instead of only after it.
+  const estimate = breakEvenEstimate();
+  const rebookBody = estimate
+    ? `One tap back to your rooms. About ${estimate.roomNights} direct room-night${estimate.roomNights === 1 ? '' : 's'} a month covers Marketel.`
+    : 'One tap back to your rooms — a booking you keep instead of renting from an OTA.';
   return [
     {
       title: 'Guests save you right from your booking page.',
@@ -555,7 +569,7 @@ function guestAppBeats() {
     },
     {
       title: 'Next time, they book you direct.',
-      body: 'One tap back to your rooms — a booking you keep instead of renting from an OTA.',
+      body: rebookBody,
       next: 'See how Front Desk protects you',
       event: 'GuestAppRebookViewed',
       proof: {
@@ -614,7 +628,6 @@ function beatStageHtml(stageClass, eyebrow, beats, index) {
       <div class="mvr-eyebrow">${eyebrow}</div>
       <h1 class="mvr-beat-title">${beat.title}</h1>
       <p class="mvr-beat-body">${beat.body}</p>
-      ${beat.proof ? '<span class="mvr-proof-badge">Real Marketel workflow</span>' : ''}
     </div>
     <div class="mvr-beat-stage">
       ${beat.proof ? `<figure class="mvr-beat-proof">

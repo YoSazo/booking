@@ -1128,24 +1128,15 @@
   filter: drop-shadow(0 18px 38px rgba(24, 55, 38, 0.18));
 }
 
-.mvr-proof-badge {
-  justify-self: center;
-  margin-top: 2px;
-  padding: 5px 11px;
-  border: 1px solid #d7e2db;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--mvr-green);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
 
 .mvr-beat-settings {
-  width: min(460px, 100%);
+  width: min(520px, 100%);
+  /* Without this the horizontal padding is added to the 100% and the card
+     overflows the stage on narrow screens. */
+  box-sizing: border-box;
   display: grid;
-  padding: 16px;
+  align-content: center;
+  padding: 30px 24px;
   border: 1px solid #d7e2db;
   border-radius: 25px;
   background: #eff4f0;
@@ -1156,9 +1147,46 @@
   animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* In a beat the rule is the whole screen, not a corner widget: flatten the
+   nested card, stack the two options so each is a full-width target, and scale
+   the type up from the 8–10px it used when it sat inside the old visual. */
 .mvr-beat-settings .mvr-fallback-control {
   margin-top: 0;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
   animation: none;
+}
+
+.mvr-beat-settings .mvr-fallback-control > strong {
+  font-size: 16px;
+}
+
+.mvr-beat-settings .mvr-fallback-options {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.mvr-beat-settings .mvr-fallback-options button {
+  gap: 5px;
+  padding: 22px 20px;
+  border-radius: 16px;
+  border-width: 1.5px;
+}
+
+.mvr-beat-settings .mvr-fallback-options b {
+  font-size: 18px;
+  white-space: normal;
+}
+
+.mvr-beat-settings .mvr-fallback-options span {
+  font-size: 13.5px;
+}
+
+.mvr-beat-settings .mvr-fallback-control > small {
+  font-size: 13px;
+  text-align: center;
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
@@ -1168,8 +1196,8 @@
   grid-template-columns: 1fr;
   grid-template-rows: auto minmax(0, 1fr);
   align-items: stretch;
-  gap: clamp(12px, 2.6vh, 20px);
-  padding: clamp(14px, 3vh, 28px) 0 8px;
+  gap: clamp(10px, 2vh, 16px);
+  padding: clamp(10px, 2.2vh, 22px) 0 6px;
   /* Definite height, not just min-height: the base stage only sets min-height,
      which lets the 1fr row grow to the image's natural size and overflow. */
   height: 100%;
@@ -1179,10 +1207,6 @@
 @media (prefers-reduced-motion: reduce) {
   .mvr-beat-proof,
   .mvr-beat-settings { animation: none; }
-}
-
-.mvr-fallback-control {
-  margin-top: 7px;
 }
 
 .mvr-fallback-control {
