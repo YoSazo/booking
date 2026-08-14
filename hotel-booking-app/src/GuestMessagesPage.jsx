@@ -58,7 +58,70 @@ export default function GuestMessagesPage({ hotel }) {
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const pageRef = useRef(null);
+  const composerRef = useRef(null);
   const touchStartYRef = useRef(null);
+
+  // Treat the visible iOS viewport as the chat window. Safari may move the
+  // visual viewport when its keyboard opens; anchoring the shell to that
+  // viewport keeps the header and thread visually stationary while the
+  // composer alone follows the new bottom edge.
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return undefined;
+
+    const viewport = window.visualViewport;
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+    let frame = 0;
+
+    const updateViewport = () => {
+      frame = 0;
+      const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
+      const height = Math.max(1, Math.round(viewport?.height || window.innerHeight));
+      page.style.setProperty('--guest-message-viewport-top', `${top}px`);
+      page.style.setProperty('--guest-message-viewport-height', `${height}px`);
+    };
+
+    const scheduleViewportUpdate = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(updateViewport);
+    };
+
+    const updateComposerHeight = () => {
+      const height = Math.ceil(composerRef.current?.getBoundingClientRect().height || 0);
+      if (height > 0) page.style.setProperty('--guest-message-composer-height', `${height}px`);
+    };
+
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    updateViewport();
+    updateComposerHeight();
+
+    const composerObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateComposerHeight)
+      : null;
+    if (composerRef.current) composerObserver?.observe(composerRef.current);
+
+    window.addEventListener('resize', scheduleViewportUpdate);
+    viewport?.addEventListener('resize', scheduleViewportUpdate);
+    viewport?.addEventListener('scroll', scheduleViewportUpdate);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      composerObserver?.disconnect();
+      window.removeEventListener('resize', scheduleViewportUpdate);
+      viewport?.removeEventListener('resize', scheduleViewportUpdate);
+      viewport?.removeEventListener('scroll', scheduleViewportUpdate);
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, [guestStay?.code]);
 
   // Scroll only the message list — never scrollIntoView on a position:fixed
   // container, which drags the visual viewport and makes the composer jitter.
@@ -263,7 +326,7 @@ export default function GuestMessagesPage({ hotel }) {
 
   if (!guestStay?.code) {
     return (
-      <div className="guest-messages-page" style={styles.page}>
+      <div ref={pageRef} className="guest-messages-page" style={styles.page}>
         <div style={styles.header}>
           <h1 style={styles.headerTitle}>Messages</h1>
           <p style={styles.headerSubtitle}><span style={styles.headerDot} />Front Desk</p>
@@ -295,7 +358,7 @@ export default function GuestMessagesPage({ hotel }) {
   }
 
   return (
-    <div className="guest-messages-page" style={styles.page}>
+    <div ref={pageRef} className="guest-messages-page" style={styles.page}>
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.headerTitle}>Messages</h1>
@@ -411,7 +474,7 @@ export default function GuestMessagesPage({ hotel }) {
       </div>
 
       {/* Floating compose bar */}
-      <div className="guest-message-composer" style={styles.composeBar}>
+      <div ref={composerRef} className="guest-message-composer" style={styles.composeBar}>
         {/* Quick chips */}
         <div className="guest-message-quick-chips" style={styles.chipsScroll}>
           {QUICK_CHIPS.map((chip) => {
@@ -472,14 +535,22 @@ const spinnerKeyframes = `
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+.guest-messages-page {
+  --guest-message-composer-offset: var(--guest-nav-clearance, 0px);
+}
 html.marketel-keyboard-open .guest-message-composer {
-  bottom: var(--marketel-keyboard-inset, 0px) !important;
+  bottom: 0 !important;
   padding-bottom: 8px !important;
   background: #EFF4F0 !important;
-  transition: none !important;
+}
+html.marketel-keyboard-open .guest-messages-page {
+  --guest-message-composer-offset: 0px;
 }
 html.marketel-keyboard-open .guest-message-quick-chips {
   display: none !important;
+}
+.guest-message-scroll::-webkit-scrollbar {
+  display: none;
 }
 .guest-msg-input:focus {
   border-color: #2E7D5B !important;
@@ -501,16 +572,16 @@ const styles = {
   page: {
     display: 'flex',
     flexDirection: 'column',
-    height: 'auto',
-    maxHeight: 'none',
+    height: 'var(--guest-message-viewport-height, 100dvh)',
+    maxHeight: 'var(--guest-message-viewport-height, 100dvh)',
     background: '#EFF4F0',
     color: '#1A2B22',
     fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',
     position: 'fixed',
-    top: 0,
-    bottom: 0,
+    top: 'var(--guest-message-viewport-top, 0px)',
+    bottom: 'auto',
     left: 0,
     right: 0,
     width: '100%',
@@ -518,6 +589,7 @@ const styles = {
     overflow: 'hidden',
     paddingBottom: 0,
     contain: 'layout',
+    overscrollBehavior: 'none',
   },
 
   // Header
@@ -555,9 +627,11 @@ const styles = {
     flex: 1,
     minHeight: 0,
     overflowY: 'auto',
-    padding: '0 16px calc(104px + var(--guest-nav-clearance, 0px))',
+    boxSizing: 'border-box',
+    padding: '0 16px calc(var(--guest-message-composer-height, 104px) + var(--guest-message-composer-offset, 0px) + 8px)',
     WebkitOverflowScrolling: 'touch',
     overscrollBehaviorY: 'contain',
+    scrollbarWidth: 'none',
   },
   messagesList: {
     display: 'flex',
@@ -739,12 +813,12 @@ const styles = {
     animation: 'guestMsgSpinner 0.8s linear infinite',
   },
 
-  // This is an overlay, not a flex child. Keyboard changes only its bottom
-  // coordinate, so the header and conversation never resize or translate.
+  // The page itself tracks the visual viewport, so the composer only needs to
+  // sit at that page's bottom edge. No keyboard height is added a second time.
   composeBar: {
-    position: 'fixed',
+    position: 'absolute',
     left: '50%',
-    bottom: 'var(--guest-nav-clearance, 0px)',
+    bottom: 'var(--guest-message-composer-offset, var(--guest-nav-clearance, 0px))',
     transform: 'translateX(-50%)',
     width: 'min(540px, 100%)',
     boxSizing: 'border-box',
@@ -754,7 +828,7 @@ const styles = {
     background: 'rgba(239,244,240,0.94)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    transition: 'bottom 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+    transition: 'bottom 180ms cubic-bezier(0.22, 1, 0.36, 1)',
   },
   chipsScroll: {
     display: 'flex',
@@ -790,7 +864,8 @@ const styles = {
     borderRadius: 24,
     border: '1.5px solid #D8E4DC',
     padding: '12px 16px',
-    fontSize: 15,
+    // iOS zooms/pans focused inputs below 16px, moving the entire chat view.
+    fontSize: 16,
     fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     outline: 'none',
     color: '#1A2B22',
