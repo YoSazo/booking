@@ -109,11 +109,11 @@ export default function GuestMessagesPage({ hotel }) {
     };
   }, [guestStay?.code, refreshStayState, waitingForRequestedStay]);
 
-  // Resize the chat to the visible iOS viewport while keeping its top edge
-  // fixed. Safari reports several temporary offsetTop values while it pans a
-  // focused field into view; applying those values to the entire page makes
-  // the header and thread bounce. Height is the only keyboard measurement the
-  // shell needs—the composer already sits on the shell's bottom edge.
+  // Match the chat to the visible iOS viewport. Safari pans that viewport when
+  // focusing an input, even when the document itself is not scrollable. The
+  // offset is compensated with a compositor transform (rather than `top`,
+  // which relays out the whole page on every keyboard frame), while height
+  // keeps the composer docked to the keyboard's visible edge.
   useEffect(() => {
     const page = pageRef.current;
     if (!page) return undefined;
@@ -130,9 +130,11 @@ export default function GuestMessagesPage({ hotel }) {
       viewport?.height || 0
     );
     let frame = 0;
+    let settleTimer = 0;
 
     const updateViewport = () => {
       frame = 0;
+      const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
       const height = Math.max(1, Math.round(viewport?.height || window.innerHeight));
       const inputFocused = document.activeElement === inputRef.current;
       if (!inputFocused) fullViewportHeight = Math.max(fullViewportHeight, height);
@@ -140,6 +142,7 @@ export default function GuestMessagesPage({ hotel }) {
       // for a real viewport reduction prevents the composer/chips from
       // jumping ahead of the native keyboard animation.
       const keyboardVisible = height < fullViewportHeight - 80;
+      page.style.setProperty('--guest-message-viewport-offset', `${top}px`);
       page.style.setProperty('--guest-message-viewport-height', `${height}px`);
       page.classList.toggle('has-guest-keyboard', keyboardVisible);
     };
@@ -147,6 +150,15 @@ export default function GuestMessagesPage({ hotel }) {
     const scheduleViewportUpdate = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(updateViewport);
+      // WebKit can expose the final offset one beat after its resize/scroll
+      // event. One trailing read prevents a stale gap without animating or
+      // repeatedly moving the document.
+      if (settleTimer) window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        settleTimer = 0;
+        if (frame) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(updateViewport);
+      }, 60);
     };
 
     const updateComposerHeight = () => {
@@ -173,6 +185,7 @@ export default function GuestMessagesPage({ hotel }) {
 
     return () => {
       if (frame) cancelAnimationFrame(frame);
+      if (settleTimer) window.clearTimeout(settleTimer);
       composerObserver?.disconnect();
       window.removeEventListener('resize', scheduleViewportUpdate);
       document.removeEventListener('focusin', scheduleViewportUpdate);
@@ -180,6 +193,7 @@ export default function GuestMessagesPage({ hotel }) {
       viewport?.removeEventListener('resize', scheduleViewportUpdate);
       viewport?.removeEventListener('scroll', scheduleViewportUpdate);
       page.classList.remove('has-guest-keyboard');
+      page.style.removeProperty('--guest-message-viewport-offset');
       page.style.removeProperty('--guest-message-viewport-height');
       html.style.overflow = previousHtmlOverflow;
       body.style.overflow = previousBodyOverflow;
@@ -742,6 +756,8 @@ const styles = {
     boxSizing: 'border-box',
     overflow: 'hidden',
     paddingBottom: 0,
+    transform: 'translate3d(0, var(--guest-message-viewport-offset, 0px), 0)',
+    willChange: 'height, transform',
     contain: 'layout',
     overscrollBehavior: 'none',
   },
