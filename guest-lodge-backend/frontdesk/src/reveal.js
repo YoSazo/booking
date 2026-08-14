@@ -631,7 +631,7 @@ function beatStageHtml(stageClass, eyebrow, beats, index) {
     </div>
     <div class="mvr-beat-stage">
       ${beat.proof ? `<figure class="mvr-beat-proof">
-        <img src="${beat.proof.url}" width="780" height="1531" decoding="async" alt="${esc(beat.proof.alt)}">
+        <img src="${beat.proof.url}" width="780" height="1528" decoding="async" alt="${esc(beat.proof.alt)}">
       </figure>` : `<div class="mvr-beat-settings">${beat.render ? beat.render() : ''}</div>`}
     </div>
   </section>`;
