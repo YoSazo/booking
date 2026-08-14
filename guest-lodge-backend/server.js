@@ -2356,6 +2356,12 @@ const guestMessagesFetchRateLimit = createRouteRateLimiter('guest-messages-fetch
     scope: (req) => req.query?.code,
 });
 const guestMessagesFetchGlobalRateLimit = createRouteRateLimiter('guest-messages-fetch-global', { windowMs: 60 * 1000, max: 240 });
+const guestUnreadSyncRateLimit = createRouteRateLimiter('guest-unread-sync', {
+    windowMs: 5 * 60 * 1000,
+    max: 30,
+    scope: (req) => req.body?.hotelId,
+});
+const guestUnreadSyncGlobalRateLimit = createRouteRateLimiter('guest-unread-sync-global', { windowMs: 5 * 60 * 1000, max: 300 });
 const guestPushSubscribeRateLimit = createRouteRateLimiter('guest-push-subscribe', {
     windowMs: 5 * 60 * 1000,
     max: 8,
@@ -2363,6 +2369,12 @@ const guestPushSubscribeRateLimit = createRouteRateLimiter('guest-push-subscribe
 });
 const guestPushSubscribeGlobalRateLimit = createRouteRateLimiter('guest-push-subscribe-global', { windowMs: 5 * 60 * 1000, max: 60 });
 const guestBookingLookupRateLimit = createRouteRateLimiter('guest-booking-lookup', { windowMs: 5 * 60 * 1000, max: 60 });
+const guestBookingSyncRateLimit = createRouteRateLimiter('guest-booking-sync', {
+    windowMs: 5 * 60 * 1000,
+    max: 40,
+    scope: (req) => req.body?.hotelId,
+});
+const guestBookingSyncGlobalRateLimit = createRouteRateLimiter('guest-booking-sync-global', { windowMs: 5 * 60 * 1000, max: 300 });
 
 function guestBookingThreadCode(booking, fallback = '') {
     return String(booking?.ourReservationCode || booking?.pmsConfirmationCode || fallback || '').trim();
@@ -2392,6 +2404,68 @@ async function findGuestBooking(hotelId, reservationCode, select) {
         },
         ...(select ? { select } : {}),
     });
+}
+
+function guestBookingPayload(booking, suppliedCode = '') {
+    return {
+        reservationCode: guestBookingThreadCode(booking, suppliedCode),
+        confirmationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
+        guestFirstName: booking.guestFirstName,
+        guestLastName: booking.guestLastName,
+        guestEmail: booking.guestEmail,
+        guestPhone: booking.guestPhone,
+        roomName: booking.roomName,
+        checkin: booking.checkinDate,
+        checkout: booking.checkoutDate,
+        nights: booking.nights,
+        total: booking.grandTotal,
+        amountPaidNow: booking.amountPaidNow,
+        status: booking.status,
+        bookingType: booking.bookingType,
+        holdStatus: booking.holdStatus,
+        pendingUntil: booking.pendingUntil,
+        approvalNoResponseAction: booking.approvalNoResponseAction,
+        approvalOutcome: booking.approvalOutcome,
+        cancelledAt: booking.cancelledAt,
+        cancellationReason: booking.cancellationReason,
+        fulfillmentStatus: booking.fulfillmentStatus,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+    };
+}
+
+function absolutePublicAssetUrl(req, value) {
+    const clean = String(value || '').trim();
+    if (!clean) return '';
+    if (/^https?:\/\//i.test(clean)) return clean;
+    return `${req.protocol}://${req.get('host')}${clean.startsWith('/') ? '' : '/'}${clean}`;
+}
+
+async function guestHotelPayload(hotelId, req) {
+    const hotel = await prisma.hotelConfig.findUnique({
+        where: { id: hotelId },
+        select: {
+            name: true,
+            subtitle: true,
+            address: true,
+            phone: true,
+            appIconUrl: true,
+            checkInTime: true,
+            checkOutTime: true,
+            cancellationPolicy: true,
+        },
+    }).catch(() => null);
+    if (!hotel) return null;
+    return {
+        name: hotel.name || '',
+        subtitle: hotel.subtitle || '',
+        address: hotel.address || '',
+        phone: hotel.phone || '',
+        appIconUrl: absolutePublicAssetUrl(req, hotel.appIconUrl),
+        checkInTime: hotel.checkInTime || '',
+        checkOutTime: hotel.checkOutTime || '',
+        cancellationPolicy: hotel.cancellationPolicy || '',
+    };
 }
 
 const EXTERNAL_PMS_RECONCILIATION_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
@@ -3147,6 +3221,7 @@ app.post('/api/guest-message', guestMessageGlobalRateLimit, guestMessageRateLimi
 // PUBLIC: guest fetches their conversation thread for a reservation.
 app.get('/api/guest-messages', guestMessagesFetchGlobalRateLimit, guestMessagesFetchRateLimit, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const { hotelId, code, email } = req.query;
         if (!hotelId || !code) return res.status(400).json({ success: false, message: 'Missing hotelId or code.' });
 
@@ -3196,6 +3271,72 @@ app.get('/api/guest-messages', guestMessagesFetchGlobalRateLimit, guestMessagesF
     }
 });
 
+// PUBLIC: one lightweight unread query for every stay in an installed guest
+// app. Returning counts only avoids downloading every conversation every 15s,
+// which previously became noisy and rate-limit-prone for repeat guests.
+app.post('/api/guest-messages/unread', guestUnreadSyncGlobalRateLimit, guestUnreadSyncRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const hotelId = String(req.body?.hotelId || '').trim();
+        const requested = (Array.isArray(req.body?.stays) ? req.body.stays : [])
+            .slice(0, 12)
+            .map((stay) => ({
+                code: String(stay?.code || '').trim().slice(0, 160),
+                email: String(stay?.email || '').trim().slice(0, 200),
+            }))
+            .filter((stay) => stay.code);
+        if (!hotelId || !requested.length) {
+            return res.status(400).json({ success: false, message: 'Reservation details are required.' });
+        }
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status || 404).json({ success: false, message: 'Property not found.' });
+        }
+        const codes = [...new Set(requested.map((stay) => stay.code))];
+        const bookings = await prisma.booking.findMany({
+            where: {
+                hotelId: validation.hotelId,
+                OR: [
+                    { ourReservationCode: { in: codes } },
+                    { pmsConfirmationCode: { in: codes } },
+                ],
+            },
+        });
+        const verified = requested.map((request) => {
+            const booking = bookings.find((row) => (
+                row.ourReservationCode === request.code || row.pmsConfirmationCode === request.code
+            ));
+            if (!booking || !guestEmailMatches(booking, request.email)) return null;
+            return { request, threadCodes: guestBookingThreadCodes(booking, request.code) };
+        }).filter(Boolean);
+        const allThreadCodes = [...new Set(verified.flatMap((entry) => entry.threadCodes))];
+        const unreadRows = allThreadCodes.length
+            ? await prisma.guestMessage.findMany({
+                where: {
+                    hotelId: validation.hotelId,
+                    reservationCode: { in: allThreadCodes },
+                    sender: 'hotel',
+                    guestReadAt: null,
+                },
+                select: { reservationCode: true },
+            })
+            : [];
+        const counts = verified.map((entry) => ({
+            code: entry.request.code,
+            unread: unreadRows.filter((row) => entry.threadCodes.includes(row.reservationCode)).length,
+        }));
+        return res.json({
+            success: true,
+            total: counts.reduce((sum, entry) => sum + entry.unread, 0),
+            counts,
+        });
+    } catch (error) {
+        console.error('POST /api/guest-messages/unread error:', error.message);
+        return res.status(500).json({ success: false, message: 'Could not refresh unread messages.' });
+    }
+});
+
 // PUBLIC: a guest opening the conversation marks only Front Desk replies read.
 // Owner unread state remains independent in GuestMessage.readAt.
 app.post('/api/guest-messages/read', guestMessagesReadGlobalRateLimit, guestMessagesReadRateLimit, async (req, res) => {
@@ -3235,6 +3376,7 @@ app.post('/api/guest-messages/read', guestMessagesReadGlobalRateLimit, guestMess
 // adds a second factor for the manual "find my reservation" form.
 app.get('/api/booking/lookup', guestBookingLookupRateLimit, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const hotelId = req.query.hotelId;
         const code = String(req.query.code || '').trim();
         const email = String(req.query.email || '').trim();
@@ -3260,28 +3402,75 @@ app.get('/api/booking/lookup', guestBookingLookupRateLimit, async (req, res) => 
         if (!booking) return notFound();
         if (email && String(booking.guestEmail || '').toLowerCase() !== email.toLowerCase()) return notFound();
 
+        const hotel = await guestHotelPayload(resolvedHotelId, req);
         res.json({
             success: true,
-            booking: {
-                reservationCode: guestBookingThreadCode(booking, code),
-                confirmationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
-                guestFirstName: booking.guestFirstName,
-                guestLastName: booking.guestLastName,
-                guestEmail: booking.guestEmail,
-                guestPhone: booking.guestPhone,
-                roomName: booking.roomName,
-                checkin: booking.checkinDate,
-                checkout: booking.checkoutDate,
-                nights: booking.nights,
-                total: booking.grandTotal,
-                status: booking.status,
-                bookingType: booking.bookingType,
-                createdAt: booking.createdAt,
-            },
+            booking: guestBookingPayload(booking, code),
+            hotel,
+            serverTime: new Date().toISOString(),
         });
     } catch (e) {
         console.error('booking lookup error:', e.message);
         res.status(500).json({ success: false, message: 'Lookup failed. Please try again.' });
+    }
+});
+
+// PUBLIC: refresh every reservation connected to one guest PWA in a single
+// request. This keeps Front Desk decisions, cancellation reasons and property
+// details coherent without multiplying polling traffic for repeat guests.
+app.post('/api/booking/stays', guestBookingSyncGlobalRateLimit, guestBookingSyncRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const hotelId = String(req.body?.hotelId || '').trim();
+        const requested = (Array.isArray(req.body?.stays) ? req.body.stays : [])
+            .slice(0, 12)
+            .map((stay) => ({
+                code: String(stay?.code || '').trim().slice(0, 160),
+                email: String(stay?.email || '').trim().slice(0, 200),
+            }))
+            .filter((stay) => stay.code);
+        if (!hotelId || !requested.length) {
+            return res.status(400).json({ success: false, message: 'Property and reservation details are required.' });
+        }
+
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status || 400).json({ success: false, message: validation.message });
+        }
+        const resolvedHotelId = validation.hotelId;
+        const codes = [...new Set(requested.map((stay) => stay.code))];
+        const rows = await prisma.booking.findMany({
+            where: {
+                hotelId: resolvedHotelId,
+                OR: [
+                    { ourReservationCode: { in: codes } },
+                    { pmsConfirmationCode: { in: codes } },
+                ],
+            },
+        });
+
+        const bookings = [];
+        requested.forEach((request) => {
+            const booking = rows.find((row) => (
+                row.ourReservationCode === request.code || row.pmsConfirmationCode === request.code
+            ));
+            if (!booking || !guestEmailMatches(booking, request.email)) return;
+            bookings.push({
+                ...guestBookingPayload(booking, request.code),
+                requestedCode: request.code,
+            });
+        });
+
+        const hotel = await guestHotelPayload(resolvedHotelId, req);
+        return res.json({
+            success: true,
+            bookings,
+            hotel,
+            serverTime: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('booking stays sync error:', error.message);
+        return res.status(500).json({ success: false, message: 'Your stays could not refresh. Please try again.' });
     }
 });
 
@@ -7776,6 +7965,46 @@ async function notifyBookingApprovalResolved(booking, outcome, source = 'owner')
     }
 }
 
+// Guest-side counterpart to the owner alert. Front Desk is the source of
+// truth, so every material reservation transition should reach an installed
+// guest app immediately as well as through email and foreground polling.
+async function notifyGuestBookingStateChanged(booking, status, reason = '') {
+    if (!booking?.hotelId || !booking?.id) return { sent: 0, failed: 0, cleaned: 0 };
+    const normalized = String(status || booking.status || '').trim().toLowerCase();
+    const code = guestBookingThreadCode(booking);
+    const stay = formatApprovalStayRange(booking.checkinDate, booking.checkoutDate);
+    const room = booking.roomName || 'Your room';
+    let title = 'Your reservation was updated';
+    let body = `${room}${stay ? ` · ${stay}` : ''}`;
+    if (normalized === 'confirmed') {
+        title = 'Your reservation is confirmed ✓';
+        body = `${room}${stay ? ` · ${stay}` : ''} is confirmed.`;
+    } else if (normalized === 'released') {
+        title = 'Your room request was released';
+        body = `The property could not confirm ${room}${stay ? ` for ${stay}` : ''}. Your temporary card hold is being released.`;
+    } else if (normalized === 'cancelled' || normalized === 'canceled') {
+        title = 'Your reservation was cancelled';
+        body = reason
+            ? `${room}${stay ? ` · ${stay}` : ''}: ${String(reason).trim().slice(0, 120)}`
+            : `${room}${stay ? ` · ${stay}` : ''} was cancelled by the property. Tap for details or to contact Front Desk.`;
+    }
+    return sendPushToGuests(booking.hotelId, {
+        title,
+        body,
+        url: `/guest/home?stay=${encodeURIComponent(code)}`,
+        icon: `/api/hotel/${encodeURIComponent(booking.hotelId)}/guest-app-icon.png?s=192`,
+        badge: '/icon-192.png',
+        tag: `guest-booking-${booking.id}`,
+        requireInteraction: normalized === 'released' || normalized === 'cancelled' || normalized === 'canceled',
+        data: {
+            type: 'guest_booking_status',
+            hotelId: booking.hotelId,
+            reservationCode: code,
+            status: normalized,
+        },
+    }, { TTL: 24 * 60 * 60, urgency: 'high' }, 'guestBookingStatus', guestBookingThreadCodes(booking, code));
+}
+
 // Release an uncaptured authorization or refund a captured payment when the
 // owner turns a confirmed booking away. Idempotency protects repeat taps.
 async function voidBookingHold(booking) {
@@ -7999,6 +8228,7 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
         }));
 
     notifyBookingApprovalResolved(decided, outcome, source).catch(() => {});
+    notifyGuestBookingStateChanged(decided, decided.status).catch(() => {});
     console.log(`✅ [approval] ${outcome} booking=${decided.id} hotel=${decided.hotelId} via=${source}`);
 
     return {
@@ -8279,6 +8509,8 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
     const cancelled = {
         ...booking,
         status: 'cancelled',
+        cancelledAt: new Date(),
+        cancellationReason: String(reason || '').trim().slice(0, 500) || null,
         ownerReviewStatus: 'cancelled',
         ownerReviewedAt: new Date(),
         ownerReviewNextReminderAt: null,
@@ -8288,6 +8520,7 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
             processed: 0,
             fulfillment: { status: 'pending', lastError: error.message },
         }));
+    notifyGuestBookingStateChanged(cancelled, 'cancelled', cancelled.cancellationReason || '').catch(() => {});
     console.log(`🚫 [cancel] booking=${booking.id} hotel=${hotelId} was=${booking.status} reason=${reason || 'none'}`);
 
     return {
@@ -13557,7 +13790,6 @@ app.patch('/api/crm/payment-declined/:id', crmAuth, async (req, res) => {
     }
 });
 
-// Delete a booking
 // Lightweight unread count for message badges (no message bodies).
 app.get('/api/crm/messages/unread-count', crmAuth, async (req, res) => {
     try {
@@ -13598,18 +13830,31 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
         const threadBookings = bookingIds.length
             ? await withRetry(() => prisma.booking.findMany({
                 where: { hotelId, id: { in: bookingIds } },
-                select: { id: true, ourReservationCode: true, pmsConfirmationCode: true },
+                select: {
+                    id: true,
+                    ourReservationCode: true,
+                    pmsConfirmationCode: true,
+                    status: true,
+                    checkinDate: true,
+                    checkoutDate: true,
+                    cancellationReason: true,
+                },
             }))
             : [];
         const bookingById = new Map(threadBookings.map((booking) => [booking.id, booking]));
         const messages = rows.map((m) => {
+            const threadBooking = bookingById.get(m.bookingId);
             let requests = [];
             try { requests = m.requests ? JSON.parse(m.requests) : []; } catch (_) { requests = []; }
             return {
                 id: m.id,
                 createdAt: m.createdAt,
                 bookingId: m.bookingId,
-                reservationCode: guestBookingThreadCode(bookingById.get(m.bookingId), m.reservationCode),
+                reservationCode: guestBookingThreadCode(threadBooking, m.reservationCode),
+                bookingStatus: threadBooking?.status || '',
+                checkin: threadBooking?.checkinDate || null,
+                checkout: threadBooking?.checkoutDate || null,
+                cancellationReason: threadBooking?.cancellationReason || '',
                 guestName: m.guestName,
                 guestEmail: m.guestEmail,
                 guestPhone: m.guestPhone,
@@ -13700,7 +13945,15 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
             title: 'New message from Front Desk',
             body: body.trim().slice(0, 160),
             url: `/guest/messages?stay=${encodeURIComponent(canonicalCode)}`,
-            icon: '/icon-192.png',
+            icon: `/api/hotel/${encodeURIComponent(hotelId)}/guest-app-icon.png?s=192`,
+            badge: '/icon-192.png',
+            tag: `guest-message-${canonicalCode}`,
+            requireInteraction: false,
+            data: {
+                type: 'guest_message',
+                hotelId,
+                reservationCode: canonicalCode,
+            },
         }, { TTL: 60 * 60 }, 'guestReply', threadCodes).catch((e) => {
             console.error('guest reply push error:', e.message);
         });
@@ -13712,23 +13965,27 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
     }
 });
 
+// Legacy delete route: never erase a real reservation record. Route it through
+// the same cancellation transaction used by the visible Front Desk action so
+// inventory, the card hold, email, guest PWA and revenue history stay aligned.
 app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const bookingMatch = await withRetry(() => prisma.booking.findFirst({
-            where: { id, hotelId },
-            select: { id: true },
-        }));
-        if (!bookingMatch) return res.status(404).json({ success: false, message: 'Booking not found or already deleted.' });
-
-        await withRetry(() => prisma.booking.delete({ where: { id } }));
-        res.json({ success: true });
+        const result = await cancelBookingByOwner(id, hotelId, 'Removed in Front Desk');
+        if (!result.ok && result.code === 'not_found') {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+        return res.json({
+            success: true,
+            status: result.status,
+            code: result.code,
+            fulfillment: result.fulfillment,
+        });
     } catch (e) {
-        console.error('CRM delete error:', e.message);
-        const msg = e.code === 'P2025' ? 'Booking not found or already deleted.' : (e.message || 'Delete failed');
-        res.status(e.code === 'P2025' ? 404 : 500).json({ success: false, message: msg });
+        console.error('CRM legacy delete/cancel error:', e.message);
+        res.status(500).json({ success: false, message: e.message || 'Cancellation failed' });
     }
 });
 

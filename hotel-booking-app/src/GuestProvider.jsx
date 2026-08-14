@@ -3,6 +3,7 @@ import {
   clearGuestStay,
   readGuestStay,
   readGuestStays,
+  mergeGuestStays as mergeStoredGuestStays,
   selectGuestStay as selectStoredGuestStay,
   writeGuestStay,
 } from './guestStayStorage.js';
@@ -92,6 +93,15 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
     return true;
   }, [hotelId]);
 
+  const updateGuestStays = useCallback((updates) => {
+    const scopedUpdates = (Array.isArray(updates) ? updates : [updates])
+      .filter(Boolean)
+      .map((stay) => ({ ...stay, hotelId }));
+    if (!hotelId || !scopedUpdates.length) return;
+    mergeStoredGuestStays(scopedUpdates);
+    syncGuestStay();
+  }, [hotelId, syncGuestStay]);
+
   const clearGuest = useCallback(() => {
     setGuestStayState(null);
     setGuestStaysState([]);
@@ -109,11 +119,12 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
     guestStays,
     setGuestStay,
     selectGuestStay,
+    updateGuestStays,
     clearGuest,
     syncGuestStay,
     apiBaseUrl,
     hotelId,
-  }), [isGuest, isLoading, guestStay, guestStays, setGuestStay, selectGuestStay, clearGuest, syncGuestStay, apiBaseUrl, hotelId]);
+  }), [isGuest, isLoading, guestStay, guestStays, setGuestStay, selectGuestStay, updateGuestStays, clearGuest, syncGuestStay, apiBaseUrl, hotelId]);
 
   return (
     <GuestContext.Provider value={value}>

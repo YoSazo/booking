@@ -10,6 +10,7 @@ import { GuestProvider } from './GuestProvider.jsx';
 import GuestLayout from './GuestLayout.jsx';
 import { isStandalone } from './pwaUtils.js';
 import { readGuestStay } from './guestStayStorage.js';
+import { isDeadBookingStatus } from './guestStayState.js';
 
 // Lazy-load heavy pages so they don't bloat the initial landing page bundle.
 // GuestInfoPage pulls in Stripe + Google Maps — biggest win.
@@ -21,7 +22,6 @@ const ImageLightbox = lazy(() => import('./ImageLightbox.jsx'));
 const GuestHomePage = lazy(() => import('./GuestHomePage.jsx'));
 const GuestMessagesPage = lazy(() => import('./GuestMessagesPage.jsx'));
 const InstallPage = lazy(() => import('./InstallPage.jsx'));
-const GuestCheckInPage = lazy(() => import('./GuestCheckInPage.jsx'));
 
 
 const hotelId = getHotelId();
@@ -248,6 +248,8 @@ function App() {
           rates: data.rates || fallbackHotel.rates,
           rooms: data.rooms || [],
           cancellationPolicy: data.cancellationPolicy || '',
+          checkInTime: data.checkInTime || '',
+          checkOutTime: data.checkOutTime || '',
           subscribed: data.subscribed || false,
           appIconUrl: data.appIconUrl || '',
           reviews: [],
@@ -363,7 +365,18 @@ function App() {
       return;
     }
 
-    const hasActiveStay = !!readGuestStay(hotelId);
+    const storedStay = readGuestStay(hotelId);
+    const checkout = storedStay?.checkout || storedStay?.checkoutDate;
+    const checkoutDate = checkout ? new Date(checkout) : null;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const hasActiveStay = Boolean(
+      storedStay
+      && !isDeadBookingStatus(storedStay.status)
+      && checkoutDate
+      && !Number.isNaN(checkoutDate.getTime())
+      && checkoutDate >= startOfToday
+    );
 
     if (!ownerPreview && (hasActiveStay || isStandalone())) {
       initialRedirectDone.current = true;
@@ -893,11 +906,9 @@ const handleConfirmBooking = async (bookingDetails) => {
               <InstallPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
             </Suspense>
           } />
-          <Route path="/guest/check-in" element={
-            <Suspense fallback={null}>
-              <GuestCheckInPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
-            </Suspense>
-          } />
+          {/* Old confirmation emails and previously installed PWAs may still
+              carry this URL. There is now one canonical stay surface. */}
+          <Route path="/guest/check-in" element={<Navigate to="/guest/home" replace />} />
 
           <Route path="/guest-info" element={
             <Suspense fallback={null}>

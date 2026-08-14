@@ -61,20 +61,17 @@ export default function GuestLayout({ children }) {
   const fetchUnread = useCallback(async () => {
     if (!guestStays.length || !hotelId) return;
     try {
-      const results = await Promise.all(guestStays.map(async (stay) => {
-        const params = new URLSearchParams({
+      const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages/unread`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           hotelId,
-          code: stay.code,
-          email: stay.email || '',
-        });
-        const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) return 0;
-        return (data.messages || []).filter(
-          (message) => message.sender === 'hotel' && !message.guestReadAt
-        ).length;
-      }));
-      const unread = results.reduce((total, count) => total + count, 0);
+          stays: guestStays.map((stay) => ({ code: stay.code, email: stay.email || '' })),
+        }),
+      }, 12000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) return;
+      const unread = Math.max(0, Number(data.total) || 0);
       setUnreadCount(unread);
       if (installedApp && 'setAppBadge' in navigator && unread > 0) {
         navigator.setAppBadge(unread).catch(() => {});
@@ -85,9 +82,10 @@ export default function GuestLayout({ children }) {
   }, [guestStays, hotelId, apiBaseUrl, installedApp]);
 
   useEffect(() => {
-    // The conversation owns refresh while open. Everywhere else this powers
-    // the small unread marker on Your Stay.
-    if (!installedApp || !isGuest || location.pathname.startsWith('/guest/messages')) return;
+    // One lightweight aggregate query keeps both the tab marker and the native
+    // app badge honest across every reservation, including while one thread is
+    // open and messages from another stay arrive.
+    if (!installedApp || !isGuest) return;
     fetchUnread();
     const refreshWhenVisible = () => {
       if (document.visibilityState !== 'hidden') fetchUnread();
@@ -108,7 +106,7 @@ export default function GuestLayout({ children }) {
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('marketel:guest-messages-read', refreshWhenVisible);
     };
-  }, [installedApp, isGuest, fetchUnread, location.pathname]);
+  }, [installedApp, isGuest, fetchUnread]);
 
   useEffect(() => {
     if (!installedApp || !('serviceWorker' in navigator)) return undefined;

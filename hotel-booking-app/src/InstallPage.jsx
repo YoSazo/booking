@@ -16,6 +16,7 @@ import {
 } from './guestInstallUi.jsx';
 import { trackGuestInstall, installTouchpointFromRef } from './guestInstallTracking.js';
 import BookingInstallCoach from './BookingInstallCoach.jsx';
+import { stayStorageSnapshot } from './guestStayState.js';
 
 function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const [searchParams] = useSearchParams();
@@ -92,16 +93,7 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
         const res = await fetch(`${apiBaseUrl}/api/booking/lookup?${params}`);
         const data = await res.json().catch(() => ({}));
         if (!cancelled && res.ok && data.success && data.booking) {
-          const b = data.booking;
-          setGuestStay({
-            code: b.reservationCode,
-            email: b.guestEmail || '',
-            checkin: b.checkin,
-            checkout: b.checkout,
-            roomName: b.roomName || '',
-            name: [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ').trim(),
-            phone: b.guestPhone || '',
-          });
+          setGuestStay(stayStorageSnapshot(data.booking));
         }
       } catch (e) { /* ignore */ }
       if (!cancelled) setLookupDone(true);
@@ -278,8 +270,8 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
         <div style={styles.footer}>
           {ctaBlock}
           {guestStay?.code && (
-            <button type="button" onClick={() => navigate('/guest/check-in')} style={styles.secondaryBtn}>
-              Continue to check-in
+            <button type="button" onClick={() => navigate('/guest/home')} style={styles.secondaryBtn}>
+              Open Your Stay
               <ArrowRight size={16} strokeWidth={2.2} />
             </button>
           )}

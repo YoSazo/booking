@@ -6,8 +6,12 @@ import GuestInstallCard from './GuestInstallCard.jsx';
 import { isStandalone } from './pwaUtils.js';
 import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
+import { getStayStatusMeta, isDeadBookingStatus, stayStorageSnapshot } from './guestStayState.js';
+import useGuestStayDeepLink from './useGuestStayDeepLink.js';
 
-const QUICK_CHIPS = ['Early check-in', 'Late check-out', 'Extra towels', 'Quiet room'];
+const ACTIVE_QUICK_CHIPS = ['Early check-in', 'Late check-out', 'Extra towels', 'Quiet room'];
+const PENDING_QUICK_CHIPS = ['Question about my request', 'Update my request'];
+const CANCELLED_QUICK_CHIPS = ['Question about cancellation', 'Help with my card hold'];
 
 function formatRelativeTime(dateStr) {
   const now = new Date();
@@ -47,13 +51,12 @@ function formatRelativeTime(dateStr) {
 }
 
 export default function GuestMessagesPage({ hotel }) {
-  const { guestStay, guestStays, setGuestStay, selectGuestStay, apiBaseUrl, hotelId } = useGuest();
+  const { guestStay, updateGuestStays, apiBaseUrl, hotelId } = useGuest();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedStayCode = String(searchParams.get('stay') || '').trim();
-  const waitingForRequestedStay = Boolean(
-    requestedStayCode && requestedStayCode !== guestStay?.code
-  );
+  const { resolvingStay, requestedStayError } = useGuestStayDeepLink(requestedStayCode);
+  const waitingForRequestedStay = resolvingStay;
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messageText, setMessageText] = useState('');
@@ -69,45 +72,42 @@ export default function GuestMessagesPage({ hotel }) {
   const fetchInFlightRef = useRef(null);
   const lastFetchAtRef = useRef(0);
   const retryFetchAfterRef = useRef(0);
-  const requestedLookupRef = useRef('');
+  // Messages is a first-class reservation surface, not a disconnected chat.
+  // Keep its cached stay record aligned with Front Desk decisions even when
+  // the guest opens this route directly from a reply notification.
+  const refreshStayState = useCallback(async () => {
+    if (!guestStay?.code || !hotelId) return;
+    try {
+      const params = new URLSearchParams({
+        hotelId,
+        code: guestStay.code,
+        email: guestStay.email || '',
+      });
+      const response = await fetchWithTimeout(`${apiBaseUrl}/api/booking/lookup?${params}`, {}, 12000);
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success && data.booking) {
+        updateGuestStays([stayStorageSnapshot(data.booking, guestStay)]);
+      }
+    } catch (_) { /* cached thread remains usable while temporarily offline */ }
+  }, [apiBaseUrl, guestStay, hotelId, updateGuestStays]);
 
-  // A reply notification carries its reservation thread. Select that stay
-  // before loading the conversation so tapping an older stay's notification
-  // never opens the newest booking by mistake.
   useEffect(() => {
-    if (!requestedStayCode || requestedStayCode === guestStay?.code) return undefined;
-    if (guestStays.some((stay) => stay.code === requestedStayCode)) {
-      selectGuestStay(requestedStayCode);
-      return undefined;
-    }
-
-    // The PWA's storage may have been cleared while its push subscription
-    // remained alive. The signed/random confirmation code in the notification
-    // can safely reconnect that reservation before opening the thread.
-    if (!hotelId || requestedLookupRef.current === requestedStayCode) return undefined;
-    requestedLookupRef.current = requestedStayCode;
-    let cancelled = false;
-    (async () => {
-      try {
-        const params = new URLSearchParams({ hotelId, code: requestedStayCode });
-        const response = await fetchWithTimeout(`${apiBaseUrl}/api/booking/lookup?${params}`, {}, 12000);
-        const data = await response.json().catch(() => ({}));
-        if (!cancelled && response.ok && data.success && data.booking) {
-          const booking = data.booking;
-          setGuestStay({
-            code: booking.reservationCode,
-            email: booking.guestEmail || '',
-            checkin: booking.checkin,
-            checkout: booking.checkout,
-            roomName: booking.roomName || '',
-            name: [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim(),
-            phone: booking.guestPhone || '',
-          });
-        }
-      } catch (_) { /* the normal connect-reservation state remains available */ }
-    })();
-    return () => { cancelled = true; };
-  }, [apiBaseUrl, guestStay?.code, guestStays, hotelId, requestedStayCode, selectGuestStay, setGuestStay]);
+    if (waitingForRequestedStay || !guestStay?.code) return undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshStayState();
+    };
+    refreshStayState();
+    const interval = window.setInterval(refreshWhenVisible, 30000);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('marketel:guest-refresh', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('marketel:guest-refresh', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [guestStay?.code, refreshStayState, waitingForRequestedStay]);
 
   // Treat the visible iOS viewport as the chat window. Safari may move the
   // visual viewport when its keyboard opens; anchoring the shell to that
@@ -307,7 +307,6 @@ export default function GuestMessagesPage({ hotel }) {
         setMessages((previous) => previous.map((message) => (
           message.sender === 'hotel' ? { ...message, guestReadAt: message.guestReadAt || readAt } : message
         )));
-        if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
         window.dispatchEvent(new CustomEvent('marketel:guest-messages-read'));
       } catch (e) { /* ignore */ }
     };
@@ -407,6 +406,14 @@ export default function GuestMessagesPage({ hotel }) {
     }
   };
 
+  const stayMeta = getStayStatusMeta(guestStay);
+  const deadStay = isDeadBookingStatus(guestStay?.status);
+  const quickChips = deadStay
+    ? CANCELLED_QUICK_CHIPS
+    : stayMeta.phase === 'pending'
+      ? PENDING_QUICK_CHIPS
+      : ACTIVE_QUICK_CHIPS;
+
   const messagesHeader = (
     <div style={styles.header}>
       <button
@@ -419,11 +426,41 @@ export default function GuestMessagesPage({ hotel }) {
       </button>
       <div style={styles.headerCopy}>
         <h1 style={styles.headerTitle}>Messages</h1>
-        <p style={styles.headerSubtitle}>Front Desk</p>
+        <p style={styles.headerSubtitle}>
+          {[hotel?.name, guestStay?.roomName].filter(Boolean).join(' · ') || 'Front Desk'}
+        </p>
       </div>
       <span aria-hidden="true" />
     </div>
   );
+
+  if (waitingForRequestedStay) {
+    return (
+      <div ref={pageRef} className="guest-messages-page" style={styles.page}>
+        {messagesHeader}
+        <div style={styles.emptyContainer}>
+          <div style={styles.spinner} />
+          <p style={styles.emptySubtitle}>Opening this Front Desk conversation…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requestedStayError) {
+    return (
+      <div ref={pageRef} className="guest-messages-page" style={styles.page}>
+        {messagesHeader}
+        <div style={styles.emptyContainer}>
+          <div style={styles.emptyIcon}><MessageSquare size={26} color="#A63F3F" /></div>
+          <p style={styles.emptyTitle}>This conversation could not open</p>
+          <p style={styles.emptySubtitle}>{requestedStayError}</p>
+          <button type="button" onClick={() => navigate('/guest/home', { replace: true })} style={styles.lookupButton}>
+            Open Your Stay
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!guestStay?.code) {
     return (
@@ -469,7 +506,18 @@ export default function GuestMessagesPage({ hotel }) {
         onTouchMove={handleMessagesTouchMove}
         onTouchEnd={() => { touchStartYRef.current = null; }}
       >
-        {!isStandalone() && (
+        {stayMeta.phase === 'pending' && (
+          <div style={{ ...styles.stayContext, ...styles.stayContextPending }}>
+            Front Desk is still reviewing this room request. You can ask a question here while it is held.
+          </div>
+        )}
+        {deadStay && (
+          <div style={{ ...styles.stayContext, ...styles.stayContextDead }}>
+            This reservation is {stayMeta.phase === 'released' ? 'released' : 'cancelled'}. This conversation stays open if you need help with the reason, card hold, or another stay.
+          </div>
+        )}
+
+        {!deadStay && !isStandalone() && (
           <div style={{ marginBottom: 8 }}>
             <GuestInstallCard
               hotelName={hotel?.name}
@@ -484,11 +532,13 @@ export default function GuestMessagesPage({ hotel }) {
           </div>
         )}
 
-        <GuestNotificationPrompt
-          apiBaseUrl={apiBaseUrl}
-          hotelId={hotelId}
-          guestStay={guestStay}
-        />
+        {!deadStay && (
+          <GuestNotificationPrompt
+            apiBaseUrl={apiBaseUrl}
+            hotelId={hotelId}
+            guestStay={guestStay}
+          />
+        )}
 
         {loading ? (
           <div style={styles.emptyContainer}>
@@ -507,7 +557,11 @@ export default function GuestMessagesPage({ hotel }) {
             <div style={styles.emptyIcon}><MessageSquare size={26} color="#2E7D5B" /></div>
             <p style={styles.emptyTitle}>No messages yet</p>
             <p style={styles.emptySubtitle}>
-              Send a message to the front desk — they'll respond here.
+              {deadStay
+                ? 'Ask Front Desk about the cancellation, card hold, or finding another stay.'
+                : stayMeta.phase === 'pending'
+                  ? 'Ask Front Desk anything about your room request.'
+                  : 'Send a message to Front Desk — they’ll respond here.'}
             </p>
           </div>
         ) : (
@@ -572,7 +626,7 @@ export default function GuestMessagesPage({ hotel }) {
       <div ref={composerRef} className="guest-message-composer" style={styles.composeBar}>
         {/* Quick chips */}
         <div className="guest-message-quick-chips" style={styles.chipsScroll}>
-          {QUICK_CHIPS.map((chip) => {
+          {quickChips.map((chip) => {
             const active = selectedChips.includes(chip);
             return (
               <button
@@ -750,6 +804,25 @@ const styles = {
     flexDirection: 'column',
     gap: 6,
     paddingTop: 8,
+  },
+  stayContext: {
+    margin: '10px 0 4px',
+    padding: '11px 13px',
+    border: '1px solid #D8E4DC',
+    borderRadius: 13,
+    fontSize: 12,
+    fontWeight: 650,
+    lineHeight: 1.45,
+  },
+  stayContextPending: {
+    borderColor: '#E7D6AD',
+    background: '#FFF8E8',
+    color: '#76591F',
+  },
+  stayContextDead: {
+    borderColor: '#EBCACA',
+    background: '#FFF4F4',
+    color: '#795151',
   },
 
   // Bubble rows

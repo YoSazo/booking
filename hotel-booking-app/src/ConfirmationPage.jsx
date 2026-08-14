@@ -7,6 +7,7 @@ import GuestInstallCard from './GuestInstallCard.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { isStandalone } from './pwaUtils.js';
+import { normalizeBookingStatus } from './guestStayState.js';
 
 const formatDateWithSuffix = (date) => {
   const d = new Date(date);
@@ -154,9 +155,12 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
         roomName: bookingDetails.roomName || bookingDetails.name || '',
         name: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ').trim(),
         phone: guestInfo.phone || '',
+        status: normalizeBookingStatus(liveBookingStatus),
+        pendingUntil: bookingDetails.pendingUntil || null,
+        approvalNoResponseAction: bookingDetails.approvalNoResponseAction || null,
       });
     }
-  }, [reservationCode, bookingDetails, guestInfo, setGuestStay]);
+  }, [reservationCode, bookingDetails, guestInfo, liveBookingStatus, setGuestStay]);
 
   // Keep the held request live in the installed guest app. Owner decisions,
   // SMS replies, and the no-response rule should update this screen without a

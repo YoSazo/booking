@@ -2937,6 +2937,10 @@ function buildMessageThreads() {
         roomName: m.roomName,
         guestPhone: m.guestPhone,
         guestEmail: m.guestEmail,
+        bookingStatus: m.bookingStatus || '',
+        checkin: m.checkin || null,
+        checkout: m.checkout || null,
+        cancellationReason: m.cancellationReason || '',
         msgs: [],
       };
     }
@@ -3013,6 +3017,24 @@ function renderMessageThreadDetail(thread) {
   const hasUnread = thread.msgs.some(m => !m.read && (m.sender || 'guest') === 'guest');
   const phone = normalizePhoneTarget(thread.guestPhone);
   const email = (thread.guestEmail || '').trim();
+  const bookingStatus = String(thread.bookingStatus || '').trim().toLowerCase();
+  const bookingStateClass = ['cancelled', 'canceled', 'released'].includes(bookingStatus)
+    ? 'dead'
+    : bookingStatus === 'pending'
+      ? 'pending'
+      : 'confirmed';
+  const bookingStateLabel = bookingStateClass === 'dead'
+    ? (bookingStatus === 'released' ? 'Released' : 'Cancelled')
+    : bookingStateClass === 'pending'
+      ? 'Awaiting decision'
+      : bookingStatus
+        ? 'Confirmed'
+        : '';
+  const bookingStateNotice = bookingStateClass === 'dead'
+    ? `<div class="message-booking-notice dead">This reservation is ${bookingStatus === 'released' ? 'released' : 'cancelled'}.${thread.cancellationReason ? ` ${esc(thread.cancellationReason)}` : ''}</div>`
+    : bookingStateClass === 'pending'
+      ? '<div class="message-booking-notice pending">This room request is still waiting for a keep or release decision.</div>'
+      : '';
   const contactBtns = [
     phone ? `<a href="tel:${esc(phone)}" class="message-contact-btn primary" aria-label="Call ${esc(thread.guestName || 'guest')}">Call</a>` : '',
     phone ? `<a href="sms:${esc(phone)}" class="message-contact-btn">Text</a>` : '',
@@ -3046,11 +3068,13 @@ function renderMessageThreadDetail(thread) {
           <div class="message-booking-context">
             ${thread.roomName ? esc(thread.roomName) : 'Booking guest'}
             ${thread.code ? `<span>· #${esc(thread.code)}</span>` : ''}
+            ${bookingStateLabel ? `<span class="message-booking-state ${bookingStateClass}">${esc(bookingStateLabel)}</span>` : ''}
           </div>
         </div>
         <div class="message-contact-actions">${contactBtns}</div>
       </div>
       <div class="message-conversation" id="activeMessageConversation">
+        ${bookingStateNotice}
         ${msgBubbles}
       </div>
       ${hasUnread ? '<button type="button" class="message-mark-read" onclick="markActiveMessageThreadRead()">Mark conversation read</button>' : ''}

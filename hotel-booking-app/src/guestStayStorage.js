@@ -2,24 +2,39 @@ const LEGACY_STORAGE_KEY = 'marketel_guest_stay';
 const STAYS_STORAGE_KEY = 'marketel_guest_stays';
 const SELECTED_STORAGE_KEY = 'marketel_guest_stay_selected';
 
+const POST_STAY_RETENTION_DAYS = 90;
+
 function startOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today;
 }
 
-function isUpcomingStay(stay) {
+function shouldRetainStay(stay) {
   if (!stay?.code || !stay?.hotelId || !(stay.checkout || stay.checkoutDate)) return false;
   const checkout = new Date(stay.checkout || stay.checkoutDate);
-  return !Number.isNaN(checkout.getTime()) && checkout >= startOfToday();
+  if (Number.isNaN(checkout.getTime())) return false;
+  const oldestRetainedCheckout = startOfToday();
+  oldestRetainedCheckout.setDate(oldestRetainedCheckout.getDate() - POST_STAY_RETENTION_DAYS);
+  return checkout >= oldestRetainedCheckout;
 }
 
 function sortStays(stays) {
+  const today = startOfToday().getTime();
   return [...stays].sort((left, right) => {
+    const leftCheckout = new Date(left.checkout || left.checkoutDate).getTime();
+    const rightCheckout = new Date(right.checkout || right.checkoutDate).getTime();
+    const leftPast = Number.isFinite(leftCheckout) && leftCheckout < today;
+    const rightPast = Number.isFinite(rightCheckout) && rightCheckout < today;
+    if (leftPast !== rightPast) return leftPast ? 1 : -1;
+
     const leftDate = new Date(left.checkin || left.checkinDate || left.checkout || left.checkoutDate).getTime();
     const rightDate = new Date(right.checkin || right.checkinDate || right.checkout || right.checkoutDate).getTime();
-    return (Number.isNaN(leftDate) ? Number.MAX_SAFE_INTEGER : leftDate)
-      - (Number.isNaN(rightDate) ? Number.MAX_SAFE_INTEGER : rightDate);
+    const safeLeft = Number.isNaN(leftDate) ? Number.MAX_SAFE_INTEGER : leftDate;
+    const safeRight = Number.isNaN(rightDate) ? Number.MAX_SAFE_INTEGER : rightDate;
+    // Upcoming stays read chronologically; completed stays keep the most
+    // recent conversation first instead of burying it below older history.
+    return leftPast ? safeRight - safeLeft : safeLeft - safeRight;
   });
 }
 
@@ -56,7 +71,7 @@ function readAllStays() {
   } catch (_) { /* ignore malformed legacy data */ }
 
   const deduped = new Map();
-  stored.filter(isUpcomingStay).forEach((stay) => {
+  stored.filter(shouldRetainStay).forEach((stay) => {
     deduped.set(`${stay.hotelId}:${stay.code}`, stay);
   });
   return sortStays([...deduped.values()]);
@@ -86,7 +101,7 @@ export function readGuestStay(hotelId) {
 /** Add/update a reservation and make it the currently open stay. */
 export function writeGuestStay(stay) {
   if (!stay) return;
-  if (!isUpcomingStay(stay)) return;
+  if (!shouldRetainStay(stay)) return;
 
   const allStays = readAllStays();
   const matchIndex = allStays.findIndex((existing) => (
@@ -94,13 +109,40 @@ export function writeGuestStay(stay) {
   ));
   if (matchIndex >= 0) allStays[matchIndex] = { ...allStays[matchIndex], ...stay };
   else allStays.push(stay);
-  persistAllStays(sortStays(allStays.filter(isUpcomingStay)));
+  persistAllStays(sortStays(allStays.filter(shouldRetainStay)));
 
   const selected = readSelectedMap();
   selected[stay.hotelId] = stay.code;
   writeSelectedMap(selected);
   try { localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(stay)); }
   catch (_) { /* legacy mirror is best effort */ }
+}
+
+/** Refresh reservation metadata without changing which stay the guest opened. */
+export function mergeGuestStays(stays) {
+  const updates = Array.isArray(stays) ? stays.filter(shouldRetainStay) : [];
+  if (!updates.length) return readAllStays();
+  const allStays = readAllStays();
+  const byKey = new Map(allStays.map((stay) => [`${stay.hotelId}:${stay.code}`, stay]));
+  updates.forEach((stay) => {
+    const key = `${stay.hotelId}:${stay.code}`;
+    byKey.set(key, { ...(byKey.get(key) || {}), ...stay });
+  });
+  const merged = sortStays([...byKey.values()].filter(shouldRetainStay));
+  persistAllStays(merged);
+
+  // Keep the legacy mirror aligned with the selected reservation so older
+  // bundles opened from Safari do not undo fresh status data.
+  const selected = readSelectedMap();
+  const updatedHotelIds = new Set(updates.map((stay) => stay.hotelId));
+  const selectedStay = merged.find((stay) => (
+    updatedHotelIds.has(stay.hotelId) && selected[stay.hotelId] === stay.code
+  ));
+  if (selectedStay) {
+    try { localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(selectedStay)); }
+    catch (_) { /* best effort */ }
+  }
+  return merged;
 }
 
 export function selectGuestStay(hotelId, code) {
