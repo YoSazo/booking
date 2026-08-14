@@ -583,36 +583,79 @@ function guestAppRevealHtml() {
 function assistantRevealHtml() {
   const roomName = firstRoom().name || 'King Suite';
   const releases = assistantNoResponseAction === 'release';
+  const checkin = new Date();
+  checkin.setDate(checkin.getDate() + 1);
+  const checkout = new Date(checkin);
+  checkout.setDate(checkout.getDate() + 1);
+  const dateLabel = (value) => value.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `<section class="mvr-stage mvr-stage-assistant">
     <div class="mvr-copy">
       <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
       <h1>Front Desk checks in before a room conflict becomes a guest problem.</h1>
-      <p>When a direct booking arrives, Front Desk asks whether the room is still available. If a walk-in or another channel took it, reply with what happened. Marketel updates Availability and reduces what remains available on your direct booking page.</p>
+      <p>When a direct booking arrives, Front Desk asks if the room is still free. If a walk-in or another channel took it, reply with what changed. Marketel updates Availability, releases the request and tells the guest.</p>
       <div class="mvr-callout">
         <strong>You stay in control—even when you miss the alert.</strong>
         Choose whether silence keeps the sale or protects availability. You can change the rule anytime.
       </div>
     </div>
     <div class="mvr-visual mvr-assistant-visual">
-      <div class="mvr-booking-alert">
-        <div class="mvr-marketel-avatar">M</div>
-        <div><span>Front Desk</span><strong>New ${esc(roomName)} booking</strong><small>Tomorrow · ${money(nightlyRate())}</small></div>
-        <b>now</b>
-      </div>
-      <div class="mvr-chat">
-        <div class="mvr-bubble mvr-bubble-in" style="--stagger:0">Is ${esc(roomName)} still available tomorrow?</div>
-        <div class="mvr-bubble mvr-bubble-out" style="--stagger:1">No, a walk-in took it.</div>
-        <div class="mvr-bubble mvr-bubble-in success" style="--stagger:2"><strong>Handled.</strong> Tomorrow is blocked, the $1 hold was released and the guest was notified.</div>
-      </div>
-      <div class="mvr-fallback-control">
-        <strong>If nobody answers</strong>
-        <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
-          <button type="button" data-mvr-fallback="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep the booking</b><span>Revenue first</span></button>
-          <button type="button" data-mvr-fallback="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
+      <div class="mvr-fd-header">
+        <div class="mvr-fd-brand">
+          <img src="/marketellogo.svg" alt="">
+          <div><strong>Front Desk</strong><span>${esc(propertyName())}</span></div>
         </div>
-        <small>${releases
-          ? 'Your rule: void the $1 hold and notify the guest if nobody replies.'
-          : 'Your rule: confirm the booking automatically if nobody replies.'}</small>
+        <div class="mvr-fd-live"><i></i> Live</div>
+      </div>
+      <div class="mvr-fd-tabs" aria-label="Front Desk preview">
+        <span>Your page</span>
+        <span class="is-active">Bookings <b>1</b></span>
+        <span>Availability</span>
+        <span>Guest Reach</span>
+      </div>
+      <div class="mvr-fd-workspace">
+        <div class="mvr-fd-page-heading">
+          <div><strong>Bookings</strong><span>One request needs a decision</span></div>
+          <b>1 needs attention</b>
+        </div>
+        <article class="mvr-fd-booking">
+          <div class="mvr-fd-booking-summary">
+            <div class="mvr-fd-booking-main">
+              <div class="mvr-fd-booking-name"><strong>Jordan Lee</strong><b>${money(nightlyRate())}</b></div>
+              <div class="mvr-fd-trip">${esc(roomName)} · ${dateLabel(checkin)} – ${dateLabel(checkout)} · 1 night</div>
+              <div class="mvr-fd-status"><span><i></i> Decision due in 5 min</span><small>$1 hold verified</small></div>
+            </div>
+          </div>
+          <div class="mvr-fd-booking-detail">
+            <div class="mvr-fd-question"><strong>Is this room still free?</strong><span>No reply ${releases ? 'releases this request' : 'keeps this booking'}.</span></div>
+            <div class="mvr-fd-booking-actions" aria-hidden="true">
+              <span>Yes, keep it</span><span>No, release</span>
+            </div>
+          </div>
+        </article>
+
+        <section class="mvr-fd-assistant-activity">
+          <div class="mvr-fd-activity-head">
+            <div><img src="/marketellogo.svg" alt=""><strong>Front Desk Assistant</strong></div>
+            <span>Text conversation</span>
+          </div>
+          <div class="mvr-fd-message mvr-fd-message-in" style="--stagger:0">Is ${esc(roomName)} still free for ${dateLabel(checkin)}?</div>
+          <div class="mvr-fd-message mvr-fd-message-out" style="--stagger:1">No, a walk-in took it.</div>
+          <div class="mvr-fd-handled" style="--stagger:2">
+            <span>✓</span>
+            <div><strong>Handled in Front Desk</strong><small>One fewer room available · guest notified · $1 hold released</small></div>
+          </div>
+        </section>
+
+        <div class="mvr-fallback-control">
+          <strong>If you miss the alert</strong>
+          <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
+            <button type="button" data-mvr-fallback="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep the booking</b><span>Revenue first</span></button>
+            <button type="button" data-mvr-fallback="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
+          </div>
+          <small>${releases
+            ? 'Your rule: void the $1 hold and notify the guest if nobody replies.'
+            : 'Your rule: confirm the booking automatically if nobody replies.'}</small>
+        </div>
       </div>
     </div>
   </section>`;
