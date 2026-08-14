@@ -3,6 +3,7 @@ import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
 import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
 import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
+import ownerEditorProofUrl from './assets/frontdesk-editor.webp';
 import guestInstallBannerUrl from './assets/guest-install-banner.webp';
 import guestInstallSheetUrl from './assets/guest-install-sheet.webp';
 import guestHomeScreenUrl from './assets/guest-home-screen.webp';
@@ -508,7 +509,7 @@ function bookingRevealHtml() {
 function guestAppRevealHtml() {
   return beatStageHtml(
     'mvr-stage-app',
-    '2 · Guests’ Home Screens',
+    '2 · Your app and theirs',
     guestAppBeats(),
     stageBeatIndex[1] || 0
   );
@@ -527,6 +528,20 @@ function guestAppBeats() {
     ? `One tap back to your rooms. About ${estimate.roomNights} direct room-night${estimate.roomNights === 1 ? '' : 's'} a month covers Marketel.`
     : 'One tap back to your rooms — a booking you keep instead of renting from an OTA.';
   return [
+    {
+      // Lands on the tap straight after she edits her own page in stage 1, so
+      // it reads as the punchline to what just happened: the screen she was
+      // using is the app. Establishing her app first makes the guest install
+      // that follows a contrast rather than the first mention of either.
+      title: 'The page you just edited lives in an app.',
+      body: 'Front Desk, from the App Store. Rooms, prices and photos — from your phone.',
+      next: 'See what your guests get',
+      event: 'GuestAppOwnerEditorViewed',
+      proof: {
+        url: ownerEditorProofUrl,
+        alt: 'Marketel Front Desk open on a phone, showing the property page editor with tappable header fields and a save button.',
+      },
+    },
     {
       title: 'Guests save you right from your booking page.',
       body: 'A prompt sits under the room. One tap, no App Store, no download.',
@@ -548,8 +563,10 @@ function guestAppBeats() {
       },
     },
     {
-      title: 'It lands on their Home Screen.',
-      body: `Guests get ${name}. You get Front Desk. Two apps, two jobs.`,
+      title: 'Both, side by side.',
+      // The difference is how each one is installed, not what each is called —
+      // that is the version of the two-app story people actually retain.
+      body: `Yours from the App Store. ${name} saved straight from your booking page.`,
       next: 'See what they open',
       event: 'GuestAppHomeScreenViewed',
       proof: {
