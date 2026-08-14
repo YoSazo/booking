@@ -156,6 +156,18 @@
       font-size: 16px !important;
     }
 
+    /* Capacitor overlays the native keyboard instead of resizing the WebView.
+       Reserve its measured height inside auth pages so every sign-in option
+       and legal link remains reachable while the keyboard stays open. */
+    body.native-ios .login-screen.marketel-auth-keyboard-surface {
+      padding-bottom: calc(
+        var(--marketel-auth-keyboard-height, 0px)
+        + max(28px, env(safe-area-inset-bottom, 0px))
+      );
+      scroll-padding-top: max(24px, env(safe-area-inset-top, 0px));
+      scroll-padding-bottom: calc(var(--marketel-auth-keyboard-height, 0px) + 24px);
+    }
+
     /* ── HEADER ── */
     .header {
       background: rgba(255,255,255,0.78);

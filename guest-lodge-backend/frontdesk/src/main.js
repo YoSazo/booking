@@ -5,9 +5,10 @@ import '@fontsource/dm-sans/700.css';
 import '@fontsource/dm-mono/400.css';
 import '@fontsource/dm-mono/500.css';
 import './styles/core.css';
-import { bindFormKeyboardViewport } from './formKeyboard.js';
+import { bindFormKeyboardViewport, enableNativeKeyboardAccessoryBar } from './formKeyboard.js';
 import './core.js';
 
+enableNativeKeyboardAccessoryBar();
 bindFormKeyboardViewport();
 
 // The HTML boot guard uses this signal to distinguish a slow property lookup

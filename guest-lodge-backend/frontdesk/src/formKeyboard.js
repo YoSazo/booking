@@ -24,6 +24,21 @@ function keyboardHeightFromEvent(event) {
   return Math.max(0, Number(event?.keyboardHeight || event?.detail?.keyboardHeight || 0));
 }
 
+export function enableNativeKeyboardAccessoryBar() {
+  if (!isNativeApp()) return;
+  let attempts = 0;
+  const enable = () => {
+    attempts += 1;
+    const keyboard = window.Capacitor?.Plugins?.Keyboard;
+    if (typeof keyboard?.setAccessoryBarVisible === 'function') {
+      Promise.resolve(keyboard.setAccessoryBarVisible({ isVisible: true })).catch(() => {});
+      return;
+    }
+    if (attempts < 6) window.setTimeout(enable, attempts * 120);
+  };
+  enable();
+}
+
 function scrollableParent(field, surface) {
   let node = field?.parentElement;
   while (node && node !== surface && node !== document.body) {
@@ -63,9 +78,10 @@ export function bindFormKeyboardViewport() {
   };
 
   const clearSurface = () => {
-    activeSurface?.classList.remove('marketel-form-keyboard-surface');
+    activeSurface?.classList.remove('marketel-form-keyboard-surface', 'marketel-auth-keyboard-surface');
     activeSurface?.style.removeProperty('--marketel-form-visible-top');
     activeSurface?.style.removeProperty('--marketel-form-visible-height');
+    activeSurface?.style.removeProperty('--marketel-auth-keyboard-height');
     document.body?.classList.remove('marketel-form-keyboard-open');
     keyboardOpen = false;
   };
@@ -128,9 +144,14 @@ export function bindFormKeyboardViewport() {
     keyboardOpen = true;
     document.body?.classList.add('marketel-form-keyboard-open');
     if (activeSurface) {
-      activeSurface.classList.add('marketel-form-keyboard-surface');
-      activeSurface.style.setProperty('--marketel-form-visible-top', `${visibleTop}px`);
-      activeSurface.style.setProperty('--marketel-form-visible-height', `${visibleHeight}px`);
+      if (activeSurface.matches(NATIVE_AUTH_SELECTOR)) {
+        activeSurface.classList.add('marketel-auth-keyboard-surface');
+        activeSurface.style.setProperty('--marketel-auth-keyboard-height', `${Math.round(keyboardInset)}px`);
+      } else {
+        activeSurface.classList.add('marketel-form-keyboard-surface');
+        activeSurface.style.setProperty('--marketel-form-visible-top', `${visibleTop}px`);
+        activeSurface.style.setProperty('--marketel-form-visible-height', `${visibleHeight}px`);
+      }
     }
     requestAnimationFrame(ensureFieldVisible);
   };
@@ -159,19 +180,9 @@ export function bindFormKeyboardViewport() {
   const onFocusIn = (event) => {
     const field = event.target;
     if (!field?.matches?.(FORM_FIELD_SELECTOR) || field.closest(CHAT_SURFACE_SELECTOR)) return;
-    // Authentication is already a full, scrollable page. Let WKWebView place
-    // its keyboard over that page normally instead of turning the page into a
-    // synthetic keyboard-height sheet.
-    if (field.closest(NATIVE_AUTH_SELECTOR)) {
-      clearSurface();
-      activeField = null;
-      activeSurface = null;
-      nativeKeyboardHeight = 0;
-      return;
-    }
     clearSurface();
     activeField = field;
-    activeSurface = field.closest(FORM_SURFACE_SELECTOR);
+    activeSurface = field.closest(NATIVE_AUTH_SELECTOR) || field.closest(FORM_SURFACE_SELECTOR);
     fullViewportBottom = Math.max(
       fullViewportBottom,
       window.innerHeight || 0,
