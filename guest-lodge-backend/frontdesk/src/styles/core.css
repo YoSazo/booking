@@ -3528,19 +3528,6 @@ body.native-ios .marketel-form-keyboard-surface {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
-body.native-ios .marketel-form-keyboard-surface.login-screen {
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding-top: max(18px, env(safe-area-inset-top, 0px));
-  padding-bottom: max(18px, env(safe-area-inset-bottom, 0px));
-}
-body.native-ios .marketel-form-keyboard-surface .native-property-card,
-body.native-ios .marketel-form-keyboard-surface .login-card {
-  max-height: none;
-  margin: 0 auto;
-  overflow: visible;
-  scroll-padding-block: 0;
-}
 body.native-ios .rooms-modal-bg.marketel-form-keyboard-surface {
   align-items: flex-end;
 }

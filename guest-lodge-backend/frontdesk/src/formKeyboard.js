@@ -9,10 +9,10 @@ const CHAT_SURFACE_SELECTOR = '.messages-workspace, .marketel-support-overlay';
 const FORM_SURFACE_SELECTOR = [
   '.rooms-modal-bg',
   '.edit-add-room-modal',
-  '.login-screen',
   '#notesModal',
   '[data-marketel-keyboard-surface]',
 ].join(', ');
+const NATIVE_AUTH_SELECTOR = '.login-screen';
 
 function isNativeApp() {
   return document.body?.classList.contains('native-ios')
@@ -159,6 +159,16 @@ export function bindFormKeyboardViewport() {
   const onFocusIn = (event) => {
     const field = event.target;
     if (!field?.matches?.(FORM_FIELD_SELECTOR) || field.closest(CHAT_SURFACE_SELECTOR)) return;
+    // Authentication is already a full, scrollable page. Let WKWebView place
+    // its keyboard over that page normally instead of turning the page into a
+    // synthetic keyboard-height sheet.
+    if (field.closest(NATIVE_AUTH_SELECTOR)) {
+      clearSurface();
+      activeField = null;
+      activeSurface = null;
+      nativeKeyboardHeight = 0;
+      return;
+    }
     clearSurface();
     activeField = field;
     activeSurface = field.closest(FORM_SURFACE_SELECTOR);

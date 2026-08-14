@@ -123,7 +123,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         webView?.scrollView.contentInsetAdjustmentBehavior = .never
         webView?.scrollView.verticalScrollIndicatorInsets = .zero
         webView?.scrollView.alwaysBounceVertical = true
-        webView?.scrollView.keyboardDismissMode = .interactive
+        // Forms should scroll behind the keyboard without a drag implicitly
+        // dismissing it. Messaging surfaces provide their own explicit
+        // composer dismissal behavior in the web layer.
+        webView?.scrollView.keyboardDismissMode = .none
     }
 
     override func viewDidLoad() {

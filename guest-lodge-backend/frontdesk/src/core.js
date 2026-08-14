@@ -6260,37 +6260,6 @@ if (nativeAddAccountBtn) nativeAddAccountBtn.addEventListener('click', () => {
 });
 const nativePropertyCancelBtn = document.getElementById('nativePropertyCancelBtn');
 if (nativePropertyCancelBtn) nativePropertyCancelBtn.addEventListener('click', cancelNativePropertyPicker);
-
-// Full-page authentication should behave like a native form: tapping open
-// space or dragging downward dismisses the keyboard, while controls retain
-// their normal taps and the page remains independently scrollable.
-['nativePropertyScreen', 'loginScreen'].forEach((screenId) => {
-  const screen = document.getElementById(screenId);
-  if (!screen) return;
-  let touchStartY = null;
-  const blurActiveAuthField = () => {
-    const active = document.activeElement;
-    if (active && screen.contains(active) && active.matches('input, textarea, select, [contenteditable="true"]')) {
-      active.blur();
-    }
-  };
-  screen.addEventListener('pointerdown', (event) => {
-    if (event.target?.closest?.('input, textarea, select, button, a, label, [contenteditable="true"]')) return;
-    blurActiveAuthField();
-  });
-  screen.addEventListener('touchstart', (event) => {
-    touchStartY = event.touches?.[0]?.clientY ?? null;
-  }, { passive: true });
-  screen.addEventListener('touchmove', (event) => {
-    const currentY = event.touches?.[0]?.clientY;
-    if (touchStartY == null || currentY == null) return;
-    if (currentY - touchStartY > 48) {
-      blurActiveAuthField();
-      touchStartY = null;
-    }
-  }, { passive: true });
-  screen.addEventListener('touchend', () => { touchStartY = null; }, { passive: true });
-});
 bootCrmApp();
 if ('requestIdleCallback' in window) {
   requestIdleCallback(() => { loadAppsModule().catch(() => {}); }, { timeout: 4000 });
