@@ -1,6 +1,6 @@
 {
   "appId": "com.bookmarketel.frontdesk",
-  "appName": "Marketel Front Desk",
+  "appName": "Marketel",
   "webDir": "www",
   "ios": {
     "contentInset": "never",

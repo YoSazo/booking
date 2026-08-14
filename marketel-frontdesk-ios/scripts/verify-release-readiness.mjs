@@ -35,8 +35,11 @@ const capacitor = read('capacitor.config.json');
 const exportOptions = read('ios/ExportOptions.plist');
 const bundledFrontDesk = read('www/frontdesk/index.html');
 
-expect(info, /<key>CFBundleDisplayName<\/key>\s*<string>Marketel Front Desk<\/string>/,
-  'Info.plist must use the Marketel Front Desk display name');
+// The Home Screen label truncates around 11-12 characters, so the icon uses the
+// short brand name. "Marketel Front Desk" rendered as "MarketelFr…", cutting off
+// exactly the words that identified the app.
+expect(info, /<key>CFBundleDisplayName<\/key>\s*<string>Marketel<\/string>/,
+  'Info.plist must use the Marketel Home Screen display name');
 expect(info, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/,
   'Info.plist must declare standard exempt encryption usage');
 expect(entitlements, /<key>aps-environment<\/key>/,
