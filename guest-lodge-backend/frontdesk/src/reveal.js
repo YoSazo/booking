@@ -554,7 +554,7 @@ function guestAppBeats() {
       event: 'GuestAppHomeScreenViewed',
       proof: {
         url: guestHomeScreenUrl,
-        alt: 'An iPhone Home Screen showing the property’s guest app icon beside the Marketel Front Desk icon.',
+        alt: 'An iPhone Home Screen showing the saved property icon beside the Marketel Front Desk icon.',
       },
     },
     {
@@ -564,7 +564,7 @@ function guestAppBeats() {
       event: 'GuestAppStayViewed',
       proof: {
         url: guestAppStayUrl,
-        alt: 'The installed guest app showing the stay: check-in today, room, dates, amount due and property details.',
+        alt: 'The saved property opened from the Home Screen to the guest’s stay: check-in today, room, dates, amount due and property details.',
       },
     },
     {
@@ -574,7 +574,7 @@ function guestAppBeats() {
       event: 'GuestAppRebookViewed',
       proof: {
         url: guestAppBookUrl,
-        alt: 'The installed guest app on its Book tab, showing the property’s rooms ready to reserve again.',
+        alt: 'The saved property opened from the Home Screen to its Book tab, showing the rooms ready to reserve again.',
       },
     },
   ];

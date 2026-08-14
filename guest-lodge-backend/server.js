@@ -2323,6 +2323,16 @@ const availabilityRateLimit = createRouteRateLimiter('availability', {
 });
 const paymentDeclinedRateLimit = createRouteRateLimiter('payment-declined', { windowMs: 60 * 1000, max: 10 });
 const crmVerifyRateLimit = createRouteRateLimiter('crm-verify', { windowMs: 5 * 60 * 1000, max: 10 });
+// Bootstrap runs on every Front Desk load, so it cannot share the PIN check's
+// anti-brute-force budget — walking the funnel and reloading the reveal a few
+// times exhausted all ten and locked the owner out of their own property. It is
+// already behind crmAuth, which authorises the token against the hotel being
+// requested, so the ceiling here is only about runaway clients.
+const crmBootstrapRateLimit = createRouteRateLimiter('crm-bootstrap', {
+    windowMs: 5 * 60 * 1000,
+    max: 60,
+    scope: (req) => String(req.query?.hotelId || '').trim().toLowerCase(),
+});
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
 const journeyEventRateLimit = createRouteRateLimiter('marketel-journey', { windowMs: 60 * 1000, max: 180 });
 const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
@@ -13565,7 +13575,7 @@ async function getCrmBookingList(hotelId) {
 // One startup request replaces the sequential context → verification →
 // bookings/availability chain. Secondary surfaces (messages, analytics,
 // conflicts and push maintenance) intentionally load after first paint.
-app.get('/api/crm/bootstrap', crmVerifyRateLimit, crmAuth, async (req, res) => {
+app.get('/api/crm/bootstrap', crmBootstrapRateLimit, crmAuth, async (req, res) => {
     const startedAt = Date.now();
     try {
         const hotelId = requireScopedHotelId(req, res);
