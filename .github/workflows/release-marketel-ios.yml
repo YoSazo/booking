@@ -7,7 +7,7 @@ on:
         description: Upload the signed IPA to App Store Connect
         required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
