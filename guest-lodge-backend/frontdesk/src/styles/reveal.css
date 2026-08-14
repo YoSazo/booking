@@ -1070,38 +1070,71 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.mvr-assistant-visual {
+/* ── Assistant stage: one claim over one full-bleed proof, per beat ── */
+.mvr-beat-band {
   width: min(620px, 100%);
-  min-height: 0;
-  display: block;
-  overflow: hidden;
-  border: 1px solid #d7e2db;
-  border-radius: 25px;
-  background: #eff4f0;
-  box-shadow:
-    0 2px 4px rgba(24, 55, 38, 0.03),
-    0 16px 40px rgba(24, 55, 38, 0.08),
-    0 36px 80px rgba(24, 55, 38, 0.13),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-.mvr-assistant-proof-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 15px 12px;
-  border-bottom: 1px solid #dce6e0;
-  background: rgba(255, 255, 255, 0.82);
-}
-
-.mvr-assistant-proof-head > div:first-child {
-  min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 6px;
+  margin: 0 auto 14px;
+  text-align: center;
 }
 
-.mvr-assistant-proof-head span {
+.mvr-beat-title {
+  margin: 0;
+  color: #16281f;
+  font-size: clamp(20px, 5.4vw, 27px);
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.mvr-beat-body {
+  margin: 0;
+  color: #5d6f65;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The stage claims the leftover height so the proof can be shown whole: the
+   screenshot scales to fit the space rather than being cropped into a window.
+   min-height keeps it from collapsing to a postage stamp on short viewports —
+   below that the main region scrolls instead. */
+.mvr-beat-stage {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* The figure fills the grid cell and `object-fit: contain` scales the whole
+   screenshot to fit inside it — nothing cropped, nothing overflowing. Sizing
+   the <img> box rather than the image itself avoids percentage max-heights
+   resolving against an indefinite-height parent. */
+.mvr-beat-proof {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mvr-beat-proof img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 18px 38px rgba(24, 55, 38, 0.18));
+}
+
+.mvr-proof-badge {
+  justify-self: center;
+  margin-top: 2px;
+  padding: 5px 11px;
+  border: 1px solid #d7e2db;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
   color: var(--mvr-green);
   font-size: 9px;
   font-weight: 800;
@@ -1109,117 +1142,45 @@
   text-transform: uppercase;
 }
 
-.mvr-assistant-proof-head strong {
-  color: #1d3026;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.mvr-assistant-proof-tabs {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid #dbe6df;
-  border-radius: 999px;
-  background: #edf3ef;
-}
-
-.mvr-assistant-proof-tabs button {
-  min-height: 30px;
-  padding: 6px 11px;
-  color: #718078;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  font: 750 10px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  cursor: pointer;
-}
-
-.mvr-assistant-proof-tabs button.is-active {
-  color: #1f6749;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(35, 81, 57, 0.11);
-}
-
-.mvr-assistant-proof-viewport {
-  width: 100%;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.86) 0 14%, transparent 14.5%),
-    linear-gradient(155deg, #e8f2ec, #f6f9f7);
-}
-
-.mvr-assistant-proof-track {
-  display: flex;
-  transform: translateX(calc(var(--mvr-assistant-slide, 0) * -100%));
-  transition: transform 440ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.mvr-assistant-proof-slide {
-  min-width: 100%;
-  margin: 0;
+.mvr-beat-settings {
+  width: min(460px, 100%);
   display: grid;
-  justify-items: center;
-  gap: 10px;
-  padding: 15px 14px 12px;
+  padding: 16px;
+  border: 1px solid #d7e2db;
+  border-radius: 25px;
+  background: #eff4f0;
+  box-shadow:
+    0 2px 4px rgba(24, 55, 38, 0.03),
+    0 16px 40px rgba(24, 55, 38, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.mvr-assistant-proof-slide img {
-  display: block;
-  width: min(310px, 92%);
-  height: auto;
-  filter: drop-shadow(0 16px 24px rgba(20, 52, 35, 0.14));
+.mvr-beat-settings .mvr-fallback-control {
+  margin-top: 0;
+  animation: none;
 }
 
-.mvr-assistant-proof-slide figcaption {
-  width: min(430px, 100%);
-  display: grid;
-  gap: 2px;
-  text-align: center;
+/* Single column with a fixed text band on top; the proof takes the rest. This
+   overrides the default two-column stage grid so the beat never scrolls. */
+.mvr-stage-assistant {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(12px, 2.6vh, 20px);
+  padding: clamp(14px, 3vh, 28px) 0 8px;
+  /* Definite height, not just min-height: the base stage only sets min-height,
+     which lets the 1fr row grow to the image's natural size and overflow. */
+  height: 100%;
+  box-sizing: border-box;
 }
 
-.mvr-assistant-proof-slide figcaption strong {
-  color: #20372b;
-  font-size: 12px;
-  font-weight: 800;
+@media (prefers-reduced-motion: reduce) {
+  .mvr-beat-proof,
+  .mvr-beat-settings { animation: none; }
 }
 
-.mvr-assistant-proof-slide figcaption span {
-  color: #6b7d72;
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.mvr-assistant-proof-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 10px 15px 3px;
-}
-
-.mvr-assistant-proof-controls button {
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: #c5d2ca;
-  cursor: pointer;
-  transition: width 180ms ease, background 180ms ease;
-}
-
-.mvr-assistant-proof-controls button.is-active {
-  width: 22px;
-  background: var(--mvr-green);
-}
-
-.mvr-assistant-settings-proof {
-  padding: 0 15px 15px;
-}
-
-.mvr-assistant-settings-proof .mvr-fallback-control {
+.mvr-fallback-control {
   margin-top: 7px;
 }
 

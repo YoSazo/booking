@@ -18,7 +18,7 @@ let bookingPageTimer = 0;
 let guestAppDemoTimer = 0;
 let guestAppDemoObserver = null;
 let guestAppDemoSlide = 0;
-let assistantProofSlide = 0;
+let assistantBeat = 0;
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
@@ -583,57 +583,67 @@ function guestAppRevealHtml() {
   </section>`;
 }
 
-function assistantRevealHtml() {
+// The Assistant stage is a three-beat sequence rather than a scrolling page:
+// each beat is one claim over one full-bleed proof, and the footer is the only
+// way forward. Beat 3 is the single real setting on the screen — text vs in-app
+// is not a choice (both always fire), so it is never offered as a toggle.
+const ASSISTANT_BEATS = [
+  {
+    title: 'It texts you the moment a request lands.',
+    body: 'Reply naturally — a walk-in took it, you’re full, whatever changed.',
+    next: 'See how you answer',
+    event: 'AssistantTextProofViewed',
+    proof: {
+      url: assistantTextResolutionUrl,
+      alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.',
+    },
+  },
+  {
+    title: 'Or answer with one tap.',
+    body: 'The same request is already waiting in Bookings. Either way works.',
+    next: 'Set your rule',
+    event: 'AssistantAppProofViewed',
+    proof: {
+      url: assistantBookingRequestUrl,
+      alt: 'A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
+    },
+  },
+  {
+    title: 'And if you miss it, your rule decides.',
+    body: 'That’s how a room conflict never becomes a guest problem.',
+    next: 'Review plans and activation',
+    event: 'AssistantFallbackViewed',
+    proof: null,
+  },
+];
+
+function assistantFallbackHtml() {
   const releases = assistantNoResponseAction === 'release';
-  return `<section class="mvr-stage mvr-stage-assistant">
-    <div class="mvr-copy">
-      <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
-      <h1>Front Desk checks in before a room conflict becomes a guest problem.</h1>
-      <p>A direct booking triggers an alert. Reply naturally if a walk-in took the room—or handle it with one tap in the app. Marketel updates Availability, releases the $1 hold and tells the guest.</p>
-      <div class="mvr-callout">
-        <strong>You stay in control—even when you miss the alert.</strong>
-        Choose whether silence keeps the sale or protects availability. You can change the rule anytime.
-      </div>
+  return `<div class="mvr-fallback-control">
+    <strong>If you miss the alert</strong>
+    <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
+      <button type="button" data-mvr-fallback="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep the booking</b><span>Revenue first</span></button>
+      <button type="button" data-mvr-fallback="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
     </div>
-    <div class="mvr-visual mvr-assistant-visual">
-      <div class="mvr-assistant-proof-head">
-        <div>
-          <span>Real Marketel workflow</span>
-          <strong>Two ways to answer Front Desk</strong>
-        </div>
-        <div class="mvr-assistant-proof-tabs" role="tablist" aria-label="Front Desk response examples">
-          <button type="button" role="tab" data-mvr-assistant-slide="0" aria-selected="${assistantProofSlide === 0}" class="${assistantProofSlide === 0 ? 'is-active' : ''}">By text</button>
-          <button type="button" role="tab" data-mvr-assistant-slide="1" aria-selected="${assistantProofSlide === 1}" class="${assistantProofSlide === 1 ? 'is-active' : ''}">In the app</button>
-        </div>
-      </div>
-      <div class="mvr-assistant-proof-viewport">
-        <div class="mvr-assistant-proof-track" style="--mvr-assistant-slide:${assistantProofSlide}">
-          <figure class="mvr-assistant-proof-slide" role="tabpanel" aria-hidden="${assistantProofSlide !== 0}">
-            <img src="${assistantTextResolutionUrl}" width="780" height="1532" decoding="async" alt="A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.">
-            <figcaption><strong>Tell it what changed.</strong><span>Front Desk handles the work and confirms exactly what it did.</span></figcaption>
-          </figure>
-          <figure class="mvr-assistant-proof-slide" role="tabpanel" aria-hidden="${assistantProofSlide !== 1}">
-            <img src="${assistantBookingRequestUrl}" width="780" height="1524" decoding="async" alt="A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.">
-            <figcaption><strong>Or decide inside the app.</strong><span>The same request appears in Bookings with one-tap controls.</span></figcaption>
-          </figure>
-        </div>
-      </div>
-      <div class="mvr-assistant-proof-controls" aria-label="Choose a Front Desk example">
-        <button type="button" data-mvr-assistant-slide="0" class="${assistantProofSlide === 0 ? 'is-active' : ''}" aria-label="Show the text conversation"></button>
-        <button type="button" data-mvr-assistant-slide="1" class="${assistantProofSlide === 1 ? 'is-active' : ''}" aria-label="Show the in-app booking request"></button>
-      </div>
-      <div class="mvr-assistant-settings-proof">
-        <div class="mvr-fallback-control">
-          <strong>If you miss the alert</strong>
-          <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
-            <button type="button" data-mvr-fallback="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep the booking</b><span>Revenue first</span></button>
-            <button type="button" data-mvr-fallback="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
-          </div>
-          <small>${releases
-            ? 'Your rule: void the $1 hold and notify the guest if nobody replies.'
-            : 'Your rule: confirm the booking automatically if nobody replies.'}</small>
-        </div>
-      </div>
+    <small>${releases
+      ? 'Your rule: void the $1 hold and notify the guest if nobody replies.'
+      : 'Your rule: confirm the booking automatically if nobody replies.'}</small>
+  </div>`;
+}
+
+function assistantRevealHtml() {
+  const beat = ASSISTANT_BEATS[assistantBeat] || ASSISTANT_BEATS[0];
+  return `<section class="mvr-stage mvr-stage-assistant">
+    <div class="mvr-beat-band">
+      <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
+      <h1 class="mvr-beat-title">${beat.title}</h1>
+      <p class="mvr-beat-body">${beat.body}</p>
+      ${beat.proof ? '<span class="mvr-proof-badge">Real Marketel workflow</span>' : ''}
+    </div>
+    <div class="mvr-beat-stage">
+      ${beat.proof ? `<figure class="mvr-beat-proof">
+        <img src="${beat.proof.url}" width="780" height="1532" decoding="async" alt="${esc(beat.proof.alt)}">
+      </figure>` : `<div class="mvr-beat-settings">${assistantFallbackHtml()}</div>`}
     </div>
   </section>`;
 }
@@ -700,14 +710,15 @@ function footerHtml() {
       <div></div>
     </div>`;
   }
-  const labels = [
-    '',
-    'See how Front Desk protects you',
-    'Review plans and activation',
-  ];
+  // One forward affordance for the whole reveal. Inside the Assistant stage it
+  // walks the beats before advancing the stage, so the progress bar never lies
+  // and there is never a second "next" competing with this one.
+  const label = currentStep === 2
+    ? (ASSISTANT_BEATS[assistantBeat] || ASSISTANT_BEATS[0]).next
+    : 'See how Front Desk protects you';
   return `<div class="mvr-footer">
     ${currentStep > 0 ? '<button type="button" class="mvr-back" id="mvrBack">← Back</button>' : '<span></span>'}
-    <button type="button" class="mvr-primary" id="mvrNext">${labels[currentStep]} →</button>
+    <button type="button" class="mvr-primary" id="mvrNext">${label} →</button>
   </div>`;
 }
 
@@ -1046,24 +1057,15 @@ function revealGuestAppValue(manual = false) {
   }, manual ? 900 : 1200);
 }
 
-function setAssistantProofSlide(nextSlide, manual = false) {
-  assistantProofSlide = Number(nextSlide) === 1 ? 1 : 0;
-  const visual = document.querySelector('.mvr-assistant-visual');
-  if (!visual) return;
-  visual.querySelector('.mvr-assistant-proof-track')?.style.setProperty('--mvr-assistant-slide', String(assistantProofSlide));
-  visual.querySelectorAll('.mvr-assistant-proof-slide').forEach((slide, index) => {
-    slide.setAttribute('aria-hidden', index === assistantProofSlide ? 'false' : 'true');
-  });
-  visual.querySelectorAll('[data-mvr-assistant-slide]').forEach((button) => {
-    const isActive = Number(button.dataset.mvrAssistantSlide) === assistantProofSlide;
-    button.classList.toggle('is-active', isActive);
-    if (button.getAttribute('role') === 'tab') button.setAttribute('aria-selected', String(isActive));
-  });
+function setAssistantBeat(nextBeat, manual = false) {
+  const clamped = Math.max(0, Math.min(ASSISTANT_BEATS.length - 1, Number(nextBeat) || 0));
+  if (clamped === assistantBeat) return;
+  assistantBeat = clamped;
+  renderReveal();
+  document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
   if (!manual) return;
-  trackReveal(assistantProofSlide === 1 ? 'AssistantAppProofViewed' : 'AssistantTextProofViewed');
-  trackJourney('JourneyAssistantProofViewed', {
-    proof: assistantProofSlide === 1 ? 'app' : 'text',
-  });
+  trackReveal(ASSISTANT_BEATS[assistantBeat].event);
+  trackJourney('JourneyAssistantBeatViewed', { beat: assistantBeat });
 }
 
 function scheduleGuestAppValueDemo() {
@@ -1095,10 +1097,18 @@ function scheduleGuestAppValueDemo() {
 
 function bindRevealEvents() {
   document.getElementById('mvrNext')?.addEventListener('click', () => {
+    if (currentStep === 2 && assistantBeat < ASSISTANT_BEATS.length - 1) {
+      setAssistantBeat(assistantBeat + 1, true);
+      return;
+    }
     trackJourney('JourneyRevealNavigation', { action: 'next', toStep: currentStep + 1 });
     moveToStep(currentStep + 1);
   });
   document.getElementById('mvrBack')?.addEventListener('click', () => {
+    if (currentStep === 2 && assistantBeat > 0) {
+      setAssistantBeat(assistantBeat - 1, true);
+      return;
+    }
     trackJourney('JourneyRevealNavigation', { action: 'back', toStep: currentStep - 1 });
     moveToStep(currentStep - 1);
   });
@@ -1126,13 +1136,6 @@ function bindRevealEvents() {
     button.addEventListener('click', () => {
       const nextSlide = Number(button.dataset.mvrAppSlide) === 1 ? 1 : 0;
       if (nextSlide !== guestAppDemoSlide) setGuestAppDemoSlide(nextSlide, true);
-    });
-  });
-  document.querySelectorAll('[data-mvr-assistant-slide]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const nextSlide = Number(button.dataset.mvrAssistantSlide) === 1 ? 1 : 0;
-      if (nextSlide === assistantProofSlide) return;
-      setAssistantProofSlide(nextSlide, true);
     });
   });
   document.querySelectorAll('[data-mvr-fallback]').forEach((button) => {
