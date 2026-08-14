@@ -33,16 +33,36 @@ const isCheckinToday = (checkinStr) => {
     && d.getUTCDate() === now.getUTCDate();
 };
 
+function PropertyMasthead({ hotel }) {
+  const name = hotel?.name || 'Your Hotel';
+  const iconUrl = hotel?.appIconUrl || '';
+
+  return (
+    <header style={styles.propertyMasthead}>
+      <div style={styles.propertyIcon}>
+        {iconUrl
+          ? <img src={iconUrl} alt="" style={styles.propertyIconImage} />
+          : <span>{name.charAt(0).toUpperCase()}</span>}
+      </div>
+      <div style={styles.propertyIdentity}>
+        <span style={styles.propertyEyebrow}>Guest app</span>
+        <strong style={styles.propertyName}>{name}</strong>
+      </div>
+      <span style={styles.propertyLiveDot} aria-label="Connected" />
+    </header>
+  );
+}
+
 function PreBookHub({ hotel, onBook, onFindReservation }) {
-  const hotelName = hotel?.name || 'Your Hotel';
   const subtitle = hotel?.subtitle || '';
   const address = hotel?.address || '';
   const phone = hotel?.phone || '';
 
   return (
     <div style={styles.page}>
+      <PropertyMasthead hotel={hotel} />
       <div style={styles.greetingSection}>
-        <h1 style={styles.greeting}>{hotelName}</h1>
+        <h1 style={styles.greeting}>Your next stay starts here</h1>
         <p style={styles.greetingSubtitle}>
           {isStandalone()
             ? 'Welcome — book a stay or find an existing reservation.'
@@ -161,6 +181,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
   if (loading) {
     return (
       <div style={styles.page}>
+        <PropertyMasthead hotel={hotelProp} />
         <div style={styles.loadingContainer}>
           <div style={styles.spinner} />
           <p style={styles.loadingText}>Loading your stay...</p>
@@ -173,6 +194,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
   if (!booking) {
     return (
       <div style={styles.page}>
+        <PropertyMasthead hotel={hotelProp} />
         <div style={styles.emptyContainer}>
           <div style={styles.emptyIcon}><Hotel size={30} color="#2E7D5B" /></div>
           <h2 style={styles.emptyTitle}>No upcoming stays</h2>
@@ -226,6 +248,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
 
   return (
     <div style={styles.page}>
+      <PropertyMasthead hotel={lookupHotel || hotelProp} />
       {/* Greeting */}
       <div style={styles.greetingSection}>
         <h1 style={styles.greeting}>Welcome, {firstName}</h1>
@@ -365,12 +388,78 @@ if (typeof document !== 'undefined') {
 
 const styles = {
   page: {
-    background: '#EFF4F0',
+    background: 'radial-gradient(circle at 12% -8%, rgba(126,226,184,0.22), transparent 34%), radial-gradient(circle at 96% 18%, rgba(76,175,125,0.10), transparent 30%), #EFF4F0',
     minHeight: '100vh',
-    padding: '24px 16px 40px',
+    padding: 'max(14px, env(safe-area-inset-top)) 14px 42px',
     fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',
+  },
+
+  propertyMasthead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 11,
+    minHeight: 58,
+    padding: '9px 12px',
+    border: '1px solid rgba(255,255,255,0.8)',
+    borderRadius: 20,
+    background: 'linear-gradient(145deg, rgba(255,255,255,0.76), rgba(232,245,238,0.56))',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.94), 0 8px 24px rgba(46,125,91,0.10)',
+    backdropFilter: 'blur(22px) saturate(170%)',
+    WebkitBackdropFilter: 'blur(22px) saturate(170%)',
+  },
+  propertyIcon: {
+    display: 'flex',
+    width: 40,
+    height: 40,
+    flex: '0 0 40px',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.72)',
+    borderRadius: 13,
+    background: 'linear-gradient(145deg, #4CAF7D, #2E7D5B)',
+    boxShadow: '0 4px 12px rgba(46,125,91,0.24)',
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: 800,
+  },
+  propertyIconImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  propertyIdentity: {
+    display: 'flex',
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'column',
+    lineHeight: 1.16,
+  },
+  propertyEyebrow: {
+    color: '#6B7D72',
+    fontSize: 10,
+    fontWeight: 750,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+  },
+  propertyName: {
+    overflow: 'hidden',
+    color: '#1A2B22',
+    fontSize: 15,
+    fontWeight: 800,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  propertyLiveDot: {
+    width: 8,
+    height: 8,
+    flex: '0 0 8px',
+    border: '3px solid rgba(76,175,125,0.17)',
+    borderRadius: '50%',
+    background: '#4CAF7D',
+    boxSizing: 'content-box',
   },
 
   // Loading
@@ -542,8 +631,8 @@ const styles = {
 
   // Greeting
   greetingSection: {
-    marginBottom: 20,
-    paddingTop: 16,
+    marginBottom: 18,
+    padding: '24px 4px 0',
   },
   greeting: {
     fontSize: 28,

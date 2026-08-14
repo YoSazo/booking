@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, CalendarSearch, MessageCircle } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { isStandalone } from './pwaUtils.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import useVisualKeyboard from './useVisualKeyboard.js';
+import './GuestLayout.css';
 
 const NAV_TABS = [
   { key: 'home', label: 'Home', icon: Home, path: '/guest/home' },
@@ -12,107 +13,20 @@ const NAV_TABS = [
   { key: 'messages', label: 'Messages', icon: MessageCircle, path: '/guest/messages' },
 ];
 
-// Liquid-glass bottom nav — a frosted, floating pill that matches the Front Desk
-// visual language (sage palette, DM Sans, green active lens). Injected once so we
-// can use ::before sheen + focus/active pseudo-states that inline styles can't do.
-const NAV_STYLES = `
-.guest-nav {
-  position: fixed;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 2px;
-  padding: 7px 8px;
-  width: min(340px, 84%);
-  border-radius: 999px;
-  z-index: 10050;
-  isolation: isolate;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: rgba(255,255,255,0.5);
-  -webkit-backdrop-filter: blur(28px) saturate(185%);
-  backdrop-filter: blur(28px) saturate(185%);
-  border: 1px solid rgba(255,255,255,0.65);
-  box-shadow:
-    inset 0 1px 1px rgba(255,255,255,0.9),
-    inset 0 -1px 2px rgba(255,255,255,0.35),
-    0 10px 30px rgba(26,43,34,0.18),
-    0 3px 10px rgba(46,125,91,0.12);
-}
-.guest-nav::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.06) 46%, rgba(255,255,255,0) 100%);
-  pointer-events: none;
-  z-index: -1;
-}
-.guest-nav__tab {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
-}
-.guest-nav__tab.is-active { transform: translateY(-3px); }
-.guest-nav__icon {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.28s ease, box-shadow 0.28s ease, transform 0.15s ease;
-}
-.guest-nav__tab.is-active .guest-nav__icon {
-  background: linear-gradient(145deg, #4CAF7D 0%, #2E7D5B 100%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), 0 6px 16px rgba(46,125,91,0.42);
-}
-.guest-nav__tab:active .guest-nav__icon { transform: scale(0.9); }
-.guest-nav__label {
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  color: #6B7D72;
-  transition: color 0.28s ease;
-}
-.guest-nav__tab.is-active .guest-nav__label { color: #2E7D5B; }
-.guest-nav__dot {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #E05252;
-  border: 2px solid rgba(255,255,255,0.95);
-  box-sizing: content-box;
-}
-@media (prefers-reduced-motion: reduce) {
-  .guest-nav__tab, .guest-nav__icon { transition: none; }
-}
-`;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-if (typeof document !== 'undefined') {
-  const id = 'guest-nav-style';
-  if (!document.getElementById(id)) {
-    const styleEl = document.createElement('style');
-    styleEl.id = id;
-    styleEl.textContent = NAV_STYLES;
-    document.head.appendChild(styleEl);
+function activeTabForPath(pathname) {
+  if (pathname.startsWith('/guest/messages')) return 'messages';
+  if (pathname === '/') return 'book';
+  if (
+    pathname === '/guest-info'
+    || pathname === '/confirmation'
+    || pathname === '/final-confirmation'
+  ) {
+    return null;
   }
+  if (pathname.startsWith('/guest/') || pathname.startsWith('/booking')) return 'home';
+  return 'book';
 }
 
 export default function GuestLayout({ children }) {
@@ -126,6 +40,15 @@ export default function GuestLayout({ children }) {
   // Nav only after Add to Home Screen — re-check on install + display-mode change.
   const [installedApp, setInstalledApp] = useState(() => isStandalone());
   const keyboardOpen = useVisualKeyboard();
+  const navRef = useRef(null);
+  const dragRef = useRef(null);
+  const suppressClickRef = useRef(false);
+
+  const activeTab = activeTabForPath(location.pathname);
+  const activeIndex = NAV_TABS.findIndex((tab) => tab.key === activeTab);
+  const [navPosition, setNavPosition] = useState(activeIndex >= 0 ? activeIndex : 1);
+  const [isDraggingNav, setIsDraggingNav] = useState(false);
+  const [navShineX, setNavShineX] = useState(170);
 
   useEffect(() => {
     const syncInstalled = () => setInstalledApp(isStandalone());
@@ -221,54 +144,149 @@ export default function GuestLayout({ children }) {
   // Bottom nav: installed PWA only. Browser booking flow stays nav-free.
   const showNav = installedApp && isMobile && !isInstallPage && !keyboardOpen;
 
-  const activeTab = (() => {
-    if (location.pathname.startsWith('/guest/messages')) return 'messages';
-    if (location.pathname === '/') return 'book';
-    if (
-      location.pathname === '/guest-info'
-      || location.pathname === '/confirmation'
-      || location.pathname === '/final-confirmation'
-    ) {
-      return null;
+  useEffect(() => {
+    if (!isDraggingNav && activeIndex >= 0) setNavPosition(activeIndex);
+  }, [activeIndex, isDraggingNav]);
+
+  const openTab = useCallback((tab, source = 'tap') => {
+    if (!tab) return;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    syncGuestStay();
+    window.dispatchEvent(new CustomEvent('marketel:guest-refresh', {
+      detail: { source: `navigation-${source}`, tab: tab.key },
+    }));
+    navigate(tab.path);
+  }, [navigate, syncGuestStay]);
+
+  const positionForPointer = useCallback((clientX) => {
+    const nav = navRef.current;
+    if (!nav) return activeIndex >= 0 ? activeIndex : 1;
+    const rect = nav.getBoundingClientRect();
+    const edge = 8;
+    const trackWidth = Math.max(1, rect.width - (edge * 2));
+    const slotWidth = trackWidth / NAV_TABS.length;
+    const position = (clientX - rect.left - edge - (slotWidth / 2)) / slotWidth;
+    setNavShineX(clamp(clientX - rect.left, 0, rect.width));
+    return clamp(position, 0, NAV_TABS.length - 1);
+  }, [activeIndex]);
+
+  const handleNavPointerDown = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const nav = navRef.current;
+    if (!nav) return;
+    const tabButton = event.target.closest?.('[data-guest-tab-index]');
+    const position = positionForPointer(event.clientX);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      position,
+      moved: false,
+      tapIndex: tabButton ? Number(tabButton.dataset.guestTabIndex) : null,
+    };
+    nav.setPointerCapture?.(event.pointerId);
+    setNavPosition(position);
+    setIsDraggingNav(true);
+  };
+
+  const handleNavPointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const position = positionForPointer(event.clientX);
+    drag.position = position;
+    if (Math.abs(event.clientX - drag.startX) > 6) drag.moved = true;
+    setNavPosition(position);
+  };
+
+  const finishNavPointer = (event, cancelled = false) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    navRef.current?.releasePointerCapture?.(event.pointerId);
+    dragRef.current = null;
+    setIsDraggingNav(false);
+
+    if (cancelled) {
+      setNavPosition(activeIndex >= 0 ? activeIndex : 1);
+      return;
     }
-    if (
-      location.pathname.startsWith('/guest/') ||
-      location.pathname.startsWith('/booking')
-    ) {
-      return 'home';
+
+    const destination = clamp(Math.round(drag.position), 0, NAV_TABS.length - 1);
+    setNavPosition(destination);
+    if (drag.moved) {
+      suppressClickRef.current = true;
+      openTab(NAV_TABS[destination], 'drag');
+      window.setTimeout(() => { suppressClickRef.current = false; }, 0);
     }
-    return 'book';
-  })();
+  };
+
+  const handleTabClick = (event, tab, index) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    setNavPosition(index);
+    openTab(tab, 'tap');
+  };
+
+  const handleNavKeyDown = (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const current = activeIndex >= 0 ? activeIndex : 1;
+    const destination = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? NAV_TABS.length - 1
+        : clamp(current + (event.key === 'ArrowRight' ? 1 : -1), 0, NAV_TABS.length - 1);
+    setNavPosition(destination);
+    openTab(NAV_TABS[destination], 'keyboard');
+    requestAnimationFrame(() => {
+      navRef.current?.querySelector(`[data-guest-tab-index="${destination}"]`)?.focus();
+    });
+  };
+
+  const visualActiveIndex = isDraggingNav
+    ? clamp(Math.round(navPosition), 0, NAV_TABS.length - 1)
+    : activeIndex;
+  const lensVisible = activeIndex >= 0 || isDraggingNav;
 
   return (
     <div style={{ ...styles.wrapper, '--guest-nav-clearance': showNav ? '116px' : '0px' }}>
       <div style={{ ...styles.content, paddingBottom: showNav ? 110 : 0 }}>{children}</div>
 
       {showNav && (
-        <nav className="guest-app-navigation guest-nav" aria-label="Property navigation">
-          {NAV_TABS.map((tab) => {
-            const isActive = activeTab === tab.key;
+        <nav
+          ref={navRef}
+          className={`guest-app-navigation guest-nav${isDraggingNav ? ' is-dragging' : ''}`}
+          aria-label="Property navigation. Tap a tab or drag between tabs."
+          onPointerDown={handleNavPointerDown}
+          onPointerMove={handleNavPointerMove}
+          onPointerUp={(event) => finishNavPointer(event)}
+          onPointerCancel={(event) => finishNavPointer(event, true)}
+          onKeyDown={handleNavKeyDown}
+          style={{
+            '--guest-nav-position': navPosition,
+            '--guest-nav-translate': `${navPosition * 100}%`,
+            '--guest-nav-shine-x': `${navShineX}px`,
+            '--guest-nav-lens-opacity': lensVisible ? 1 : 0,
+          }}
+        >
+          <span className="guest-nav__lens" aria-hidden="true" />
+          {NAV_TABS.map((tab, index) => {
+            const isActive = visualActiveIndex === index;
             const Icon = tab.icon;
             const isMessages = tab.key === 'messages';
-            const openTab = () => {
-              document.body.style.overflow = '';
-              document.body.style.position = '';
-              document.body.style.top = '';
-              document.body.style.width = '';
-              syncGuestStay();
-              window.dispatchEvent(new CustomEvent('marketel:guest-refresh', {
-                detail: { source: 'navigation', tab: tab.key },
-              }));
-              navigate(tab.path);
-            };
 
             return (
               <button
                 key={tab.key}
                 type="button"
-                onClick={openTab}
+                data-guest-tab-index={index}
+                onClick={(event) => handleTabClick(event, tab, index)}
                 className={`guest-nav__tab${isActive ? ' is-active' : ''}`}
-                aria-current={isActive ? 'page' : undefined}
+                aria-current={activeIndex === index ? 'page' : undefined}
               >
                 <span className="guest-nav__icon">
                   <Icon
@@ -284,6 +302,7 @@ export default function GuestLayout({ children }) {
               </button>
             );
           })}
+          <span className="guest-nav__drag-hint">Drag to switch</span>
         </nav>
       )}
     </div>
