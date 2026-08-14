@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuest } from './GuestProvider.jsx';
-import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3 } from 'lucide-react';
+import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3, MessageCircle, XCircle } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
+import { fetchWithTimeout } from './fetchWithTimeout.js';
+import { isStandalone } from './pwaUtils.js';
 
 const formatDateWithSuffix = (date) => {
   const d = new Date(date);
@@ -102,8 +104,16 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
   const resolvedHotelId = hotelId || hotel?.id;
   const hotelName = hotel?.name || 'us';
   const stayMoney = getStayMoney(bookingDetails);
-  const confirmationPending = bookingDetails?.confirmationPending === true;
+  const [liveBookingStatus, setLiveBookingStatus] = useState(
+    bookingDetails?.confirmationPending === true ? 'pending' : 'confirmed'
+  );
+  const confirmationPending = liveBookingStatus === 'pending';
+  const confirmationReleased = liveBookingStatus === 'released' || liveBookingStatus === 'cancelled';
   const reviewMinutes = Number(bookingDetails?.reviewWindowMinutes || 0);
+
+  useEffect(() => {
+    setLiveBookingStatus(bookingDetails?.confirmationPending === true ? 'pending' : 'confirmed');
+  }, [bookingDetails?.confirmationPending, reservationCode]);
 
   useEffect(() => () => {
     document.body.style.overflow = '';
@@ -113,7 +123,10 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
     if (!bookingDetails) return;
 
     const shouldShow =
-      bookingDetails.bookingType === 'payLater' && !confirmationPending && !callModalDismissed;
+      bookingDetails.bookingType === 'payLater'
+      && !confirmationPending
+      && !confirmationReleased
+      && !callModalDismissed;
 
     if (!shouldShow) {
       document.body.style.overflow = '';
@@ -129,7 +142,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
       clearTimeout(timer);
       document.body.style.overflow = '';
     };
-  }, [bookingDetails, callModalDismissed, confirmationPending]);
+  }, [bookingDetails, callModalDismissed, confirmationPending, confirmationReleased]);
 
   useEffect(() => {
     if (reservationCode && bookingDetails?.checkout && guestInfo?.email) {
@@ -143,6 +156,57 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
     }
   }, [reservationCode, bookingDetails, guestInfo, setGuestStay]);
 
+  // Keep the held request live in the installed guest app. Owner decisions,
+  // SMS replies, and the no-response rule should update this screen without a
+  // Safari refresh or forcing the guest to leave and return.
+  useEffect(() => {
+    if (!confirmationPending || !reservationCode || !resolvedHotelId || !guestInfo?.email) return undefined;
+    let stopped = false;
+    let inFlight = false;
+    const refreshStatus = async () => {
+      if (stopped || inFlight || document.visibilityState === 'hidden') return;
+      inFlight = true;
+      try {
+        const params = new URLSearchParams({
+          hotelId: resolvedHotelId,
+          code: reservationCode,
+          email: guestInfo.email,
+        });
+        const response = await fetchWithTimeout(`${apiBaseUrl}/api/booking/lookup?${params}`, {}, 10000);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success || !data.booking || stopped) return;
+        const status = String(data.booking.status || '').toLowerCase();
+        if (status === 'released' || status === 'cancelled' || status === 'canceled') {
+          setLiveBookingStatus('released');
+        } else if (status && status !== 'pending') {
+          setLiveBookingStatus('confirmed');
+        }
+        window.dispatchEvent(new CustomEvent('marketel:guest-refresh', {
+          detail: { source: 'booking-status', status },
+        }));
+      } catch (_) {
+        // Email remains the durable fallback; transient polling failures stay quiet.
+      } finally {
+        inFlight = false;
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshStatus();
+    };
+    refreshStatus();
+    const interval = window.setInterval(refreshStatus, 5000);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('marketel:guest-refresh', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('marketel:guest-refresh', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [apiBaseUrl, confirmationPending, guestInfo?.email, reservationCode, resolvedHotelId]);
+
   const handleDismissCallModal = () => {
     setShowCallModal(false);
     setCallModalDismissed(true);
@@ -151,7 +215,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
 
   return (
     <>
-      {bookingDetails?.bookingType === 'payLater' && !confirmationPending && showCallModal && (
+      {bookingDetails?.bookingType === 'payLater' && !confirmationPending && !confirmationReleased && showCallModal && (
         <div className="confirmation-call-modal-overlay" onClick={(e) => e.stopPropagation()}>
           <div className="confirmation-call-modal-sheet">
             <div className="confirmation-call-phone-pulse-wrapper">
@@ -230,12 +294,16 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
         <div className="confirmation-container">
           {/* One outcome, one focal point. Pending stays visually distinct from confirmed. */}
           <section
-            className={`confirmation-card confirmation-card--outcome ${confirmationPending ? 'is-pending' : 'is-confirmed'}`}
+            className={`confirmation-card confirmation-card--outcome ${confirmationPending ? 'is-pending' : confirmationReleased ? 'is-released' : 'is-confirmed'}`}
             aria-live="polite"
           >
           {confirmationPending ? (
             <div className="confirmation-status-icon confirmation-status-icon--pending" aria-hidden="true">
               <Clock3 size={32} strokeWidth={2} />
+            </div>
+          ) : confirmationReleased ? (
+            <div className="confirmation-status-icon confirmation-status-icon--pending confirmation-status-icon--released" aria-hidden="true">
+              <XCircle size={32} strokeWidth={2} />
             </div>
           ) : (
             <div className="success-checkmark confirmation-status-icon" aria-hidden="true">
@@ -247,17 +315,19 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           )}
 
           <div className="confirmation-header">
-            <h1>{confirmationPending ? 'Your room is being held' : 'Your booking is confirmed'}</h1>
+            <h1>{confirmationPending ? 'Your room is being held' : confirmationReleased ? 'This request was released' : 'Your booking is confirmed'}</h1>
             <p className="confirmation-status-copy">
               {confirmationPending
                 ? (reviewMinutes
                   ? `We’ll email you with the final status within ${reviewMinutes} minute${reviewMinutes === 1 ? '' : 's'}.`
                   : 'We’ll email you as soon as the property responds.')
+                : confirmationReleased
+                  ? <>The property couldn’t confirm this room. We sent the details to <strong>{guestInfo.email}</strong>.</>
                 : <>A confirmation email was sent to <strong>{guestInfo.email}</strong>.</>}
             </p>
             {reservationCode && (
               <div className="confirmation-reference">
-                <span>{confirmationPending ? 'Request' : 'Confirmation'}</span>
+                <span>{confirmationPending || confirmationReleased ? 'Request' : 'Confirmation'}</span>
                 <strong>#{reservationCode}</strong>
               </div>
             )}
@@ -269,12 +339,33 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           </div>
           </section>
 
+          {isStandalone() && reservationCode && (
+            <section style={{
+              margin: '0 auto 12px', padding: '14px 15px', borderRadius: 16,
+              border: '1px solid rgba(46,125,91,.16)', background: '#f4faf6',
+              color: '#173226', textAlign: 'left',
+            }}>
+              <strong style={{ display: 'block', fontSize: 14 }}>This stay is connected to your app</strong>
+              <span style={{ display: 'block', marginTop: 3, color: '#5d6e64', fontSize: 12.5, lineHeight: 1.45 }}>
+                Home follows the booking status. Messages connects you directly to Front Desk.
+              </span>
+              <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
+                <button type="button" className="stay-summary-card__btn" onClick={() => navigate('/guest/home')}>
+                  <Smartphone size={16} /> Open Home
+                </button>
+                <button type="button" className="stay-summary-card__btn" onClick={() => navigate('/guest/messages')}>
+                  <MessageCircle size={16} /> Messages
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* 2. YOUR STAY — always visible (was hidden in <details>). The money
               line is the trust payoff and must never be a tap away. */}
           <div className="stay-details-card stay-summary-card">
           <div className="stay-summary-card__head">
             <span className="stay-summary-card__title">{bookingDetails.name || 'Your room'}</span>
-            <span className="stay-summary-card__badge">{confirmationPending ? 'Room held' : 'Confirmed'}</span>
+            <span className="stay-summary-card__badge">{confirmationPending ? 'Room held' : confirmationReleased ? 'Released' : 'Confirmed'}</span>
           </div>
 
           <div className="stay-summary-card__dates">
@@ -352,7 +443,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
               <p className="confirmation-details__footnote">{hotel.cancellationPolicy}</p>
             )}
             <p className="confirmation-details__footnote" style={{ marginTop: 12 }}>
-              {confirmationPending ? 'Your final status will be sent to ' : 'Your confirmation was sent to '}
+              {confirmationPending ? 'Your final status will be sent to ' : confirmationReleased ? 'Your release notice was sent to ' : 'Your confirmation was sent to '}
               <strong style={{ color: '#374151' }}>{guestInfo.email}</strong>.
               Questions? Call {hotelPhone} — we&apos;re happy to help.
             </p>

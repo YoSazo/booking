@@ -29,9 +29,21 @@ self.addEventListener('push', function(event) {
         data: Object.assign({ url: data.url || '/frontdesk' }, data.data || {})
     };
 
-    event.waitUntil(
-        self.registration.showNotification(data.title, options)
-    );
+    const notify = self.registration.showNotification(data.title, options);
+    const refreshOpenFrontDesks = self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then(function(clientList) {
+            clientList.forEach(function(client) {
+                client.postMessage({
+                    type: 'marketel-frontdesk-data-updated',
+                    source: 'push',
+                    url: data.url || '/frontdesk'
+                });
+            });
+        })
+        .catch(function() {});
+
+    event.waitUntil(Promise.all([notify, refreshOpenFrontDesks]));
 });
 
 self.addEventListener('notificationclick', function(event) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, Search, MessageSquare, FileText } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
@@ -6,6 +6,7 @@ import { downloadStayIcs } from './guestMessaging.jsx';
 import { isStandalone } from './pwaUtils.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
+import { fetchWithTimeout } from './fetchWithTimeout.js';
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -89,40 +90,61 @@ export default function GuestHomePage({ hotel: hotelProp }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const fetchBooking = useCallback(async ({ initial = false } = {}) => {
     if (!guestStay?.code || !hotelId) {
+      setBooking(null);
+      setLookupHotel(null);
       setLoading(false);
       return;
     }
-
-    let cancelled = false;
-
-    const fetchBooking = async () => {
-      try {
-        const params = new URLSearchParams({
-          hotelId,
-          code: guestStay.code,
-          email: guestStay.email || '',
-        });
-        const res = await fetch(`${apiBaseUrl}/api/booking/lookup?${params}`);
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (data.success && data.booking) {
-          setBooking(data.booking);
-          if (data.hotel) setLookupHotel(data.hotel);
-        } else {
-          setError('Could not load your stay details.');
-        }
-      } catch (e) {
-        if (!cancelled) setError('Unable to connect. Please try again.');
+    if (initial) setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        hotelId,
+        code: guestStay.code,
+        email: guestStay.email || '',
+      });
+      const res = await fetchWithTimeout(`${apiBaseUrl}/api/booking/lookup?${params}`, {}, 12000);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.booking) {
+        setBooking(data.booking);
+        if (data.hotel) setLookupHotel(data.hotel);
+        setError('');
+      } else if (initial) {
+        setBooking(null);
+        setError('Could not load your stay details.');
       }
-      if (!cancelled) setLoading(false);
-    };
-
-    fetchBooking();
-    return () => { cancelled = true; };
+    } catch (e) {
+      if (initial) setError('Unable to connect. Please try again.');
+    } finally {
+      if (initial) setLoading(false);
+    }
   }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
+
+  useEffect(() => {
+    fetchBooking({ initial: true });
+  }, [fetchBooking]);
+
+  useEffect(() => {
+    if (!guestStay?.code) return undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') fetchBooking();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 15000);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('pageshow', refreshWhenVisible);
+    window.addEventListener('online', refreshWhenVisible);
+    window.addEventListener('marketel:guest-refresh', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('pageshow', refreshWhenVisible);
+      window.removeEventListener('online', refreshWhenVisible);
+      window.removeEventListener('marketel:guest-refresh', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [fetchBooking, guestStay?.code]);
 
   // No active stay — hotel hub (especially for installed PWA before booking)
   if (!guestStay?.code) {

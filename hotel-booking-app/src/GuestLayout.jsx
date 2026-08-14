@@ -13,7 +13,7 @@ const NAV_TABS = [
 ];
 
 export default function GuestLayout({ children }) {
-  const { isGuest, guestStay, apiBaseUrl, hotelId } = useGuest();
+  const { isGuest, guestStay, syncGuestStay, apiBaseUrl, hotelId } = useGuest();
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -69,17 +69,43 @@ export default function GuestLayout({ children }) {
   useEffect(() => {
     if (!installedApp || !isGuest) return;
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') fetchUnread();
+    };
+    const interval = setInterval(refreshWhenVisible, 15000);
     const clearUnread = () => {
       setUnreadCount(0);
       if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
     };
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('pageshow', refreshWhenVisible);
+    window.addEventListener('online', refreshWhenVisible);
+    window.addEventListener('marketel:guest-refresh', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
     window.addEventListener('marketel:guest-messages-read', clearUnread);
     return () => {
       clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('pageshow', refreshWhenVisible);
+      window.removeEventListener('online', refreshWhenVisible);
+      window.removeEventListener('marketel:guest-refresh', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('marketel:guest-messages-read', clearUnread);
     };
   }, [installedApp, isGuest, fetchUnread]);
+
+  useEffect(() => {
+    if (!installedApp || !('serviceWorker' in navigator)) return undefined;
+    const onWorkerMessage = (event) => {
+      if (event?.data?.type !== 'marketel-guest-data-updated') return;
+      syncGuestStay();
+      window.dispatchEvent(new CustomEvent('marketel:guest-refresh', {
+        detail: event.data,
+      }));
+    };
+    navigator.serviceWorker.addEventListener('message', onWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onWorkerMessage);
+  }, [installedApp, syncGuestStay]);
 
   useEffect(() => {
     if (installedApp && !guestStay?.code && 'clearAppBadge' in navigator) {
@@ -96,8 +122,14 @@ export default function GuestLayout({ children }) {
     if (location.pathname.startsWith('/guest/messages')) return 'messages';
     if (location.pathname === '/') return 'book';
     if (
+      location.pathname === '/guest-info'
+      || location.pathname === '/confirmation'
+      || location.pathname === '/final-confirmation'
+    ) {
+      return null;
+    }
+    if (
       location.pathname.startsWith('/guest/') ||
-      location.pathname === '/final-confirmation' ||
       location.pathname.startsWith('/booking')
     ) {
       return 'home';
@@ -115,12 +147,23 @@ export default function GuestLayout({ children }) {
             const isActive = activeTab === tab.key;
             const Icon = tab.icon;
             const isMessages = tab.key === 'messages';
+            const openTab = () => {
+              document.body.style.overflow = '';
+              document.body.style.position = '';
+              document.body.style.top = '';
+              document.body.style.width = '';
+              syncGuestStay();
+              window.dispatchEvent(new CustomEvent('marketel:guest-refresh', {
+                detail: { source: 'navigation', tab: tab.key },
+              }));
+              navigate(tab.path);
+            };
 
             return (
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => navigate(tab.path)}
+                onClick={openTab}
                 style={{
                   ...styles.tabButton,
                   transform: isActive ? 'translateY(-2px)' : 'none',

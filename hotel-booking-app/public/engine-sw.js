@@ -36,10 +36,22 @@ self.addEventListener('push', function (event) {
     data: Object.assign({ url: data.url || '/frontdesk' }, data.data || {}),
   };
   const notificationPromise = self.registration.showNotification(data.title, options);
+  const refreshOpenApps = self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then(function (clientList) {
+      clientList.forEach(function (client) {
+        client.postMessage({
+          type: 'marketel-guest-data-updated',
+          source: 'push',
+          url: (data.data && data.data.url) || data.url || '',
+        });
+      });
+    })
+    .catch(function () {});
   const badgePromise = self.navigator && typeof self.navigator.setAppBadge === 'function'
     ? self.navigator.setAppBadge(1).catch(function () {})
     : Promise.resolve();
-  event.waitUntil(Promise.all([notificationPromise, badgePromise]));
+  event.waitUntil(Promise.all([notificationPromise, badgePromise, refreshOpenApps]));
 });
 
 self.addEventListener('notificationclick', function (event) {

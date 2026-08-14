@@ -13,6 +13,8 @@ private extension Notification.Name {
         Notification.Name("MarketelDidFailToRegisterForRemoteNotifications")
     static let marketelOpenNotificationPath =
         Notification.Name("MarketelOpenNotificationPath")
+    static let marketelRefreshFrontDesk =
+        Notification.Name("MarketelRefreshFrontDesk")
 }
 
 private var marketelPendingNotificationDestination: [String: String]?
@@ -152,6 +154,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             self,
             selector: #selector(openNotificationPath(_:)),
             name: .marketelOpenNotificationPath,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshFrontDeskData(_:)),
+            name: .marketelRefreshFrontDesk,
             object: nil
         )
     }
@@ -606,6 +614,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         }
     }
 
+    @objc private func refreshFrontDeskData(_ notification: Notification) {
+        sendWebAction("refresh")
+    }
+
     private func openNotificationDestination(_ destination: [String: String]) {
         marketelPendingNotificationDestination = nil
         let path = destination["path"] ?? "/frontdesk?tab=bookings"
@@ -928,6 +940,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        NotificationCenter.default.post(name: .marketelRefreshFrontDesk, object: nil)
         if #available(iOS 14.0, *) {
             completionHandler([.banner, .list, .sound, .badge])
         } else {
@@ -1014,6 +1027,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         } else {
             application.applicationIconBadgeNumber = 0
         }
+        NotificationCenter.default.post(name: .marketelRefreshFrontDesk, object: nil)
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

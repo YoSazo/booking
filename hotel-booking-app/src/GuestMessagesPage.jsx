@@ -106,11 +106,28 @@ export default function GuestMessagesPage({ hotel }) {
     fetchMessages(true);
   }, [fetchMessages, guestStay?.code]);
 
-  // Poll every 15 seconds
+  // Push/service-worker events refresh immediately. A quiet visible-only poll
+  // remains as a fallback for replies delivered while Web Push is unavailable.
   useEffect(() => {
-    const interval = setInterval(() => fetchMessages(false), 15000);
-    return () => clearInterval(interval);
-  }, [fetchMessages]);
+    if (!guestStay?.code) return undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') fetchMessages(false);
+    };
+    const interval = window.setInterval(refreshWhenVisible, 10000);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('pageshow', refreshWhenVisible);
+    window.addEventListener('online', refreshWhenVisible);
+    window.addEventListener('marketel:guest-refresh', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('pageshow', refreshWhenVisible);
+      window.removeEventListener('online', refreshWhenVisible);
+      window.removeEventListener('marketel:guest-refresh', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [fetchMessages, guestStay?.code]);
 
   // No auto-scroll — user lands at top of conversation
 

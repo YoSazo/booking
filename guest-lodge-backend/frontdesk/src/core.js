@@ -816,7 +816,7 @@ function marketelNativeSelectTab(filter) {
 
 function marketelNativeAction(action) {
   if (action === 'qr') showCheckinQrOverlay();
-  else if (action === 'refresh') refreshCurrentView();
+  else if (action === 'refresh') refreshCurrentView({ force: true, visibleOnly: false });
   else if (action === 'tour') replayWalkthrough();
   else if (action === 'assistant') {
     // Dismiss native chrome before the lazy Assistant chunk is fetched. This
@@ -2877,7 +2877,9 @@ async function loadMessages() {
       const data = await api('GET', '/api/crm/messages');
       if (!data.success) return;
       crm.guestMessages = data.messages || [];
-      crm.messageUnreadCount = 0;
+      crm.messageUnreadCount = crm.guestMessages.filter(
+        message => !message.read && (message.sender || 'guest') !== 'hotel'
+      ).length;
       updateMessageBadges();
       if (crm.currentFilter === 'apps' || crm.messagesExpanded) renderMessages();
     } catch (e) { /* non-fatal */ }
@@ -2893,9 +2895,12 @@ function updateMessageBadges() {
   const appOnlySurface = isNativeFrontdeskApp()
     || document.body.classList.contains('frontdesk-editor-preview')
     || new URLSearchParams(window.location.search).get('previewEditor') === '1';
-  const unread = !appOnlySurface ? 0 : crm.guestMessages.length
-    ? crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
-    : crm.messageUnreadCount;
+  const loadedUnread = crm.guestMessages.filter(
+    message => !message.read && (message.sender || 'guest') !== 'hotel'
+  ).length;
+  const unread = !appOnlySurface
+    ? 0
+    : Math.max(loadedUnread, Number(crm.messageUnreadCount || 0));
   const badge = document.getElementById('msgUnreadBadge');
   if (badge) {
     badge.textContent = unread;
@@ -3251,6 +3256,9 @@ function markActiveMessageThreadRead() {
   crm.guestMessages.forEach(message => {
     if (pending.has(message.id)) message.read = true;
   });
+  crm.messageUnreadCount = crm.guestMessages.filter(
+    message => !message.read && (message.sender || 'guest') !== 'hotel'
+  ).length;
   updateMessageBadges();
   renderMessages();
   Promise.all([...pending].map(id =>
@@ -3261,6 +3269,9 @@ function markActiveMessageThreadRead() {
 async function markMessageRead(id) {
   const msg = crm.guestMessages.find(m => m.id === id);
   if (msg) msg.read = true;
+  crm.messageUnreadCount = crm.guestMessages.filter(
+    message => !message.read && (message.sender || 'guest') !== 'hotel'
+  ).length;
   updateMessageBadges();
   renderMessages();
   try { await api('POST', `/api/crm/messages/${encodeURIComponent(id)}/read`); }
@@ -3269,6 +3280,7 @@ async function markMessageRead(id) {
 
 async function markAllMessagesRead() {
   crm.guestMessages.forEach(m => { m.read = true; });
+  crm.messageUnreadCount = 0;
   updateMessageBadges();
   renderMessages();
   try { await api('POST', '/api/crm/messages/read-all'); }
@@ -3304,26 +3316,79 @@ async function replyToThread(reservationCode, inputId) {
   input.disabled = false;
 }
 
-async function refreshCurrentView() {
+let currentViewRefreshPromise = null;
+
+async function refreshCurrentView(options = {}) {
+  if (currentViewRefreshPromise) return currentViewRefreshPromise;
   if (!crm.token || !crm.activeHotelId || document.getElementById('app').style.display === 'none') return;
-  // Don't auto-refresh when user is on Edit tab (causes disruptive reload)
-  if (crm.currentFilter === 'settings') return;
-  if (crm.currentFilter === 'apps') {
-    loadAppsModule().then(() => Promise.allSettled([
-      loadGuestInstallStats(),
-      loadMessages(),
-    ])).catch(() => {});
-    return;
+  if (options.visibleOnly !== false && document.visibilityState === 'hidden') return;
+
+  currentViewRefreshPromise = (async () => {
+    // Every surface keeps lightweight booking/message badges fresh. The active
+    // surface then reloads its own data without resetting unrelated editors or
+    // forms that the owner may currently be using.
+    if (crm.currentFilter === 'settings') {
+      await Promise.allSettled([
+        loadBookings({ silent: true, deferMessages: true }),
+        loadMessageBadges(),
+      ]);
+      syncNativeShellState();
+      return;
+    }
+
+    if (crm.currentFilter === 'apps') {
+      const activeComposer = document.querySelector('.message-composer input');
+      const composerBusy = !!activeComposer && (
+        activeComposer === document.activeElement || String(activeComposer.value || '').trim().length > 0
+      );
+      await Promise.allSettled([
+        loadBookings({ silent: true, deferMessages: true }),
+        loadAppsModule().then(() => Promise.allSettled([
+          loadGuestInstallStats(),
+          composerBusy ? loadMessageBadges() : loadMessages(),
+        ])),
+      ]);
+      syncNativeShellState();
+      return;
+    }
+
+    if (crm.currentFilter === 'availability') {
+      // Availability renders booking occupancy, so update the booking snapshot
+      // first and then paint the room grid from that same snapshot.
+      await loadBookings({ silent: true, deferMessages: true });
+      await Promise.allSettled([
+        loadManualAvailability(),
+        loadMessageBadges(),
+      ]);
+      syncNativeShellState();
+      return;
+    }
+
+    const tasks = [loadBookings(), loadMessageBadges()];
+    if (crm.currentFilter === 'bookings') {
+      tasks.push(loadOperationalReadiness({ force: options.force === true }));
+    }
+    if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'revenue' && crm.revenueEnabled) {
+      tasks.push(loadRevenueData(options.force === true));
+    }
+    await Promise.allSettled(tasks);
+    syncNativeShellState();
+  })();
+
+  try {
+    return await currentViewRefreshPromise;
+  } finally {
+    currentViewRefreshPromise = null;
   }
-  const tasks = [loadBookings()];
-  if (crm.currentFilter === 'bookings') tasks.push(loadOperationalReadiness({ force: true }));
-  if (crm.currentFilter === 'availability') {
-    tasks.push(loadManualAvailability());
-  }
-  if (crm.currentFilter === 'bookings' && crm.bookingsSubview === 'revenue' && crm.revenueEnabled) {
-    tasks.push(loadRevenueData(true));
-  }
-  await Promise.allSettled(tasks);
+}
+
+let lastAutomaticRefreshAt = 0;
+function requestAutomaticRefresh(source = 'automatic') {
+  if (document.visibilityState === 'hidden') return;
+  const now = Date.now();
+  if (now - lastAutomaticRefreshAt < 1200) return;
+  lastAutomaticRefreshAt = now;
+  void refreshCurrentView({ force: source === 'manual' });
 }
 
 // ── RENDER ─────────────────────────────────────────────
@@ -6177,7 +6242,23 @@ if ('requestIdleCallback' in window) {
 } else {
   setTimeout(() => { loadAppsModule().catch(() => {}); }, 2000);
 }
-setInterval(refreshCurrentView, 30000);
+// Freshness is event-driven first: an incoming Web Push/native APNs alert,
+// returning to the app, reconnecting, or reopening a tab refreshes immediately.
+// A visible-only poll is the fallback for changes made by another employee.
+window.addEventListener('focus', () => requestAutomaticRefresh('focus'));
+window.addEventListener('pageshow', () => requestAutomaticRefresh('pageshow'));
+window.addEventListener('online', () => requestAutomaticRefresh('online'));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestAutomaticRefresh('visible');
+});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event?.data?.type === 'marketel-frontdesk-data-updated') {
+      requestAutomaticRefresh('push');
+    }
+  });
+}
+setInterval(() => requestAutomaticRefresh('poll'), 12000);
 (function(){
   function loadTelemetry(){
     const s = document.createElement('script');

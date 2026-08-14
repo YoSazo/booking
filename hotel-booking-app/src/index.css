@@ -1913,6 +1913,13 @@ body {
   animation: confirmationClockArrive 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.confirmation-status-icon--released {
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecaca;
+  box-shadow: 0 8px 24px rgba(180, 35, 24, 0.1);
+}
+
 @keyframes confirmationClockArrive {
   from { opacity: 0; transform: translateY(5px) scale(0.9); }
   to { opacity: 1; transform: translateY(0) scale(1); }
