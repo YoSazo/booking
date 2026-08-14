@@ -27,6 +27,7 @@ const telemetry = require('./marketel-signal-extractor');
 const { createFrontDeskAssistant } = require('./frontdesk-assistant');
 const { buildFrontdeskReturnPath } = require('./frontdesk-return');
 const { buildBookingQuote } = require('./booking-pricing');
+const { buildPreauthIdempotencyKey } = require('./booking-idempotency');
 
 let frontDeskAssistant = null;
 
@@ -577,14 +578,17 @@ async function withRetry(fn, retries = 3, delay = 1000) {
     }
 }
 
-// Keepalive ping so connection never goes idle (Supabase drops ~5 min)
-setInterval(async () => {
+// Keepalive ping so connection never goes idle (Supabase drops ~5 min).
+// Unref keeps one-off maintenance/test scripts that import this module from
+// hanging after their actual work is complete.
+const prismaKeepaliveTimer = setInterval(async () => {
     try {
         await prisma.$queryRaw`SELECT 1`;
     } catch (e) {
         // silent - just keeping connection warm
     }
 }, 2 * 60 * 1000); // ping every 2 minutes (well under Supabase's ~5 min timeout)
+prismaKeepaliveTimer.unref?.();
 
 const allowedOrigins = [
     'https://suitestay.clickinns.com',
@@ -995,11 +999,10 @@ function normalizeIsoDate(value) {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     
-    // Extract local components to avoid UTC drift
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    // Prisma returns date-only hotel fields as UTC-midnight Date objects.
+    // Reading local components in a western timezone silently moves them to
+    // the previous day; preserve the stored calendar date instead.
+    return d.toISOString().slice(0, 10);
 }
 
 function enumerateDatesInclusive(startIso, endIso, maxDays = 180) {
@@ -2683,7 +2686,7 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
 
         // Create a PaymentIntent with manual capture
         // This places a hold on the card without charging
-        const paymentIntent = await stripe.paymentIntents.create({
+        const paymentIntentParams = {
             amount: noShowFeeInCents,
             currency: 'usd',
             capture_method: 'manual', // 🔑 KEY: This creates a hold instead of charging
@@ -2707,7 +2710,19 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
                 },
             }),
             description: `Pre-authorization hold for ${quote.bookingDetails.roomName} - ${quote.nights} nights`
-        });
+        };
+        // The booking engine generates one reservation code before entering
+        // checkout and keeps it through refresh/Back. Stripe therefore returns
+        // the original PaymentIntent if the browser repeats this request rather
+        // than placing a second $1 authorization for the same attempt.
+        const idempotencyKey = buildPreauthIdempotencyKey(
+            hotelValidation.hotelId,
+            quote.bookingDetails.reservationCode
+        );
+        const paymentIntent = await stripe.paymentIntents.create(
+            paymentIntentParams,
+            idempotencyKey ? { idempotencyKey } : undefined
+        );
         
         res.send({ 
             clientSecret: paymentIntent.client_secret,
@@ -7625,9 +7640,15 @@ function bookingDetailsFromBookingRow(booking) {
 
 function formatApprovalStayRange(checkin, checkout) {
     try {
+        const checkinIso = normalizeIsoDate(checkin);
+        const checkoutIso = normalizeIsoDate(checkout);
+        if (!checkinIso || !checkoutIso) return '';
         const opts = { month: 'short', day: 'numeric' };
-        const a = new Date(checkin).toLocaleDateString('en-US', opts);
-        const b = new Date(checkout).toLocaleDateString('en-US', opts);
+        // Noon UTC is deliberate: formatting a database midnight in a western
+        // timezone can display the previous day. Owner push, SMS, email and the
+        // booking card must all show the guest's check-in and checkout dates.
+        const a = new Date(`${checkinIso}T12:00:00.000Z`).toLocaleDateString('en-US', opts);
+        const b = new Date(`${checkoutIso}T12:00:00.000Z`).toLocaleDateString('en-US', opts);
         return `${a} – ${b}`;
     } catch (_) {
         return '';
@@ -8765,7 +8786,7 @@ const sendEveningRecaps = () => forEachSubscribedHotel('evening recap', sendHote
 let lastDigestDate = '';
 let lastRecapDate = '';
 if (process.env.ENABLE_SCHEDULED_PUSH_DIGESTS !== 'false') {
-    setInterval(() => {
+    const scheduledPushTimer = setInterval(() => {
         try {
             const hour = getReportingHour();
             const today = getReportingTodayIso();
@@ -8779,6 +8800,7 @@ if (process.env.ENABLE_SCHEDULED_PUSH_DIGESTS !== 'false') {
             }
         } catch (_) {}
     }, 5 * 60 * 1000);
+    scheduledPushTimer.unref?.();
 }
 
 // Support for old notifyPurchase is removed to prevent double notifications
@@ -13689,7 +13711,8 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
 // Mount telemetry routes (LLM-optimized session intelligence)
 telemetry.setupRoutes(app);
 
-app.listen(PORT, () => {
+function startServer() {
+    return app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);
     // Pre-check-in guest install reminders (12–36h before check-in)
     if (process.env.ENABLE_GUEST_INSTALL_REMINDERS !== 'false') {
@@ -13748,4 +13771,26 @@ app.listen(PORT, () => {
         setTimeout(deletionSweep, 45_000);
         setInterval(deletionSweep, ACCOUNT_DELETION_SWEEP_MS);
     }
-});
+    });
+}
+
+if (require.main === module) {
+    startServer();
+}
+
+// The release-QA runner imports these exact production paths. Keeping them
+// behind one explicit namespace prevents test helpers from becoming HTTP API.
+module.exports = {
+    app,
+    startServer,
+    prisma,
+    releaseQa: {
+        ManualInventoryUnavailableError,
+        createManualBookingRecordWithInventory,
+        deleteRoomCatalogEntry,
+        formatApprovalStayRange,
+        getManualAvailability,
+        manualBookingStayDates,
+        saveRoomCatalogEntry,
+    },
+};

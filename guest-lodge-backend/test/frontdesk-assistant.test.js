@@ -6,6 +6,7 @@ const {
     deterministicSocialReply,
     sanitizeAssistantSocialReply,
     bookingDateContext,
+    buildNewBookingAlertMessage,
     formatRecentBookingStatus,
 } = require('../frontdesk-assistant');
 
@@ -142,6 +143,25 @@ test('booking dates distinguish guest checkout from the final occupied night', (
             stayLabel: 'Aug 13–Aug 20',
         }
     );
+});
+
+test('booking alert copy uses checkout, never the final occupied night', () => {
+    const now = new Date('2026-08-13T12:00:00.000Z').getTime();
+    const message = buildNewBookingAlertMessage({
+        status: 'pending',
+        roomName: 'Queen Suite',
+        checkinDate: new Date('2026-08-13T00:00:00.000Z'),
+        checkoutDate: new Date('2026-08-20T00:00:00.000Z'),
+        grandTotal: 328.9,
+        pendingUntil: new Date(now + 5 * 60 * 1000),
+        approvalNoResponseAction: 'confirm',
+    }, "Jack's Inn", now);
+
+    assert.equal(
+        message,
+        "New request at Jack's Inn: Queen Suite, Aug 13–Aug 20, $328.90.\nIs it still free? Say yes to keep it, or tell me what changed. If I don’t hear from you, I’ll keep it in 5 min."
+    );
+    assert.doesNotMatch(message, /Aug 19/);
 });
 
 test('recent booking status explains an automatic keep directly', () => {

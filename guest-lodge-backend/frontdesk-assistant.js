@@ -146,6 +146,23 @@ function bookingDateContext(booking) {
     };
 }
 
+function buildNewBookingAlertMessage(booking, propertyName = 'your property', nowMs = Date.now()) {
+    const stay = bookingDateContext(booking).stayLabel;
+    const amount = Number(booking?.grandTotal || 0).toFixed(2);
+    const isPending = String(booking?.status || '').toLowerCase() === 'pending';
+    if (!isPending) {
+        return `New booking at ${propertyName}: ${booking?.roomName || 'Room'}, ${stay}, $${amount}.\nIs the room still free? Tell me what changed, or say it’s available.`;
+    }
+
+    const dueMs = new Date(booking?.pendingUntil || 0).getTime() - Number(nowMs || 0);
+    const minutes = Math.max(1, Math.round(dueMs / 60000));
+    const fallbackRelease = String(booking?.approvalNoResponseAction || '').toLowerCase() === 'release';
+    const fallbackLine = fallbackRelease
+        ? `If I don’t hear from you, I’ll release it in ${minutes} min.`
+        : `If I don’t hear from you, I’ll keep it in ${minutes} min.`;
+    return `New request at ${propertyName}: ${booking?.roomName || 'Room'}, ${stay}, $${amount}.\nIs it still free? Say yes to keep it, or tell me what changed. ${fallbackLine}`;
+}
+
 function naturalDurationEndDate(text, startDate) {
     const lower = String(text || '').toLowerCase();
     const weekMatch = lower.match(/\bfor\s+(?:(?:a|one)\s+)?(\d+)?\s*weeks?\b/);
@@ -2014,19 +2031,9 @@ function createFrontDeskAssistant({
             });
         }
 
-        const stay = bookingDateContext(booking).stayLabel;
-        const amount = Number(booking.grandTotal || 0).toFixed(2);
-        const isPending = String(booking.status || '').toLowerCase() === 'pending';
-        const dueMs = new Date(booking.pendingUntil || 0).getTime() - Date.now();
-        const minutes = Math.max(1, Math.round(dueMs / 60000));
-        const fallbackRelease = String(booking.approvalNoResponseAction || '').toLowerCase() === 'release';
-        const fallbackLine = fallbackRelease
-            ? `If I don’t hear from you, I’ll release it in ${minutes} min.`
-            : `If I don’t hear from you, I’ll keep it in ${minutes} min.`;
         const propertyName = hotel.name || 'your property';
-        const body = isPending
-            ? `New request at ${propertyName}: ${booking.roomName}, ${stay}, $${amount}.\nIs it still free? Say yes to keep it, or tell me what changed. ${fallbackLine}`
-            : `New booking at ${propertyName}: ${booking.roomName}, ${stay}, $${amount}.\nIs the room still free? Tell me what changed, or say it’s available.`;
+        const body = buildNewBookingAlertMessage(booking, propertyName);
+        const stay = bookingDateContext(booking).stayLabel;
         return sendToVerifiedRecipients(hotel, body, {
             type: 'booking_alert',
             summary: `New ${booking.roomName} booking · ${stay}`,
@@ -2592,5 +2599,6 @@ module.exports = {
     deterministicSocialReply,
     sanitizeAssistantSocialReply,
     bookingDateContext,
+    buildNewBookingAlertMessage,
     formatRecentBookingStatus,
 };
