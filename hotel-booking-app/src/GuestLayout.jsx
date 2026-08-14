@@ -28,7 +28,7 @@ function isFocusedFlow(pathname) {
 }
 
 export default function GuestLayout({ children }) {
-  const { isGuest, guestStay, syncGuestStay, apiBaseUrl, hotelId } = useGuest();
+  const { isGuest, guestStay, guestStays, syncGuestStay, apiBaseUrl, hotelId } = useGuest();
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -59,28 +59,30 @@ export default function GuestLayout({ children }) {
   }, []);
 
   const fetchUnread = useCallback(async () => {
-    if (!guestStay?.code || !hotelId) return;
+    if (!guestStays.length || !hotelId) return;
     try {
-      const params = new URLSearchParams({
-        hotelId,
-        code: guestStay.code,
-        email: guestStay.email || '',
-      });
-      const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
-      const data = await res.json();
-      if (data.success) {
-        const unread = data.messages.filter(
+      const results = await Promise.all(guestStays.map(async (stay) => {
+        const params = new URLSearchParams({
+          hotelId,
+          code: stay.code,
+          email: stay.email || '',
+        });
+        const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages?${params}`, {}, 12000);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) return 0;
+        return (data.messages || []).filter(
           (message) => message.sender === 'hotel' && !message.guestReadAt
         ).length;
-        setUnreadCount(unread);
-        if (installedApp && 'setAppBadge' in navigator && unread > 0) {
-          navigator.setAppBadge(unread).catch(() => {});
-        } else if (installedApp && 'clearAppBadge' in navigator) {
-          navigator.clearAppBadge().catch(() => {});
-        }
+      }));
+      const unread = results.reduce((total, count) => total + count, 0);
+      setUnreadCount(unread);
+      if (installedApp && 'setAppBadge' in navigator && unread > 0) {
+        navigator.setAppBadge(unread).catch(() => {});
+      } else if (installedApp && 'clearAppBadge' in navigator) {
+        navigator.clearAppBadge().catch(() => {});
       }
     } catch (error) { /* quiet badge refresh */ }
-  }, [guestStay?.code, guestStay?.email, hotelId, apiBaseUrl, installedApp]);
+  }, [guestStays, hotelId, apiBaseUrl, installedApp]);
 
   useEffect(() => {
     // The conversation owns refresh while open. Everywhere else this powers
@@ -91,16 +93,12 @@ export default function GuestLayout({ children }) {
       if (document.visibilityState !== 'hidden') fetchUnread();
     };
     const interval = window.setInterval(refreshWhenVisible, 15000);
-    const clearUnread = () => {
-      setUnreadCount(0);
-      if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
-    };
     window.addEventListener('focus', refreshWhenVisible);
     window.addEventListener('pageshow', refreshWhenVisible);
     window.addEventListener('online', refreshWhenVisible);
     window.addEventListener('marketel:guest-refresh', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
-    window.addEventListener('marketel:guest-messages-read', clearUnread);
+    window.addEventListener('marketel:guest-messages-read', refreshWhenVisible);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('focus', refreshWhenVisible);
@@ -108,7 +106,7 @@ export default function GuestLayout({ children }) {
       window.removeEventListener('online', refreshWhenVisible);
       window.removeEventListener('marketel:guest-refresh', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
-      window.removeEventListener('marketel:guest-messages-read', clearUnread);
+      window.removeEventListener('marketel:guest-messages-read', refreshWhenVisible);
     };
   }, [installedApp, isGuest, fetchUnread, location.pathname]);
 

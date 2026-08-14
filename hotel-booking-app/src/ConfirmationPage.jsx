@@ -149,7 +149,9 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
       setGuestStay({
         code: reservationCode,
         email: guestInfo.email,
+        checkin: bookingDetails.checkin,
         checkout: bookingDetails.checkout,
+        roomName: bookingDetails.roomName || bookingDetails.name || '',
         name: [guestInfo.firstName, guestInfo.lastName].filter(Boolean).join(' ').trim(),
         phone: guestInfo.phone || '',
       });

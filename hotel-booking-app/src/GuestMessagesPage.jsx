@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Send, Search, MessageSquare } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import GuestInstallCard from './GuestInstallCard.jsx';
@@ -47,8 +47,13 @@ function formatRelativeTime(dateStr) {
 }
 
 export default function GuestMessagesPage({ hotel }) {
-  const { guestStay, apiBaseUrl, hotelId } = useGuest();
+  const { guestStay, guestStays, setGuestStay, selectGuestStay, apiBaseUrl, hotelId } = useGuest();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedStayCode = String(searchParams.get('stay') || '').trim();
+  const waitingForRequestedStay = Boolean(
+    requestedStayCode && requestedStayCode !== guestStay?.code
+  );
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messageText, setMessageText] = useState('');
@@ -64,6 +69,45 @@ export default function GuestMessagesPage({ hotel }) {
   const fetchInFlightRef = useRef(null);
   const lastFetchAtRef = useRef(0);
   const retryFetchAfterRef = useRef(0);
+  const requestedLookupRef = useRef('');
+
+  // A reply notification carries its reservation thread. Select that stay
+  // before loading the conversation so tapping an older stay's notification
+  // never opens the newest booking by mistake.
+  useEffect(() => {
+    if (!requestedStayCode || requestedStayCode === guestStay?.code) return undefined;
+    if (guestStays.some((stay) => stay.code === requestedStayCode)) {
+      selectGuestStay(requestedStayCode);
+      return undefined;
+    }
+
+    // The PWA's storage may have been cleared while its push subscription
+    // remained alive. The signed/random confirmation code in the notification
+    // can safely reconnect that reservation before opening the thread.
+    if (!hotelId || requestedLookupRef.current === requestedStayCode) return undefined;
+    requestedLookupRef.current = requestedStayCode;
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams({ hotelId, code: requestedStayCode });
+        const response = await fetchWithTimeout(`${apiBaseUrl}/api/booking/lookup?${params}`, {}, 12000);
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && data.success && data.booking) {
+          const booking = data.booking;
+          setGuestStay({
+            code: booking.reservationCode,
+            email: booking.guestEmail || '',
+            checkin: booking.checkin,
+            checkout: booking.checkout,
+            roomName: booking.roomName || '',
+            name: [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim(),
+            phone: booking.guestPhone || '',
+          });
+        }
+      } catch (_) { /* the normal connect-reservation state remains available */ }
+    })();
+    return () => { cancelled = true; };
+  }, [apiBaseUrl, guestStay?.code, guestStays, hotelId, requestedStayCode, selectGuestStay, setGuestStay]);
 
   // Treat the visible iOS viewport as the chat window. Safari may move the
   // visual viewport when its keyboard opens; anchoring the shell to that
@@ -200,12 +244,16 @@ export default function GuestMessagesPage({ hotel }) {
 
   // Initial load
   useEffect(() => {
+    if (waitingForRequestedStay) return;
     if (!guestStay?.code) {
       setLoading(false);
       return;
     }
+    setMessages([]);
+    setLoadError('');
+    setLoading(true);
     fetchMessages(true);
-  }, [fetchMessages, guestStay?.code]);
+  }, [fetchMessages, guestStay?.code, waitingForRequestedStay]);
 
   // Push/service-worker events refresh immediately. A quiet visible-only poll
   // remains as a fallback for replies delivered while Web Push is unavailable.
@@ -238,7 +286,7 @@ export default function GuestMessagesPage({ hotel }) {
 
   // Mark hotel messages as read (fire-and-forget)
   useEffect(() => {
-    if (!guestStay?.code || !hotelId) return;
+    if (waitingForRequestedStay || !guestStay?.code || !hotelId) return;
     const unread = messages.filter((m) => m.sender === 'hotel' && !m.guestReadAt);
     if (unread.length === 0) return;
 
@@ -264,7 +312,7 @@ export default function GuestMessagesPage({ hotel }) {
       } catch (e) { /* ignore */ }
     };
     markRead();
-  }, [messages, guestStay?.code, guestStay?.email, hotelId, apiBaseUrl]);
+  }, [messages, guestStay?.code, guestStay?.email, hotelId, apiBaseUrl, waitingForRequestedStay]);
 
   const toggleChip = (chip) => {
     setSelectedChips((prev) =>

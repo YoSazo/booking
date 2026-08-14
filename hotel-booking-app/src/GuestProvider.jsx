@@ -1,18 +1,29 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { readGuestStay, writeGuestStay, clearGuestStay } from './guestStayStorage.js';
+import {
+  clearGuestStay,
+  readGuestStay,
+  readGuestStays,
+  selectGuestStay as selectStoredGuestStay,
+  writeGuestStay,
+} from './guestStayStorage.js';
 
 const GuestContext = createContext(null);
 
 export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
   const [guestStay, setGuestStayState] = useState(null);
+  const [guestStays, setGuestStaysState] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const syncGuestStay = useCallback(() => {
     const storedStay = readGuestStay(hotelId);
+    const storedStays = readGuestStays(hotelId);
     setGuestStayState((currentStay) => {
       if (JSON.stringify(currentStay) === JSON.stringify(storedStay)) return currentStay;
       return storedStay;
     });
+    setGuestStaysState((currentStays) => (
+      JSON.stringify(currentStays) === JSON.stringify(storedStays) ? currentStays : storedStays
+    ));
     return storedStay;
   }, [hotelId]);
 
@@ -56,8 +67,10 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
 
   const setGuestStay = useCallback((stay) => {
     const scoped = stay && hotelId ? { ...stay, hotelId } : stay;
-    setGuestStayState(scoped);
     writeGuestStay(scoped);
+    const storedStays = readGuestStays(hotelId);
+    setGuestStaysState(storedStays);
+    setGuestStayState(storedStays.find((candidate) => candidate.code === scoped?.code) || scoped);
     window.dispatchEvent(new CustomEvent('marketel:guest-stay-changed', {
       detail: { hotelId, connected: !!scoped },
     }));
@@ -68,9 +81,21 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
     } catch (_) { /* BroadcastChannel is an optional cross-window accelerator. */ }
   }, [hotelId]);
 
+  const selectGuestStay = useCallback((code) => {
+    const selected = selectStoredGuestStay(hotelId, code);
+    if (!selected) return false;
+    setGuestStayState(selected);
+    setGuestStaysState(readGuestStays(hotelId));
+    window.dispatchEvent(new CustomEvent('marketel:guest-stay-changed', {
+      detail: { hotelId, connected: true, selectedCode: selected.code },
+    }));
+    return true;
+  }, [hotelId]);
+
   const clearGuest = useCallback(() => {
     setGuestStayState(null);
-    clearGuestStay();
+    setGuestStaysState([]);
+    clearGuestStay(hotelId);
     window.dispatchEvent(new CustomEvent('marketel:guest-stay-changed', {
       detail: { hotelId, connected: false },
     }));
@@ -81,12 +106,14 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
     isGuest,
     isLoading,
     guestStay,
+    guestStays,
     setGuestStay,
+    selectGuestStay,
     clearGuest,
     syncGuestStay,
     apiBaseUrl,
     hotelId,
-  }), [isGuest, isLoading, guestStay, setGuestStay, clearGuest, syncGuestStay, apiBaseUrl, hotelId]);
+  }), [isGuest, isLoading, guestStay, guestStays, setGuestStay, selectGuestStay, clearGuest, syncGuestStay, apiBaseUrl, hotelId]);
 
   return (
     <GuestContext.Provider value={value}>

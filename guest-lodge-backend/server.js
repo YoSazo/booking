@@ -6818,15 +6818,22 @@ async function saveGuestPushSubscription({ endpoint, p256dh, auth, hotelId, rese
     if (!cleanEndpoint || !p256dh || !auth || !cleanHotelId) {
         throw new Error('Missing subscription data');
     }
+    const existing = await prisma.pushSubscription.findFirst({ where: { endpoint: cleanEndpoint } });
+    const existingCodes = existing?.source === 'guest' && existing.hotelId === cleanHotelId
+        ? parseGuestPushReservationCodes(existing.reservationCode)
+        : [];
+    const reservationCodes = [...new Set([...existingCodes, cleanCode].filter(Boolean))];
     const data = {
         endpoint: cleanEndpoint,
         p256dh,
         auth,
         source: 'guest',
         hotelId: cleanHotelId,
-        reservationCode: cleanCode,
+        // A browser has one push endpoint even when its guest has multiple
+        // upcoming stays. Preserve every thread instead of moving alerts to
+        // whichever reservation was booked most recently.
+        reservationCode: JSON.stringify(reservationCodes),
     };
-    const existing = await prisma.pushSubscription.findFirst({ where: { endpoint: cleanEndpoint } });
     if (existing) {
         await prisma.pushSubscription.update({ where: { id: existing.id }, data });
     } else {
@@ -6834,17 +6841,34 @@ async function saveGuestPushSubscription({ endpoint, p256dh, auth, hotelId, rese
     }
 }
 
+function parseGuestPushReservationCodes(value) {
+    const clean = String(value || '').trim();
+    if (!clean) return [];
+    if (clean.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(clean);
+            if (Array.isArray(parsed)) {
+                return parsed.map(code => String(code || '').trim()).filter(Boolean);
+            }
+        } catch (_) { /* legacy single-code values are handled below */ }
+    }
+    return [clean];
+}
+
 // Send push to guest subscriptions (optionally scoped to one reservation thread).
 async function sendPushToGuests(hotelId, payloadObj, opts = {}, label = 'guestPush', reservationCode = '') {
     if (!VAPID_PRIVATE) { console.log(`🔕 [push] ${label} skipped — VAPID not configured (hotel=${hotelId})`); return { sent: 0, failed: 0, cleaned: 0 }; }
     if (!hotelId) { console.log(`🔕 [push] ${label} skipped — no hotelId`); return { sent: 0, failed: 0, cleaned: 0 }; }
-    const where = { hotelId, source: 'guest' };
     const reservationCodes = (Array.isArray(reservationCode) ? reservationCode : [reservationCode])
         .map((code) => String(code || '').trim())
         .filter(Boolean);
-    if (reservationCodes.length === 1) where.reservationCode = reservationCodes[0];
-    else if (reservationCodes.length > 1) where.reservationCode = { in: [...new Set(reservationCodes)] };
-    const subs = await prisma.pushSubscription.findMany({ where });
+    let subs = await prisma.pushSubscription.findMany({ where: { hotelId, source: 'guest' } });
+    if (reservationCodes.length > 0) {
+        const requested = new Set(reservationCodes);
+        subs = subs.filter(sub => (
+            parseGuestPushReservationCodes(sub.reservationCode).some(code => requested.has(code))
+        ));
+    }
     if (subs.length === 0) { console.log(`🔔 [push] ${label} hotel=${hotelId}: 0 guest subscriptions`); return { sent: 0, failed: 0, cleaned: 0 }; }
     const payload = JSON.stringify(payloadObj);
     const results = await Promise.allSettled(subs.map((s) =>
@@ -10967,7 +10991,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             subtitle: hotel.subtitle,
             pms: hotel.pms,
             theme: hotel.theme || 'light',
-            appIconUrl: hotel.appIconUrl || '',
+            appIconUrl: hotel.appIconUrl ? resolveImgUrl(hotel.appIconUrl) : '',
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
@@ -13675,7 +13699,7 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
         sendPushToGuests(hotelId, {
             title: 'New message from Front Desk',
             body: body.trim().slice(0, 160),
-            url: '/guest/messages',
+            url: `/guest/messages?stay=${encodeURIComponent(canonicalCode)}`,
             icon: '/icon-192.png',
         }, { TTL: 60 * 60 }, 'guestReply', threadCodes).catch((e) => {
             console.error('guest reply push error:', e.message);

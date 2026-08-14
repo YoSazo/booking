@@ -96,7 +96,9 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
           setGuestStay({
             code: b.reservationCode,
             email: b.guestEmail || '',
+            checkin: b.checkin,
             checkout: b.checkout,
+            roomName: b.roomName || '',
             name: [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ').trim(),
             phone: b.guestPhone || '',
           });

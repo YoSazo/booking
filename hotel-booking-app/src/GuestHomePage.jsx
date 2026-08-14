@@ -35,20 +35,26 @@ const isCheckinToday = (checkinStr) => {
 
 function PropertyMasthead({ hotel }) {
   const name = hotel?.name || 'Your Hotel';
-  const iconUrl = hotel?.appIconUrl || '';
+  const iconUrl = hotel?.appIconUrl
+    || hotel?.rooms?.[0]?.imageUrls?.[0]
+    || hotel?.rooms?.[0]?.imageUrl
+    || '';
+  const [iconFailed, setIconFailed] = useState(false);
+
+  useEffect(() => setIconFailed(false), [iconUrl]);
 
   return (
     <header style={styles.propertyMasthead}>
       <div style={styles.propertyIcon}>
-        {iconUrl
-          ? <img src={iconUrl} alt="" style={styles.propertyIconImage} />
+        {iconUrl && !iconFailed
+          ? <img src={iconUrl} alt="" style={styles.propertyIconImage} onError={() => setIconFailed(true)} />
           : <span>{name.charAt(0).toUpperCase()}</span>}
       </div>
       <div style={styles.propertyIdentity}>
         <span style={styles.propertyEyebrow}>Guest app</span>
         <strong style={styles.propertyName}>{name}</strong>
       </div>
-      <span style={styles.propertyLiveDot} aria-label="Connected" />
+      <span className="guest-property-live-dot" style={styles.propertyLiveDot} aria-label="Connected" />
     </header>
   );
 }
@@ -103,7 +109,7 @@ function PreBookHub({ hotel, onBook, onFindReservation }) {
 }
 
 export default function GuestHomePage({ hotel: hotelProp }) {
-  const { guestStay, apiBaseUrl, hotelId } = useGuest();
+  const { guestStay, guestStays, selectGuestStay, setGuestStay, apiBaseUrl, hotelId } = useGuest();
   const navigate = useNavigate();
   const [booking, setBooking] = useState(null);
   const [lookupHotel, setLookupHotel] = useState(null);
@@ -144,6 +150,21 @@ export default function GuestHomePage({ hotel: hotelProp }) {
   useEffect(() => {
     fetchBooking({ initial: true });
   }, [fetchBooking]);
+
+  // Enrich legacy reservations after their first successful lookup so the
+  // multi-stay switcher can name them without another endpoint or account.
+  useEffect(() => {
+    if (!booking || !guestStay?.code) return;
+    const checkin = booking.checkin || booking.checkinDate || '';
+    const checkout = booking.checkout || booking.checkoutDate || '';
+    const roomName = booking.roomName || booking.room?.name || '';
+    if (
+      guestStay.checkin === checkin
+      && guestStay.checkout === checkout
+      && guestStay.roomName === roomName
+    ) return;
+    setGuestStay({ ...guestStay, checkin, checkout, roomName });
+  }, [booking, guestStay, setGuestStay]);
 
   useEffect(() => {
     if (!guestStay?.code) return undefined;
@@ -249,6 +270,40 @@ export default function GuestHomePage({ hotel: hotelProp }) {
   return (
     <div style={styles.page}>
       <PropertyMasthead hotel={lookupHotel || hotelProp} />
+      {guestStays.length > 1 && (
+        <section style={styles.staySwitcher} aria-label="Upcoming stays">
+          <div style={styles.staySwitcherHeading}>
+            <strong style={styles.staySwitcherTitle}>Your stays</strong>
+            <span style={styles.staySwitcherCount}>{guestStays.length} upcoming</span>
+          </div>
+          <div style={styles.staySwitcherList}>
+            {guestStays.map((stay, index) => {
+              const selected = stay.code === guestStay.code;
+              const stayDate = stay.checkin || stay.checkinDate;
+              const dateLabel = stayDate
+                ? new Date(stayDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+                : `Stay ${index + 1}`;
+              return (
+                <button
+                  type="button"
+                  key={stay.code}
+                  onClick={() => selectGuestStay(stay.code)}
+                  aria-pressed={selected}
+                  style={{
+                    ...styles.staySwitcherButton,
+                    ...(selected ? styles.staySwitcherButtonActive : {}),
+                  }}
+                >
+                  <span style={styles.staySwitcherDate}>{dateLabel}</span>
+                  <span style={styles.staySwitcherRoom}>
+                    {stay.roomName || `#${String(stay.code).slice(-5)}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
       {/* Greeting */}
       <div style={styles.greetingSection}>
         <h1 style={styles.greeting}>Welcome, {firstName}</h1>
@@ -275,7 +330,10 @@ export default function GuestHomePage({ hotel: hotelProp }) {
 
       <GuestInstallCard
         hotelName={hotelProp?.name || lookupHotel?.name}
-        appIconUrl={hotelProp?.appIconUrl || lookupHotel?.appIconUrl}
+        appIconUrl={hotelProp?.appIconUrl
+          || lookupHotel?.appIconUrl
+          || hotelProp?.rooms?.[0]?.imageUrls?.[0]
+          || hotelProp?.rooms?.[0]?.imageUrl}
         hotelId={hotelId}
         reservationCode={confirmationCode}
         apiBaseUrl={apiBaseUrl}
@@ -365,7 +423,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
         onClick={() => navigate('/')}
         style={styles.bookAgainLink}
       >
-        <span>Book again or extend your stay</span>
+        <span>Book another stay</span>
         <ChevronRight size={16} color="#2E7D5B" />
       </button>
     </div>
@@ -376,6 +434,13 @@ const spinnerKeyframes = `
 @keyframes guestHomeSpinner {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+@keyframes guestLivePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(54, 162, 105, 0); opacity: .82; }
+  50% { box-shadow: 0 0 0 5px rgba(54, 162, 105, .13); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guest-property-live-dot { animation: none !important; }
 }
 `;
 
@@ -454,13 +519,81 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   propertyLiveDot: {
-    width: 8,
-    height: 8,
-    flex: '0 0 8px',
-    border: '3px solid rgba(76,175,125,0.17)',
+    width: 6,
+    height: 6,
+    flex: '0 0 6px',
     borderRadius: '50%',
-    background: '#4CAF7D',
-    boxSizing: 'content-box',
+    background: '#36A269',
+    animation: 'guestLivePulse 2.4s ease-in-out infinite',
+  },
+
+  staySwitcher: {
+    marginTop: 12,
+    padding: '12px',
+    border: '1px solid rgba(216,228,220,.9)',
+    borderRadius: 17,
+    background: 'rgba(255,255,255,.68)',
+    boxShadow: '0 5px 18px rgba(46,125,91,.06)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+  },
+  staySwitcherHeading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 9,
+    padding: '0 2px',
+  },
+  staySwitcherTitle: {
+    color: '#1A2B22',
+    fontSize: 13,
+    fontWeight: 800,
+  },
+  staySwitcherCount: {
+    color: '#6B7D72',
+    fontSize: 11,
+    fontWeight: 650,
+  },
+  staySwitcherList: {
+    display: 'flex',
+    gap: 8,
+    overflowX: 'auto',
+    scrollbarWidth: 'none',
+    WebkitOverflowScrolling: 'touch',
+  },
+  staySwitcherButton: {
+    display: 'flex',
+    minWidth: 104,
+    flex: '0 0 auto',
+    flexDirection: 'column',
+    gap: 2,
+    padding: '9px 12px',
+    border: '1px solid #D8E4DC',
+    borderRadius: 12,
+    background: '#F5F8F6',
+    color: '#52645A',
+    fontFamily: 'inherit',
+    textAlign: 'left',
+    cursor: 'pointer',
+  },
+  staySwitcherButtonActive: {
+    borderColor: 'rgba(46,125,91,.38)',
+    background: '#E8F5EE',
+    color: '#245F46',
+    boxShadow: 'inset 0 0 0 1px rgba(46,125,91,.08)',
+  },
+  staySwitcherDate: {
+    fontSize: 13,
+    fontWeight: 800,
+  },
+  staySwitcherRoom: {
+    maxWidth: 132,
+    overflow: 'hidden',
+    fontSize: 10.5,
+    fontWeight: 600,
+    opacity: .82,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
 
   // Loading
@@ -563,12 +696,15 @@ const styles = {
 
   // Check-in top card (D12/1D.5)
   checkinCard: {
-    background: 'linear-gradient(135deg,#1a2b22,#2E7D5B)',
-    borderRadius: 16,
+    background: 'linear-gradient(145deg, rgba(255,255,255,.92), rgba(232,245,238,.82))',
+    border: '1px solid rgba(76,175,125,.22)',
+    borderRadius: 18,
     padding: '18px',
     marginBottom: 16,
-    color: '#fff',
-    boxShadow: '0 6px 20px rgba(46,125,91,0.25)',
+    color: '#1A2B22',
+    boxShadow: '0 8px 24px rgba(46,125,91,.10)',
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
   },
   checkinPill: {
     display: 'inline-flex',
@@ -576,14 +712,14 @@ const styles = {
     gap: 7,
     fontSize: 12,
     fontWeight: 700,
-    color: 'rgba(255,255,255,0.92)',
+    color: '#2E7D5B',
     marginBottom: 8,
   },
   checkinDot: {
     width: 8,
     height: 8,
     borderRadius: '50%',
-    background: '#7ee2b8',
+    background: '#4CAF7D',
     display: 'inline-block',
   },
   checkinTitle: {
@@ -606,8 +742,8 @@ const styles = {
     padding: '12px 14px',
     borderRadius: 12,
     border: 'none',
-    background: '#fff',
-    color: '#245F46',
+    background: '#2E7D5B',
+    color: '#fff',
     fontSize: 14,
     fontWeight: 700,
     fontFamily: 'inherit',
@@ -621,9 +757,9 @@ const styles = {
     gap: 8,
     padding: '12px 14px',
     borderRadius: 12,
-    border: '1.5px solid rgba(255,255,255,0.55)',
-    background: 'transparent',
-    color: '#fff',
+    border: '1px solid #CFE1D6',
+    background: 'rgba(255,255,255,.78)',
+    color: '#245F46',
     fontSize: 14,
     fontWeight: 700,
     fontFamily: 'inherit',
