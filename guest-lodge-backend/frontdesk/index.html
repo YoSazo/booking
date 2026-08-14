@@ -106,7 +106,7 @@
       <button type="button" class="login-btn" id="nativeCodeRequestBtn">Email me a code</button>
       <div id="nativeCodeStep" style="display:none;margin-top:16px;">
         <label class="native-property-label" for="nativePropertyCode">Verification code</label>
-        <input class="login-input native-property-code" type="text" id="nativePropertyCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+        <input class="login-input native-property-code native-property-otp" type="text" id="nativePropertyCode" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code" inputmode="numeric" enterkeyhint="done">
         <button type="button" class="login-btn" id="nativeCodeVerifyBtn">Continue</button>
       </div>
       <div id="nativePropertyMessage" class="native-property-message"></div>
@@ -119,7 +119,7 @@
       <label class="native-property-label" for="nativePropertyId">Property ID</label>
       <input class="login-input native-property-input" type="text" id="nativePropertyId" placeholder="your-property" autocapitalize="none" autocomplete="off">
       <label class="native-property-label" for="nativePropertyPin">Front Desk PIN</label>
-      <input class="login-input native-property-code" type="password" id="nativePropertyPin" placeholder="••••••" autocomplete="current-password">
+      <input class="login-input native-property-code" type="password" id="nativePropertyPin" placeholder="Enter PIN" autocomplete="current-password" enterkeyhint="go">
       <button type="button" class="login-btn" id="nativePinLoginBtn">Open Front Desk</button>
       <div id="nativePinMessage" class="native-property-message"></div>
       <button type="button" class="native-property-link" id="nativeEmailLoginToggle">Use email instead</button>
@@ -166,7 +166,7 @@
       <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
     </div>
     <p>Front Desk — Enter your PIN to continue</p>
-    <input class="login-input" type="password" id="pinInput" placeholder="••••••" maxlength="20" autocomplete="current-password" enterkeyhint="go">
+    <input class="login-input login-pin-input" type="password" id="pinInput" placeholder="Enter PIN" maxlength="20" autocomplete="current-password" enterkeyhint="go">
     <button type="button" class="login-btn" id="signInBtn">Sign In</button>
     <div class="login-error" id="loginError"></div>
     <div id="forgotPinSection" style="margin-top:14px;text-align:center;">

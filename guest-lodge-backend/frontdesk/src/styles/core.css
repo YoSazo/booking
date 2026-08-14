@@ -103,6 +103,59 @@
     .login-btn:active:not(:disabled) { transform: scale(0.98); }
     .login-error { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; }
 
+    /* Authentication is a destination, not a modal. Keep the content directly
+       on one full green page and make that page the only scrolling surface. */
+    #loginScreen,
+    .native-property-screen {
+      width: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: max(28px, env(safe-area-inset-top, 0px)) 20px
+        max(28px, env(safe-area-inset-bottom, 0px));
+      background:
+        radial-gradient(circle at 50% -12%, rgba(76, 175, 125, .24), transparent 43%),
+        linear-gradient(180deg, #dceee3 0%, var(--bg) 48%, #deeee4 100%);
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      scroll-padding-block: 24px;
+    }
+    #loginScreen > .login-card,
+    .native-property-screen > .native-property-card {
+      width: min(410px, 100%);
+      max-width: 100%;
+      max-height: none;
+      margin: auto 0;
+      padding: clamp(24px, 7vh, 58px) 0;
+      overflow: visible;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      text-align: left;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    #loginScreen > .login-card {
+      text-align: center;
+    }
+    #loginScreen .login-input,
+    .native-property-screen .login-input {
+      min-height: 52px;
+      border-color: rgba(46, 125, 91, .2);
+      background: rgba(255, 255, 255, .78);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, .7) inset;
+    }
+    #loginScreen .login-input,
+    #loginScreen .login-pin-input {
+      text-align: left;
+      letter-spacing: 0;
+      font-size: 16px !important;
+    }
+
     /* ── HEADER ── */
     .header {
       background: rgba(255,255,255,0.78);
@@ -2490,14 +2543,10 @@
       margin-right: auto;
     }
 
-    .native-property-screen {
-      padding: max(18px, env(safe-area-inset-top, 0px)) 16px
-        max(18px, env(safe-area-inset-bottom, 0px));
-    }
     .native-property-card {
-      width: min(390px, 100%);
-      max-height: calc(100dvh - 36px);
-      overflow-y: auto;
+      width: min(410px, 100%);
+      max-height: none;
+      overflow: visible;
       text-align: left;
     }
     .native-property-card .login-logo,
@@ -2525,10 +2574,22 @@
       font-size: 16px !important;
     }
     .native-property-code {
-      text-align: center;
-      letter-spacing: 0.22em;
-      font-size: 20px !important;
+      text-align: left;
+      letter-spacing: 0;
+      font-size: 16px !important;
       font-variant-numeric: tabular-nums;
+    }
+    .native-property-otp:not(:placeholder-shown) {
+      text-align: center;
+      letter-spacing: 0.18em;
+      font-size: 20px !important;
+    }
+    .native-property-code::placeholder,
+    .native-property-otp::placeholder {
+      color: #839189;
+      font-size: 16px;
+      letter-spacing: 0;
+      opacity: 1;
     }
     .native-property-message {
       min-height: 20px;
@@ -3468,16 +3529,17 @@ body.native-ios .marketel-form-keyboard-surface {
   -webkit-overflow-scrolling: touch;
 }
 body.native-ios .marketel-form-keyboard-surface.login-screen {
-  align-items: center;
-  justify-content: center;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: max(18px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(18px, env(safe-area-inset-bottom, 0px));
 }
 body.native-ios .marketel-form-keyboard-surface .native-property-card,
 body.native-ios .marketel-form-keyboard-surface .login-card {
-  max-height: calc(var(--marketel-form-visible-height, 100dvh) - 20px);
-  overscroll-behavior: contain;
-  scroll-padding-block: 18px;
+  max-height: none;
+  margin: 0 auto;
+  overflow: visible;
+  scroll-padding-block: 0;
 }
 body.native-ios .rooms-modal-bg.marketel-form-keyboard-surface {
   align-items: flex-end;
