@@ -3,6 +3,11 @@ import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
 import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
 import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
+import guestInstallBannerUrl from './assets/guest-install-banner.webp';
+import guestInstallSheetUrl from './assets/guest-install-sheet.webp';
+import guestHomeScreenUrl from './assets/guest-home-screen.webp';
+import guestAppStayUrl from './assets/guest-app-stay.webp';
+import guestAppBookUrl from './assets/guest-app-book.webp';
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
@@ -10,15 +15,12 @@ const BILLING_KEY = 'marketelBillingIntervalV1';
 
 let currentStep = 0;
 let livePreviewMode = 'guest';
-let homeScreenInstalled = false;
 let revealData = { rooms: [], rates: null };
 let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
 let bookingPageTimer = 0;
-let guestAppDemoTimer = 0;
-let guestAppDemoObserver = null;
-let guestAppDemoSlide = 0;
-let assistantBeat = 0;
+// Which beat each beat-driven stage is showing. Keyed by reveal step.
+let stageBeatIndex = { 1: 0, 2: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
@@ -28,8 +30,6 @@ let bookingPreviewUnavailable = false;
 let nextStageViewIsResume = false;
 let assistantNoResponseAction = 'confirm';
 
-const IOS_PHONE_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/46/2a/e1/462ae1c9-9347-efd0-5e99-41e7f636e3f7/phone-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
-const IOS_SAFARI_ICON_URL = 'https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/23/4c/cb/234ccbb4-e65a-bb94-f877-3d230743e9e3/safari-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg';
 
 function isLocalFrontdesk() {
   const host = window.location.hostname;
@@ -497,125 +497,146 @@ function bookingRevealHtml() {
   </section>`;
 }
 
-function iosSystemIcon(url, label) {
-  return `<img class="mvr-ios-system-icon" src="${esc(url)}" alt="${esc(label)}">`;
-}
 
 function guestAppRevealHtml() {
-  return `<section class="mvr-stage mvr-stage-app">
-    <div class="mvr-copy">
-      <div class="mvr-eyebrow">2 · Guests’ Home Screens</div>
-      <h1>Stay on their Home Screen. Reach them again.</h1>
-      <p>Guests save <strong>${esc(propertyName())}</strong> to their Home Screen from your booking page—no App Store download. Then they can return in one tap and receive notifications you send from Marketel Front Desk.</p>
-      <div class="mvr-callout">
-        <strong>One Home Screen save. Two lasting advantages.</strong>
-        A direct path back for them and a direct line from Front Desk for you.
-      </div>
+  return beatStageHtml(
+    'mvr-stage-app',
+    '2 · Guests’ Home Screens',
+    guestAppBeats(),
+    stageBeatIndex[1] || 0
+  );
+}
+
+// Beat-driven stages: one claim over one full-size proof, advanced only by the
+// footer. Screenshots are real product, shown whole rather than cropped, so the
+// owner is looking at the thing itself instead of an illustration of it.
+function guestAppBeats() {
+  const name = esc(propertyName());
+  return [
+    {
+      title: 'Guests save you right from your booking page.',
+      body: 'A prompt sits under the room. One tap, no App Store, no download.',
+      next: 'See what iOS does',
+      event: 'GuestAppInstallBannerViewed',
+      proof: {
+        url: guestInstallBannerUrl,
+        alt: 'A real booking page open in Safari with a card offering to save the property to the guest’s Home Screen.',
+      },
+    },
+    {
+      title: 'iOS adds it like any other app.',
+      body: 'Your name, your icon — handled by the phone, not by us.',
+      next: 'See where it lands',
+      event: 'GuestAppInstallSheetViewed',
+      proof: {
+        url: guestInstallSheetUrl,
+        alt: 'The real iOS Add to Home Screen sheet showing the property name, its web address and the Open as Web App switch.',
+      },
+    },
+    {
+      title: 'It lands on their Home Screen.',
+      body: `Guests get ${name}. You get Front Desk. Two apps, two jobs.`,
+      next: 'See what they open',
+      event: 'GuestAppHomeScreenViewed',
+      proof: {
+        url: guestHomeScreenUrl,
+        alt: 'An iPhone Home Screen showing the property’s guest app icon beside the Marketel Front Desk icon.',
+      },
+    },
+    {
+      title: 'They open straight to their stay.',
+      body: 'Check-in time, directions, and a direct line to your front desk. No browser, no searching.',
+      next: 'See what it wins you',
+      event: 'GuestAppStayViewed',
+      proof: {
+        url: guestAppStayUrl,
+        alt: 'The installed guest app showing the stay: check-in today, room, dates, amount due and property details.',
+      },
+    },
+    {
+      title: 'Next time, they book you direct.',
+      body: 'One tap back to your rooms — a booking you keep instead of renting from an OTA.',
+      next: 'See how Front Desk protects you',
+      event: 'GuestAppRebookViewed',
+      proof: {
+        url: guestAppBookUrl,
+        alt: 'The installed guest app on its Book tab, showing the property’s rooms ready to reserve again.',
+      },
+    },
+  ];
+}
+
+// Beat 3 is the single real setting on the screen — text vs in-app is not a
+// choice (both always fire), so it is never offered as a toggle.
+function assistantBeats() {
+  return [
+    {
+      title: 'It texts you the moment a request lands.',
+      body: 'Reply naturally — a walk-in took it, you’re full, whatever changed.',
+      next: 'See how you answer',
+      event: 'AssistantTextProofViewed',
+      proof: {
+        url: assistantTextResolutionUrl,
+        alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.',
+      },
+    },
+    {
+      title: 'Or answer with one tap.',
+      body: 'The same request is already waiting in Bookings. Either way works.',
+      next: 'Set your rule',
+      event: 'AssistantAppProofViewed',
+      proof: {
+        url: assistantBookingRequestUrl,
+        alt: 'A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
+      },
+    },
+    {
+      title: 'And if you miss it, your rule decides.',
+      body: 'That’s how a room conflict never becomes a guest problem.',
+      next: 'Review plans and activation',
+      event: 'AssistantFallbackViewed',
+      proof: null,
+      render: assistantFallbackHtml,
+    },
+  ];
+}
+
+function stageBeats(step = currentStep) {
+  if (step === 1) return guestAppBeats();
+  if (step === 2) return assistantBeats();
+  return null;
+}
+
+function beatStageHtml(stageClass, eyebrow, beats, index) {
+  const beat = beats[Math.max(0, Math.min(beats.length - 1, index))] || beats[0];
+  return `<section class="mvr-stage mvr-stage-beats ${stageClass}">
+    <div class="mvr-beat-band">
+      <div class="mvr-eyebrow">${eyebrow}</div>
+      <h1 class="mvr-beat-title">${beat.title}</h1>
+      <p class="mvr-beat-body">${beat.body}</p>
+      ${beat.proof ? '<span class="mvr-proof-badge">Real Marketel workflow</span>' : ''}
     </div>
-    <div class="mvr-visual mvr-install-visual ${homeScreenInstalled ? 'is-installed' : ''} ${guestAppDemoSlide === 1 ? 'is-slide-2' : ''}">
-      <div class="mvr-app-carousel">
-        <div class="mvr-app-carousel-viewport">
-          <div class="mvr-app-carousel-track">
-            <div class="mvr-app-carousel-slide mvr-app-carousel-install" aria-hidden="${guestAppDemoSlide === 0 ? 'false' : 'true'}">
-              <div class="mvr-install-demo-stage">
-                <div class="mvr-install-entry">
-                  <small class="mvr-install-context">On your booking page</small>
-                  <div class="mvr-install-card">
-                    <div class="mvr-install-property-icon">${appIconHtml()}</div>
-                    <div>
-                      <strong>Save ${esc(propertyName())} to your Home Screen</strong>
-                      <span>Return to this booking page in one tap. No App Store.</span>
-                    </div>
-                    <button type="button" id="mvrInstallDemo" ${homeScreenInstalled ? 'disabled' : ''}>${homeScreenInstalled ? 'Saved ✓' : 'Add'}</button>
-                  </div>
-                  <div class="mvr-install-arrow"><span>${homeScreenInstalled ? 'Saved to their Home Screen' : 'Tap Add to Home Screen'}</span><b>↓</b></div>
-                  <div class="mvr-ios-crop">
-                    <div class="mvr-ios-dock">
-                      <div class="mvr-dock-icon mvr-dock-property">${appIconHtml()}</div>
-                      <div class="mvr-dock-icon">${iosSystemIcon(IOS_PHONE_ICON_URL, 'Phone')}</div>
-                      <div class="mvr-dock-icon">${iosSystemIcon(IOS_SAFARI_ICON_URL, 'Safari')}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="mvr-app-carousel-slide mvr-app-carousel-value" aria-hidden="${guestAppDemoSlide === 1 ? 'false' : 'true'}">
-              <div class="mvr-installed-value">
-                <div class="mvr-installed-value-head">
-                  <div class="mvr-installed-app-icon">${appIconHtml()}</div>
-                  <div>
-                    <strong>From their Home Screen</strong>
-                    <span>${esc(propertyName())} stays one tap away.</span>
-                  </div>
-                  <b>✓</b>
-                </div>
-                <div class="mvr-app-direct-result">
-                  <span aria-hidden="true">↗</span>
-                  <div>
-                    <strong>Book direct again</strong>
-                    <small>One tap brings them straight back to your booking page.</small>
-                  </div>
-                </div>
-                <div class="mvr-app-push-preview">
-                  <div class="mvr-app-push-meta">
-                    <span class="mvr-app-push-icon">${appIconHtml()}</span>
-                    <strong>${esc(propertyName())}</strong>
-                    <span>now</span>
-                  </div>
-                  <div class="mvr-app-push-title">Summer dates are open</div>
-                  <div class="mvr-app-push-body">Tap to see availability and book direct.</div>
-                </div>
-                <div class="mvr-app-push-foot">Sent from Front Desk → delivered to their phone</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mvr-app-carousel-controls" aria-label="Guest Home Screen demonstration">
-          <button type="button" data-mvr-app-slide="0" aria-label="Show how guests save the property to their Home Screen" ${guestAppDemoSlide === 0 ? 'disabled' : ''}>‹</button>
-          <div class="mvr-app-carousel-dots">
-            <button type="button" data-mvr-app-slide="0" class="${guestAppDemoSlide === 0 ? 'is-active' : ''}" aria-label="Save to Home Screen" aria-current="${guestAppDemoSlide === 0 ? 'step' : 'false'}"></button>
-            <button type="button" data-mvr-app-slide="1" class="${guestAppDemoSlide === 1 ? 'is-active' : ''}" aria-label="What Home Screen access unlocks" aria-current="${guestAppDemoSlide === 1 ? 'step' : 'false'}"></button>
-          </div>
-          <button type="button" data-mvr-app-slide="1" aria-label="Show what saving the property unlocks" ${guestAppDemoSlide === 1 ? 'disabled' : ''}>›</button>
-        </div>
-      </div>
+    <div class="mvr-beat-stage">
+      ${beat.proof ? `<figure class="mvr-beat-proof">
+        <img src="${beat.proof.url}" width="780" height="1531" decoding="async" alt="${esc(beat.proof.alt)}">
+      </figure>` : `<div class="mvr-beat-settings">${beat.render ? beat.render() : ''}</div>`}
     </div>
   </section>`;
 }
 
-// The Assistant stage is a three-beat sequence rather than a scrolling page:
-// each beat is one claim over one full-bleed proof, and the footer is the only
-// way forward. Beat 3 is the single real setting on the screen — text vs in-app
-// is not a choice (both always fire), so it is never offered as a toggle.
-const ASSISTANT_BEATS = [
-  {
-    title: 'It texts you the moment a request lands.',
-    body: 'Reply naturally — a walk-in took it, you’re full, whatever changed.',
-    next: 'See how you answer',
-    event: 'AssistantTextProofViewed',
-    proof: {
-      url: assistantTextResolutionUrl,
-      alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.',
-    },
-  },
-  {
-    title: 'Or answer with one tap.',
-    body: 'The same request is already waiting in Bookings. Either way works.',
-    next: 'Set your rule',
-    event: 'AssistantAppProofViewed',
-    proof: {
-      url: assistantBookingRequestUrl,
-      alt: 'A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
-    },
-  },
-  {
-    title: 'And if you miss it, your rule decides.',
-    body: 'That’s how a room conflict never becomes a guest problem.',
-    next: 'Review plans and activation',
-    event: 'AssistantFallbackViewed',
-    proof: null,
-  },
-];
+function setStageBeat(nextBeat, manual = false) {
+  const beats = stageBeats();
+  if (!beats) return;
+  const clamped = Math.max(0, Math.min(beats.length - 1, Number(nextBeat) || 0));
+  if (clamped === (stageBeatIndex[currentStep] || 0)) return;
+  stageBeatIndex[currentStep] = clamped;
+  renderReveal();
+  document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
+  if (!manual) return;
+  const beat = beats[clamped];
+  if (beat.event) trackReveal(beat.event);
+  trackJourney('JourneyRevealBeatViewed', { revealStep: currentStep, beat: clamped });
+}
 
 function assistantFallbackHtml() {
   const releases = assistantNoResponseAction === 'release';
@@ -632,20 +653,12 @@ function assistantFallbackHtml() {
 }
 
 function assistantRevealHtml() {
-  const beat = ASSISTANT_BEATS[assistantBeat] || ASSISTANT_BEATS[0];
-  return `<section class="mvr-stage mvr-stage-assistant">
-    <div class="mvr-beat-band">
-      <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
-      <h1 class="mvr-beat-title">${beat.title}</h1>
-      <p class="mvr-beat-body">${beat.body}</p>
-      ${beat.proof ? '<span class="mvr-proof-badge">Real Marketel workflow</span>' : ''}
-    </div>
-    <div class="mvr-beat-stage">
-      ${beat.proof ? `<figure class="mvr-beat-proof">
-        <img src="${beat.proof.url}" width="780" height="1532" decoding="async" alt="${esc(beat.proof.alt)}">
-      </figure>` : `<div class="mvr-beat-settings">${assistantFallbackHtml()}</div>`}
-    </div>
-  </section>`;
+  return beatStageHtml(
+    'mvr-stage-assistant',
+    '3 · Your Front Desk Assistant',
+    assistantBeats(),
+    stageBeatIndex[2] || 0
+  );
 }
 
 function finaleHtml() {
@@ -713,8 +726,9 @@ function footerHtml() {
   // One forward affordance for the whole reveal. Inside the Assistant stage it
   // walks the beats before advancing the stage, so the progress bar never lies
   // and there is never a second "next" competing with this one.
-  const label = currentStep === 2
-    ? (ASSISTANT_BEATS[assistantBeat] || ASSISTANT_BEATS[0]).next
+  const beats = stageBeats();
+  const label = beats
+    ? (beats[stageBeatIndex[currentStep] || 0] || beats[0]).next
     : 'See how Front Desk protects you';
   return `<div class="mvr-footer">
     ${currentStep > 0 ? '<button type="button" class="mvr-back" id="mvrBack">← Back</button>' : '<span></span>'}
@@ -905,7 +919,6 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
 }
 
 function moveToStep(nextStep) {
-  clearGuestAppDemoSchedule();
   const previousStep = currentStep;
   const normalizedStep = Math.max(0, Math.min(3, nextStep));
   const now = Date.now();
@@ -949,7 +962,6 @@ function finishReveal() {
   }
   stopBookingChallenge('reveal-finished', true);
   activeBookingChallenge = null;
-  clearGuestAppDemoSchedule();
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -988,125 +1000,22 @@ async function activateMarketel(button) {
   }
 }
 
-function clearGuestAppDemoSchedule() {
-  if (guestAppDemoTimer) {
-    window.clearTimeout(guestAppDemoTimer);
-    guestAppDemoTimer = 0;
-  }
-  guestAppDemoObserver?.disconnect();
-  guestAppDemoObserver = null;
-}
-
-function setGuestAppInstallVisual(installed) {
-  homeScreenInstalled = !!installed;
-  const visual = document.querySelector('.mvr-install-visual');
-  visual?.classList.toggle('is-installed', homeScreenInstalled);
-  const button = document.getElementById('mvrInstallDemo');
-  if (button) {
-    button.textContent = homeScreenInstalled ? 'Saved ✓' : 'Add';
-    button.disabled = homeScreenInstalled;
-  }
-  const arrowLabel = visual?.querySelector('.mvr-install-arrow span');
-  if (arrowLabel) arrowLabel.textContent = homeScreenInstalled ? 'Saved to their Home Screen' : 'Tap Add to Home Screen';
-}
-
-function setGuestAppDemoSlide(nextSlide, manual = false) {
-  clearGuestAppDemoSchedule();
-  guestAppDemoSlide = Number(nextSlide) === 1 ? 1 : 0;
-  const visual = document.querySelector('.mvr-install-visual');
-  if (!visual) return;
-  visual.classList.toggle('is-slide-2', guestAppDemoSlide === 1);
-  visual.querySelectorAll('.mvr-app-carousel-slide').forEach((slide, index) => {
-    slide.setAttribute('aria-hidden', index === guestAppDemoSlide ? 'false' : 'true');
-  });
-  visual.querySelectorAll('.mvr-app-carousel-dots button').forEach((dot) => {
-    const isActive = Number(dot.dataset.mvrAppSlide) === guestAppDemoSlide;
-    dot.classList.toggle('is-active', isActive);
-    dot.setAttribute('aria-current', isActive ? 'step' : 'false');
-  });
-  visual.querySelectorAll('.mvr-app-carousel-controls > button').forEach((button) => {
-    button.disabled = Number(button.dataset.mvrAppSlide) === guestAppDemoSlide;
-  });
-  if (guestAppDemoSlide === 1) {
-    setGuestAppInstallVisual(true);
-  } else {
-    setGuestAppInstallVisual(false);
-    scheduleGuestAppValueDemo();
-  }
-  if (manual) trackReveal(guestAppDemoSlide === 1 ? 'GuestAppValueSlideViewed' : 'GuestAppInstallSlideReplayed');
-  trackJourney('JourneyGuestAppDemo', {
-    action: 'slide-viewed',
-    slide: guestAppDemoSlide === 1 ? 'value' : 'install',
-    manual: !!manual,
-  });
-}
-
-function revealGuestAppValue(manual = false) {
-  if (homeScreenInstalled || guestAppDemoSlide !== 0) return;
-  clearGuestAppDemoSchedule();
-  setGuestAppInstallVisual(true);
-  if (manual) trackReveal('GuestAppInstallDemoClicked');
-  trackJourney('JourneyGuestAppDemo', {
-    action: 'install-demonstrated',
-    manual: !!manual,
-  });
-  guestAppDemoTimer = window.setTimeout(() => {
-    if (currentStep === 1 && document.getElementById('marketelValueReveal')) {
-      setGuestAppDemoSlide(1, false);
-    }
-  }, manual ? 900 : 1200);
-}
-
-function setAssistantBeat(nextBeat, manual = false) {
-  const clamped = Math.max(0, Math.min(ASSISTANT_BEATS.length - 1, Number(nextBeat) || 0));
-  if (clamped === assistantBeat) return;
-  assistantBeat = clamped;
-  renderReveal();
-  document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
-  if (!manual) return;
-  trackReveal(ASSISTANT_BEATS[assistantBeat].event);
-  trackJourney('JourneyAssistantBeatViewed', { beat: assistantBeat });
-}
-
-function scheduleGuestAppValueDemo() {
-  clearGuestAppDemoSchedule();
-  if (currentStep !== 1 || guestAppDemoSlide !== 0) return;
-  const visual = document.querySelector('.mvr-install-visual');
-  if (!visual) return;
-  const begin = () => {
-    if (guestAppDemoTimer) return;
-    guestAppDemoTimer = window.setTimeout(() => {
-      if (currentStep === 1 && document.getElementById('marketelValueReveal')) {
-        if (homeScreenInstalled) setGuestAppDemoSlide(1, false);
-        else revealGuestAppValue(false);
-      }
-    }, homeScreenInstalled ? 900 : 1300);
-  };
-  if ('IntersectionObserver' in window) {
-    guestAppDemoObserver = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.35)) return;
-      guestAppDemoObserver?.disconnect();
-      guestAppDemoObserver = null;
-      begin();
-    }, { threshold: [0.35] });
-    guestAppDemoObserver.observe(visual);
-  } else {
-    begin();
-  }
-}
-
 function bindRevealEvents() {
   document.getElementById('mvrNext')?.addEventListener('click', () => {
-    if (currentStep === 2 && assistantBeat < ASSISTANT_BEATS.length - 1) {
-      setAssistantBeat(assistantBeat + 1, true);
+    const beats = stageBeats();
+    const beatIndex = stageBeatIndex[currentStep] || 0;
+    if (beats && beatIndex < beats.length - 1) {
+      setStageBeat(beatIndex + 1, true);
       return;
     }
     trackJourney('JourneyRevealNavigation', { action: 'next', toStep: currentStep + 1 });
     moveToStep(currentStep + 1);
   });
   document.getElementById('mvrBack')?.addEventListener('click', () => {
-    if (currentStep === 2 && assistantBeat > 0) {
-      setAssistantBeat(assistantBeat - 1, true);
+    const beats = stageBeats();
+    const beatIndex = stageBeatIndex[currentStep] || 0;
+    if (beats && beatIndex > 0) {
+      setStageBeat(beatIndex - 1, true);
       return;
     }
     trackJourney('JourneyRevealNavigation', { action: 'back', toStep: currentStep - 1 });
@@ -1129,15 +1038,6 @@ function bindRevealEvents() {
       renderReveal();
     });
   });
-  document.getElementById('mvrInstallDemo')?.addEventListener('click', () => {
-    revealGuestAppValue(true);
-  });
-  document.querySelectorAll('[data-mvr-app-slide]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const nextSlide = Number(button.dataset.mvrAppSlide) === 1 ? 1 : 0;
-      if (nextSlide !== guestAppDemoSlide) setGuestAppDemoSlide(nextSlide, true);
-    });
-  });
   document.querySelectorAll('[data-mvr-fallback]').forEach((button) => {
     button.addEventListener('click', () => {
       const next = button.dataset.mvrFallback === 'release' ? 'release' : 'confirm';
@@ -1151,7 +1051,6 @@ function bindRevealEvents() {
       renderReveal();
     });
   });
-  scheduleGuestAppValueDemo();
 }
 
 async function loadRevealData() {
@@ -1240,8 +1139,7 @@ export function showMarketelValueReveal(options = {}) {
     : Math.max(0, Math.min(3, Number.isFinite(storedStep) ? storedStep : 0));
   if (crm.hotelSubscribed && currentStep === 3) currentStep = 0;
   livePreviewMode = 'guest';
-  homeScreenInstalled = false;
-  guestAppDemoSlide = 0;
+  stageBeatIndex = { 1: 0, 2: 0 };
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
   revealStartedAt = Date.now();
@@ -1250,7 +1148,6 @@ export function showMarketelValueReveal(options = {}) {
   bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
-  clearGuestAppDemoSchedule();
 
   if (!crm.hotelSubscribed) {
     try {

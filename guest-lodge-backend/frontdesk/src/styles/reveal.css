@@ -1162,8 +1162,9 @@
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
-   overrides the default two-column stage grid so the beat never scrolls. */
-.mvr-stage-assistant {
+   overrides the default two-column stage grid so the beat never scrolls.
+   Shared by every beat-driven stage (guest app + assistant). */
+.mvr-stage-beats {
   grid-template-columns: 1fr;
   grid-template-rows: auto minmax(0, 1fr);
   align-items: stretch;
