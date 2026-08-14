@@ -2356,10 +2356,26 @@ const guestMessagesFetchRateLimit = createRouteRateLimiter('guest-messages-fetch
     scope: (req) => req.query?.code,
 });
 const guestMessagesFetchGlobalRateLimit = createRouteRateLimiter('guest-messages-fetch-global', { windowMs: 60 * 1000, max: 240 });
+// Guest polling buckets must isolate one *device*, not one property. Scoping on
+// hotelId alone collides behind NAT: every guest on the property's wifi shares
+// one egress IP, so two in-stay guests would exhaust a hotel-wide bucket and the
+// rest would sit on stale reservation state. The connected reservation codes are
+// the stable per-guest discriminator the request already carries.
+function guestStaySyncScope(req) {
+    const hotelId = String(req.body?.hotelId || '').trim().toLowerCase();
+    const codes = Array.isArray(req.body?.stays)
+        ? req.body.stays
+            .map((stay) => String(stay?.code || '').trim().toLowerCase())
+            .filter(Boolean)
+            .sort()
+        : [];
+    return `${hotelId}:${codes.join(',')}`;
+}
+
 const guestUnreadSyncRateLimit = createRouteRateLimiter('guest-unread-sync', {
     windowMs: 5 * 60 * 1000,
     max: 30,
-    scope: (req) => req.body?.hotelId,
+    scope: guestStaySyncScope,
 });
 const guestUnreadSyncGlobalRateLimit = createRouteRateLimiter('guest-unread-sync-global', { windowMs: 5 * 60 * 1000, max: 300 });
 const guestPushSubscribeRateLimit = createRouteRateLimiter('guest-push-subscribe', {
@@ -2372,7 +2388,7 @@ const guestBookingLookupRateLimit = createRouteRateLimiter('guest-booking-lookup
 const guestBookingSyncRateLimit = createRouteRateLimiter('guest-booking-sync', {
     windowMs: 5 * 60 * 1000,
     max: 40,
-    scope: (req) => req.body?.hotelId,
+    scope: guestStaySyncScope,
 });
 const guestBookingSyncGlobalRateLimit = createRouteRateLimiter('guest-booking-sync-global', { windowMs: 5 * 60 * 1000, max: 300 });
 
@@ -3405,7 +3421,9 @@ app.get('/api/booking/lookup', guestBookingLookupRateLimit, async (req, res) => 
         const hotel = await guestHotelPayload(resolvedHotelId, req);
         res.json({
             success: true,
-            booking: guestBookingPayload(booking, code),
+            // `requestedCode` mirrors /api/booking/stays so a PMS alias resolves
+            // back to the local record the guest actually asked for.
+            booking: { ...guestBookingPayload(booking, code), requestedCode: code },
             hotel,
             serverTime: new Date().toISOString(),
         });

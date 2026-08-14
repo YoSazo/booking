@@ -367,6 +367,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
   const [connectionState, setConnectionState] = useState('connecting');
   const [serverClockOffset, setServerClockOffset] = useState(0);
   const syncInFlightRef = useRef(null);
+  const retrySyncAfterRef = useRef(0);
 
   const hotel = useMemo(() => ({ ...(hotelProp || {}), ...(liveHotel || {}) }), [hotelProp, liveHotel]);
   const stayRequests = guestStays.length ? guestStays : guestStay ? [guestStay] : [];
@@ -378,6 +379,12 @@ export default function GuestHomePage({ hotel: hotelProp }) {
       return null;
     }
     if (syncInFlightRef.current) return syncInFlightRef.current;
+    // Honour a 429 window instead of re-polling every 15s, which would keep the
+    // bucket saturated and pin the guest on stale reservation state.
+    if (Date.now() < retrySyncAfterRef.current) {
+      if (initial) setLoading(false);
+      return null;
+    }
     if (initial) setLoading(true);
     setConnectionState((current) => (current === 'live' ? current : 'connecting'));
 
@@ -391,8 +398,14 @@ export default function GuestHomePage({ hotel: hotelProp }) {
             stays: stayRequests.map((stay) => ({ code: stay.code, email: stay.email || '' })),
           }),
         }, 12000);
+        if (response.status === 429) {
+          const retrySeconds = Math.max(1, Number(response.headers.get('Retry-After')) || 30);
+          retrySyncAfterRef.current = Date.now() + (retrySeconds * 1000);
+          throw new Error('Your stays could not refresh.');
+        }
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success) throw new Error(data.message || 'Your stays could not refresh.');
+        retrySyncAfterRef.current = 0;
 
         const nextBookings = {};
         const updates = [];
@@ -623,8 +636,11 @@ const styles = {
   statusIconDead: { background: '#F5DADA', color: '#A63F3F' },
   statusCopy: { minWidth: 0, flex: 1 },
   statusEyebrow: { display: 'block', marginBottom: 4, fontSize: 10.5, fontWeight: 800, letterSpacing: '.055em', textTransform: 'uppercase' },
-  statusTitle: { margin: 0, fontSize: 20, lineHeight: 1.22, letterSpacing: '-.02em' },
-  statusBody: { margin: '7px 0 0', color: '#596B61', fontSize: 13.5, lineHeight: 1.52 },
+  // Property names and owner-typed cancellation reasons are free text; an
+  // unbroken token (a URL in a reason, a long single-word name) would otherwise
+  // push the hero wider than a compact iPhone.
+  statusTitle: { margin: 0, fontSize: 20, lineHeight: 1.22, letterSpacing: '-.02em', overflowWrap: 'anywhere' },
+  statusBody: { margin: '7px 0 0', color: '#596B61', fontSize: 13.5, lineHeight: 1.52, overflowWrap: 'anywhere' },
   deadAssurance: { display: 'flex', alignItems: 'flex-start', gap: 7, marginTop: 11, paddingTop: 10, borderTop: '1px solid rgba(166,63,63,.12)', color: '#795151', fontSize: 11.5, lineHeight: 1.4 },
   card: { marginBottom: 14, padding: 18, border: '1px solid #D8E4DC', borderRadius: 19, background: 'rgba(255,255,255,.92)', boxShadow: '0 3px 14px rgba(46,125,91,.07)' },
   cardHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 },

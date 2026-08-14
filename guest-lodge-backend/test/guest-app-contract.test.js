@@ -38,3 +38,21 @@ test('repeat guests receive one lightweight unread-count request', () => {
 test('the legacy delete route preserves the booking and uses cancellation side effects', () => {
     assert.match(server, /app\.delete\('\/api\/crm\/bookings\/:id'[\s\S]*?cancelBookingByOwner\(id, hotelId, 'Removed in Front Desk'\)/);
 });
+
+test('guest polling buckets isolate one device rather than one property', () => {
+    // Rate-limit keys are IP-based, so scoping on hotelId alone collides behind
+    // the property's wifi NAT: two in-stay guests would exhaust a hotel-wide
+    // bucket and everyone else would sit on stale reservation state.
+    assert.match(server, /function guestStaySyncScope/);
+    assert.match(server, /'guest-unread-sync',[\s\S]*?scope: guestStaySyncScope/);
+    assert.match(server, /'guest-booking-sync',[\s\S]*?scope: guestStaySyncScope/);
+    // Guard the regression specifically for the 15s pollers. Low-frequency
+    // manual routes (support messages) may still share a property bucket.
+    assert.doesNotMatch(server, /'guest-(unread|booking)-sync',[\s\S]{0,160}?scope: \(req\) => req\.body\?\.hotelId/);
+});
+
+test('single reservation lookup echoes the requested code like the batch endpoint', () => {
+    // Without this a PMS alias resolves to a canonical code the client never
+    // asked for, and the deep-link surface can never confirm it resolved.
+    assert.match(server, /requestedCode: code/);
+});

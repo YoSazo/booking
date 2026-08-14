@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGuest } from './GuestProvider.jsx';
 import { isStandalone } from './pwaUtils.js';
@@ -36,6 +36,7 @@ export default function GuestLayout({ children }) {
     typeof window !== 'undefined' ? window.innerWidth <= 768 : true
   );
   const [installedApp, setInstalledApp] = useState(() => isStandalone());
+  const retryUnreadAfterRef = useRef(0);
 
   const activeTab = activeTabForPath(location.pathname);
   const activeIndex = NAV_TABS.findIndex((tab) => tab.key === activeTab);
@@ -60,6 +61,9 @@ export default function GuestLayout({ children }) {
 
   const fetchUnread = useCallback(async () => {
     if (!guestStays.length || !hotelId) return;
+    // Same 429 discipline as the stay sync: a saturated bucket must not be
+    // re-hit every 15s, or the badge never recovers inside the window.
+    if (Date.now() < retryUnreadAfterRef.current) return;
     try {
       const res = await fetchWithTimeout(`${apiBaseUrl}/api/guest-messages/unread`, {
         method: 'POST',
@@ -69,8 +73,14 @@ export default function GuestLayout({ children }) {
           stays: guestStays.map((stay) => ({ code: stay.code, email: stay.email || '' })),
         }),
       }, 12000);
+      if (res.status === 429) {
+        const retrySeconds = Math.max(1, Number(res.headers.get('Retry-After')) || 30);
+        retryUnreadAfterRef.current = Date.now() + (retrySeconds * 1000);
+        return;
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) return;
+      retryUnreadAfterRef.current = 0;
       const unread = Math.max(0, Number(data.total) || 0);
       setUnreadCount(unread);
       if (installedApp && 'setAppBadge' in navigator && unread > 0) {

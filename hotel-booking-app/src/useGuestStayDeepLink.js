@@ -15,7 +15,14 @@ export default function useGuestStayDeepLink(requestedCode) {
   } = useGuest();
   const attemptedRef = useRef('');
   const [error, setError] = useState('');
-  const ready = !cleanCode || cleanCode === guestStay?.code;
+  const [resolvedCode, setResolvedCode] = useState('');
+  // A PMS alias resolves to a booking whose canonical code differs from the one
+  // in the link, so equality alone can never confirm the deep link finished.
+  // Without the resolved marker the surface stays inert forever: spinner shown,
+  // messages unfetched, nothing marked read.
+  const ready = !cleanCode
+    || cleanCode === guestStay?.code
+    || cleanCode === resolvedCode;
 
   useEffect(() => {
     setError('');
@@ -38,7 +45,12 @@ export default function useGuestStayDeepLink(requestedCode) {
           setError(data.message || 'This reservation could not be opened.');
           return;
         }
-        setGuestStay(stayStorageSnapshot(data.booking));
+        // Key the local record by the code the guest arrived with, exactly as
+        // the batch /api/booking/stays path does via `requestedCode`.
+        const snapshot = stayStorageSnapshot(data.booking);
+        const localCode = data.booking.requestedCode || cleanCode || snapshot.code;
+        setGuestStay({ ...snapshot, code: localCode });
+        setResolvedCode(cleanCode);
       } catch (_) {
         if (!cancelled) setError('This reservation could not be opened right now.');
       }
