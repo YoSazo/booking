@@ -7,8 +7,8 @@ import ownerEditorProofUrl from './assets/frontdesk-editor.webp';
 import guestInstallBannerUrl from './assets/guest-install-banner.webp';
 import guestInstallSheetUrl from './assets/guest-install-sheet.webp';
 import guestHomeScreenUrl from './assets/guest-home-screen.webp';
-import guestAppStayUrl from './assets/guest-app-stay.webp';
 import guestAppBookUrl from './assets/guest-app-book.webp';
+import guestBroadcastSendUrl from './assets/guest-broadcast-send.webp';
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
@@ -567,7 +567,7 @@ function guestAppBeats() {
       // The difference is how each one is installed, not what each is called —
       // that is the version of the two-app story people actually retain.
       body: `Yours from the App Store. ${name} saved straight from your booking page.`,
-      next: 'See what they open',
+      next: 'See what it wins you',
       event: 'GuestAppHomeScreenViewed',
       proof: {
         url: guestHomeScreenUrl,
@@ -575,23 +575,26 @@ function guestAppBeats() {
       },
     },
     {
-      title: 'They open straight to their stay.',
-      body: 'Check-in time, directions, and a direct line to your front desk. No browser, no searching.',
-      next: 'See what it wins you',
-      event: 'GuestAppStayViewed',
-      proof: {
-        url: guestAppStayUrl,
-        alt: 'The saved property opened from the Home Screen to the guest’s stay: check-in today, room, dates, amount due and property details.',
-      },
-    },
-    {
       title: 'Next time, they book you direct.',
       body: rebookBody,
-      next: 'See how Front Desk protects you',
+      next: 'See what else that wins you',
       event: 'GuestAppRebookViewed',
       proof: {
         url: guestAppBookUrl,
         alt: 'The saved property opened from the Home Screen to its Book tab, showing the rooms ready to reserve again.',
+      },
+    },
+    {
+      // The rest of the funnel argues cost avoidance. This is the one beat that
+      // argues upside — she can create demand instead of waiting for it — and
+      // it is the concrete form of owning the guest relationship an OTA keeps.
+      title: 'And when you want them back, you tell them.',
+      body: 'One message from Front Desk reaches every guest who saved you and allowed alerts. No ad spend, no OTA.',
+      next: 'See how Front Desk protects you',
+      event: 'GuestAppBroadcastViewed',
+      proof: {
+        url: guestBroadcastSendUrl,
+        alt: 'Marketel Front Desk composing a notification to saved guests, with a preview of what arrives on their phone and a send button.',
       },
     },
   ];
