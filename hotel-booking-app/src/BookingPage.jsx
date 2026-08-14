@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
+import { isStandalone } from './pwaUtils.js';
 import { trackPageView, trackHotelFunnel } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 
@@ -113,7 +114,9 @@ function BookingPage({
 
   const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-  const showInstallBanner = (roomData?.length > 0 || ownerScrollInstall);
+  // In the installed PWA the install banner self-hides — so don't reserve its
+  // sticky-footer space either, or the bottom nav floats over a dead 120px gap.
+  const showInstallBanner = !isStandalone() && (roomData?.length > 0 || ownerScrollInstall);
 
   return (
     <div className="container" style={{ paddingBottom: showInstallBanner ? '120px' : undefined }}>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, Search, MessageSquare, FileText } from 'lucide-react';
+import { CalendarPlus, MessageCircle, ArrowRight, ChevronRight, MapPin, Phone, Search, MessageSquare, FileText, Hotel } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { isStandalone } from './pwaUtils.js';
@@ -174,7 +174,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
     return (
       <div style={styles.page}>
         <div style={styles.emptyContainer}>
-          <div style={styles.emptyEmoji}>🏨</div>
+          <div style={styles.emptyIcon}><Hotel size={30} color="#2E7D5B" /></div>
           <h2 style={styles.emptyTitle}>No upcoming stays</h2>
           <p style={styles.emptySubtitle}>
             {error || 'Book your next getaway and it will appear here.'}
@@ -275,8 +275,8 @@ export default function GuestHomePage({ hotel: hotelProp }) {
               ...styles.statusBadge,
               background:
                 status.toLowerCase() === 'confirmed'
-                  ? '#e8f7ee'
-                  : '#fff3cd',
+                  ? '#E8F5EE'
+                  : '#FEF3C7',
               color:
                 status.toLowerCase() === 'confirmed'
                   ? '#2E7D5B'
@@ -295,7 +295,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
               {checkin ? formatDate(checkin) : '—'}
             </span>
           </div>
-          <ArrowRight size={18} color="#9ca3af" style={{ flexShrink: 0 }} />
+          <ArrowRight size={18} color="#6B7D72" style={{ flexShrink: 0 }} />
           <div style={styles.dateBlock}>
             <span style={styles.dateLabel}>Check-out</span>
             <span style={styles.dateValue}>
@@ -365,10 +365,10 @@ if (typeof document !== 'undefined') {
 
 const styles = {
   page: {
-    background: '#f4f7f9',
+    background: '#EFF4F0',
     minHeight: '100vh',
     padding: '24px 16px 40px',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',
   },
@@ -385,14 +385,14 @@ const styles = {
   spinner: {
     width: 36,
     height: 36,
-    border: '3px solid #e5e7eb',
+    border: '3px solid #D8E4DC',
     borderTopColor: '#2E7D5B',
     borderRadius: '50%',
     animation: 'guestHomeSpinner 0.8s linear infinite',
   },
   loadingText: {
     fontSize: 15,
-    color: '#6b7280',
+    color: '#6B7D72',
     margin: 0,
   },
 
@@ -406,20 +406,25 @@ const styles = {
     textAlign: 'center',
     gap: 8,
   },
-  emptyEmoji: {
-    fontSize: 48,
-    lineHeight: 1,
+  emptyIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#E8F5EE',
     marginBottom: 8,
   },
   emptyTitle: {
     fontSize: 22,
     fontWeight: 700,
-    color: '#1a1a2e',
+    color: '#1A2B22',
     margin: 0,
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: '#6B7D72',
     margin: '0 0 20px',
     lineHeight: 1.5,
     maxWidth: 300,
@@ -431,12 +436,13 @@ const styles = {
     padding: '14px 28px',
     borderRadius: 12,
     border: 'none',
-    background: '#2E7D5B',
+    background: 'linear-gradient(135deg, #4CAF7D 0%, #2E7D5B 60%, #245F46 100%)',
     color: '#fff',
     fontSize: 15,
     fontWeight: 700,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     cursor: 'pointer',
+    boxShadow: '0 6px 18px rgba(46,125,91,0.3)',
   },
   secondaryButton: {
     display: 'inline-flex',
@@ -446,12 +452,12 @@ const styles = {
     width: '100%',
     padding: '14px 28px',
     borderRadius: 12,
-    border: '1.5px solid #d7e3dc',
-    background: '#f5f9f6',
+    border: '1.5px solid #D8E4DC',
+    background: '#F4F8F5',
     color: '#2E7D5B',
     fontSize: 15,
     fontWeight: 700,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     cursor: 'pointer',
   },
   hubInfoRow: {
@@ -461,7 +467,7 @@ const styles = {
   },
   hubInfoText: {
     fontSize: 14,
-    color: '#475569',
+    color: '#4B5D52',
     lineHeight: 1.5,
   },
 
@@ -511,7 +517,7 @@ const styles = {
     borderRadius: 12,
     border: 'none',
     background: '#fff',
-    color: '#1a5c3f',
+    color: '#245F46',
     fontSize: 14,
     fontWeight: 700,
     fontFamily: 'inherit',
@@ -542,22 +548,23 @@ const styles = {
   greeting: {
     fontSize: 28,
     fontWeight: 800,
-    color: '#1a1a2e',
+    color: '#1A2B22',
+    letterSpacing: '-0.02em',
     margin: 0,
     lineHeight: 1.2,
   },
   greetingSubtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: '#6B7D72',
     margin: '6px 0 0',
   },
 
   // Card
   card: {
     background: '#fff',
-    borderRadius: 16,
-    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-    border: '1px solid #e5e7eb',
+    borderRadius: 20,
+    boxShadow: '0 2px 6px rgba(46,125,91,0.06), 0 8px 20px rgba(46,125,91,0.08)',
+    border: '1px solid #D8E4DC',
     padding: '20px',
     marginBottom: 16,
   },
@@ -571,7 +578,7 @@ const styles = {
   roomName: {
     fontSize: 18,
     fontWeight: 700,
-    color: '#1a1a2e',
+    color: '#1A2B22',
     margin: 0,
   },
   statusBadge: {
@@ -599,22 +606,22 @@ const styles = {
   dateLabel: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#9ca3af',
+    color: '#6B7D72',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
   dateValue: {
     fontSize: 15,
     fontWeight: 600,
-    color: '#1a1a2e',
+    color: '#1A2B22',
   },
   nightsPill: {
     fontSize: 12,
     fontWeight: 700,
     padding: '4px 10px',
     borderRadius: 999,
-    background: '#f0f4f8',
-    color: '#475569',
+    background: '#E8F5EE',
+    color: '#2E7D5B',
     marginLeft: 'auto',
     whiteSpace: 'nowrap',
   },
@@ -625,18 +632,18 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 0 0',
-    borderTop: '1px solid #f0f0f0',
+    borderTop: '1px solid #E6EEE9',
   },
   codeLabel: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#6B7D72',
     fontWeight: 500,
   },
   codeValue: {
     fontSize: 14,
     fontWeight: 700,
-    color: '#475569',
-    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+    color: '#245F46',
+    fontFamily: "'DM Mono', 'SF Mono', 'Consolas', monospace",
     letterSpacing: '0.5px',
   },
 
@@ -655,12 +662,12 @@ const styles = {
     padding: '13px 14px',
     borderRadius: 12,
     cursor: 'pointer',
-    border: '1px solid #d7e3dc',
-    background: '#f5f9f6',
+    border: '1px solid #D8E4DC',
+    background: '#F4F8F5',
     color: '#2E7D5B',
     fontSize: 14,
     fontWeight: 700,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     whiteSpace: 'nowrap',
   },
 
@@ -678,6 +685,6 @@ const styles = {
     fontSize: 14,
     fontWeight: 600,
     color: '#2E7D5B',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
   },
 };

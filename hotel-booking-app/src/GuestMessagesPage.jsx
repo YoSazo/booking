@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, Search } from 'lucide-react';
+import { Send, Search, MessageSquare } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { isStandalone } from './pwaUtils.js';
@@ -60,8 +60,11 @@ export default function GuestMessagesPage({ hotel }) {
   const inputRef = useRef(null);
   const touchStartYRef = useRef(null);
 
-  const scrollToBottom = useCallback((behavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
+  // Scroll only the message list — never scrollIntoView on a position:fixed
+  // container, which drags the visual viewport and makes the composer jitter.
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
   }, []);
 
   // Fetch messages
@@ -129,7 +132,30 @@ export default function GuestMessagesPage({ hotel }) {
     };
   }, [fetchMessages, guestStay?.code]);
 
-  // No auto-scroll — user lands at top of conversation
+  // Messaging-app behavior: stay pinned to the newest message as the thread
+  // grows (initial load, incoming replies, and your own sends).
+  useEffect(() => {
+    scrollToBottom('auto');
+  }, [messages.length, loading, scrollToBottom]);
+
+  // Keep the latest messages glued just above the composer while the keyboard
+  // animates. Pinning to the bottom on every viewport step is what removes the
+  // "scroll up to see what you sent" problem and the modal's jitter.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    const pinWhileTyping = () => {
+      if (document.activeElement !== inputRef.current) return;
+      const el = scrollContainerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    };
+    vv.addEventListener('resize', pinWhileTyping);
+    vv.addEventListener('scroll', pinWhileTyping);
+    return () => {
+      vv.removeEventListener('resize', pinWhileTyping);
+      vv.removeEventListener('scroll', pinWhileTyping);
+    };
+  }, []);
 
   // Mark hotel messages as read (fire-and-forget)
   useEffect(() => {
@@ -240,8 +266,9 @@ export default function GuestMessagesPage({ hotel }) {
   };
 
   const handleInputFocus = () => {
-    window.setTimeout(() => scrollToBottom('auto'), 120);
-    window.setTimeout(() => scrollToBottom('auto'), 320);
+    // Jump to the newest message the instant the field is tapped; the viewport
+    // listener then keeps it pinned as the keyboard finishes animating in.
+    requestAnimationFrame(() => scrollToBottom('auto'));
   };
 
   const handleMessagesTouchStart = (event) => {
@@ -264,10 +291,10 @@ export default function GuestMessagesPage({ hotel }) {
       <div className="guest-messages-page" style={styles.page}>
         <div style={styles.header}>
           <h1 style={styles.headerTitle}>Messages</h1>
-          <p style={styles.headerSubtitle}>Front Desk</p>
+          <p style={styles.headerSubtitle}><span style={styles.headerDot} />Front Desk</p>
         </div>
         <div style={styles.emptyContainer}>
-          <div style={styles.emptyEmoji}>💬</div>
+          <div style={styles.emptyIcon}><MessageSquare size={26} color="#2E7D5B" /></div>
           <p style={styles.emptyTitle}>Connect your reservation</p>
           <p style={styles.emptySubtitle}>
             Find your booking to message the front desk — or book a room first.
@@ -344,7 +371,7 @@ export default function GuestMessagesPage({ hotel }) {
           </div>
         ) : messages.length === 0 ? (
           <div style={styles.emptyContainer}>
-            <div style={styles.emptyEmoji}>💬</div>
+            <div style={styles.emptyIcon}><MessageSquare size={26} color="#2E7D5B" /></div>
             <p style={styles.emptyTitle}>No messages yet</p>
             <p style={styles.emptySubtitle}>
               Send a message to the front desk — they'll respond here.
@@ -421,12 +448,11 @@ export default function GuestMessagesPage({ hotel }) {
                 onClick={() => toggleChip(chip)}
                 style={{
                   ...styles.chip,
-                  background: active ? '#2E7D5B' : 'rgba(255,255,255,0.85)',
+                  background: active ? '#2E7D5B' : '#E8F5EE',
                   color: active ? '#fff' : '#2E7D5B',
-                  borderColor: active ? '#2E7D5B' : 'rgba(46,125,91,0.3)',
+                  borderColor: active ? '#2E7D5B' : 'rgba(46,125,91,0.28)',
                 }}
               >
-                {active ? '✓ ' : ''}
                 {chip}
               </button>
             );
@@ -444,6 +470,7 @@ export default function GuestMessagesPage({ hotel }) {
             onFocus={handleInputFocus}
             placeholder="Type a message..."
             enterKeyHint="send"
+            className="guest-msg-input"
             style={styles.textInput}
           />
           <button
@@ -473,10 +500,15 @@ const spinnerKeyframes = `
 }
 html.marketel-keyboard-open .guest-messages-page {
   padding-bottom: 0 !important;
+  transition: none !important;
 }
 html.marketel-keyboard-open .guest-message-composer {
   padding-bottom: calc(var(--marketel-keyboard-inset, 0px) + 8px) !important;
-  background: #f4f7f9 !important;
+  background: #EFF4F0 !important;
+}
+.guest-msg-input:focus {
+  border-color: #2E7D5B !important;
+  box-shadow: 0 0 0 4px #E8F5EE !important;
 }
 `;
 
@@ -496,8 +528,9 @@ const styles = {
     flexDirection: 'column',
     height: 'auto',
     maxHeight: 'none',
-    background: '#f4f7f9',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    background: '#EFF4F0',
+    color: '#1A2B22',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',
     position: 'fixed',
@@ -511,7 +544,6 @@ const styles = {
     paddingBottom: 'var(--guest-nav-clearance, 0px)',
     transition: 'padding-bottom 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
     contain: 'layout',
-    boxShadow: '0 0 0 200vmax #f4f7f9',
   },
 
   // Header
@@ -522,14 +554,26 @@ const styles = {
   headerTitle: {
     fontSize: 24,
     fontWeight: 800,
-    color: '#1a1a2e',
+    color: '#1A2B22',
+    letterSpacing: '-0.02em',
     margin: 0,
   },
   headerSubtitle: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
     fontSize: 13,
-    color: '#6b7280',
-    margin: '2px 0 0',
+    color: '#6B7D72',
+    margin: '4px 0 0',
     fontWeight: 500,
+  },
+  headerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: '50%',
+    background: '#4CAF7D',
+    boxShadow: '0 0 0 3px rgba(76,175,125,0.18)',
+    flexShrink: 0,
   },
 
   // Messages area — tight bottom padding to sit just above compose bar
@@ -565,32 +609,35 @@ const styles = {
   // Bubbles
   bubbleGuest: {
     maxWidth: '80%',
-    padding: '10px 16px',
-    borderRadius: '18px',
-    borderBottomRightRadius: 4,
-    background: '#2E7D5B',
+    padding: '10px 15px',
+    borderRadius: '20px',
+    borderBottomRightRadius: 5,
+    background: 'linear-gradient(135deg, #4CAF7D 0%, #2E7D5B 60%, #245F46 100%)',
     color: '#fff',
     fontSize: 15,
     lineHeight: 1.45,
     wordBreak: 'break-word',
+    boxShadow: '0 3px 10px rgba(46,125,91,0.22)',
   },
   bubbleHotel: {
     maxWidth: '80%',
-    padding: '10px 16px',
-    borderRadius: '18px',
-    borderBottomLeftRadius: 4,
-    background: '#f3f4f6',
-    color: '#1a1a2e',
+    padding: '10px 15px',
+    borderRadius: '20px',
+    borderBottomLeftRadius: 5,
+    background: '#FFFFFF',
+    color: '#1A2B22',
     fontSize: 15,
     lineHeight: 1.45,
     wordBreak: 'break-word',
+    border: '1px solid #E6EEE9',
+    boxShadow: '0 1px 2px rgba(26,43,34,0.05), 0 4px 12px rgba(46,125,91,0.05)',
   },
 
   // Hotel label
   hotelLabel: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#9ca3af',
+    color: '#6B7D72',
     marginBottom: 4,
     marginLeft: 4,
   },
@@ -607,15 +654,15 @@ const styles = {
     fontWeight: 600,
     padding: '3px 10px',
     borderRadius: 999,
-    border: '1px solid #2E7D5B',
+    border: '1px solid rgba(46,125,91,0.25)',
     color: '#2E7D5B',
-    background: '#f0faf5',
+    background: '#E8F5EE',
   },
 
   // Timestamp
   timestamp: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#9CA79E',
   },
   deliveryRow: {
     display: 'flex',
@@ -658,20 +705,25 @@ const styles = {
     textAlign: 'center',
     gap: 6,
   },
-  emptyEmoji: {
-    fontSize: 40,
-    lineHeight: 1,
-    marginBottom: 4,
+  emptyIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#E8F5EE',
+    marginBottom: 8,
   },
   emptyTitle: {
     fontSize: 17,
     fontWeight: 700,
-    color: '#1a1a2e',
+    color: '#1A2B22',
     margin: 0,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#6B7D72',
     margin: 0,
     maxWidth: 260,
     lineHeight: 1.5,
@@ -689,7 +741,7 @@ const styles = {
     color: '#fff',
     fontSize: 15,
     fontWeight: 700,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     cursor: 'pointer',
   },
   lookupLink: {
@@ -700,14 +752,14 @@ const styles = {
     color: '#2E7D5B',
     fontSize: 14,
     fontWeight: 600,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     cursor: 'pointer',
   },
 
   spinner: {
     width: 30,
     height: 30,
-    border: '3px solid #e5e7eb',
+    border: '3px solid #D8E4DC',
     borderTopColor: '#2E7D5B',
     borderRadius: '50%',
     animation: 'guestMsgSpinner 0.8s linear infinite',
@@ -720,8 +772,8 @@ const styles = {
     flexShrink: 0,
     padding: '8px 12px max(10px, env(safe-area-inset-bottom))',
     zIndex: 99,
-    borderTop: '1px solid rgba(0,0,0,0.06)',
-    background: 'rgba(244,247,249,0.94)',
+    borderTop: '1px solid #E6EEE9',
+    background: 'rgba(239,244,240,0.94)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
   },
@@ -743,7 +795,7 @@ const styles = {
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     whiteSpace: 'nowrap',
     transition: 'all 0.15s ease',
     backdropFilter: 'blur(8px)',
@@ -757,29 +809,28 @@ const styles = {
   textInput: {
     flex: 1,
     borderRadius: 24,
-    border: '1.5px solid rgba(0,0,0,0.08)',
+    border: '1.5px solid #D8E4DC',
     padding: '12px 16px',
     fontSize: 15,
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     outline: 'none',
-    color: '#1a1a2e',
-    background: 'rgba(255,255,255,0.92)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+    color: '#1A2B22',
+    background: '#FFFFFF',
+    boxShadow: '0 1px 2px rgba(26,43,34,0.06)',
+    transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: '50%',
-    background: '#2E7D5B',
+    background: 'linear-gradient(145deg, #4CAF7D 0%, #2E7D5B 100%)',
     border: 'none',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    transition: 'opacity 0.15s ease',
-    boxShadow: '0 4px 16px rgba(46,125,91,0.3)',
+    transition: 'opacity 0.15s ease, transform 0.15s ease',
+    boxShadow: '0 4px 16px rgba(46,125,91,0.32)',
   },
 };
