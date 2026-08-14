@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuest } from './GuestProvider.jsx';
-import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3, MessageCircle, XCircle } from 'lucide-react';
+import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3, XCircle } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
@@ -347,14 +347,11 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
             }}>
               <strong style={{ display: 'block', fontSize: 14 }}>This stay is connected to your app</strong>
               <span style={{ display: 'block', marginTop: 3, color: '#5d6e64', fontSize: 12.5, lineHeight: 1.45 }}>
-                Home follows the booking status. Messages connects you directly to Front Desk.
+                Your Stay keeps your booking status, details, and Front Desk messages together.
               </span>
-              <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
+              <div style={{ display: 'flex', marginTop: 11 }}>
                 <button type="button" className="stay-summary-card__btn" onClick={() => navigate('/guest/home')}>
-                  <Smartphone size={16} /> Open Home
-                </button>
-                <button type="button" className="stay-summary-card__btn" onClick={() => navigate('/guest/messages')}>
-                  <MessageCircle size={16} /> Messages
+                  <Smartphone size={16} /> Open Your Stay
                 </button>
               </div>
             </section>

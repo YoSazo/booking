@@ -252,7 +252,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
       {/* Greeting */}
       <div style={styles.greetingSection}>
         <h1 style={styles.greeting}>Welcome, {firstName}</h1>
-        <p style={styles.greetingSubtitle}>Here's your upcoming stay</p>
+        <p style={styles.greetingSubtitle}>Everything for your upcoming stay</p>
       </div>
 
       {/* D12/1D.5: check-in is the TOP card inside the 48h window */}
@@ -355,7 +355,7 @@ export default function GuestHomePage({ hotel: hotelProp }) {
           style={styles.actionButton}
         >
           <MessageCircle size={17} color="#2E7D5B" />
-          <span>Message</span>
+          <span>Front Desk</span>
         </button>
       </div>
 
@@ -389,9 +389,9 @@ if (typeof document !== 'undefined') {
 const styles = {
   page: {
     background: 'radial-gradient(circle at 12% -8%, rgba(126,226,184,0.22), transparent 34%), radial-gradient(circle at 96% 18%, rgba(76,175,125,0.10), transparent 30%), #EFF4F0',
-    minHeight: 'calc(100dvh - var(--guest-nav-clearance, 0px))',
+    minHeight: 'calc(100dvh - var(--guest-top-tabs-height, 0px))',
     boxSizing: 'border-box',
-    padding: 'max(12px, env(safe-area-inset-top)) 14px 12px',
+    padding: '12px 14px',
     fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',

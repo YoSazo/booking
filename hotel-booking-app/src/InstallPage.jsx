@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Share, Smartphone, Loader2, Copy, ArrowRight, MessageCircle } from 'lucide-react';
+import { Share, Smartphone, Loader2, Copy, ArrowRight } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { isStandalone } from './pwaUtils.js';
 import {
@@ -168,18 +168,8 @@ function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
               onClick={() => navigate(guestStay?.code ? '/guest/home' : '/')}
               style={styles.primaryBtn}
             >
-              {guestStay?.code ? 'Go to my stay' : 'Book a room'}
+              {guestStay?.code ? 'Open Your Stay' : 'Book a room'}
             </button>
-            {guestStay?.code && (
-              <button
-                type="button"
-                onClick={() => navigate('/guest/messages')}
-                style={styles.secondaryBtn}
-              >
-                <MessageCircle size={16} strokeWidth={2.2} />
-                Message the front desk
-              </button>
-            )}
           </div>
         </div>
       </div>

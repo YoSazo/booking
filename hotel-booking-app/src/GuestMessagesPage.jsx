@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, Search, MessageSquare } from 'lucide-react';
+import { ChevronLeft, Send, Search, MessageSquare } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { isStandalone } from './pwaUtils.js';
@@ -359,13 +359,28 @@ export default function GuestMessagesPage({ hotel }) {
     }
   };
 
+  const messagesHeader = (
+    <div style={styles.header}>
+      <button
+        type="button"
+        aria-label="Back to Your Stay"
+        onClick={() => navigate('/guest/home')}
+        style={styles.headerBack}
+      >
+        <ChevronLeft size={23} strokeWidth={2.2} />
+      </button>
+      <div style={styles.headerCopy}>
+        <h1 style={styles.headerTitle}>Messages</h1>
+        <p style={styles.headerSubtitle}>Front Desk</p>
+      </div>
+      <span aria-hidden="true" />
+    </div>
+  );
+
   if (!guestStay?.code) {
     return (
       <div ref={pageRef} className="guest-messages-page" style={styles.page}>
-        <div style={styles.header}>
-          <h1 style={styles.headerTitle}>Messages</h1>
-          <p style={styles.headerSubtitle}><span style={styles.headerDot} />Front Desk</p>
-        </div>
+        {messagesHeader}
         <div style={styles.emptyContainer}>
           <div style={styles.emptyIcon}><MessageSquare size={26} color="#2E7D5B" /></div>
           <p style={styles.emptyTitle}>Connect your reservation</p>
@@ -395,10 +410,7 @@ export default function GuestMessagesPage({ hotel }) {
   return (
     <div ref={pageRef} className="guest-messages-page" style={styles.page}>
       {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.headerTitle}>Messages</h1>
-        <p style={styles.headerSubtitle}>Front Desk</p>
-      </div>
+      {messagesHeader}
 
       {/* Message area */}
       <div
@@ -630,32 +642,48 @@ const styles = {
 
   // Header
   header: {
-    padding: '20px 16px 12px',
+    display: 'grid',
+    gridTemplateColumns: '44px minmax(0, 1fr) 44px',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 72,
+    padding: 'max(10px, env(safe-area-inset-top)) 12px 10px',
+    borderBottom: '1px solid #E6EEE9',
+    background: 'rgba(255,255,255,0.88)',
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
     flexShrink: 0,
   },
+  headerBack: {
+    display: 'inline-flex',
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    border: '1px solid #D8E4DC',
+    borderRadius: '50%',
+    background: '#FFFFFF',
+    color: '#1A2B22',
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  headerCopy: {
+    minWidth: 0,
+    textAlign: 'center',
+  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 17,
     fontWeight: 800,
     color: '#1A2B22',
-    letterSpacing: '-0.02em',
+    letterSpacing: '-0.01em',
     margin: 0,
   },
   headerSubtitle: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    fontSize: 13,
+    fontSize: 11,
     color: '#6B7D72',
-    margin: '4px 0 0',
-    fontWeight: 500,
-  },
-  headerDot: {
-    width: 7,
-    height: 7,
-    borderRadius: '50%',
-    background: '#4CAF7D',
-    boxShadow: '0 0 0 3px rgba(76,175,125,0.18)',
-    flexShrink: 0,
+    margin: '2px 0 0',
+    fontWeight: 600,
   },
 
   // Messages area — tight bottom padding to sit just above compose bar
