@@ -1085,410 +1085,142 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-.mvr-fd-header {
-  width: 100%;
-  min-height: 58px;
+.mvr-assistant-proof-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 9px 15px;
-  border-bottom: 1px solid #dde7e1;
-  background: rgba(255, 255, 255, 0.83);
-  backdrop-filter: blur(16px) saturate(1.35);
-  -webkit-backdrop-filter: blur(16px) saturate(1.35);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 5px 18px rgba(46, 125, 91, 0.05);
+  padding: 14px 15px 12px;
+  border-bottom: 1px solid #dce6e0;
+  background: rgba(255, 255, 255, 0.82);
 }
 
-.mvr-fd-brand {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.mvr-fd-brand > img {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  object-fit: contain;
-}
-
-.mvr-fd-brand > div {
+.mvr-assistant-proof-head > div:first-child {
   min-width: 0;
   display: grid;
-  gap: 1px;
+  gap: 2px;
 }
 
-.mvr-fd-brand strong,
-.mvr-fd-brand span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.mvr-assistant-proof-head span {
+  color: var(--mvr-green);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.mvr-fd-brand strong {
+.mvr-assistant-proof-head strong {
   color: #1d3026;
   font-size: 13px;
   font-weight: 800;
 }
 
-.mvr-fd-brand span {
-  max-width: 220px;
-  color: #75837b;
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.mvr-fd-live {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  color: #2c7353;
-  border: 1px solid #d1e7da;
+.mvr-assistant-proof-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dbe6df;
   border-radius: 999px;
-  background: #edf8f1;
-  font-size: 10px;
-  font-weight: 750;
+  background: #edf3ef;
 }
 
-.mvr-fd-live i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #4caf7d;
-  box-shadow: 0 0 0 0 rgba(76, 175, 125, 0.4);
-  animation: mvr-status-pulse 1.6s ease-out infinite;
+.mvr-assistant-proof-tabs button {
+  min-height: 30px;
+  padding: 6px 11px;
+  color: #718078;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: 750 10px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
 }
 
-.mvr-fd-tabs {
+.mvr-assistant-proof-tabs button.is-active {
+  color: #1f6749;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(35, 81, 57, 0.11);
+}
+
+.mvr-assistant-proof-viewport {
+  width: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 10% 90%, rgba(255, 255, 255, 0.86) 0 14%, transparent 14.5%),
+    linear-gradient(155deg, #e8f2ec, #f6f9f7);
+}
+
+.mvr-assistant-proof-track {
+  display: flex;
+  transform: translateX(calc(var(--mvr-assistant-slide, 0) * -100%));
+  transition: transform 440ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mvr-assistant-proof-slide {
+  min-width: 100%;
+  margin: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2px;
-  margin: 11px 14px 0;
-  padding: 4px;
-  border: 1px solid #e0e8e3;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 2px 8px rgba(46, 125, 91, 0.06);
+  justify-items: center;
+  gap: 10px;
+  padding: 15px 14px 12px;
 }
 
-.mvr-fd-tabs span {
-  min-width: 0;
+.mvr-assistant-proof-slide img {
+  display: block;
+  width: min(310px, 92%);
+  height: auto;
+  filter: drop-shadow(0 16px 24px rgba(20, 52, 35, 0.14));
+}
+
+.mvr-assistant-proof-slide figcaption {
+  width: min(430px, 100%);
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.mvr-assistant-proof-slide figcaption strong {
+  color: #20372b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mvr-assistant-proof-slide figcaption span {
+  color: #6b7d72;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.mvr-assistant-proof-controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 7px 5px;
-  overflow: hidden;
-  color: #748078;
-  border-radius: 9px;
-  font-size: 9px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fd-tabs span.is-active {
-  color: var(--mvr-green);
-  background: #fff;
-  box-shadow: 0 2px 7px rgba(46, 125, 91, 0.12);
-}
-
-.mvr-fd-tabs b {
-  min-width: 15px;
-  height: 15px;
-  display: inline-grid;
-  place-items: center;
-  color: #fff;
-  border-radius: 999px;
-  background: var(--mvr-green);
-  font-size: 8px;
-}
-
-.mvr-fd-workspace {
-  padding: 13px 15px 15px;
-}
-
-.mvr-fd-page-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 9px;
-}
-
-.mvr-fd-page-heading > div {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.mvr-fd-page-heading strong {
-  color: #1d3026;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.mvr-fd-page-heading span {
-  color: #7c8981;
-  font-size: 9px;
-}
-
-.mvr-fd-page-heading > b {
-  flex: 0 0 auto;
-  padding: 5px 8px;
-  color: #895a13;
-  border-radius: 999px;
-  background: #fff1cd;
-  font-size: 8px;
-  font-weight: 750;
-}
-
-.mvr-fd-booking {
-  overflow: hidden;
-  border: 1px solid #dfe7e2;
-  border-left: 3px solid #d89926;
-  border-radius: 15px;
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(28, 67, 45, 0.045);
-  animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
-}
-
-.mvr-fd-booking-summary {
-  padding: 12px 13px 10px;
-}
-
-.mvr-fd-booking-main {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.mvr-fd-booking-name,
-.mvr-fd-status {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-}
-
-.mvr-fd-booking-name strong {
-  overflow: hidden;
-  color: #1d2d24;
-  font-size: 14px;
-  font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fd-booking-name b {
-  color: #1d2d24;
-  font-family: 'DM Mono', ui-monospace, monospace;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.mvr-fd-trip {
-  overflow: hidden;
-  color: #6e7b73;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fd-status span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #8b5a0a;
-  font-size: 9px;
-  font-weight: 750;
-}
-
-.mvr-fd-status span i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #d89926;
-}
-
-.mvr-fd-status small {
-  overflow: hidden;
-  color: #89948e;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fd-booking-detail {
-  padding: 10px 13px 12px;
-  border-top: 1px solid #edf1ee;
-}
-
-.mvr-fd-question {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 8px 9px;
-  color: #81530c;
-  border-radius: 9px;
-  background: #fff8e9;
-  font-size: 9px;
-  line-height: 1.35;
-}
-
-.mvr-fd-question strong {
-  flex: 0 0 auto;
-}
-
-.mvr-fd-booking-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 7px;
-  margin-top: 8px;
+  padding: 10px 15px 3px;
 }
 
-.mvr-fd-booking-actions span {
-  min-width: 0;
-  padding: 8px 7px;
-  text-align: center;
-  border-radius: 9px;
-  font-size: 9px;
-  font-weight: 750;
+.mvr-assistant-proof-controls button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #c5d2ca;
+  cursor: pointer;
+  transition: width 180ms ease, background 180ms ease;
 }
 
-.mvr-fd-booking-actions span:first-child {
-  color: #fff;
-  background: linear-gradient(135deg, var(--mvr-green-light), var(--mvr-green));
-  box-shadow: 0 3px 9px rgba(46, 125, 91, 0.2);
-}
-
-.mvr-fd-booking-actions span:last-child {
-  color: #a23f3f;
-  border: 1px solid #e4caca;
-  background: #fff;
-}
-
-.mvr-fd-assistant-activity {
-  display: grid;
-  gap: 7px;
-  margin-top: 10px;
-  padding: 11px;
-  border: 1px solid #dde7e1;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 3px 12px rgba(28, 67, 45, 0.05);
-}
-
-.mvr-fd-activity-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 3px;
-}
-
-.mvr-fd-activity-head > div {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.mvr-fd-activity-head img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-}
-
-.mvr-fd-activity-head strong {
-  overflow: hidden;
-  color: #263a2f;
-  font-size: 10px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fd-activity-head > span {
-  flex: 0 0 auto;
-  color: #87938c;
-  font-size: 8px;
-  font-weight: 650;
-}
-
-.mvr-fd-message {
-  width: fit-content;
-  max-width: 78%;
-  padding: 7px 9px;
-  border-radius: 12px;
-  font-size: 9px;
-  line-height: 1.4;
-  animation: mvr-bubble-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--stagger, 0) * 150ms + 240ms);
-}
-
-.mvr-fd-message-in {
-  justify-self: start;
-  color: #36483e;
-  border-bottom-left-radius: 4px;
-  background: #edf1ee;
-}
-
-.mvr-fd-message-out {
-  justify-self: end;
-  color: #fff;
-  border-bottom-right-radius: 4px;
-  background: linear-gradient(135deg, var(--mvr-green-light), var(--mvr-green));
-}
-
-.mvr-fd-handled {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 9px;
-  color: #245f46;
-  border: 1px solid #cfe5d8;
-  border-radius: 10px;
-  background: #ebf7f0;
-  animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--stagger, 0) * 150ms + 240ms);
-}
-
-.mvr-fd-handled > span {
+.mvr-assistant-proof-controls button.is-active {
   width: 22px;
-  height: 22px;
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  color: #fff;
-  border-radius: 50%;
   background: var(--mvr-green);
-  font-size: 10px;
-  font-weight: 900;
 }
 
-.mvr-fd-handled > div {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
+.mvr-assistant-settings-proof {
+  padding: 0 15px 15px;
 }
 
-.mvr-fd-handled strong {
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.mvr-fd-handled small {
-  overflow: hidden;
-  color: #61806d;
-  font-size: 8px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.mvr-assistant-settings-proof .mvr-fallback-control {
+  margin-top: 7px;
 }
 
 .mvr-fallback-control {
@@ -2401,10 +2133,6 @@
     border-radius: 21px;
   }
 
-  .mvr-fd-workspace {
-    padding: 12px;
-  }
-
   .mvr-footer {
     align-items: center;
     padding-top: 8px;
@@ -2561,34 +2289,31 @@
     padding-top: 22px;
   }
 
-  .mvr-fd-header {
-    min-height: 54px;
-    padding: 8px 11px;
-  }
-
-  .mvr-fd-tabs {
-    margin-right: 10px;
-    margin-left: 10px;
-  }
-
-  .mvr-fd-tabs span {
-    padding-right: 3px;
-    padding-left: 3px;
-    font-size: 8px;
-  }
-
-  .mvr-fd-page-heading > b {
-    display: none;
-  }
-
-  .mvr-fd-question {
-    align-items: flex-start;
+  .mvr-assistant-proof-head {
+    align-items: stretch;
     flex-direction: column;
-    gap: 2px;
+    gap: 10px;
+    padding: 12px;
   }
 
-  .mvr-fd-handled small {
-    white-space: normal;
+  .mvr-assistant-proof-tabs {
+    width: 100%;
+  }
+
+  .mvr-assistant-proof-tabs button {
+    flex: 1;
+  }
+
+  .mvr-assistant-proof-slide {
+    padding: 12px 8px 10px;
+  }
+
+  .mvr-assistant-proof-slide img {
+    width: min(340px, 100%);
+  }
+
+  .mvr-assistant-settings-proof {
+    padding: 0 10px 12px;
   }
 
   .mvr-copy h1 {
@@ -2682,7 +2407,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mvr-app-carousel-track {
+  .mvr-app-carousel-track,
+  .mvr-assistant-proof-track {
     transition-duration: 1ms;
   }
 
@@ -2697,10 +2423,6 @@
   .mvr-visual,
   .mvr-live-preview,
   .mvr-preview-live i,
-  .mvr-fd-booking,
-  .mvr-fd-message,
-  .mvr-fd-handled,
-  .mvr-fd-live i,
   .mvr-finale-card,
   .mvr-finale-mark,
   .mvr-value-list > div,

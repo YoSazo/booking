@@ -1,6 +1,8 @@
 import './styles/reveal.css';
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
+import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
+import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
@@ -16,6 +18,7 @@ let bookingPageTimer = 0;
 let guestAppDemoTimer = 0;
 let guestAppDemoObserver = null;
 let guestAppDemoSlide = 0;
+let assistantProofSlide = 0;
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
@@ -581,71 +584,45 @@ function guestAppRevealHtml() {
 }
 
 function assistantRevealHtml() {
-  const roomName = firstRoom().name || 'King Suite';
   const releases = assistantNoResponseAction === 'release';
-  const checkin = new Date();
-  checkin.setDate(checkin.getDate() + 1);
-  const checkout = new Date(checkin);
-  checkout.setDate(checkout.getDate() + 1);
-  const dateLabel = (value) => value.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `<section class="mvr-stage mvr-stage-assistant">
     <div class="mvr-copy">
       <div class="mvr-eyebrow">3 · Your Front Desk Assistant</div>
       <h1>Front Desk checks in before a room conflict becomes a guest problem.</h1>
-      <p>When a direct booking arrives, Front Desk asks if the room is still free. If a walk-in or another channel took it, reply with what changed. Marketel updates Availability, releases the request and tells the guest.</p>
+      <p>A direct booking triggers an alert. Reply naturally if a walk-in took the room—or handle it with one tap in the app. Marketel updates Availability, releases the $1 hold and tells the guest.</p>
       <div class="mvr-callout">
         <strong>You stay in control—even when you miss the alert.</strong>
         Choose whether silence keeps the sale or protects availability. You can change the rule anytime.
       </div>
     </div>
     <div class="mvr-visual mvr-assistant-visual">
-      <div class="mvr-fd-header">
-        <div class="mvr-fd-brand">
-          <img src="/marketellogo.svg" alt="">
-          <div><strong>Front Desk</strong><span>${esc(propertyName())}</span></div>
+      <div class="mvr-assistant-proof-head">
+        <div>
+          <span>Real Marketel workflow</span>
+          <strong>Two ways to answer Front Desk</strong>
         </div>
-        <div class="mvr-fd-live"><i></i> Live</div>
-      </div>
-      <div class="mvr-fd-tabs" aria-label="Front Desk preview">
-        <span>Your page</span>
-        <span class="is-active">Bookings <b>1</b></span>
-        <span>Availability</span>
-        <span>Guest Reach</span>
-      </div>
-      <div class="mvr-fd-workspace">
-        <div class="mvr-fd-page-heading">
-          <div><strong>Bookings</strong><span>One request needs a decision</span></div>
-          <b>1 needs attention</b>
+        <div class="mvr-assistant-proof-tabs" role="tablist" aria-label="Front Desk response examples">
+          <button type="button" role="tab" data-mvr-assistant-slide="0" aria-selected="${assistantProofSlide === 0}" class="${assistantProofSlide === 0 ? 'is-active' : ''}">By text</button>
+          <button type="button" role="tab" data-mvr-assistant-slide="1" aria-selected="${assistantProofSlide === 1}" class="${assistantProofSlide === 1 ? 'is-active' : ''}">In the app</button>
         </div>
-        <article class="mvr-fd-booking">
-          <div class="mvr-fd-booking-summary">
-            <div class="mvr-fd-booking-main">
-              <div class="mvr-fd-booking-name"><strong>Jordan Lee</strong><b>${money(nightlyRate())}</b></div>
-              <div class="mvr-fd-trip">${esc(roomName)} · ${dateLabel(checkin)} – ${dateLabel(checkout)} · 1 night</div>
-              <div class="mvr-fd-status"><span><i></i> Decision due in 5 min</span><small>$1 hold verified</small></div>
-            </div>
-          </div>
-          <div class="mvr-fd-booking-detail">
-            <div class="mvr-fd-question"><strong>Is this room still free?</strong><span>No reply ${releases ? 'releases this request' : 'keeps this booking'}.</span></div>
-            <div class="mvr-fd-booking-actions" aria-hidden="true">
-              <span>Yes, keep it</span><span>No, release</span>
-            </div>
-          </div>
-        </article>
-
-        <section class="mvr-fd-assistant-activity">
-          <div class="mvr-fd-activity-head">
-            <div><img src="/marketellogo.svg" alt=""><strong>Front Desk Assistant</strong></div>
-            <span>Text conversation</span>
-          </div>
-          <div class="mvr-fd-message mvr-fd-message-in" style="--stagger:0">Is ${esc(roomName)} still free for ${dateLabel(checkin)}?</div>
-          <div class="mvr-fd-message mvr-fd-message-out" style="--stagger:1">No, a walk-in took it.</div>
-          <div class="mvr-fd-handled" style="--stagger:2">
-            <span>✓</span>
-            <div><strong>Handled in Front Desk</strong><small>One fewer room available · guest notified · $1 hold released</small></div>
-          </div>
-        </section>
-
+      </div>
+      <div class="mvr-assistant-proof-viewport">
+        <div class="mvr-assistant-proof-track" style="--mvr-assistant-slide:${assistantProofSlide}">
+          <figure class="mvr-assistant-proof-slide" role="tabpanel" aria-hidden="${assistantProofSlide !== 0}">
+            <img src="${assistantTextResolutionUrl}" width="780" height="1532" decoding="async" alt="A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.">
+            <figcaption><strong>Tell it what changed.</strong><span>Front Desk handles the work and confirms exactly what it did.</span></figcaption>
+          </figure>
+          <figure class="mvr-assistant-proof-slide" role="tabpanel" aria-hidden="${assistantProofSlide !== 1}">
+            <img src="${assistantBookingRequestUrl}" width="780" height="1524" decoding="async" alt="A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.">
+            <figcaption><strong>Or decide inside the app.</strong><span>The same request appears in Bookings with one-tap controls.</span></figcaption>
+          </figure>
+        </div>
+      </div>
+      <div class="mvr-assistant-proof-controls" aria-label="Choose a Front Desk example">
+        <button type="button" data-mvr-assistant-slide="0" class="${assistantProofSlide === 0 ? 'is-active' : ''}" aria-label="Show the text conversation"></button>
+        <button type="button" data-mvr-assistant-slide="1" class="${assistantProofSlide === 1 ? 'is-active' : ''}" aria-label="Show the in-app booking request"></button>
+      </div>
+      <div class="mvr-assistant-settings-proof">
         <div class="mvr-fallback-control">
           <strong>If you miss the alert</strong>
           <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
@@ -1069,6 +1046,26 @@ function revealGuestAppValue(manual = false) {
   }, manual ? 900 : 1200);
 }
 
+function setAssistantProofSlide(nextSlide, manual = false) {
+  assistantProofSlide = Number(nextSlide) === 1 ? 1 : 0;
+  const visual = document.querySelector('.mvr-assistant-visual');
+  if (!visual) return;
+  visual.querySelector('.mvr-assistant-proof-track')?.style.setProperty('--mvr-assistant-slide', String(assistantProofSlide));
+  visual.querySelectorAll('.mvr-assistant-proof-slide').forEach((slide, index) => {
+    slide.setAttribute('aria-hidden', index === assistantProofSlide ? 'false' : 'true');
+  });
+  visual.querySelectorAll('[data-mvr-assistant-slide]').forEach((button) => {
+    const isActive = Number(button.dataset.mvrAssistantSlide) === assistantProofSlide;
+    button.classList.toggle('is-active', isActive);
+    if (button.getAttribute('role') === 'tab') button.setAttribute('aria-selected', String(isActive));
+  });
+  if (!manual) return;
+  trackReveal(assistantProofSlide === 1 ? 'AssistantAppProofViewed' : 'AssistantTextProofViewed');
+  trackJourney('JourneyAssistantProofViewed', {
+    proof: assistantProofSlide === 1 ? 'app' : 'text',
+  });
+}
+
 function scheduleGuestAppValueDemo() {
   clearGuestAppDemoSchedule();
   if (currentStep !== 1 || guestAppDemoSlide !== 0) return;
@@ -1129,6 +1126,13 @@ function bindRevealEvents() {
     button.addEventListener('click', () => {
       const nextSlide = Number(button.dataset.mvrAppSlide) === 1 ? 1 : 0;
       if (nextSlide !== guestAppDemoSlide) setGuestAppDemoSlide(nextSlide, true);
+    });
+  });
+  document.querySelectorAll('[data-mvr-assistant-slide]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextSlide = Number(button.dataset.mvrAssistantSlide) === 1 ? 1 : 0;
+      if (nextSlide === assistantProofSlide) return;
+      setAssistantProofSlide(nextSlide, true);
     });
   });
   document.querySelectorAll('[data-mvr-fallback]').forEach((button) => {
