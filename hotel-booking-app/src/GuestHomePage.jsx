@@ -389,8 +389,9 @@ if (typeof document !== 'undefined') {
 const styles = {
   page: {
     background: 'radial-gradient(circle at 12% -8%, rgba(126,226,184,0.22), transparent 34%), radial-gradient(circle at 96% 18%, rgba(76,175,125,0.10), transparent 30%), #EFF4F0',
-    minHeight: '100vh',
-    padding: 'max(14px, env(safe-area-inset-top)) 14px 42px',
+    minHeight: 'calc(100dvh - var(--guest-nav-clearance, 0px))',
+    boxSizing: 'border-box',
+    padding: 'max(12px, env(safe-area-inset-top)) 14px 12px',
     fontFamily: 'DM Sans, -apple-system, BlinkMacSystemFont, sans-serif',
     maxWidth: 540,
     margin: '0 auto',

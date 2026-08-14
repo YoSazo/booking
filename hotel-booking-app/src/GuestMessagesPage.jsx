@@ -138,25 +138,6 @@ export default function GuestMessagesPage({ hotel }) {
     scrollToBottom('auto');
   }, [messages.length, loading, scrollToBottom]);
 
-  // Keep the latest messages glued just above the composer while the keyboard
-  // animates. Pinning to the bottom on every viewport step is what removes the
-  // "scroll up to see what you sent" problem and the modal's jitter.
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return undefined;
-    const pinWhileTyping = () => {
-      if (document.activeElement !== inputRef.current) return;
-      const el = scrollContainerRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    };
-    vv.addEventListener('resize', pinWhileTyping);
-    vv.addEventListener('scroll', pinWhileTyping);
-    return () => {
-      vv.removeEventListener('resize', pinWhileTyping);
-      vv.removeEventListener('scroll', pinWhileTyping);
-    };
-  }, []);
-
   // Mark hotel messages as read (fire-and-forget)
   useEffect(() => {
     if (!guestStay?.code || !hotelId) return;
@@ -263,12 +244,6 @@ export default function GuestMessagesPage({ hotel }) {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const handleInputFocus = () => {
-    // Jump to the newest message the instant the field is tapped; the viewport
-    // listener then keeps it pinned as the keyboard finishes animating in.
-    requestAnimationFrame(() => scrollToBottom('auto'));
   };
 
   const handleMessagesTouchStart = (event) => {
@@ -467,7 +442,6 @@ export default function GuestMessagesPage({ hotel }) {
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={handleInputFocus}
             placeholder="Type a message..."
             enterKeyHint="send"
             className="guest-msg-input"
@@ -498,13 +472,14 @@ const spinnerKeyframes = `
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-html.marketel-keyboard-open .guest-messages-page {
-  padding-bottom: 0 !important;
+html.marketel-keyboard-open .guest-message-composer {
+  bottom: var(--marketel-keyboard-inset, 0px) !important;
+  padding-bottom: 8px !important;
+  background: #EFF4F0 !important;
   transition: none !important;
 }
-html.marketel-keyboard-open .guest-message-composer {
-  padding-bottom: calc(var(--marketel-keyboard-inset, 0px) + 8px) !important;
-  background: #EFF4F0 !important;
+html.marketel-keyboard-open .guest-message-quick-chips {
+  display: none !important;
 }
 .guest-msg-input:focus {
   border-color: #2E7D5B !important;
@@ -541,8 +516,7 @@ const styles = {
     width: '100%',
     boxSizing: 'border-box',
     overflow: 'hidden',
-    paddingBottom: 'var(--guest-nav-clearance, 0px)',
-    transition: 'padding-bottom 240ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+    paddingBottom: 0,
     contain: 'layout',
   },
 
@@ -581,7 +555,7 @@ const styles = {
     flex: 1,
     minHeight: 0,
     overflowY: 'auto',
-    padding: '0 16px 10px',
+    padding: '0 16px calc(104px + var(--guest-nav-clearance, 0px))',
     WebkitOverflowScrolling: 'touch',
     overscrollBehaviorY: 'contain',
   },
@@ -765,17 +739,22 @@ const styles = {
     animation: 'guestMsgSpinner 0.8s linear infinite',
   },
 
-  // The composer grows an opaque bottom inset equal to the keyboard height.
-  // Its input row stays above the keyboard without moving the route itself.
+  // This is an overlay, not a flex child. Keyboard changes only its bottom
+  // coordinate, so the header and conversation never resize or translate.
   composeBar: {
-    position: 'relative',
-    flexShrink: 0,
+    position: 'fixed',
+    left: '50%',
+    bottom: 'var(--guest-nav-clearance, 0px)',
+    transform: 'translateX(-50%)',
+    width: 'min(540px, 100%)',
+    boxSizing: 'border-box',
     padding: '8px 12px max(10px, env(safe-area-inset-bottom))',
     zIndex: 99,
     borderTop: '1px solid #E6EEE9',
     background: 'rgba(239,244,240,0.94)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
+    transition: 'bottom 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
   },
   chipsScroll: {
     display: 'flex',

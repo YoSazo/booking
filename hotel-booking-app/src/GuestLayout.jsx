@@ -141,8 +141,9 @@ export default function GuestLayout({ children }) {
   }, [installedApp, guestStay?.code]);
 
   const isInstallPage = location.pathname === '/install';
-  // Bottom nav: installed PWA only. Browser booking flow stays nav-free.
-  const showNav = installedApp && isMobile && !isInstallPage && !keyboardOpen;
+  // Keep the shell mounted while the keyboard is open. Removing it used to
+  // change the route's bottom padding and make the entire Messages view jump.
+  const showNav = installedApp && isMobile && !isInstallPage;
 
   useEffect(() => {
     if (!isDraggingNav && activeIndex >= 0) setNavPosition(activeIndex);
@@ -253,13 +254,13 @@ export default function GuestLayout({ children }) {
   const lensVisible = activeIndex >= 0 || isDraggingNav;
 
   return (
-    <div style={{ ...styles.wrapper, '--guest-nav-clearance': showNav ? '116px' : '0px' }}>
-      <div style={{ ...styles.content, paddingBottom: showNav ? 110 : 0 }}>{children}</div>
+    <div style={{ ...styles.wrapper, '--guest-nav-clearance': showNav ? '94px' : '0px' }}>
+      <div style={{ ...styles.content, paddingBottom: showNav ? 94 : 0 }}>{children}</div>
 
       {showNav && (
         <nav
           ref={navRef}
-          className={`guest-app-navigation guest-nav${isDraggingNav ? ' is-dragging' : ''}`}
+          className={`guest-app-navigation guest-nav${isDraggingNav ? ' is-dragging' : ''}${keyboardOpen ? ' is-keyboard-hidden' : ''}`}
           aria-label="Property navigation. Tap a tab or drag between tabs."
           onPointerDown={handleNavPointerDown}
           onPointerMove={handleNavPointerMove}
@@ -291,7 +292,7 @@ export default function GuestLayout({ children }) {
                 <span className="guest-nav__icon">
                   <Icon
                     size={22}
-                    color={isActive ? '#fff' : '#6B7D72'}
+                    color={isActive ? '#245F46' : '#6B7D72'}
                     strokeWidth={isActive ? 2.3 : 1.9}
                   />
                   {isMessages && unreadCount > 0 && (
@@ -312,10 +313,11 @@ export default function GuestLayout({ children }) {
 const styles = {
   wrapper: {
     width: '100%',
-    minHeight: '100vh',
+    minHeight: '100dvh',
   },
   content: {
     width: '100%',
-    minHeight: '100vh',
+    minHeight: '100dvh',
+    boxSizing: 'border-box',
   },
 };
