@@ -483,7 +483,7 @@ function bookingPreviewCardHtml() {
       <span class="mvr-preview-live"><i></i>Live</span>
     </div>
     <div class="mvr-preview-teaser">
-      ${url
+      ${url && !bookingPageState.checking
         ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
@@ -840,10 +840,17 @@ function footerHtml() {
   </div>`;
 }
 
+// Stage 0 embeds a live iframe of the booking page, and this function replaces
+// the whole subtree — so every redundant render tore that frame down and made
+// the page load again. Boot fires several renders (data load, status checks),
+// which is the visible "refreshes itself three times". Skipping renders whose
+// output is byte-identical keeps the frame alive.
+let lastRenderedRevealHtml = '';
+
 function renderReveal() {
   const root = document.getElementById('marketelValueReveal');
   if (!root) return;
-  root.innerHTML = `<div class="mvr-shell">
+  const nextHtml = `<div class="mvr-shell">
     <header class="mvr-header">
       <div class="mvr-brand"><img src="/marketellogo.svg" alt="Marketel"><span>Marketel</span></div>
       ${progressHtml()}
@@ -851,6 +858,9 @@ function renderReveal() {
     <main class="mvr-main">${stepHtml()}</main>
     ${footerHtml()}
   </div>`;
+  if (nextHtml === lastRenderedRevealHtml && root.firstElementChild) return;
+  lastRenderedRevealHtml = nextHtml;
+  root.innerHTML = nextHtml;
   bindRevealEvents();
 }
 
@@ -965,6 +975,15 @@ function continueFromBookingPreview(modal, previewOpenedAt, action) {
   moveToStep(1);
 }
 
+function setPreviewFrameSrc(iframe, nextSrc) {
+  if (!iframe || !nextSrc) return;
+  let current = '';
+  try { current = new URL(iframe.getAttribute('src') || '', window.location.href).toString(); }
+  catch (_) { current = iframe.getAttribute('src') || ''; }
+  if (current === nextSrc) return;
+  iframe.src = nextSrc;
+}
+
 function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-selected') {
   if (!modal?.isConnected) return;
   if (nextMode === 'edit') stopBookingChallenge('edit-mode-selected', true);
@@ -998,7 +1017,9 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
       ? `${propertyName()} Front Desk editor`
       : `${propertyName()} booking-page preview`;
     if (livePreviewMode === 'edit') {
-      iframe.src = frontdeskEditorUrl();
+      // Re-assigning the same src reloads the frame, which is what made the
+      // editor flash the loading screen, appear, then load a second time.
+      setPreviewFrameSrc(iframe, frontdeskEditorUrl());
     } else {
       const guestUrl = new URL(bookingUrl());
       if (modal.dataset.editorSaved === '1') {
@@ -1017,7 +1038,9 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
         delete modal.dataset.editorHighlightRoom;
         delete modal.dataset.editorPreviewTarget;
       }
-      iframe.src = guestUrl.toString();
+      // A save-return deliberately carries a fresh previewRefresh, so this
+      // still reloads when it should; it only skips a genuinely identical URL.
+      setPreviewFrameSrc(iframe, guestUrl.toString());
     }
   }
   trackJourney('JourneyBookingPreviewModeChanged', {
@@ -1072,6 +1095,7 @@ function finishReveal() {
   stopBookingChallenge('reveal-finished', true);
   activeBookingChallenge = null;
   clearBeatFrames();
+  lastRenderedRevealHtml = '';
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -1254,6 +1278,7 @@ export function showMarketelValueReveal(options = {}) {
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
   bookingEditorVisited = false;
+  lastRenderedRevealHtml = '';
   revealStartedAt = Date.now();
   stageStartedAt = 0;
   nextStageViewIsResume = !Number.isFinite(requestedStep) && hadPendingReveal;
