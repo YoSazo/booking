@@ -1143,7 +1143,7 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 620ms ease;
+  transition: opacity 340ms ease;
 }
 
 .mvr-beat-proof.is-paired .mvr-beat-frame.is-active {

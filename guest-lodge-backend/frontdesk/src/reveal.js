@@ -30,6 +30,10 @@ let billingInterval = 'month';
 let activeBookingChallenge = null;
 let bookingPreviewOpened = false;
 let bookingPreviewUnavailable = false;
+// Saving in the editor returns to the booking page to show the highlighted
+// change, so mode alone can't drive the CTA — it would offer "edit" a second
+// time. Once the editor has been seen, the only way on is the Home Screen.
+let bookingEditorVisited = false;
 let nextStageViewIsResume = false;
 let assistantNoResponseAction = 'confirm';
 
@@ -683,13 +687,21 @@ function beatStageHtml(stageClass, eyebrow, beats, index) {
   </section>`;
 }
 
-const BEAT_FRAME_MS = 3400;
+// The first swap comes fast so a paired beat announces itself before she taps
+// on; after that it settles into a slower loop that is readable rather than busy.
+const BEAT_FRAME_FIRST_MS = 850;
+const BEAT_FRAME_MS = 2600;
 let beatFrameTimer = 0;
+let beatFrameDelay = 0;
 
 function clearBeatFrames() {
   if (beatFrameTimer) {
     window.clearInterval(beatFrameTimer);
     beatFrameTimer = 0;
+  }
+  if (beatFrameDelay) {
+    window.clearTimeout(beatFrameDelay);
+    beatFrameDelay = 0;
   }
 }
 
@@ -703,12 +715,18 @@ function startBeatFrames() {
   const dots = [...figure.querySelectorAll('.mvr-beat-frame-dots i')];
   if (frames.length < 2) return;
   let shown = 0;
-  beatFrameTimer = window.setInterval(() => {
+  const advance = () => {
     if (!figure.isConnected) return clearBeatFrames();
     shown = (shown + 1) % frames.length;
     frames.forEach((frame, i) => frame.classList.toggle('is-active', i === shown));
     dots.forEach((dot, i) => dot.classList.toggle('is-active', i === shown));
-  }, BEAT_FRAME_MS);
+    return undefined;
+  };
+  beatFrameDelay = window.setTimeout(() => {
+    beatFrameDelay = 0;
+    advance();
+    beatFrameTimer = window.setInterval(advance, BEAT_FRAME_MS);
+  }, BEAT_FRAME_FIRST_MS);
 }
 
 function setStageBeat(nextBeat, manual = false) {
@@ -958,14 +976,16 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   const continueGuestApp = modal.querySelector('#mvrContinueGuestApp');
   const back = modal.querySelector('#mvrLiveBack');
   const editing = livePreviewMode === 'edit';
+  if (editing) bookingEditorVisited = true;
   location?.classList.toggle('is-editor', editing);
   if (locationText) locationText.textContent = editing ? 'Front Desk editor' : bookingDisplayDomain();
   if (location) location.setAttribute('aria-label', editing ? 'Front Desk editor' : 'Your live booking address');
   // Exactly one green CTA per mode, so the way forward is never a choice:
   // view the page → edit it → continue. Editing is on the path, not optional,
   // which is what earns the "the page you just edited lives in an app" beat.
-  if (forward) forward.hidden = editing;
-  if (continueGuestApp) continueGuestApp.hidden = !editing;
+  const past = editing || bookingEditorVisited;
+  if (forward) forward.hidden = past;
+  if (continueGuestApp) continueGuestApp.hidden = !past;
   if (back) back.hidden = !editing;
   setLivePreviewActionsVisible(modal, true);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
@@ -1229,6 +1249,7 @@ export function showMarketelValueReveal(options = {}) {
   stageBeatIndex = { 1: 0, 2: 0 };
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
+  bookingEditorVisited = false;
   revealStartedAt = Date.now();
   stageStartedAt = 0;
   nextStageViewIsResume = !Number.isFinite(requestedStep) && hadPendingReveal;
