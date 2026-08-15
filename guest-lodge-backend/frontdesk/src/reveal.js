@@ -7,8 +7,10 @@ import ownerEditorProofUrl from './assets/frontdesk-editor.webp';
 import guestInstallBannerUrl from './assets/guest-install-banner.webp';
 import guestInstallSheetUrl from './assets/guest-install-sheet.webp';
 import guestHomeScreenUrl from './assets/guest-home-screen.webp';
+import guestAppStayUrl from './assets/guest-app-stay.webp';
 import guestAppBookUrl from './assets/guest-app-book.webp';
 import guestBroadcastSendUrl from './assets/guest-broadcast-send.webp';
+import guestBroadcastArrivesUrl from './assets/guest-broadcast-arrives.webp';
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
@@ -575,26 +577,32 @@ function guestAppBeats() {
       },
     },
     {
-      title: 'Next time, they book you direct.',
+      // Two frames: the stay they arrive to, and the rooms they rebook from.
+      title: 'It opens to their stay. And to your rooms.',
       body: rebookBody,
       next: 'See what else that wins you',
       event: 'GuestAppRebookViewed',
       proof: {
-        url: guestAppBookUrl,
-        alt: 'The saved property opened from the Home Screen to its Book tab, showing the rooms ready to reserve again.',
+        frames: [
+          { url: guestAppStayUrl, alt: 'The saved property opened from the Home Screen to the guest’s stay: check-in today, room, dates, amount due and property details.' },
+          { url: guestAppBookUrl, alt: 'The same saved property on its Book tab, showing the rooms ready to reserve again.' },
+        ],
       },
     },
     {
       // The rest of the funnel argues cost avoidance. This is the one beat that
       // argues upside — she can create demand instead of waiting for it — and
       // it is the concrete form of owning the guest relationship an OTA keeps.
+      // Two frames close the loop: her sending it, and it landing on a phone.
       title: 'And when you want them back, you tell them.',
       body: 'One message from Front Desk reaches every guest who saved you and allowed alerts. No ad spend, no OTA.',
       next: 'See how Front Desk protects you',
       event: 'GuestAppBroadcastViewed',
       proof: {
-        url: guestBroadcastSendUrl,
-        alt: 'Marketel Front Desk composing a notification to saved guests, with a preview of what arrives on their phone and a send button.',
+        frames: [
+          { url: guestBroadcastSendUrl, alt: 'Marketel Front Desk composing a notification to saved guests, with a preview of what arrives on their phone and a send button.' },
+          { url: guestBroadcastArrivesUrl, alt: 'The same notification arriving on a guest’s Home Screen from the saved property, with a badge on its icon.' },
+        ],
       },
     },
   ];
@@ -641,8 +649,18 @@ function stageBeats(step = currentStep) {
   return null;
 }
 
+// A proof may carry one frame or a pair. A pair cross-fades on its own so the
+// beat can show both halves of a loop — sent and received, stay and rebook —
+// without a second control competing with the footer.
+function proofFrames(proof) {
+  if (!proof) return [];
+  return proof.frames || [{ url: proof.url, alt: proof.alt }];
+}
+
 function beatStageHtml(stageClass, eyebrow, beats, index) {
   const beat = beats[Math.max(0, Math.min(beats.length - 1, index))] || beats[0];
+  const frames = proofFrames(beat.proof);
+  const paired = frames.length > 1;
   return `<section class="mvr-stage mvr-stage-beats ${stageClass}">
     <div class="mvr-beat-band">
       <div class="mvr-eyebrow">${eyebrow}</div>
@@ -650,11 +668,40 @@ function beatStageHtml(stageClass, eyebrow, beats, index) {
       <p class="mvr-beat-body">${beat.body}</p>
     </div>
     <div class="mvr-beat-stage">
-      ${beat.proof ? `<figure class="mvr-beat-proof">
-        <img src="${beat.proof.url}" width="780" height="1528" decoding="async" alt="${esc(beat.proof.alt)}">
+      ${beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
+        ${frames.map((frame, i) => `<img class="mvr-beat-frame${i === 0 ? ' is-active' : ''}" src="${frame.url}" width="780" height="1528" decoding="async" alt="${esc(frame.alt)}">`).join('')}
+        ${paired ? `<span class="mvr-beat-frame-dots" aria-hidden="true">${frames.map((_, i) => `<i${i === 0 ? ' class="is-active"' : ''}></i>`).join('')}</span>` : ''}
       </figure>` : `<div class="mvr-beat-settings">${beat.render ? beat.render() : ''}</div>`}
     </div>
   </section>`;
+}
+
+const BEAT_FRAME_MS = 3400;
+let beatFrameTimer = 0;
+
+function clearBeatFrames() {
+  if (beatFrameTimer) {
+    window.clearInterval(beatFrameTimer);
+    beatFrameTimer = 0;
+  }
+}
+
+// Runs after every render; a paired proof advances itself and loops. Restarting
+// from scratch each render is what keeps the timer from outliving its beat.
+function startBeatFrames() {
+  clearBeatFrames();
+  const figure = document.querySelector('.mvr-beat-proof.is-paired');
+  if (!figure) return;
+  const frames = [...figure.querySelectorAll('.mvr-beat-frame')];
+  const dots = [...figure.querySelectorAll('.mvr-beat-frame-dots i')];
+  if (frames.length < 2) return;
+  let shown = 0;
+  beatFrameTimer = window.setInterval(() => {
+    if (!figure.isConnected) return clearBeatFrames();
+    shown = (shown + 1) % frames.length;
+    frames.forEach((frame, i) => frame.classList.toggle('is-active', i === shown));
+    dots.forEach((dot, i) => dot.classList.toggle('is-active', i === shown));
+  }, BEAT_FRAME_MS);
 }
 
 function setStageBeat(nextBeat, manual = false) {
@@ -995,6 +1042,7 @@ function finishReveal() {
   }
   stopBookingChallenge('reveal-finished', true);
   activeBookingChallenge = null;
+  clearBeatFrames();
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -1084,6 +1132,7 @@ function bindRevealEvents() {
       renderReveal();
     });
   });
+  startBeatFrames();
 }
 
 async function loadRevealData() {
