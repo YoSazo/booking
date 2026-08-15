@@ -211,11 +211,18 @@ function shellVisible(visible) {
   }
 }
 
+function challengeSeconds(elapsedMs) {
+  return Math.max(0, Math.floor(Number(elapsedMs || 0) / 1000));
+}
+
+// The dial counts straight up in seconds — 01, 02 … 60, 61 — rather than
+// rolling over to mm:ss, so a sub-minute checkout reads as one number.
+function formatChallengeTicks(elapsedMs) {
+  return String(challengeSeconds(elapsedMs)).padStart(2, '0');
+}
+
 function formatChallengeTime(elapsedMs) {
-  const totalSeconds = Math.max(0, Math.floor(Number(elapsedMs || 0) / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = String(totalSeconds % 60).padStart(2, '0');
-  return `${minutes}:${seconds}`;
+  return `${challengeSeconds(elapsedMs)}s`;
 }
 
 function hideBookingChallengeLayer(challenge) {
@@ -253,7 +260,7 @@ function stopBookingChallenge(reason = '', shouldTrack = false) {
       elapsedMs,
     }, { durationMs: elapsedMs });
   }
-  if (challenge.timer) challenge.timer.hidden = true;
+  challenge.timer?.classList.remove('is-live');
   if (challenge.status === 'running') challenge.status = 'abandoned';
   hideBookingChallengeLayer(challenge);
 }
@@ -262,7 +269,7 @@ function updateBookingChallengeTimer(challenge) {
   if (!challenge || challenge.status !== 'running' || !challenge.timer) return;
   const elapsedMs = Date.now() - challenge.startedAt;
   const time = challenge.timer.querySelector('[data-challenge-time]');
-  if (time) time.textContent = `${formatChallengeTime(elapsedMs)} / 1:00`;
+  if (time) time.textContent = formatChallengeTicks(elapsedMs);
   challenge.timer.classList.toggle('is-over-minute', elapsedMs >= 60000);
 }
 
@@ -272,7 +279,7 @@ function startBookingChallenge(challenge) {
   challenge.startedAt = Date.now();
   hideBookingChallengeLayer(challenge);
   setLivePreviewActionsVisible(challenge.modal, true);
-  challenge.timer.hidden = false;
+  challenge.timer.classList.add('is-live');
   updateBookingChallengeTimer(challenge);
   challenge.timerId = window.setInterval(() => updateBookingChallengeTimer(challenge), 500);
   trackReveal('BookingChallengeStarted');
@@ -330,7 +337,7 @@ function completeBookingChallenge(challenge) {
     challenge.timerId = 0;
   }
   challenge.status = 'completed';
-  challenge.timer.hidden = true;
+  challenge.timer.classList.remove('is-live');
   setLivePreviewActionsVisible(challenge.modal, false);
   challenge.layer.innerHTML = `<section class="mvr-challenge-card mvr-challenge-complete" role="dialog" aria-labelledby="mvrChallengeCompleteTitle">
     <span class="mvr-challenge-check" aria-hidden="true">✓</span>
@@ -856,11 +863,9 @@ function showExpandedPreview() {
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
         <strong data-live-location-text>${esc(bookingDisplayDomain())}</strong>
       </div>
-      <span class="mvr-live-balance" aria-hidden="true"></span>
-    </div>
-    <div class="mvr-challenge-timer" hidden aria-live="polite">
-      <span></span>
-      <div><small>Checkout challenge</small><strong data-challenge-time>0:00 / 1:00</strong></div>
+      <span class="mvr-challenge-timer" aria-live="polite" aria-label="Seconds elapsed">
+        <strong data-challenge-time>00</strong>
+      </span>
     </div>
   </div>
   <div class="mvr-live-stage">
@@ -868,11 +873,12 @@ function showExpandedPreview() {
     <div class="mvr-challenge-layer" aria-hidden="true"></div>
   </div>
   <div class="mvr-live-actions" id="mvrLiveActions" hidden>
+    <button type="button" class="mvr-live-back" id="mvrLiveBack" hidden>← Back</button>
     <button type="button" class="mvr-live-forward" id="mvrLiveForward">
       <span data-live-forward-long>See how to edit your booking page</span>
       <b aria-hidden="true">→</b>
     </button>
-    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp">See the Home Screen experience</button>
+    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Home Screen experience</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
@@ -916,10 +922,9 @@ function showExpandedPreview() {
     continueFromBookingPreview(modal, previewOpenedAt, 'continued-without-editor');
   });
   modal.querySelector('#mvrLiveForward')?.addEventListener('click', () => {
-    if (livePreviewMode === 'guest') {
-      setLivePreviewMode(modal, 'edit', previewOpenedAt, 'guided-forward');
-      return;
-    }
+    setLivePreviewMode(modal, 'edit', previewOpenedAt, 'guided-forward');
+  });
+  modal.querySelector('#mvrLiveBack')?.addEventListener('click', () => {
     setLivePreviewMode(modal, 'guest', previewOpenedAt, 'returned-to-booking-page');
   });
   trackReveal('BookingEngineFullPreviewOpened');
@@ -951,17 +956,17 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   const locationText = modal.querySelector('[data-live-location-text]');
   const forward = modal.querySelector('#mvrLiveForward');
   const continueGuestApp = modal.querySelector('#mvrContinueGuestApp');
-  const forwardLong = modal.querySelector('[data-live-forward-long]');
-  const forwardArrow = forward?.querySelector('b');
-  location?.classList.toggle('is-editor', livePreviewMode === 'edit');
-  if (locationText) locationText.textContent = livePreviewMode === 'edit' ? 'Front Desk editor' : bookingDisplayDomain();
-  if (location) location.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Front Desk editor' : 'Your live booking address');
-  if (forwardLong) forwardLong.textContent = livePreviewMode === 'edit' ? 'Back to your booking page' : 'See how to edit your booking page';
-  if (forwardArrow) forwardArrow.textContent = livePreviewMode === 'edit' ? '↩' : '→';
-  if (forward) {
-    forward.setAttribute('aria-label', livePreviewMode === 'edit' ? 'Back to your direct booking page' : 'See how you edit this booking page');
-  }
-  if (continueGuestApp) continueGuestApp.hidden = false;
+  const back = modal.querySelector('#mvrLiveBack');
+  const editing = livePreviewMode === 'edit';
+  location?.classList.toggle('is-editor', editing);
+  if (locationText) locationText.textContent = editing ? 'Front Desk editor' : bookingDisplayDomain();
+  if (location) location.setAttribute('aria-label', editing ? 'Front Desk editor' : 'Your live booking address');
+  // Exactly one green CTA per mode, so the way forward is never a choice:
+  // view the page → edit it → continue. Editing is on the path, not optional,
+  // which is what earns the "the page you just edited lives in an app" beat.
+  if (forward) forward.hidden = editing;
+  if (continueGuestApp) continueGuestApp.hidden = !editing;
+  if (back) back.hidden = !editing;
   setLivePreviewActionsVisible(modal, true);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');
   if (iframe) {

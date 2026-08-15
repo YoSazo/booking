@@ -1071,9 +1071,14 @@
 }
 
 /* ── Assistant stage: one claim over one full-bleed proof, per beat ── */
+/* Fixed height, not auto: the proof below takes the leftover space, so a band
+   that grew with copy length made every beat's screenshot a different size.
+   Reserving room for the longest beat keeps all of them identical. */
 .mvr-beat-band {
   width: min(620px, 100%);
+  min-height: 132px;
   display: grid;
+  align-content: center;
   gap: 6px;
   margin: 0 auto 14px;
   text-align: center;
@@ -1780,10 +1785,7 @@
   line-height: 1;
 }
 
-.mvr-live-balance {
-  width: 38px;
-  height: 38px;
-}
+
 
 .mvr-live-forward {
   min-height: 42px;
@@ -2019,66 +2021,39 @@
   font-weight: 900;
 }
 
+/* A dial in the toolbar, not a banner under it: the preview is the point and
+   the count only needs a glance. It runs straight through the minute — 59, 60,
+   61 — so the number always reads as seconds elapsed. */
 .mvr-challenge-timer {
-  min-width: 174px;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 15px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   background: #236b4d;
-  box-shadow: 0 12px 30px rgba(22, 73, 49, 0.28), 0 0 0 3px rgba(46, 125, 91, 0.12);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 8px 20px rgba(22, 73, 49, 0.26), 0 0 0 3px rgba(46, 125, 91, 0.12);
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 220ms ease, transform 220ms ease, background 220ms ease;
 }
 
-.mvr-challenge-timer:not([hidden]) {
-  display: flex;
-  align-self: center;
-  margin-top: 8px;
-  animation: mvr-timer-arrive 220ms ease-out both;
-}
-
-.mvr-challenge-timer > span {
-  width: 11px;
-  height: 11px;
-  flex: 0 0 auto;
-  border: 2px solid #d8f5e5;
-  border-radius: 50%;
-  background: #8be0b0;
-  box-shadow: 0 0 0 5px rgba(216, 245, 229, 0.14);
-  animation: mvr-timer-pulse 1.5s ease-out infinite;
-}
-
-.mvr-challenge-timer div {
-  display: grid;
-}
-
-.mvr-challenge-timer small {
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+.mvr-challenge-timer.is-live { opacity: 1; transform: none; }
 
 .mvr-challenge-timer strong {
-  color: #fff;
-  font-size: 16px;
-  font-weight: 900;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.mvr-challenge-timer.is-over-minute {
-  background: #8a4d20;
-  box-shadow: 0 12px 30px rgba(104, 54, 19, 0.28), 0 0 0 3px rgba(165, 89, 35, 0.12);
-}
+.mvr-challenge-timer.is-over-minute { background: #b4762a; }
 
-.mvr-challenge-timer.is-over-minute > span {
-  border-color: #ffe4c7;
-  background: #ffc98f;
-  box-shadow: 0 0 0 5px rgba(255, 228, 199, 0.16);
+@media (prefers-reduced-motion: reduce) {
+  .mvr-challenge-timer { transition: none; }
 }
 
 @keyframes mvr-timer-arrive {
@@ -2253,14 +2228,15 @@
     flex-direction: row;
   }
 
+  /* Match the 40px topline column the dial sits in. */
   .mvr-challenge-timer {
-    min-width: 150px;
-    gap: 8px;
-    padding: 9px 11px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
   }
 
   .mvr-challenge-timer strong {
-    font-size: 15px;
+    font-size: 13px;
   }
 }
 
@@ -2275,11 +2251,21 @@
     gap: 5px;
   }
 
+  /* Stays a row: Back belongs beside the CTA, not stacked above it. */
   .mvr-live-actions {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 6px;
+    align-items: center;
+    flex-direction: row;
+    gap: 10px;
     padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .mvr-challenge-timer {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mvr-challenge-timer strong {
+    font-size: 12px;
   }
 
   .mvr-live-continue {
@@ -2464,3 +2450,54 @@
     animation: none !important;
   }
 }
+
+/* ── Live preview actions: one green CTA per mode ──────────────────────────
+   View the page → edit it → continue. Editing sits on the path rather than
+   beside it, which is what earns the "the page you just edited lives in an
+   app" beat that follows. The back button matches the funnel footer so going
+   back to the booking page reads the same everywhere. */
+.mvr-live-actions {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mvr-live-actions .mvr-live-back {
+  flex: 0 0 auto;
+  appearance: none;
+  min-height: 44px;
+  padding: 12px 2px;
+  color: #6f7e75;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.mvr-live-actions .mvr-live-back:hover { color: #244b38; }
+.mvr-live-actions .mvr-live-back[hidden] { display: none; }
+
+.mvr-live-actions .mvr-live-forward,
+.mvr-live-actions .mvr-live-continue {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 15px 20px;
+  color: #fff;
+  border: 0;
+  border-radius: 15px;
+  background: var(--mvr-green);
+  box-shadow: 0 8px 22px rgba(35, 101, 70, 0.24);
+  font-size: clamp(13px, 3.5vw, 15px);
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.mvr-live-actions .mvr-live-continue:hover { color: #fff; }
