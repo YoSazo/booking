@@ -2501,3 +2501,12 @@
 }
 
 .mvr-live-actions .mvr-live-continue:hover { color: #fff; }
+
+/* These must out-specify the display rules above. Setting `display` on an
+   element defeats the browser's own [hidden] rule, so without these the
+   hidden attribute is inert and both CTAs show at once. */
+.mvr-live-actions .mvr-live-forward[hidden],
+.mvr-live-actions .mvr-live-continue[hidden],
+.mvr-live-actions .mvr-live-back[hidden] {
+  display: none !important;
+}
