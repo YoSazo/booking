@@ -202,6 +202,45 @@ model NativePushDevice {
   @@index([deviceToken, active])
 }
 
+// Push-to-start token (iOS 17.2+). One per install per property, and it is what
+// lets a booking raise a Live Activity while the app is closed — which is the
+// entire point, since nobody is holding the phone when a booking lands.
+model LiveActivityStarter {
+  id          String      @id @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  lastSeenAt  DateTime    @default(now())
+  hotel       HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId     String
+  startToken  String
+  environment String      @default("production") // production | sandbox
+  active      Boolean     @default(true)
+
+  @@unique([startToken, hotelId])
+  @@index([hotelId, active])
+}
+
+// A running activity. The update token is issued per activity by ActivityKit,
+// so ending the right card requires storing it against the booking that owns it.
+model LiveActivity {
+  id          String      @id @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  hotel       HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  hotelId     String
+  bookingId   String
+  activityId  String      @unique
+  updateToken String
+  environment String      @default("production")
+  state       String      @default("active") // active | ended
+  endedAt     DateTime?
+
+  // At most one live card per booking; a duplicate would strand the first with
+  // no token left to end it.
+  @@index([bookingId, state])
+  @@index([hotelId, state])
+}
+
 // Email-code challenges must survive a Render restart and work correctly when
 // more than one server instance is handling requests.
 model NativeLoginChallenge {
@@ -300,6 +339,8 @@ model HotelConfig {
   assistantActivities     FrontDeskAssistantActivity[]
   assistantPendingActions FrontDeskAssistantPendingAction[]
   nativePushDevices       NativePushDevice[]
+  liveActivityStarters    LiveActivityStarter[]
+  liveActivities          LiveActivity[]
   accountDeletionRequest  AccountDeletionRequest?
   supportThread           SupportThread?
 }

@@ -28,6 +28,13 @@ const { createFrontDeskAssistant } = require('./frontdesk-assistant');
 const { buildFrontdeskReturnPath } = require('./frontdesk-return');
 const { buildBookingQuote } = require('./booking-pricing');
 const { buildPreauthIdempotencyKey } = require('./booking-idempotency');
+const {
+    buildStartPayload,
+    buildUpdatePayload,
+    buildEndPayload,
+    liveActivityActionForBooking,
+    liveActivityApnsHeaders,
+} = require('./live-activities');
 
 let frontDeskAssistant = null;
 
@@ -2701,6 +2708,9 @@ async function persistManualPayLaterBooking({ paymentIntent, hotelId, bookingDet
     if (outcome.created) {
         if (approvalPlan.hold) {
             notifyBookingNeedsApproval(outcome.booking).catch(() => {});
+            // Raise the Lock Screen countdown alongside the alert, not instead
+            // of it: the push is the fallback for anyone the activity misses.
+            syncBookingLiveActivity(outcome.booking).catch(() => {});
         } else {
             triggerBookingNotifications(
                 hotelId,
@@ -5725,6 +5735,85 @@ function normalizeApnsDeviceToken(value) {
     return token.length >= 64 && token.length <= 200 ? token : '';
 }
 
+// The push-to-start token is per install, not per activity. Without it a
+// booking can only raise a card while the app is already open.
+app.post('/api/push/live-activity/starter', crmAuth, async (req, res) => {
+    try {
+        if (!req.crmIsNativeClient) {
+            return res.status(400).json({ success: false, message: 'Native client header required.' });
+        }
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const startToken = normalizeApnsDeviceToken(req.body?.startToken);
+        if (!startToken) {
+            return res.status(400).json({ success: false, message: 'A valid push-to-start token is required.' });
+        }
+        const environment = String(req.body?.environment || '').toLowerCase() === 'sandbox'
+            ? 'sandbox'
+            : 'production';
+        await prisma.liveActivityStarter.upsert({
+            where: { startToken_hotelId: { startToken, hotelId } },
+            create: { startToken, hotelId, environment, active: true, lastSeenAt: new Date() },
+            update: { environment, active: true, lastSeenAt: new Date() },
+        });
+        res.json({ success: true, pushConfigured: APNS_CONFIGURED });
+    } catch (error) {
+        console.error('live-activity starter register failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not register for Live Activities.' });
+    }
+});
+
+// Each running activity issues its own update token; ending the right card
+// later depends on having stored it against the booking that owns it.
+app.post('/api/push/live-activity/register', crmAuth, async (req, res) => {
+    try {
+        if (!req.crmIsNativeClient) {
+            return res.status(400).json({ success: false, message: 'Native client header required.' });
+        }
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const activityId = String(req.body?.activityId || '').trim().slice(0, 128);
+        const updateToken = normalizeApnsDeviceToken(req.body?.updateToken);
+        const bookingId = String(req.body?.bookingId || '').trim().slice(0, 64);
+        if (!activityId || !updateToken || !bookingId) {
+            return res.status(400).json({ success: false, message: 'activityId, updateToken and bookingId are required.' });
+        }
+        const environment = String(req.body?.environment || '').toLowerCase() === 'sandbox'
+            ? 'sandbox'
+            : 'production';
+        await prisma.liveActivity.upsert({
+            where: { activityId },
+            create: { activityId, updateToken, bookingId, hotelId, environment, state: 'active' },
+            update: { updateToken, environment, state: 'active', endedAt: null },
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('live-activity register failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not register the Live Activity.' });
+    }
+});
+
+// The owner can dismiss a card by hand. Recording that stops us pushing to a
+// token that no longer has anything to update.
+app.post('/api/push/live-activity/ended', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const activityId = String(req.body?.activityId || '').trim().slice(0, 128);
+        if (!activityId) {
+            return res.status(400).json({ success: false, message: 'activityId is required.' });
+        }
+        await prisma.liveActivity.updateMany({
+            where: { activityId, hotelId },
+            data: { state: 'ended', endedAt: new Date() },
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('live-activity end failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not end the Live Activity.' });
+    }
+});
+
 app.post('/api/push/native/register', crmAuth, async (req, res) => {
     try {
         if (!req.crmIsNativeClient) {
@@ -7022,6 +7111,139 @@ function sendApnsRequest(device, payloadObj, opts = {}) {
     });
 }
 
+// ── LIVE ACTIVITIES ───────────────────────────────────────────────────────
+// Same APNs connection, different contract: a dedicated topic, the liveactivity
+// push type, and a raw payload rather than an alert envelope.
+function sendLiveActivityRequest(target, payload, opts = {}) {
+    const host = target.environment === 'sandbox'
+        ? 'https://api.sandbox.push.apple.com'
+        : 'https://api.push.apple.com';
+    const body = JSON.stringify(payload);
+    const ttl = Math.max(0, Number(opts.TTL || 600));
+    const headers = liveActivityApnsHeaders(APNS_BUNDLE_ID, { priority: opts.priority || 10 });
+
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        let timer = null;
+        const client = http2.connect(host);
+        const finish = (error, result) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            try { client.close(); } catch (_) {}
+            if (error) reject(error);
+            else resolve(result);
+        };
+        timer = setTimeout(() => finish(new Error('APNs live activity request timed out')), 12000);
+        client.once('error', error => finish(error));
+
+        let request;
+        try {
+            request = client.request({
+                ':method': 'POST',
+                ':path': `/3/device/${target.token}`,
+                authorization: `bearer ${createApnsProviderToken()}`,
+                ...headers,
+                'apns-expiration': String(Math.floor(Date.now() / 1000) + ttl),
+            });
+        } catch (error) {
+            finish(error);
+            return;
+        }
+
+        let status = 0;
+        let responseBody = '';
+        request.setEncoding('utf8');
+        request.on('response', h => { status = Number(h[':status'] || 0); });
+        request.on('data', chunk => { responseBody += chunk; });
+        request.on('error', error => finish(error));
+        request.on('end', () => {
+            let reason = '';
+            try { reason = JSON.parse(responseBody || '{}').reason || ''; } catch (_) {}
+            if (status === 200) return finish(null, { ok: true, status });
+            const error = new Error(`APNs ${status || 'error'}${reason ? `: ${reason}` : ''}`);
+            error.statusCode = status;
+            error.reason = reason;
+            finish(error);
+        });
+        request.end(body);
+    });
+}
+
+const LIVE_ACTIVITY_DEAD_REASONS = new Set([
+    'BadDeviceToken',
+    'DeviceTokenNotForTopic',
+    'Unregistered',
+    'ExpiredToken',
+]);
+
+/**
+ * Reconciles a booking's Live Activity with its current status.
+ *
+ * Called from the one place every decision already funnels through, so an owner
+ * tap, an SMS reply, a notification action and the auto sweep all end the card
+ * the same way. Best-effort throughout: a failed push must never change the
+ * outcome of the booking that triggered it.
+ */
+async function syncBookingLiveActivity(booking, options = {}) {
+    if (!APNS_CONFIGURED || !booking?.id || !prisma.liveActivity) return;
+    try {
+        const hotelId = booking.hotelId;
+        const existing = await prisma.liveActivity.findFirst({
+            where: { bookingId: booking.id, state: 'active' },
+            orderBy: { createdAt: 'desc' },
+        });
+        const decision = liveActivityActionForBooking(booking, existing);
+        if (decision.action === 'none') return;
+
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { id: true, name: true },
+        }).catch(() => null);
+
+        if (decision.action === 'start') {
+            const starters = await prisma.liveActivityStarter.findMany({
+                where: { hotelId, active: true },
+            });
+            if (!starters.length) return;
+            const payload = buildStartPayload(booking, hotel, options);
+            const results = await Promise.allSettled(starters.map(starter =>
+                sendLiveActivityRequest({ token: starter.startToken, environment: starter.environment }, payload)
+            ));
+            const deadIds = results
+                .map((r, i) => (r.status === 'rejected' && LIVE_ACTIVITY_DEAD_REASONS.has(r.reason?.reason) ? starters[i].id : null))
+                .filter(Boolean);
+            if (deadIds.length) {
+                await prisma.liveActivityStarter.updateMany({
+                    where: { id: { in: deadIds } },
+                    data: { active: false },
+                }).catch(() => {});
+            }
+            return;
+        }
+
+        // update | end — addressed to the activity's own token.
+        const payload = decision.action === 'end'
+            ? buildEndPayload(booking, options)
+            : buildUpdatePayload(booking, options);
+        await sendLiveActivityRequest(
+            { token: existing.updateToken, environment: existing.environment },
+            payload
+        ).catch(error => {
+            console.error(`❌ [live-activity] ${decision.action} booking=${booking.id}: ${error.message}`);
+        });
+
+        if (decision.action === 'end') {
+            await prisma.liveActivity.update({
+                where: { id: existing.id },
+                data: { state: 'ended', endedAt: new Date() },
+            }).catch(() => {});
+        }
+    } catch (error) {
+        console.error(`❌ [live-activity] sync failed for booking=${booking?.id}: ${error.message}`);
+    }
+}
+
 async function sendNativePushToHotel(hotelId, payloadObj, opts = {}, label = 'nativePush') {
     if (!APNS_CONFIGURED || !hotelId || !prisma.nativePushDevice) return 0;
     const devices = await prisma.nativePushDevice.findMany({
@@ -8280,6 +8502,10 @@ async function applyBookingApprovalDecision(bookingId, action, source = 'owner')
 
     notifyBookingApprovalResolved(decided, outcome, source).catch(() => {});
     notifyGuestBookingStateChanged(decided, decided.status).catch(() => {});
+    // Every decision route reaches here — owner tap, SMS reply, notification
+    // action and the auto sweep — so ending the Lock Screen card once, here,
+    // is what stops a ghost countdown surviving a decision made elsewhere.
+    syncBookingLiveActivity(decided, { decidedBy: source }).catch(() => {});
     console.log(`✅ [approval] ${outcome} booking=${decided.id} hotel=${decided.hotelId} via=${source}`);
 
     return {
@@ -8572,6 +8798,7 @@ async function cancelBookingByOwner(bookingId, hotelId, reason = '') {
             fulfillment: { status: 'pending', lastError: error.message },
         }));
     notifyGuestBookingStateChanged(cancelled, 'cancelled', cancelled.cancellationReason || '').catch(() => {});
+    syncBookingLiveActivity(cancelled, { decidedBy: 'owner-cancel' }).catch(() => {});
     console.log(`🚫 [cancel] booking=${booking.id} hotel=${hotelId} was=${booking.status} reason=${reason || 'none'}`);
 
     return {
