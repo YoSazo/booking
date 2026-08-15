@@ -762,16 +762,25 @@
     }
 
     /* Notes Modal */
+    /* No backdrop blur: the blur layer does not repaint when the keyboard
+       resizes the visual viewport, which split the scrim into a sharp half and
+       a blurred half. A slightly deeper scrim separates the modal instead. */
     .notes-modal-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(26, 43, 34, 0.45);
+      background: rgba(26, 43, 34, 0.55);
       z-index: 10000;
       align-items: center;
       justify-content: center;
       padding: 20px;
-      backdrop-filter: blur(4px);
+      overscroll-behavior: contain;
+    }
+    /* The page behind a modal must not scroll. */
+    html.marketel-modal-open,
+    html.marketel-modal-open body {
+      overflow: hidden !important;
+      overscroll-behavior: none;
     }
     .notes-modal {
       background: var(--white);
@@ -1887,20 +1896,37 @@
       text-transform: uppercase;
       letter-spacing: .06em;
     }
+    /* iOS gives input[type=date] an intrinsic width from the locale format and
+       ignores the grid cell, so the two fields grew until they overlapped.
+       Stripping the native appearance is what lets them size to the container. */
     .revenue-custom-field input {
       width: 100%;
       max-width: 100%;
       min-width: 0;
-      min-height: 42px;
+      min-height: 40px;
       box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
       border: 1.5px solid var(--border);
-      border-radius: 10px;
+      border-radius: 999px;
       background: var(--surface-subtle);
       color: var(--text);
-      padding: 8px 9px;
+      padding: 8px 12px;
       font-family: inherit;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
+      text-align: center;
+    }
+    /* Safari renders the value in a nested pseudo-element that keeps its own
+       intrinsic width unless it is allowed to shrink. */
+    .revenue-custom-field input::-webkit-date-and-time-value {
+      width: 100%;
+      min-width: 0;
+      text-align: center;
+      margin: 0;
+    }
+    .revenue-custom-field input::-webkit-calendar-picker-indicator {
+      display: none;
     }
     .revenue-custom-apply {
       min-height: 42px;
@@ -1917,12 +1943,12 @@
     @media (max-width: 520px) {
       .revenue-custom-range {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 7px;
+        gap: 12px;
         padding: 10px;
       }
       .revenue-custom-field input {
-        padding-inline: 6px;
-        font-size: 12px;
+        padding-inline: 8px;
+        font-size: 12.5px;
       }
       .revenue-custom-apply { grid-column: 1 / -1; width: 100%; }
     }

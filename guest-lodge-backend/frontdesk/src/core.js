@@ -4820,6 +4820,7 @@ function addNote(id, existingNote = '') {
   const input = document.getElementById('noteInput');
   input.value = existingNote;
   setNativeModalOpen('booking-note', true);
+  document.documentElement.classList.add('marketel-modal-open');
   modal.style.display = 'flex';
   setTimeout(() => input.focus(), 100);
 }
@@ -4828,6 +4829,7 @@ function closeNotesModal(event) {
   if (event && event.target !== event.currentTarget) return;
   const modal = document.getElementById('notesModal');
   modal.style.display = 'none';
+  document.documentElement.classList.remove('marketel-modal-open');
   currentNoteBookingId = null;
   document.getElementById('noteInput').value = '';
   setNativeModalOpen('booking-note', false);
