@@ -2816,8 +2816,15 @@
       pointer-events: auto !important;
       cursor: not-allowed !important;
     }
+    /* Tabs stay live: moving between Your page, Bookings, Availability and
+       Guest Reach changes nothing, and a dead nav both reads as a mock and
+       leaves the owner thinking Front Desk is only an editor. Sub-navigation
+       inside a tab stays locked. */
     .frontdesk-editor-preview #app .tab,
-    .frontdesk-editor-preview #app .mobile-nav-item,
+    .frontdesk-editor-preview #app .mobile-nav-item {
+      pointer-events: auto !important;
+      cursor: pointer !important;
+    }
     .frontdesk-editor-preview #app #revenuePeriodBar button,
     .frontdesk-editor-preview #app #bookingsSubtabs .subtab {
       pointer-events: none !important;
