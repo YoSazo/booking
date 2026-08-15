@@ -502,6 +502,27 @@ function getRequestedHotelId() {
   return getContextParam('hotelId') || getNativeSelectedHotelId();
 }
 
+// The hotel a session belongs to only ever lived in the URL query string, so a
+// navigation that dropped ?hotelId= made the next bootstrap ambiguous. The
+// server then scoped the request purely by hostname, and a PIN whose grant
+// depends on an explicit hotelId (dogfood/master) failed the host check with a
+// 403 — which the client reads as "signed out". Remembering the resolved hotel
+// keeps every request explicit, exactly as api() already does.
+const CRM_HOTEL_ID_KEY = 'crmHotelId';
+
+function getStoredCrmHotelId() {
+  try { return String(localStorage.getItem(CRM_HOTEL_ID_KEY) || '').trim(); }
+  catch (_) { return ''; }
+}
+
+function rememberCrmHotelId(hotelId) {
+  const clean = String(hotelId || '').trim();
+  try {
+    if (clean) localStorage.setItem(CRM_HOTEL_ID_KEY, clean);
+    else localStorage.removeItem(CRM_HOTEL_ID_KEY);
+  } catch (_) { /* private mode: fall back to host scoping */ }
+}
+
 function nativeShellPost(message) {
   if (!isNativeFrontdeskApp()) return false;
   try {
@@ -1044,6 +1065,7 @@ function applyHotelContextData(data = {}) {
   }
 
   crm.activeHotelId = String(data.hotelId || '').trim();
+  rememberCrmHotelId(crm.activeHotelId);
   crm.activeHotelName = String(config.name || data.hotelId || '').trim();
   crm.activeHotelAppIcon = String(config.appIconUrl || '').trim();
   const nativeStoredProperty = isNativeFrontdeskApp()
@@ -1086,7 +1108,7 @@ async function loadHotelContext() {
 
 async function loadCrmBootstrap() {
   const url = new URL('/api/crm/bootstrap', marketelLocalUrlBase);
-  const requestedHotelId = getRequestedHotelId();
+  const requestedHotelId = getRequestedHotelId() || getStoredCrmHotelId();
   if (requestedHotelId) url.searchParams.set('hotelId', requestedHotelId);
   const res = await fetchWithTimeout(url.pathname + url.search, {
     headers: {
@@ -2715,6 +2737,7 @@ function showLogin() {
   crm.assistantError = '';
   syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
+  rememberCrmHotelId('');
 }
 
 function showNativeAuthenticationError(error) {
