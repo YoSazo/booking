@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Send, Search, MessageSquare } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import GuestInstallCard from './GuestInstallCard.jsx';
+import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { isStandalone } from './pwaUtils.js';
 import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
@@ -539,7 +540,7 @@ export default function GuestMessagesPage({ hotel }) {
           <div style={{ marginBottom: 8 }}>
             <GuestInstallCard
               hotelName={hotel?.name}
-              appIconUrl={hotel?.appIconUrl}
+              appIconUrl={resolvePropertyIconUrl(hotel)}
               hotelId={hotelId}
               reservationCode={guestStay?.code}
               apiBaseUrl={apiBaseUrl}

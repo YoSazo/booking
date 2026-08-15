@@ -1319,11 +1319,41 @@
   line-height: 1.4;
 }
 
+/* The activation screen owns the whole scroll area rather than sitting above a
+   footer strip. justify-items keeps the card centred while align-content: start
+   lets it grow past the fold instead of being cropped at a hard edge. */
 .mvr-stage-finale {
   display: grid;
   grid-template-columns: 1fr;
-  place-items: center;
-  padding-top: 24px;
+  justify-items: center;
+  align-content: start;
+  gap: 14px;
+  padding: 8px 0 28px;
+}
+
+/* Sticky, so it stays reachable while the offer scrolls under it. */
+.mvr-finale-back {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  justify-self: start;
+  min-height: 40px;
+  padding: 9px 16px 9px 13px;
+  border: 1px solid rgba(213, 226, 218, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #46584e;
+  font: 800 13px/1 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(24, 55, 38, 0.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.mvr-finale-back:hover {
+  color: var(--mvr-green);
+  border-color: var(--mvr-green);
 }
 
 .mvr-finale-card {

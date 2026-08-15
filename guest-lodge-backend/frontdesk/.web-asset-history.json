@@ -2,6 +2,17 @@
   "current": [
     "assets/apps-wv97Jj41.js",
     "assets/assistant-553sC3Ai.js",
+    "assets/index-DCxx5e_O.js",
+    "assets/index-xn5ldcs4.css",
+    "assets/native-onboarding-CBcVt6hh.js",
+    "assets/reveal-D1S0SXsq.js",
+    "assets/reveal-d_6nbCBP.css",
+    "assets/settings-B4WoF5xs.js",
+    "assets/support-Bn1XwZ96.js"
+  ],
+  "previous": [
+    "assets/apps-wv97Jj41.js",
+    "assets/assistant-553sC3Ai.js",
     "assets/index-O7_bvTY-.js",
     "assets/index-xn5ldcs4.css",
     "assets/native-onboarding-CBcVt6hh.js",
@@ -9,16 +20,5 @@
     "assets/reveal-D8pglT-q.js",
     "assets/settings-B4WoF5xs.js",
     "assets/support-CixzovHd.js"
-  ],
-  "previous": [
-    "assets/apps-wv97Jj41.js",
-    "assets/assistant-553sC3Ai.js",
-    "assets/index-CmxAGdQW.js",
-    "assets/index-xn5ldcs4.css",
-    "assets/native-onboarding-CBcVt6hh.js",
-    "assets/reveal-B_dMCOtZ.css",
-    "assets/reveal-D8pglT-q.js",
-    "assets/settings-B4WoF5xs.js",
-    "assets/support-miCnra4M.js"
   ]
 }

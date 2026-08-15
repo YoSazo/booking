@@ -4,6 +4,7 @@ import { useGuest } from './GuestProvider.jsx';
 import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3, XCircle } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
+import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { isStandalone } from './pwaUtils.js';
@@ -427,7 +428,7 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           {/* 3. STAY IN TOUCH — install is secondary, framed as how you reach us */}
           <GuestInstallCard
           hotelName={hotelName}
-          appIconUrl={hotel?.appIconUrl}
+          appIconUrl={resolvePropertyIconUrl(hotel)}
           hotelId={resolvedHotelId}
           reservationCode={reservationCode}
           apiBaseUrl={apiBaseUrl}

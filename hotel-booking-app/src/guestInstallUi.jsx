@@ -66,6 +66,20 @@ export function qrCodeUrl(data, size = 200) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
 }
 
+// One resolver for the property's app icon. Each surface used to work this out
+// for itself, so the booking page fell back to a room photo while checkout,
+// confirmation and messages passed the bare field — and the icon silently
+// degraded to a letter halfway through the flow.
+export function resolvePropertyIconUrl(hotel, rooms) {
+  const roomList = Array.isArray(rooms) && rooms.length ? rooms : hotel?.rooms;
+  const firstRoom = Array.isArray(roomList) ? roomList[0] : null;
+  return hotel?.appIconUrl
+    || firstRoom?.imageUrls?.[0]
+    || firstRoom?.images?.[0]?.url
+    || firstRoom?.imageUrl
+    || '';
+}
+
 export function HotelIcon({ hotelName, appIconUrl, size = 68, style = {} }) {
   const initial = (hotelName || 'H').trim().charAt(0).toUpperCase();
   const radius = Math.round(size * 0.25);

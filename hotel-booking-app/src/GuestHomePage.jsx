@@ -20,6 +20,7 @@ import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { isStandalone } from './pwaUtils.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
+import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import {
@@ -38,12 +39,7 @@ function calcNights(checkin, checkout) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function propertyIconUrl(hotel) {
-  return hotel?.appIconUrl
-    || hotel?.rooms?.[0]?.imageUrls?.[0]
-    || hotel?.rooms?.[0]?.imageUrl
-    || '';
-}
+const propertyIconUrl = (hotel) => resolvePropertyIconUrl(hotel);
 
 function formatPropertyTime(value) {
   const clean = String(value || '').trim();

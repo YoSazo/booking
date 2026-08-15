@@ -780,6 +780,7 @@ function finaleHtml() {
     <div style="--stagger:2"><span>✓</span><p><strong>Marketel Front Desk and Assistant</strong><small>Tell it when a walk-in takes a room; it updates remaining availability</small></p></div>
   </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
+    <button type="button" class="mvr-finale-back" id="mvrBack">← Back</button>
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
@@ -822,12 +823,10 @@ function footerHtml() {
       <button type="button" class="mvr-primary" id="mvrNext">See the Home Screen experience →</button>
     </div>`;
   }
-  if (currentStep === 3) {
-    return `<div class="mvr-footer mvr-footer-final">
-      <button type="button" class="mvr-back" id="mvrBack">← Back</button>
-      <div></div>
-    </div>`;
-  }
+  // The activation screen carries its own Back pill so the page can run the
+  // full height. A footer row here cropped the card at a hard edge, which read
+  // as the end of the content and hid the fact that it scrolls.
+  if (currentStep === 3) return '';
   // One forward affordance for the whole reveal. Inside the Assistant stage it
   // walks the beats before advancing the stage, so the progress bar never lies
   // and there is never a second "next" competing with this one.
@@ -980,12 +979,17 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   location?.classList.toggle('is-editor', editing);
   if (locationText) locationText.textContent = editing ? 'Front Desk editor' : bookingDisplayDomain();
   if (location) location.setAttribute('aria-label', editing ? 'Front Desk editor' : 'Your live booking address');
-  // Exactly one green CTA per mode, so the way forward is never a choice:
-  // view the page → edit it → continue. Editing is on the path, not optional,
-  // which is what earns the "the page you just edited lives in an app" beat.
-  const past = editing || bookingEditorVisited;
-  if (forward) forward.hidden = past;
-  if (continueGuestApp) continueGuestApp.hidden = !past;
+  // Exactly one green CTA, and it always names where you are not.
+  //   engine            → "See how to edit your booking page"
+  //   editor            → Back + "See the Home Screen experience"
+  //   engine after save → forward, because re-offering the step just completed
+  //                       reads as though the save did not take.
+  // Returning via Back is deliberately *not* a save, so the editor stays one
+  // tap away instead of stranding the owner on the engine.
+  const savedReturn = !editing && String(action || '').startsWith('saved-');
+  const showContinue = editing || savedReturn;
+  if (forward) forward.hidden = showContinue;
+  if (continueGuestApp) continueGuestApp.hidden = !showContinue;
   if (back) back.hidden = !editing;
   setLivePreviewActionsVisible(modal, true);
   const iframe = modal.querySelector('.mvr-live-stage > iframe');

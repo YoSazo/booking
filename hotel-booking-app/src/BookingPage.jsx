@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import { isStandalone } from './pwaUtils.js';
+import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { trackPageView, trackHotelFunnel } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 
@@ -237,7 +238,7 @@ function BookingPage({
       {showInstallBanner && !isCalendarOpen && (
         <InstallAppBanner
           hotelName={hotel.name}
-          appIconUrl={hotel.appIconUrl || roomData?.[0]?.images?.[0]?.url || roomData?.[0]?.imageUrl}
+          appIconUrl={resolvePropertyIconUrl(hotel, roomData)}
           hotelId={hotelId}
           ownerPreview={ownerPreview}
           sticky
