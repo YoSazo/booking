@@ -2583,3 +2583,13 @@
     font-size: 12.5px;
   }
 }
+
+/* Content arriving mid-step must not replay the entrance choreography — that
+   is what made the reveal look like it was rebuilding itself on boot. */
+#marketelValueReveal.mvr-no-enter .mvr-stage,
+#marketelValueReveal.mvr-no-enter .mvr-beat-proof,
+#marketelValueReveal.mvr-no-enter .mvr-beat-settings,
+#marketelValueReveal.mvr-no-enter .mvr-finale-card,
+#marketelValueReveal.mvr-no-enter .mvr-value-list > div {
+  animation: none !important;
+}

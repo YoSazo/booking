@@ -459,6 +459,9 @@ const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requeste
 let hotelData = {};
 let rooms = [];
 let pendingFile = null;
+// Resolves when background photo compression finishes, so the save step can
+// wait for it without the picker ever blocking the UI.
+let pendingPhotoPrep = null;
 let qualifiedLeadTracked = false;
 let currentSetupStep = 1;
 let setupStepStartedAt = Date.now();
@@ -611,6 +614,17 @@ function renderSetupPhoto(url, label) {
   if (hint) hint.textContent = 'Tap here if you want to choose a different photo.';
 }
 
+function renderSetupPhotoCleared() {
+  const preview = document.getElementById('setupPhotoPreview');
+  const area = document.getElementById('setupPhotoArea');
+  const title = document.getElementById('setupPhotoTitle');
+  const hint = document.getElementById('setupPhotoHint');
+  if (preview) { preview.innerHTML = ''; preview.classList.remove('has-photo'); }
+  if (area) area.classList.remove('has-photo');
+  if (title) title.textContent = 'Add a photo';
+  if (hint) hint.textContent = 'Tap to choose a photo of this room.';
+}
+
 async function prepareSetupPhoto(file) {
   if (!file || !file.type.startsWith('image/')) return file;
   try {
@@ -641,20 +655,30 @@ async function previewSetupPhoto(input) {
     showToast('Choose a JPG, PNG, or WebP image', true);
     return;
   }
-  pendingFile = await prepareSetupPhoto(file);
-  if (pendingFile.size > 5 * 1024 * 1024) {
-    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room-photo', reason: 'too-large', bytes: pendingFile.size });
-    pendingFile = null;
-    input.value = '';
-    showToast('That photo is too large. Choose one under 5 MB.', true);
-    return;
-  }
-  window.MarketelJourney?.track('JourneyPhotoSelected', {
-    mimeType: pendingFile.type || file.type || '',
-    originalBytes: file.size,
-    preparedBytes: pendingFile.size,
-  });
-  renderSetupPhoto(URL.createObjectURL(pendingFile), 'Photo selected');
+  // Paint the preview from the original straight away. Resizing and re-encoding
+  // a phone photo is main-thread canvas work measured in seconds, and nothing
+  // needs the smaller file until the room is saved — so it runs in the
+  // background while the owner answers the next question.
+  renderSetupPhoto(URL.createObjectURL(file), 'Photo selected');
+  pendingFile = file;
+  pendingPhotoPrep = (async () => {
+    const prepared = await prepareSetupPhoto(file);
+    if (prepared.size > 5 * 1024 * 1024) {
+      window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room-photo', reason: 'too-large', bytes: prepared.size });
+      pendingFile = null;
+      input.value = '';
+      renderSetupPhotoCleared();
+      showToast('That photo is too large. Choose one under 5 MB.', true);
+      return null;
+    }
+    pendingFile = prepared;
+    window.MarketelJourney?.track('JourneyPhotoSelected', {
+      mimeType: prepared.type || file.type || '',
+      originalBytes: file.size,
+      preparedBytes: prepared.size,
+    });
+    return prepared;
+  })();
 }
 
 // Step 1: Save hotel info
@@ -733,6 +757,12 @@ async function addRoomAndFinish() {
       }),
     });
     if (!ratesRes.ok) throw new Error('Could not save starting price');
+
+    // Background compression usually finished while they answered the next
+    // question; if not, this is the one place that genuinely needs to wait.
+    if (pendingPhotoPrep) {
+      try { await pendingPhotoPrep; } catch (_) { /* keep the original file */ }
+    }
 
     if (pendingFile && roomId) {
       const form = new FormData();

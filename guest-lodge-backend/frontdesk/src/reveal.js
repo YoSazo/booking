@@ -846,6 +846,8 @@ function footerHtml() {
 // which is the visible "refreshes itself three times". Skipping renders whose
 // output is byte-identical keeps the frame alive.
 let lastRenderedRevealHtml = '';
+let lastRenderedStep = -1;
+let lastRenderedBeat = -1;
 
 function renderReveal() {
   const root = document.getElementById('marketelValueReveal');
@@ -859,6 +861,14 @@ function renderReveal() {
     ${footerHtml()}
   </div>`;
   if (nextHtml === lastRenderedRevealHtml && root.firstElementChild) return;
+  // Entrance animations belong to moving through the reveal, not to content
+  // arriving. Boot re-renders when the property name and the page status land,
+  // and replaying the stage slide each time reads as the page rebuilding itself.
+  const beatNow = stageBeatIndex[currentStep] || 0;
+  const advanced = currentStep !== lastRenderedStep || beatNow !== lastRenderedBeat;
+  root.classList.toggle('mvr-no-enter', !advanced && lastRenderedStep !== -1);
+  lastRenderedStep = currentStep;
+  lastRenderedBeat = beatNow;
   lastRenderedRevealHtml = nextHtml;
   root.innerHTML = nextHtml;
   bindRevealEvents();
@@ -1096,6 +1106,8 @@ function finishReveal() {
   activeBookingChallenge = null;
   clearBeatFrames();
   lastRenderedRevealHtml = '';
+  lastRenderedStep = -1;
+  lastRenderedBeat = -1;
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -1279,6 +1291,8 @@ export function showMarketelValueReveal(options = {}) {
   bookingPreviewUnavailable = false;
   bookingEditorVisited = false;
   lastRenderedRevealHtml = '';
+  lastRenderedStep = -1;
+  lastRenderedBeat = -1;
   revealStartedAt = Date.now();
   stageStartedAt = 0;
   nextStageViewIsResume = !Number.isFinite(requestedStep) && hadPendingReveal;
