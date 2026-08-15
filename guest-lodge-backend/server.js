@@ -5053,11 +5053,24 @@ const crmAuth = async (req, res, next) => {
     const isNativeClient = marketelClient === 'ios' || marketelClient === 'android';
     const returnAuth = await verifyCrmReturnToken(token);
     const nativeAuth = returnAuth ? null : verifyNativeSessionToken(token);
+    // A lookup that *fails* is not a credential that is *absent*. Swallowing the
+    // error into an empty list made a transient database blip indistinguishable
+    // from a wrong PIN, and the client responds to 401 by deleting a valid token
+    // and demanding the PIN again.
+    let credentialLookupFailed = false;
     const dbAllowedHotels = returnAuth || nativeAuth
         ? []
-        : await getDbAllowedHotelsForToken(token).catch(() => []);
+        : await getDbAllowedHotelsForToken(token).catch((error) => {
+            credentialLookupFailed = true;
+            console.error('⚠️ crmAuth PIN lookup failed:', error?.message || error);
+            return [];
+        });
     const nativeAllowedHotels = nativeAuth
-        ? await getDbAllowedHotelsForOwnerEmail(nativeAuth.email).catch(() => [])
+        ? await getDbAllowedHotelsForOwnerEmail(nativeAuth.email).catch((error) => {
+            credentialLookupFailed = true;
+            console.error('⚠️ crmAuth owner lookup failed:', error?.message || error);
+            return [];
+        })
         : [];
     let allowedHotels = returnAuth
         ? [returnAuth.hotelId]
@@ -5091,7 +5104,17 @@ const crmAuth = async (req, res, next) => {
         if (!allowedHotels.includes('*')) allowedHotels = [...allowedHotels, '*'];
     }
 
-    if (!token || !allowedHotels?.length) return res.status(401).json({ error: 'Unauthorized' });
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    if (!allowedHotels?.length) {
+        // Only claim the credential is bad when we actually established that.
+        if (credentialLookupFailed) {
+            return res.status(503).json({
+                error: 'Front Desk could not reach its records. Please try again.',
+                retryable: true,
+            });
+        }
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
     const hostContext = await resolveCrmHostHotelContext(req);
     if (!hostContext.ok) {
         return res.status(hostContext.status).json({

@@ -2424,11 +2424,16 @@
 
       /* Bookings has multiple visible siblings; keep them stacked on desktop. */
       #bookingsSubtabs { grid-row: 1; }
+      /* #revenueView is a sibling of the subtabs, not a child, so the shared
+         grid-row: 1 above stacked the period chips underneath the Bookings /
+         Revenue switch. It needs its own row like every other sibling. */
+      #revenueView { grid-row: 2; }
       #messagesPanel { grid-row: 2; }
       #bookingFilterChips { grid-row: 3; }
       #bookingsList { grid-row: 4; }
 
       #app.has-go-live-banner #bookingsSubtabs { grid-row: 2; }
+      #app.has-go-live-banner #revenueView { grid-row: 3; }
       #app.has-go-live-banner #messagesPanel { grid-row: 3; }
       #app.has-go-live-banner #bookingFilterChips { grid-row: 4; }
       #app.has-go-live-banner #bookingsList { grid-row: 5; }

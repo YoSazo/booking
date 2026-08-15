@@ -2678,6 +2678,15 @@ async function api(method, path, body) {
   }
   const res = await fetch(url.pathname + url.search, opts);
   if (res.status === 401) { showLogin(); throw new Error('Unauthorized'); }
+  // The server now says 503 when it could not verify the credential rather than
+  // claiming it is invalid. Keep the session and surface it as retryable, so a
+  // database blip never presents itself as a logout.
+  if (res.status === 503) {
+    const error = new Error('Front Desk is reconnecting. Try that again in a moment.');
+    error.status = 503;
+    error.retryable = true;
+    throw error;
+  }
   return res.json();
 }
 
@@ -2785,7 +2794,10 @@ async function bootCrmApp() {
           }
         }
         crm.lastAuthError = e && e.message ? e.message : 'verify failed';
-        if (isNativeFrontdeskApp() && !isAuthenticationFailure(e)) {
+        // Only a real credential rejection should end the session. Anything else
+        // — 503, 5xx, a dropped connection — is a reachability problem, and
+        // signing the owner out for it is both wrong and alarming.
+        if (!isAuthenticationFailure(e)) {
           showHotelContextError(e);
         } else if (!showNativeAuthenticationError(e)) {
           // Bootstrap authentication can fail before context is populated.
