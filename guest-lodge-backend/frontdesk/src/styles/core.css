@@ -2749,7 +2749,6 @@
       content-visibility: visible;
     }
     .frontdesk-editor-preview #app > .header,
-    .frontdesk-editor-preview #app .tabs-container,
     .frontdesk-editor-preview #editView .dash-c > *,
     .frontdesk-editor-preview #editView .dash-d > *,
     .frontdesk-editor-preview #editView .dash-growth > *,
@@ -2760,6 +2759,17 @@
       user-select: none;
       transition: opacity 180ms ease, filter 180ms ease;
     }
+    /* The nav stays live in the preview. Looking around costs nothing and is
+       what proves Front Desk is the whole operation rather than an editor —
+       the beat immediately after this claims exactly that. Everything inside
+       the other tabs is still locked by the capture-phase guard. */
+    .frontdesk-editor-preview #app .tabs-container,
+    .frontdesk-editor-preview #mobileBottomNav {
+      opacity: 1;
+      filter: none;
+      pointer-events: auto !important;
+    }
+
     .frontdesk-editor-preview #tour-header-preview-card,
     .frontdesk-editor-preview #editRoomsCards > .booking-card:first-child {
       position: relative;

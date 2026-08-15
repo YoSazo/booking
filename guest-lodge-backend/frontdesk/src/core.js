@@ -2274,7 +2274,12 @@ function installEmbeddedEditorPreview() {
       const isFirstRoomEditor = !!firstRoomCard && !interactive.closest('.room-edit-delete-btn');
       const isFirstRoomEditorModal = !!interactive.closest('[data-preview-action-scope="first-room-editor"]');
       const isHeaderEditor = !!interactive.closest('#tour-header-preview-card');
-      return isHeaderEditor || isFirstRoomEditor || isFirstRoomEditorModal;
+      // Switching tabs changes nothing, and a visible-but-dead nav reads as a
+      // mock — it also leaves the owner thinking Front Desk is only an editor,
+      // which undersells the app the very next beat is about to claim. Looking
+      // around stays open; everything inside those tabs is still locked.
+      const isNavTab = !!interactive.closest('[data-nav-filter]');
+      return isHeaderEditor || isFirstRoomEditor || isFirstRoomEditorModal || isNavTab;
     };
     const blockLockedPreviewAction = (event) => {
       const interactive = event.target?.closest?.('button, a, input, select, textarea, label, form, [role="button"], [onclick]');
