@@ -26,6 +26,10 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Front Desk uses the camera when you choose to add a property or room photo.</string>
 	<key>NSContactsUsageDescription</key>

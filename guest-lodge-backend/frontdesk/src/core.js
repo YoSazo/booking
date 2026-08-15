@@ -815,6 +815,11 @@ async function nativePinLogin() {
 
 function nativeSignOut() {
   nativeShellPost({ type: 'signedOut' });
+  // Retire any Lock Screen card before the session goes: a card that outlives
+  // sign-out would offer a decision this device may no longer make.
+  import('./live-activity.js')
+    .then(module => module.clearLiveActivityCredentials())
+    .catch(() => {});
   crm.token = '';
   try {
     localStorage.removeItem('crmToken');
@@ -1066,6 +1071,12 @@ function applyHotelContextData(data = {}) {
 
   crm.activeHotelId = String(data.hotelId || '').trim();
   rememberCrmHotelId(crm.activeHotelId);
+  // Lazy so the web build never pays for native-only code.
+  if (isNativeFrontdeskApp()) {
+    import('./live-activity.js')
+      .then(module => module.initLiveActivities())
+      .catch(() => {});
+  }
   crm.activeHotelName = String(config.name || data.hotelId || '').trim();
   crm.activeHotelAppIcon = String(config.appIconUrl || '').trim();
   const nativeStoredProperty = isNativeFrontdeskApp()
