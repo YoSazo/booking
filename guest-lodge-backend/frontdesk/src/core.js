@@ -1021,6 +1021,21 @@ function showBootState({ title, message, debug = '', showRetry = false } = {}) {
   document.getElementById('bootRetryBtn').style.display = showRetry ? 'block' : 'none';
 }
 
+// The reveal is a full-screen takeover of a product the owner has not been
+// introduced to yet, so letting the Front Desk shell paint first flashes a UI
+// that means nothing to them. The boot screen stays over the shell until the
+// reveal is mounted and hands straight over to it.
+function holdBootScreenForReveal() {
+  document.getElementById('bootScreen')?.classList.add('is-holding-for-reveal');
+}
+
+function releaseBootScreenHold() {
+  const boot = document.getElementById('bootScreen');
+  if (!boot) return;
+  boot.classList.remove('is-holding-for-reveal');
+  boot.style.display = 'none';
+}
+
 function formatContextDebugLines(lines) {
   return lines.filter(Boolean).join('\n');
 }
@@ -2420,7 +2435,8 @@ async function startCrmApp(verification, options = {}) {
     if (!bootstrapped) hydrateCrmInBackground();
   }
 
-  document.getElementById('bootScreen').style.display = 'none';
+  if (shouldShowValueReveal) holdBootScreenForReveal();
+  else document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
   hideNativePropertyScreen();
   document.getElementById('app').style.display = 'block';
@@ -2486,10 +2502,12 @@ async function startCrmApp(verification, options = {}) {
     try {
       if (typeof loadSettingsModule === 'function') await loadSettingsModule();
       const revealModule = await loadRevealModule();
-      revealModule.showMarketelValueReveal({ startAt: revealStartAt });
+      await revealModule.showMarketelValueReveal({ startAt: revealStartAt });
     } catch (error) {
       console.error('Marketel value reveal failed:', error);
       if (isFirstWelcome) showWelcomeModal();
+    } finally {
+      releaseBootScreenHold();
     }
   } else if (isFirstWelcome) {
     showWelcomeModal();

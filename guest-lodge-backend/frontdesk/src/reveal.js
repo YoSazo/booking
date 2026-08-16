@@ -924,7 +924,8 @@ function showExpandedPreview() {
     </div>
   </div>
   <div class="mvr-live-stage">
-    <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+    <iframe data-preview-frame="guest" title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+    <iframe data-preview-frame="editor" title="${esc(propertyName())} Front Desk editor" hidden sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
     <div class="mvr-challenge-layer" aria-hidden="true"></div>
   </div>
   <div class="mvr-live-actions" id="mvrLiveActions" hidden>
@@ -936,7 +937,16 @@ function showExpandedPreview() {
     <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Home Screen experience</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
-  const iframe = modal.querySelector('.mvr-live-stage > iframe');
+  const iframe = modal.querySelector('[data-preview-frame="guest"]');
+  // Front Desk cold-booting in front of the owner is not part of the pitch.
+  // The editor loads behind the booking page so that by the time they ask to
+  // see it, it is already up — they get the product, not its loading screen.
+  // It starts after the booking page so the two are not racing for the network.
+  window.setTimeout(() => {
+    const editorFrame = modal.querySelector('[data-preview-frame="editor"]');
+    if (!editorFrame?.isConnected || editorFrame.getAttribute('src')) return;
+    editorFrame.src = frontdeskEditorUrl();
+  }, 1200);
   activeBookingChallenge = {
     modal,
     iframe,
@@ -1039,15 +1049,13 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (continueGuestApp) continueGuestApp.hidden = !showContinue;
   if (back) back.hidden = !editing;
   setLivePreviewActionsVisible(modal, true);
-  const iframe = modal.querySelector('.mvr-live-stage > iframe');
-  if (iframe) {
-    iframe.title = livePreviewMode === 'edit'
-      ? `${propertyName()} Front Desk editor`
-      : `${propertyName()} booking-page preview`;
-    if (livePreviewMode === 'edit') {
-      // Re-assigning the same src reloads the frame, which is what made the
-      // editor flash the loading screen, appear, then load a second time.
-      setPreviewFrameSrc(iframe, frontdeskEditorUrl());
+  const guestFrame = modal.querySelector('[data-preview-frame="guest"]');
+  const editorFrame = modal.querySelector('[data-preview-frame="editor"]');
+  if (guestFrame && editorFrame) {
+    if (editing) {
+      // Normally already loaded from the preload above; this only covers a jump
+      // to the editor faster than the preload timer.
+      if (!editorFrame.getAttribute('src')) editorFrame.src = frontdeskEditorUrl();
     } else {
       const guestUrl = new URL(bookingUrl());
       if (modal.dataset.editorSaved === '1') {
@@ -1068,7 +1076,14 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
       }
       // A save-return deliberately carries a fresh previewRefresh, so this
       // still reloads when it should; it only skips a genuinely identical URL.
-      setPreviewFrameSrc(iframe, guestUrl.toString());
+      setPreviewFrameSrc(guestFrame, guestUrl.toString());
+    }
+    // Both pages stay loaded and only their visibility changes, so moving
+    // between the booking page and the editor never costs a page load.
+    guestFrame.hidden = editing;
+    editorFrame.hidden = !editing;
+    if (activeBookingChallenge?.modal === modal) {
+      activeBookingChallenge.iframe = editing ? editorFrame : guestFrame;
     }
   }
   trackJourney('JourneyBookingPreviewModeChanged', {
