@@ -82,6 +82,15 @@ guests, reservations and availability.
 No email inbox access, one-time code, or sample file is required. The four tabs
 are **Your Page**, **Bookings**, **Availability** and **Guest Reach**.
 
+**Account deletion.** Delete Account is under Your Page, beside Privacy, Terms
+and Support. Deleting a business account normally requires the owner to be
+signed in with the owner email, because a shared front-desk PIN is used by
+staff and must not be able to delete the property. The demonstration property
+is exempt from that safeguard so the reviewer can run the whole flow directly
+from the supplied Property ID and PIN. Deletion schedules a seven-day recovery
+window and can be cancelled from the same screen with **Keep my Marketel
+account**.
+
 The app contains no purchase, subscription, upgrade or checkout flow of any
 kind. Only a property with an existing active Marketel account can sign in;
 billing is handled entirely outside the app by the business customer.

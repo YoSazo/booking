@@ -12668,10 +12668,27 @@ app.patch('/api/admin/support/:threadId', adminAuth, async (req, res) => {
 const ACCOUNT_DELETION_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 const ACCOUNT_DELETION_SWEEP_MS = 60 * 60 * 1000;
 
-function requireNativeOwnerSession(req, res, hotel) {
+// Deleting a business account is owner-only: a shared front-desk PIN must never
+// be able to destroy the property. The one exception is the synthetic App Review
+// property, whose reviewers sign in with property ID and PIN as our review notes
+// instruct — without this they reach a dead end on a flow Apple requires them to
+// verify. 'app_review' is written only by seed-app-review-property.js and read
+// nowhere else, so no real customer can take this path. The seven-day recovery
+// window means a reviewer who does delete it can be undone rather than locking
+// out the next reviewer.
+function isAppReviewDemoProperty(hotel) {
+    return String(hotel?.marketelSubscriptionStatus || '').trim().toLowerCase() === 'app_review';
+}
+
+function hasAccountOwnerSession(req, hotel) {
+    if (isAppReviewDemoProperty(hotel)) return true;
     const sessionEmail = String(req.crmNativeEmail || '').trim().toLowerCase();
     const ownerEmail = String(hotel?.ownerEmail || '').trim().toLowerCase();
-    if (!req.crmIsNativeSession || !sessionEmail || !ownerEmail || sessionEmail !== ownerEmail) {
+    return !!(req.crmIsNativeSession && sessionEmail && ownerEmail && sessionEmail === ownerEmail);
+}
+
+function requireNativeOwnerSession(req, res, hotel) {
+    if (!hasAccountOwnerSession(req, hotel)) {
         res.status(403).json({
             success: false,
             message: 'For your security, sign out and sign in with the owner email before deleting this account.',
@@ -12910,16 +12927,13 @@ app.get('/api/crm/account-deletion/status', crmAuth, async (req, res) => {
         if (!hotelId) return;
         const hotel = await prisma.hotelConfig.findUnique({
             where: { id: hotelId },
-            select: { ownerEmail: true },
+            select: { ownerEmail: true, marketelSubscriptionStatus: true },
         });
         if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
         const request = await prisma.accountDeletionRequest.findUnique({ where: { hotelId } });
         res.json({
             success: true,
-            ownerSession: !!(
-                req.crmIsNativeSession
-                && String(req.crmNativeEmail || '').toLowerCase() === String(hotel.ownerEmail || '').toLowerCase()
-            ),
+            ownerSession: hasAccountOwnerSession(req, hotel),
             request: request ? {
                 status: request.status,
                 requestedAt: request.requestedAt,
@@ -12941,6 +12955,7 @@ app.post('/api/crm/account-deletion/request', crmAuth, async (req, res) => {
             select: {
                 name: true,
                 ownerEmail: true,
+                marketelSubscriptionStatus: true,
             },
         });
         if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
@@ -13003,7 +13018,7 @@ app.post('/api/crm/account-deletion/cancel', crmAuth, async (req, res) => {
         if (!hotelId) return;
         const hotel = await prisma.hotelConfig.findUnique({
             where: { id: hotelId },
-            select: { ownerEmail: true },
+            select: { ownerEmail: true, marketelSubscriptionStatus: true },
         });
         if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
         if (!requireNativeOwnerSession(req, res, hotel)) return;
