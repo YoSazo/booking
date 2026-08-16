@@ -462,6 +462,9 @@ let pendingFile = null;
 // Resolves when background photo compression finishes, so the save step can
 // wait for it without the picker ever blocking the UI.
 let pendingPhotoPrep = null;
+// Resolves when the room photo has finished uploading. Nothing before the
+// handoff to Front Desk needs the photo, so the build never waits on it.
+let pendingPhotoUpload = null;
 let qualifiedLeadTracked = false;
 let currentSetupStep = 1;
 let setupStepStartedAt = Date.now();
@@ -758,20 +761,26 @@ async function addRoomAndFinish() {
     });
     if (!ratesRes.ok) throw new Error('Could not save starting price');
 
-    // Background compression usually finished while they answered the next
-    // question; if not, this is the one place that genuinely needs to wait.
-    if (pendingPhotoPrep) {
-      try { await pendingPhotoPrep; } catch (_) { /* keep the original file */ }
-    }
-
-    if (pendingFile && roomId) {
-      const form = new FormData();
-      form.append('image', pendingFile);
-      const photoRes = await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + encodeURIComponent(roomId) + '/images', {
-        method: 'POST',
-        body: form,
+    // Compressing and uploading the photo is the slowest part of the build and
+    // nothing between here and the success step needs it, so it runs alongside
+    // the rest. The handoff to Front Desk awaits it, which is the first moment
+    // the photo has to exist.
+    if (roomId) {
+      pendingPhotoUpload = (async () => {
+        if (pendingPhotoPrep) {
+          try { await pendingPhotoPrep; } catch (_) { /* keep the original file */ }
+        }
+        if (!pendingFile) return;
+        const form = new FormData();
+        form.append('image', pendingFile);
+        const photoRes = await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + encodeURIComponent(roomId) + '/images', {
+          method: 'POST',
+          body: form,
+        });
+        if (!photoRes.ok) throw new Error('photo-upload-failed');
+      })().catch(() => {
+        showToast('Your page was built, but the photo did not upload. You can add it in Front Desk.', true);
       });
-      if (!photoRes.ok) showToast('Your page was built, but the photo did not upload. You can add it in Front Desk.', true);
     }
 
     // Complete setup — get domain + PIN
@@ -823,6 +832,17 @@ async function addRoomAndFinish() {
         from: 'setup',
         to: 'frontdesk-reveal',
       }, { durationMs: Date.now() - setupStepStartedAt });
+      // The photo has been uploading since the build started, so this normally
+      // resolves instantly. It has to settle before /finalize, which retires
+      // this setup token and would reject an upload still in flight. The cap
+      // keeps a stalled upload from trapping the owner on the success step —
+      // the photo can always be added in Front Desk.
+      if (pendingPhotoUpload) {
+        await Promise.race([
+          pendingPhotoUpload,
+          new Promise((resolve) => setTimeout(resolve, 6000)),
+        ]);
+      }
       if (!successLink.dataset.finalized) {
         successLink.dataset.finalized = '1';
         try {
