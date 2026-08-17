@@ -125,7 +125,7 @@ public class LiveActivityPlugin: CAPPlugin {
     /// End every running card. Used on sign-out so a card cannot outlive the
     /// session that is allowed to act on it.
     @objc func endAll(_ call: CAPPluginCall) {
-        guard #available(iOS 16.1, *) else {
+        guard #available(iOS 16.2, *) else {
             call.resolve()
             return
         }
