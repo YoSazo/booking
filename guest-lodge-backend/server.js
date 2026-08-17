@@ -4851,6 +4851,46 @@ function verifyNativeSessionToken(token) {
     }
 }
 
+// A handoff token is not a session. The fd_ return token exists to carry an
+// owner across one boundary — out to Stripe, back from setup — and expires in
+// 24 hours, but the browser was storing it as its long-lived credential. A day
+// later every request 401s and the client, which treats any 401 as "signed
+// out", wipes the token and demands a PIN the owner may never have been given.
+//
+// So a return token is exchanged once for this: same signing secret, scoped to
+// the one hotel it already proved access to, and lasting as long as a native
+// session. Minting a PIN instead would either rotate the property's shared PIN
+// and sign out its staff, or add a new PIN on every return.
+const CRM_SESSION_TOKEN_EXPIRY_MS = NATIVE_SESSION_TOKEN_EXPIRY_MS;
+
+function generateCrmSessionToken(hotelId) {
+    const payload = JSON.stringify({
+        purpose: 'frontdesk-session',
+        hotelId: String(hotelId || '').trim(),
+        exp: Date.now() + CRM_SESSION_TOKEN_EXPIRY_MS,
+    });
+    const encoded = Buffer.from(payload).toString('base64url');
+    const sig = crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET).update(encoded).digest('base64url');
+    return `fds_${encoded}.${sig}`;
+}
+
+function verifyCrmSessionToken(token) {
+    const raw = String(token || '').trim();
+    if (!raw.startsWith('fds_')) return null;
+    const parts = raw.slice(4).split('.');
+    if (parts.length !== 2) return null;
+    const [encoded, sig] = parts;
+    const expected = crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET).update(encoded).digest('base64url');
+    if (!timingSafeTextEqual(sig, expected)) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (payload.purpose !== 'frontdesk-session' || !payload.hotelId || payload.exp < Date.now()) return null;
+        return { hotelId: String(payload.hotelId).trim() };
+    } catch (_) {
+        return null;
+    }
+}
+
 const nativeOwnerHotelsCache = new Map();
 
 async function getDbAllowedHotelsForOwnerEmail(email) {
@@ -5052,13 +5092,14 @@ const crmAuth = async (req, res, next) => {
     const marketelClient = String(req.headers['x-marketel-client'] || '').trim().toLowerCase();
     const isNativeClient = marketelClient === 'ios' || marketelClient === 'android';
     const returnAuth = await verifyCrmReturnToken(token);
-    const nativeAuth = returnAuth ? null : verifyNativeSessionToken(token);
+    const sessionAuth = returnAuth ? null : verifyCrmSessionToken(token);
+    const nativeAuth = returnAuth || sessionAuth ? null : verifyNativeSessionToken(token);
     // A lookup that *fails* is not a credential that is *absent*. Swallowing the
     // error into an empty list made a transient database blip indistinguishable
     // from a wrong PIN, and the client responds to 401 by deleting a valid token
     // and demanding the PIN again.
     let credentialLookupFailed = false;
-    const dbAllowedHotels = returnAuth || nativeAuth
+    const dbAllowedHotels = returnAuth || sessionAuth || nativeAuth
         ? []
         : await getDbAllowedHotelsForToken(token).catch((error) => {
             credentialLookupFailed = true;
@@ -5074,14 +5115,17 @@ const crmAuth = async (req, res, next) => {
         : [];
     let allowedHotels = returnAuth
         ? [returnAuth.hotelId]
-        : nativeAuth
-            ? nativeAllowedHotels
-            : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
+        : sessionAuth
+            ? [sessionAuth.hotelId]
+            : nativeAuth
+                ? nativeAllowedHotels
+                : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
 
     const requestedHotelId = String(req.query?.hotelId || req.body?.hotelId || '').trim();
     let isDogfoodPreviewAccess = false;
     if (
         !returnAuth
+        && !sessionAuth
         && !nativeAuth
         && requestedHotelId
         && CRM_DOGFOOD_PINS.has(token)
@@ -12890,6 +12934,21 @@ app.post('/api/admin/support/:threadId/reply', adminAuth, async (req, res) => {
             });
         }));
 
+        // Owners were only told by email that support had answered, so a reply
+        // landed in an inbox while Front Desk sat silent — the reverse of the
+        // owner's own message, which alerts us immediately.
+        if (existing.hotel?.id) {
+            void sendPushToHotel(existing.hotel.id, {
+                title: 'Marketel replied',
+                body: message.length > 140 ? `${message.slice(0, 137)}…` : message,
+                url: '/frontdesk?support=1',
+                icon: '/apple-touch-icon.png',
+                tag: `support-reply-${threadId}`,
+                renotify: true,
+                data: { type: 'support_reply', threadId },
+            }, { TTL: 24 * 60 * 60, urgency: 'high' }, 'support-reply').catch(() => {});
+        }
+
         if (emailTransporter && existing.hotel?.ownerEmail) {
             emailTransporter.sendMail({
                 from: '"Marketel Support" <support@bookmarketel.com>',
@@ -13889,6 +13948,26 @@ async function getCrmBookingList(hotelId) {
 // One startup request replaces the sequential context → verification →
 // bookings/availability chain. Secondary surfaces (messages, analytics,
 // conflicts and push maintenance) intentionally load after first paint.
+// Trades a one-boundary handoff token for a real session, so arriving from
+// setup or from Stripe does not leave the browser holding a credential that
+// dies in 24 hours. Any already-valid credential can call this; a PIN holder
+// simply gets a session that does not depend on remembering the PIN.
+app.post('/api/crm/session/exchange', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        res.json({
+            success: true,
+            token: generateCrmSessionToken(hotelId),
+            hotelId,
+            expiresInMs: CRM_SESSION_TOKEN_EXPIRY_MS,
+        });
+    } catch (e) {
+        console.error('crm session exchange:', e.message);
+        res.status(500).json({ success: false, message: 'Could not create a session.' });
+    }
+});
+
 app.get('/api/crm/bootstrap', crmBootstrapRateLimit, crmAuth, async (req, res) => {
     const startedAt = Date.now();
     try {

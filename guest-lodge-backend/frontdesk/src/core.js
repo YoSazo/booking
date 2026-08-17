@@ -2771,6 +2771,30 @@ function showNativeAuthenticationError(error) {
   return true;
 }
 
+// fd_ return tokens are handoff credentials that expire in a day, and storing
+// one as the session is why Front Desk would sign an owner out with
+// "Unauthorized" some time after they arrived from setup or Stripe. Trade it
+// for a real session as soon as one request has proved it still works. Failure
+// is not fatal — the handoff token is still valid today, so the owner carries
+// on and the next load tries again.
+async function upgradeToDurableSession() {
+  if (!crm.token || !String(crm.token).startsWith('fd_')) return;
+  if (crm.sessionUpgradeInFlight) return;
+  crm.sessionUpgradeInFlight = true;
+  try {
+    const data = await api('POST', '/api/crm/session/exchange');
+    if (data?.success && typeof data.token === 'string' && data.token.startsWith('fds_')) {
+      crm.token = data.token;
+      try { localStorage.setItem('crmToken', crm.token); } catch (_) {}
+      logFrontdeskAuth('session-upgraded', { hotelId: data.hotelId || '' });
+    }
+  } catch (_) {
+    // Keep the handoff token; it still has time left on it.
+  } finally {
+    crm.sessionUpgradeInFlight = false;
+  }
+}
+
 function isAuthenticationFailure(error) {
   const status = Number(error?.status) || 0;
   return status === 401 || status === 403;
@@ -2823,6 +2847,9 @@ async function bootCrmApp() {
       try {
         const verification = await loadCrmBootstrap();
         await startCrmApp(verification, { bootstrapped: true });
+        // Bootstrap succeeding is the proof the credential works, which is the
+        // right moment to trade a handoff token for a lasting session.
+        upgradeToDurableSession().catch(() => {});
         return;
       } catch (e) {
         // Safe rolling deploy: an already-installed native bundle may launch
