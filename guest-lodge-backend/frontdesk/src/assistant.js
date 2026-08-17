@@ -196,6 +196,10 @@ function ensureStyles() {
     .fda-live::before{content:"";width:7px;height:7px;border-radius:50%;background:#65d69a;box-shadow:0 0 0 4px rgba(101,214,154,.14);}
     .fda-native-result{width:100%;display:flex;align-items:center;gap:12px;margin:0 0 13px;padding:13px 14px;border:1px solid #d7e8de;border-radius:15px;background:linear-gradient(145deg,#f5fbf7,#fff);box-shadow:0 4px 16px rgba(25,70,45,.055);color:#1a2b22;font-family:inherit;text-align:left;cursor:pointer;}
     .fda-native-result.attention{border-color:#efd3a4;background:linear-gradient(145deg,#fff8eb,#fff);}
+    /* The empty state is an invitation, not a result: quieter than an activity
+       card so it never reads as something that needs attention. */
+    .fda-native-result.is-intro{border-style:dashed;background:#fff;box-shadow:none;}
+    .fda-native-result.is-intro .fda-native-result-icon{background:#eef5f1;color:#4a7a63;font-weight:700;}
     .fda-native-result-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;background:#dff2e7;color:#23714f;font-size:16px;font-weight:900;}
     .fda-native-result.attention .fda-native-result-icon{background:#fff0d2;color:#a15c0b;}
     .fda-native-result-copy{min-width:0;flex:1;}
@@ -340,11 +344,28 @@ export function renderFrontDeskAssistantCard() {
   if (isNativeFrontDesk()) {
     const activity = latestMeaningfulActivity();
     if (!crm.assistantData || !activity) {
-      panel.innerHTML = '';
-      panel.style.display = 'none';
       if (!crm.assistantData && !crm.assistantLoading && !crm.assistantError) {
         loadFrontDeskAssistant().catch(() => {});
       }
+      // Hiding this until the Assistant has done something made it findable
+      // only through an unlabelled ⋯ menu, so an owner who had never used it
+      // had no way to learn it exists. Empty is a state worth showing: it says
+      // what the Assistant is for and opens it.
+      if (crm.assistantLoading) {
+        panel.innerHTML = '';
+        panel.style.display = 'none';
+        return;
+      }
+      panel.style.display = 'block';
+      panel.innerHTML = `<button type="button" class="fda-native-result is-intro" onclick="openFrontDeskAssistant()" aria-label="Set up Front Desk Assistant">
+        <span class="fda-native-result-icon" aria-hidden="true">☎</span>
+        <span class="fda-native-result-copy">
+          <span class="fda-native-result-label">Front Desk Assistant</span>
+          <span class="fda-native-result-title">Get a text when a room is requested.</span>
+          <span class="fda-native-result-time">Reply in words — it updates availability for you</span>
+        </span>
+        <span class="fda-native-result-arrow" aria-hidden="true">›</span>
+      </button>`;
       return;
     }
     const attention = activity.type === 'availability_warning' || activity.status === 'attention';

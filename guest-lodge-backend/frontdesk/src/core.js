@@ -2439,6 +2439,25 @@ async function startCrmApp(verification, options = {}) {
     crm.currentFilter = 'bookings';
   }
 
+  // Notifications deep-link to a surface, and the surface has to answer. A
+  // support reply sent the owner to /frontdesk?support=1, nothing read the
+  // parameter, and the app opened on whatever tab it would have anyway — so
+  // tapping "Marketel replied" produced no reply.
+  if (urlParams.get('support') === '1') {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('support');
+    window.history.replaceState({}, '', cleanUrl);
+    // After the first paint, so the conversation opens over a rendered app
+    // rather than a blank one.
+    window.setTimeout(() => {
+      setNativeShellVisible(false);
+      loadSupportModule().then((module) => module.openSupportConversation()).catch(() => {
+        setNativeShellVisible(true);
+        toast('Could not open support. Email support@bookmarketel.com.', 'error');
+      });
+    }, 0);
+  }
+
   if (isFirstWelcome) {
     if (crm.revenueEnabled) seedTourRevenueShell();
     if (typeof loadSettingsModule === 'function') await loadSettingsModule();
@@ -5709,15 +5728,47 @@ function showBookingFulfillmentToast(action, fulfillment) {
   );
 }
 
+// Deciding costs a POST and then a reload of bookings, conflicts and
+// availability — several seconds on hotel wifi. Without a pending state the
+// owner taps, nothing moves, and the honest reading is that the tap missed. So
+// the card commits visually the moment it is pressed, and both buttons lock so
+// the same request cannot be sent twice while the first is in flight.
+function setBookingDecisionPending(bookingId, action) {
+  const card = document.querySelector(`[data-booking-id="${CSS.escape(String(bookingId))}"]`);
+  const scope = card || document;
+  const buttons = [...scope.querySelectorAll('button')]
+    .filter((button) => (button.getAttribute('onclick') || '').includes(`'${bookingId}'`));
+  if (!buttons.length) return () => {};
+  const restore = buttons.map((button) => ({ button, html: button.innerHTML, disabled: button.disabled }));
+  buttons.forEach((button) => {
+    button.disabled = true;
+    button.classList.add('is-deciding');
+    const isThisOne = (button.getAttribute('onclick') || '').includes(`'${action}'`);
+    if (isThisOne) {
+      button.classList.add('is-active');
+      button.innerHTML = action === 'confirm' ? 'Keeping…' : 'Releasing…';
+    }
+  });
+  return () => restore.forEach(({ button, html, disabled }) => {
+    button.innerHTML = html;
+    button.disabled = disabled;
+    button.classList.remove('is-deciding', 'is-active');
+  });
+}
+
 async function decideBookingFromCard(bookingId, action) {
+  const restoreButtons = setBookingDecisionPending(bookingId, action);
   try {
     const body = await api('POST', `/api/crm/bookings/${encodeURIComponent(bookingId)}/approval`, { action });
     if (!body?.success) throw new Error(body?.message || 'Could not apply that decision.');
     if (body.alreadyDecided) toast(`That request was already ${body.status || 'decided'}.`, 'info');
     else showBookingFulfillmentToast(action, body.fulfillment);
+    // No restore on success: loadBookings replaces the card with its decided
+    // state, so putting the old label back would flash the pending buttons.
     await loadBookings();
     await Promise.allSettled([loadBookingConflicts(), loadManualAvailability()]);
   } catch (error) {
+    restoreButtons();
     toast(error?.message || 'Could not apply that decision.', 'error');
   }
 }

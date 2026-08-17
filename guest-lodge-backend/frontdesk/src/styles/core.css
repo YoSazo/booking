@@ -413,6 +413,21 @@
       color: white; box-shadow: 0 4px 14px rgba(46,125,91,0.26);
     }
     .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 7px 22px rgba(46,125,91,0.34); }
+    /* A decision takes several seconds to settle. The pressed button keeps its
+       colour and gains a spinner so the choice reads as made; the other fades
+       to show it is no longer available. The card looks committed the instant
+       it is tapped rather than inert until the reload lands. */
+    .btn.is-deciding { cursor: default; opacity: 0.5; }
+    .btn.is-deciding:hover { transform: none; box-shadow: none; }
+    .btn.is-deciding.is-active { opacity: 1; }
+    .btn.is-deciding.is-active::after {
+      content: '';
+      width: 13px; height: 13px;
+      border: 2px solid currentColor; border-top-color: transparent;
+      border-radius: 50%;
+      animation: marketel-decide-spin 0.7s linear infinite;
+    }
+    @keyframes marketel-decide-spin { to { transform: rotate(360deg); } }
     .btn-note { background: var(--white); color: var(--text); border-color: var(--border); }
     .btn-note:hover { border-color: var(--green); color: var(--green); background: var(--green-pale); }
     .btn-note-quiet {
