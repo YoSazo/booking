@@ -8,6 +8,18 @@ on:
         required: true
         type: boolean
         default: true
+      signing_style:
+        description: >-
+          manual = one pre-installed profile for the app, the path every release
+          has used. automatic = let Xcode register bundle IDs and create
+          profiles through the App Store Connect key, which is what a build with
+          a widget extension needs before its profile exists.
+        required: true
+        type: choice
+        default: manual
+        options:
+          - manual
+          - automatic
 
 permissions:
   contents: read
@@ -157,7 +169,23 @@ jobs:
             "$RUNNER_TEMP/MarketelExportOptions.plist"
           echo "MARKETEL_BUILD_NUMBER=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
-      - name: Archive signed app
+      # Automatic signing needs the App Store Connect key on disk before the
+      # archive, not just before the upload, because -allowProvisioningUpdates
+      # is what talks to Apple to register a missing bundle ID.
+      - name: Stage App Store Connect key for provisioning
+        if: inputs.signing_style == 'automatic'
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc_keys"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" \
+            | base64 -D \
+            > "$RUNNER_TEMP/asc_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8"
+          echo "MARKETEL_ASC_KEY_PATH=$RUNNER_TEMP/asc_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8" >> "$GITHUB_ENV"
+
+      - name: Archive signed app (manual signing)
+        if: inputs.signing_style == 'manual'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
@@ -176,13 +204,64 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--keychain $MARKETEL_KEYCHAIN_PATH" \
             clean archive
 
-      - name: Export App Store IPA
+      # No PROVISIONING_PROFILE_SPECIFIER here on purpose: naming one profile
+      # would force it onto both targets, and the widget needs its own. Xcode
+      # resolves each target's profile itself and creates what is missing.
+      - name: Archive signed app (automatic signing)
+        if: inputs.signing_style == 'automatic'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath ios/output/Marketel-Front-Desk.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$MARKETEL_ASC_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$MARKETEL_BUILD_NUMBER" \
+            clean archive
+
+      # Under automatic signing the export must not be handed a fixed profile
+      # map — it would pin the app and leave the widget unsigned. Rewrite the
+      # plist to let Xcode resolve both, using the same key it archived with.
+      - name: Switch export options to automatic signing
+        if: inputs.signing_style == 'automatic'
+        run: |
+          /usr/libexec/PlistBuddy \
+            -c "Set :signingStyle automatic" \
+            "$RUNNER_TEMP/MarketelExportOptions.plist"
+          /usr/libexec/PlistBuddy \
+            -c "Delete :provisioningProfiles" \
+            "$RUNNER_TEMP/MarketelExportOptions.plist"
+
+      - name: Export App Store IPA
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          extra=()
+          if [[ "${{ inputs.signing_style }}" == "automatic" ]]; then
+            extra+=(
+              -allowProvisioningUpdates
+              -authenticationKeyPath "$MARKETEL_ASC_KEY_PATH"
+              -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID"
+              -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+            )
+          fi
           xcodebuild \
             -exportArchive \
             -archivePath ios/output/Marketel-Front-Desk.xcarchive \
             -exportPath ios/output/app-store \
-            -exportOptionsPlist "$RUNNER_TEMP/MarketelExportOptions.plist"
+            -exportOptionsPlist "$RUNNER_TEMP/MarketelExportOptions.plist" \
+            "${extra[@]}"
           exported_ipa="$(find ios/output/app-store -maxdepth 1 -type f -name '*.ipa' -print -quit)"
           test -n "$exported_ipa"
           if [[ "$exported_ipa" != "ios/output/app-store/Marketel-Front-Desk.ipa" ]]; then
