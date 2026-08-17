@@ -801,7 +801,7 @@
       <button class="ghost-btn" onclick="copyJourneyExport()">Copy journey JSON</button>
       <button class="danger-btn" onclick="purgeActivity()">Delete all activity</button>
     </div>
-    <div class="panel-hint" id="dataHint">Copy pastes the full visitor→session→event export to your clipboard. Delete removes every funnel event and cannot be undone; bookings, properties and support threads are not touched.</div>
+    <div class="panel-hint" id="dataHint">Copy pastes the full visitor→session→event export to your clipboard. Delete clears the landing → setup → reveal → activation telemetry and cannot be undone. It keeps the rows that do a job: the activation and preview email send-once guards, blocked-booking demand, and onboarding answers. Bookings, properties and support threads are never touched.</div>
   </div>
 </div>
 
@@ -1631,7 +1631,7 @@ async function copyJourneyExport() {
 
 async function purgeActivity() {
   const hint = document.getElementById('dataHint');
-  const typed = window.prompt('This permanently deletes every funnel event. Bookings, properties and support threads are not touched.\n\nType DELETE ALL ACTIVITY to confirm.');
+  const typed = window.prompt('This permanently deletes the landing → setup → reveal → activation telemetry.\n\nKept: email send-once guards, blocked-booking demand, onboarding answers, and every booking, property and support thread.\n\nType DELETE ALL ACTIVITY to confirm.');
   if (typed !== 'DELETE ALL ACTIVITY') {
     if (hint && typed !== null) hint.textContent = 'Purge cancelled — the phrase did not match.';
     return;

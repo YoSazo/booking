@@ -10710,9 +10710,29 @@ app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
     }
 });
 
-// Clears funnel activity so a real traffic run is not read through test data.
-// Scoped deliberately: FunnelEvent only. Bookings, properties and support
-// threads are business records and are never touched here.
+// FunnelEvent is not only analytics. A few rows in it are load-bearing, and
+// deleting them has consequences out in the world rather than on a chart:
+//
+//   ActivationEmailSent / ActivationEmailSending  send-once guard. Without the
+//       row, a property that already received its activation email gets another.
+//   PreviewReadyEmailSent                         same guard for the preview email.
+//   BlockedBookingAttempt                         guest demand against a blocked
+//       property. It is evidence, not telemetry, and feeds the comeback signal.
+//   OnboardingAnswers                             what the owner told us at signup.
+//
+// So the purge works from an allowlist of the funnel telemetry itself. Anything
+// not named here survives, which also means a future operational use of this
+// table is safe by default rather than by remembering to update a denylist.
+const FUNNEL_PURGE_PROTECTED = new Set([
+    'ActivationEmailSending',
+    'ActivationEmailSent',
+    'PreviewReadyEmailSent',
+    'BlockedBookingAttempt',
+    'OnboardingAnswers',
+]);
+const FUNNEL_PURGEABLE_EVENT_NAMES = MARKETEL_ONBOARDING_EVENT_NAMES
+    .filter((name) => !FUNNEL_PURGE_PROTECTED.has(name));
+
 app.post('/api/admin/funnel/purge', adminAuth, async (req, res) => {
     try {
         if (String(req.body?.confirm || '') !== 'DELETE ALL ACTIVITY') {
@@ -10725,10 +10745,16 @@ app.post('/api/admin/funnel/purge', adminAuth, async (req, res) => {
         if (before && isNaN(before)) {
             return res.status(400).json({ success: false, message: 'Invalid before date.' });
         }
-        const where = before ? { createdAt: { lt: before } } : {};
+        const where = { eventName: { in: FUNNEL_PURGEABLE_EVENT_NAMES } };
+        if (before) where.createdAt = { lt: before };
         const deleted = await prisma.funnelEvent.deleteMany({ where });
         console.log(`admin purge: removed ${deleted.count} funnel events${before ? ` before ${before.toISOString()}` : ''}`);
-        res.json({ success: true, deleted: deleted.count, scope: before ? `before ${before.toISOString()}` : 'all' });
+        res.json({
+            success: true,
+            deleted: deleted.count,
+            scope: before ? `before ${before.toISOString()}` : 'all',
+            preserved: [...FUNNEL_PURGE_PROTECTED],
+        });
     } catch (e) {
         console.error('admin funnel purge:', e.message);
         res.status(500).json({ success: false, message: 'Could not purge activity.' });

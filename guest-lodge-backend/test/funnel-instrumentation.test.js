@@ -73,7 +73,29 @@ test('purging activity is confirmed, scoped, and never touches business records'
     assert.ok(purge, 'purge route is missing');
     assert.match(purge, /adminAuth/);
     assert.match(purge, /DELETE ALL ACTIVITY/);
-    assert.match(purge, /prisma\.funnelEvent\.deleteMany/);
-    // Bookings, properties and support threads are business records.
+    // Deleting by allowlist, never by "everything except". A bare deleteMany
+    // with no eventName filter would take the protected rows with it.
+    assert.match(purge, /deleteMany\(\{ where \}\)/);
+    assert.match(purge, /eventName: \{ in: FUNNEL_PURGEABLE_EVENT_NAMES \}/);
     assert.doesNotMatch(purge, /prisma\.(booking|hotelConfig|supportThread|supportMessage)\.delete/);
+});
+
+test('the purge cannot delete a row that something else depends on', () => {
+    // Each of these gates behaviour outside the dashboard. Losing the email
+    // guards re-sends real mail to real customers, which is why the protection
+    // is asserted here and not left to the comment above the set.
+    const protectedRows = [
+        ['ActivationEmailSent', /if \(existing\?\.eventName === 'ActivationEmailSent'\) return;/],
+        ['PreviewReadyEmailSent', /eventName: 'PreviewReadyEmailSent'[\s\S]{0,200}if \(!existingEmail\)/],
+        ['BlockedBookingAttempt', /eventName: 'BlockedBookingAttempt', createdAt/],
+    ];
+    for (const [name, usage] of protectedRows) {
+        assert.match(server, usage, `${name} no longer guards what this test assumes`);
+        assert.match(
+            server,
+            new RegExp(`FUNNEL_PURGE_PROTECTED = new Set\\(\\[[\\s\\S]*?'${name}'`),
+            `${name} is load-bearing but not protected from the purge`
+        );
+    }
+    assert.match(server, /FUNNEL_PURGEABLE_EVENT_NAMES = MARKETEL_ONBOARDING_EVENT_NAMES[\s\S]{0,120}FUNNEL_PURGE_PROTECTED\.has/);
 });
