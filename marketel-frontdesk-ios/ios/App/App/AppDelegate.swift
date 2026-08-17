@@ -119,6 +119,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        // Capacitor 6+ does not auto-discover plugins that live in the app target
+        // (only those shipped in packages). Register this one explicitly, or
+        // window.Capacitor.Plugins.LiveActivity is undefined and the web half
+        // never observes a push-to-start token.
+        bridge?.registerPluginInstance(LiveActivityPlugin())
         webView?.configuration.userContentController.add(self, name: "marketelShell")
         webView?.scrollView.contentInsetAdjustmentBehavior = .never
         webView?.scrollView.verticalScrollIndicatorInsets = .zero
