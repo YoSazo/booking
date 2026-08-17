@@ -5800,6 +5800,7 @@ app.post('/api/push/live-activity/starter', crmAuth, async (req, res) => {
             create: { startToken, hotelId, environment, active: true, lastSeenAt: new Date() },
             update: { environment, active: true, lastSeenAt: new Date() },
         });
+        console.log(`📲 [live-activity] push-to-start token registered hotel=${hotelId} env=${environment} token=…${startToken.slice(-6)} apns=${APNS_CONFIGURED}`);
         res.json({ success: true, pushConfigured: APNS_CONFIGURED });
     } catch (error) {
         console.error('live-activity starter register failed:', error.message);
@@ -7258,6 +7259,7 @@ async function syncBookingLiveActivity(booking, options = {}) {
             orderBy: { createdAt: 'desc' },
         });
         const decision = liveActivityActionForBooking(booking, existing);
+        console.log(`🎬 [live-activity] booking=${booking.id} hotel=${hotelId} status=${booking.status} action=${decision.action}${decision.reason ? ` (${decision.reason})` : ''}`);
         if (decision.action === 'none') return;
 
         const hotel = await prisma.hotelConfig.findUnique({
@@ -7269,11 +7271,19 @@ async function syncBookingLiveActivity(booking, options = {}) {
             const starters = await prisma.liveActivityStarter.findMany({
                 where: { hotelId, active: true },
             });
-            if (!starters.length) return;
+            if (!starters.length) {
+                console.log(`🎬 [live-activity] no push-to-start tokens registered for hotel=${hotelId} — card skipped (device must open Front Desk on iOS 17.2+ with Live Activities on)`);
+                return;
+            }
             const payload = buildStartPayload(booking, hotel, options);
             const results = await Promise.allSettled(starters.map(starter =>
                 sendLiveActivityRequest({ token: starter.startToken, environment: starter.environment }, payload)
             ));
+            const sent = results.filter(r => r.status === 'fulfilled').length;
+            const failed = results
+                .filter(r => r.status === 'rejected')
+                .map(r => r.reason?.reason || r.reason?.message || 'error');
+            console.log(`🎬 [live-activity] start push booking=${booking.id}: ${sent}/${starters.length} sent${failed.length ? `, failed=[${failed.join(', ')}]` : ''}`);
             const deadIds = results
                 .map((r, i) => (r.status === 'rejected' && LIVE_ACTIVITY_DEAD_REASONS.has(r.reason?.reason) ? starters[i].id : null))
                 .filter(Boolean);
