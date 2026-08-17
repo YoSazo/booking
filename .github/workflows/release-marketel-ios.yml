@@ -44,6 +44,8 @@ jobs:
           APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
           APPLE_PROVISIONING_PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
+          APPLE_WIDGET_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_WIDGET_PROVISIONING_PROFILE_NAME: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE_NAME }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -55,6 +57,8 @@ jobs:
             APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD
             APPLE_PROVISIONING_PROFILE_BASE64
             APPLE_PROVISIONING_PROFILE_NAME
+            APPLE_WIDGET_PROVISIONING_PROFILE_BASE64
+            APPLE_WIDGET_PROVISIONING_PROFILE_NAME
             APPLE_TEAM_ID
           )
           if [[ "$UPLOAD_TO_TESTFLIGHT" == "true" ]]; then
@@ -120,19 +124,18 @@ jobs:
             -scheme App \
             -resolvePackageDependencies
 
-      - name: Install distribution certificate and profile
+      - name: Install distribution certificate and profiles
         env:
           CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          WIDGET_PROFILE_BASE64: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE_BASE64 }}
         run: |
           certificate_path="$RUNNER_TEMP/marketel-distribution.p12"
-          profile_path="$RUNNER_TEMP/marketel-app-store.mobileprovision"
           keychain_path="$RUNNER_TEMP/marketel-signing.keychain-db"
           keychain_password="$(openssl rand -base64 24)"
 
           printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$certificate_path"
-          printf '%s' "$PROFILE_BASE64" | base64 -D > "$profile_path"
 
           security create-keychain -p "$keychain_password" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
@@ -149,16 +152,29 @@ jobs:
             "$keychain_path"
           security list-keychain -d user -s "$keychain_path"
 
-          security cms -D -i "$profile_path" > "$RUNNER_TEMP/marketel-profile.plist"
-          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/marketel-profile.plist")"
+          # Install each App Store profile under its own UUID so both the app and
+          # the widget extension find their own during archive.
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+          install_profile() {
+            local b64="$1" name="$2"
+            local path="$RUNNER_TEMP/$name.mobileprovision"
+            local plist="$RUNNER_TEMP/$name.plist"
+            printf '%s' "$b64" | base64 -D > "$path"
+            security cms -D -i "$path" > "$plist"
+            local uuid
+            uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$plist")"
+            cp "$path" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
+          }
+          install_profile "$PROFILE_BASE64" marketel-app-store
+          install_profile "$WIDGET_PROFILE_BASE64" marketel-widget-app-store
+
           echo "MARKETEL_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
 
       - name: Prepare App Store export options
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
+          WIDGET_PROFILE_NAME: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE_NAME }}
         run: |
           cp ios/ExportOptions.plist "$RUNNER_TEMP/MarketelExportOptions.plist"
           /usr/libexec/PlistBuddy \
@@ -166,6 +182,12 @@ jobs:
             "$RUNNER_TEMP/MarketelExportOptions.plist"
           /usr/libexec/PlistBuddy \
             -c "Set :provisioningProfiles:com.bookmarketel.frontdesk $PROFILE_NAME" \
+            "$RUNNER_TEMP/MarketelExportOptions.plist"
+          /usr/libexec/PlistBuddy \
+            -c "Add :provisioningProfiles:com.bookmarketel.frontdesk.MarketelActivityWidget string $WIDGET_PROFILE_NAME" \
+            "$RUNNER_TEMP/MarketelExportOptions.plist" 2>/dev/null \
+          || /usr/libexec/PlistBuddy \
+            -c "Set :provisioningProfiles:com.bookmarketel.frontdesk.MarketelActivityWidget $WIDGET_PROFILE_NAME" \
             "$RUNNER_TEMP/MarketelExportOptions.plist"
           echo "MARKETEL_BUILD_NUMBER=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
@@ -184,11 +206,14 @@ jobs:
             > "$RUNNER_TEMP/asc_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8"
           echo "MARKETEL_ASC_KEY_PATH=$RUNNER_TEMP/asc_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8" >> "$GITHUB_ENV"
 
+      # No PROVISIONING_PROFILE_SPECIFIER on the command line: a single specifier
+      # forces one profile onto both the app and the widget. Each target's Release
+      # config already names its own profile, so the archive lets them resolve
+      # per target from the two profiles installed above.
       - name: Archive signed app (manual signing)
         if: inputs.signing_style == 'manual'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
         run: |
           xcodebuild \
             -project ios/App/App.xcodeproj \
@@ -199,7 +224,6 @@ jobs:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             CURRENT_PROJECT_VERSION="$MARKETEL_BUILD_NUMBER" \
             OTHER_CODE_SIGN_FLAGS="--keychain $MARKETEL_KEYCHAIN_PATH" \
             clean archive
@@ -226,7 +250,6 @@ jobs:
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$MARKETEL_BUILD_NUMBER" \
             clean archive
 

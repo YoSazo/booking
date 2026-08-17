@@ -12,6 +12,8 @@
 	<dict>
 		<key>com.bookmarketel.frontdesk</key>
 		<string>MARKETEL_APP_STORE_PROFILE</string>
+		<key>com.bookmarketel.frontdesk.MarketelActivityWidget</key>
+		<string>MARKETEL_WIDGET_APP_STORE_PROFILE</string>
 	</dict>
 	<key>signingStyle</key>
 	<string>manual</string>
