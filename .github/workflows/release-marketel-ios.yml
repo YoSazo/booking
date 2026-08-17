@@ -231,7 +231,9 @@ jobs:
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$MARKETEL_BUILD_NUMBER" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $MARKETEL_KEYCHAIN_PATH" \
             clean archive
 
       # Under automatic signing the export must not be handed a fixed profile
