@@ -6111,8 +6111,15 @@ const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
     'JourneyRevealStageViewed',
     'JourneyRevealStageCompleted',
     'JourneyRevealNavigation',
+    // Beats are the real resolution of the reveal. A stage view only says an
+    // owner reached the guest-app stage; the beat says whether they got past
+    // the install sheet. Without this the middle of the funnel is one bucket.
+    'JourneyRevealBeatViewed',
+    'JourneyAssistantFallbackSelected',
+    'JourneyBillingIntervalSelected',
     'JourneyBookingPreviewOpened',
     'JourneyBookingPreviewModeChanged',
+    'JourneyBookingPreviewEdited',
     'JourneyBookingPreviewCheckoutReached',
     'JourneyBookingChallengeShown',
     'JourneyBookingChallengeStarted',
@@ -6316,6 +6323,19 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppValueSlideViewed',
     'GuestAppInstallSlideReplayed',
     'GuestAppInstallDemoClicked',
+    // The reveal was rebuilt around real screenshots played as beats, and these
+    // are the per-beat milestones it has been firing ever since. They were never
+    // added here, so every one of them was rejected as an unknown event and the
+    // guest-app and assistant stages recorded nothing between entry and exit.
+    'GuestAppOwnerEditorViewed',
+    'GuestAppInstallBannerViewed',
+    'GuestAppInstallSheetViewed',
+    'GuestAppHomeScreenViewed',
+    'GuestAppRebookViewed',
+    'GuestAppBroadcastViewed',
+    'AssistantTextProofViewed',
+    'AssistantAppProofViewed',
+    'AssistantFallbackViewed',
     'BookingChallengeShown',
     'BookingChallengeStarted',
     'BookingChallengeDismissed',
@@ -10619,6 +10639,101 @@ function productionLaunchReadiness() {
         ],
     };
 }
+
+// Front Desk shows a property its own revenue and nothing ever added those up,
+// so there was no view of gross booking volume across the base. That total is
+// the number every payments question starts from, so it belongs on one screen.
+app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
+    try {
+        const daysBack = Math.max(1, Math.min(365, parseInt(req.query.days, 10) || 30));
+        const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+        const [hotels, bookings] = await Promise.all([
+            prisma.hotelConfig.findMany({
+                select: { id: true, name: true, marketelSubscriptionStatus: true, createdAt: true },
+            }),
+            prisma.booking.findMany({
+                where: { createdAt: { gte: since } },
+                select: { hotelId: true, grandTotal: true, nights: true, status: true },
+            }),
+        ]);
+
+        const byHotel = new Map();
+        for (const hotel of hotels) {
+            byHotel.set(hotel.id, {
+                hotelId: hotel.id,
+                name: hotel.name || hotel.id,
+                subscriptionStatus: hotel.marketelSubscriptionStatus || null,
+                bookings: 0,
+                cancelled: 0,
+                nights: 0,
+                gmv: 0,
+            });
+        }
+        for (const booking of bookings) {
+            const row = byHotel.get(booking.hotelId);
+            if (!row) continue;
+            const cancelled = String(booking.status || '').toLowerCase() === 'cancelled';
+            if (cancelled) {
+                row.cancelled += 1;
+                continue;
+            }
+            row.bookings += 1;
+            row.nights += Number(booking.nights) || 0;
+            row.gmv += Number(booking.grandTotal) || 0;
+        }
+
+        const properties = Array.from(byHotel.values()).sort((a, b) => b.gmv - a.gmv);
+        const paying = properties.filter((p) => ['active', 'trialing'].includes(String(p.subscriptionStatus || '').toLowerCase()));
+        const gmv = properties.reduce((sum, p) => sum + p.gmv, 0);
+        const bookingCount = properties.reduce((sum, p) => sum + p.bookings, 0);
+
+        res.json({
+            success: true,
+            rangeDays: daysBack,
+            totals: {
+                properties: properties.length,
+                payingProperties: paying.length,
+                bookings: bookingCount,
+                cancelled: properties.reduce((sum, p) => sum + p.cancelled, 0),
+                nights: properties.reduce((sum, p) => sum + p.nights, 0),
+                gmv: Math.round(gmv * 100) / 100,
+                averageBookingValue: bookingCount ? Math.round((gmv / bookingCount) * 100) / 100 : 0,
+                // What a processing spread would have earned over this window.
+                // Sizing only — it assumes every booking settles on our rails.
+                processingAt40Bps: Math.round(gmv * 0.004 * 100) / 100,
+            },
+            properties,
+        });
+    } catch (e) {
+        console.error('admin portfolio:', e.message);
+        res.status(500).json({ success: false, message: 'Could not build the portfolio view.' });
+    }
+});
+
+// Clears funnel activity so a real traffic run is not read through test data.
+// Scoped deliberately: FunnelEvent only. Bookings, properties and support
+// threads are business records and are never touched here.
+app.post('/api/admin/funnel/purge', adminAuth, async (req, res) => {
+    try {
+        if (String(req.body?.confirm || '') !== 'DELETE ALL ACTIVITY') {
+            return res.status(400).json({
+                success: false,
+                message: 'Send confirm: "DELETE ALL ACTIVITY" to purge.',
+            });
+        }
+        const before = req.body?.before ? new Date(req.body.before) : null;
+        if (before && isNaN(before)) {
+            return res.status(400).json({ success: false, message: 'Invalid before date.' });
+        }
+        const where = before ? { createdAt: { lt: before } } : {};
+        const deleted = await prisma.funnelEvent.deleteMany({ where });
+        console.log(`admin purge: removed ${deleted.count} funnel events${before ? ` before ${before.toISOString()}` : ''}`);
+        res.json({ success: true, deleted: deleted.count, scope: before ? `before ${before.toISOString()}` : 'all' });
+    } catch (e) {
+        console.error('admin funnel purge:', e.message);
+        res.status(500).json({ success: false, message: 'Could not purge activity.' });
+    }
+});
 
 app.get('/api/admin/launch-readiness', adminAuth, (_req, res) => {
     const readiness = productionLaunchReadiness();

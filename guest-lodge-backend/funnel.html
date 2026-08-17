@@ -497,6 +497,69 @@
   .overview-section {
     padding: 24px;
   }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .panel-head h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .panel-note { font-size: 12px; color: var(--muted); }
+  .panel-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .panel-hint { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .ghost-btn, .danger-btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ghost-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  .ghost-btn:hover { border-color: var(--green); color: var(--green); }
+  .danger-btn { background: var(--card); border: 1px solid var(--red); color: var(--red); }
+  .danger-btn:hover { background: var(--red); color: #fff; }
+  .beat-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 52px;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+  .beat-row.is-stage { font-weight: 700; margin-top: 10px; }
+  .beat-row.is-stage:first-child { margin-top: 0; }
+  .beat-row .beat-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .beat-row:not(.is-stage) .beat-name { color: var(--muted); padding-left: 14px; }
+  .beat-bar { background: var(--bg); border-radius: 999px; height: 8px; overflow: hidden; }
+  .beat-bar i { display: block; height: 100%; background: var(--green); border-radius: 999px; }
+  .beat-row:not(.is-stage) .beat-bar i { background: var(--green-lt); border: 1px solid var(--green); box-sizing: border-box; }
+  .beat-count { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .beat-drop { color: var(--red); font-weight: 600; }
+  .portfolio-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .portfolio-table th, .portfolio-table td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .portfolio-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .portfolio-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .portfolio-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
   .overview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -707,6 +770,38 @@
       <div class="stat-value" id="stat-paid">0</div>
       <div class="stat-label">Paid</div>
     </div>
+  </div>
+
+  <!-- Beat-level drop-off. A stage count says an owner reached the guest-app
+       stage; these say which beat lost them. -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Where the reveal loses people</h2>
+      <span class="panel-note">Properties reaching each beat, in order</span>
+    </div>
+    <div id="beatFunnel"><div class="loading">Loading…</div></div>
+  </div>
+
+  <!-- Gross booking volume across every property. -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Portfolio</h2>
+      <span class="panel-note" id="portfolioRange">Last 30 days</span>
+    </div>
+    <div class="overview-grid" id="portfolioStats"></div>
+    <div id="portfolioTable"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Data</h2>
+      <span class="panel-note">Full journey detail for analysis</span>
+    </div>
+    <div class="panel-actions">
+      <button class="ghost-btn" onclick="copyJourneyExport()">Copy journey JSON</button>
+      <button class="danger-btn" onclick="purgeActivity()">Delete all activity</button>
+    </div>
+    <div class="panel-hint" id="dataHint">Copy pastes the full visitor→session→event export to your clipboard. Delete removes every funnel event and cannot be undone; bookings, properties and support threads are not touched.</div>
   </div>
 </div>
 
@@ -1256,7 +1351,16 @@ const ICONS = {
   BookingChallengeAbandoned: '⏹',
   BookingChallengeCheckoutReached: '🏁',
   GuestAppRevealViewed: '📱',
+  GuestAppOwnerEditorViewed: '🎬',
+  GuestAppInstallBannerViewed: '🎬',
+  GuestAppInstallSheetViewed: '🎬',
+  GuestAppHomeScreenViewed: '🎬',
+  GuestAppRebookViewed: '🎬',
+  GuestAppBroadcastViewed: '🎬',
   AssistantRevealViewed: '🛎',
+  AssistantTextProofViewed: '🎬',
+  AssistantAppProofViewed: '🎬',
+  AssistantFallbackViewed: '🎬',
   ActivationOfferViewed: '$',
   ActivationCtaClicked: '🖱',
   PreviewReadyEmailSent: '✉️',
@@ -1289,7 +1393,16 @@ const TYPE_LABELS = {
   BookingChallengeAbandoned: 'Challenge Exited',
   BookingChallengeCheckoutReached: 'Preview Checkout Reached',
   GuestAppRevealViewed: 'Home Screen Reveal',
+  GuestAppOwnerEditorViewed: '· Beat 1 — Owner editor',
+  GuestAppInstallBannerViewed: '· Beat 2 — Install banner',
+  GuestAppInstallSheetViewed: '· Beat 3 — iOS install sheet',
+  GuestAppHomeScreenViewed: '· Beat 4 — Home screen',
+  GuestAppRebookViewed: '· Beat 5 — Rebooking',
+  GuestAppBroadcastViewed: '· Beat 6 — Broadcast',
   AssistantRevealViewed: 'Assistant Reveal',
+  AssistantTextProofViewed: '· Beat 1 — Text proof',
+  AssistantAppProofViewed: '· Beat 2 — App proof',
+  AssistantFallbackViewed: '· Beat 3 — Fallback rule',
   ActivationOfferViewed: '$199 Offer Viewed',
   ActivationCtaClicked: 'Activation CTA Clicked',
   PreviewReadyEmailSent: 'Preview Email Sent',
@@ -1350,6 +1463,7 @@ function renderEvents() {
   document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
   document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
   document.getElementById('stat-paid').textContent = paid;
+  renderBeatFunnel(allCounts);
 
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty-state"><p>No events found for this filter.</p></div>';
@@ -1412,6 +1526,131 @@ async function deleteEvent(eventId, timestamp) {
   }
 }
 
+// The reveal in the order an owner actually walks it, stage by stage and beat
+// by beat. Reading the counts down the column shows exactly which frame loses
+// them, which a four-bucket stage funnel cannot.
+const REVEAL_WALK = [
+  { key: 'BookingEngineRevealViewed', label: 'Booking page', stage: true },
+  { key: 'BookingEngineFullPreviewOpened', label: 'Opened full preview' },
+  { key: 'BookingEngineEditPreviewViewed', label: 'Opened Front Desk editor' },
+  { key: 'GuestAppRevealViewed', label: 'Guest app', stage: true },
+  { key: 'GuestAppOwnerEditorViewed', label: 'Owner editor' },
+  { key: 'GuestAppInstallBannerViewed', label: 'Install banner' },
+  { key: 'GuestAppInstallSheetViewed', label: 'iOS install sheet' },
+  { key: 'GuestAppHomeScreenViewed', label: 'Home screen' },
+  { key: 'GuestAppRebookViewed', label: 'Rebooking' },
+  { key: 'GuestAppBroadcastViewed', label: 'Broadcast' },
+  { key: 'AssistantRevealViewed', label: 'Assistant', stage: true },
+  { key: 'AssistantTextProofViewed', label: 'Text proof' },
+  { key: 'AssistantAppProofViewed', label: 'App proof' },
+  { key: 'AssistantFallbackViewed', label: 'Fallback rule' },
+  { key: 'ActivationOfferViewed', label: 'Activation offer', stage: true },
+  { key: 'ActivationCtaClicked', label: 'Clicked activate' },
+];
+
+function renderBeatFunnel(counts) {
+  const host = document.getElementById('beatFunnel');
+  if (!host) return;
+  const top = counts.BookingEngineRevealViewed || 0;
+  if (!top) {
+    host.innerHTML = '<div class="portfolio-empty">No reveal activity in this range yet.</div>';
+    return;
+  }
+  let previous = top;
+  host.innerHTML = REVEAL_WALK.map((step) => {
+    const value = counts[step.key] || 0;
+    const width = top ? Math.round((value / top) * 100) : 0;
+    const dropped = previous - value;
+    const dropNote = dropped > 0 ? ` <span class="beat-drop">−${dropped}</span>` : '';
+    previous = value;
+    return `<div class="beat-row${step.stage ? ' is-stage' : ''}">
+      <span class="beat-name">${escapeHtml(step.label)}</span>
+      <span class="beat-bar"><i style="width:${width}%"></i></span>
+      <span class="beat-count">${value}${dropNote}</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadPortfolio() {
+  const stats = document.getElementById('portfolioStats');
+  const table = document.getElementById('portfolioTable');
+  if (!stats || !table) return;
+  try {
+    const response = await adminFetch('/api/admin/portfolio?days=30');
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Request failed');
+    const t = data.totals || {};
+    const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    stats.innerHTML = [
+      ['💵', money(t.gmv), 'Booking volume'],
+      ['🏨', t.properties || 0, 'Properties'],
+      ['✅', t.payingProperties || 0, 'Paying'],
+      ['🗓', t.bookings || 0, 'Bookings'],
+      ['🌙', t.nights || 0, 'Nights'],
+      ['📊', money(t.averageBookingValue), 'Avg booking'],
+      ['⚡', money(t.processingAt40Bps), 'Spread at 0.4%'],
+    ].map(([icon, value, label]) => `<div class="stat-card">
+        <div class="stat-icon">${icon}</div>
+        <div class="stat-value">${escapeHtml(String(value))}</div>
+        <div class="stat-label">${escapeHtml(label)}</div>
+      </div>`).join('');
+
+    const rows = (data.properties || []).filter((p) => p.bookings > 0 || p.gmv > 0);
+    table.innerHTML = rows.length
+      ? `<table class="portfolio-table"><thead><tr>
+          <th>Property</th><th>Status</th>
+          <th style="text-align:right">Bookings</th>
+          <th style="text-align:right">Nights</th>
+          <th style="text-align:right">Volume</th>
+        </tr></thead><tbody>${rows.map((p) => `<tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.subscriptionStatus || '—')}</td>
+            <td class="num">${p.bookings}</td>
+            <td class="num">${p.nights}</td>
+            <td class="num">${money(p.gmv)}</td>
+          </tr>`).join('')}</tbody></table>`
+      : '<div class="portfolio-empty">No guest bookings in the last 30 days.</div>';
+  } catch (e) {
+    table.innerHTML = '<div class="portfolio-empty">Could not load portfolio: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function copyJourneyExport() {
+  const hint = document.getElementById('dataHint');
+  try {
+    const response = await adminFetch('/api/funnel/journey-export?days=90');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Request failed');
+    const text = JSON.stringify(data, null, 2);
+    await navigator.clipboard.writeText(text);
+    if (hint) hint.textContent = `Copied ${text.length.toLocaleString()} characters covering ${data.totals?.sessions || 0} sessions across ${data.totals?.visitors || 0} visitors. Paste it straight into Claude.`;
+  } catch (e) {
+    if (hint) hint.textContent = 'Could not copy: ' + e.message;
+  }
+}
+
+async function purgeActivity() {
+  const hint = document.getElementById('dataHint');
+  const typed = window.prompt('This permanently deletes every funnel event. Bookings, properties and support threads are not touched.\n\nType DELETE ALL ACTIVITY to confirm.');
+  if (typed !== 'DELETE ALL ACTIVITY') {
+    if (hint && typed !== null) hint.textContent = 'Purge cancelled — the phrase did not match.';
+    return;
+  }
+  try {
+    const response = await adminFetch('/api/admin/funnel/purge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: 'DELETE ALL ACTIVITY' }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Request failed');
+    if (hint) hint.textContent = `Deleted ${data.deleted} events. Reloading…`;
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) {
+    if (hint) hint.textContent = 'Could not purge: ' + e.message;
+  }
+}
+
 async function loadEvents() {
   if (!calStart || !calEnd) return;
   const from = fmtDate(calStart);
@@ -1462,6 +1701,10 @@ if (new URLSearchParams(window.location.search).get('view') === 'support') {
 } else {
   loadEvents();
 }
+// Portfolio reads bookings rather than funnel events, so it loads on its own
+// and is left out of the 30s refresh — guest booking volume does not move at
+// that cadence and the query walks every property.
+loadPortfolio();
 
 // Auto-refresh every 30 seconds
 setInterval(() => {
