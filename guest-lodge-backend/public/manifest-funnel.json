@@ -1,1 +1,15 @@
-{"name":"Marketel Funnel","short_name":"Funnel","start_url":"/funnel","display":"standalone","background_color":"#EEF2EF","theme_color":"#2E7D5B","icons":[{"src":"/marketellogo.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}
+{
+  "name": "Marketel Activity",
+  "short_name": "Activity",
+  "start_url": "/funnel",
+  "scope": "/funnel",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8f9fa",
+  "theme_color": "#2E7D5B",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "maskable" },
+    { "src": "/marketellogo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

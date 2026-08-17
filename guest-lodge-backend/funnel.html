@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Marketel · Activity</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest-funnel.json">
+<meta name="theme-color" content="#2E7D5B">
+<!-- iOS reads these rather than the manifest for home-screen behaviour, and it
+     ignores SVG icons entirely, so the touch icon has to be a PNG. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Activity">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -560,6 +568,20 @@
   .portfolio-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
   .portfolio-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .portfolio-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+  .push-triggers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .push-triggers label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .push-triggers input { accent-color: var(--green); cursor: pointer; }
+  .push-triggers label:has(input:checked) { border-color: var(--green); color: var(--green); background: var(--green-lt); }
   .overview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -790,6 +812,20 @@
     </div>
     <div class="overview-grid" id="portfolioStats"></div>
     <div id="portfolioTable"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Notifications</h2>
+      <span class="panel-note" id="pushState">Checking…</span>
+    </div>
+    <div id="pushTriggers" class="push-triggers"></div>
+    <div class="panel-actions">
+      <button class="ghost-btn" id="pushEnableBtn" onclick="enablePush()">Enable notifications</button>
+      <button class="ghost-btn" id="pushTestBtn" onclick="testPush()" style="display:none">Send test</button>
+      <button class="ghost-btn" id="pushOffBtn" onclick="disablePush()" style="display:none">Turn off</button>
+    </div>
+    <div class="panel-hint" id="pushHint"></div>
   </div>
 
   <div class="panel">
@@ -1526,6 +1562,177 @@ async function deleteEvent(eventId, timestamp) {
   }
 }
 
+/* ---------- Push notifications ---------- */
+
+const PUSH_TRIGGER_LABELS = {
+  Lead: 'Qualified lead',
+  SetupCompleted: 'Setup completed',
+  GoLiveClicked: 'Activation clicked',
+  PaymentSucceeded: 'Paid',
+  SupportMessage: 'Support message',
+};
+
+// iOS only delivers Web Push to an installed PWA, and only from a window
+// launched by its Home Screen icon — the same page in Safari can subscribe and
+// then never receive anything, so the state is worth naming rather than
+// letting the button silently do nothing.
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+let pushRegistration = null;
+let pushSubscription = null;
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+function selectedTriggers() {
+  return [...document.querySelectorAll('#pushTriggers input:checked')].map((i) => i.value);
+}
+
+function renderPushTriggers(enabled) {
+  const host = document.getElementById('pushTriggers');
+  if (!host) return;
+  const active = new Set(enabled || Object.keys(PUSH_TRIGGER_LABELS));
+  host.innerHTML = Object.entries(PUSH_TRIGGER_LABELS).map(([key, label]) =>
+    `<label><input type="checkbox" value="${key}"${active.has(key) ? ' checked' : ''} onchange="saveTriggers()">${escapeHtml(label)}</label>`
+  ).join('');
+}
+
+function setPushUi({ state, hint, subscribed }) {
+  const stateEl = document.getElementById('pushState');
+  const hintEl = document.getElementById('pushHint');
+  if (stateEl) stateEl.textContent = state;
+  if (hintEl) hintEl.textContent = hint || '';
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('pushEnableBtn', !subscribed);
+  show('pushTestBtn', !!subscribed);
+  show('pushOffBtn', !!subscribed);
+}
+
+async function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setPushUi({ state: 'Not supported', hint: 'This browser cannot receive web push.', subscribed: false });
+    return;
+  }
+  try {
+    pushRegistration = await navigator.serviceWorker.register('/funnel-sw.js', { scope: '/funnel' });
+    pushSubscription = await pushRegistration.pushManager.getSubscription();
+    const response = await adminFetch('/api/admin/push/status');
+    const data = await response.json();
+    if (!data.configured) {
+      setPushUi({ state: 'Unavailable', hint: 'Push is not configured on the server — VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are not set.', subscribed: false });
+      return;
+    }
+    // The status list is every subscribed device, so the checkboxes have to
+    // reflect this one rather than whichever row happens to come back first.
+    const myEndpoint = pushSubscription ? pushSubscription.endpoint : '';
+    const mine = (data.subscriptions || []).find((s) => s.endpoint === myEndpoint);
+    renderPushTriggers(mine && Array.isArray(mine.events) ? mine.events : null);
+    if (pushSubscription) {
+      setPushUi({ state: 'On for this device', hint: `${(data.subscriptions || []).length} device(s) subscribed.`, subscribed: true });
+    } else if (isIOS && !isStandalone) {
+      setPushUi({
+        state: 'Add to Home Screen first',
+        hint: 'iOS only delivers notifications to an installed app. Tap Share → Add to Home Screen, open Activity from the icon, then enable here.',
+        subscribed: false,
+      });
+    } else {
+      setPushUi({ state: 'Off', hint: 'Enable to get notified on the moments that matter.', subscribed: false });
+    }
+  } catch (e) {
+    setPushUi({ state: 'Error', hint: e.message, subscribed: false });
+  }
+}
+
+async function enablePush() {
+  try {
+    if (isIOS && !isStandalone) {
+      setPushUi({ state: 'Add to Home Screen first', hint: 'Open Activity from its Home Screen icon, then enable notifications from there.', subscribed: false });
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      setPushUi({ state: 'Blocked', hint: 'Notification permission was denied. Re-allow it in browser settings.', subscribed: false });
+      return;
+    }
+    const statusRes = await adminFetch('/api/admin/push/status');
+    const status = await statusRes.json();
+    if (!status.publicKey) throw new Error('Server has no VAPID public key');
+
+    pushSubscription = await pushRegistration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(status.publicKey),
+    });
+    const raw = pushSubscription.toJSON();
+    const response = await adminFetch('/api/admin/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: raw.endpoint,
+        p256dh: raw.keys.p256dh,
+        auth: raw.keys.auth,
+        label: navigator.platform || 'device',
+        events: selectedTriggers(),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Subscribe failed');
+    setPushUi({ state: 'On for this device', hint: 'Subscribed. Send a test to confirm it lands.', subscribed: true });
+  } catch (e) {
+    setPushUi({ state: 'Error', hint: e.message, subscribed: false });
+  }
+}
+
+async function saveTriggers() {
+  if (!pushSubscription) return;
+  const raw = pushSubscription.toJSON();
+  try {
+    await adminFetch('/api/admin/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: raw.endpoint,
+        p256dh: raw.keys.p256dh,
+        auth: raw.keys.auth,
+        events: selectedTriggers(),
+      }),
+    });
+    const hint = document.getElementById('pushHint');
+    if (hint) hint.textContent = 'Saved.';
+  } catch (_) { /* the checkbox state is the source of truth on next save */ }
+}
+
+async function testPush() {
+  try {
+    await adminFetch('/api/admin/push/test', { method: 'POST' });
+    const hint = document.getElementById('pushHint');
+    if (hint) hint.textContent = 'Test sent. It should arrive within a few seconds.';
+  } catch (e) {
+    const hint = document.getElementById('pushHint');
+    if (hint) hint.textContent = 'Could not send test: ' + e.message;
+  }
+}
+
+async function disablePush() {
+  if (!pushSubscription) return;
+  const endpoint = pushSubscription.endpoint;
+  try {
+    await pushSubscription.unsubscribe();
+    await adminFetch('/api/admin/push/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    });
+    pushSubscription = null;
+    setPushUi({ state: 'Off', hint: 'Notifications turned off for this device.', subscribed: false });
+  } catch (e) {
+    setPushUi({ state: 'Error', hint: e.message, subscribed: true });
+  }
+}
+
 // The reveal in the order an owner actually walks it, stage by stage and beat
 // by beat. Reading the counts down the column shows exactly which frame loses
 // them, which a four-bucket stage funnel cannot.
@@ -1705,6 +1912,7 @@ if (new URLSearchParams(window.location.search).get('view') === 'support') {
 // and is left out of the 30s refresh — guest booking volume does not move at
 // that cadence and the query walks every property.
 loadPortfolio();
+initPush();
 
 // Auto-refresh every 30 seconds
 setInterval(() => {

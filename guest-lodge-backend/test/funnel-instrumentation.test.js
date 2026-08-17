@@ -65,6 +65,51 @@ test('the dashboard names every beat it charts', () => {
     }
 });
 
+test('every push trigger is actually fired by the code path it names', () => {
+    // A trigger defined but never called is a notification that silently never
+    // arrives, which is indistinguishable from "nothing happened yet".
+    const block = server.slice(
+        server.indexOf('const ADMIN_PUSH_TRIGGERS = {'),
+        server.indexOf('const ADMIN_PUSH_DEFAULT_EVENTS')
+    );
+    const triggers = [...block.matchAll(/^\s{4}([A-Za-z]+):/gm)].map((m) => m[1]);
+    assert.ok(triggers.length >= 5, `expected the trigger table, saw ${triggers.length}`);
+    for (const name of triggers) {
+        assert.match(
+            server,
+            new RegExp(`sendAdminPush\\('${name}'`),
+            `${name} is a push trigger that nothing ever sends`
+        );
+    }
+    // Business paths must never block on or fail from a notification: a payment
+    // succeeded whether or not the phone buzzed. The only permitted await is
+    // /api/admin/push/test, where the caller is asking whether the send worked.
+    const calls = server.match(/(?:void|await) sendAdminPush\(/g) || [];
+    const guarded = server.match(/void sendAdminPush\(/g) || [];
+    assert.equal(
+        calls.length - guarded.length,
+        1,
+        'exactly one awaited sendAdminPush is allowed, and only in the test route'
+    );
+    assert.match(
+        server.slice(server.indexOf("app.post('/api/admin/push/test'")),
+        /^[\s\S]{0,200}await sendAdminPush\(/,
+        'the awaited call is not the one in the test route'
+    );
+});
+
+test('the dashboard offers exactly the triggers the server supports', () => {
+    const labels = dashboard.match(/const PUSH_TRIGGER_LABELS = \{([\s\S]*?)\};/);
+    assert.ok(labels, 'PUSH_TRIGGER_LABELS is missing');
+    const shown = [...labels[1].matchAll(/^\s{2}([A-Za-z]+):/gm)].map((m) => m[1]);
+    const block = server.slice(
+        server.indexOf('const ADMIN_PUSH_TRIGGERS = {'),
+        server.indexOf('const ADMIN_PUSH_DEFAULT_EVENTS')
+    );
+    const supported = [...block.matchAll(/^\s{4}([A-Za-z]+):/gm)].map((m) => m[1]);
+    assert.deepEqual(shown.sort(), supported.sort());
+});
+
 test('purging activity is confirmed, scoped, and never touches business records', () => {
     const purge = server.slice(
         server.indexOf("app.post('/api/admin/funnel/purge'"),

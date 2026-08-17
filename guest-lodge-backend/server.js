@@ -9497,6 +9497,9 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
                 externalId: linkedExternalId,
             },
         });
+        if (eventName === 'Lead') {
+            void sendAdminPush('Lead', { property: trackedEmail || trackedHotelId });
+        }
 
         // Match the browser's standard Lead event and event_id. Meta uses the
         // pair to deduplicate Pixel and Conversions API copies of the same lead.
@@ -10761,6 +10764,134 @@ app.post('/api/admin/funnel/purge', adminAuth, async (req, res) => {
     }
 });
 
+// The moments worth interrupting an operator for. Landing views are omitted on
+// purpose: during an ad run they arrive constantly, and a dashboard that buzzes
+// all day gets its notifications switched off within a day, taking the useful
+// ones with it.
+const ADMIN_PUSH_TRIGGERS = {
+    Lead: { title: 'Qualified lead', body: (c) => `${c.property || 'A property'} answered as qualified.` },
+    SetupCompleted: { title: 'Setup completed', body: (c) => `${c.property || 'A property'} finished setup.` },
+    GoLiveClicked: { title: 'Activation clicked', body: (c) => `${c.property || 'A property'} clicked activate.` },
+    PaymentSucceeded: { title: 'Paid', body: (c) => `${c.property || 'A property'} activated Marketel.` },
+    SupportMessage: { title: 'New support message', body: (c) => `${c.property || 'A property'} sent a message.` },
+};
+const ADMIN_PUSH_DEFAULT_EVENTS = Object.keys(ADMIN_PUSH_TRIGGERS);
+
+function adminPushWants(subscription, eventName) {
+    const chosen = Array.isArray(subscription?.events) ? subscription.events : null;
+    return chosen ? chosen.includes(eventName) : true;
+}
+
+// Fire-and-forget. A notification failing must never affect the request that
+// triggered it — a payment still succeeded whether or not the phone buzzed.
+async function sendAdminPush(eventName, context = {}) {
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+    const trigger = ADMIN_PUSH_TRIGGERS[eventName];
+    if (!trigger) return;
+    let subscriptions = [];
+    try {
+        subscriptions = await prisma.adminPushSubscription.findMany();
+    } catch (_) {
+        return;
+    }
+    const payload = JSON.stringify({
+        title: trigger.title,
+        body: trigger.body(context),
+        tag: `marketel-${eventName}`,
+        url: eventName === 'SupportMessage' ? '/funnel?view=support' : '/funnel',
+    });
+    await Promise.all(subscriptions.filter((s) => adminPushWants(s, eventName)).map(async (s) => {
+        try {
+            await webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload
+            );
+            await prisma.adminPushSubscription.update({
+                where: { id: s.id },
+                data: { lastSentAt: new Date(), failures: 0 },
+            }).catch(() => {});
+        } catch (e) {
+            // 404/410 mean the browser threw the subscription away. Anything
+            // else may be transient, so only a gone endpoint is deleted.
+            if (e?.statusCode === 404 || e?.statusCode === 410) {
+                await prisma.adminPushSubscription.delete({ where: { id: s.id } }).catch(() => {});
+            } else {
+                await prisma.adminPushSubscription.update({
+                    where: { id: s.id },
+                    data: { failures: { increment: 1 } },
+                }).catch(() => {});
+            }
+        }
+    }));
+}
+
+app.get('/api/admin/push/status', adminAuth, async (_req, res) => {
+    try {
+        const subscriptions = await prisma.adminPushSubscription.findMany({
+            // endpoint is returned so the page can tell which row is this
+            // device and show its own trigger choices, not another device's.
+            select: { id: true, endpoint: true, label: true, createdAt: true, events: true, lastSentAt: true },
+            orderBy: { createdAt: 'asc' },
+        });
+        res.json({
+            success: true,
+            configured: !!(VAPID_PUBLIC && VAPID_PRIVATE),
+            publicKey: VAPID_PUBLIC || null,
+            triggers: ADMIN_PUSH_DEFAULT_EVENTS,
+            subscriptions,
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Could not read push status.' });
+    }
+});
+
+app.post('/api/admin/push/subscribe', adminAuth, async (req, res) => {
+    try {
+        if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+            return res.status(503).json({ success: false, message: 'Push is not configured. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.' });
+        }
+        const { endpoint, p256dh, auth, label, events } = req.body || {};
+        if (!endpoint || !p256dh || !auth) {
+            return res.status(400).json({ success: false, message: 'endpoint, p256dh and auth are required.' });
+        }
+        const chosen = Array.isArray(events)
+            ? events.filter((name) => ADMIN_PUSH_DEFAULT_EVENTS.includes(name))
+            : ADMIN_PUSH_DEFAULT_EVENTS;
+        const saved = await prisma.adminPushSubscription.upsert({
+            where: { endpoint: String(endpoint) },
+            create: {
+                endpoint: String(endpoint),
+                p256dh: String(p256dh),
+                auth: String(auth),
+                label: label ? String(label).slice(0, 80) : null,
+                events: chosen,
+            },
+            update: { p256dh: String(p256dh), auth: String(auth), events: chosen, failures: 0 },
+            select: { id: true, events: true },
+        });
+        res.json({ success: true, id: saved.id, events: saved.events });
+    } catch (e) {
+        console.error('admin push subscribe:', e.message);
+        res.status(500).json({ success: false, message: 'Could not save the subscription.' });
+    }
+});
+
+app.post('/api/admin/push/unsubscribe', adminAuth, async (req, res) => {
+    try {
+        const endpoint = String(req.body?.endpoint || '');
+        if (!endpoint) return res.status(400).json({ success: false, message: 'endpoint is required.' });
+        await prisma.adminPushSubscription.deleteMany({ where: { endpoint } });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Could not remove the subscription.' });
+    }
+});
+
+app.post('/api/admin/push/test', adminAuth, async (_req, res) => {
+    await sendAdminPush('PaymentSucceeded', { property: 'Test notification' });
+    res.json({ success: true });
+});
+
 app.get('/api/admin/launch-readiness', adminAuth, (_req, res) => {
     const readiness = productionLaunchReadiness();
     res.status(readiness.ready ? 200 : 503).json({ success: readiness.ready, ...readiness });
@@ -11131,6 +11262,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             })).catch(() => {});
         }
 
+        void sendAdminPush('SetupCompleted', { property: hotel.name || hotel.ownerEmail || hotel.id });
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
         res.json({ success: true, bookingUrl: 'https://' + assignedDomain, frontdeskUrl: 'https://' + assignedDomain + '/frontdesk', crmPin: defaultPin });
     } catch (e) {
@@ -12061,6 +12193,7 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
                 },
             },
         }).catch((e) => console.error('Payment funnel tracking failed:', e.message));
+        void sendAdminPush('PaymentSucceeded', { property: hotel?.ownerEmail || hotelId });
     }
 
     // The webhook guarantees delivery if the owner closes Stripe. The browser
@@ -12212,6 +12345,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 metadata: { source: 'activation-cta', provider: 'stripe', billingInterval },
             },
         }).catch(() => {});
+        void sendAdminPush('GoLiveClicked', { property: hotel.name || hotel.ownerEmail || hotelId });
         console.log('crm:go-live checkout session creating:', {
             hotelId,
             host: req.get('host'),
@@ -12664,6 +12798,7 @@ app.post('/api/crm/support', crmAuth, supportMessageRateLimit, async (req, res) 
                 ].join('\n'),
             }).catch((error) => console.error('crm:support notification email:', error.message));
         }
+        void sendAdminPush('SupportMessage', { property: hotel.name || hotel.ownerEmail || hotelId });
         console.log(`📩 Support message from ${hotel.name || hotelId}`);
         res.json({ success: true, thread: serializeSupportThread(thread, 'owner') });
     } catch (e) {
