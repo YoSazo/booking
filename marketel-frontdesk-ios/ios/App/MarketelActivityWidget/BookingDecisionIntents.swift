@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import ActivityKit
 
 // One-tap Keep / Release straight from the Lock Screen (iOS 17+).
 //
@@ -87,6 +88,18 @@ struct BookingDecisionService {
     }
 }
 
+// A push-to-start card is launched while the app is closed, so its update token
+// is never registered and the server has no way to end it. The decision runs
+// here in the widget process, which can reach the activity directly, so end it
+// locally the moment the owner taps.
+@available(iOS 17.0, *)
+private func endLiveActivity(bookingId: String) async {
+    for activity in Activity<BookingDecisionAttributes>.activities
+    where activity.attributes.bookingId == bookingId {
+        await activity.end(nil, dismissalPolicy: .immediate)
+    }
+}
+
 @available(iOS 17.0, *)
 struct KeepBookingIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Keep booking"
@@ -100,6 +113,7 @@ struct KeepBookingIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let message = try await BookingDecisionService.submit(bookingId: bookingId, action: "confirm")
+        await endLiveActivity(bookingId: bookingId)
         return .result(dialog: IntentDialog(stringLiteral: message))
     }
 }
@@ -117,6 +131,7 @@ struct ReleaseBookingIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let message = try await BookingDecisionService.submit(bookingId: bookingId, action: "release")
+        await endLiveActivity(bookingId: bookingId)
         return .result(dialog: IntentDialog(stringLiteral: message))
     }
 }

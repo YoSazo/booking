@@ -110,6 +110,10 @@ private struct LockScreenView: View {
             }
         }
         .padding(16)
+        // The card always draws on its own near-white background, so pin it to
+        // light mode: otherwise `.secondary` text resolves against the device's
+        // dark appearance and renders almost invisible on the Lock Screen.
+        .environment(\.colorScheme, .light)
     }
 }
 
