@@ -27,6 +27,28 @@ The Swift files exist but **belong to no target yet**. That is the whole job bel
 
 ---
 
+## Steps 1–3 are now a script
+
+```bash
+node marketel-frontdesk-ios/scripts/add-widget-target.js
+```
+
+Already run and committed. It creates the target, gives
+`BookingDecisionAttributes.swift` membership of **both** targets, adds the
+plugin's `.swift` and `.m` to App, embeds the appex, and sets the widget floor
+to 17.2 while the app stays on 15.0. Fixed object IDs make it idempotent;
+`--check` exits non-zero if the target has gone missing.
+
+The original reasoning for doing this by hand — that a hand-edited project file
+cannot be compile-checked — was wrong. `build-marketel-ios.yml` builds on a
+macOS runner via `workflow_dispatch` and only publishes on an `ios-v*` tag, so
+it is exactly the compile check that was said not to exist.
+
+**Only section 4 below still needs a human**, because it is developer-portal
+work. Sections 1–3 are kept for reference.
+
+---
+
 ## 1. Create the widget extension
 
 1. `ios/App/App.xcodeproj` → **File ▸ New ▸ Target… ▸ Widget Extension**
