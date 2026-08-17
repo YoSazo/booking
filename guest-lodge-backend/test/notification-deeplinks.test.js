@@ -47,6 +47,36 @@ test('booking decisions show they were received before the reload lands', () => 
     assert.match(decide, /catch \(error\) \{\s*\n\s*restoreButtons\(\);/);
 });
 
+test('the Assistant modal retires its own tutorial', () => {
+    const assistant = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'assistant.js'), 'utf8');
+    // The story teaches what texting your Front Desk means. Rendering it
+    // unconditionally meant every configured owner scrolled a fixed demo
+    // conversation to reach their settings, forever.
+    assert.match(assistant, /const hasConfigured = !!config\.enabled && recipients\.length > 0;/);
+    assert.match(assistant, /const storySection = hasConfigured\s*\n?\s*\?\s*''/);
+    // And the demo names their own room rather than an invented one.
+    assert.match(assistant, /function firstRoomName\(\)/);
+    assert.match(assistant, /New booking: \$\{esc\(firstRoomName\(\)\)\}/);
+
+    // "Cannot work yet" is one message, not a stack of independent apologies.
+    assert.match(assistant, /const blockers = \[\];/);
+    assert.doesNotMatch(assistant, /const systemNote = capabilities\.smsConfigured/);
+    assert.doesNotMatch(assistant, /const inventoryNote = capabilities\.manualAvailability/);
+});
+
+test('Settings offers a route to the Assistant that survives lazy loading', () => {
+    const settings = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'settings.js'), 'utf8');
+    assert.match(settings, /function assistantSettingsRowHtml\(\)/);
+    assert.match(settings, /\$\{assistantSettingsRowHtml\(\)\}/);
+    // assistant.js is lazy. Calling its export directly would be undefined
+    // until something else had already opened the modal, so this goes through
+    // the action that loads the module first.
+    assert.match(settings, /window\.marketelNativeAction\?\.\('assistant'\)/);
+    assert.doesNotMatch(settings, /onclick="openFrontDeskAssistant\(\)"/);
+    // And must not assert a state it cannot know before that data loads.
+    assert.match(settings, /const status = !data/);
+});
+
 test('the Assistant is reachable before it has ever done anything', () => {
     const assistant = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'assistant.js'), 'utf8');
     const emptyState = assistant.slice(

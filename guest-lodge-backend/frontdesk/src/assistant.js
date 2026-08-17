@@ -65,6 +65,18 @@ function isNativeFrontDesk() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
 
+// The demo conversation reads as a mock-up when it names a room the property
+// does not have. Their own first room costs nothing and makes it theirs.
+function firstRoomName() {
+  const sources = [crm.editRooms, crm.manualAvailability?.rooms];
+  for (const rooms of sources) {
+    if (!Array.isArray(rooms)) continue;
+    const name = String(rooms[0]?.name || '').trim();
+    if (name) return name;
+  }
+  return 'Queen Room';
+}
+
 function latestMeaningfulActivity() {
   if (crm.assistantData?.latestResult) return crm.assistantData.latestResult;
   const meaningfulTypes = new Set([
@@ -492,30 +504,47 @@ function sheetBodyHtml() {
   const policyDisabled = subscribed && capabilities.manualAvailability ? '' : 'disabled';
   const zone = config.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
   const isNativeApp = typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
-  const systemNote = capabilities.smsConfigured
-    ? ''
-    : `<div class="fda-section fda-lock"><div class="fda-section-title">Messaging is being connected</div><div class="fda-section-sub" style="margin:0;">The interface is ready, but Marketel's texting number still needs its server credentials before it can send.</div></div>`;
-  const inventoryNote = capabilities.manualAvailability
-    ? ''
-    : `<div class="fda-section fda-lock"><div class="fda-section-title">Availability updates are not available here yet</div><div class="fda-section-sub" style="margin:0;">The Assistant currently works with properties whose Availability is managed directly in Marketel.</div></div>`;
+  // "Cannot work yet" was three independent grey boxes, so a property blocked
+  // on two reasons read two apologies before reaching anything actionable. One
+  // blocker, stated once, with the reason that applies.
+  const blockers = [];
+  if (!capabilities.smsConfigured) {
+    blockers.push("Marketel's texting number still needs its server credentials.");
+  }
+  if (!capabilities.manualAvailability) {
+    blockers.push('The Assistant works with properties whose Availability is managed in Marketel.');
+  }
+  const blockerNote = blockers.length
+    ? `<div class="fda-section fda-lock">
+        <div class="fda-section-title">Not ready on this property yet</div>
+        <div class="fda-section-sub" style="margin:0;">${blockers.map((reason) => esc(reason)).join(' ')}</div>
+      </div>`
+    : '';
 
-  return `
-    <div class="fda-section fda-story">
+  // The story teaches what texting your Front Desk means. Once recipients are
+  // saved and it is switched on, it has taught that — and every later visit is
+  // someone scrolling past a fixed demo conversation to reach their settings.
+  const hasConfigured = !!config.enabled && recipients.length > 0;
+  const storySection = hasConfigured
+    ? ''
+    : `<div class="fda-section fda-story">
       <div class="fda-section-title">Your Front Desk becomes someone you can text</div>
       <div class="fda-section-sub">If a walk-in or another channel takes a room, text what happened. Front Desk updates Availability and reduces what remains available on your direct booking page.</div>
-      <div class="fda-bubble assistant"><strong>Front Desk</strong><br>New booking: Queen Room, tonight. Is it still free?</div>
+      <div class="fda-bubble assistant"><strong>Front Desk</strong><br>New booking: ${esc(firstRoomName())}, tonight. Is it still free?</div>
       <div class="fda-bubble owner">A walk-in took it.</div>
       <div class="fda-bubble assistant"><strong>Done.</strong> I updated availability. If an online guest is affected, I’ll ask before cancelling anything.</div>
       <div class="fda-policy-result"><strong>You set the fallback.</strong> If nobody answers a new-booking alert, Front Desk either keeps the sale or releases the request—your choice.</div>
-    </div>
+    </div>`;
+
+  return `
+    ${storySection}
 
     ${!subscribed && !isNativeApp ? `<div class="fda-section fda-lock">
       <div class="fda-section-title">Included with your $199/month activation</div>
       <div class="fda-lock-price">Activate your direct booking page to connect phones, receive booking texts, and update availability by reply.</div>
       <button type="button" class="fda-btn primary full" onclick="activateFromAssistant()">Activate Marketel</button>
     </div>` : ''}
-    ${systemNote}
-    ${inventoryNote}
+    ${blockerNote}
     ${nativeBookingAlertsHtml()}
 
     <div class="fda-section">

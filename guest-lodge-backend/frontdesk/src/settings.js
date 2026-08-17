@@ -19,6 +19,34 @@ import {
 
 // ── SETTINGS TAB ───────────────────────────────────────────────
 
+// The Assistant had two ways in: an unlabelled ⋯ menu, and a card on Bookings.
+// Neither is where an owner looks to configure something, so Your Page — the
+// tab that holds every other setting — carries a row for it too.
+function assistantSettingsRowHtml() {
+  if (isEmbeddedEditorPreview()) return '';
+  // assistant.js is lazy, so its data may not be loaded when this renders.
+  // Claiming "not set up yet" on missing data would tell a configured owner
+  // their Assistant is off, so say nothing about state until state is known.
+  const data = crm.assistantData;
+  const recipients = (data?.recipients || []).filter((r) => r && r.active !== false);
+  const status = !data
+    ? 'Texts you when a room is requested'
+    : (data.config?.enabled && recipients.length)
+      ? `On · texting ${recipients.length} ${recipients.length === 1 ? 'number' : 'numbers'}`
+      : 'Not set up yet · texts you when a room is requested';
+  // Routed through the same action the ⋯ menu uses, which loads the lazy module
+  // and hides native chrome first. Calling openFrontDeskAssistant() directly
+  // would be undefined until something else had already opened it.
+  return `<button type="button" class="booking-card" onclick="window.marketelNativeAction?.('assistant')" style="width:100%;display:flex;align-items:center;gap:13px;padding:16px 18px;margin-bottom:14px;border:1.5px solid var(--border);background:var(--white);font-family:inherit;text-align:left;cursor:pointer;">
+    <span aria-hidden="true" style="width:36px;height:36px;flex:0 0 auto;border-radius:11px;display:grid;place-items:center;background:var(--green-pale);color:var(--green);font-size:16px;font-weight:800;">☎</span>
+    <span style="flex:1;min-width:0;">
+      <span style="display:block;font-size:15px;font-weight:700;color:var(--text);">Front Desk Assistant</span>
+      <span style="display:block;margin-top:2px;font-size:12.5px;color:var(--text-muted);">${status}</span>
+    </span>
+    <span aria-hidden="true" style="color:var(--text-muted);font-size:19px;">›</span>
+  </button>`;
+}
+
 function isNativeApp() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
@@ -900,6 +928,7 @@ async function loadEditRooms() {
       </div>
       <div class="dash-b">
       ${goLiveInlineCardHtml()}
+      ${assistantSettingsRowHtml()}
       ${(typeof twoRoomExplainerHtml === 'function' ? twoRoomExplainerHtml : window.twoRoomExplainerHtml)('booking-page')}
       <div id="editRoomsCards"></div>
       <button id="edit-add-room-btn" style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
