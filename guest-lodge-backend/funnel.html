@@ -15,20 +15,32 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Front Desk's tokens verbatim. The dashboard kept its own near-miss palette
+     — cool greys against Front Desk's green-tinted ones — which is what made it
+     read as a different product. */
   :root {
-    --bg: #f8f9fa;
-    --card: #ffffff;
-    --border: #e9ecef;
-    --text: #1a1a2e;
-    --muted: #6c757d;
+    --bg: #EFF4F0;
+    --card: #FFFFFF;
+    --white: #FFFFFF;
+    --surface-subtle: #F4F8F5;
+    --border: #D8E4DC;
+    --border-soft: #E6EEE9;
+    --text: #1A2B22;
+    --muted: #6B7D72;
+    --text-soft: #4B5D52;
     --green: #2E7D5B;
-    --green-lt: #e8f5ee;
+    --green-light: #4CAF7D;
+    --green-lt: #E8F5EE;
+    --green-pale: #E8F5EE;
+    --green-mint: #C8EDD9;
+    --green-dark: #245F46;
     --blue: #3b82f6;
-    --amber: #f59e0b;
-    --red: #ef4444;
+    --amber: #F59E0B;
+    --red: #E05252;
     --purple: #8b5cf6;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-sm: 0 1px 2px rgba(26,43,34,0.04), 0 1px 3px rgba(46,125,91,0.06);
+    --shadow: 0 2px 6px rgba(46,125,91,0.06), 0 8px 20px rgba(46,125,91,0.08);
+    --shadow-md: 0 4px 14px rgba(46,125,91,0.08), 0 18px 44px rgba(46,125,91,0.13);
   }
   body {
     font-family: 'DM Sans', sans-serif;
@@ -36,6 +48,11 @@
     color: var(--text);
     min-height: 100vh;
     padding: 0;
+    /* The page itself must never scroll sideways. Anything genuinely too wide
+       — the portfolio table — scrolls inside its own container instead, which
+       is what stopped the sticky header sliding off with it. */
+    overflow-x: hidden;
+    max-width: 100%;
   }
 
   /* Header */
@@ -46,9 +63,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
     position: sticky;
     top: 0;
     z-index: 100;
+    max-width: 100%;
   }
   .header-left {
     display: flex;
@@ -293,6 +313,9 @@
   .event-card:hover {
     box-shadow: var(--shadow-md);
   }
+  /* Initials rather than an emoji. Front Desk has no emoji anywhere, and a
+     column of them was the single loudest thing making this read as a
+     different, less careful product. */
   .event-badge {
     flex-shrink: 0;
     width: 36px;
@@ -301,7 +324,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    background: var(--green-pale);
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
   .event-badge.search { background: #dbeafe; }
   .event-badge.addtocart { background: #fef3c7; }
@@ -359,9 +387,18 @@
     border-radius: 6px;
     transition: all 0.15s;
     opacity: 0;
-    font-size: 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
+  .delete-btn:hover { color: var(--red); }
   .event-card:hover .delete-btn { opacity: 1; }
+  /* Touch has no hover, so on a phone the control would never appear. */
+  @media (hover: none) {
+    .delete-btn { opacity: 1; }
+  }
   .delete-btn:hover { color: var(--red); background: #fee2e2; }
 
   /* Detail modal */
@@ -506,12 +543,13 @@
     padding: 24px;
   }
   .panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
     margin-bottom: 20px;
     box-shadow: var(--shadow);
+    max-width: 100%;
   }
   .panel-head {
     display: flex;
@@ -559,7 +597,13 @@
   .beat-row:not(.is-stage) .beat-bar i { background: var(--green-lt); border: 1px solid var(--green); box-sizing: border-box; }
   .beat-count { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
   .beat-drop { color: var(--red); font-weight: 600; }
-  .portfolio-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .portfolio-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -18px;
+    padding: 0 18px;
+  }
+  .portfolio-table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 13px; }
   .portfolio-table th, .portfolio-table td {
     text-align: left;
     padding: 9px 10px;
@@ -582,43 +626,63 @@
   }
   .push-triggers input { accent-color: var(--green); cursor: pointer; }
   .push-triggers label:has(input:checked) { border-color: var(--green); color: var(--green); background: var(--green-lt); }
+  /* Front Desk's metric card: micro-label above, figure below, no icon. Two
+     columns, the same as the revenue tab, so the two apps read as one. */
   .overview-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
     box-shadow: var(--shadow);
-  }
-  .stat-icon {
-    font-size: 20px;
-    margin-bottom: 6px;
-  }
-  .stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.2;
+    min-width: 0;
   }
   .stat-label {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--muted);
-    margin-top: 4px;
+    margin-bottom: 8px;
   }
-  .revenue-card {
-    background: linear-gradient(135deg, var(--green) 0%, #1a5c3f 100%);
-    border: none;
-    color: white;
+  .stat-value {
+    font-size: 26px;
+    line-height: 1;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
   }
-  .revenue-card .stat-value { color: white; }
-  .revenue-card .stat-label { color: rgba(255,255,255,0.8); }
+
+  /* MRR is the number the whole dashboard exists to move, so it gets the
+     full-width treatment Front Desk gives a property's own earnings. */
+  .mrr-hero {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #F3FFF8 0%, #E9FFF3 100%);
+    border: 2px solid var(--green-mint);
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .mrr-hero .stat-label { color: var(--green); }
+  .mrr-hero .stat-value { font-size: 40px; font-weight: 700; }
+  .mrr-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1.5px solid var(--green-mint);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-soft);
+  }
+  .mrr-hero-meta b { color: var(--text); font-weight: 700; }
 
   /* Founder support inbox */
   .support-tab-badge {
@@ -737,60 +801,58 @@
 <!-- OVERVIEW VIEW -->
 <div id="overviewView" class="overview-section">
   <div class="overview-grid" id="overviewGrid">
-    <div class="stat-card revenue-card">
-      <div class="stat-icon">💰</div>
+    <div class="mrr-hero">
+      <div class="stat-label">Monthly recurring revenue</div>
+      <div class="stat-value" id="stat-mrr">$0</div>
+      <div class="mrr-hero-meta">
+        <span><b id="stat-mrr-count">0</b> paying</span>
+        <span><b id="stat-mrr-arr">$0</b> annualized</span>
+        <span><b id="stat-mrr-avg">$0</b> per property</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Activation revenue</div>
       <div class="stat-value" id="stat-revenue">$0</div>
-      <div class="stat-label">Revenue</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">👁</div>
+      <div class="stat-label">Landing views</div>
       <div class="stat-value" id="stat-landing">0</div>
-      <div class="stat-label">Landing Views</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">📧</div>
+      <div class="stat-label">Setup started</div>
       <div class="stat-value" id="stat-started">0</div>
-      <div class="stat-label">Setup Started</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🎯</div>
+      <div class="stat-label">Qualified leads</div>
       <div class="stat-value" id="stat-leads">0</div>
-      <div class="stat-label">Qualified Leads</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🏨</div>
+      <div class="stat-label">Setup done</div>
       <div class="stat-value" id="stat-step4">0</div>
-      <div class="stat-label">Setup Done</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🌐</div>
+      <div class="stat-label">Saw booking page</div>
       <div class="stat-value" id="stat-booking-reveal">0</div>
-      <div class="stat-label">Saw Booking Page</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">📱</div>
+      <div class="stat-label">Saw home screen</div>
       <div class="stat-value" id="stat-app-reveal">0</div>
-      <div class="stat-label">Saw Home Screen</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🛎</div>
+      <div class="stat-label">Saw assistant</div>
       <div class="stat-value" id="stat-assistant-reveal">0</div>
-      <div class="stat-label">Saw Assistant</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">$</div>
+      <div class="stat-label">Saw $199 offer</div>
       <div class="stat-value" id="stat-offer-reveal">0</div>
-      <div class="stat-label">Saw $199 Offer</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🖱</div>
+      <div class="stat-label">Activation clicks</div>
       <div class="stat-value" id="stat-cta">0</div>
-      <div class="stat-label">Activation Clicks</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">✅</div>
-      <div class="stat-value" id="stat-paid">0</div>
       <div class="stat-label">Paid</div>
+      <div class="stat-value" id="stat-paid">0</div>
     </div>
   </div>
 
@@ -891,7 +953,14 @@ let allEvents = [];
 let allCounts = {};
 let currentFilter = 'all';
 let currentView = 'overview';
-let adminToken = sessionStorage.getItem('marketelAdminToken') || '';
+// localStorage, not sessionStorage: an installed PWA gets a fresh session every
+// time it is launched from the Home Screen, so the token was being demanded on
+// every single open. Only a 401 clears it now.
+// Guarded the way Front Desk guards its own: Safari private mode and some
+// installed-PWA contexts throw on storage access, and an unguarded read here
+// takes the whole dashboard script down with it.
+let adminToken = '';
+try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
 let supportThreads = [];
 let selectedSupportThreadId = new URLSearchParams(window.location.search).get('thread') || '';
 let supportLoading = false;
@@ -900,13 +969,13 @@ async function adminFetch(url, options = {}, allowRetry = true) {
   if (!adminToken) {
     adminToken = (window.prompt('Enter the Marketel admin token') || '').trim();
     if (!adminToken) throw new Error('Admin token required');
-    sessionStorage.setItem('marketelAdminToken', adminToken);
+    try { localStorage.setItem('marketelAdminToken', adminToken); } catch (_) {}
   }
   const headers = new Headers(options.headers || {});
   headers.set('x-admin-token', adminToken);
   const response = await fetch(url, { ...options, headers });
   if (response.status === 401 && allowRetry) {
-    sessionStorage.removeItem('marketelAdminToken');
+    try { localStorage.removeItem('marketelAdminToken'); } catch (_) {}
     adminToken = '';
     return adminFetch(url, options, false);
   }
@@ -1366,48 +1435,8 @@ function closeDetail(e) {
   document.body.style.overflow = '';
 }
 
-const ICONS = {
-  LandingPageView: '👁',
-  SetupStarted: '📧',
-  Step1Reached: '1️⃣',
-  Step2Reached: '2️⃣',
-  Step3Reached: '3️⃣',
-  Step4Reached: '4️⃣',
-  Step5Reached: '5️⃣',
-  QualityAnswer: '💬',
-  Lead: '🎯',
-  SetupCompleted: '🏨',
-  ValueRevealStarted: '✨',
-  BookingEngineRevealViewed: '🌐',
-  BookingEngineEditPreviewViewed: '✏️',
-  BookingEngineFullPreviewOpened: '↔️',
-  BookingChallengeShown: '⏱',
-  BookingChallengeStarted: '▶️',
-  BookingChallengeDismissed: '↪️',
-  BookingChallengeAbandoned: '⏹',
-  BookingChallengeCheckoutReached: '🏁',
-  GuestAppRevealViewed: '📱',
-  GuestAppOwnerEditorViewed: '🎬',
-  GuestAppInstallBannerViewed: '🎬',
-  GuestAppInstallSheetViewed: '🎬',
-  GuestAppHomeScreenViewed: '🎬',
-  GuestAppRebookViewed: '🎬',
-  GuestAppBroadcastViewed: '🎬',
-  AssistantRevealViewed: '🛎',
-  AssistantTextProofViewed: '🎬',
-  AssistantAppProofViewed: '🎬',
-  AssistantFallbackViewed: '🎬',
-  ActivationOfferViewed: '$',
-  ActivationCtaClicked: '🖱',
-  PreviewReadyEmailSent: '✉️',
-  ActivationEmailSent: '📨',
-  PaymentCTAClicked: '🖱',
-  GoLiveClicked: '🖱',
-  CheckoutStarted: '💳',
-  PaymentSucceeded: '✅',
-  SubscriptionStatusChanged: '🔄',
-};
-
+// Event badges are typographic now — see eventInitials(). The emoji map that
+// used to live here was the last of it.
 const TYPE_LABELS = {
   LandingPageView: 'Landing Page',
   SetupStarted: 'Setup Started',
@@ -1508,7 +1537,7 @@ function renderEvents() {
 
   list.innerHTML = filtered.map(e => {
     const typeClass = e.event_name.toLowerCase().replace(/[^a-z]/g, '') || 'other';
-    const icon = ICONS[e.event_name] || '•';
+    const icon = eventInitials(TYPE_LABELS[e.event_name] || e.event_name);
     const label = TYPE_LABELS[e.event_name] || e.event_name;
     const idx = allEvents.indexOf(e);
     
@@ -1534,7 +1563,7 @@ function renderEvents() {
         </div>
         <div class="event-right">
           <span class="event-time">${formatTime(e.timestamp)}</span>
-          <button class="delete-btn" onclick="event.stopPropagation(); deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">🗑</button>
+          <button class="delete-btn" onclick="event.stopPropagation(); deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">Delete</button>
         </div>
       </div>
     `;
@@ -1560,6 +1589,19 @@ async function deleteEvent(eventId, timestamp) {
   } catch (e) {
     console.error('Delete failed:', e);
   }
+}
+
+// Two letters from the label — beats reduce to their stage plus number, so
+// "· Beat 3 — iOS install sheet" reads as B3 rather than a stray bullet.
+function eventInitials(label) {
+  const clean = String(label || '').replace(/^[·\s]+/, '').trim();
+  const beat = clean.match(/^Beat (\d+)/i);
+  if (beat) return 'B' + beat[1];
+  // Only letter-led words count, so "Paid $199" reads PA rather than P$.
+  const words = clean.split(/[\s—–-]+/).filter((w) => /^[A-Za-z]/.test(w));
+  if (!words.length) return clean.slice(0, 2).toUpperCase() || '··';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
 }
 
 /* ---------- Push notifications ---------- */
@@ -1788,23 +1830,32 @@ async function loadPortfolio() {
     if (!response.ok || !data.success) throw new Error(data.message || 'Request failed');
     const t = data.totals || {};
     const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    // MRR is the headline the overview opens with, and it comes from the same
+    // portfolio query, so it is filled here rather than fetched twice.
+    const paying = t.payingProperties || 0;
+    const mrr = paying * 199;
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    setText('stat-mrr', money(mrr));
+    setText('stat-mrr-count', String(paying));
+    setText('stat-mrr-arr', money(mrr * 12));
+    setText('stat-mrr-avg', money(paying ? mrr / paying : 0));
+
     stats.innerHTML = [
-      ['💵', money(t.gmv), 'Booking volume'],
-      ['🏨', t.properties || 0, 'Properties'],
-      ['✅', t.payingProperties || 0, 'Paying'],
-      ['🗓', t.bookings || 0, 'Bookings'],
-      ['🌙', t.nights || 0, 'Nights'],
-      ['📊', money(t.averageBookingValue), 'Avg booking'],
-      ['⚡', money(t.processingAt40Bps), 'Spread at 0.4%'],
-    ].map(([icon, value, label]) => `<div class="stat-card">
-        <div class="stat-icon">${icon}</div>
-        <div class="stat-value">${escapeHtml(String(value))}</div>
+      ['Booking volume', money(t.gmv)],
+      ['Properties', t.properties || 0],
+      ['Paying', paying],
+      ['Bookings', t.bookings || 0],
+      ['Nights', t.nights || 0],
+      ['Avg booking', money(t.averageBookingValue)],
+      ['Spread at 0.4%', money(t.processingAt40Bps)],
+    ].map(([label, value]) => `<div class="stat-card">
         <div class="stat-label">${escapeHtml(label)}</div>
+        <div class="stat-value">${escapeHtml(String(value))}</div>
       </div>`).join('');
 
     const rows = (data.properties || []).filter((p) => p.bookings > 0 || p.gmv > 0);
     table.innerHTML = rows.length
-      ? `<table class="portfolio-table"><thead><tr>
+      ? `<div class="portfolio-scroll"><table class="portfolio-table"><thead><tr>
           <th>Property</th><th>Status</th>
           <th style="text-align:right">Bookings</th>
           <th style="text-align:right">Nights</th>
@@ -1815,7 +1866,7 @@ async function loadPortfolio() {
             <td class="num">${p.bookings}</td>
             <td class="num">${p.nights}</td>
             <td class="num">${money(p.gmv)}</td>
-          </tr>`).join('')}</tbody></table>`
+          </tr>`).join('')}</tbody></table></div>`
       : '<div class="portfolio-empty">No guest bookings in the last 30 days.</div>';
   } catch (e) {
     table.innerHTML = '<div class="portfolio-empty">Could not load portfolio: ' + escapeHtml(e.message) + '</div>';
