@@ -374,7 +374,7 @@ function renderAppsView() {
 
   const hName       = crm.activeHotelName || 'Your Property';
   const hotelAppIcon = crm.activeHotelAppIcon || '';
-  const hotelInitial = hName.trim().charAt(0).toUpperCase() || '🏡';
+  const hotelInitial = hName.trim().charAt(0).toUpperCase() || 'P';
   const domain      = crm.activeHotelDomain || '';
   const bookingUrl  = domain ? 'https://' + domain : '#';
   const guestInstallUrl = domain ? 'https://' + domain + '/install' : '#';
@@ -574,7 +574,7 @@ function renderAppsView() {
           ${appsQuestionRow('Guest texts you, you text back', '', enc(messageItems), 0, true)}
           ${appsQuestionRow('Your owner app and their saved property', '', enc(homeScreenItems), 0, false)}
         </div>
-        ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website ↗</button>` : ''}`;
+        ${bookingUrl !== '#' ? `<button onclick="window.open('${bookingUrl}','_blank')" style="width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--border);background:none;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">Preview guest website <i data-lucide="arrow-up-right" style="width:15px;height:15px;"></i></button>` : ''}`;
 
   const deviceCardHtml = (tourId) => `
     <div class="apps-step-card"${tourId ? ' id="tour-fd-install-card"' : ''}>
@@ -586,7 +586,7 @@ function renderAppsView() {
   const reminderCardHtml = `
     <div class="apps-step-card" id="tour-fd-reminder-card" style="background:#F3F4F3;border-color:#D7DBD8;box-shadow:none;">
       <div style="display:flex;align-items:flex-start;gap:11px;">
-        <div style="width:34px;height:34px;border-radius:10px;background:#E1E4E2;color:#737B76;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🔒</div>
+        <div style="width:34px;height:34px;border-radius:10px;background:#E1E4E2;color:#737B76;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;"><i data-lucide="lock" style="width:16px;height:16px;"></i></div>
         <div style="flex:1;min-width:0;">
           <div class="apps-section-divider" style="margin:0 0 5px;padding:0;border-top:none;color:#737B76;">Booking alerts</div>
           <div class="apps-step-title" style="color:#555D58;">Help prevent double bookings</div>
@@ -649,7 +649,7 @@ function renderAppsView() {
   const webAppLockHtml = `
     <section style="min-height:52vh;display:grid;place-items:center;padding:34px 0;">
       <div style="width:min(100%,430px);padding:28px 24px;border:1.5px solid var(--border);border-radius:22px;background:#fff;text-align:center;box-shadow:0 14px 40px rgba(26,43,34,.09);">
-        <div style="width:58px;height:58px;display:grid;place-items:center;margin:0 auto 16px;border-radius:17px;background:var(--green-pale);color:var(--green);font-size:25px;">↗</div>
+        <div style="width:58px;height:58px;display:grid;place-items:center;margin:0 auto 16px;border-radius:17px;background:var(--green-pale);color:var(--green);font-size:25px;"><i data-lucide="arrow-up-right" style="width:15px;height:15px;"></i></div>
         <div style="font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--green);">Front Desk app</div>
         <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Guest Reach lives in the owner app.</h2>
         <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Marketel Front Desk from the App Store to share your booking page, choose the Home Screen icon guests save, reply to guests, and send notifications.</p>
@@ -783,7 +783,7 @@ function renderAppsView() {
 
   <div class="apps-page">
 
-    ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;">📱 <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
+    ${isPwaSimulated() ? `<div style="margin-bottom:12px;padding:10px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#9a3412;line-height:1.45;text-align:center;"><i data-lucide="smartphone" style="width:15px;height:15px;"></i> <strong>PWA preview</strong> — compact installed layout. Add <code style="font-size:11px;background:#ffedd5;padding:1px 5px;border-radius:4px;">?pwa=0</code> to the URL to exit.</div>` : ''}
     ${appsMainHtml}
 
     ${appsFootnoteHtml ? `<p class="apps-footnote">${appsFootnoteHtml}</p>` : ''}

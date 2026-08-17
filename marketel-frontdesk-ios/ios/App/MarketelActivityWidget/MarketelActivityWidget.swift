@@ -33,7 +33,7 @@ struct MarketelActivityWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    CountdownLabel(state: context.state, alignment: .trailing)
+                    StackedCountdown(state: context.state, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if context.state.isPending {
@@ -72,38 +72,53 @@ private struct LockScreenView: View {
     let context: ActivityViewContext<BookingDecisionAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(context.attributes.propertyName.uppercased())
-                        .font(.system(size: 10, weight: .heavy))
-                        .kerning(0.6)
-                        .foregroundStyle(marketelGreen)
-                    Text(context.attributes.guestName)
-                        .font(.system(size: 19, weight: .bold))
+        VStack(alignment: .leading, spacing: 9) {
+            // Property and price: the two things scanned first.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(context.attributes.propertyName.uppercased())
+                    .font(.system(size: 10, weight: .heavy))
+                    .kerning(0.6)
+                    .foregroundStyle(marketelGreen)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                if !context.attributes.amountLabel.isEmpty {
+                    Text(context.attributes.amountLabel)
+                        .font(.system(size: 17, weight: .bold, design: .monospaced))
                         .foregroundStyle(marketelInk)
                         .lineLimit(1)
-                    Text("\(context.attributes.roomName) · \(context.attributes.stayLabel)")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 10)
-                VStack(alignment: .trailing, spacing: 3) {
-                    if !context.attributes.amountLabel.isEmpty {
-                        Text(context.attributes.amountLabel)
-                            .font(.system(size: 17, weight: .bold, design: .monospaced))
-                            .foregroundStyle(marketelInk)
-                    }
-                    CountdownLabel(state: context.state, alignment: .trailing)
                 }
             }
 
-            Text(context.state.headline)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(context.state.isPending
-                    ? .secondary
-                    : (context.state.isKept ? marketelGreen : .secondary))
+            Text(context.attributes.guestName)
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(marketelInk)
+                .lineLimit(1)
+
+            // Full width on its own row. Sharing a row with the countdown cost
+            // this line most of the card: Text(timerInterval:) reserves space
+            // for the widest time it could ever display and never gives it
+            // back, so the stay dates were truncated to make room a timer was
+            // not using.
+            Text("\(context.attributes.roomName) · \(context.attributes.stayLabel)")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // The countdown belongs with the instruction it qualifies, not
+            // stranded in a column of its own.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                CountdownLabel(state: context.state)
+                Text(context.state.headline)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(context.state.isPending
+                        ? .secondary
+                        : (context.state.isKept ? marketelGreen : .secondary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+            }
 
             if context.state.isPending {
                 DecisionButtons(bookingId: context.attributes.bookingId)
@@ -120,24 +135,46 @@ private struct LockScreenView: View {
 @available(iOS 16.1, *)
 private struct CountdownLabel: View {
     let state: BookingDecisionAttributes.ContentState
-    var alignment: HorizontalAlignment = .leading
 
     var body: some View {
-        VStack(alignment: alignment, spacing: 1) {
+        Group {
             if let deadline = state.deadlineDate, state.isPending {
                 // A native timer keeps ticking with no further pushes, which is
                 // what makes a five-minute window feel live rather than stale.
+                //
+                // fixedSize is what stops it eating the card: the view reserves
+                // width for the widest time it could ever show, and without
+                // this it keeps that reservation while rendering "4:17" — space
+                // taken from the stay dates beside it and then left blank.
                 Text(timerInterval: Date()...max(deadline, Date().addingTimeInterval(1)), countsDown: true)
-                    .font(.system(size: 17, weight: .bold, design: .monospaced))
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundStyle(marketelAmber)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+            } else {
+                Image(systemName: statusIcon(state))
+                    .font(.system(size: 15))
+                    .foregroundStyle(state.isKept ? marketelGreen : .secondary)
+            }
+        }
+    }
+}
+
+// The expanded Dynamic Island keeps the stacked form: there the trailing region
+// is a column of its own, so "to decide" has somewhere to sit.
+@available(iOS 16.1, *)
+private struct StackedCountdown: View {
+    let state: BookingDecisionAttributes.ContentState
+    var alignment: HorizontalAlignment = .trailing
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 1) {
+            CountdownLabel(state: state)
+            if state.isPending, state.deadlineDate != nil {
                 Text("to decide")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
-            } else {
-                Image(systemName: statusIcon(state))
-                    .font(.system(size: 18))
-                    .foregroundStyle(state.isKept ? marketelGreen : .secondary)
             }
         }
     }

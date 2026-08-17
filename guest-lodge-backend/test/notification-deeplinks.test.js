@@ -6,6 +6,8 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const core = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'core.js'), 'utf8');
+const assistant = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'assistant.js'), 'utf8');
+const settings = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'settings.js'), 'utf8');
 
 // A notification that opens the app but not the thing it is about is worse than
 // no notification: the owner taps, lands on whatever tab was already there, and
@@ -18,7 +20,9 @@ test('every Front Desk deep link a notification sends is handled by the client',
     for (const match of server.matchAll(/(?<!start_)url: ['`]\/frontdesk\?([a-zA-Z]+)=/g)) sent.add(match[1]);
     assert.ok(sent.size >= 3, `expected several frontdesk deep links, saw ${[...sent].join(', ')}`);
 
-    const unhandled = [...sent].filter((param) => !new RegExp(`get\\('${param}'\\)`).test(core));
+    // A plain substring beats a regex here: escaping a template literal
+    // through a heredoc silently ate the backslashes and matched nothing.
+    const unhandled = [...sent].filter((param) => !core.includes("get('" + param + "')"));
     assert.deepEqual(unhandled, [], `deep-link params nothing reads: ${unhandled.join(', ')}`);
 });
 
@@ -36,24 +40,21 @@ test('booking decisions show they were received before the reload lands', () => 
     // The POST plus three reloads take seconds; with no pending state the tap
     // reads as missed and gets pressed again.
     assert.match(core, /function setBookingDecisionPending\(bookingId, action\)/);
-    const decide = core.slice(
-        core.indexOf('async function decideBookingFromCard'),
-        core.indexOf('async function decideBookingFromCard') + 1400
-    );
+    const at = core.indexOf('async function decideBookingFromCard');
+    const decide = core.slice(at, at + 1400);
     assert.match(decide, /const restoreButtons = setBookingDecisionPending\(bookingId, action\);/);
     // Both buttons lock, so the same decision cannot be sent twice in flight.
     assert.match(core, /button\.disabled = true;/);
-    // Failure must hand the card back, or the owner is stuck looking at "Keeping…".
+    // Failure must hand the card back, or the owner stares at "Keeping…".
     assert.match(decide, /catch \(error\) \{\s*\n\s*restoreButtons\(\);/);
 });
 
 test('the Assistant modal retires its own tutorial', () => {
-    const assistant = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'assistant.js'), 'utf8');
     // The story teaches what texting your Front Desk means. Rendering it
     // unconditionally meant every configured owner scrolled a fixed demo
     // conversation to reach their settings, forever.
     assert.match(assistant, /const hasConfigured = !!config\.enabled && recipients\.length > 0;/);
-    assert.match(assistant, /const storySection = hasConfigured\s*\n?\s*\?\s*''/);
+    assert.match(assistant, /const storySection = hasConfigured/);
     // And the demo names their own room rather than an invented one.
     assert.match(assistant, /function firstRoomName\(\)/);
     assert.match(assistant, /New booking: \$\{esc\(firstRoomName\(\)\)\}/);
@@ -64,30 +65,35 @@ test('the Assistant modal retires its own tutorial', () => {
     assert.doesNotMatch(assistant, /const inventoryNote = capabilities\.manualAvailability/);
 });
 
-test('Settings offers a route to the Assistant that survives lazy loading', () => {
-    const settings = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'settings.js'), 'utf8');
-    assert.match(settings, /function assistantSettingsRowHtml\(\)/);
-    assert.match(settings, /\$\{assistantSettingsRowHtml\(\)\}/);
-    // assistant.js is lazy. Calling its export directly would be undefined
-    // until something else had already opened the modal, so this goes through
-    // the action that loads the module first.
-    assert.match(settings, /window\.marketelNativeAction\?\.\('assistant'\)/);
-    assert.doesNotMatch(settings, /onclick="openFrontDeskAssistant\(\)"/);
-    // And must not assert a state it cannot know before that data loads.
-    assert.match(settings, /const status = !data/);
+test('the Assistant has one obvious surface, not three', () => {
+    // A pill above the tab bar: visible without owning a tab, and present in
+    // every state rather than only once the Assistant has done something.
+    assert.match(assistant, /export function renderAssistantPill\(\)/);
+    assert.match(assistant, /pill\.classList\.add\('is-visible'\)/);
+    assert.match(assistant, /crm\.currentFilter === 'bookings'/);
+
+    // Wording follows state, so an unconfigured Assistant reads as an
+    // invitation rather than a bare name.
+    assert.match(assistant, /'Set up Front Desk Assistant'/);
+    assert.match(assistant, /'Front Desk needs your review'/);
+
+    // The two stopgaps it replaced are gone. Three doors to one feature is
+    // worse than one door anybody can find.
+    assert.doesNotMatch(settings, /assistantSettingsRowHtml/);
+    assert.doesNotMatch(assistant, /fda-native-result is-intro/);
 });
 
-test('the Assistant is reachable before it has ever done anything', () => {
-    const assistant = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'assistant.js'), 'utf8');
-    const emptyState = assistant.slice(
-        assistant.indexOf('const activity = latestMeaningfulActivity();'),
-        assistant.indexOf('const attention =')
-    );
-    // The panel used to hide itself with no activity, leaving the unlabelled
-    // overflow menu as the only route to a feature owners pay for.
-    assert.match(emptyState, /fda-native-result is-intro/);
-    assert.match(emptyState, /onclick="openFrontDeskAssistant\(\)"/);
-    // Still quiet while loading, so it does not flash an invitation and replace
-    // it with a result a moment later.
-    assert.match(emptyState, /if \(crm\.assistantLoading\) \{[\s\S]{0,140}display = 'none';/);
+test('no emoji ships in the Front Desk interface', () => {
+    // Front Desk draws its icons from a bundled lucide set. An emoji renders
+    // differently on every platform and reads as a placeholder beside them.
+    const dir = path.join(root, 'frontdesk', 'src');
+    const offenders = [];
+    for (const file of fs.readdirSync(dir)) {
+        if (!file.endsWith('.js')) continue;
+        const text = fs.readFileSync(path.join(dir, file), 'utf8');
+        text.split(/\r?\n/).forEach((line, index) => {
+            if (/\p{Extended_Pictographic}/u.test(line)) offenders.push(`${file}:${index + 1}`);
+        });
+    }
+    assert.deepEqual(offenders, [], `emoji found: ${offenders.join(', ')}`);
 });

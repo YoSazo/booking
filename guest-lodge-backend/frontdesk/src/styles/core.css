@@ -3759,3 +3759,60 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
   .messages-workspace .message-thread-heading { flex: 0 0 auto; }
   .messages-workspace .message-conversation { padding-bottom: 14px; }
 }
+
+    /* Floating Assistant pill.
+       The Assistant was reachable only through an unlabelled overflow menu, so
+       owners who had never opened it had no way to learn it exists. A pill
+       above the tab bar is permanently visible without occupying a tab, and
+       reads as an action rather than a setting. */
+    .fda-pill {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 190;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 18px 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 999px;
+      background: var(--white);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(26, 43, 34, 0.16), 0 2px 10px rgba(46, 125, 91, 0.10);
+      /* Clear of the tab bar, which is 22px up plus its own height. */
+      bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+      max-width: calc(100vw - 40px);
+      white-space: nowrap;
+      transition: opacity 0.18s, transform 0.18s;
+    }
+    .fda-pill.is-visible { display: inline-flex; }
+    .fda-pill:active { transform: translateX(-50%) scale(0.97); }
+    .fda-pill-mark {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--green-pale);
+      color: var(--green);
+    }
+    /* A dot instead of a number: the pill invites, it does not report. */
+    .fda-pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      flex: 0 0 auto;
+    }
+    /* Any modal owns the screen while it is open. */
+    body.marketel-support-open .fda-pill,
+    body.fda-open .fda-pill,
+    body.marketel-modal-open .fda-pill { display: none !important; }
+    @media (min-width: 861px) {
+      .fda-pill { bottom: 26px; }
+    }

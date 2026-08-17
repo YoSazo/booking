@@ -1334,7 +1334,7 @@ function syncRevenueUi() {
               </div>
             </div>
             <div style="margin-top:14px;padding:14px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;" id="paymentsExplainer">
-              <div style="font-size:13px;font-weight:600;color:#166534;margin-bottom:6px;">🔒 How payments work</div>
+              <div style="font-size:13px;font-weight:600;color:#166534;margin-bottom:6px;">How payments work</div>
               <p style="font-size:12px;color:#15803d;margin:0;line-height:1.6;">A temporary <strong>$1 card hold</strong> helps prevent fake bookings. Guests are not charged for their stay online — <strong>you collect payment at check-in</strong> however you prefer (cash, card, Venmo, etc).</p>
             </div>
           </div>
@@ -2050,7 +2050,10 @@ function applyBookingsSubview() {
     if (document.body.classList.contains('frontdesk-editor-preview')) {
       renderEmbeddedAssistantPreviewCard();
     } else {
-      loadAssistantModule().then((module) => module.renderFrontDeskAssistantCard()).catch(() => {});
+      loadAssistantModule().then((module) => {
+        module.renderFrontDeskAssistantCard();
+        module.renderAssistantPill();
+      }).catch(() => {});
     }
   }
   renderBookingsNotices();
@@ -2968,7 +2971,7 @@ async function loadBookings(opts = {}) {
     if (e.message === 'Unauthorized') return;
     document.getElementById('bookingsList').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">⚠️</div>
+        <div class="empty-icon"><i data-lucide="circle-alert" style="width:26px;height:26px;"></i></div>
       <div class="empty-text">Could not load bookings</div>
       <div class="empty-sub">${esc(e.message)}</div>
       </div>`;
@@ -3798,7 +3801,7 @@ function renderBookings(fullList) {
           <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">You&apos;re live — waiting for bookings</div>
           <div class="empty-sub" style="margin-bottom:12px;">Share your link to start getting direct reservations.</div>
-          <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">📋 Copy Your Link</button>
+          <button onclick="copyBookingLinkFromChecklist()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Copy Your Link</button>
           <div style="margin-top:12px;"><button onclick="openGrowthWorkspace()" style="background:none;border:none;color:#2E7D5B;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline;">See how to get found →</button></div>
         </div>`;
     } else if (allDone && !crm.hotelSubscribed) {
@@ -4178,7 +4181,7 @@ function guestBroadcastCardHtml(options = {}) {
     </div>
     <button id="guest-broadcast-btn" type="button" onclick="sendGuestBroadcast()" disabled style="width:100%;padding:12px;border-radius:10px;border:none;background:#c5d5cc;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;">No guests to notify yet</button>
     <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
-    <button type="button" class="guest-reach-video" onclick="appsOpenLightbox(${demoItems},0)"><span aria-hidden="true">▶</span> Watch a real notification arrive</button>
+    <button type="button" class="guest-reach-video" onclick="appsOpenLightbox(${demoItems},0)"><span aria-hidden="true"><i data-lucide="play" style="width:15px;height:15px;"></i></span> Watch a real notification arrive</button>
   </div>`;
 }
 
@@ -5058,7 +5061,7 @@ function promptUploadLogoBeforeQr(preselectedCode) {
   overlay.style.cssText = 'position:fixed;inset:0;z-index:102400;background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;';
   overlay.innerHTML = `
     <div style="background:white;border-radius:20px;padding:24px 22px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-      <div style="font-size:28px;margin-bottom:10px;">🖼️</div>
+      <div style="margin-bottom:10px;"><i data-lucide="image" style="width:26px;height:26px;"></i></div>
       <h2 style="font-size:17px;font-weight:800;color:#1a1a2e;margin:0 0 8px;line-height:1.35;">Upload your property logo first?</h2>
       <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${crm.activeHotelName || 'your property'}</strong> to their Home Screen. Takes 5 seconds.</p>
       <input type="file" id="logoGateFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
@@ -5278,7 +5281,7 @@ function toast(msg, type = '') {
   const c = document.getElementById('toasts');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.textContent = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'} ${msg}`;
+  el.textContent = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'i'} ${msg}`;
   c.appendChild(el);
   setTimeout(() => el.remove(), 3100);
 }
@@ -5466,7 +5469,7 @@ function conflictBannerHtml() {
     : '';
 
   return `<div id="conflictBanner" style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:14px;padding:16px;margin-bottom:14px;">
-      <div style="font-size:14px;font-weight:800;color:#7f1d1d;margin-bottom:4px;">⚠️ Double-booked ${conflicts.length === 1 ? 'room' : 'rooms'}</div>
+      <div style="font-size:14px;font-weight:800;color:#7f1d1d;margin-bottom:4px;">Double-booked ${conflicts.length === 1 ? 'room' : 'rooms'}</div>
       <div style="font-size:12px;color:#7f1d1d;line-height:1.5;">More bookings than rooms on the nights below. Cancel the online booking to free the room and void the guest's card hold — they'll get an email explaining.</div>
       ${rows}${more}
     </div>`;
@@ -5506,7 +5509,7 @@ function promptCancelBooking(bookingId, guestName) {
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100005;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:20px;padding:24px 22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-      <div style="font-size:30px;text-align:center;margin-bottom:6px;">🚫</div>
+      <div style="text-align:center;margin-bottom:6px;"><i data-lucide="ban" style="width:26px;height:26px;"></i></div>
       <h2 style="font-size:18px;font-weight:800;color:#1a1a2e;margin:0 0 8px;text-align:center;">Cancel ${esc(guestName)}'s booking?</h2>
       <p style="font-size:12px;color:#6b7280;line-height:1.55;margin:0 0 16px;text-align:center;">The room goes back on sale, the $1 card hold is voided, and they get an email explaining. This can't be undone.</p>
       <label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Reason (the guest sees this)</label>
@@ -5641,7 +5644,7 @@ function showBookingApprovalModal(token, booking) {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:20px;padding:24px 22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:32px;margin-bottom:6px;">🛏</div>
+        <div style="margin-bottom:6px;"><i data-lucide="bed" style="width:28px;height:28px;"></i></div>
         <h2 style="font-size:18px;font-weight:800;color:#1a1a2e;margin:0 0 6px;">Is this room still free?</h2>
         <p style="font-size:12px;color:#6b7280;line-height:1.5;margin:0;">
           ${fallbackCopy}
@@ -5651,9 +5654,9 @@ function showBookingApprovalModal(token, booking) {
         <div style="font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:2px;">${esc(booking.guestName || 'Guest')}</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">${esc(booking.guestPhone || '')}</div>
         <div style="font-size:13px;color:#374151;line-height:1.7;">
-          <div>🛏 ${esc(booking.roomName || 'Room')}</div>
-          <div>📅 ${fmt(booking.checkinDate)} → ${fmt(booking.checkoutDate)}</div>
-          <div>🌙 ${booking.nights} night${booking.nights !== 1 ? 's' : ''} · $${total}</div>
+          <div>${esc(booking.roomName || 'Room')}</div>
+          <div>${fmt(booking.checkinDate)} → ${fmt(booking.checkoutDate)}</div>
+          <div>${booking.nights} night${booking.nights !== 1 ? 's' : ''} · $${total}</div>
         </div>
       </div>
       <button type="button" id="bookingApprovalConfirm" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Yes, keep the booking</button>
@@ -5867,7 +5870,7 @@ function showBookingReviewModal(token, booking) {
           <div style="background:#fff;border-radius:10px;padding:9px 10px;"><div style="font-size:9px;text-transform:uppercase;font-weight:800;color:#7B8C82;">Check-out</div><div style="font-size:12px;font-weight:750;color:#1A2B22;margin-top:2px;">${bookingReviewDateLabel(booking.checkoutDate)}</div></div>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:#33443A;">
-          <strong>🛏 ${esc(booking.roomName || 'Room')}</strong>
+          <strong>${esc(booking.roomName || 'Room')}</strong>
           <span>${paidNow > 0 ? 'Paid online' : 'Collect at check-in'}</span>
         </div>
       </div>
@@ -6088,7 +6091,7 @@ function showNotifPromptModal() {
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-      <div style="font-size:34px;margin-bottom:10px;">🔔</div>
+      <div style="margin-bottom:10px;"><i data-lucide="bell" style="width:28px;height:28px;"></i></div>
       <h2 style="font-size:19px;font-weight:700;color:#1a1a2e;margin:0 0 8px;">Turn on booking alerts?</h2>
       <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 20px;">Confirmed bookings and guest messages will reach this phone, even when Front Desk is closed.</p>
       <button id="notifPromptEnable" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">Turn on booking alerts</button>

@@ -19,34 +19,6 @@ import {
 
 // ── SETTINGS TAB ───────────────────────────────────────────────
 
-// The Assistant had two ways in: an unlabelled ⋯ menu, and a card on Bookings.
-// Neither is where an owner looks to configure something, so Your Page — the
-// tab that holds every other setting — carries a row for it too.
-function assistantSettingsRowHtml() {
-  if (isEmbeddedEditorPreview()) return '';
-  // assistant.js is lazy, so its data may not be loaded when this renders.
-  // Claiming "not set up yet" on missing data would tell a configured owner
-  // their Assistant is off, so say nothing about state until state is known.
-  const data = crm.assistantData;
-  const recipients = (data?.recipients || []).filter((r) => r && r.active !== false);
-  const status = !data
-    ? 'Texts you when a room is requested'
-    : (data.config?.enabled && recipients.length)
-      ? `On · texting ${recipients.length} ${recipients.length === 1 ? 'number' : 'numbers'}`
-      : 'Not set up yet · texts you when a room is requested';
-  // Routed through the same action the ⋯ menu uses, which loads the lazy module
-  // and hides native chrome first. Calling openFrontDeskAssistant() directly
-  // would be undefined until something else had already opened it.
-  return `<button type="button" class="booking-card" onclick="window.marketelNativeAction?.('assistant')" style="width:100%;display:flex;align-items:center;gap:13px;padding:16px 18px;margin-bottom:14px;border:1.5px solid var(--border);background:var(--white);font-family:inherit;text-align:left;cursor:pointer;">
-    <span aria-hidden="true" style="width:36px;height:36px;flex:0 0 auto;border-radius:11px;display:grid;place-items:center;background:var(--green-pale);color:var(--green);font-size:16px;font-weight:800;">☎</span>
-    <span style="flex:1;min-width:0;">
-      <span style="display:block;font-size:15px;font-weight:700;color:var(--text);">Front Desk Assistant</span>
-      <span style="display:block;margin-top:2px;font-size:12.5px;color:var(--text-muted);">${status}</span>
-    </span>
-    <span aria-hidden="true" style="color:var(--text-muted);font-size:19px;">›</span>
-  </button>`;
-}
-
 function isNativeApp() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
@@ -157,7 +129,7 @@ async function loadSettings() {
             <div style="position:relative;background:var(--bg);border-radius:14px 14px 0 0;overflow:hidden;">
               ${hasImage ? `<img src="${r.images[0].url}" loading="lazy" decoding="async" style="width:100%;height:clamp(260px,34vw,380px);object-fit:contain;display:block;background:var(--bg);border-radius:14px 14px 0 0;">` : `<div style="width:100%;height:clamp(260px,34vw,380px);background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;border-radius:14px 14px 0 0;">No photos yet</div>`}
               <label style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.65);color:white;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-                📷 ${hasImage ? 'Change Photo' : '+ Add Photo'}
+                ${hasImage ? 'Change Photo' : '+ Add Photo'}
                 <input type="file" accept="image/*" style="display:none;" onchange="settingsUploadPhoto(event,'${r.id}')">
               </label>
             </div>
@@ -250,7 +222,7 @@ async function loadSettings() {
     list.innerHTML = html;
     window.refreshSupportSummary?.();
   } catch (e) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load settings</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="circle-alert" style="width:26px;height:26px;"></i></div><div class="empty-text">Failed to load settings</div></div>';
   }
 }
 
@@ -700,7 +672,7 @@ function showWelcomeModal() {
   function renderWelcomeStep() {
     overlay.innerHTML = `
       <div style="background:white;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
-        <div style="font-size:32px;margin-bottom:12px;">🏡</div>
+        <div style="margin-bottom:12px;"><i data-lucide="house" style="width:28px;height:28px;"></i></div>
         <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Welcome to your Front Desk</h2>
         <p style="font-size:14px;color:#6b7280;line-height:1.65;margin:0 0 20px;text-align:left;">Guests use your direct booking page. This is the owner dashboard where you:<br><br>
           <strong>Set up</strong> your booking page<br>
@@ -927,8 +899,7 @@ async function loadEditRooms() {
       </div>
       </div>
       <div class="dash-b">
-      ${goLiveInlineCardHtml()}
-      ${assistantSettingsRowHtml()}
+      ${goLiveInlineCardHtml()}
       ${(typeof twoRoomExplainerHtml === 'function' ? twoRoomExplainerHtml : window.twoRoomExplainerHtml)('booking-page')}
       <div id="editRoomsCards"></div>
       <button id="edit-add-room-btn" style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
@@ -988,7 +959,7 @@ async function loadEditRooms() {
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
           <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
             <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
-            <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">📋 Copy Link</button>
+            <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy Link</button>
           </div>
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Use this link on your website, Google Business Profile, or in a message.</p>
         </div>
@@ -1054,7 +1025,7 @@ async function loadEditRooms() {
     window.refreshSupportSummary?.();
     if (typeof lucide !== 'undefined') lucide.createIcons();
   } catch (e) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load your page</div><div class="empty-sub">Check your connection and refresh.</div></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="circle-alert" style="width:26px;height:26px;"></i></div><div class="empty-text">Failed to load your page</div><div class="empty-sub">Check your connection and refresh.</div></div>';
   }
   })();
   try {
@@ -1081,7 +1052,7 @@ function renderEditRoomsCards() {
   const cards = document.getElementById('editRoomsCards');
   if (!cards) return;
   if (!crm.editRooms.length) {
-    cards.innerHTML = '<div class="empty-state"><div class="empty-icon">🛏️</div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
+    cards.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="bed" style="width:26px;height:26px;"></i></div><div class="empty-text">No rooms yet</div><div class="empty-sub">Add your first room type below.</div></div>';
     return;
   }
   cards.innerHTML = crm.editRooms.map((r, idx) => {
@@ -1104,7 +1075,7 @@ function renderEditRoomsCards() {
             </div>` : ''}
         ` : `<div class="room-edit-photo-placeholder">No photos yet</div>`}
         <label class="room-edit-photo-upload">
-          📷 + Add Photos
+          + Add Photos
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${roomIdJs}')">
         </label>
       </div>
@@ -1674,7 +1645,7 @@ function restoreAppIconPreview() {
     return;
   }
   // Letter icon: full-bleed green edge-to-edge, no white inner frame.
-  const initial = (crm.activeHotelName || 'P').trim().charAt(0).toUpperCase() || '🏡';
+  const initial = (crm.activeHotelName || 'P').trim().charAt(0).toUpperCase() || 'P';
   el.style.background = 'transparent';
   el.style.border = 'none';
   el.style.padding = '0';

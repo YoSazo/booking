@@ -1479,15 +1479,15 @@ function startSettingsTour() {
         <div style="background:#f0fdf4;border-radius:12px;padding:16px;border:1px solid #bbf7d0;">
           <div style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;align-items:flex-start;gap:8px;">
-              <span style="font-size:14px;">✅</span>
+              <span><i data-lucide="circle-check" style="width:14px;height:14px;"></i></span>
               <span style="font-size:13px;color:#166534;line-height:1.4;">Rooms default to <strong>open</strong> with all units available</span>
             </div>
             <div style="display:flex;align-items:flex-start;gap:8px;">
-              <span style="font-size:14px;">🔒</span>
+              <span><i data-lucide="lock" style="width:14px;height:14px;"></i></span>
               <span style="font-size:13px;color:#166534;line-height:1.4;">Toggle <strong>close</strong> on days you're fully booked</span>
             </div>
             <div style="display:flex;align-items:flex-start;gap:8px;">
-              <span style="font-size:14px;">🔢</span>
+              <span><i data-lucide="hash" style="width:14px;height:14px;"></i></span>
               <span style="font-size:13px;color:#166534;line-height:1.4;">Use +/− to reduce units when partially booked</span>
             </div>
           </div>
@@ -1581,8 +1581,8 @@ function startSettingsTour() {
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
                   <span style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;font-size:11px;font-weight:750;padding:4px 9px;border-radius:20px;">● Needs verification</span>
-                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">🛏 King Room</span>
-                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">🌙 3 nights</span>
+                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">King Room</span>
+                <span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:650;padding:4px 9px;border-radius:20px;">3 nights</span>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;padding:10px;background:#f8faf9;border-radius:10px;margin-bottom:12px;">
                 <div style="text-align:center;">
@@ -1672,7 +1672,7 @@ function startSettingsTour() {
               <div style="font-size:10px;font-weight:800;color:#166534;">You checked it</div>
             </div>
             <div style="background:#F0FDF4;border:1px solid #D7EBDD;border-radius:11px;padding:10px;text-align:center;">
-              <div style="font-size:17px;color:#166534;font-weight:900;margin-bottom:2px;">↩</div>
+              <div style="color:#166534;margin-bottom:2px;"><i data-lucide="undo-2" style="width:16px;height:16px;"></i></div>
               <div style="font-size:10px;font-weight:800;color:#166534;">Cancel if needed</div>
             </div>
             <div style="background:#F0FDF4;border:1px solid #D7EBDD;border-radius:11px;padding:10px;text-align:center;">

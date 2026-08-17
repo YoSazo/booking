@@ -208,10 +208,6 @@ function ensureStyles() {
     .fda-live::before{content:"";width:7px;height:7px;border-radius:50%;background:#65d69a;box-shadow:0 0 0 4px rgba(101,214,154,.14);}
     .fda-native-result{width:100%;display:flex;align-items:center;gap:12px;margin:0 0 13px;padding:13px 14px;border:1px solid #d7e8de;border-radius:15px;background:linear-gradient(145deg,#f5fbf7,#fff);box-shadow:0 4px 16px rgba(25,70,45,.055);color:#1a2b22;font-family:inherit;text-align:left;cursor:pointer;}
     .fda-native-result.attention{border-color:#efd3a4;background:linear-gradient(145deg,#fff8eb,#fff);}
-    /* The empty state is an invitation, not a result: quieter than an activity
-       card so it never reads as something that needs attention. */
-    .fda-native-result.is-intro{border-style:dashed;background:#fff;box-shadow:none;}
-    .fda-native-result.is-intro .fda-native-result-icon{background:#eef5f1;color:#4a7a63;font-weight:700;}
     .fda-native-result-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;background:#dff2e7;color:#23714f;font-size:16px;font-weight:900;}
     .fda-native-result.attention .fda-native-result-icon{background:#fff0d2;color:#a15c0b;}
     .fda-native-result-copy{min-width:0;flex:1;}
@@ -330,6 +326,61 @@ export async function loadFrontDeskAssistant({ force = false } = {}) {
   return loadPromise;
 }
 
+// The pill is the Assistant's permanent home. It sits above the tab bar on
+// Bookings, so it is visible without owning a tab, and it reads as an action
+// rather than a buried setting. The intro card it replaces only appeared in
+// one state; this appears in all of them.
+export function renderAssistantPill() {
+  ensureStyles();
+  let pill = document.getElementById('frontDeskAssistantPill');
+  const belongsHere = isNativeFrontDesk()
+    && crm.currentFilter === 'bookings'
+    && crm.bookingsSubview === 'bookings'
+    && !crm.settingsTourActive;
+
+  if (!belongsHere) {
+    pill?.classList.remove('is-visible');
+    return;
+  }
+
+  if (!pill) {
+    pill = document.createElement('button');
+    pill.id = 'frontDeskAssistantPill';
+    pill.type = 'button';
+    pill.className = 'fda-pill';
+    pill.addEventListener('click', () => openFrontDeskAssistant());
+    document.body.appendChild(pill);
+  }
+
+  // Wording follows state: an unconfigured Assistant is an invitation, a
+  // configured one with something waiting is a prompt, otherwise it is a door.
+  const data = crm.assistantData;
+  const recipients = activeRecipients();
+  const configured = !!data?.config?.enabled && recipients.length > 0;
+  const activity = latestMeaningfulActivity();
+  const needsReview = !!activity
+    && (activity.type === 'availability_warning' || activity.status === 'attention');
+
+  const label = !configured
+    ? 'Set up Front Desk Assistant'
+    : needsReview
+      ? 'Front Desk needs your review'
+      : 'Front Desk Assistant';
+
+  pill.innerHTML = `<span class="fda-pill-mark" aria-hidden="true"><i data-lucide="phone" style="width:14px;height:14px;"></i></span>${needsReview ? '<span class="fda-pill-dot" aria-hidden="true"></span>' : ''}<span>${esc(label)}</span>`;
+  pill.setAttribute('aria-label', label);
+  pill.classList.add('is-visible');
+  try { window.lucide?.createIcons(); } catch (_) {}
+
+  if (!data && !crm.assistantLoading && !crm.assistantError) {
+    loadFrontDeskAssistant().catch(() => {});
+  }
+}
+
+export function hideAssistantPill() {
+  document.getElementById('frontDeskAssistantPill')?.classList.remove('is-visible');
+}
+
 export function renderFrontDeskAssistantCard() {
   ensureStyles();
   const panel = document.getElementById('frontDeskAssistantPanel');
@@ -342,7 +393,7 @@ export function renderFrontDeskAssistantCard() {
   if (!isNativeFrontDesk()) {
     panel.innerHTML = `<div class="fda-card is-off">
       <div class="fda-card-row">
-        <div class="fda-card-icon">↗</div>
+        <div class="fda-card-icon"><i data-lucide="arrow-up-right" style="width:16px;height:16px;"></i></div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk app</div>
           <div class="fda-card-title">Assistant lives on your phone.</div>
@@ -359,25 +410,10 @@ export function renderFrontDeskAssistantCard() {
       if (!crm.assistantData && !crm.assistantLoading && !crm.assistantError) {
         loadFrontDeskAssistant().catch(() => {});
       }
-      // Hiding this until the Assistant has done something made it findable
-      // only through an unlabelled ⋯ menu, so an owner who had never used it
-      // had no way to learn it exists. Empty is a state worth showing: it says
-      // what the Assistant is for and opens it.
-      if (crm.assistantLoading) {
-        panel.innerHTML = '';
-        panel.style.display = 'none';
-        return;
-      }
-      panel.style.display = 'block';
-      panel.innerHTML = `<button type="button" class="fda-native-result is-intro" onclick="openFrontDeskAssistant()" aria-label="Set up Front Desk Assistant">
-        <span class="fda-native-result-icon" aria-hidden="true">☎</span>
-        <span class="fda-native-result-copy">
-          <span class="fda-native-result-label">Front Desk Assistant</span>
-          <span class="fda-native-result-title">Get a text when a room is requested.</span>
-          <span class="fda-native-result-time">Reply in words — it updates availability for you</span>
-        </span>
-        <span class="fda-native-result-arrow" aria-hidden="true">›</span>
-      </button>`;
+      // The pill now carries discovery, so an empty card here would be a
+      // second invitation stacked above the first.
+      panel.innerHTML = '';
+      panel.style.display = 'none';
       return;
     }
     const attention = activity.type === 'availability_warning' || activity.status === 'attention';
@@ -397,7 +433,7 @@ export function renderFrontDeskAssistantCard() {
     const loadFailed = !!crm.assistantError && !crm.assistantLoading;
     panel.innerHTML = `<div class="fda-card is-off">
       <div class="fda-card-row">
-        <div class="fda-card-icon">💬</div>
+        <div class="fda-card-icon"><i data-lucide="message-circle" style="width:16px;height:16px;"></i></div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk Assistant</div>
           <div class="fda-card-title">${crm.assistantLoading ? 'Connecting your assistant…' : (loadFailed ? 'Assistant could not connect' : 'Tell Front Desk when a room is taken')}</div>
@@ -420,7 +456,7 @@ export function renderFrontDeskAssistantCard() {
       : '';
     panel.innerHTML = `<div class="fda-card">
       <div class="fda-card-row">
-        <div class="fda-card-icon">💬</div>
+        <div class="fda-card-icon"><i data-lucide="message-circle" style="width:16px;height:16px;"></i></div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow fda-live">Assistant on</div>
           <div class="fda-card-title">Front Desk is watching ${recipients.length} phone${recipients.length === 1 ? '' : 's'}</div>
@@ -435,7 +471,7 @@ export function renderFrontDeskAssistantCard() {
   const locked = !isSubscribed();
   panel.innerHTML = `<div class="fda-card is-off">
     <div class="fda-card-row">
-      <div class="fda-card-icon">💬</div>
+      <div class="fda-card-icon"><i data-lucide="message-circle" style="width:16px;height:16px;"></i></div>
       <div class="fda-card-copy">
         <div class="fda-eyebrow">${locked ? 'Included when activated' : 'Front Desk Assistant'}</div>
         <div class="fda-card-title">Text Front Desk. It handles availability.</div>
@@ -896,6 +932,8 @@ const exportsForWindow = {
   removeAssistantRecipient,
   refreshFrontDeskAssistantSheet,
   renderFrontDeskAssistantCard,
+  renderAssistantPill,
+  hideAssistantPill,
   retryFrontDeskAssistant,
   resendAssistantCode,
   runAssistantCheckNow,
