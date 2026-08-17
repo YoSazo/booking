@@ -86,6 +86,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				A11E01022E00000100000001 /* MarketelActivityWidget */,
+				A11E01032E00000100000001 /* Shared */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
