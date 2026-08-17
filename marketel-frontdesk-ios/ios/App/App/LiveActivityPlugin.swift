@@ -15,7 +15,20 @@ import ActivityKit
 // Intents run in the widget process and cannot reach the webview.
 
 @objc(LiveActivityPlugin)
-public class LiveActivityPlugin: CAPPlugin {
+public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
+
+    // Capacitor 6+ discovers plugins through this Swift conformance, not the
+    // legacy Objective-C CAP_PLUGIN macro. Without it the class compiles but is
+    // never registered, so window.Capacitor.Plugins.LiveActivity is undefined.
+    public let identifier = "LiveActivityPlugin"
+    public let jsName = "LiveActivity"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getCapabilities", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setCredentials", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearCredentials", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startObserving", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endAll", returnType: CAPPluginReturnPromise),
+    ]
 
     private static let appGroup = "group.com.bookmarketel.frontdesk"
     private var observing = false
