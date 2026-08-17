@@ -38,6 +38,17 @@ async function post(path, body) {
   }
 }
 
+// Best-effort visibility into the on-device registration path, which is
+// otherwise invisible when the app runs from TestFlight. Surfaces each step in
+// the server logs so a card that never appears can be diagnosed without a Mac.
+function beacon(step, detail) {
+  try {
+    console.log('[live-activity]', step, detail || {});
+    post('/api/push/live-activity/debug', { step, detail: detail || {} });
+  } catch (_) {
+  }
+}
+
 /**
  * Hand the signed-in session to the widget process. Lock Screen buttons run
  * outside the webview and cannot read localStorage, so this is the only way a
@@ -71,39 +82,48 @@ export async function clearLiveActivityCredentials() {
 export async function initLiveActivities() {
   if (wired || !isNativeShell()) return { supported: false };
   const api = plugin();
-  if (!api?.getCapabilities) return { supported: false };
+  if (!api?.getCapabilities) { beacon('no-plugin', {}); return { supported: false }; }
 
   let capabilities = { supported: false, pushToStart: false, enabled: false };
   try {
     capabilities = await api.getCapabilities();
-  } catch (_) {
+  } catch (error) {
+    beacon('capabilities-failed', { message: String(error?.message || error) });
     return { supported: false };
   }
+  beacon('capabilities', capabilities);
   if (!capabilities.supported) return capabilities;
 
   wired = true;
 
   // Per install. Without it a booking cannot raise a card while the app is
   // closed, which is the only moment that matters.
-  api.addListener?.('pushToStartToken', ({ token }) => {
+  const startTokenListener = api.addListener?.('pushToStartToken', ({ token }) => {
+    beacon('push-to-start-token', { hasToken: !!token });
     if (!token) return;
     post('/api/push/live-activity/starter', { startToken: token });
   });
 
   // Per activity. This token is the only way to update or end that card.
-  api.addListener?.('activityToken', ({ activityId, bookingId, token }) => {
+  const activityTokenListener = api.addListener?.('activityToken', ({ activityId, bookingId, token }) => {
     if (!activityId || !token || !bookingId) return;
     post('/api/push/live-activity/register', { activityId, bookingId, updateToken: token });
   });
 
   // The owner can swipe a card away. Recording it stops us pushing to a token
   // with nothing left to update.
-  api.addListener?.('activityEnded', ({ activityId }) => {
+  const activityEndedListener = api.addListener?.('activityEnded', ({ activityId }) => {
     if (!activityId) return;
     post('/api/push/live-activity/ended', { activityId });
   });
 
-  try { await api.startObserving(); } catch (_) {}
+  // Await registration before observing: iOS can emit the push-to-start token
+  // the instant startObserving runs, and a listener still registering across the
+  // bridge would miss that one-shot event.
+  try { await Promise.all([startTokenListener, activityTokenListener, activityEndedListener]); } catch (_) {}
+
+  try { await api.startObserving(); beacon('observing', {}); }
+  catch (error) { beacon('observe-failed', { message: String(error?.message || error) }); }
   await syncLiveActivityCredentials();
 
   return capabilities;

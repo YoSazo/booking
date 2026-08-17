@@ -5780,6 +5780,20 @@ function normalizeApnsDeviceToken(value) {
 }
 
 // The push-to-start token is per install, not per activity. Without it a
+// Temporary on-device diagnostic: the web half of Live Activities reports each
+// step of its registration here so a card that never appears is visible in the
+// server logs without a Mac. Deliberately lenient — it only logs.
+app.post('/api/push/live-activity/debug', crmAuth, async (req, res) => {
+    try {
+        const hotelId = req.crmHotelId || req.query?.hotelId || 'unknown';
+        const step = String(req.body?.step || '').slice(0, 40);
+        let detail = '';
+        try { detail = JSON.stringify(req.body?.detail || {}).slice(0, 300); } catch (_) { detail = '{}'; }
+        console.log(`🔎 [live-activity/debug] hotel=${hotelId} native=${req.crmIsNativeClient} step=${step} detail=${detail}`);
+    } catch (_) { /* diagnostics must never fail a request */ }
+    res.json({ success: true });
+});
+
 // booking can only raise a card while the app is already open.
 app.post('/api/push/live-activity/starter', crmAuth, async (req, res) => {
     try {

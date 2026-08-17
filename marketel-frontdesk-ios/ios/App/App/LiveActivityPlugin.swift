@@ -78,7 +78,11 @@ public class LiveActivityPlugin: CAPPlugin {
             Task { [weak self] in
                 for await tokenData in Activity<BookingDecisionAttributes>.pushToStartTokenUpdates {
                     let token = tokenData.map { String(format: "%02x", $0) }.joined()
-                    self?.notifyListeners("pushToStartToken", data: ["token": token])
+                    // Retain until consumed: iOS can hand over the token the instant
+                    // observation starts, before the JS listener finishes registering
+                    // across the bridge. Without retention that one-shot event is lost
+                    // and does not re-fire until the token rotates.
+                    self?.notifyListeners("pushToStartToken", data: ["token": token], retainUntilConsumed: true)
                 }
             }
         }
@@ -107,7 +111,7 @@ public class LiveActivityPlugin: CAPPlugin {
                     "activityId": activity.id,
                     "bookingId": activity.attributes.bookingId,
                     "token": token,
-                ])
+                ], retainUntilConsumed: true)
             }
         }
         Task { [weak self] in
@@ -116,7 +120,7 @@ public class LiveActivityPlugin: CAPPlugin {
                     self?.notifyListeners("activityEnded", data: [
                         "activityId": activity.id,
                         "bookingId": activity.attributes.bookingId,
-                    ])
+                    ], retainUntilConsumed: true)
                 }
             }
         }
