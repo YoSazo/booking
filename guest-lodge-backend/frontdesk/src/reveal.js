@@ -21,7 +21,12 @@ let livePreviewMode = 'guest';
 let revealData = { rooms: [], rates: null };
 let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
+// Sticky once a status check has actually come back negative. The check retries
+// every six seconds, and without this the stage would swing between "online"
+// and "publishing" on every attempt.
+let bookingPageCheckFailed = false;
 let bookingPageTimer = 0;
+let revealOpening = false;
 // Which beat each beat-driven stage is showing. Keyed by reveal step.
 let stageBeatIndex = { 1: 0, 2: 0 };
 let revealStartedAt = 0;
@@ -457,14 +462,27 @@ function roomPhotoHtml(className = '') {
   return `<div class="${className} mvr-photo-placeholder"><span>${esc((firstRoom().name || 'R').trim().charAt(0).toUpperCase())}</span></div>`;
 }
 
+// The wildcard guest domain serves a property the moment its row exists, so the
+// page is already live by the time the reveal opens — the status check only
+// confirms it. Showing "publishing" until that check returns made stage 0 paint
+// twice, and the second paint replaces the subtree and reloads the preview
+// frame, which is the rebuild owners see. So the stage opens in its finished
+// state and steps back only if a check actually disagrees.
+function bookingPageLooksReady() {
+  if (bookingPreviewUnavailable) return false;
+  if (bookingPageState.reason === 'deployment-disabled') return false;
+  if (bookingPageCheckFailed && !bookingPageState.ready) return false;
+  return !!bookingUrl();
+}
+
 function bookingPageStatusHtml() {
-  if (bookingPreviewUnavailable) {
-    return '<div class="mvr-page-status is-attention"><span>!</span>The live preview is still publishing. Your setup is saved, so you can continue without waiting.</div>';
-  }
-  if (bookingPageState.ready) {
+  if (bookingPageLooksReady()) {
     return `<div class="mvr-page-status is-ready"><span>✓</span>${bookingPageState.reason === 'local'
       ? 'Local guest preview connected'
       : 'Your live guest page is online'}</div>`;
+  }
+  if (bookingPreviewUnavailable) {
+    return '<div class="mvr-page-status is-attention"><span>!</span>The live preview is still publishing. Your setup is saved, so you can continue without waiting.</div>';
   }
   if (bookingPageState.reason === 'deployment-disabled') {
     return '<div class="mvr-page-status is-attention"><span>!</span>Your live page deployment needs to be re-enabled. Your saved setup is safe.</div>';
@@ -483,8 +501,8 @@ function bookingPreviewCardHtml() {
       <span class="mvr-preview-live"><i></i>Live</span>
     </div>
     <div class="mvr-preview-teaser">
-      ${url && !bookingPageState.checking
-        ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
+      ${url
+        ? `<iframe title="${esc(propertyName())} booking-page preview" src="${esc(url)}" tabindex="-1" aria-hidden="true" scrolling="no" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>`
         : '<div class="mvr-preview-teaser-fallback"><strong>Your booking page</strong><span>Personalized preview publishing…</span></div>'}
       <div class="mvr-preview-teaser-veil" aria-hidden="true"></div>
       <button type="button" id="mvrExpandPreview" aria-label="${url ? 'View your booking page' : 'Check booking page preview'}" ${bookingPreviewUnavailable ? 'disabled' : ''}>
@@ -906,7 +924,8 @@ function showExpandedPreview() {
     </div>
   </div>
   <div class="mvr-live-stage">
-    <iframe title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+    <iframe data-preview-frame="guest" title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+    <iframe data-preview-frame="editor" title="${esc(propertyName())} Front Desk editor" hidden sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
     <div class="mvr-challenge-layer" aria-hidden="true"></div>
   </div>
   <div class="mvr-live-actions" id="mvrLiveActions" hidden>
@@ -918,7 +937,16 @@ function showExpandedPreview() {
     <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Home Screen experience</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
-  const iframe = modal.querySelector('.mvr-live-stage > iframe');
+  const iframe = modal.querySelector('[data-preview-frame="guest"]');
+  // Front Desk cold-booting in front of the owner is not part of the pitch.
+  // The editor loads behind the booking page so that by the time they ask to
+  // see it, it is already up — they get the product, not its loading screen.
+  // It starts after the booking page so the two are not racing for the network.
+  window.setTimeout(() => {
+    const editorFrame = modal.querySelector('[data-preview-frame="editor"]');
+    if (!editorFrame?.isConnected || editorFrame.getAttribute('src')) return;
+    editorFrame.src = frontdeskEditorUrl();
+  }, 1200);
   activeBookingChallenge = {
     modal,
     iframe,
@@ -1021,15 +1049,13 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (continueGuestApp) continueGuestApp.hidden = !showContinue;
   if (back) back.hidden = !editing;
   setLivePreviewActionsVisible(modal, true);
-  const iframe = modal.querySelector('.mvr-live-stage > iframe');
-  if (iframe) {
-    iframe.title = livePreviewMode === 'edit'
-      ? `${propertyName()} Front Desk editor`
-      : `${propertyName()} booking-page preview`;
-    if (livePreviewMode === 'edit') {
-      // Re-assigning the same src reloads the frame, which is what made the
-      // editor flash the loading screen, appear, then load a second time.
-      setPreviewFrameSrc(iframe, frontdeskEditorUrl());
+  const guestFrame = modal.querySelector('[data-preview-frame="guest"]');
+  const editorFrame = modal.querySelector('[data-preview-frame="editor"]');
+  if (guestFrame && editorFrame) {
+    if (editing) {
+      // Normally already loaded from the preload above; this only covers a jump
+      // to the editor faster than the preload timer.
+      if (!editorFrame.getAttribute('src')) editorFrame.src = frontdeskEditorUrl();
     } else {
       const guestUrl = new URL(bookingUrl());
       if (modal.dataset.editorSaved === '1') {
@@ -1050,7 +1076,14 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
       }
       // A save-return deliberately carries a fresh previewRefresh, so this
       // still reloads when it should; it only skips a genuinely identical URL.
-      setPreviewFrameSrc(iframe, guestUrl.toString());
+      setPreviewFrameSrc(guestFrame, guestUrl.toString());
+    }
+    // Both pages stay loaded and only their visibility changes, so moving
+    // between the booking page and the editor never costs a page load.
+    guestFrame.hidden = editing;
+    editorFrame.hidden = !editing;
+    if (activeBookingChallenge?.modal === modal) {
+      activeBookingChallenge.iframe = editing ? editorFrame : guestFrame;
     }
   }
   trackJourney('JourneyBookingPreviewModeChanged', {
@@ -1168,6 +1201,10 @@ function bindRevealEvents() {
     moveToStep(currentStep - 1);
   });
   document.getElementById('mvrExpandPreview')?.addEventListener('click', showExpandedPreview);
+  document.querySelector('.mvr-preview-teaser-veil')?.addEventListener('click', () => {
+    if (bookingPreviewUnavailable) return;
+    showExpandedPreview();
+  });
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.querySelectorAll('[data-mvr-billing]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -1233,6 +1270,7 @@ async function checkBookingPageStatus() {
       attempts: 1,
       domain: '',
     };
+    bookingPageCheckFailed = !bookingPageState.ready;
     if (bookingUrl()) bookingPreviewUnavailable = false;
     trackJourney('JourneyBookingPageStatus', {
       ready: bookingPageState.ready,
@@ -1253,9 +1291,12 @@ async function checkBookingPageStatus() {
       attempts: bookingPageState.attempts,
       domain: String(result?.domain || ''),
     };
+    bookingPageCheckFailed = !bookingPageState.ready;
   } catch (_) {
     bookingPageState.checking = false;
     bookingPageState.reason = 'unreachable';
+    // A check we could not complete says nothing about the page, so the stage
+    // keeps showing what it has rather than accusing a live page of being down.
   }
 
   if (bookingUrl()) bookingPreviewUnavailable = false;
@@ -1273,8 +1314,24 @@ async function checkBookingPageStatus() {
   }
 }
 
-export function showMarketelValueReveal(options = {}) {
+export async function showMarketelValueReveal(options = {}) {
+  if (document.getElementById('marketelValueReveal') || revealOpening) return;
+  revealOpening = true;
+  // Stage 0 embeds the live booking page, and opening before the room data
+  // lands forces a second render once it arrives — which replaces the subtree
+  // and makes the frame load again. Waiting here costs one request; the cap
+  // stops a slow API from holding the reveal shut.
+  let preloadedRevealData = false;
+  if (!crm.editRooms?.length && typeof window.api === 'function') {
+    await Promise.race([
+      loadRevealData(),
+      new Promise((resolve) => { setTimeout(resolve, 2500); }),
+    ]);
+    preloadedRevealData = true;
+  }
+  revealOpening = false;
   if (document.getElementById('marketelValueReveal')) return;
+
   const requestedStep = Number(options.startAt);
   let storedStep = 0;
   let hadPendingReveal = false;
@@ -1297,6 +1354,7 @@ export function showMarketelValueReveal(options = {}) {
   stageStartedAt = 0;
   nextStageViewIsResume = !Number.isFinite(requestedStep) && hadPendingReveal;
   bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
+  bookingPageCheckFailed = false;
   if (bookingPageTimer) window.clearTimeout(bookingPageTimer);
   bookingPageTimer = 0;
 
@@ -1329,7 +1387,7 @@ export function showMarketelValueReveal(options = {}) {
     pendingResume: nextStageViewIsResume,
   });
   moveToStep(currentStep);
-  void loadRevealData();
+  if (!preloadedRevealData) void loadRevealData();
   void checkBookingPageStatus();
 }
 

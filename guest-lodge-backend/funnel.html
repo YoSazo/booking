@@ -5,22 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Marketel · Activity</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest-funnel.json">
+<meta name="theme-color" content="#2E7D5B">
+<!-- iOS reads these rather than the manifest for home-screen behaviour, and it
+     ignores SVG icons entirely, so the touch icon has to be a PNG. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Activity">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Front Desk's tokens verbatim. The dashboard kept its own near-miss palette
+     — cool greys against Front Desk's green-tinted ones — which is what made it
+     read as a different product. */
   :root {
-    --bg: #f8f9fa;
-    --card: #ffffff;
-    --border: #e9ecef;
-    --text: #1a1a2e;
-    --muted: #6c757d;
+    --bg: #EFF4F0;
+    --card: #FFFFFF;
+    --white: #FFFFFF;
+    --surface-subtle: #F4F8F5;
+    --border: #D8E4DC;
+    --border-soft: #E6EEE9;
+    --text: #1A2B22;
+    --muted: #6B7D72;
+    --text-soft: #4B5D52;
     --green: #2E7D5B;
-    --green-lt: #e8f5ee;
+    --green-light: #4CAF7D;
+    --green-lt: #E8F5EE;
+    --green-pale: #E8F5EE;
+    --green-mint: #C8EDD9;
+    --green-dark: #245F46;
     --blue: #3b82f6;
-    --amber: #f59e0b;
-    --red: #ef4444;
+    --amber: #F59E0B;
+    --red: #E05252;
     --purple: #8b5cf6;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-sm: 0 1px 2px rgba(26,43,34,0.04), 0 1px 3px rgba(46,125,91,0.06);
+    --shadow: 0 2px 6px rgba(46,125,91,0.06), 0 8px 20px rgba(46,125,91,0.08);
+    --shadow-md: 0 4px 14px rgba(46,125,91,0.08), 0 18px 44px rgba(46,125,91,0.13);
   }
   body {
     font-family: 'DM Sans', sans-serif;
@@ -28,6 +48,11 @@
     color: var(--text);
     min-height: 100vh;
     padding: 0;
+    /* The page itself must never scroll sideways. Anything genuinely too wide
+       — the portfolio table — scrolls inside its own container instead, which
+       is what stopped the sticky header sliding off with it. */
+    overflow-x: hidden;
+    max-width: 100%;
   }
 
   /* Header */
@@ -38,9 +63,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
     position: sticky;
     top: 0;
     z-index: 100;
+    max-width: 100%;
   }
   .header-left {
     display: flex;
@@ -285,6 +313,9 @@
   .event-card:hover {
     box-shadow: var(--shadow-md);
   }
+  /* Initials rather than an emoji. Front Desk has no emoji anywhere, and a
+     column of them was the single loudest thing making this read as a
+     different, less careful product. */
   .event-badge {
     flex-shrink: 0;
     width: 36px;
@@ -293,7 +324,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    background: var(--green-pale);
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
   .event-badge.search { background: #dbeafe; }
   .event-badge.addtocart { background: #fef3c7; }
@@ -351,9 +387,18 @@
     border-radius: 6px;
     transition: all 0.15s;
     opacity: 0;
-    font-size: 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
+  .delete-btn:hover { color: var(--red); }
   .event-card:hover .delete-btn { opacity: 1; }
+  /* Touch has no hover, so on a phone the control would never appear. */
+  @media (hover: none) {
+    .delete-btn { opacity: 1; }
+  }
   .delete-btn:hover { color: var(--red); background: #fee2e2; }
 
   /* Detail modal */
@@ -497,43 +542,147 @@
   .overview-section {
     padding: 24px;
   }
+  .panel {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    max-width: 100%;
+  }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .panel-head h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .panel-note { font-size: 12px; color: var(--muted); }
+  .panel-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .panel-hint { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .ghost-btn, .danger-btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ghost-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  .ghost-btn:hover { border-color: var(--green); color: var(--green); }
+  .danger-btn { background: var(--card); border: 1px solid var(--red); color: var(--red); }
+  .danger-btn:hover { background: var(--red); color: #fff; }
+  .beat-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 52px;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+  .beat-row.is-stage { font-weight: 700; margin-top: 10px; }
+  .beat-row.is-stage:first-child { margin-top: 0; }
+  .beat-row .beat-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .beat-row:not(.is-stage) .beat-name { color: var(--muted); padding-left: 14px; }
+  .beat-bar { background: var(--bg); border-radius: 999px; height: 8px; overflow: hidden; }
+  .beat-bar i { display: block; height: 100%; background: var(--green); border-radius: 999px; }
+  .beat-row:not(.is-stage) .beat-bar i { background: var(--green-lt); border: 1px solid var(--green); box-sizing: border-box; }
+  .beat-count { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .beat-drop { color: var(--red); font-weight: 600; }
+  .portfolio-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -18px;
+    padding: 0 18px;
+  }
+  .portfolio-table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 13px; }
+  .portfolio-table th, .portfolio-table td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .portfolio-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .portfolio-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .portfolio-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+  .push-triggers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .push-triggers label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .push-triggers input { accent-color: var(--green); cursor: pointer; }
+  .push-triggers label:has(input:checked) { border-color: var(--green); color: var(--green); background: var(--green-lt); }
+  /* Front Desk's metric card: micro-label above, figure below, no icon. Two
+     columns, the same as the revenue tab, so the two apps read as one. */
   .overview-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
     box-shadow: var(--shadow);
-  }
-  .stat-icon {
-    font-size: 20px;
-    margin-bottom: 6px;
-  }
-  .stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.2;
+    min-width: 0;
   }
   .stat-label {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--muted);
-    margin-top: 4px;
+    margin-bottom: 8px;
   }
-  .revenue-card {
-    background: linear-gradient(135deg, var(--green) 0%, #1a5c3f 100%);
-    border: none;
-    color: white;
+  .stat-value {
+    font-size: 26px;
+    line-height: 1;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
   }
-  .revenue-card .stat-value { color: white; }
-  .revenue-card .stat-label { color: rgba(255,255,255,0.8); }
+
+  /* MRR is the number the whole dashboard exists to move, so it gets the
+     full-width treatment Front Desk gives a property's own earnings. */
+  .mrr-hero {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #F3FFF8 0%, #E9FFF3 100%);
+    border: 2px solid var(--green-mint);
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .mrr-hero .stat-label { color: var(--green); }
+  .mrr-hero .stat-value { font-size: 40px; font-weight: 700; }
+  .mrr-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1.5px solid var(--green-mint);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-soft);
+  }
+  .mrr-hero-meta b { color: var(--text); font-weight: 700; }
 
   /* Founder support inbox */
   .support-tab-badge {
@@ -652,61 +801,105 @@
 <!-- OVERVIEW VIEW -->
 <div id="overviewView" class="overview-section">
   <div class="overview-grid" id="overviewGrid">
-    <div class="stat-card revenue-card">
-      <div class="stat-icon">💰</div>
+    <div class="mrr-hero">
+      <div class="stat-label">Monthly recurring revenue</div>
+      <div class="stat-value" id="stat-mrr">$0</div>
+      <div class="mrr-hero-meta">
+        <span><b id="stat-mrr-count">0</b> paying</span>
+        <span><b id="stat-mrr-arr">$0</b> annualized</span>
+        <span><b id="stat-mrr-avg">$0</b> per property</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Activation revenue</div>
       <div class="stat-value" id="stat-revenue">$0</div>
-      <div class="stat-label">Revenue</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">👁</div>
+      <div class="stat-label">Landing views</div>
       <div class="stat-value" id="stat-landing">0</div>
-      <div class="stat-label">Landing Views</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">📧</div>
+      <div class="stat-label">Setup started</div>
       <div class="stat-value" id="stat-started">0</div>
-      <div class="stat-label">Setup Started</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🎯</div>
+      <div class="stat-label">Qualified leads</div>
       <div class="stat-value" id="stat-leads">0</div>
-      <div class="stat-label">Qualified Leads</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🏨</div>
+      <div class="stat-label">Setup done</div>
       <div class="stat-value" id="stat-step4">0</div>
-      <div class="stat-label">Setup Done</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🌐</div>
+      <div class="stat-label">Saw booking page</div>
       <div class="stat-value" id="stat-booking-reveal">0</div>
-      <div class="stat-label">Saw Booking Page</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">📱</div>
+      <div class="stat-label">Saw home screen</div>
       <div class="stat-value" id="stat-app-reveal">0</div>
-      <div class="stat-label">Saw Home Screen</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🛎</div>
+      <div class="stat-label">Saw assistant</div>
       <div class="stat-value" id="stat-assistant-reveal">0</div>
-      <div class="stat-label">Saw Assistant</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">$</div>
+      <div class="stat-label">Saw $199 offer</div>
       <div class="stat-value" id="stat-offer-reveal">0</div>
-      <div class="stat-label">Saw $199 Offer</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🖱</div>
+      <div class="stat-label">Activation clicks</div>
       <div class="stat-value" id="stat-cta">0</div>
-      <div class="stat-label">Activation Clicks</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">✅</div>
-      <div class="stat-value" id="stat-paid">0</div>
       <div class="stat-label">Paid</div>
+      <div class="stat-value" id="stat-paid">0</div>
     </div>
+  </div>
+
+  <!-- Beat-level drop-off. A stage count says an owner reached the guest-app
+       stage; these say which beat lost them. -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Where the reveal loses people</h2>
+      <span class="panel-note">Properties reaching each beat, in order</span>
+    </div>
+    <div id="beatFunnel"><div class="loading">Loading…</div></div>
+  </div>
+
+  <!-- Gross booking volume across every property. -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Portfolio</h2>
+      <span class="panel-note" id="portfolioRange">Last 30 days</span>
+    </div>
+    <div class="overview-grid" id="portfolioStats"></div>
+    <div id="portfolioTable"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Notifications</h2>
+      <span class="panel-note" id="pushState">Checking…</span>
+    </div>
+    <div id="pushTriggers" class="push-triggers"></div>
+    <div class="panel-actions">
+      <button class="ghost-btn" id="pushEnableBtn" onclick="enablePush()">Enable notifications</button>
+      <button class="ghost-btn" id="pushTestBtn" onclick="testPush()" style="display:none">Send test</button>
+      <button class="ghost-btn" id="pushOffBtn" onclick="disablePush()" style="display:none">Turn off</button>
+    </div>
+    <div class="panel-hint" id="pushHint"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Data</h2>
+      <span class="panel-note">Full journey detail for analysis</span>
+    </div>
+    <div class="panel-actions">
+      <button class="ghost-btn" onclick="copyJourneyExport()">Copy journey JSON</button>
+      <button class="danger-btn" onclick="purgeActivity()">Delete all activity</button>
+    </div>
+    <div class="panel-hint" id="dataHint">Copy pastes the full visitor→session→event export to your clipboard. Delete clears the landing → setup → reveal → activation telemetry and cannot be undone. It keeps the rows that do a job: the activation and preview email send-once guards, blocked-booking demand, and onboarding answers. Bookings, properties and support threads are never touched.</div>
   </div>
 </div>
 
@@ -760,7 +953,14 @@ let allEvents = [];
 let allCounts = {};
 let currentFilter = 'all';
 let currentView = 'overview';
-let adminToken = sessionStorage.getItem('marketelAdminToken') || '';
+// localStorage, not sessionStorage: an installed PWA gets a fresh session every
+// time it is launched from the Home Screen, so the token was being demanded on
+// every single open. Only a 401 clears it now.
+// Guarded the way Front Desk guards its own: Safari private mode and some
+// installed-PWA contexts throw on storage access, and an unguarded read here
+// takes the whole dashboard script down with it.
+let adminToken = '';
+try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
 let supportThreads = [];
 let selectedSupportThreadId = new URLSearchParams(window.location.search).get('thread') || '';
 let supportLoading = false;
@@ -769,13 +969,13 @@ async function adminFetch(url, options = {}, allowRetry = true) {
   if (!adminToken) {
     adminToken = (window.prompt('Enter the Marketel admin token') || '').trim();
     if (!adminToken) throw new Error('Admin token required');
-    sessionStorage.setItem('marketelAdminToken', adminToken);
+    try { localStorage.setItem('marketelAdminToken', adminToken); } catch (_) {}
   }
   const headers = new Headers(options.headers || {});
   headers.set('x-admin-token', adminToken);
   const response = await fetch(url, { ...options, headers });
   if (response.status === 401 && allowRetry) {
-    sessionStorage.removeItem('marketelAdminToken');
+    try { localStorage.removeItem('marketelAdminToken'); } catch (_) {}
     adminToken = '';
     return adminFetch(url, options, false);
   }
@@ -1235,39 +1435,8 @@ function closeDetail(e) {
   document.body.style.overflow = '';
 }
 
-const ICONS = {
-  LandingPageView: '👁',
-  SetupStarted: '📧',
-  Step1Reached: '1️⃣',
-  Step2Reached: '2️⃣',
-  Step3Reached: '3️⃣',
-  Step4Reached: '4️⃣',
-  Step5Reached: '5️⃣',
-  QualityAnswer: '💬',
-  Lead: '🎯',
-  SetupCompleted: '🏨',
-  ValueRevealStarted: '✨',
-  BookingEngineRevealViewed: '🌐',
-  BookingEngineEditPreviewViewed: '✏️',
-  BookingEngineFullPreviewOpened: '↔️',
-  BookingChallengeShown: '⏱',
-  BookingChallengeStarted: '▶️',
-  BookingChallengeDismissed: '↪️',
-  BookingChallengeAbandoned: '⏹',
-  BookingChallengeCheckoutReached: '🏁',
-  GuestAppRevealViewed: '📱',
-  AssistantRevealViewed: '🛎',
-  ActivationOfferViewed: '$',
-  ActivationCtaClicked: '🖱',
-  PreviewReadyEmailSent: '✉️',
-  ActivationEmailSent: '📨',
-  PaymentCTAClicked: '🖱',
-  GoLiveClicked: '🖱',
-  CheckoutStarted: '💳',
-  PaymentSucceeded: '✅',
-  SubscriptionStatusChanged: '🔄',
-};
-
+// Event badges are typographic now — see eventInitials(). The emoji map that
+// used to live here was the last of it.
 const TYPE_LABELS = {
   LandingPageView: 'Landing Page',
   SetupStarted: 'Setup Started',
@@ -1289,7 +1458,16 @@ const TYPE_LABELS = {
   BookingChallengeAbandoned: 'Challenge Exited',
   BookingChallengeCheckoutReached: 'Preview Checkout Reached',
   GuestAppRevealViewed: 'Home Screen Reveal',
+  GuestAppOwnerEditorViewed: '· Beat 1 — Owner editor',
+  GuestAppInstallBannerViewed: '· Beat 2 — Install banner',
+  GuestAppInstallSheetViewed: '· Beat 3 — iOS install sheet',
+  GuestAppHomeScreenViewed: '· Beat 4 — Home screen',
+  GuestAppRebookViewed: '· Beat 5 — Rebooking',
+  GuestAppBroadcastViewed: '· Beat 6 — Broadcast',
   AssistantRevealViewed: 'Assistant Reveal',
+  AssistantTextProofViewed: '· Beat 1 — Text proof',
+  AssistantAppProofViewed: '· Beat 2 — App proof',
+  AssistantFallbackViewed: '· Beat 3 — Fallback rule',
   ActivationOfferViewed: '$199 Offer Viewed',
   ActivationCtaClicked: 'Activation CTA Clicked',
   PreviewReadyEmailSent: 'Preview Email Sent',
@@ -1350,6 +1528,7 @@ function renderEvents() {
   document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
   document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
   document.getElementById('stat-paid').textContent = paid;
+  renderBeatFunnel(allCounts);
 
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty-state"><p>No events found for this filter.</p></div>';
@@ -1358,7 +1537,7 @@ function renderEvents() {
 
   list.innerHTML = filtered.map(e => {
     const typeClass = e.event_name.toLowerCase().replace(/[^a-z]/g, '') || 'other';
-    const icon = ICONS[e.event_name] || '•';
+    const icon = eventInitials(TYPE_LABELS[e.event_name] || e.event_name);
     const label = TYPE_LABELS[e.event_name] || e.event_name;
     const idx = allEvents.indexOf(e);
     
@@ -1384,7 +1563,7 @@ function renderEvents() {
         </div>
         <div class="event-right">
           <span class="event-time">${formatTime(e.timestamp)}</span>
-          <button class="delete-btn" onclick="event.stopPropagation(); deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">🗑</button>
+          <button class="delete-btn" onclick="event.stopPropagation(); deleteEvent('${e.event_id || ''}', ${e.timestamp})" title="Delete">Delete</button>
         </div>
       </div>
     `;
@@ -1409,6 +1588,324 @@ async function deleteEvent(eventId, timestamp) {
     }
   } catch (e) {
     console.error('Delete failed:', e);
+  }
+}
+
+// Two letters from the label — beats reduce to their stage plus number, so
+// "· Beat 3 — iOS install sheet" reads as B3 rather than a stray bullet.
+function eventInitials(label) {
+  const clean = String(label || '').replace(/^[·\s]+/, '').trim();
+  const beat = clean.match(/^Beat (\d+)/i);
+  if (beat) return 'B' + beat[1];
+  // Only letter-led words count, so "Paid $199" reads PA rather than P$.
+  const words = clean.split(/[\s—–-]+/).filter((w) => /^[A-Za-z]/.test(w));
+  if (!words.length) return clean.slice(0, 2).toUpperCase() || '··';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+/* ---------- Push notifications ---------- */
+
+const PUSH_TRIGGER_LABELS = {
+  Lead: 'Qualified lead',
+  SetupCompleted: 'Setup completed',
+  GoLiveClicked: 'Activation clicked',
+  PaymentSucceeded: 'Paid',
+  SupportMessage: 'Support message',
+};
+
+// iOS only delivers Web Push to an installed PWA, and only from a window
+// launched by its Home Screen icon — the same page in Safari can subscribe and
+// then never receive anything, so the state is worth naming rather than
+// letting the button silently do nothing.
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+let pushRegistration = null;
+let pushSubscription = null;
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+function selectedTriggers() {
+  return [...document.querySelectorAll('#pushTriggers input:checked')].map((i) => i.value);
+}
+
+function renderPushTriggers(enabled) {
+  const host = document.getElementById('pushTriggers');
+  if (!host) return;
+  const active = new Set(enabled || Object.keys(PUSH_TRIGGER_LABELS));
+  host.innerHTML = Object.entries(PUSH_TRIGGER_LABELS).map(([key, label]) =>
+    `<label><input type="checkbox" value="${key}"${active.has(key) ? ' checked' : ''} onchange="saveTriggers()">${escapeHtml(label)}</label>`
+  ).join('');
+}
+
+function setPushUi({ state, hint, subscribed }) {
+  const stateEl = document.getElementById('pushState');
+  const hintEl = document.getElementById('pushHint');
+  if (stateEl) stateEl.textContent = state;
+  if (hintEl) hintEl.textContent = hint || '';
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('pushEnableBtn', !subscribed);
+  show('pushTestBtn', !!subscribed);
+  show('pushOffBtn', !!subscribed);
+}
+
+async function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setPushUi({ state: 'Not supported', hint: 'This browser cannot receive web push.', subscribed: false });
+    return;
+  }
+  try {
+    pushRegistration = await navigator.serviceWorker.register('/funnel-sw.js', { scope: '/funnel' });
+    pushSubscription = await pushRegistration.pushManager.getSubscription();
+    const response = await adminFetch('/api/admin/push/status');
+    const data = await response.json();
+    if (!data.configured) {
+      setPushUi({ state: 'Unavailable', hint: 'Push is not configured on the server — VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are not set.', subscribed: false });
+      return;
+    }
+    // The status list is every subscribed device, so the checkboxes have to
+    // reflect this one rather than whichever row happens to come back first.
+    const myEndpoint = pushSubscription ? pushSubscription.endpoint : '';
+    const mine = (data.subscriptions || []).find((s) => s.endpoint === myEndpoint);
+    renderPushTriggers(mine && Array.isArray(mine.events) ? mine.events : null);
+    if (pushSubscription) {
+      setPushUi({ state: 'On for this device', hint: `${(data.subscriptions || []).length} device(s) subscribed.`, subscribed: true });
+    } else if (isIOS && !isStandalone) {
+      setPushUi({
+        state: 'Add to Home Screen first',
+        hint: 'iOS only delivers notifications to an installed app. Tap Share → Add to Home Screen, open Activity from the icon, then enable here.',
+        subscribed: false,
+      });
+    } else {
+      setPushUi({ state: 'Off', hint: 'Enable to get notified on the moments that matter.', subscribed: false });
+    }
+  } catch (e) {
+    setPushUi({ state: 'Error', hint: e.message, subscribed: false });
+  }
+}
+
+async function enablePush() {
+  try {
+    if (isIOS && !isStandalone) {
+      setPushUi({ state: 'Add to Home Screen first', hint: 'Open Activity from its Home Screen icon, then enable notifications from there.', subscribed: false });
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      setPushUi({ state: 'Blocked', hint: 'Notification permission was denied. Re-allow it in browser settings.', subscribed: false });
+      return;
+    }
+    const statusRes = await adminFetch('/api/admin/push/status');
+    const status = await statusRes.json();
+    if (!status.publicKey) throw new Error('Server has no VAPID public key');
+
+    pushSubscription = await pushRegistration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(status.publicKey),
+    });
+    const raw = pushSubscription.toJSON();
+    const response = await adminFetch('/api/admin/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: raw.endpoint,
+        p256dh: raw.keys.p256dh,
+        auth: raw.keys.auth,
+        label: navigator.platform || 'device',
+        events: selectedTriggers(),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Subscribe failed');
+    setPushUi({ state: 'On for this device', hint: 'Subscribed. Send a test to confirm it lands.', subscribed: true });
+  } catch (e) {
+    setPushUi({ state: 'Error', hint: e.message, subscribed: false });
+  }
+}
+
+async function saveTriggers() {
+  if (!pushSubscription) return;
+  const raw = pushSubscription.toJSON();
+  try {
+    await adminFetch('/api/admin/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: raw.endpoint,
+        p256dh: raw.keys.p256dh,
+        auth: raw.keys.auth,
+        events: selectedTriggers(),
+      }),
+    });
+    const hint = document.getElementById('pushHint');
+    if (hint) hint.textContent = 'Saved.';
+  } catch (_) { /* the checkbox state is the source of truth on next save */ }
+}
+
+async function testPush() {
+  try {
+    await adminFetch('/api/admin/push/test', { method: 'POST' });
+    const hint = document.getElementById('pushHint');
+    if (hint) hint.textContent = 'Test sent. It should arrive within a few seconds.';
+  } catch (e) {
+    const hint = document.getElementById('pushHint');
+    if (hint) hint.textContent = 'Could not send test: ' + e.message;
+  }
+}
+
+async function disablePush() {
+  if (!pushSubscription) return;
+  const endpoint = pushSubscription.endpoint;
+  try {
+    await pushSubscription.unsubscribe();
+    await adminFetch('/api/admin/push/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    });
+    pushSubscription = null;
+    setPushUi({ state: 'Off', hint: 'Notifications turned off for this device.', subscribed: false });
+  } catch (e) {
+    setPushUi({ state: 'Error', hint: e.message, subscribed: true });
+  }
+}
+
+// The reveal in the order an owner actually walks it, stage by stage and beat
+// by beat. Reading the counts down the column shows exactly which frame loses
+// them, which a four-bucket stage funnel cannot.
+const REVEAL_WALK = [
+  { key: 'BookingEngineRevealViewed', label: 'Booking page', stage: true },
+  { key: 'BookingEngineFullPreviewOpened', label: 'Opened full preview' },
+  { key: 'BookingEngineEditPreviewViewed', label: 'Opened Front Desk editor' },
+  { key: 'GuestAppRevealViewed', label: 'Guest app', stage: true },
+  { key: 'GuestAppOwnerEditorViewed', label: 'Owner editor' },
+  { key: 'GuestAppInstallBannerViewed', label: 'Install banner' },
+  { key: 'GuestAppInstallSheetViewed', label: 'iOS install sheet' },
+  { key: 'GuestAppHomeScreenViewed', label: 'Home screen' },
+  { key: 'GuestAppRebookViewed', label: 'Rebooking' },
+  { key: 'GuestAppBroadcastViewed', label: 'Broadcast' },
+  { key: 'AssistantRevealViewed', label: 'Assistant', stage: true },
+  { key: 'AssistantTextProofViewed', label: 'Text proof' },
+  { key: 'AssistantAppProofViewed', label: 'App proof' },
+  { key: 'AssistantFallbackViewed', label: 'Fallback rule' },
+  { key: 'ActivationOfferViewed', label: 'Activation offer', stage: true },
+  { key: 'ActivationCtaClicked', label: 'Clicked activate' },
+];
+
+function renderBeatFunnel(counts) {
+  const host = document.getElementById('beatFunnel');
+  if (!host) return;
+  const top = counts.BookingEngineRevealViewed || 0;
+  if (!top) {
+    host.innerHTML = '<div class="portfolio-empty">No reveal activity in this range yet.</div>';
+    return;
+  }
+  let previous = top;
+  host.innerHTML = REVEAL_WALK.map((step) => {
+    const value = counts[step.key] || 0;
+    const width = top ? Math.round((value / top) * 100) : 0;
+    const dropped = previous - value;
+    const dropNote = dropped > 0 ? ` <span class="beat-drop">−${dropped}</span>` : '';
+    previous = value;
+    return `<div class="beat-row${step.stage ? ' is-stage' : ''}">
+      <span class="beat-name">${escapeHtml(step.label)}</span>
+      <span class="beat-bar"><i style="width:${width}%"></i></span>
+      <span class="beat-count">${value}${dropNote}</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadPortfolio() {
+  const stats = document.getElementById('portfolioStats');
+  const table = document.getElementById('portfolioTable');
+  if (!stats || !table) return;
+  try {
+    const response = await adminFetch('/api/admin/portfolio?days=30');
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Request failed');
+    const t = data.totals || {};
+    const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    // MRR is the headline the overview opens with, and it comes from the same
+    // portfolio query, so it is filled here rather than fetched twice.
+    const paying = t.payingProperties || 0;
+    const mrr = paying * 199;
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    setText('stat-mrr', money(mrr));
+    setText('stat-mrr-count', String(paying));
+    setText('stat-mrr-arr', money(mrr * 12));
+    setText('stat-mrr-avg', money(paying ? mrr / paying : 0));
+
+    stats.innerHTML = [
+      ['Booking volume', money(t.gmv)],
+      ['Properties', t.properties || 0],
+      ['Paying', paying],
+      ['Bookings', t.bookings || 0],
+      ['Nights', t.nights || 0],
+      ['Avg booking', money(t.averageBookingValue)],
+      ['Spread at 0.4%', money(t.processingAt40Bps)],
+    ].map(([label, value]) => `<div class="stat-card">
+        <div class="stat-label">${escapeHtml(label)}</div>
+        <div class="stat-value">${escapeHtml(String(value))}</div>
+      </div>`).join('');
+
+    const rows = (data.properties || []).filter((p) => p.bookings > 0 || p.gmv > 0);
+    table.innerHTML = rows.length
+      ? `<div class="portfolio-scroll"><table class="portfolio-table"><thead><tr>
+          <th>Property</th><th>Status</th>
+          <th style="text-align:right">Bookings</th>
+          <th style="text-align:right">Nights</th>
+          <th style="text-align:right">Volume</th>
+        </tr></thead><tbody>${rows.map((p) => `<tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.subscriptionStatus || '—')}</td>
+            <td class="num">${p.bookings}</td>
+            <td class="num">${p.nights}</td>
+            <td class="num">${money(p.gmv)}</td>
+          </tr>`).join('')}</tbody></table></div>`
+      : '<div class="portfolio-empty">No guest bookings in the last 30 days.</div>';
+  } catch (e) {
+    table.innerHTML = '<div class="portfolio-empty">Could not load portfolio: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function copyJourneyExport() {
+  const hint = document.getElementById('dataHint');
+  try {
+    const response = await adminFetch('/api/funnel/journey-export?days=90');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Request failed');
+    const text = JSON.stringify(data, null, 2);
+    await navigator.clipboard.writeText(text);
+    if (hint) hint.textContent = `Copied ${text.length.toLocaleString()} characters covering ${data.totals?.sessions || 0} sessions across ${data.totals?.visitors || 0} visitors. Paste it straight into Claude.`;
+  } catch (e) {
+    if (hint) hint.textContent = 'Could not copy: ' + e.message;
+  }
+}
+
+async function purgeActivity() {
+  const hint = document.getElementById('dataHint');
+  const typed = window.prompt('This permanently deletes the landing → setup → reveal → activation telemetry.\n\nKept: email send-once guards, blocked-booking demand, onboarding answers, and every booking, property and support thread.\n\nType DELETE ALL ACTIVITY to confirm.');
+  if (typed !== 'DELETE ALL ACTIVITY') {
+    if (hint && typed !== null) hint.textContent = 'Purge cancelled — the phrase did not match.';
+    return;
+  }
+  try {
+    const response = await adminFetch('/api/admin/funnel/purge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: 'DELETE ALL ACTIVITY' }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Request failed');
+    if (hint) hint.textContent = `Deleted ${data.deleted} events. Reloading…`;
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) {
+    if (hint) hint.textContent = 'Could not purge: ' + e.message;
   }
 }
 
@@ -1462,6 +1959,11 @@ if (new URLSearchParams(window.location.search).get('view') === 'support') {
 } else {
   loadEvents();
 }
+// Portfolio reads bookings rather than funnel events, so it loads on its own
+// and is left out of the 30s refresh — guest booking volume does not move at
+// that cadence and the query walks every property.
+loadPortfolio();
+initPush();
 
 // Auto-refresh every 30 seconds
 setInterval(() => {

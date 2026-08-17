@@ -1026,6 +1026,21 @@ function showBootState({ title, message, debug = '', showRetry = false } = {}) {
   document.getElementById('bootRetryBtn').style.display = showRetry ? 'block' : 'none';
 }
 
+// The reveal is a full-screen takeover of a product the owner has not been
+// introduced to yet, so letting the Front Desk shell paint first flashes a UI
+// that means nothing to them. The boot screen stays over the shell until the
+// reveal is mounted and hands straight over to it.
+function holdBootScreenForReveal() {
+  document.getElementById('bootScreen')?.classList.add('is-holding-for-reveal');
+}
+
+function releaseBootScreenHold() {
+  const boot = document.getElementById('bootScreen');
+  if (!boot) return;
+  boot.classList.remove('is-holding-for-reveal');
+  boot.style.display = 'none';
+}
+
 function formatContextDebugLines(lines) {
   return lines.filter(Boolean).join('\n');
 }
@@ -2431,7 +2446,8 @@ async function startCrmApp(verification, options = {}) {
     if (!bootstrapped) hydrateCrmInBackground();
   }
 
-  document.getElementById('bootScreen').style.display = 'none';
+  if (shouldShowValueReveal) holdBootScreenForReveal();
+  else document.getElementById('bootScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
   hideNativePropertyScreen();
   document.getElementById('app').style.display = 'block';
@@ -2497,10 +2513,12 @@ async function startCrmApp(verification, options = {}) {
     try {
       if (typeof loadSettingsModule === 'function') await loadSettingsModule();
       const revealModule = await loadRevealModule();
-      revealModule.showMarketelValueReveal({ startAt: revealStartAt });
+      await revealModule.showMarketelValueReveal({ startAt: revealStartAt });
     } catch (error) {
       console.error('Marketel value reveal failed:', error);
       if (isFirstWelcome) showWelcomeModal();
+    } finally {
+      releaseBootScreenHold();
     }
   } else if (isFirstWelcome) {
     showWelcomeModal();
@@ -2764,6 +2782,30 @@ function showNativeAuthenticationError(error) {
   return true;
 }
 
+// fd_ return tokens are handoff credentials that expire in a day, and storing
+// one as the session is why Front Desk would sign an owner out with
+// "Unauthorized" some time after they arrived from setup or Stripe. Trade it
+// for a real session as soon as one request has proved it still works. Failure
+// is not fatal — the handoff token is still valid today, so the owner carries
+// on and the next load tries again.
+async function upgradeToDurableSession() {
+  if (!crm.token || !String(crm.token).startsWith('fd_')) return;
+  if (crm.sessionUpgradeInFlight) return;
+  crm.sessionUpgradeInFlight = true;
+  try {
+    const data = await api('POST', '/api/crm/session/exchange');
+    if (data?.success && typeof data.token === 'string' && data.token.startsWith('fds_')) {
+      crm.token = data.token;
+      try { localStorage.setItem('crmToken', crm.token); } catch (_) {}
+      logFrontdeskAuth('session-upgraded', { hotelId: data.hotelId || '' });
+    }
+  } catch (_) {
+    // Keep the handoff token; it still has time left on it.
+  } finally {
+    crm.sessionUpgradeInFlight = false;
+  }
+}
+
 function isAuthenticationFailure(error) {
   const status = Number(error?.status) || 0;
   return status === 401 || status === 403;
@@ -2816,6 +2858,9 @@ async function bootCrmApp() {
       try {
         const verification = await loadCrmBootstrap();
         await startCrmApp(verification, { bootstrapped: true });
+        // Bootstrap succeeding is the proof the credential works, which is the
+        // right moment to trade a handoff token for a lasting session.
+        upgradeToDurableSession().catch(() => {});
         return;
       } catch (e) {
         // Safe rolling deploy: an already-installed native bundle may launch

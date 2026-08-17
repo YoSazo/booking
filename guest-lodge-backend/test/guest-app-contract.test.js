@@ -56,3 +56,30 @@ test('single reservation lookup echoes the requested code like the batch endpoin
     // asked for, and the deep-link surface can never confirm it resolved.
     assert.match(server, /requestedCode: code/);
 });
+
+test('account deletion stays owner-only except for the synthetic review property', () => {
+    // A shared front-desk PIN must never be able to delete a real business, so
+    // the exception has to stay keyed on the seeded App Review marker and
+    // nothing broader.
+    assert.match(server, /function isAppReviewDemoProperty\(hotel\)[\s\S]{0,220}app_review/);
+    assert.match(server, /function hasAccountOwnerSession\(req, hotel\)[\s\S]{0,120}isAppReviewDemoProperty\(hotel\)/);
+    assert.match(server, /function hasAccountOwnerSession[\s\S]{0,400}crmIsNativeSession[\s\S]{0,160}sessionEmail === ownerEmail/);
+
+    // Both the gate and the button state must read the same predicate, or the
+    // control can appear without the request succeeding.
+    assert.match(server, /function requireNativeOwnerSession[\s\S]{0,120}hasAccountOwnerSession\(req, hotel\)/);
+    assert.match(server, /ownerSession: hasAccountOwnerSession\(req, hotel\)/);
+
+    // The predicate reads a field the deletion queries must actually select.
+    assert.match(server, /select: \{ ownerEmail: true, marketelSubscriptionStatus: true \}/);
+});
+
+test('only the seed writes the App Review subscription marker', () => {
+    const seed = fs.readFileSync(
+        path.join(__dirname, '..', 'scripts', 'seed-app-review-property.js'),
+        'utf8'
+    );
+    assert.match(seed, /marketelSubscriptionStatus: 'app_review'/);
+    // server.js may read the marker but must never assign it.
+    assert.doesNotMatch(server, /marketelSubscriptionStatus: 'app_review'/);
+});

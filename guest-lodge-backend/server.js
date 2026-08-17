@@ -4861,6 +4861,46 @@ function verifyNativeSessionToken(token) {
     }
 }
 
+// A handoff token is not a session. The fd_ return token exists to carry an
+// owner across one boundary — out to Stripe, back from setup — and expires in
+// 24 hours, but the browser was storing it as its long-lived credential. A day
+// later every request 401s and the client, which treats any 401 as "signed
+// out", wipes the token and demands a PIN the owner may never have been given.
+//
+// So a return token is exchanged once for this: same signing secret, scoped to
+// the one hotel it already proved access to, and lasting as long as a native
+// session. Minting a PIN instead would either rotate the property's shared PIN
+// and sign out its staff, or add a new PIN on every return.
+const CRM_SESSION_TOKEN_EXPIRY_MS = NATIVE_SESSION_TOKEN_EXPIRY_MS;
+
+function generateCrmSessionToken(hotelId) {
+    const payload = JSON.stringify({
+        purpose: 'frontdesk-session',
+        hotelId: String(hotelId || '').trim(),
+        exp: Date.now() + CRM_SESSION_TOKEN_EXPIRY_MS,
+    });
+    const encoded = Buffer.from(payload).toString('base64url');
+    const sig = crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET).update(encoded).digest('base64url');
+    return `fds_${encoded}.${sig}`;
+}
+
+function verifyCrmSessionToken(token) {
+    const raw = String(token || '').trim();
+    if (!raw.startsWith('fds_')) return null;
+    const parts = raw.slice(4).split('.');
+    if (parts.length !== 2) return null;
+    const [encoded, sig] = parts;
+    const expected = crypto.createHmac('sha256', NATIVE_SESSION_TOKEN_SECRET).update(encoded).digest('base64url');
+    if (!timingSafeTextEqual(sig, expected)) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (payload.purpose !== 'frontdesk-session' || !payload.hotelId || payload.exp < Date.now()) return null;
+        return { hotelId: String(payload.hotelId).trim() };
+    } catch (_) {
+        return null;
+    }
+}
+
 const nativeOwnerHotelsCache = new Map();
 
 async function getDbAllowedHotelsForOwnerEmail(email) {
@@ -5062,13 +5102,14 @@ const crmAuth = async (req, res, next) => {
     const marketelClient = String(req.headers['x-marketel-client'] || '').trim().toLowerCase();
     const isNativeClient = marketelClient === 'ios' || marketelClient === 'android';
     const returnAuth = await verifyCrmReturnToken(token);
-    const nativeAuth = returnAuth ? null : verifyNativeSessionToken(token);
+    const sessionAuth = returnAuth ? null : verifyCrmSessionToken(token);
+    const nativeAuth = returnAuth || sessionAuth ? null : verifyNativeSessionToken(token);
     // A lookup that *fails* is not a credential that is *absent*. Swallowing the
     // error into an empty list made a transient database blip indistinguishable
     // from a wrong PIN, and the client responds to 401 by deleting a valid token
     // and demanding the PIN again.
     let credentialLookupFailed = false;
-    const dbAllowedHotels = returnAuth || nativeAuth
+    const dbAllowedHotels = returnAuth || sessionAuth || nativeAuth
         ? []
         : await getDbAllowedHotelsForToken(token).catch((error) => {
             credentialLookupFailed = true;
@@ -5084,14 +5125,17 @@ const crmAuth = async (req, res, next) => {
         : [];
     let allowedHotels = returnAuth
         ? [returnAuth.hotelId]
-        : nativeAuth
-            ? nativeAllowedHotels
-            : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
+        : sessionAuth
+            ? [sessionAuth.hotelId]
+            : nativeAuth
+                ? nativeAllowedHotels
+                : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
 
     const requestedHotelId = String(req.query?.hotelId || req.body?.hotelId || '').trim();
     let isDogfoodPreviewAccess = false;
     if (
         !returnAuth
+        && !sessionAuth
         && !nativeAuth
         && requestedHotelId
         && CRM_DOGFOOD_PINS.has(token)
@@ -6200,8 +6244,15 @@ const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
     'JourneyRevealStageViewed',
     'JourneyRevealStageCompleted',
     'JourneyRevealNavigation',
+    // Beats are the real resolution of the reveal. A stage view only says an
+    // owner reached the guest-app stage; the beat says whether they got past
+    // the install sheet. Without this the middle of the funnel is one bucket.
+    'JourneyRevealBeatViewed',
+    'JourneyAssistantFallbackSelected',
+    'JourneyBillingIntervalSelected',
     'JourneyBookingPreviewOpened',
     'JourneyBookingPreviewModeChanged',
+    'JourneyBookingPreviewEdited',
     'JourneyBookingPreviewCheckoutReached',
     'JourneyBookingChallengeShown',
     'JourneyBookingChallengeStarted',
@@ -6405,6 +6456,19 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppValueSlideViewed',
     'GuestAppInstallSlideReplayed',
     'GuestAppInstallDemoClicked',
+    // The reveal was rebuilt around real screenshots played as beats, and these
+    // are the per-beat milestones it has been firing ever since. They were never
+    // added here, so every one of them was rejected as an unknown event and the
+    // guest-app and assistant stages recorded nothing between entry and exit.
+    'GuestAppOwnerEditorViewed',
+    'GuestAppInstallBannerViewed',
+    'GuestAppInstallSheetViewed',
+    'GuestAppHomeScreenViewed',
+    'GuestAppRebookViewed',
+    'GuestAppBroadcastViewed',
+    'AssistantTextProofViewed',
+    'AssistantAppProofViewed',
+    'AssistantFallbackViewed',
     'BookingChallengeShown',
     'BookingChallengeStarted',
     'BookingChallengeDismissed',
@@ -9704,6 +9768,9 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
                 externalId: linkedExternalId,
             },
         });
+        if (eventName === 'Lead') {
+            void sendAdminPush('Lead', { property: trackedEmail || trackedHotelId });
+        }
 
         // Match the browser's standard Lead event and event_id. Meta uses the
         // pair to deduplicate Pixel and Conversions API copies of the same lead.
@@ -10847,6 +10914,255 @@ function productionLaunchReadiness() {
     };
 }
 
+// Front Desk shows a property its own revenue and nothing ever added those up,
+// so there was no view of gross booking volume across the base. That total is
+// the number every payments question starts from, so it belongs on one screen.
+app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
+    try {
+        const daysBack = Math.max(1, Math.min(365, parseInt(req.query.days, 10) || 30));
+        const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+        const [hotels, bookings] = await Promise.all([
+            prisma.hotelConfig.findMany({
+                select: { id: true, name: true, marketelSubscriptionStatus: true, createdAt: true },
+            }),
+            prisma.booking.findMany({
+                where: { createdAt: { gte: since } },
+                select: { hotelId: true, grandTotal: true, nights: true, status: true },
+            }),
+        ]);
+
+        const byHotel = new Map();
+        for (const hotel of hotels) {
+            byHotel.set(hotel.id, {
+                hotelId: hotel.id,
+                name: hotel.name || hotel.id,
+                subscriptionStatus: hotel.marketelSubscriptionStatus || null,
+                bookings: 0,
+                cancelled: 0,
+                nights: 0,
+                gmv: 0,
+            });
+        }
+        for (const booking of bookings) {
+            const row = byHotel.get(booking.hotelId);
+            if (!row) continue;
+            const cancelled = String(booking.status || '').toLowerCase() === 'cancelled';
+            if (cancelled) {
+                row.cancelled += 1;
+                continue;
+            }
+            row.bookings += 1;
+            row.nights += Number(booking.nights) || 0;
+            row.gmv += Number(booking.grandTotal) || 0;
+        }
+
+        const properties = Array.from(byHotel.values()).sort((a, b) => b.gmv - a.gmv);
+        const paying = properties.filter((p) => ['active', 'trialing'].includes(String(p.subscriptionStatus || '').toLowerCase()));
+        const gmv = properties.reduce((sum, p) => sum + p.gmv, 0);
+        const bookingCount = properties.reduce((sum, p) => sum + p.bookings, 0);
+
+        res.json({
+            success: true,
+            rangeDays: daysBack,
+            totals: {
+                properties: properties.length,
+                payingProperties: paying.length,
+                bookings: bookingCount,
+                cancelled: properties.reduce((sum, p) => sum + p.cancelled, 0),
+                nights: properties.reduce((sum, p) => sum + p.nights, 0),
+                gmv: Math.round(gmv * 100) / 100,
+                averageBookingValue: bookingCount ? Math.round((gmv / bookingCount) * 100) / 100 : 0,
+                // What a processing spread would have earned over this window.
+                // Sizing only — it assumes every booking settles on our rails.
+                processingAt40Bps: Math.round(gmv * 0.004 * 100) / 100,
+            },
+            properties,
+        });
+    } catch (e) {
+        console.error('admin portfolio:', e.message);
+        res.status(500).json({ success: false, message: 'Could not build the portfolio view.' });
+    }
+});
+
+// FunnelEvent is not only analytics. A few rows in it are load-bearing, and
+// deleting them has consequences out in the world rather than on a chart:
+//
+//   ActivationEmailSent / ActivationEmailSending  send-once guard. Without the
+//       row, a property that already received its activation email gets another.
+//   PreviewReadyEmailSent                         same guard for the preview email.
+//   BlockedBookingAttempt                         guest demand against a blocked
+//       property. It is evidence, not telemetry, and feeds the comeback signal.
+//   OnboardingAnswers                             what the owner told us at signup.
+//
+// So the purge works from an allowlist of the funnel telemetry itself. Anything
+// not named here survives, which also means a future operational use of this
+// table is safe by default rather than by remembering to update a denylist.
+const FUNNEL_PURGE_PROTECTED = new Set([
+    'ActivationEmailSending',
+    'ActivationEmailSent',
+    'PreviewReadyEmailSent',
+    'BlockedBookingAttempt',
+    'OnboardingAnswers',
+]);
+const FUNNEL_PURGEABLE_EVENT_NAMES = MARKETEL_ONBOARDING_EVENT_NAMES
+    .filter((name) => !FUNNEL_PURGE_PROTECTED.has(name));
+
+app.post('/api/admin/funnel/purge', adminAuth, async (req, res) => {
+    try {
+        if (String(req.body?.confirm || '') !== 'DELETE ALL ACTIVITY') {
+            return res.status(400).json({
+                success: false,
+                message: 'Send confirm: "DELETE ALL ACTIVITY" to purge.',
+            });
+        }
+        const before = req.body?.before ? new Date(req.body.before) : null;
+        if (before && isNaN(before)) {
+            return res.status(400).json({ success: false, message: 'Invalid before date.' });
+        }
+        const where = { eventName: { in: FUNNEL_PURGEABLE_EVENT_NAMES } };
+        if (before) where.createdAt = { lt: before };
+        const deleted = await prisma.funnelEvent.deleteMany({ where });
+        console.log(`admin purge: removed ${deleted.count} funnel events${before ? ` before ${before.toISOString()}` : ''}`);
+        res.json({
+            success: true,
+            deleted: deleted.count,
+            scope: before ? `before ${before.toISOString()}` : 'all',
+            preserved: [...FUNNEL_PURGE_PROTECTED],
+        });
+    } catch (e) {
+        console.error('admin funnel purge:', e.message);
+        res.status(500).json({ success: false, message: 'Could not purge activity.' });
+    }
+});
+
+// The moments worth interrupting an operator for. Landing views are omitted on
+// purpose: during an ad run they arrive constantly, and a dashboard that buzzes
+// all day gets its notifications switched off within a day, taking the useful
+// ones with it.
+const ADMIN_PUSH_TRIGGERS = {
+    Lead: { title: 'Qualified lead', body: (c) => `${c.property || 'A property'} answered as qualified.` },
+    SetupCompleted: { title: 'Setup completed', body: (c) => `${c.property || 'A property'} finished setup.` },
+    GoLiveClicked: { title: 'Activation clicked', body: (c) => `${c.property || 'A property'} clicked activate.` },
+    PaymentSucceeded: { title: 'Paid', body: (c) => `${c.property || 'A property'} activated Marketel.` },
+    SupportMessage: { title: 'New support message', body: (c) => `${c.property || 'A property'} sent a message.` },
+};
+const ADMIN_PUSH_DEFAULT_EVENTS = Object.keys(ADMIN_PUSH_TRIGGERS);
+
+function adminPushWants(subscription, eventName) {
+    const chosen = Array.isArray(subscription?.events) ? subscription.events : null;
+    return chosen ? chosen.includes(eventName) : true;
+}
+
+// Fire-and-forget. A notification failing must never affect the request that
+// triggered it — a payment still succeeded whether or not the phone buzzed.
+async function sendAdminPush(eventName, context = {}) {
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+    const trigger = ADMIN_PUSH_TRIGGERS[eventName];
+    if (!trigger) return;
+    let subscriptions = [];
+    try {
+        subscriptions = await prisma.adminPushSubscription.findMany();
+    } catch (_) {
+        return;
+    }
+    const payload = JSON.stringify({
+        title: trigger.title,
+        body: trigger.body(context),
+        tag: `marketel-${eventName}`,
+        url: eventName === 'SupportMessage' ? '/funnel?view=support' : '/funnel',
+    });
+    await Promise.all(subscriptions.filter((s) => adminPushWants(s, eventName)).map(async (s) => {
+        try {
+            await webpush.sendNotification(
+                { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+                payload
+            );
+            await prisma.adminPushSubscription.update({
+                where: { id: s.id },
+                data: { lastSentAt: new Date(), failures: 0 },
+            }).catch(() => {});
+        } catch (e) {
+            // 404/410 mean the browser threw the subscription away. Anything
+            // else may be transient, so only a gone endpoint is deleted.
+            if (e?.statusCode === 404 || e?.statusCode === 410) {
+                await prisma.adminPushSubscription.delete({ where: { id: s.id } }).catch(() => {});
+            } else {
+                await prisma.adminPushSubscription.update({
+                    where: { id: s.id },
+                    data: { failures: { increment: 1 } },
+                }).catch(() => {});
+            }
+        }
+    }));
+}
+
+app.get('/api/admin/push/status', adminAuth, async (_req, res) => {
+    try {
+        const subscriptions = await prisma.adminPushSubscription.findMany({
+            // endpoint is returned so the page can tell which row is this
+            // device and show its own trigger choices, not another device's.
+            select: { id: true, endpoint: true, label: true, createdAt: true, events: true, lastSentAt: true },
+            orderBy: { createdAt: 'asc' },
+        });
+        res.json({
+            success: true,
+            configured: !!(VAPID_PUBLIC && VAPID_PRIVATE),
+            publicKey: VAPID_PUBLIC || null,
+            triggers: ADMIN_PUSH_DEFAULT_EVENTS,
+            subscriptions,
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Could not read push status.' });
+    }
+});
+
+app.post('/api/admin/push/subscribe', adminAuth, async (req, res) => {
+    try {
+        if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+            return res.status(503).json({ success: false, message: 'Push is not configured. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.' });
+        }
+        const { endpoint, p256dh, auth, label, events } = req.body || {};
+        if (!endpoint || !p256dh || !auth) {
+            return res.status(400).json({ success: false, message: 'endpoint, p256dh and auth are required.' });
+        }
+        const chosen = Array.isArray(events)
+            ? events.filter((name) => ADMIN_PUSH_DEFAULT_EVENTS.includes(name))
+            : ADMIN_PUSH_DEFAULT_EVENTS;
+        const saved = await prisma.adminPushSubscription.upsert({
+            where: { endpoint: String(endpoint) },
+            create: {
+                endpoint: String(endpoint),
+                p256dh: String(p256dh),
+                auth: String(auth),
+                label: label ? String(label).slice(0, 80) : null,
+                events: chosen,
+            },
+            update: { p256dh: String(p256dh), auth: String(auth), events: chosen, failures: 0 },
+            select: { id: true, events: true },
+        });
+        res.json({ success: true, id: saved.id, events: saved.events });
+    } catch (e) {
+        console.error('admin push subscribe:', e.message);
+        res.status(500).json({ success: false, message: 'Could not save the subscription.' });
+    }
+});
+
+app.post('/api/admin/push/unsubscribe', adminAuth, async (req, res) => {
+    try {
+        const endpoint = String(req.body?.endpoint || '');
+        if (!endpoint) return res.status(400).json({ success: false, message: 'endpoint is required.' });
+        await prisma.adminPushSubscription.deleteMany({ where: { endpoint } });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Could not remove the subscription.' });
+    }
+});
+
+app.post('/api/admin/push/test', adminAuth, async (_req, res) => {
+    await sendAdminPush('PaymentSucceeded', { property: 'Test notification' });
+    res.json({ success: true });
+});
+
 app.get('/api/admin/launch-readiness', adminAuth, (_req, res) => {
     const readiness = productionLaunchReadiness();
     res.status(readiness.ready ? 200 : 503).json({ success: readiness.ready, ...readiness });
@@ -11217,6 +11533,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             })).catch(() => {});
         }
 
+        void sendAdminPush('SetupCompleted', { property: hotel.name || hotel.ownerEmail || hotel.id });
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
         res.json({ success: true, bookingUrl: 'https://' + assignedDomain, frontdeskUrl: 'https://' + assignedDomain + '/frontdesk', crmPin: defaultPin });
     } catch (e) {
@@ -12147,6 +12464,7 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
                 },
             },
         }).catch((e) => console.error('Payment funnel tracking failed:', e.message));
+        void sendAdminPush('PaymentSucceeded', { property: hotel?.ownerEmail || hotelId });
     }
 
     // The webhook guarantees delivery if the owner closes Stripe. The browser
@@ -12298,6 +12616,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 metadata: { source: 'activation-cta', provider: 'stripe', billingInterval },
             },
         }).catch(() => {});
+        void sendAdminPush('GoLiveClicked', { property: hotel.name || hotel.ownerEmail || hotelId });
         console.log('crm:go-live checkout session creating:', {
             hotelId,
             host: req.get('host'),
@@ -12750,6 +13069,7 @@ app.post('/api/crm/support', crmAuth, supportMessageRateLimit, async (req, res) 
                 ].join('\n'),
             }).catch((error) => console.error('crm:support notification email:', error.message));
         }
+        void sendAdminPush('SupportMessage', { property: hotel.name || hotel.ownerEmail || hotelId });
         console.log(`📩 Support message from ${hotel.name || hotelId}`);
         res.json({ success: true, thread: serializeSupportThread(thread, 'owner') });
     } catch (e) {
@@ -12841,6 +13161,21 @@ app.post('/api/admin/support/:threadId/reply', adminAuth, async (req, res) => {
             });
         }));
 
+        // Owners were only told by email that support had answered, so a reply
+        // landed in an inbox while Front Desk sat silent — the reverse of the
+        // owner's own message, which alerts us immediately.
+        if (existing.hotel?.id) {
+            void sendPushToHotel(existing.hotel.id, {
+                title: 'Marketel replied',
+                body: message.length > 140 ? `${message.slice(0, 137)}…` : message,
+                url: '/frontdesk?support=1',
+                icon: '/apple-touch-icon.png',
+                tag: `support-reply-${threadId}`,
+                renotify: true,
+                data: { type: 'support_reply', threadId },
+            }, { TTL: 24 * 60 * 60, urgency: 'high' }, 'support-reply').catch(() => {});
+        }
+
         if (emailTransporter && existing.hotel?.ownerEmail) {
             emailTransporter.sendMail({
                 from: '"Marketel Support" <support@bookmarketel.com>',
@@ -12895,10 +13230,27 @@ app.patch('/api/admin/support/:threadId', adminAuth, async (req, res) => {
 const ACCOUNT_DELETION_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 const ACCOUNT_DELETION_SWEEP_MS = 60 * 60 * 1000;
 
-function requireNativeOwnerSession(req, res, hotel) {
+// Deleting a business account is owner-only: a shared front-desk PIN must never
+// be able to destroy the property. The one exception is the synthetic App Review
+// property, whose reviewers sign in with property ID and PIN as our review notes
+// instruct — without this they reach a dead end on a flow Apple requires them to
+// verify. 'app_review' is written only by seed-app-review-property.js and read
+// nowhere else, so no real customer can take this path. The seven-day recovery
+// window means a reviewer who does delete it can be undone rather than locking
+// out the next reviewer.
+function isAppReviewDemoProperty(hotel) {
+    return String(hotel?.marketelSubscriptionStatus || '').trim().toLowerCase() === 'app_review';
+}
+
+function hasAccountOwnerSession(req, hotel) {
+    if (isAppReviewDemoProperty(hotel)) return true;
     const sessionEmail = String(req.crmNativeEmail || '').trim().toLowerCase();
     const ownerEmail = String(hotel?.ownerEmail || '').trim().toLowerCase();
-    if (!req.crmIsNativeSession || !sessionEmail || !ownerEmail || sessionEmail !== ownerEmail) {
+    return !!(req.crmIsNativeSession && sessionEmail && ownerEmail && sessionEmail === ownerEmail);
+}
+
+function requireNativeOwnerSession(req, res, hotel) {
+    if (!hasAccountOwnerSession(req, hotel)) {
         res.status(403).json({
             success: false,
             message: 'For your security, sign out and sign in with the owner email before deleting this account.',
@@ -13137,16 +13489,13 @@ app.get('/api/crm/account-deletion/status', crmAuth, async (req, res) => {
         if (!hotelId) return;
         const hotel = await prisma.hotelConfig.findUnique({
             where: { id: hotelId },
-            select: { ownerEmail: true },
+            select: { ownerEmail: true, marketelSubscriptionStatus: true },
         });
         if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
         const request = await prisma.accountDeletionRequest.findUnique({ where: { hotelId } });
         res.json({
             success: true,
-            ownerSession: !!(
-                req.crmIsNativeSession
-                && String(req.crmNativeEmail || '').toLowerCase() === String(hotel.ownerEmail || '').toLowerCase()
-            ),
+            ownerSession: hasAccountOwnerSession(req, hotel),
             request: request ? {
                 status: request.status,
                 requestedAt: request.requestedAt,
@@ -13168,6 +13517,7 @@ app.post('/api/crm/account-deletion/request', crmAuth, async (req, res) => {
             select: {
                 name: true,
                 ownerEmail: true,
+                marketelSubscriptionStatus: true,
             },
         });
         if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
@@ -13230,7 +13580,7 @@ app.post('/api/crm/account-deletion/cancel', crmAuth, async (req, res) => {
         if (!hotelId) return;
         const hotel = await prisma.hotelConfig.findUnique({
             where: { id: hotelId },
-            select: { ownerEmail: true },
+            select: { ownerEmail: true, marketelSubscriptionStatus: true },
         });
         if (!hotel) return res.status(404).json({ success: false, message: 'Property not found.' });
         if (!requireNativeOwnerSession(req, res, hotel)) return;
@@ -13825,6 +14175,26 @@ async function getCrmBookingList(hotelId) {
 // One startup request replaces the sequential context → verification →
 // bookings/availability chain. Secondary surfaces (messages, analytics,
 // conflicts and push maintenance) intentionally load after first paint.
+// Trades a one-boundary handoff token for a real session, so arriving from
+// setup or from Stripe does not leave the browser holding a credential that
+// dies in 24 hours. Any already-valid credential can call this; a PIN holder
+// simply gets a session that does not depend on remembering the PIN.
+app.post('/api/crm/session/exchange', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        res.json({
+            success: true,
+            token: generateCrmSessionToken(hotelId),
+            hotelId,
+            expiresInMs: CRM_SESSION_TOKEN_EXPIRY_MS,
+        });
+    } catch (e) {
+        console.error('crm session exchange:', e.message);
+        res.status(500).json({ success: false, message: 'Could not create a session.' });
+    }
+});
+
 app.get('/api/crm/bootstrap', crmBootstrapRateLimit, crmAuth, async (req, res) => {
     const startedAt = Date.now();
     try {

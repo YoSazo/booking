@@ -598,3 +598,21 @@ model FunnelEvent {
   @@index([sessionId, sequence])
   @@index([hotelId, sessionId, createdAt])
 }
+
+// Push for the operator, not for a property. PushSubscription hangs off a
+// HotelConfig with a cascade, and the Activity dashboard belongs to no hotel,
+// so it needs its own table rather than a sentinel property row invented to
+// satisfy a foreign key.
+model AdminPushSubscription {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  label      String?
+  // Which triggers this device wants. Stored per subscription so a phone and a
+  // laptop can differ, and so muting one does not mute the other.
+  events     Json?
+  lastSentAt DateTime?
+  failures   Int       @default(0)
+}
