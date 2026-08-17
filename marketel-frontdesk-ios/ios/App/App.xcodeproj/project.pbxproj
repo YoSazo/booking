@@ -200,6 +200,10 @@
 							};
 						};
 					};
+					A11E01002E00000100000001 = {
+						CreatedOnToolsVersion = 16.0;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -219,6 +223,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				A11E01002E00000100000001 /* MarketelActivityWidgetExtension */,
 			);
 		};
 /* End PBXProject section */

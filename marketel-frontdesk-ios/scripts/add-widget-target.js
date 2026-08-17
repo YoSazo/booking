@@ -86,11 +86,23 @@ function main() {
     // wiring, not the existence.
     const problems = [];
     if (!already) problems.push('target missing');
+    // Registered on the project. Without this the target object exists, the App
+    // target depends on it, and xcodebuild fails resolving a target the project
+    // does not list — which is a different failure from simply not building it.
+    const targetsList = /targets = \(([\s\S]*?)\);/.exec(src);
+    if (!targetsList || !targetsList[1].includes(ID.widgetTarget)) {
+      problems.push('widget not in PBXProject.targets');
+    }
     if (!src.includes(`${ID.embedPhase} /* Embed Foundation Extensions */,`)) {
       problems.push('embed phase not in App.buildPhases');
     }
     if (!src.includes(`${ID.dependency} /* PBXTargetDependency */,`)) {
       problems.push('widget not in App.dependencies');
+    }
+    // Nothing may point at an object that does not exist.
+    const defined = new Set([...src.matchAll(/^\t\t([0-9A-F]{24})[ =]/gm)].map((m) => m[1]));
+    for (const [key, id] of Object.entries(ID)) {
+      if (!defined.has(id)) problems.push(`${key} object is missing`);
     }
     if (problems.length) {
       console.error('Widget target is not correctly wired: ' + problems.join('; '));
