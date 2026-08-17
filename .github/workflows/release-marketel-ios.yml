@@ -107,6 +107,11 @@ jobs:
             npm run build:native
           )
 
+      # A target that compiles but is not embedded produces an app with no
+      # extension inside it, which fails silently: no crash, no warning, and
+      # iOS simply never issues a push-to-start token.
+      - name: Verify the Live Activity widget is embedded
+        run: node scripts/add-widget-target.js --check
       - name: Synchronize the iOS project
         run: npm run sync
 

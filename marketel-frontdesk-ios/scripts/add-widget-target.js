@@ -59,6 +59,16 @@ const ID = {
   bfEmbedWidget: 'A11E011A2E00000100000001',
 };
 
+// project.pbxproj is checked out with CRLF endings on Windows, so a multi-line
+// literal written with bare newlines can never match, and String.replace
+// answers a miss by returning the input unchanged. That silence is exactly how
+// a widget reached TestFlight compiled but never embedded. Patterns here are
+// line-ending agnostic and a miss is an error, not a no-op.
+function must(src, pattern, replacement, label) {
+  if (!pattern.test(src)) throw new Error(`pbxproj patch did not match: ${label}`);
+  return src.replace(pattern, replacement);
+}
+
 function insertBefore(src, marker, block) {
   const at = src.indexOf(marker);
   if (at === -1) throw new Error(`marker not found: ${marker}`);
@@ -70,11 +80,23 @@ function main() {
   const already = src.includes(ID.widgetTarget);
 
   if (process.argv.includes('--check')) {
-    if (!already) {
-      console.error('MarketelActivityWidget target is NOT present in the project.');
+    // Presence is not enough. The first build to reach TestFlight had the
+    // target defined and compiling, and never embedded — so the app shipped
+    // without the extension and iOS issued no push-to-start token. Check the
+    // wiring, not the existence.
+    const problems = [];
+    if (!already) problems.push('target missing');
+    if (!src.includes(`${ID.embedPhase} /* Embed Foundation Extensions */,`)) {
+      problems.push('embed phase not in App.buildPhases');
+    }
+    if (!src.includes(`${ID.dependency} /* PBXTargetDependency */,`)) {
+      problems.push('widget not in App.dependencies');
+    }
+    if (problems.length) {
+      console.error('Widget target is not correctly wired: ' + problems.join('; '));
       process.exit(1);
     }
-    console.log('MarketelActivityWidget target is present.');
+    console.log('Widget target present, embedded, and depended on.');
     return;
   }
   if (already) {
