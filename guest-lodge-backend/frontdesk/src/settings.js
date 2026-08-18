@@ -19,6 +19,23 @@ import {
 
 // ── SETTINGS TAB ───────────────────────────────────────────────
 
+// Bookings staggers its cards; Your Page did not, so its sections simply
+// appeared. Two renders feed this tab — a flat list of cards, and the
+// dashboard grid whose columns hold the real sections — so stagger whichever
+// one is actually present rather than guessing at a depth.
+function staggerSettingsCards(list) {
+  if (!list || typeof window.applyRiseStagger !== 'function') return;
+  const grid = list.querySelector('.settings-dashboard-grid');
+  if (!grid) {
+    window.applyRiseStagger(list, ':scope > *');
+    return;
+  }
+  // Columns are layout, not content; the cards inside them are what arrive.
+  grid.querySelectorAll(':scope > *').forEach((column) => {
+    window.applyRiseStagger(column, ':scope > *');
+  });
+}
+
 function isNativeApp() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
@@ -220,6 +237,7 @@ async function loadSettings() {
 
     html += legalAccountCardHtml(deletionStatus);
     list.innerHTML = html;
+    staggerSettingsCards(list);
     window.refreshSupportSummary?.();
   } catch (e) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="circle-alert" style="width:26px;height:26px;"></i></div><div class="empty-text">Failed to load settings</div></div>';
@@ -969,6 +987,7 @@ async function loadEditRooms() {
       </div>
     `;
     list.innerHTML = html;
+    staggerSettingsCards(list);
     renderEditRoomsCards();
     window.renderGrowthPanel?.();
     window.loadGrowthData?.().catch(() => {});
@@ -1331,10 +1350,11 @@ function pageSectionHtml(title, bodyHtml, { open = false, hint = '', id = '' } =
   </div>`;
 }
 
-// display:none cannot be transitioned, which is why every section on this page
-// snapped. Height has to be a real number for the browser to animate it, so the
-// body is measured, moved between 0 and that measurement, then released back to
-// auto — otherwise the section could never grow again when its content changes.
+// display:none cannot be transitioned, and height is the only property that can
+// expand to fit unknown content — but height costs a layout pass every frame.
+// Two things make that affordable: `contain` scopes the layout to this subtree
+// rather than the document, and the motion the eye actually reads is carried by
+// the inner transform and opacity, which run on the compositor.
 function toggleSection(header) {
   const body = header.nextElementSibling;
   if (!body) return;
@@ -1350,28 +1370,29 @@ function toggleSection(header) {
   }
 
   // A second tap mid-flight must not measure a half-open section.
-  body.style.transition = 'none';
   if (body._sectionTimer) {
     clearTimeout(body._sectionTimer);
     body._sectionTimer = null;
   }
+  body.style.transition = 'none';
 
   if (opening) {
     body.style.display = 'block';
     body.style.height = 'auto';
     const target = body.scrollHeight;
     body.style.height = '0px';
-    body.style.opacity = '0';
-    body.classList.add('is-animating');
-    // Force a read before changing it again, or the two writes coalesce and
-    // there is no transition left to run.
+    body.classList.add('is-animating', 'is-collapsed');
+    // Force a read before changing anything else, or the writes coalesce into
+    // no transition at all.
     void body.offsetHeight;
     body.style.transition = '';
     body.style.height = target + 'px';
-    body.style.opacity = '1';
+    body.classList.remove('is-collapsed');
     body._sectionTimer = setTimeout(() => {
-      // Back to auto so the section still fits content added later.
+      // Back to auto so the section still fits content added later, and drop
+      // will-change so the layer is not kept alive for nothing.
       body.style.height = '';
+      body.style.willChange = '';
       body.classList.remove('is-animating');
       body._sectionTimer = null;
     }, 240);
@@ -1382,13 +1403,15 @@ function toggleSection(header) {
   body.classList.add('is-animating');
   void body.offsetHeight;
   body.style.transition = '';
+  // Added after the reflow, not before it, or the content snaps out instead of
+  // easing out alongside the height.
   body.style.height = '0px';
-  body.style.opacity = '0';
+  body.classList.add('is-collapsed');
   body._sectionTimer = setTimeout(() => {
     body.style.display = 'none';
     body.style.height = '';
-    body.style.opacity = '';
-    body.classList.remove('is-animating');
+    body.style.willChange = '';
+    body.classList.remove('is-animating', 'is-collapsed');
     body._sectionTimer = null;
   }, 240);
 }

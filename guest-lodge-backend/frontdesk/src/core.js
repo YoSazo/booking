@@ -6178,6 +6178,8 @@ exposeToWindow({
   api,
   applyBookingsSubview,
   applyFilter,
+
+  applyRiseStagger,
   applyGuestBroadcastAudienceUi,
   applyLegacyHotelContext,
   availabilityForDay,

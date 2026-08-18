@@ -2284,14 +2284,14 @@
         /* Glass, matching the pill above it. A lighter blur than the pill on
            purpose: the pill sits over the nav, and two heavy blurs stacked
            turn the pair muddy. The nav is the calmer, always-present layer. */
-        -webkit-backdrop-filter: blur(16px) saturate(170%);
-        backdrop-filter: blur(16px) saturate(170%);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
         background: rgba(255, 255, 255, 0.68);
         border: 1px solid rgba(255, 255, 255, 0.72);
         border-radius: 999px;
         box-shadow:
           0 10px 40px rgba(26, 43, 34, 0.14),
-          0 2px 12px rgba(46, 125, 91, 0.08),
+          0 2px 12px rgba(26, 43, 34, 0.08),
           inset 0 1px 0 rgba(255, 255, 255, 0.85);
       }
       .mobile-nav-item {
@@ -3775,13 +3775,19 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
        reads as an action rather than a setting. */
     .fda-pill {
       position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
+      /* Centred with left/right rather than translateX(-50%). A pre-existing
+         transform on an element captured by a View Transition fights the
+         transform the transition applies itself, which is what made the morph
+         jump instead of glide. */
+      left: 0;
+      right: 0;
+      margin: 0 auto;
+      width: fit-content;
       z-index: 190;
       display: none;
       align-items: center;
       gap: 8px;
-      padding: 11px 18px 11px 13px;
+      padding: 11px 17px 11px 13px;
       border-radius: 999px;
       font-family: inherit;
       font-size: 13.5px;
@@ -3790,43 +3796,35 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
       white-space: nowrap;
       max-width: calc(100vw - 40px);
       bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-      transition: opacity 0.18s, transform 0.18s;
 
-      /* Liquid glass: the pill floats over the bookings list, so it samples
-         what is behind it rather than covering it. Saturation is pushed past
-         1 because blurring alone leaves the backdrop looking washed out. */
-      -webkit-backdrop-filter: blur(22px) saturate(180%);
-      backdrop-filter: blur(22px) saturate(180%);
-      background: rgba(255, 255, 255, 0.62);
+      /* Identical material to .mobile-bottom-nav, deliberately. Two floating
+         controls a few pixels apart made of different glass reads as a mistake.
+         No colour boost here: that would be a second filter pass per frame
+         for a difference nobody sees, and two live backdrop filters already
+         cost more than the whole animation budget. */
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      background: rgba(255, 255, 255, 0.68);
       color: var(--text);
-      /* Two borders do the work of glass thickness: a hairline outer edge and
-         an inset highlight along the top, where light would catch. */
-      border: 1px solid rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.72);
       box-shadow:
-        0 8px 32px rgba(26, 43, 34, 0.16),
-        0 1px 2px rgba(26, 43, 34, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.85),
-        inset 0 -1px 0 rgba(46, 125, 91, 0.06);
-    }
-    /* Without backdrop-filter the translucency would read as a washed-out
-       button, so those browsers get the solid card treatment instead. */
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      .fda-pill {
-        background: var(--white);
-        border-color: var(--border);
-      }
+        0 10px 40px rgba(26, 43, 34, 0.14),
+        0 2px 12px rgba(26, 43, 34, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      transition: opacity var(--dur-fast) var(--ease-out);
     }
     .fda-pill.is-visible { display: inline-flex; }
-    .fda-pill:active { transform: translateX(-50%) scale(0.97); }
+    .fda-pill:active { opacity: 0.85; }
     .fda-pill-mark {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       flex: 0 0 auto;
-      border-radius: 8px;
       display: grid;
       place-items: center;
-      background: var(--green-pale);
-      color: var(--green);
+      /* No tinted plate. The nav icons sit on the glass directly, so anything
+         with its own background made the pill read as a different component. */
+      color: var(--text);
+      opacity: 0.75;
     }
     /* A dot instead of a number: the pill invites, it does not report. */
     .fda-pill-dot {
@@ -3927,11 +3925,24 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
     }
 
     /* Sections measure their own height in JS; these are the curves it uses. */
+    /* Height is the only property that can expand to fit unknown content, and
+       it costs a layout pass every frame. Two things make that affordable:
+       contain scopes the layout and paint to this subtree instead of the
+       document, and the motion the eye actually reads is carried by the inner
+       transform and opacity, which run on the compositor. */
     .accordion-body.is-animating {
       overflow: hidden;
-      transition:
-        height var(--dur-base) var(--ease-out),
-        opacity var(--dur-fast) linear;
+      contain: layout paint;
+      will-change: height;
+      transition: height var(--dur-base) var(--ease-out);
+    }
+    .accordion-body.is-animating > * {
+      transition: transform var(--dur-base) var(--ease-out),
+                  opacity var(--dur-fast) linear;
+    }
+    .accordion-body.is-collapsed > * {
+      transform: translateY(-6px);
+      opacity: 0;
     }
 
     /* Pressable feedback. A tap that does not acknowledge itself reads as a
@@ -3948,9 +3959,15 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
                   box-shadow var(--dur-fast) var(--ease-out);
     }
 
-    /* Solid fallback for the nav, same reasoning as the pill: translucency
-       without blur is just a faded bar. */
+    /* One fallback for both floating surfaces. Translucency without blur is
+       just a faded control, and they must degrade together or the pair looks
+       broken rather than plain. The pill lost its own block in a rewrite; this
+       keeps them from drifting apart again. */
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .fda-pill {
+        background: var(--white);
+        border-color: var(--border);
+      }
       @media (max-width: 600px) {
         .mobile-bottom-nav {
           background: var(--white);
@@ -3984,4 +4001,14 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
       ::view-transition-new(root) {
         animation-duration: var(--dur-base);
       }
+    }
+
+    /* A View Transition captures both elements as images and animates those.
+       Live backdrop-filters underneath are re-blurred every frame for a result
+       the snapshots already contain, so they are suspended for the duration. */
+    html:active-view-transition .fda-pill,
+    html:active-view-transition .mobile-bottom-nav {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: rgba(255, 255, 255, 0.92);
     }

@@ -74,8 +74,8 @@ test('the Assistant has one obvious surface, not three', () => {
 
     // Wording follows state, so an unconfigured Assistant reads as an
     // invitation rather than a bare name.
-    assert.match(assistant, /'Set up Front Desk Assistant'/);
-    assert.match(assistant, /'Front Desk needs your review'/);
+    assert.match(assistant, /'Set up Front Desk'/);
+    assert.match(assistant, /'Needs your review'/);
 
     // The two stopgaps it replaced are gone. Three doors to one feature is
     // worse than one door anybody can find.
@@ -150,8 +150,9 @@ test('motion is a system, not scattered one-off transitions', () => {
 test('sections animate open instead of snapping', () => {
     // display:none cannot be transitioned, so height has to be measured.
     assert.match(settings, /const target = body\.scrollHeight;/);
-    // Released back to auto, or the section can never grow when its content does.
-    assert.match(settings, /body\.style\.height = '';\s*\n\s*body\.classList\.remove\('is-animating'\)/);
+    // will-change must be released, or the layer is kept alive for nothing.
+    assert.ok(settings.includes("body.style.willChange = '';"),
+        'will-change is never released after the animation');
     // A forced reflow between the two writes, or they coalesce and nothing moves.
     assert.match(settings, /void body\.offsetHeight;/);
     // Re-tapping mid-flight must not measure a half-open section.
@@ -191,18 +192,23 @@ test('the pill morphs into the sheet and cleans up after itself', () => {
 
 test('both floating surfaces are glass, and both degrade together', () => {
     const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
-    // The pill sits above the nav. Two heavy blurs stacked read as muddy, so
-    // the nav is deliberately the lighter of the two.
+    // The pill sits a few pixels above the nav. Different glass on two adjacent
+    // floating controls reads as a mistake, so the material must be identical.
     const navRule = css.slice(css.indexOf('.mobile-bottom-nav {'), css.indexOf('.mobile-nav-item {'));
     const pillRule = css.slice(css.indexOf('.fda-pill {'), css.indexOf('.fda-pill.is-visible'));
-    const blurOf = (rule) => Number((rule.match(/backdrop-filter: blur\((\d+)px\)/) || [])[1] || 0);
-    const navBlur = blurOf(navRule);
-    const pillBlur = blurOf(pillRule);
-    assert.ok(navBlur > 0, 'the nav bar is not glass');
-    assert.ok(pillBlur > 0, 'the pill is not glass');
-    assert.ok(pillBlur > navBlur, `nav (${navBlur}px) should blur less than the pill (${pillBlur}px)`);
-    // Translucency without blur is just a faded control, so both need the
-    // solid fallback rather than only the pill.
-    const fallbacks = css.match(/@supports not \(\(backdrop-filter/g) || [];
-    assert.ok(fallbacks.length >= 2, `expected a fallback for pill and nav, saw ${fallbacks.length}`);
+    const blurOf = (rule) => (rule.match(/backdrop-filter: (blur\([^)]+\))/) || [])[1];
+    assert.ok(blurOf(navRule), 'the nav bar is not glass');
+    assert.equal(blurOf(pillRule), blurOf(navRule), 'pill and nav must use the same blur');
+    // saturate() is a second filter pass per frame on an always-visible layer,
+    // for a difference nobody sees. Two of them cost more than the animations.
+    assert.doesNotMatch(navRule, /saturate\(/);
+    assert.doesNotMatch(pillRule, /saturate\(/);
+    // A transform on an element captured by a View Transition fights the
+    // transform the transition applies, which made the morph jump.
+    assert.doesNotMatch(pillRule, /transform: translateX/);
+    // Translucency without blur is just a faded control, and both must degrade
+    // together or the pair looks broken rather than plain.
+    const fb = css.slice(css.indexOf('@supports not ((backdrop-filter'));
+    assert.match(fb.slice(0, 600), /.fda-pill {/);
+    assert.match(fb.slice(0, 600), /.mobile-bottom-nav {/);
 });

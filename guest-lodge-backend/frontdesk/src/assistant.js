@@ -216,7 +216,7 @@ function ensureStyles() {
     .fda-native-result-title{display:block;font-size:13px;font-weight:800;line-height:1.35;color:#1a2b22;}
     .fda-native-result-time{display:block;margin-top:3px;font-size:10.5px;line-height:1.3;color:#75857c;}
     .fda-native-result-arrow{flex:0 0 auto;color:#8aa095;font-size:20px;font-weight:500;line-height:1;}
-    .fda-overlay{position:fixed;inset:0;z-index:110000;background:rgba(13,27,20,.48);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:flex-end;justify-content:center;padding:0;}
+    .fda-overlay{position:fixed;inset:0;z-index:110000;background:rgba(13,27,20,.52);display:flex;align-items:flex-end;justify-content:center;padding:0;}
     .fda-sheet{width:100%;max-width:620px;max-height:min(92dvh,860px);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#eff4f0;border-radius:24px 24px 0 0;box-shadow:0 -18px 60px rgba(13,27,20,.25);padding:0 0 max(22px,env(safe-area-inset-bottom));animation:fdaSheetIn .2s ease-out;}
     .fda-sheet-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:17px 18px 13px;background:rgba(245,248,246,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(209,222,214,.8);}
     .fda-sheet-title{flex:1;min-width:0;font-size:18px;font-weight:850;color:#1a2b22;}
@@ -392,10 +392,10 @@ export function renderAssistantPill() {
     && (activity.type === 'availability_warning' || activity.status === 'attention');
 
   const label = !configured
-    ? 'Set up Front Desk Assistant'
+    ? 'Set up Front Desk'
     : needsReview
-      ? 'Front Desk needs your review'
-      : 'Front Desk Assistant';
+      ? 'Needs your review'
+      : 'Front Desk';
 
   pill.innerHTML = `<span class="fda-pill-mark" aria-hidden="true"><i data-lucide="phone" style="width:14px;height:14px;"></i></span>${needsReview ? '<span class="fda-pill-dot" aria-hidden="true"></span>' : ''}<span>${esc(label)}</span>`;
   pill.setAttribute('aria-label', label);
