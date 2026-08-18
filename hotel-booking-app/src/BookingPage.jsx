@@ -51,6 +51,17 @@ function BookingPage({
   }, []);
   const [savedHighlight, setSavedHighlight] = useState(initialSavedHighlight);
   const [showInstallQr, setShowInstallQr] = useState(false);
+  const [isDesktopBooking, setIsDesktopBooking] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  ));
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)');
+    const sync = () => setIsDesktopBooking(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     if (!savedHighlight?.target) return undefined;
@@ -176,6 +187,7 @@ function BookingPage({
       </header>
 
       <div className="booking-page-layout">
+      <div className="booking-page-main">
       <main className="rooms-list">
         {isLoading ? (
           <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}>
@@ -257,6 +269,23 @@ function BookingPage({
           </div>
         )}
       </main>
+      {showInstallBanner && isDesktopBooking && (
+        <div className="booking-desktop-install">
+          <InstallAppBanner
+            hotelName={hotel.name}
+            appIconUrl={resolvePropertyIconUrl(hotel, roomData)}
+            hotelId={hotelId}
+            ownerPreview={ownerPreview}
+            flush
+            touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
+            apiBaseUrl={apiBaseUrl}
+            guidedBookingInstall
+            hotelSubscribed={hotel.subscribed !== false}
+            onCtaClick={() => setShowInstallQr(true)}
+          />
+        </div>
+      )}
+      </div>
 
       <aside className="booking-desktop-rail" aria-label="Choose dates and book">
         <CalendarModal
@@ -338,15 +367,10 @@ function BookingPage({
             </button>
           </div>
         )}
-        {showInstallBanner && hotel.subscribed !== false && (
-          <button type="button" className="booking-save-phone" onClick={() => setShowInstallQr(true)}>
-            Save on your phone
-          </button>
-        )}
       </aside>
       </div>
 
-      {showInstallBanner && !isCalendarOpen && (
+      {showInstallBanner && !isCalendarOpen && !isDesktopBooking && (
         <div className="booking-install-mobile-only">
           <InstallAppBanner
             hotelName={hotel.name}

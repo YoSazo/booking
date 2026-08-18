@@ -478,9 +478,9 @@ body {
 
 .amenity-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
+  text-align: left;
   gap: 6px;
 }
 
@@ -2795,6 +2795,91 @@ padding: 6px 16px;
     padding: 20px;
 }
 
+.guest-info-container.has-mobile-install {
+    padding-bottom: 170px;
+}
+
+.checkout-desktop-rail,
+.checkout-desktop-column {
+    display: none;
+}
+
+.checkout-page-main .static-banner,
+.checkout-desktop-column .static-banner {
+    margin: 16px 0 0;
+    max-width: none;
+    width: 100%;
+    left: auto;
+    right: auto;
+    text-align: left;
+    border-radius: 16px;
+    z-index: 1;
+}
+
+.checkout-desktop-column .static-banner {
+    margin: 0;
+}
+
+.checkout-booking-sheet-gate {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.checkout-booking-sheet-gate__veil {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.checkout-booking-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%);
+    text-align: center;
+}
+
+.checkout-booking-banner__copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 360px;
+}
+
+.checkout-booking-banner__copy strong {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.checkout-booking-banner__copy span {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.checkout-booking-banner__call {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+    padding: 13px;
+    border-radius: 10px;
+    background: #fff;
+    color: #1a5c3f;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
 .checkout-progress-bar {
   display: flex;
   justify-content: space-between;
@@ -3131,12 +3216,14 @@ padding: 6px 16px;
 }
 
 .payment-wrapper {
+  position: relative;
   background-color: #fff;
   border-radius: 12px;
   padding: 20px 30px 30px 30px; /* Reduced top padding from 30px to 20px */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   margin-top: 30px;
   border: 1px solid #e8e8e8;
+  overflow: hidden;
 }
 
 .payment-content {
@@ -4438,6 +4525,7 @@ padding: 6px 16px;
     border: none;
     border-radius: 20px;
     padding: 8px 16px;
+    font-family: 'Inter', sans-serif;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -4800,6 +4888,7 @@ padding: 6px 16px;
   border: 1px solid #3b82f6;
   border-radius: 6px;
   color: #3b82f6;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -5561,6 +5650,7 @@ padding: 6px 16px;
   border: 2px solid #3b82f6;
   color: #3b82f6;
   border-radius: 10px;
+  font-family: inherit;
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
@@ -5706,21 +5796,148 @@ padding: 6px 16px;
 
 
 /* ========================================
-   DESKTOP PREMIUM DESIGN (1024px+)
-   Mobile stays unchanged
+   TABLET + DESKTOP PREMIUM DESIGN (768px+)
+   Phone stays one column
 ======================================== */
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   body {
     background: #EFF4F0;
     min-height: 100vh;
   }
 
-  /* Center and constrain content */
   .guest-info-container {
-    max-width: 1000px;
+    max-width: 960px;
     margin: 0 auto;
-    padding: 40px 20px;
+    padding: 24px 20px 48px;
+  }
+
+  .guest-info-container.has-mobile-install {
+    padding-bottom: 48px;
+  }
+
+  .checkout-progress-bar {
+    max-width: 360px;
+    margin: 4px auto 16px;
+    padding: 0;
+  }
+
+  .checkout-progress-bar::before {
+    top: 15px;
+    left: 16%;
+    right: 16%;
+  }
+
+  .step-circle {
+    width: 84px;
+    height: 32px;
+  }
+
+  .step-name {
+    font-size: 0.95em;
+  }
+
+  .checkout-page-main .static-banner,
+  .checkout-desktop-column .static-banner {
+    max-width: none;
+    width: 100%;
+    left: auto;
+    right: auto;
+    text-align: left;
+    border-radius: 16px;
+    z-index: 1;
+  }
+
+  .checkout-page-main .static-banner {
+    margin: 16px 0 0;
+  }
+
+  .checkout-desktop-column .static-banner {
+    margin: 0;
+  }
+
+  .checkout-page-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 22rem);
+    gap: 20px;
+    justify-content: center;
+    align-items: start;
+  }
+
+  .checkout-page-main {
+    min-width: 0;
+  }
+
+  .checkout-page-main .payment-wrapper {
+    margin-top: 0;
+  }
+
+  .checkout-mobile-only,
+  .checkout-install-mobile-only {
+    display: none !important;
+  }
+
+  .checkout-desktop-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    position: sticky;
+    top: 24px;
+  }
+
+  .checkout-desktop-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid rgba(216, 228, 220, 0.95);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 10px 32px rgba(46, 125, 91, 0.08);
+  }
+
+  .checkout-desktop-rail .modern-card {
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .checkout-desktop-rail .modern-card:hover {
+    box-shadow: none;
+  }
+
+  .checkout-rail-stay h2 {
+    margin: 0 0 4px;
+    color: #1a2b22;
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .checkout-rail-stay p {
+    margin: 0 0 10px;
+    color: #66756c;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .checkout-rail-stay .dates-section {
+    padding-top: 10px;
+  }
+
+  .checkout-desktop-rail .checkout-cta-container {
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .checkout-desktop-rail .btn {
+    font-family: inherit;
+  }
+
+  .checkout-desktop-rail .btn-confirm.btn-wider {
+    max-width: none;
   }
 }
 
@@ -6147,6 +6364,7 @@ padding: 6px 16px;
 /* Desktop booking engine: room proof left, dates + book right.
    Phone layout stays one column with the sticky install chip. */
 .booking-desktop-rail,
+.booking-desktop-install,
 .booking-save-phone {
   display: none;
 }
@@ -6155,24 +6373,35 @@ padding: 6px 16px;
   padding-bottom: 120px;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .container.booking-page {
     max-width: 1180px;
     grid-template-columns: minmax(0, 1fr);
-    padding: 28px 32px 48px;
+    padding: 24px 20px 48px;
   }
 
   .booking-page-layout {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
-    gap: 28px;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    gap: 20px;
     align-items: start;
   }
 
-  .booking-page-layout > .rooms-list {
+  .booking-page-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .booking-page-layout > .booking-page-main > .rooms-list {
     grid-column: auto;
     min-width: 0;
+  }
+
+  .booking-desktop-install {
+    display: block;
+    margin-top: 16px;
   }
 
   .booking-page .rooms-grid,
@@ -6210,6 +6439,25 @@ padding: 6px 16px;
 
   .booking-desktop-rail .premium-pricing-card {
     margin: 0;
+    padding: 8px 12px;
+  }
+
+  .booking-desktop-rail .pricing-main {
+    margin-bottom: 0;
+  }
+
+  .booking-desktop-rail .price-today-large {
+    font-size: 22px;
+  }
+
+  .booking-desktop-rail .price-today-label,
+  .booking-desktop-rail .pricing-subtitle {
+    font-size: 12px;
+  }
+
+  .booking-desktop-rail .pricing-empty-title {
+    font-size: 13px;
+    margin: 0 0 2px;
   }
 
   .booking-desktop-rail .inline-selectors {
@@ -6302,6 +6550,26 @@ padding: 6px 16px;
 
   .booking-page.has-mobile-install {
     padding-bottom: 48px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guest-info-container {
+    padding: 24px 32px 48px;
+  }
+
+  .checkout-page-layout {
+    grid-template-columns: minmax(0, 28.5rem) minmax(300px, 22rem);
+    gap: 24px;
+  }
+
+  .container.booking-page {
+    padding: 28px 32px 48px;
+  }
+
+  .booking-page-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    gap: 28px;
   }
 }
 
@@ -6400,7 +6668,7 @@ padding: 6px 16px;
 
 .booking-date-calendar .calendar-day.selected-start,
 .booking-date-calendar .calendar-day.selected-end {
-  background: #3b82f6;
+  background: #2E7D5B;
   color: #fff;
   border-radius: 6px;
 }
@@ -6413,13 +6681,13 @@ padding: 6px 16px;
 }
 
 .booking-date-calendar .calendar-day.in-range {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #E8F5EE;
+  color: #245F46;
   border-radius: 6px;
 }
 
 .booking-date-calendar .calendar-day.today {
-  border: 2px solid #3b82f6;
+  border: 2px solid #2E7D5B;
   box-sizing: border-box;
 }
 
@@ -6454,8 +6722,9 @@ padding: 6px 16px;
   border-radius: 999px;
   background: #E8F5EE;
   color: #2E7D5B;
+  font-family: inherit;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   box-shadow: none;
 }
 

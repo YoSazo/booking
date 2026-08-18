@@ -1180,6 +1180,114 @@ const handlePayLaterBooking = async (e) => {
     
     const onlineBookingGateActive = hotel && hotel.subscribed === false && currentStep === 4;
     const showGuestInstallBanner = !onlineBookingGateActive;
+    const formatStayDate = (value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const renderPriceBreakdown = () => {
+        const standardRate = 69;
+        const standardTotal = standardRate * bookingDetails.nights;
+        const actualTotal = bookingDetails.subtotal;
+        const savings = standardTotal - actualTotal;
+        const showWeeklySavings = bookingDetails.nights >= 7 && savings > 0;
+
+        return (
+            <div className="modern-card price-breakdown-card">
+                <div className="card-header">
+                    <h2>Price Breakdown</h2>
+                </div>
+                <div className="price-items">
+                    {showWeeklySavings ? (
+                        <>
+                            <div className="price-row" style={{ paddingBottom: '8px', borderBottom: '1px solid #f3f4f6' }}>
+                                <span style={{ color: '#9ca3af', fontSize: '14px' }}>
+                                    Nightly Rate ({bookingDetails.nights} nights × $69)
+                                </span>
+                                <span style={{ color: '#9ca3af', fontSize: '14px', textDecoration: 'line-through' }}>
+                                    ${standardTotal.toFixed(2)}
+                                </span>
+                            </div>
+                            <div className="price-row" style={{ paddingTop: '8px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <span>Room ({bookingDetails.nights} nights)</span>
+                                    <span style={{ fontSize: '12px', color: '#3a9b73', fontWeight: '600' }}>
+                                        {bookingDetails.nights >= 28 ? '🎉 Monthly Rate - ' : '✨ Weekly Rate - '}
+                                        Save ${savings.toFixed(2)}
+                                    </span>
+                                </div>
+                                <span className="price-value" style={{ color: '#3a9b73', fontWeight: '700' }}>
+                                    ${actualTotal.toFixed(2)}
+                                </span>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="price-row">
+                            <span>Room ({bookingDetails.nights} nights)</span>
+                            <span className="price-value">${bookingDetails.subtotal.toFixed(2)}</span>
+                        </div>
+                    )}
+                    <div className="price-row">
+                        <div className="price-label-with-info">
+                            <span>Taxes & Fees</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                        </div>
+                        <span className="price-value">${bookingDetails.taxes.toFixed(2)}</span>
+                    </div>
+                    <div className="price-total-row">
+                        <span className="total-label">Total</span>
+                        <span className="total-value">${bookingDetails.total.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div className="reserve-zero-box">
+                    <div className="reserve-header">
+                        <div className="shield-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div className="reserve-title">Reserve for $0 Today</div>
+                            <div className="reserve-subtitle">No payment required now</div>
+                        </div>
+                    </div>
+                    <div className="due-at-arrival">
+                        <div className="due-row">
+                            <span>Due at arrival:</span>
+                            <span className="due-amount">${bookingDetails.total.toFixed(2)}</span>
+                        </div>
+                        <div className="due-date">Pay when you check in on {formatStayDate(bookingDetails.checkin)}</div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderCheckoutCta = (ctaRef = null) => (
+        <div className={`checkout-cta-container sticky`} ref={ctaRef}>
+            {currentStep !== 4 ? (
+                <button type="button" className="btn btn-confirm btn-wider" onClick={handleNextStep}>
+                    {currentStep === 1 && 'Continue to Info'}
+                    {currentStep === 2 && 'Continue to Payment'}
+                </button>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '4px' }}>
+                    <button
+                        type="button"
+                        className="btn btn-confirm btn-wider"
+                        onClick={(e) => handlePayLaterBooking(e)}
+                        disabled={isPreviewMode || isProcessing || !clientSecret || !stripe || !elements}
+                    >
+                        {isPreviewMode ? 'Reserve for $0 (Preview)' : isProcessing ? 'Processing...' : getPaymentButtonText()}
+                    </button>
+                    <div style={{ textAlign: 'center', marginTop: '4px', color: '#1f5c43', fontSize: '13px', fontWeight: '600' }}>
+                        $0 stay payment today • temporary $1 verification hold
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
     const handleDismissWhyCardModal = () => {
         setShowWhyCardModal(false);
@@ -1196,32 +1304,6 @@ const handlePayLaterBooking = async (e) => {
 
     return (
         <>
-            {/* D16: guest-facing gate — guests NEVER see owner billing. When the
-                hotel hasn't activated online booking, show a clean "opens soon"
-                message and a call-to-book fallback. The blocked attempt is
-                beaconed for the owner's proof-of-demand signal (D19). */}
-            {onlineBookingGateActive && (
-              <>
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.3)', zIndex: 9998, pointerEvents: 'all' }} />
-                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: 'linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%)', padding: '16px 20px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', textAlign: 'center', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)' }}>
-                  <div style={{ color: 'white', fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>Call to reserve this room</div>
-                  <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: '13px', lineHeight: 1.45, marginBottom: hotel.phone ? '12px' : '0', maxWidth: '360px', marginLeft: 'auto', marginRight: 'auto' }}>
-                    {hotel.phone
-                      ? 'Online booking isn\u2019t active yet \u2014 call us and we\u2019ll reserve it for you right now.'
-                      : 'Online booking isn\u2019t active yet. Please call the property directly to reserve.'}
-                  </div>
-                  {hotel.phone && (
-                    <a
-                      href={`tel:${hotel.phone}`}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', maxWidth: '320px', padding: '13px', background: 'white', color: '#1a5c3f', border: 'none', borderRadius: '10px', fontFamily: 'inherit', fontSize: '15px', fontWeight: '700', cursor: 'pointer', textDecoration: 'none' }}
-                    >
-                      <PhoneCall size={17} /> Call {hotel.phone}
-                    </a>
-                  )}
-                </div>
-              </>
-            )}
-
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
 
             {/* Why We Need Your Card - Centered Floating Modal */}
@@ -1346,15 +1428,12 @@ const handlePayLaterBooking = async (e) => {
                 <button onClick={handleBackStep} className="back-button-pill" style={{ marginLeft: '20px', marginBottom: '12px' }}>
                     {getBackButtonText()}
                 </button>
-                
-                {hotel.cancellationPolicy && (
-                <div className={`static-banner ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
-                    {hotel.cancellationPolicy}
-                </div>
-                )}
             </div>
             
-            <div className="guest-info-container" style={{ paddingBottom: onlineBookingGateActive ? '220px' : showGuestInstallBanner ? '170px' : '120px', paddingTop: '0' }}>
+            <div
+                className={`guest-info-container${showGuestInstallBanner ? ' has-mobile-install' : ''}`}
+                style={{ paddingTop: '0' }}
+            >
                 <div className="checkout-progress-bar">
                     <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Review Cart</span>
@@ -1373,6 +1452,9 @@ const handlePayLaterBooking = async (e) => {
                     {currentStep === 2 && 'Step 2 of 3 — Your details'}
                     {currentStep === 4 && 'Step 3 of 3 — Payment'}
                 </div>
+
+                <div className="checkout-page-layout">
+                <div className="checkout-page-main">
 
 
                 {/* Plan selection for 7+ nights - DESKTOP PREMIUM DESIGN */}
@@ -1463,107 +1545,8 @@ const handlePayLaterBooking = async (e) => {
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* Price Breakdown Card */}
-                        <div className="modern-card price-breakdown-card">
-                            <div className="card-header">
-                                <h2>Price Breakdown</h2>
-                            </div>
-                            
-                            <div className="price-items">
-                                {(() => {
-                                    const standardRate = 69; // $69 per night
-                                    const standardTotal = standardRate * bookingDetails.nights;
-                                    const actualTotal = bookingDetails.subtotal;
-                                    const savings = standardTotal - actualTotal;
-                                    
-                                    // Show crossed-out price for 7+ nights with savings
-                                    if (bookingDetails.nights >= 7 && savings > 0) {
-                                        return (
-                                            <>
-                                                <div className="price-row" style={{ 
-                                                    paddingBottom: '8px',
-                                                    borderBottom: '1px solid #f3f4f6'
-                                                }}>
-                                                    <span style={{ color: '#9ca3af', fontSize: '14px' }}>
-                                                        Nightly Rate ({bookingDetails.nights} nights × $69)
-                                                    </span>
-                                                    <span style={{ 
-                                                        color: '#9ca3af',
-                                                        fontSize: '14px',
-                                                        textDecoration: 'line-through'
-                                                    }}>
-                                                        ${standardTotal.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <div className="price-row" style={{ paddingTop: '8px' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        <span>Room ({bookingDetails.nights} nights)</span>
-                                                        <span style={{ 
-                                                            fontSize: '12px', 
-                                                            color: '#3a9b73',
-                                                            fontWeight: '600'
-                                                        }}>
-                                                            {bookingDetails.nights >= 28 ? '🎉 Monthly Rate - ' : '✨ Weekly Rate - '}
-                                                            Save ${savings.toFixed(2)}
-                                                        </span>
-                                                    </div>
-                                                    <span className="price-value" style={{ color: '#3a9b73', fontWeight: '700' }}>
-                                                        ${actualTotal.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                            </>
-                                        );
-                                    } else {
-                                        return (
-                                            <div className="price-row">
-                                                <span>Room ({bookingDetails.nights} nights)</span>
-                                                <span className="price-value">${bookingDetails.subtotal.toFixed(2)}</span>
-                                            </div>
-                                        );
-                                    }
-                                })()}
-                                
-                                <div className="price-row">
-                                    <div className="price-label-with-info">
-                                        <span>Taxes & Fees</span>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <line x1="12" y1="16" x2="12" y2="12"/>
-                                            <line x1="12" y1="8" x2="12.01" y2="8"/>
-                                        </svg>
-                                    </div>
-                                    <span className="price-value">${bookingDetails.taxes.toFixed(2)}</span>
-                                </div>
-                                
-                                <div className="price-total-row">
-                                    <span className="total-label">Total</span>
-                                    <span className="total-value">${bookingDetails.total.toFixed(2)}</span>
-                                </div>
-                            </div>
-                            
-                            {/* Reserve for $0 Box */}
-                            <div className="reserve-zero-box">
-                                <div className="reserve-header">
-                                    <div className="shield-icon">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <div className="reserve-title">Reserve for $0 Today</div>
-                                        <div className="reserve-subtitle">No payment required now</div>
-                                    </div>
-                                </div>
-                                
-                                <div className="due-at-arrival">
-                                    <div className="due-row">
-                                        <span>Due at arrival:</span>
-                                        <span className="due-amount">${bookingDetails.total.toFixed(2)}</span>
-                                    </div>
-                                    <div className="due-date">Pay when you check in on {new Date(bookingDetails.checkin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                                </div>
-                            </div>
+                        <div className="checkout-mobile-only">
+                            {renderPriceBreakdown()}
                         </div>
                     </div>
                 )}
@@ -1604,7 +1587,6 @@ const handlePayLaterBooking = async (e) => {
 
                     {currentStep === 4 && (
                     <div className="payment-wrapper">
-  {/* Stripe Badge & Security - Combined Header */}
   <div style={{
     background: 'linear-gradient(to right, rgb(248, 250, 252), white)',
     borderBottom: '1px solid rgb(226, 232, 240)',
@@ -1747,7 +1729,7 @@ const handlePayLaterBooking = async (e) => {
                 <label>Card number</label>
                 <div className="card-field-container">
                   <CardNumberElement 
-                    options={ELEMENT_OPTIONS}
+                    options={{ ...ELEMENT_OPTIONS, disabled: onlineBookingGateActive }}
                     onFocus={() => trackFirstCardFieldFocus(bookingDetails)}
                     onChange={(e) => {
                       setCardBrand(e.brand);
@@ -1789,7 +1771,7 @@ const handlePayLaterBooking = async (e) => {
                   <label>Expiration date</label>
                   <div className="card-field-container">
                     <CardExpiryElement 
-                      options={ELEMENT_OPTIONS}
+                      options={{ ...ELEMENT_OPTIONS, disabled: onlineBookingGateActive }}
                       onChange={(e) => {
                         setCardComplete(prev => ({ ...prev, cardExpiry: e.complete }));
                         if (e.error) {
@@ -1809,7 +1791,7 @@ const handlePayLaterBooking = async (e) => {
                   <label>CVC</label>
                   <div className="card-field-container">
                     <CardCvcElement 
-                      options={ELEMENT_OPTIONS}
+                      options={{ ...ELEMENT_OPTIONS, disabled: onlineBookingGateActive }}
                       onChange={(e) => {
                         setCardComplete(prev => ({ ...prev, cardCvc: e.complete }));
                         if (e.error) {
@@ -2108,61 +2090,92 @@ const handlePayLaterBooking = async (e) => {
     ⚠️ {errorMessage}
   </div>
 )}
-</div>
-                   )}
-                </form>
-                
-                
-
-<div className={`checkout-cta-container sticky`} ref={currentStep === 4 ? paymentOptionsRef : null}>
-  {currentStep !== 4 ? (
-    <button type="button" className="btn btn-confirm btn-wider" onClick={handleNextStep}>
-      {currentStep === 1 && "Continue to Info"}
-      {currentStep === 2 && "Continue to Payment"}
-    </button>
-  ) : (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center',
-      width: '100%',
-      gap: '4px'
-    }}>
-      <button
-        type="button"
-        className="btn btn-confirm btn-wider"
-        onClick={(e) => handlePayLaterBooking(e)}
-        disabled={isPreviewMode || isProcessing || !clientSecret || !stripe || !elements}
-      >
-        {isPreviewMode ? "Reserve for $0 (Preview)" : isProcessing ? "Processing..." : getPaymentButtonText()}
-      </button>
-      
-      {/* Pay Later reassurance text - below button */}
-      <div style={{
-        textAlign: 'center',
-        marginTop: '4px',
-        color: '#1f5c43',
-        fontSize: '13px',
-        fontWeight: '600'
-      }}>
-        $0 stay payment today • temporary $1 verification hold
+  {onlineBookingGateActive && (
+    <div className="checkout-booking-sheet-gate" aria-live="polite">
+      <div className="checkout-booking-sheet-gate__veil" />
+      <div className="checkout-booking-banner">
+        <div className="checkout-booking-banner__copy">
+          <strong>Call to reserve this room</strong>
+          <span>
+            {hotel.phone
+              ? 'Online booking isn’t active yet — call us and we’ll reserve it for you right now.'
+              : 'Online booking isn’t active yet. Please call the property directly to reserve.'}
+          </span>
+        </div>
+        {hotel.phone && (
+          <a className="checkout-booking-banner__call" href={`tel:${hotel.phone}`}>
+            <PhoneCall size={17} /> Call {hotel.phone}
+          </a>
+        )}
       </div>
     </div>
   )}
 </div>
+                   )}
+                </form>
+
+                <div className="checkout-mobile-only">
+                    {!(onlineBookingGateActive && currentStep === 4) && renderCheckoutCta(currentStep === 4 ? paymentOptionsRef : null)}
+                </div>
+                {hotel.cancellationPolicy && currentStep !== 4 && (
+                  <div className={`static-banner ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
+                    {hotel.cancellationPolicy}
+                  </div>
+                )}
+                {hotel.cancellationPolicy && currentStep === 4 && (
+                  <div className={`static-banner checkout-mobile-only ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
+                    {hotel.cancellationPolicy}
+                  </div>
+                )}
+                </div>
+
+                <div className="checkout-desktop-column">
+                <aside className="checkout-desktop-rail" aria-label="Stay summary">
+                    <div className="checkout-rail-stay">
+                        <h2>{bookingDetails.name}</h2>
+                        <p>
+                            {bookingDetails.nights} night{bookingDetails.nights === 1 ? '' : 's'}
+                            {' · '}
+                            {bookingDetails.guests} {bookingDetails.guests === 1 ? 'guest' : 'guests'}
+                            {' · '}
+                            {bookingDetails.pets} {bookingDetails.pets === 1 ? 'pet' : 'pets'}
+                        </p>
+                        <div className="dates-section">
+                            <div className="date-row">
+                                <span className="date-label">Check-in</span>
+                                <span className="date-value">{formatStayDate(bookingDetails.checkin)}</span>
+                            </div>
+                            <div className="date-row">
+                                <span className="date-label">Check-out</span>
+                                <span className="date-value">{formatStayDate(bookingDetails.checkout)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {renderPriceBreakdown()}
+                    {!(onlineBookingGateActive && currentStep === 4) && renderCheckoutCta()}
+                </aside>
+                {hotel.cancellationPolicy && currentStep === 4 && (
+                  <div className={`static-banner ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
+                    {hotel.cancellationPolicy}
+                  </div>
+                )}
+                </div>
+                </div>
             </div>
 
             {showGuestInstallBanner && (
-              <InstallAppBanner
-                hotelName={hotel?.name}
-                appIconUrl={resolvePropertyIconUrl(hotel)}
-                hotelId={(hotel && hotel.id) || hotelId}
-                ownerPreview={isPreviewMode}
-                sticky
-                bottomOffset={14}
-                touchpoint="checkout"
-                apiBaseUrl={apiBaseUrl}
-              />
+              <div className="checkout-install-mobile-only">
+                <InstallAppBanner
+                  hotelName={hotel?.name}
+                  appIconUrl={resolvePropertyIconUrl(hotel)}
+                  hotelId={(hotel && hotel.id) || hotelId}
+                  ownerPreview={isPreviewMode}
+                  sticky
+                  bottomOffset={14}
+                  touchpoint="checkout"
+                  apiBaseUrl={apiBaseUrl}
+                />
+              </div>
             )}
 
         </>

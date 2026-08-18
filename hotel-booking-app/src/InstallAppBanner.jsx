@@ -14,11 +14,13 @@ function InstallAppBanner({
   hotelId,
   ownerPreview = false,
   sticky = false,
+  flush = false,
   bottomOffset = 0,
   touchpoint = 'booking-page',
   apiBaseUrl = '',
   guidedBookingInstall = false,
   hotelSubscribed = true,
+  onCtaClick,
 }) {
   const navigate = useNavigate();
   const [installed, setInstalled] = useState(false);
@@ -85,6 +87,11 @@ function InstallAppBanner({
       });
     }
 
+    if (onCtaClick) {
+      onCtaClick();
+      return;
+    }
+
     if (ios) {
       setShowBookingCoach(true);
       return;
@@ -120,7 +127,7 @@ function InstallAppBanner({
     borderRadius: 16,
     padding: '12px 12px',
     boxShadow: sticky ? '0 10px 34px rgba(26,43,34,0.18)' : '0 4px 16px rgba(0,0,0,0.06)',
-    margin: sticky ? '0 auto' : '20px 0 8px',
+    margin: sticky ? '0 auto' : flush ? 0 : '20px 0 8px',
     maxWidth: sticky ? 520 : undefined,
     pointerEvents: 'auto',
   };
