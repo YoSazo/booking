@@ -245,7 +245,7 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
             <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
           </div>
           <div className="calendar-grid">{renderDays()}</div>
-          {nights > 0 && (
+          {nights > 0 && !inline && (
             <div className="calendar-nights-selected">
               {nights} night{nights !== 1 ? 's' : ''} selected
             </div>

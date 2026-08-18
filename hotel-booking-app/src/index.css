@@ -4,6 +4,8 @@ html, body, #root {
      especially on iOS, and stops the grey background from appearing. */
   overscroll-behavior-y: contain;
   min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: #EFF4F0;
 }
 
@@ -476,7 +478,7 @@ body {
 
 .amenity-item {
   display: flex;
-  flex-col: column;
+  flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 6px;
@@ -5853,6 +5855,8 @@ padding: 6px 16px;
 .page-transition {
   width: 100%;
   min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   background: #EFF4F0;
 }
 
@@ -6192,19 +6196,82 @@ padding: 6px 16px;
     position: sticky;
     top: 24px;
     flex-direction: column;
-    gap: 14px;
-    padding: 18px;
+    gap: 10px;
+    padding: 14px 16px 16px;
     border: 1px solid rgba(216, 228, 220, 0.95);
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.94);
     box-shadow: 0 10px 32px rgba(46, 125, 91, 0.08);
   }
 
-  .booking-desktop-rail h2 {
+  .booking-desktop-rail .booking-controls-section {
+    margin-top: 0;
+  }
+
+  .booking-desktop-rail .premium-pricing-card {
     margin: 0;
-    color: #1a2b22;
-    font-size: 15px;
-    font-weight: 800;
+  }
+
+  .booking-desktop-rail .inline-selectors {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .booking-page .room-subtitle {
+    display: none;
+  }
+
+  .booking-page .room-details {
+    padding: 18px 20px 20px;
+    gap: 12px;
+  }
+
+  .booking-page .room-image-container {
+    height: clamp(320px, 38vw, 420px);
+  }
+
+  .booking-page .amenities-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0;
+  }
+
+  .booking-page .amenity-item {
+    flex-direction: row;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: #E8F5EE;
+    color: #2E7D5B;
+    text-align: left;
+  }
+
+  .booking-page .amenity-icon-box {
+    width: auto;
+    height: auto;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .booking-page .amenity-icon {
+    width: 14px;
+    height: 14px;
+    color: #2E7D5B;
+  }
+
+  .booking-page .amenity-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #2E7D5B;
+    line-height: 1.2;
+  }
+
+  .booking-page .amenity-item:hover .amenity-icon-box {
+    background: transparent;
+    transform: none;
   }
 
   .booking-save-phone {
@@ -6239,8 +6306,24 @@ padding: 6px 16px;
 }
 
 .booking-date-calendar .calendar-modal-header {
-  padding: 0 0 12px;
+  padding: 0 0 8px;
   border-bottom: 1px solid #e6eee9;
+  position: static;
+}
+
+.booking-date-calendar .calendar-header-nav {
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.booking-date-calendar .month-nav-btn {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+.booking-date-calendar .month-year-text {
+  font-size: 15px;
 }
 
 .booking-date-calendar .calendar-close-btn {
@@ -6254,11 +6337,133 @@ padding: 6px 16px;
 .booking-date-calendar .calendar-modal-body {
   max-height: none;
   overflow: visible;
-  padding: 12px 0 0;
+  padding: 8px 0 0;
 }
 
 .booking-date-calendar .calendar-content-wrapper {
+  max-width: none;
+  width: 100%;
   padding: 0;
+  margin: 0;
+}
+
+.booking-date-calendar .calendar-grid {
+  gap: 2px;
+  column-gap: 2px;
+  row-gap: 2px;
+  margin-bottom: 6px;
+}
+
+.booking-date-calendar .calendar-day-name {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 3px 0;
+}
+
+.booking-date-calendar .calendar-day {
+  aspect-ratio: 1;
+  min-height: 32px;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+}
+
+.booking-date-calendar .calendar-day-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+}
+
+.booking-date-calendar .calendar-day-content:hover {
+  background: transparent;
+}
+
+.booking-date-calendar .calendar-day::before,
+.booking-date-calendar .calendar-day::after {
+  display: none;
+}
+
+.booking-date-calendar .calendar-day:hover:not(.disabled):not(.selected-start):not(.selected-end):not(.in-range) {
+  background: #f3f4f6;
+}
+
+.booking-date-calendar .calendar-day.selected-start,
+.booking-date-calendar .calendar-day.selected-end {
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 6px;
+}
+
+.booking-date-calendar .calendar-day.selected-start .calendar-day-content,
+.booking-date-calendar .calendar-day.selected-end .calendar-day-content {
+  background: transparent;
+  color: inherit;
+  border-radius: inherit;
+}
+
+.booking-date-calendar .calendar-day.in-range {
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 6px;
+}
+
+.booking-date-calendar .calendar-day.today {
+  border: 2px solid #3b82f6;
+  box-sizing: border-box;
+}
+
+.booking-date-calendar .calendar-day.today .calendar-day-content {
+  border: none;
+  font-weight: 700;
+}
+
+.booking-date-calendar .calendar-day.disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.booking-date-calendar .calendar-nights-selected {
+  display: none;
+}
+
+.booking-date-calendar .calendar-quick-book-section {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.booking-date-calendar .quick-book-action-btn {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1.5px solid #d8e4dc;
+  border-radius: 999px;
+  background: #E8F5EE;
+  color: #2E7D5B;
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.booking-date-calendar .quick-book-action-btn:hover {
+  background: #d4ecdf;
+  color: #245f46;
+  transform: none;
+  box-shadow: none;
 }
 
 .guest-install-qr-overlay {
@@ -6337,31 +6542,12 @@ padding: 6px 16px;
   font-size: 12px !important;
 }
 
-.booking-rail-cta {
-  width: 100%;
-  min-height: 50px;
-  padding: 13px 16px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #4caf7d, #2e7d5b 65%, #245f46);
-  color: #fff;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  box-shadow: 0 6px 18px rgba(46, 125, 91, 0.24);
-  cursor: pointer;
-}
-
-.booking-rail-cta:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
 .booking-rail-meta {
   margin: 0;
   color: #66756c;
   font-size: 13px;
   line-height: 1.45;
+  text-align: center;
 }
 
 /* Owner inline edit mode */

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PawPrint, Users } from 'lucide-react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import CalendarModal from './CalendarModal.jsx';
@@ -119,6 +120,17 @@ function BookingPage({
   const showInstallBanner = !isStandalone() && (roomData?.length > 0 || ownerScrollInstall);
   const railRoom = selectedRoom || roomData?.[0] || null;
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+  const railPricing = useMemo(() => {
+    if (!railRoom || nights <= 0) return null;
+    let grandTotal;
+    if (railRoom.totalRate !== undefined && railRoom.totalRate !== null) {
+      grandTotal = Number(railRoom.totalRate);
+    } else {
+      const subtotalBeforeTax = calculateTieredPrice(nights, rates);
+      grandTotal = subtotalBeforeTax + subtotalBeforeTax * Number(rates?.taxRate ?? 0.10);
+    }
+    return { payToday: 0, balanceDue: grandTotal };
+  }, [railRoom, nights, rates]);
 
   const handleRailBook = () => {
     if (!railRoom || nights <= 0) return;
@@ -247,7 +259,6 @@ function BookingPage({
       </main>
 
       <aside className="booking-desktop-rail" aria-label="Choose dates and book">
-        <h2>Choose dates</h2>
         <CalendarModal
           inline
           isOpen
@@ -262,40 +273,71 @@ function BookingPage({
             ? `${nights} night${nights === 1 ? '' : 's'} · ${railRoom?.name || 'Select a room'}`
             : 'Pick check-in and check-out, then continue.'}
         </p>
-        {selectedRoom && (
-          <div className="inline-selectors">
-            <div className="inline-selector-item">
-              <div className="selector-label"><span>Guests</span></div>
-              <div className="custom-stepper">
-                <button type="button" className="stepper-btn" onClick={() => onGuestsChange(Math.max(1, selectedRoom.guests - 1))} disabled={selectedRoom.guests <= 1}>−</button>
-                <span className="stepper-value">{selectedRoom.guests}</span>
-                <button type="button" className="stepper-btn" onClick={() => onGuestsChange(Math.min(selectedRoom.maxOccupancy || 4, selectedRoom.guests + 1))} disabled={selectedRoom.guests >= (selectedRoom.maxOccupancy || 4)}>+</button>
-              </div>
+        {nights > 0 && railPricing ? (
+          <div className="premium-pricing-card">
+            <div className="pricing-main">
+              <span className="price-today-large">${railPricing.payToday.toFixed(0)}</span>
+              <span className="price-today-label">today</span>
             </div>
-            <div className="inline-selector-item">
-              <div className="selector-label"><span>Pets</span></div>
-              <div className="custom-stepper">
-                <button type="button" className="stepper-btn" onClick={() => onPetsChange(Math.max(0, selectedRoom.pets - 1))} disabled={selectedRoom.pets <= 0}>−</button>
-                <span className="stepper-value">{selectedRoom.pets}</span>
-                <button type="button" className="stepper-btn" onClick={() => onPetsChange(Math.min(2, selectedRoom.pets + 1))} disabled={selectedRoom.pets >= 2}>+</button>
-              </div>
-            </div>
+            <p className="pricing-subtitle">
+              Pay <span className="price-balance-highlight">${railPricing.balanceDue.toFixed(2)}</span> when you arrive
+            </p>
+          </div>
+        ) : (
+          <div className="premium-pricing-card premium-pricing-card--empty">
+            <p className="pricing-empty-title">Choose dates to see rates</p>
+            <p className="pricing-subtitle">
+              Pick your check-in and check-out to see the price for this room.
+            </p>
           </div>
         )}
-        <button
-          type="button"
-          className="booking-rail-cta"
-          onClick={handleRailBook}
-          disabled={!railRoom || isProcessingBooking || nights <= 0}
-        >
-          {isProcessingBooking
-            ? 'Processing...'
-            : selectedRoom
-              ? 'Reserve for $0'
-              : nights > 0
-                ? 'Continue Booking'
-                : 'Select Room'}
-        </button>
+        {selectedRoom ? (
+          <div className="booking-controls-section">
+            <div className="inline-selectors">
+              <div className="inline-selector-item">
+                <div className="selector-label">
+                  <Users size={18} />
+                  <span>Guests</span>
+                </div>
+                <div className="custom-stepper">
+                  <button type="button" className="stepper-btn" onClick={() => onGuestsChange(Math.max(1, selectedRoom.guests - 1))} disabled={selectedRoom.guests <= 1}>−</button>
+                  <span className="stepper-value">{selectedRoom.guests}</span>
+                  <button type="button" className="stepper-btn" onClick={() => onGuestsChange(Math.min(selectedRoom.maxOccupancy || 4, selectedRoom.guests + 1))} disabled={selectedRoom.guests >= (selectedRoom.maxOccupancy || 4)}>+</button>
+                </div>
+              </div>
+              <div className="inline-selector-item">
+                <div className="selector-label">
+                  <PawPrint size={18} />
+                  <span>Pets</span>
+                </div>
+                <div className="custom-stepper">
+                  <button type="button" className="stepper-btn" onClick={() => onPetsChange(Math.max(0, selectedRoom.pets - 1))} disabled={selectedRoom.pets <= 0}>−</button>
+                  <span className="stepper-value">{selectedRoom.pets}</span>
+                  <button type="button" className="stepper-btn" onClick={() => onPetsChange(Math.min(2, selectedRoom.pets + 1))} disabled={selectedRoom.pets >= 2}>+</button>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="premium-book-button"
+              onClick={handleRailBook}
+              disabled={isProcessingBooking}
+            >
+              {isProcessingBooking ? 'Processing...' : 'Reserve for $0'}
+            </button>
+          </div>
+        ) : (
+          <div className="booking-controls-section">
+            <button
+              type="button"
+              className="premium-select-button"
+              onClick={handleRailBook}
+              disabled={!railRoom || nights <= 0}
+            >
+              {nights > 0 ? 'Continue Booking' : 'Select Room'}
+            </button>
+          </div>
+        )}
         {showInstallBanner && hotel.subscribed !== false && (
           <button type="button" className="booking-save-phone" onClick={() => setShowInstallQr(true)}>
             Save on your phone
