@@ -746,7 +746,42 @@ export function updateAssistantTimeDisplay(input) {
   if (valueNode) valueNode.textContent = clockTimeLabel(input.value);
 }
 
-export function openFrontDeskAssistant() {
+// The pill becomes the sheet rather than the sheet appearing over it.
+//
+// View Transitions do this properly: tag both elements with the same
+// view-transition-name and the browser interpolates position, size and radius
+// between them, so the pill visibly grows into the sheet and shrinks back on
+// close. Safari 18 and Chrome support it; anywhere else falls through to the
+// existing slide-up, which is why every call is wrapped rather than assumed.
+function supportsViewTransitions() {
+  return typeof document.startViewTransition === 'function'
+    && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+// The name has to be unique while the transition runs, so it is applied to the
+// pill only for the duration and removed after. Two elements sharing a name at
+// the same time makes the browser skip the animation entirely.
+function withPillMorph(run) {
+  const pill = document.getElementById('frontDeskAssistantPill');
+  if (!supportsViewTransitions()) {
+    run();
+    return;
+  }
+  if (pill) pill.style.viewTransitionName = 'fda-morph';
+  const transition = document.startViewTransition(() => {
+    run();
+    const sheet = document.getElementById('frontDeskAssistantSheet');
+    if (sheet) sheet.style.viewTransitionName = 'fda-morph';
+    if (pill) pill.style.viewTransitionName = '';
+  });
+  transition.finished.finally(() => {
+    const sheet = document.getElementById('frontDeskAssistantSheet');
+    if (sheet) sheet.style.viewTransitionName = '';
+    if (pill) pill.style.viewTransitionName = '';
+  }).catch(() => {});
+}
+
+function openAssistantSheetNow() {
   if (!isNativeFrontDesk()) {
     window.openFrontdeskAppDownload?.();
     return;
@@ -779,10 +814,39 @@ export function openFrontDeskAssistant() {
   }
 }
 
+// Public entry: the pill morphs into the sheet where the browser can do it,
+// and simply opens where it cannot.
+export function openFrontDeskAssistant() {
+  if (!isNativeFrontDesk()) {
+    window.openFrontdeskAppDownload?.();
+    return;
+  }
+  withPillMorph(() => openAssistantSheetNow());
+}
+
+// Closing runs the same morph in reverse: the sheet shrinks back into the
+// pill rather than sliding away from it.
 export function closeFrontDeskAssistant() {
-  document.getElementById('frontDeskAssistantOverlay')?.remove();
-  document.body.style.overflow = '';
-  setNativeShellForAssistant(true);
+  const dismiss = () => {
+    document.getElementById('frontDeskAssistantOverlay')?.remove();
+    document.body.style.overflow = '';
+    setNativeShellForAssistant(true);
+  };
+  const sheet = document.getElementById('frontDeskAssistantSheet');
+  if (!supportsViewTransitions() || !sheet) {
+    dismiss();
+    return;
+  }
+  sheet.style.viewTransitionName = 'fda-morph';
+  const transition = document.startViewTransition(() => {
+    dismiss();
+    const pill = document.getElementById('frontDeskAssistantPill');
+    if (pill) pill.style.viewTransitionName = 'fda-morph';
+  });
+  transition.finished.finally(() => {
+    const pill = document.getElementById('frontDeskAssistantPill');
+    if (pill) pill.style.viewTransitionName = '';
+  }).catch(() => {});
 }
 
 export function retryFrontDeskAssistant() {

@@ -2281,10 +2281,18 @@
         justify-content: space-around;
         gap: 2px;
         padding: 8px 6px 10px;
-        background: var(--white);
-        border: 1.5px solid var(--border);
+        /* Glass, matching the pill above it. A lighter blur than the pill on
+           purpose: the pill sits over the nav, and two heavy blurs stacked
+           turn the pair muddy. The nav is the calmer, always-present layer. */
+        -webkit-backdrop-filter: blur(16px) saturate(170%);
+        backdrop-filter: blur(16px) saturate(170%);
+        background: rgba(255, 255, 255, 0.68);
+        border: 1px solid rgba(255, 255, 255, 0.72);
         border-radius: 999px;
-        box-shadow: 0 10px 40px rgba(26, 43, 34, 0.12), 0 2px 12px rgba(46, 125, 91, 0.08);
+        box-shadow:
+          0 10px 40px rgba(26, 43, 34, 0.14),
+          0 2px 12px rgba(46, 125, 91, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.85);
       }
       .mobile-nav-item {
         flex: 1 1 0;
@@ -3938,4 +3946,42 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
                   background var(--dur-fast) var(--ease-out),
                   border-color var(--dur-fast) var(--ease-out),
                   box-shadow var(--dur-fast) var(--ease-out);
+    }
+
+    /* Solid fallback for the nav, same reasoning as the pill: translucency
+       without blur is just a faded bar. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      @media (max-width: 600px) {
+        .mobile-bottom-nav {
+          background: var(--white);
+          border-color: var(--border);
+        }
+      }
+    }
+
+    /* The pill-to-sheet morph. Without these the browser cross-fades at its
+       own default speed, which reads as a dissolve rather than one element
+       becoming another. */
+    ::view-transition-group(fda-morph) {
+      animation-duration: var(--dur-slow);
+      animation-timing-function: var(--ease-sheet);
+    }
+    /* The pill and the sheet share no content, so cross-fading their pixels
+       just muddies the middle of the transition. Fading the old out quickly
+       and the new in over the full move keeps the shape change legible. */
+    ::view-transition-old(fda-morph) {
+      animation: marketel-vt-out var(--dur-fast) var(--ease-out) both;
+    }
+    ::view-transition-new(fda-morph) {
+      animation: marketel-vt-in var(--dur-slow) var(--ease-sheet) both;
+    }
+    @keyframes marketel-vt-out { to { opacity: 0; } }
+    @keyframes marketel-vt-in { from { opacity: 0; } to { opacity: 1; } }
+
+    /* The root cross-fade would dim the whole app behind the morph. */
+    @media (prefers-reduced-motion: no-preference) {
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: var(--dur-base);
+      }
     }

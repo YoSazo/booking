@@ -169,3 +169,40 @@ test('deleting a photo animates the photo out, and puts it back on failure', () 
     // The animation promises a deletion. If the request fails, undo the promise.
     assert.match(settings, /catch \(e\) \{[\s\S]{0,320}thumb\.classList\.remove\('marketel-removing'\)/);
 });
+
+test('the pill morphs into the sheet and cleans up after itself', () => {
+    const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
+    assert.match(assistant, /function supportsViewTransitions\(\)/);
+    assert.match(assistant, /function withPillMorph\(run\)/);
+    assert.ok(assistant.includes("withPillMorph(() => openAssistantSheetNow())"),
+        'opening does not run through the morph');
+    // Closing runs it in reverse, so the sheet shrinks back into the pill.
+    assert.ok(assistant.includes("sheet.style.viewTransitionName = 'fda-morph'"),
+        'closing does not tag the sheet for the reverse morph');
+    // A leftover name makes the NEXT transition silently skip, so both ends
+    // must clear regardless of how the transition resolved.
+    assert.ok(assistant.includes('transition.finished.finally('),
+        'names are not cleared on a rejected or skipped transition');
+    // Unsupported browsers and reduced motion fall through to a plain open.
+    assert.ok(assistant.includes("typeof document.startViewTransition === 'function'"),
+        'view transitions are assumed rather than feature-detected');
+    assert.match(css, /::view-transition-group\(fda-morph\)/);
+});
+
+test('both floating surfaces are glass, and both degrade together', () => {
+    const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
+    // The pill sits above the nav. Two heavy blurs stacked read as muddy, so
+    // the nav is deliberately the lighter of the two.
+    const navRule = css.slice(css.indexOf('.mobile-bottom-nav {'), css.indexOf('.mobile-nav-item {'));
+    const pillRule = css.slice(css.indexOf('.fda-pill {'), css.indexOf('.fda-pill.is-visible'));
+    const blurOf = (rule) => Number((rule.match(/backdrop-filter: blur\((\d+)px\)/) || [])[1] || 0);
+    const navBlur = blurOf(navRule);
+    const pillBlur = blurOf(pillRule);
+    assert.ok(navBlur > 0, 'the nav bar is not glass');
+    assert.ok(pillBlur > 0, 'the pill is not glass');
+    assert.ok(pillBlur > navBlur, `nav (${navBlur}px) should blur less than the pill (${pillBlur}px)`);
+    // Translucency without blur is just a faded control, so both need the
+    // solid fallback rather than only the pill.
+    const fallbacks = css.match(/@supports not \(\(backdrop-filter/g) || [];
+    assert.ok(fallbacks.length >= 2, `expected a fallback for pill and nav, saw ${fallbacks.length}`);
+});
