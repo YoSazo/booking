@@ -1,0 +1,32 @@
+1. SCREEN RECORDING
+Attached: a 2:37 recording on a physical iPhone, from the Home Screen with the app launching. It covers sign-in with the demo Property ID and PIN, the setup tour, the Contacts and Notifications prompts, browsing bookings, Call guest, changing availability, renaming a room and viewing the updated live booking page, the Add Photos picker, the check-in QR, and the full account deletion flow including its recovery window and cancellation. A second clip shows the camera prompt.
+
+No registration flow exists to record: accounts are created for existing customers outside the app. Photo selection uses a web file input, so the Photo Library path raises no permission alert; only Take Photo does.
+
+2. DEVICES TESTED
+iPhone 13, iOS 26.5 (physical device, via TestFlight)
+
+3. FUNCTION, AUDIENCE, VALUE
+Marketel Front Desk is a companion app for existing Marketel business customers operating real lodging properties: independent motels, inns and small hotels. Guests never download this app; they book on the property's own page and may save that page to their Home Screen.
+
+A small property cannot tell, when a request arrives, whether that room is still physically free; the owner may have taken a walk-in minutes earlier. Larger operators solve this with property management system integrations small properties cannot afford or install.
+
+Marketel solves it by asking the owner. When a request arrives the app alerts the owner and asks whether the room is still available. Keeping or releasing it updates availability, notifies the guest, and voids the temporary card authorization if declined.
+
+It manages availability and reservations for physical overnight stays, and sells no media or digital content.
+
+4. SETUP AND ACCESS
+No setup required. On the sign-in screen choose "Use property ID and PIN instead" and enter the credentials in the Sign-In Information fields above. They open a dedicated demonstration property, permanently entitled and non-expiring, containing only synthetic rooms, guests, bookings, messages and availability. No inbox access or one-time code is needed.
+
+Account deletion is on Your Page. Deleting a business account normally requires the owner email, because the property ID and PIN are shared with front-desk staff and must not delete the business. The demonstration property is exempt so the reviewer can run the whole flow from the supplied credentials. Deletion schedules a seven-day recovery window and is cancellable on the same screen.
+
+The app contains no purchase, subscription or checkout flow, does not link to one, and provides no subscription management. Billing happens outside the app.
+
+5. EXTERNAL SERVICES
+OpenAI powers the Front Desk Assistant, which turns an owner's SMS reply ("a walk-in took the queen suite") into an availability change; only reservation and room context is sent. Twilio sends SMS to the property's own staff; Brevo, transactional email; Apple Push Notification service, native alerts. Render hosts the backend, Vercel each property's public booking page, Cloudflare R2 the photos. Stripe processes the guest card authorization on a property's public booking page and the property's own subscription; neither exists inside this app, which has no purchase path and never reaches Stripe.
+
+6. REGIONAL DIFFERENCES
+The app functions consistently in all regions; nothing is region-gated. The interface is English and current customers operate US properties, so amounts show in US dollars.
+
+7. REGULATED INDUSTRY / PROTECTED MATERIAL
+Not applicable. Marketel is business software licensed to lodging operators to manage their own rooms. It is not a travel agency or marketplace: it does not resell, aggregate or display third-party inventory. Each account is scoped to one property its holder operates and cannot see another's reservations. The demonstration property is entirely synthetic and owned by Marketel.
