@@ -134,3 +134,38 @@ test('the Assistant pill knows its state before the data arrives', () => {
     // Scoped per property, or switching properties would inherit the answer.
     assert.match(assistant, /crm\.activeHotelId/);
 });
+
+test('motion is a system, not scattered one-off transitions', () => {
+    const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
+    // One vocabulary. Bare `ease` is symmetrical and reads sluggish on a phone.
+    for (const token of ['--ease-out', '--ease-sheet', '--dur-fast', '--dur-base']) {
+        assert.ok(css.includes(token), `${token} is missing from the motion tokens`);
+    }
+    // Respecting the setting is both an accessibility requirement and the
+    // cheapest signal that the motion was designed rather than sprinkled.
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+    assert.match(css, /animation-duration: 0\.01ms !important/);
+});
+
+test('sections animate open instead of snapping', () => {
+    // display:none cannot be transitioned, so height has to be measured.
+    assert.match(settings, /const target = body\.scrollHeight;/);
+    // Released back to auto, or the section can never grow when its content does.
+    assert.match(settings, /body\.style\.height = '';\s*\n\s*body\.classList\.remove\('is-animating'\)/);
+    // A forced reflow between the two writes, or they coalesce and nothing moves.
+    assert.match(settings, /void body\.offsetHeight;/);
+    // Re-tapping mid-flight must not measure a half-open section.
+    assert.match(settings, /if \(body\._sectionTimer\) \{/);
+    // Reduced motion skips the animation rather than running it at 0ms.
+    assert.ok(settings.includes("window.matchMedia('(prefers-reduced-motion: reduce)').matches"),
+        'toggleSection does not consult the reduced-motion setting');
+    assert.ok(settings.includes("body.style.display = opening ? 'block' : 'none';"),
+        'reduced motion should switch instantly rather than animate at 0ms');
+});
+
+test('deleting a photo animates the photo out, and puts it back on failure', () => {
+    assert.match(settings, /data-thumb-id="\$\{esc\(img\.id\)\}"/);
+    assert.match(settings, /thumb\.classList\.add\('marketel-removing'\)/);
+    // The animation promises a deletion. If the request fails, undo the promise.
+    assert.match(settings, /catch \(e\) \{[\s\S]{0,320}thumb\.classList\.remove\('marketel-removing'\)/);
+});

@@ -3741,6 +3741,19 @@ function embeddedExampleBookingHtml() {
     </section>`;
 }
 
+// Cards arrive top-down instead of the whole list flashing in at once. The
+// index is set per element so one keyframe serves any list length, and the
+// whole thing is skipped under reduced motion rather than run at 0ms.
+function applyRiseStagger(container, selector) {
+  if (!container) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const children = container.querySelectorAll(selector || ':scope > *');
+  children.forEach((child, index) => {
+    child.style.setProperty('--rise-index', String(index));
+    child.classList.add('marketel-rise');
+  });
+}
+
 function renderBookings(fullList) {
   const el = document.getElementById('bookingsList');
   if (!el) return;
@@ -3858,6 +3871,7 @@ function renderBookings(fullList) {
   }
 
   el.innerHTML = list.map(bookingCardHtml).join('');
+  applyRiseStagger(el);
 }
 
 // ── FILTER TABS ────────────────────────────────────────

@@ -3865,3 +3865,77 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
     /* An unfinished section says so on the header, so the page reads as a
        checklist without opening anything. */
     .page-section-hint.is-todo { color: var(--amber); }
+
+    /* ── Motion ──────────────────────────────────────────────────────────
+       One vocabulary, so every surface accelerates the same way. The curves
+       are iOS's, not the browser's: `ease` is symmetrical and reads sluggish
+       on a phone, while these start fast and settle, which is what makes a
+       native app feel like it responded before it finished moving. */
+    :root {
+      --ease-out: cubic-bezier(0.2, 0, 0, 1);        /* entrances, expansion */
+      --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);   /* things that move in place */
+      --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);  /* sheets and modals */
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* small confirmations */
+      --dur-fast: 140ms;    /* taps, toggles */
+      --dur-base: 220ms;    /* most things */
+      --dur-slow: 320ms;    /* sheets, large surfaces */
+    }
+
+    /* Vestibular safety, and it doubles as a quality signal: an app that
+       respects the setting feels considered. Nothing below is decorative
+       enough to be worth overriding it. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* Cards arrive rather than appear. Staggered by index so a list resolves
+       top-down instead of flashing in as one block. */
+    @keyframes marketel-rise {
+      from { opacity: 0; transform: translateY(9px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .marketel-rise {
+      animation: marketel-rise var(--dur-base) var(--ease-out) both;
+      animation-delay: calc(var(--rise-index, 0) * 28ms);
+    }
+    /* Past the first handful the stagger stops earning its delay and starts
+       feeling like lag. */
+    .marketel-rise:nth-child(n + 7) { animation-delay: 168ms; }
+
+    /* Removal should read as the row leaving, not the list jumping to close
+       a hole. Height and margin collapse together so neighbours slide up. */
+    @keyframes marketel-collapse {
+      from { opacity: 1; transform: none; }
+      to   { opacity: 0; transform: scale(0.94); }
+    }
+    .marketel-removing {
+      animation: marketel-collapse var(--dur-fast) var(--ease-in-out) forwards;
+      pointer-events: none;
+    }
+
+    /* Sections measure their own height in JS; these are the curves it uses. */
+    .accordion-body.is-animating {
+      overflow: hidden;
+      transition:
+        height var(--dur-base) var(--ease-out),
+        opacity var(--dur-fast) linear;
+    }
+
+    /* Pressable feedback. A tap that does not acknowledge itself reads as a
+       tap that missed — the same failure the booking buttons had. */
+    .btn, .fda-pill, .page-section-head, .mobile-nav-item, .refresh-btn {
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active, .refresh-btn:active { transform: scale(0.975); }
+    .page-section-head:active { background: var(--surface-subtle); }
+    .btn, .refresh-btn {
+      transition: transform var(--dur-fast) var(--ease-out),
+                  background var(--dur-fast) var(--ease-out),
+                  border-color var(--dur-fast) var(--ease-out),
+                  box-shadow var(--dur-fast) var(--ease-out);
+    }

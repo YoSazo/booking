@@ -1029,7 +1029,7 @@ function renderEditRoomsCards() {
           <input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEditImages(event,'${roomIdJs}')">
         </label>
       </div>
-      ${images.length > 1 ? `<div class="room-edit-thumbs">` + images.map((img, idx) => `<div class="room-edit-thumb-wrap"><button type="button" class="room-edit-thumb ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="showEditRoomPhoto('${roomIdJs}', ${idx})"><img src="${esc(img.url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/room-placeholder.svg';"></button><button type="button" onclick="event.stopPropagation();deleteEditImage('${roomIdJs}','${jsStr(img.id)}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
+      ${images.length > 1 ? `<div class="room-edit-thumbs">` + images.map((img, idx) => `<div class="room-edit-thumb-wrap" data-thumb-id="${esc(img.id)}"><button type="button" class="room-edit-thumb ${idx === 0 ? 'active' : ''}" aria-label="Show photo ${idx + 1}" ${idx === 0 ? 'aria-current="true"' : ''} onclick="showEditRoomPhoto('${roomIdJs}', ${idx})"><img src="${esc(img.url)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/room-placeholder.svg';"></button><button type="button" onclick="event.stopPropagation();deleteEditImage('${roomIdJs}','${jsStr(img.id)}')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;border:none;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>`).join('') + `</div>` : ''}
       </div>
       <div class="room-edit-fields" style="padding:18px;">
         <div data-tour-room-details-anchor="1" style="margin-bottom:12px;">
@@ -1331,16 +1331,66 @@ function pageSectionHtml(title, bodyHtml, { open = false, hint = '', id = '' } =
   </div>`;
 }
 
+// display:none cannot be transitioned, which is why every section on this page
+// snapped. Height has to be a real number for the browser to animate it, so the
+// body is measured, moved between 0 and that measurement, then released back to
+// auto — otherwise the section could never grow again when its content changes.
 function toggleSection(header) {
   const body = header.nextElementSibling;
+  if (!body) return;
   const arrow = header.querySelector('.accordion-arrow');
-  if (body.style.display === 'none') {
-    body.style.display = 'block';
-    if (arrow) arrow.style.transform = 'rotate(90deg)';
-  } else {
-    body.style.display = 'none';
-    if (arrow) arrow.style.transform = 'rotate(0deg)';
+  const opening = body.style.display === 'none' || !body.style.display;
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (arrow) arrow.style.transform = opening ? 'rotate(90deg)' : 'rotate(0deg)';
+
+  if (reduced) {
+    body.style.display = opening ? 'block' : 'none';
+    return;
   }
+
+  // A second tap mid-flight must not measure a half-open section.
+  body.style.transition = 'none';
+  if (body._sectionTimer) {
+    clearTimeout(body._sectionTimer);
+    body._sectionTimer = null;
+  }
+
+  if (opening) {
+    body.style.display = 'block';
+    body.style.height = 'auto';
+    const target = body.scrollHeight;
+    body.style.height = '0px';
+    body.style.opacity = '0';
+    body.classList.add('is-animating');
+    // Force a read before changing it again, or the two writes coalesce and
+    // there is no transition left to run.
+    void body.offsetHeight;
+    body.style.transition = '';
+    body.style.height = target + 'px';
+    body.style.opacity = '1';
+    body._sectionTimer = setTimeout(() => {
+      // Back to auto so the section still fits content added later.
+      body.style.height = '';
+      body.classList.remove('is-animating');
+      body._sectionTimer = null;
+    }, 240);
+    return;
+  }
+
+  body.style.height = body.scrollHeight + 'px';
+  body.classList.add('is-animating');
+  void body.offsetHeight;
+  body.style.transition = '';
+  body.style.height = '0px';
+  body.style.opacity = '0';
+  body._sectionTimer = setTimeout(() => {
+    body.style.display = 'none';
+    body.style.height = '';
+    body.style.opacity = '';
+    body.classList.remove('is-animating');
+    body._sectionTimer = null;
+  }, 240);
 }
 
 let goLiveInFlight = false;
@@ -1655,8 +1705,23 @@ async function uploadAppIcon(input) {
   input.value = '';
 }
 
+// The thumbnail used to vanish on the next full re-render, so a delete read as
+// the strip flickering rather than that photo leaving. It now collapses in
+// place first, and the request runs behind the animation instead of before it.
 async function deleteEditImage(roomId, imageId) {
   if (!confirm('Delete this photo?')) return;
+  const thumb = document.querySelector(`[data-thumb-id="${CSS.escape(String(imageId))}"]`);
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (thumb && !reduced) {
+    thumb.classList.add('marketel-removing');
+    // Width and margin collapse after the scale, so neighbours slide into the
+    // gap rather than jumping the moment it is gone.
+    setTimeout(() => {
+      thumb.style.transition = 'width 140ms var(--ease-in-out), margin 140ms var(--ease-in-out)';
+      thumb.style.width = '0px';
+      thumb.style.margin = '0';
+    }, 120);
+  }
   try {
     await api('DELETE', `/api/crm/rooms/${roomId}/images/${imageId}`);
     // Remove from local state
@@ -1670,6 +1735,13 @@ async function deleteEditImage(roomId, imageId) {
     notifyEmbeddedEditorSaved('room-photo-deleted', { roomId, changedFields: ['photos'] });
     previewSavedVisual('room-photo', roomId);
   } catch (e) {
+    // Put it back: the animation promised a deletion that did not happen.
+    if (thumb) {
+      thumb.classList.remove('marketel-removing');
+      thumb.style.transition = '';
+      thumb.style.width = '';
+      thumb.style.margin = '';
+    }
     toast('Failed to delete', 'error');
   }
 }
