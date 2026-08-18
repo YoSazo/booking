@@ -3862,9 +3862,12 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
       will-change: height;
       transition: height var(--dur-base) var(--ease-out);
     }
-    .accordion-body.is-animating > * {
+    /* Only on the way in. Closing is the height alone: a child fading on a
+       different clock than the box, while sliding up as the box clips down,
+       reads as two separate stops rather than one collapse. */
+    .accordion-body.is-opening > * {
       transition: transform var(--dur-base) var(--ease-out),
-                  opacity var(--dur-fast) linear;
+                  opacity var(--dur-base) var(--ease-out);
     }
     .accordion-body.is-collapsed > * {
       transform: translateY(-6px);

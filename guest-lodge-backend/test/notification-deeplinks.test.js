@@ -187,3 +187,42 @@ test('the pill label is known before the Assistant data arrives', () => {
     // right on the frame the tab appears.
     assert.match(assistant, /window\.syncNativeShellState\?\.\(\)/);
 });
+test('closing a section is one motion, not two', () => {
+    const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
+    // Three clocks ran at once: height 220ms, child transform 220ms, child
+    // opacity 140ms. The content finished fading while the box was still
+    // collapsing, and slid up while the box clipped down — read as two stops.
+    assert.match(css, /\.accordion-body\.is-opening > \* \{/);
+    assert.doesNotMatch(css, /\.accordion-body\.is-animating > \* \{/);
+    // Open: box and children share one duration so they land together.
+    const opening = css.slice(css.indexOf('.accordion-body.is-opening > * {'));
+    assert.doesNotMatch(opening.slice(0, 200), /--dur-fast/);
+    // Close: the collapsed class is never applied, so nothing but height moves.
+    assert.doesNotMatch(settings, /body\.classList\.add\('is-collapsed'\);/);
+});
+
+test('the native pill survives a fast tab switch', () => {
+    const appDelegate = fs.readFileSync(
+        path.join(root, '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
+        'utf8'
+    );
+    // Switching tabs quickly starts a second animation before the first
+    // finishes. Deciding from the captured value hid a pill that had since been
+    // asked to show again, and it stayed gone until the owner navigated away
+    // and back slowly.
+    assert.match(appDelegate, /completion: \{ finished in/);
+    assert.match(appDelegate, /guard finished, !self\.assistantPillVisible else \{ return \}/);
+    assert.doesNotMatch(appDelegate, /completion: \{ _ in\s*\n\s*if !visible \{/);
+});
+
+test('content that arrives after the page does not pop in', () => {
+    // Room cards and guest messages both land after their own fetch, so they
+    // replaced a loading row rather than arriving with the page.
+    assert.match(settings, /window\.applyRiseStagger\?\.\(cards\);/);
+    assert.match(core, /window\.applyRiseStagger\?\.\(panel\);/);
+    // Both must sit after the innerHTML assignment completes, not inside the
+    // template literal that builds it.
+    const roomsAt = settings.indexOf('window.applyRiseStagger?.(cards);');
+    assert.ok(settings.lastIndexOf("}).join('');", roomsAt) > 0,
+        'the room-card stagger runs before the markup is committed');
+});

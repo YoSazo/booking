@@ -1084,6 +1084,9 @@ function renderEditRoomsCards() {
       </div>
     </div>`;
   }).join('');
+  // Room cards arrive after their own fetch, so without this they pop in
+  // against a page that has already settled.
+  window.applyRiseStagger?.(cards);
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -1381,7 +1384,7 @@ function toggleSection(header) {
     body.style.height = 'auto';
     const target = body.scrollHeight;
     body.style.height = '0px';
-    body.classList.add('is-animating', 'is-collapsed');
+    body.classList.add('is-animating', 'is-opening', 'is-collapsed');
     // Force a read before changing anything else, or the writes coalesce into
     // no transition at all.
     void body.offsetHeight;
@@ -1393,7 +1396,7 @@ function toggleSection(header) {
       // will-change so the layer is not kept alive for nothing.
       body.style.height = '';
       body.style.willChange = '';
-      body.classList.remove('is-animating');
+      body.classList.remove('is-animating', 'is-opening');
       body._sectionTimer = null;
     }, 240);
     return;
@@ -1406,7 +1409,6 @@ function toggleSection(header) {
   // Added after the reflow, not before it, or the content snaps out instead of
   // easing out alongside the height.
   body.style.height = '0px';
-  body.classList.add('is-collapsed');
   body._sectionTimer = setTimeout(() => {
     body.style.display = 'none';
     body.style.height = '';

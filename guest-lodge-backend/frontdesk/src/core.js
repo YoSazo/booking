@@ -3392,6 +3392,10 @@ function renderMessages() {
       </div>
       ${inboxBody}
     </section>`;
+  // Messages load after the tab is already on screen, so the card replaces a
+  // loading row rather than arriving with the page. Rise it in so the swap
+  // reads as content settling instead of a jump.
+  window.applyRiseStagger?.(panel);
 }
 
 function markActiveMessageThreadRead() {

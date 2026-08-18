@@ -543,11 +543,15 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             self.assistantPill.transform = CGAffineTransform(scaleX: scale, y: scale)
             self.assistantPillButton.transform = self.assistantPill.transform
             self.assistantPillButton.alpha = visible ? 1 : 0
-        } completion: { _ in
-            if !visible {
-                self.assistantPill.isHidden = true
-                self.assistantPillButton.isHidden = true
-            }
+        } completion: { finished in
+            // Switching tabs quickly starts a second animation before this one
+            // finishes. Deciding from the captured value would hide a pill that
+            // has since been asked to show again, which is what made it vanish
+            // until the owner navigated away and back slowly. Read the current
+            // state instead, and ignore interrupted runs entirely.
+            guard finished, !self.assistantPillVisible else { return }
+            self.assistantPill.isHidden = true
+            self.assistantPillButton.isHidden = true
         }
     }
 
