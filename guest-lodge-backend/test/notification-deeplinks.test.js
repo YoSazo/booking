@@ -97,3 +97,40 @@ test('no emoji ships in the Front Desk interface', () => {
     }
     assert.deepEqual(offenders, [], `emoji found: ${offenders.join(', ')}`);
 });
+
+test('Your Page uses one disclosure pattern and shrinks once set up', () => {
+    // It previously used three at once: a tab switcher for rates and PIN, a
+    // real accordion for Subscription, and everything else permanently open.
+    assert.match(settings, /function pageSectionHtml\(title, bodyHtml/);
+    assert.doesNotMatch(settings, /page-utility-tab/);
+    assert.doesNotMatch(settings, /selectPageUtility/);
+
+    // Sections open when unfinished and closed when done, so a new property
+    // gets the guided page and an established one gets a short list.
+    assert.match(settings, /open: !\(hotelRes\?\.rates\?\.nightly > 0\)/);
+    assert.match(settings, /open: !hotelRes\?\.cancellationPolicy/);
+
+    // The checkout mock-up hosted exactly one field inside fifty lines of fake
+    // page. The field stays; the simulation does not.
+    assert.match(settings, /id="edit-hotel-policy"/);
+    assert.doesNotMatch(settings, /Checkout Page Preview/);
+
+    // The tour still targets the rates card, and the scroll-to-rates helper
+    // still finds an .accordion-body whose previous sibling holds the arrow.
+    assert.match(settings, /id: 'tour-rates-card'/);
+    assert.match(settings, /page-section-head[\s\S]{0,400}accordion-body/);
+    for (const field of ['edit-rate-nightly', 'edit-new-pin']) {
+        assert.ok(settings.includes(field), `${field} was lost in the conversion`);
+    }
+});
+
+test('the Assistant pill knows its state before the data arrives', () => {
+    // Treating "not loaded" as "not configured" made a set-up property open on
+    // "Set up Front Desk Assistant" and correct itself seconds later.
+    assert.match(assistant, /function rememberedAssistantConfigured\(\)/);
+    assert.match(assistant, /const configured = data\s*\n?\s*\?/);
+    assert.match(assistant, /: rememberedAssistantConfigured\(\)/);
+    assert.match(assistant, /if \(data\) rememberAssistantConfigured\(configured\);/);
+    // Scoped per property, or switching properties would inherit the answer.
+    assert.match(assistant, /crm\.activeHotelId/);
+});

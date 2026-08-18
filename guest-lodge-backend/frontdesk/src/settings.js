@@ -905,55 +905,11 @@ async function loadEditRooms() {
       <button id="edit-add-room-btn" style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>
       </div>
       <div class="dash-c">
-      <div class="booking-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px;">Checkout Page Preview</div>
-          <div style="background:#f4f7f9;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
-            <!-- Back button pill (matches .back-button-pill) -->
-            <div style="padding:12px 16px 0;">
-              <span style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:600;box-shadow:0 2px 6px rgba(16,185,129,0.2);">‹ Back to Booking</span>
-            </div>
-            <!-- Cancellation policy banner (matches .static-banner — white pill with shadow) -->
-            <div style="padding:10px 16px;display:flex;justify-content:center;">
-              <div style="background:white;border-radius:20px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.1);border:2px dashed #10b981;width:fit-content;max-width:100%;position:relative;">
-                <div style="position:absolute;top:-8px;right:8px;background:#10b981;color:white;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px;">Editable</div>
-                <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;font-size:11px;color:#111827;font-weight:500;border:none;background:transparent;outline:none;font-family:inherit;text-align:center;">
-              </div>
-            </div>
-            <!-- Progress bar (matches .checkout-progress-bar with pill step-circles) -->
-            <div style="padding:8px 16px 14px;position:relative;">
-              <div style="display:flex;justify-content:space-between;align-items:center;position:relative;">
-                <!-- Connecting line -->
-                <div style="position:absolute;top:11px;left:15%;right:15%;height:2px;background:#ddd;z-index:0;"></div>
-                <!-- Step 1: Review Cart (active/completed) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:#28a745;border:2px solid #28a745;"></div>
-                  <span style="font-size:10px;color:#000;font-weight:600;">Review Cart</span>
-                </div>
-                <!-- Step 2: Info (inactive) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
-                  <span style="font-size:10px;color:#888;">Info</span>
-                </div>
-                <!-- Step 3: Payment (inactive) -->
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;z-index:1;flex:1;">
-                  <div style="width:40px;height:16px;border-radius:999px;background:white;border:2px solid #ccc;"></div>
-                  <span style="font-size:10px;color:#888;">Payment</span>
-                </div>
-              </div>
-            </div>
-            <!-- Placeholder content -->
-            <div style="padding:0 16px 14px;">
-              <div style="background:white;border-radius:8px;padding:10px;border:1px solid var(--border);">
-                <div style="height:8px;background:var(--border);border-radius:4px;margin-bottom:6px;width:60%;"></div>
-                <div style="height:8px;background:var(--border);border-radius:4px;width:40%;"></div>
-              </div>
-            </div>
-          </div>
-          <p style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Edit the green banner above — shown to guests during checkout.</p>
-          <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">${embeddedPreview || crm.hotelSubscribed ? 'Save &amp; see changes' : 'Save Banner'}</button>
-        </div>
-      </div>
+      ${pageSectionHtml('Checkout note', `
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;line-height:1.5;">One line shown to guests on the checkout page. Check-in and check-out times, or anything they should know before paying.</p>
+        <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;padding:11px 13px;font-size:13px;color:var(--text);border:1.5px solid var(--border);border-radius:10px;background:var(--white);outline:none;font-family:inherit;">
+        <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
+      `, { open: !hotelRes?.cancellationPolicy, hint: hotelRes?.cancellationPolicy ? '' : 'Not set yet' })}
       <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
         <div style="padding:18px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
@@ -971,13 +927,7 @@ async function loadEditRooms() {
         </div>
       </div>
       <div class="dash-d">
-      <div class="booking-card" id="tour-rates-card" style="margin-bottom:14px;">
-        <div class="page-utility-tabs" role="tablist" aria-label="Property tools">
-          <button type="button" id="tour-rates-header" class="page-utility-tab active" data-utility-tab="rates" role="tab" aria-selected="true" onclick="selectPageUtility('tour-rates-card','rates')">Rates</button>
-          <button type="button" id="tour-pin-header" class="page-utility-tab" data-utility-tab="pin" role="tab" aria-selected="false" onclick="selectPageUtility('tour-rates-card','pin')">Change PIN</button>
-        </div>
-        <div class="accordion-body page-utility-body" style="display:block;">
-          <div class="page-utility-panel" data-utility-panel="rates">
+      ${pageSectionHtml('Rates', `
             <div id="tour-rates-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
               <div>
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Nightly</div>
@@ -992,17 +942,17 @@ async function loadEditRooms() {
                 <input type="number" value="${rates.monthly}" id="edit-rate-monthly" min="1" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:16px;outline:none;">
               </div>
             </div>
-            <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${crm.hotelSubscribed && !embeddedPreview ? 'Save &amp; see changes' : 'Save Rates'}</button>
-          </div>
-          <div class="page-utility-panel" data-utility-panel="pin" hidden>
+            <button onclick="saveRates()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${crm.hotelSubscribed && !embeddedPreview ? 'Save &amp; see changes' : 'Save Rates'}</button>`, {
+        open: !(hotelRes?.rates?.nightly > 0),
+        hint: hotelRes?.rates?.nightly > 0 ? `$${hotelRes.rates.nightly} nightly` : 'Not set yet',
+        id: 'tour-rates-card',
+      })}
+      ${pageSectionHtml('Change PIN', `
             <div style="margin-bottom:12px;">
               <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 6 chars)'}" style="width:100%;box-sizing:border-box;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
             </div>
             <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
-            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>
-          </div>
-        </div>
-      </div>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>`)}
       ${hotelRes?.subscribed && !isNativeApp() ? `<div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
@@ -1359,17 +1309,26 @@ function copyBookingLink(url) {
   });
 }
 
-function selectPageUtility(cardId, panelName) {
-  const card = document.getElementById(cardId);
-  if (!card) return;
-  card.querySelectorAll('[data-utility-tab]').forEach((tab) => {
-    const active = tab.dataset.utilityTab === panelName;
-    tab.classList.toggle('active', active);
-    tab.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
-  card.querySelectorAll('[data-utility-panel]').forEach((panel) => {
-    panel.hidden = panel.dataset.utilityPanel !== panelName;
-  });
+
+// Your Page used three disclosure patterns at once — a tab switcher for rates
+// and PIN, a real accordion for Subscription, and everything else permanently
+// open — so no section behaved the way the last one did. This is the single
+// pattern they all now use.
+//
+// Open by default when the section is unfinished and closed when it is done:
+// a new property gets the guided full-length page, an established one gets a
+// short list of labelled sections and opens the one it came for.
+function pageSectionHtml(title, bodyHtml, { open = false, hint = '', id = '' } = {}) {
+  return `<div class="booking-card page-section" style="margin-bottom:14px;"${id ? ` id="${id}"` : ''}>
+    <div class="page-section-head" onclick="toggleSection(this)">
+      <div>
+        <div class="page-section-title">${title}</div>
+        ${hint ? `<div class="page-section-hint">${hint}</div>` : ''}
+      </div>
+      <span class="accordion-arrow" style="${open ? 'transform:rotate(90deg);' : ''}">›</span>
+    </div>
+    <div class="accordion-body" style="display:${open ? 'block' : 'none'};padding:0 18px 18px;">${bodyHtml}</div>
+  </div>`;
 }
 
 function toggleSection(header) {
@@ -1886,7 +1845,6 @@ const _settingsExports = {
   saveEditRoom,
   saveHotelInfo,
   saveRates,
-  selectPageUtility,
   scrollTourTargetIntoView,
   sendSupportMessage,
   setAppIconPreviewImage,

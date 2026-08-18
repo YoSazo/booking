@@ -330,6 +330,27 @@ export async function loadFrontDeskAssistant({ force = false } = {}) {
 // Bookings, so it is visible without owning a tab, and it reads as an action
 // rather than a buried setting. The intro card it replaces only appeared in
 // one state; this appears in all of them.
+// Whether this property had the Assistant configured last time we knew. Only
+// ever used to choose a label before the real data lands, so a stale answer
+// costs one wrong word for a moment rather than a wrong action.
+const ASSISTANT_CONFIGURED_KEY = 'marketelAssistantConfigured';
+
+function rememberedAssistantConfigured() {
+  try {
+    return localStorage.getItem(ASSISTANT_CONFIGURED_KEY + ':' + (crm.activeHotelId || '')) === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+function rememberAssistantConfigured(value) {
+  try {
+    const key = ASSISTANT_CONFIGURED_KEY + ':' + (crm.activeHotelId || '');
+    if (value) localStorage.setItem(key, '1');
+    else localStorage.removeItem(key);
+  } catch (_) {}
+}
+
 export function renderAssistantPill() {
   ensureStyles();
   let pill = document.getElementById('frontDeskAssistantPill');
@@ -354,9 +375,18 @@ export function renderAssistantPill() {
 
   // Wording follows state: an unconfigured Assistant is an invitation, a
   // configured one with something waiting is a prompt, otherwise it is a door.
+  //
+  // Assistant data arrives a moment after the tab paints, and treating "not
+  // loaded" as "not configured" made a set-up property open on "Set up Front
+  // Desk Assistant" and correct itself seconds later. The last known answer is
+  // remembered, so a returning owner gets the right label on the first frame
+  // and the fetch only ever confirms it.
   const data = crm.assistantData;
   const recipients = activeRecipients();
-  const configured = !!data?.config?.enabled && recipients.length > 0;
+  const configured = data
+    ? (!!data.config?.enabled && recipients.length > 0)
+    : rememberedAssistantConfigured();
+  if (data) rememberAssistantConfigured(configured);
   const activity = latestMeaningfulActivity();
   const needsReview = !!activity
     && (activity.type === 'availability_warning' || activity.status === 'attention');
