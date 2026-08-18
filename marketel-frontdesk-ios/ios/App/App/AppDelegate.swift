@@ -140,6 +140,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         view.tintColor = UIColor(red: 46 / 255, green: 125 / 255, blue: 91 / 255, alpha: 1)
         configureTopBar()
         configureTabBar()
+        configureAssistantPill()
         setShellVisible(false, animated: false)
         NotificationCenter.default.addObserver(
             self,
@@ -214,10 +215,30 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             height: tabHeight
         )
 
+        // Sits above the tab bar, centred, sized to its own content.
+        let pillSize = assistantPillButton.systemLayoutSizeFitting(
+            UIView.layoutFittingCompressedSize
+        )
+        let pillWidth = min(max(pillSize.width, 132), bounds.width - 48)
+        let pillHeight = max(pillSize.height, 42)
+        let pillFrame = CGRect(
+            x: (bounds.width - pillWidth) / 2,
+            y: tabBar.frame.minY - pillHeight - 12,
+            width: pillWidth,
+            height: pillHeight
+        )
+        assistantPill.frame = pillFrame
+        assistantPillButton.frame = pillFrame
+        if #unavailable(iOS 26.0) {
+            assistantPill.layer.cornerRadius = pillHeight / 2
+        }
+
         view.bringSubviewToFront(statusBarBackdrop)
         view.bringSubviewToFront(topBar)
         view.bringSubviewToFront(menuButton)
         view.bringSubviewToFront(tabBar)
+        view.bringSubviewToFront(assistantPill)
+        view.bringSubviewToFront(assistantPillButton)
     }
 
     private func configureTopBar() {
@@ -432,6 +453,102 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         view.addSubview(topBar)
         view.addSubview(menuButton)
+    }
+
+    // Floating Assistant pill. Native because it has to sit beside the tab bar
+    // and read as the same material: UIGlassEffect samples the real screen and
+    // does its own specular and edge work, none of which a CSS backdrop-filter
+    // inside the web view can see or reproduce. A web pill was always going to
+    // look like a different component next to this.
+    private let assistantPill = UIVisualEffectView()
+    private let assistantPillButton = UIButton(type: .system)
+    private var assistantPillVisible = false
+    private var assistantPillLabel = "Front Desk"
+
+    private func configureAssistantPill() {
+        if #available(iOS 26.0, *) {
+            let glass = UIGlassEffect(style: .regular)
+            glass.tintColor = UIColor(red: 239 / 255, green: 244 / 255, blue: 240 / 255, alpha: 0.12)
+            assistantPill.effect = glass
+            assistantPill.cornerConfiguration = .capsule()
+        } else {
+            assistantPill.effect = UIBlurEffect(style: .systemThinMaterial)
+            assistantPill.layer.cornerCurve = .continuous
+        }
+        assistantPill.clipsToBounds = true
+        assistantPill.isUserInteractionEnabled = false
+        assistantPill.isHidden = true
+        view.addSubview(assistantPill)
+
+        // Same arrangement as the menu button: the control lives outside the
+        // effect view so iOS can animate it without snapshotting the glass.
+        var config = UIButton.Configuration.plain()
+        config.image = UIImage(systemName: "phone.fill")
+        config.imagePadding = 7
+        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 18)
+        config.baseForegroundColor = .label
+        assistantPillButton.configuration = config
+        assistantPillButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        assistantPillButton.isHidden = true
+        assistantPillButton.alpha = 0
+        assistantPillButton.addTarget(self, action: #selector(openAssistantFromPill), for: .touchUpInside)
+        view.addSubview(assistantPillButton)
+        applyAssistantPillTitle()
+    }
+
+    private func applyAssistantPillTitle() {
+        var config = assistantPillButton.configuration
+        var title = AttributedString(assistantPillLabel)
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        config?.attributedTitle = title
+        assistantPillButton.configuration = config
+        assistantPillButton.accessibilityLabel = assistantPillLabel
+    }
+
+    @objc private func openAssistantFromPill() {
+        sendWebAction("assistant")
+    }
+
+    // Driven by the same `state` message that already reports the selected tab,
+    // so the pill follows the app rather than keeping its own idea of where the
+    // owner is.
+    private func updateAssistantPill(visible: Bool, label: String) {
+        if !label.isEmpty && label != assistantPillLabel {
+            assistantPillLabel = label
+            applyAssistantPillTitle()
+            view.setNeedsLayout()
+        }
+        guard visible != assistantPillVisible else { return }
+        assistantPillVisible = visible
+
+        // Never fade the effect view through partial alpha — same reason as the
+        // rest of the shell: it forces an offscreen render and flashes an empty
+        // white material. Visibility is swapped atomically and only the scale
+        // is animated, which the compositor handles without re-rendering glass.
+        if visible {
+            assistantPill.isHidden = false
+            assistantPillButton.isHidden = false
+            assistantPill.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+            assistantPillButton.transform = assistantPill.transform
+            assistantPillButton.alpha = 0
+        }
+        UIView.animate(
+            withDuration: 0.28,
+            delay: 0,
+            usingSpringWithDamping: 0.88,
+            initialSpringVelocity: 0.2,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            let scale: CGFloat = visible ? 1 : 0.92
+            self.assistantPill.transform = CGAffineTransform(scaleX: scale, y: scale)
+            self.assistantPillButton.transform = self.assistantPill.transform
+            self.assistantPillButton.alpha = visible ? 1 : 0
+        } completion: { _ in
+            if !visible {
+                self.assistantPill.isHidden = true
+                self.assistantPillButton.isHidden = true
+            }
+        }
     }
 
     private func configureTabBar() {
@@ -795,9 +912,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         topBar.isHidden = !visible
         menuButton.isHidden = !visible
         tabBar.isHidden = !visible
+        assistantPill.isHidden = !visible || !assistantPillVisible
+        assistantPillButton.isHidden = assistantPill.isHidden
         topBar.isUserInteractionEnabled = visible && !nativeTourActive
         menuButton.isUserInteractionEnabled = visible && !nativeTourActive
         tabBar.isUserInteractionEnabled = visible && !nativeTourActive
+        assistantPillButton.isUserInteractionEnabled = visible && !nativeTourActive
     }
 
     private func presentInAppBrowser(_ rawURL: String) {
@@ -837,6 +957,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
             updateGuestAppBadge(payload["guestAppBadge"] as? Int ?? 0)
+            updateAssistantPill(
+                visible: (payload["assistantPill"] as? Bool ?? false),
+                label: payload["assistantPillLabel"] as? String ?? ""
+            )
             let requestedVisible = payload["visible"] as? Bool ?? true
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "saveContact":

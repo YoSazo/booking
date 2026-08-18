@@ -577,6 +577,11 @@ function syncNativeShellState() {
       : 'settings',
     bookingBadge: Math.max(0, needsCalls),
     guestAppBadge: Math.max(0, unreadMessages),
+    // The pill is drawn natively so it can use the same UIGlassEffect as the
+    // tab bar; the web only decides whether it belongs on screen and what it
+    // should say. A CSS pill could never match that material.
+    assistantPill: crm.currentFilter === 'bookings' && crm.bookingsSubview === 'bookings' && !crm.settingsTourActive,
+    assistantPillLabel: window.marketelAssistantPillLabel || 'Front Desk',
   });
 }
 

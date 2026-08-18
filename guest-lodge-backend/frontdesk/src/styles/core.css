@@ -3768,80 +3768,6 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
   .messages-workspace .message-conversation { padding-bottom: 14px; }
 }
 
-    /* Floating Assistant pill.
-       The Assistant was reachable only through an unlabelled overflow menu, so
-       owners who had never opened it had no way to learn it exists. A pill
-       above the tab bar is permanently visible without occupying a tab, and
-       reads as an action rather than a setting. */
-    .fda-pill {
-      position: fixed;
-      /* Centred with left/right rather than translateX(-50%). A pre-existing
-         transform on an element captured by a View Transition fights the
-         transform the transition applies itself, which is what made the morph
-         jump instead of glide. */
-      left: 0;
-      right: 0;
-      margin: 0 auto;
-      width: fit-content;
-      z-index: 190;
-      display: none;
-      align-items: center;
-      gap: 8px;
-      padding: 11px 17px 11px 13px;
-      border-radius: 999px;
-      font-family: inherit;
-      font-size: 13.5px;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
-      max-width: calc(100vw - 40px);
-      bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-
-      /* Identical material to .mobile-bottom-nav, deliberately. Two floating
-         controls a few pixels apart made of different glass reads as a mistake.
-         No colour boost here: that would be a second filter pass per frame
-         for a difference nobody sees, and two live backdrop filters already
-         cost more than the whole animation budget. */
-      -webkit-backdrop-filter: blur(14px);
-      backdrop-filter: blur(14px);
-      background: rgba(255, 255, 255, 0.68);
-      color: var(--text);
-      border: 1px solid rgba(255, 255, 255, 0.72);
-      box-shadow:
-        0 10px 40px rgba(26, 43, 34, 0.14),
-        0 2px 12px rgba(26, 43, 34, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.85);
-      transition: opacity var(--dur-fast) var(--ease-out);
-    }
-    .fda-pill.is-visible { display: inline-flex; }
-    .fda-pill:active { opacity: 0.85; }
-    .fda-pill-mark {
-      width: 22px;
-      height: 22px;
-      flex: 0 0 auto;
-      display: grid;
-      place-items: center;
-      /* No tinted plate. The nav icons sit on the glass directly, so anything
-         with its own background made the pill read as a different component. */
-      color: var(--text);
-      opacity: 0.75;
-    }
-    /* A dot instead of a number: the pill invites, it does not report. */
-    .fda-pill-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--amber);
-      flex: 0 0 auto;
-    }
-    /* Any modal owns the screen while it is open. */
-    body.marketel-support-open .fda-pill,
-    body.fda-open .fda-pill,
-    body.marketel-modal-open .fda-pill { display: none !important; }
-    @media (min-width: 861px) {
-      .fda-pill { bottom: 26px; }
-    }
-
     /* One disclosure pattern for every Your Page section. */
     .page-section-head {
       padding: 15px 18px;
@@ -3947,9 +3873,6 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
 
     /* Pressable feedback. A tap that does not acknowledge itself reads as a
        tap that missed — the same failure the booking buttons had. */
-    .btn, .fda-pill, .page-section-head, .mobile-nav-item, .refresh-btn {
-      -webkit-tap-highlight-color: transparent;
-    }
     .btn:active, .refresh-btn:active { transform: scale(0.975); }
     .page-section-head:active { background: var(--surface-subtle); }
     .btn, .refresh-btn {
@@ -3964,10 +3887,6 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
        broken rather than plain. The pill lost its own block in a rewrite; this
        keeps them from drifting apart again. */
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      .fda-pill {
-        background: var(--white);
-        border-color: var(--border);
-      }
       @media (max-width: 600px) {
         .mobile-bottom-nav {
           background: var(--white);
@@ -3976,24 +3895,6 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
       }
     }
 
-    /* The pill-to-sheet morph. Without these the browser cross-fades at its
-       own default speed, which reads as a dissolve rather than one element
-       becoming another. */
-    ::view-transition-group(fda-morph) {
-      animation-duration: var(--dur-slow);
-      animation-timing-function: var(--ease-sheet);
-    }
-    /* The pill and the sheet share no content, so cross-fading their pixels
-       just muddies the middle of the transition. Fading the old out quickly
-       and the new in over the full move keeps the shape change legible. */
-    ::view-transition-old(fda-morph) {
-      animation: marketel-vt-out var(--dur-fast) var(--ease-out) both;
-    }
-    ::view-transition-new(fda-morph) {
-      animation: marketel-vt-in var(--dur-slow) var(--ease-sheet) both;
-    }
-    @keyframes marketel-vt-out { to { opacity: 0; } }
-    @keyframes marketel-vt-in { from { opacity: 0; } to { opacity: 1; } }
 
     /* The root cross-fade would dim the whole app behind the morph. */
     @media (prefers-reduced-motion: no-preference) {
@@ -4006,7 +3907,6 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
     /* A View Transition captures both elements as images and animates those.
        Live backdrop-filters underneath are re-blurred every frame for a result
        the snapshots already contain, so they are suspended for the duration. */
-    html:active-view-transition .fda-pill,
     html:active-view-transition .mobile-bottom-nav {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;

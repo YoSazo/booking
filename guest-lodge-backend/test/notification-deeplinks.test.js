@@ -65,24 +65,6 @@ test('the Assistant modal retires its own tutorial', () => {
     assert.doesNotMatch(assistant, /const inventoryNote = capabilities\.manualAvailability/);
 });
 
-test('the Assistant has one obvious surface, not three', () => {
-    // A pill above the tab bar: visible without owning a tab, and present in
-    // every state rather than only once the Assistant has done something.
-    assert.match(assistant, /export function renderAssistantPill\(\)/);
-    assert.match(assistant, /pill\.classList\.add\('is-visible'\)/);
-    assert.match(assistant, /crm\.currentFilter === 'bookings'/);
-
-    // Wording follows state, so an unconfigured Assistant reads as an
-    // invitation rather than a bare name.
-    assert.match(assistant, /'Set up Front Desk'/);
-    assert.match(assistant, /'Needs your review'/);
-
-    // The two stopgaps it replaced are gone. Three doors to one feature is
-    // worse than one door anybody can find.
-    assert.doesNotMatch(settings, /assistantSettingsRowHtml/);
-    assert.doesNotMatch(assistant, /fda-native-result is-intro/);
-});
-
 test('no emoji ships in the Front Desk interface', () => {
     // Front Desk draws its icons from a bundled lucide set. An emoji renders
     // differently on every platform and reads as a placeholder beside them.
@@ -124,17 +106,6 @@ test('Your Page uses one disclosure pattern and shrinks once set up', () => {
     }
 });
 
-test('the Assistant pill knows its state before the data arrives', () => {
-    // Treating "not loaded" as "not configured" made a set-up property open on
-    // "Set up Front Desk Assistant" and correct itself seconds later.
-    assert.match(assistant, /function rememberedAssistantConfigured\(\)/);
-    assert.match(assistant, /const configured = data\s*\n?\s*\?/);
-    assert.match(assistant, /: rememberedAssistantConfigured\(\)/);
-    assert.match(assistant, /if \(data\) rememberAssistantConfigured\(configured\);/);
-    // Scoped per property, or switching properties would inherit the answer.
-    assert.match(assistant, /crm\.activeHotelId/);
-});
-
 test('motion is a system, not scattered one-off transitions', () => {
     const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
     // One vocabulary. Bare `ease` is symmetrical and reads sluggish on a phone.
@@ -171,44 +142,48 @@ test('deleting a photo animates the photo out, and puts it back on failure', () 
     assert.match(settings, /catch \(e\) \{[\s\S]{0,320}thumb\.classList\.remove\('marketel-removing'\)/);
 });
 
-test('the pill morphs into the sheet and cleans up after itself', () => {
+test('the Assistant pill is native, and the web only says what it should read', () => {
+    const appDelegate = fs.readFileSync(
+        path.join(root, '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
+        'utf8'
+    );
     const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
-    assert.match(assistant, /function supportsViewTransitions\(\)/);
-    assert.match(assistant, /function withPillMorph\(run\)/);
-    assert.ok(assistant.includes("withPillMorph(() => openAssistantSheetNow())"),
-        'opening does not run through the morph');
-    // Closing runs it in reverse, so the sheet shrinks back into the pill.
-    assert.ok(assistant.includes("sheet.style.viewTransitionName = 'fda-morph'"),
-        'closing does not tag the sheet for the reverse morph');
-    // A leftover name makes the NEXT transition silently skip, so both ends
-    // must clear regardless of how the transition resolved.
-    assert.ok(assistant.includes('transition.finished.finally('),
-        'names are not cleared on a rejected or skipped transition');
-    // Unsupported browsers and reduced motion fall through to a plain open.
-    assert.ok(assistant.includes("typeof document.startViewTransition === 'function'"),
-        'view transitions are assumed rather than feature-detected');
-    assert.match(css, /::view-transition-group\(fda-morph\)/);
+
+    // UIGlassEffect samples the real screen and does its own specular and edge
+    // work. A CSS backdrop-filter inside the web view cannot see past the web
+    // view, so it could never be the same material as the tab bar beside it.
+    assert.match(appDelegate, /private let assistantPill = UIVisualEffectView\(\)/);
+    assert.match(appDelegate, /UIGlassEffect\(style: \.regular\)[\s\S]{0,400}assistantPill\.effect = glass/);
+    assert.match(appDelegate, /assistantPillButton\.addTarget\(self, action: #selector\(openAssistantFromPill\)/);
+    assert.match(appDelegate, /sendWebAction\("assistant"\)/);
+
+    // Never fade a UIVisualEffectView through partial alpha: it forces an
+    // offscreen render and flashes an empty white material. The rest of the
+    // shell already learned this.
+    assert.doesNotMatch(appDelegate, /assistantPill\.alpha/);
+    assert.match(appDelegate, /assistantPill\.isHidden/);
+
+    // Exactly one implementation. A CSS pill would only ever render in a
+    // browser tab and would drift from the native one.
+    assert.doesNotMatch(css, /\.fda-pill/);
+    assert.doesNotMatch(assistant, /fda-pill/);
+
+    // The web decides the wording and whether it belongs on screen; both ride
+    // the state message that already reports the selected tab.
+    assert.match(core, /assistantPill: crm\.currentFilter === 'bookings'/);
+    assert.match(core, /assistantPillLabel: window\.marketelAssistantPillLabel/);
+    assert.match(appDelegate, /payload\["assistantPill"\] as\? Bool/);
 });
 
-test('both floating surfaces are glass, and both degrade together', () => {
-    const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
-    // The pill sits a few pixels above the nav. Different glass on two adjacent
-    // floating controls reads as a mistake, so the material must be identical.
-    const navRule = css.slice(css.indexOf('.mobile-bottom-nav {'), css.indexOf('.mobile-nav-item {'));
-    const pillRule = css.slice(css.indexOf('.fda-pill {'), css.indexOf('.fda-pill.is-visible'));
-    const blurOf = (rule) => (rule.match(/backdrop-filter: (blur\([^)]+\))/) || [])[1];
-    assert.ok(blurOf(navRule), 'the nav bar is not glass');
-    assert.equal(blurOf(pillRule), blurOf(navRule), 'pill and nav must use the same blur');
-    // saturate() is a second filter pass per frame on an always-visible layer,
-    // for a difference nobody sees. Two of them cost more than the animations.
-    assert.doesNotMatch(navRule, /saturate\(/);
-    assert.doesNotMatch(pillRule, /saturate\(/);
-    // A transform on an element captured by a View Transition fights the
-    // transform the transition applies, which made the morph jump.
-    assert.doesNotMatch(pillRule, /transform: translateX/);
-    // Translucency without blur is just a faded control, and both must degrade
-    // together or the pair looks broken rather than plain.
-    const fb = css.slice(css.indexOf('@supports not ((backdrop-filter'));
-    assert.match(fb.slice(0, 600), /.fda-pill {/);
-    assert.match(fb.slice(0, 600), /.mobile-bottom-nav {/);
+test('the pill label is known before the Assistant data arrives', () => {
+    // Treating "not loaded" as "not configured" made a set-up property show
+    // "Set up Front Desk" and correct itself seconds later.
+    assert.match(assistant, /function rememberedAssistantConfigured\(\)/);
+    assert.match(assistant, /: rememberedAssistantConfigured\(\)/);
+    assert.match(assistant, /if \(data\) rememberAssistantConfigured\(configured\);/);
+    // Scoped per property, or switching properties inherits the wrong answer.
+    assert.match(assistant, /ASSISTANT_CONFIGURED_KEY \+ ':' \+ \(crm\.activeHotelId/);
+    // Pushed immediately rather than waiting for the next tick, so the label is
+    // right on the frame the tab appears.
+    assert.match(assistant, /window\.syncNativeShellState\?\.\(\)/);
 });

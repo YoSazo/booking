@@ -255,8 +255,8 @@ function ensureStyles() {
     .fda-person-copy{min-width:0;flex:1;}
     .fda-person-name{font-size:13px;font-weight:800;color:#1a2b22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .fda-person-meta{font-size:11px;color:#718278;margin-top:2px;}
-    .fda-pill{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#eaf7ef;color:#23714f;font-size:9.5px;font-weight:800;}
-    .fda-pill.pending{background:#fff3df;color:#9a5a12;}
+    .fda-recipient-badge{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#eaf7ef;color:#23714f;font-size:9.5px;font-weight:800;}
+    .fda-recipient-badge.pending{background:#fff3df;color:#9a5a12;}
     .fda-icon-btn{border:0;background:#f1f5f3;color:#596e62;border-radius:9px;padding:8px 9px;font-family:inherit;font-size:11px;font-weight:750;cursor:pointer;}
     .fda-icon-btn.danger{color:#b42318;background:#fff1f0;}
     .fda-verify{display:flex;gap:7px;margin:1px 0 10px 46px;}
@@ -326,13 +326,9 @@ export async function loadFrontDeskAssistant({ force = false } = {}) {
   return loadPromise;
 }
 
-// The pill is the Assistant's permanent home. It sits above the tab bar on
-// Bookings, so it is visible without owning a tab, and it reads as an action
-// rather than a buried setting. The intro card it replaces only appeared in
-// one state; this appears in all of them.
 // Whether this property had the Assistant configured last time we knew. Only
-// ever used to choose a label before the real data lands, so a stale answer
-// costs one wrong word for a moment rather than a wrong action.
+// ever used to choose the pill's wording before the real data lands, so a stale
+// answer costs one wrong word for a moment rather than a wrong action.
 const ASSISTANT_CONFIGURED_KEY = 'marketelAssistantConfigured';
 
 function rememberedAssistantConfigured() {
@@ -351,56 +347,36 @@ function rememberAssistantConfigured(value) {
   } catch (_) {}
 }
 
+// The pill itself is drawn natively, beside the tab bar, using the same
+// UIGlassEffect. UIGlassEffect samples the real screen and does its own
+// specular and edge work; a CSS backdrop-filter inside the web view cannot see
+// past the web view, so it could never be the same material no matter how the
+// values were tuned.
+//
+// All this does now is decide the wording and publish it. Whether the pill is
+// on screen travels with the existing `state` message, which already reports
+// the selected tab.
 export function renderAssistantPill() {
-  ensureStyles();
-  let pill = document.getElementById('frontDeskAssistantPill');
-  const belongsHere = isNativeFrontDesk()
-    && crm.currentFilter === 'bookings'
-    && crm.bookingsSubview === 'bookings'
-    && !crm.settingsTourActive;
-
-  if (!belongsHere) {
-    pill?.classList.remove('is-visible');
-    return;
-  }
-
-  if (!pill) {
-    pill = document.createElement('button');
-    pill.id = 'frontDeskAssistantPill';
-    pill.type = 'button';
-    pill.className = 'fda-pill';
-    pill.addEventListener('click', () => openFrontDeskAssistant());
-    document.body.appendChild(pill);
-  }
-
-  // Wording follows state: an unconfigured Assistant is an invitation, a
-  // configured one with something waiting is a prompt, otherwise it is a door.
-  //
-  // Assistant data arrives a moment after the tab paints, and treating "not
-  // loaded" as "not configured" made a set-up property open on "Set up Front
-  // Desk Assistant" and correct itself seconds later. The last known answer is
-  // remembered, so a returning owner gets the right label on the first frame
-  // and the fetch only ever confirms it.
   const data = crm.assistantData;
   const recipients = activeRecipients();
   const configured = data
     ? (!!data.config?.enabled && recipients.length > 0)
     : rememberedAssistantConfigured();
   if (data) rememberAssistantConfigured(configured);
+
   const activity = latestMeaningfulActivity();
   const needsReview = !!activity
     && (activity.type === 'availability_warning' || activity.status === 'attention');
 
-  const label = !configured
+  window.marketelAssistantPillLabel = !configured
     ? 'Set up Front Desk'
     : needsReview
       ? 'Needs your review'
       : 'Front Desk';
 
-  pill.innerHTML = `<span class="fda-pill-mark" aria-hidden="true"><i data-lucide="phone" style="width:14px;height:14px;"></i></span>${needsReview ? '<span class="fda-pill-dot" aria-hidden="true"></span>' : ''}<span>${esc(label)}</span>`;
-  pill.setAttribute('aria-label', label);
-  pill.classList.add('is-visible');
-  try { window.lucide?.createIcons(); } catch (_) {}
+  // Push the new wording straight out rather than waiting for the next state
+  // tick, so the label is right on the frame the tab appears.
+  window.syncNativeShellState?.();
 
   if (!data && !crm.assistantLoading && !crm.assistantError) {
     loadFrontDeskAssistant().catch(() => {});
@@ -408,7 +384,7 @@ export function renderAssistantPill() {
 }
 
 export function hideAssistantPill() {
-  document.getElementById('frontDeskAssistantPill')?.classList.remove('is-visible');
+  window.marketelAssistantPillLabel = 'Front Desk';
 }
 
 export function renderFrontDeskAssistantCard() {
@@ -522,7 +498,7 @@ function recipientHtml(recipient) {
         <div class="fda-person-name">${esc(recipient.name)}</div>
         <div class="fda-person-meta">${esc(meta)}</div>
       </div>
-      <span class="fda-pill ${recipient.verified ? '' : 'pending'}">${recipient.verified ? 'Connected' : 'Verify'}</span>
+      <span class="fda-recipient-badge ${recipient.verified ? '' : 'pending'}">${recipient.verified ? 'Connected' : 'Verify'}</span>
       <button type="button" class="fda-icon-btn danger" onclick='removeAssistantRecipient(${js(recipient.id)})'>Remove</button>
     </div>
     ${recipient.verified ? '' : `<div class="fda-verify">
@@ -746,40 +722,6 @@ export function updateAssistantTimeDisplay(input) {
   if (valueNode) valueNode.textContent = clockTimeLabel(input.value);
 }
 
-// The pill becomes the sheet rather than the sheet appearing over it.
-//
-// View Transitions do this properly: tag both elements with the same
-// view-transition-name and the browser interpolates position, size and radius
-// between them, so the pill visibly grows into the sheet and shrinks back on
-// close. Safari 18 and Chrome support it; anywhere else falls through to the
-// existing slide-up, which is why every call is wrapped rather than assumed.
-function supportsViewTransitions() {
-  return typeof document.startViewTransition === 'function'
-    && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-}
-
-// The name has to be unique while the transition runs, so it is applied to the
-// pill only for the duration and removed after. Two elements sharing a name at
-// the same time makes the browser skip the animation entirely.
-function withPillMorph(run) {
-  const pill = document.getElementById('frontDeskAssistantPill');
-  if (!supportsViewTransitions()) {
-    run();
-    return;
-  }
-  if (pill) pill.style.viewTransitionName = 'fda-morph';
-  const transition = document.startViewTransition(() => {
-    run();
-    const sheet = document.getElementById('frontDeskAssistantSheet');
-    if (sheet) sheet.style.viewTransitionName = 'fda-morph';
-    if (pill) pill.style.viewTransitionName = '';
-  });
-  transition.finished.finally(() => {
-    const sheet = document.getElementById('frontDeskAssistantSheet');
-    if (sheet) sheet.style.viewTransitionName = '';
-    if (pill) pill.style.viewTransitionName = '';
-  }).catch(() => {});
-}
 
 function openAssistantSheetNow() {
   if (!isNativeFrontDesk()) {
@@ -814,39 +756,21 @@ function openAssistantSheetNow() {
   }
 }
 
-// Public entry: the pill morphs into the sheet where the browser can do it,
-// and simply opens where it cannot.
+// Public entry. The pill is a native view now, so there is no web element to
+// morph from — a View Transition can only interpolate between two things the
+// browser draws, and the pill is drawn by UIKit.
 export function openFrontDeskAssistant() {
   if (!isNativeFrontDesk()) {
     window.openFrontdeskAppDownload?.();
     return;
   }
-  withPillMorph(() => openAssistantSheetNow());
+  openAssistantSheetNow();
 }
 
-// Closing runs the same morph in reverse: the sheet shrinks back into the
-// pill rather than sliding away from it.
 export function closeFrontDeskAssistant() {
-  const dismiss = () => {
-    document.getElementById('frontDeskAssistantOverlay')?.remove();
-    document.body.style.overflow = '';
-    setNativeShellForAssistant(true);
-  };
-  const sheet = document.getElementById('frontDeskAssistantSheet');
-  if (!supportsViewTransitions() || !sheet) {
-    dismiss();
-    return;
-  }
-  sheet.style.viewTransitionName = 'fda-morph';
-  const transition = document.startViewTransition(() => {
-    dismiss();
-    const pill = document.getElementById('frontDeskAssistantPill');
-    if (pill) pill.style.viewTransitionName = 'fda-morph';
-  });
-  transition.finished.finally(() => {
-    const pill = document.getElementById('frontDeskAssistantPill');
-    if (pill) pill.style.viewTransitionName = '';
-  }).catch(() => {});
+  document.getElementById('frontDeskAssistantOverlay')?.remove();
+  document.body.style.overflow = '';
+  setNativeShellForAssistant(true);
 }
 
 export function retryFrontDeskAssistant() {
