@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
+import CalendarModal from './CalendarModal.jsx';
+import GuestInstallQrOverlay from './GuestInstallQrOverlay.jsx';
 import { isStandalone } from './pwaUtils.js';
 import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { trackPageView, trackHotelFunnel } from './trackingService.js';
@@ -47,6 +49,7 @@ function BookingPage({
     };
   }, []);
   const [savedHighlight, setSavedHighlight] = useState(initialSavedHighlight);
+  const [showInstallQr, setShowInstallQr] = useState(false);
 
   useEffect(() => {
     if (!savedHighlight?.target) return undefined;
@@ -113,14 +116,21 @@ function BookingPage({
     };
   }, [ownerScrollInstall, isLoading, roomData]);
 
-  const formatDate = (date) => date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
-  // In the installed PWA the install banner self-hides — so don't reserve its
-  // sticky-footer space either, or the bottom nav floats over a dead 120px gap.
   const showInstallBanner = !isStandalone() && (roomData?.length > 0 || ownerScrollInstall);
+  const railRoom = selectedRoom || roomData?.[0] || null;
+  const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
+
+  const handleRailBook = () => {
+    if (!railRoom || nights <= 0) return;
+    if (selectedRoom?.id === railRoom.id) {
+      onConfirmBooking({ guests: selectedRoom.guests, pets: selectedRoom.pets });
+      return;
+    }
+    onRoomSelect(railRoom);
+  };
 
   return (
-    <div className="container" style={{ paddingBottom: showInstallBanner ? '120px' : undefined }}>
+    <div className={`container booking-page${showInstallBanner ? ' has-mobile-install' : ''}`}>
       <header className={`header ${savedTargetClass('header')}`.trim()} data-preview-highlight="header">
         <div className="header-identity">
           <h1 className={savedTargetClass('header-name')} data-preview-highlight="header-name">
@@ -153,6 +163,7 @@ function BookingPage({
         )}
       </header>
 
+      <div className="booking-page-layout">
       <main className="rooms-list">
         {isLoading ? (
           <p style={{textAlign: 'center', fontSize: '1.2em', padding: '40px 0'}}>
@@ -235,18 +246,84 @@ function BookingPage({
         )}
       </main>
 
+      <aside className="booking-desktop-rail" aria-label="Choose dates and book">
+        <h2>Choose dates</h2>
+        <CalendarModal
+          inline
+          isOpen
+          onClose={() => {}}
+          onDatesChange={onDatesChange}
+          initialCheckin={checkinDate}
+          initialCheckout={checkoutDate}
+          rates={rates}
+        />
+        <p className="booking-rail-meta">
+          {nights > 0
+            ? `${nights} night${nights === 1 ? '' : 's'} · ${railRoom?.name || 'Select a room'}`
+            : 'Pick check-in and check-out, then continue.'}
+        </p>
+        {selectedRoom && (
+          <div className="inline-selectors">
+            <div className="inline-selector-item">
+              <div className="selector-label"><span>Guests</span></div>
+              <div className="custom-stepper">
+                <button type="button" className="stepper-btn" onClick={() => onGuestsChange(Math.max(1, selectedRoom.guests - 1))} disabled={selectedRoom.guests <= 1}>−</button>
+                <span className="stepper-value">{selectedRoom.guests}</span>
+                <button type="button" className="stepper-btn" onClick={() => onGuestsChange(Math.min(selectedRoom.maxOccupancy || 4, selectedRoom.guests + 1))} disabled={selectedRoom.guests >= (selectedRoom.maxOccupancy || 4)}>+</button>
+              </div>
+            </div>
+            <div className="inline-selector-item">
+              <div className="selector-label"><span>Pets</span></div>
+              <div className="custom-stepper">
+                <button type="button" className="stepper-btn" onClick={() => onPetsChange(Math.max(0, selectedRoom.pets - 1))} disabled={selectedRoom.pets <= 0}>−</button>
+                <span className="stepper-value">{selectedRoom.pets}</span>
+                <button type="button" className="stepper-btn" onClick={() => onPetsChange(Math.min(2, selectedRoom.pets + 1))} disabled={selectedRoom.pets >= 2}>+</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className="booking-rail-cta"
+          onClick={handleRailBook}
+          disabled={!railRoom || isProcessingBooking || nights <= 0}
+        >
+          {isProcessingBooking
+            ? 'Processing...'
+            : selectedRoom
+              ? 'Reserve for $0'
+              : nights > 0
+                ? 'Continue Booking'
+                : 'Select Room'}
+        </button>
+        {showInstallBanner && hotel.subscribed !== false && (
+          <button type="button" className="booking-save-phone" onClick={() => setShowInstallQr(true)}>
+            Save on your phone
+          </button>
+        )}
+      </aside>
+      </div>
+
       {showInstallBanner && !isCalendarOpen && (
-        <InstallAppBanner
+        <div className="booking-install-mobile-only">
+          <InstallAppBanner
+            hotelName={hotel.name}
+            appIconUrl={resolvePropertyIconUrl(hotel, roomData)}
+            hotelId={hotelId}
+            ownerPreview={ownerPreview}
+            sticky
+            bottomOffset={14}
+            touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
+            apiBaseUrl={apiBaseUrl}
+            guidedBookingInstall
+            hotelSubscribed={hotel.subscribed !== false}
+          />
+        </div>
+      )}
+      {showInstallQr && (
+        <GuestInstallQrOverlay
           hotelName={hotel.name}
-          appIconUrl={resolvePropertyIconUrl(hotel, roomData)}
-          hotelId={hotelId}
-          ownerPreview={ownerPreview}
-          sticky
-          bottomOffset={14}
-          touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
-          apiBaseUrl={apiBaseUrl}
-          guidedBookingInstall
-          hotelSubscribed={hotel.subscribed !== false}
+          onClose={() => setShowInstallQr(false)}
         />
       )}
     </div>

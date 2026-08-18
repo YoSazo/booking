@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { trackSearch } from './trackingService.js';
 
-function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initialCheckout, rates }) {
+function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initialCheckout, rates, inline = false }) {
   const [startDate, setStartDate] = useState(initialCheckin);
   const [endDate, setEndDate] = useState(initialCheckout);
   const [currentDate, setCurrentDate] = useState(initialCheckin || new Date());
@@ -46,6 +46,12 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
   };
 
   useEffect(() => {
+    if (inline) {
+      setStartDate(initialCheckin);
+      setEndDate(initialCheckout);
+      if (initialCheckin) setCurrentDate(initialCheckin);
+      return undefined;
+    }
     if (isOpen) {
       const minDate = getMinBookingDate();
       
@@ -86,7 +92,14 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
       document.body.style.width = '';
       document.body.style.overflow = '';
     };
-  }, [isOpen, initialCheckin, initialCheckout]);
+  }, [isOpen, inline, initialCheckin, initialCheckout]);
+
+  const applyRange = (start, end) => {
+    if (!start || !end) return;
+    trackSearch(start, end);
+    onDatesChange({ start, end });
+    if (!inline) onClose();
+  };
 
   const handleDayClick = (day) => {
     // Normalize the clicked day to midnight
@@ -107,8 +120,8 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         normalizedStart.setHours(0, 0, 0, 0);
         
         if (normalizedDay.getTime() > normalizedStart.getTime()) {
-            // Set as end date
             setEndDate(normalizedDay);
+            if (inline) applyRange(startDate, normalizedDay);
         } else {
             // Clicking same or earlier date resets
             setStartDate(normalizedDay);
@@ -116,13 +129,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
         }
     }
 };
-  
+
   const handleApply = () => {
-    if (startDate && endDate) {
-      trackSearch(startDate, endDate);
-      onDatesChange({ start: startDate, end: endDate });
-      onClose();
-    }
+    applyRange(startDate, endDate);
   };
 
   const handleBookMonth = () => {
@@ -130,11 +139,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     start.setHours(0,0,0,0);
     const newEndDate = new Date(start);
     newEndDate.setDate(newEndDate.getDate() + 28);
-    
-    // Immediately apply and search
-    trackSearch(start, newEndDate);
-    onDatesChange({ start: start, end: newEndDate });
-    onClose();
+    setStartDate(start);
+    setEndDate(newEndDate);
+    applyRange(start, newEndDate);
   };
 
   const handleBookWeek = () => {
@@ -142,11 +149,9 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
     start.setHours(0,0,0,0);
     const newEndDate = new Date(start);
     newEndDate.setDate(newEndDate.getDate() + 7);
-    
-    // Immediately apply and search
-    trackSearch(start, newEndDate);
-    onDatesChange({ start: start, end: newEndDate });
-    onClose();
+    setStartDate(start);
+    setEndDate(newEndDate);
+    applyRange(start, newEndDate);
   };
 
   const changeMonth = (amount) => {
@@ -217,70 +222,66 @@ function CalendarModal({ isOpen, onClose, onDatesChange, initialCheckin, initial
 
   const nights = (startDate && endDate) ? Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) : 0;
 
-  return (
-    <div className={`calendar-modal-fullscreen ${isOpen ? 'open' : ''}`}>
-      <div className="calendar-modal-overlay" onClick={onClose}></div>
-      <div className="calendar-modal-content">
-        {/* Header with Close Button */}
-        {/* Combined Header with Month Navigation and Close Button */}
-        <div className="calendar-modal-header">
-          <div className="calendar-header-nav">
-            <button onClick={() => changeMonth(-1)} className="month-nav-btn">&lt;</button>
-            <h3 className="month-year-text">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-            <button onClick={() => changeMonth(1)} className="month-nav-btn">&gt;</button>
-          </div>
-          <button className="calendar-close-btn" onClick={onClose}>
+  const picker = (
+    <>
+      <div className="calendar-modal-header">
+        <div className="calendar-header-nav">
+          <button type="button" onClick={() => changeMonth(-1)} className="month-nav-btn">&lt;</button>
+          <h3 className="month-year-text">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+          <button type="button" onClick={() => changeMonth(1)} className="month-nav-btn">&gt;</button>
+        </div>
+        {!inline && (
+          <button type="button" className="calendar-close-btn" onClick={onClose}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
-        </div>
-
-        {/* Scrollable Content Area */}
-        <div className="calendar-modal-body">
-          <div className="calendar-content-wrapper">
-
-            {/* Calendar Grid */}
-            <div className="calendar-grid">
-              <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
+        )}
+      </div>
+      <div className="calendar-modal-body">
+        <div className="calendar-content-wrapper">
+          <div className="calendar-grid">
+            <div className="calendar-day-name">Sun</div><div className="calendar-day-name">Mon</div><div className="calendar-day-name">Tue</div><div className="calendar-day-name">Wed</div><div className="calendar-day-name">Thu</div><div className="calendar-day-name">Fri</div><div className="calendar-day-name">Sat</div>
+          </div>
+          <div className="calendar-grid">{renderDays()}</div>
+          {nights > 0 && (
+            <div className="calendar-nights-selected">
+              {nights} night{nights !== 1 ? 's' : ''} selected
             </div>
-            <div className="calendar-grid">{renderDays()}</div>
-
-            {/* Show nights selected */}
-            {nights > 0 && (
-              <div className="calendar-nights-selected">
-                {nights} night{nights !== 1 ? 's' : ''} selected
-              </div>
-            )}
-
-            {/* Quick Book Buttons - styled as buttons that trigger search */}
-            <div className="calendar-quick-book-section">
-              <button 
-                className="quick-book-action-btn" 
-                onClick={handleBookWeek}
-              >
-                Book 1 Week
-              </button>
-              <button 
-                className="quick-book-action-btn" 
-                onClick={handleBookMonth}
-              >
-                Book 1 Month
-              </button>
-            </div>
-
-            {/* Apply Button */}
-            <button 
-              className="calendar-apply-btn" 
+          )}
+          <div className="calendar-quick-book-section">
+            <button type="button" className="quick-book-action-btn" onClick={handleBookWeek}>
+              Book 1 Week
+            </button>
+            <button type="button" className="quick-book-action-btn" onClick={handleBookMonth}>
+              Book 1 Month
+            </button>
+          </div>
+          {!inline && (
+            <button
+              type="button"
+              className="calendar-apply-btn"
               onClick={handleApply}
               disabled={!startDate || !endDate}
             >
               Apply
             </button>
-          </div>
+          )}
         </div>
+      </div>
+    </>
+  );
 
+  if (inline) {
+    return <div className="booking-date-calendar">{picker}</div>;
+  }
+
+  return (
+    <div className={`calendar-modal-fullscreen ${isOpen ? 'open' : ''}`}>
+      <div className="calendar-modal-overlay" onClick={onClose}></div>
+      <div className="calendar-modal-content">
+        {picker}
       </div>
     </div>
   );
