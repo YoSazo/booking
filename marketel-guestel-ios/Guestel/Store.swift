@@ -48,21 +48,56 @@ struct Reservation: Identifiable, Hashable, Codable {
     }
 }
 
+// Kept locally so rebooking is near one-tap: entered once, prefilled after.
+struct GuestInfo: Codable, Equatable {
+    var name = ""
+    var email = ""
+    var phone = ""
+
+    var isComplete: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && email.contains("@") && phone.count >= 7
+    }
+    var dictionary: [String: Any] { ["name": name, "email": email, "phone": phone] }
+}
+
 @Observable
 final class GuestStore {
     var hotels: [Hotel]
     var reservations: [Reservation]
-    var guestName: String = "Guest"
+    var guest: GuestInfo
+
+    var guestName: String { guest.name.isEmpty ? "Guest" : guest.name }
 
     private static let reservationsKey = "guestel.reservations.v1"
+    private static let guestKey = "guestel.guest.v1"
 
     init(hotels: [Hotel] = GuestStore.sample) {
         self.hotels = hotels
         self.reservations = GuestStore.loadReservations()
+        self.guest = GuestStore.loadGuest()
     }
 
     func hotelName(for hotelId: String) -> String {
         hotels.first { $0.hotelId == hotelId || $0.slug == hotelId }?.name ?? "Your hotel"
+    }
+
+    func saveGuest(_ g: GuestInfo) {
+        guest = g
+        if let data = try? JSONEncoder().encode(g) {
+            UserDefaults.standard.set(data, forKey: Self.guestKey)
+        }
+    }
+
+    func addReservation(code: String, hotelId: String, checkin: String, checkout: String) {
+        ingest([["code": code, "hotelId": hotelId, "checkin": checkin, "checkout": checkout]])
+    }
+
+    private static func loadGuest() -> GuestInfo {
+        guard
+            let data = UserDefaults.standard.data(forKey: guestKey),
+            let g = try? JSONDecoder().decode(GuestInfo.self, from: data)
+        else { return GuestInfo() }
+        return g
     }
 
     // The next stay whose checkout hasn't passed — shown prominently up top.

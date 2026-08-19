@@ -65,7 +65,7 @@ struct HotelDetailView: View {
         .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $showingBooking) {
-            BookingSheet(hotel: hotel, store: store)
+            RebookView(hotel: hotel)
         }
     }
 }
