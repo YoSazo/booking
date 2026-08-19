@@ -37,7 +37,7 @@ struct AddHotelView: View {
             Spacer(minLength: 0)
 
             Button {
-                store.add(Hotel(name: "New Hotel", location: "Added just now", stays: 0, lastStayed: "—"))
+                store.add(Hotel(hotelId: "new-hotel", name: "New Hotel", location: "Added just now", stays: 0, lastStayed: "—"))
                 dismiss()
             } label: {
                 Text("Scan code")
