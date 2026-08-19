@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HotelDetailView: View {
     let hotel: Hotel
+    @Environment(GuestStore.self) private var store
+    @State private var showingBooking = false
 
     var body: some View {
         ScrollView {
@@ -21,7 +23,7 @@ struct HotelDetailView: View {
                 }
 
                 VStack(spacing: 12) {
-                    Button {} label: {
+                    Button { showingBooking = true } label: {
                         Text("Book again")
                             .font(.system(size: 17, weight: .bold))
                             .foregroundStyle(.white)
@@ -62,6 +64,9 @@ struct HotelDetailView: View {
         .background(Theme.canvas)
         .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $showingBooking) {
+            BookingSheet(hotel: hotel, store: store)
+        }
     }
 }
 

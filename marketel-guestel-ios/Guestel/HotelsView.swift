@@ -14,6 +14,9 @@ struct HotelsView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
+                            if let stay = store.upcomingReservation {
+                                UpcomingStayCard(stay: stay, hotelName: store.hotelName(for: stay.hotelId))
+                            }
                             ForEach(Array(store.hotels.enumerated()), id: \.element.id) { index, hotel in
                                 NavigationLink(value: hotel) {
                                     HotelCard(hotel: hotel, seed: index)
@@ -128,5 +131,67 @@ private struct EmptyHotelsView: View {
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// The real, paid, upcoming stay — read from the booking engine after checkout.
+private struct UpcomingStayCard: View {
+    let stay: Reservation
+    let hotelName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 13))
+                Text("UPCOMING STAY")
+                    .font(.system(size: 12, weight: .heavy))
+                    .kerning(0.8)
+                Spacer()
+                Text("#\(stay.code)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .opacity(0.9)
+            }
+            .foregroundStyle(.white.opacity(0.95))
+
+            Text(hotelName)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.white)
+
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 14))
+                Text(dateRange)
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
+                Text("Paid · Confirmed")
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.white.opacity(0.18), in: Capsule())
+            }
+            .foregroundStyle(.white.opacity(0.95))
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Theme.green, Color(red: 31 / 255, green: 92 / 255, blue: 66 / 255)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: Theme.green.opacity(0.30), radius: 16, x: 0, y: 8)
+    }
+
+    private var dateRange: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "MMM d"
+        switch (stay.checkinDate, stay.checkoutDate) {
+        case let (i?, o?): return "\(f.string(from: i)) → \(f.string(from: o))"
+        case let (i?, nil): return f.string(from: i)
+        default: return "Upcoming"
+        }
     }
 }
