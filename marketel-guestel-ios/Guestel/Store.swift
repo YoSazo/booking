@@ -2,19 +2,22 @@ import SwiftUI
 
 struct Hotel: Identifiable, Hashable {
     let id: UUID
-    var hotelId: String     // backend id / slug used by the booking engine
+    var hotelId: String     // backend id — matches the stay the engine stores
+    var domain: String      // the hotel's own branded booking domain
     var name: String
     var location: String
     var stays: Int
     var lastStayed: String
 
-    // The real direct booking engine for this hotel. Opens BookingPage → GuestInfo
-    // → Confirmation inside Guestel (WKWebView), never the browser.
-    var bookingURL: URL { URL(string: "https://bookmarketel.com/?hotelId=\(hotelId)")! }
+    // The hotel's OWN direct booking site (e.g. jacksinn.mktel.co) opens inside
+    // Guestel (WKWebView) — the guest books on the hotel's brand, not bookmarketel.
+    var bookingURL: URL { URL(string: "https://\(domain)")! }
+    var slug: String { domain.replacingOccurrences(of: ".mktel.co", with: "") }
 
-    init(id: UUID = UUID(), hotelId: String, name: String, location: String, stays: Int, lastStayed: String) {
+    init(id: UUID = UUID(), hotelId: String, domain: String, name: String, location: String, stays: Int, lastStayed: String) {
         self.id = id
         self.hotelId = hotelId
+        self.domain = domain
         self.name = name
         self.location = location
         self.stays = stays
@@ -59,7 +62,7 @@ final class GuestStore {
     }
 
     func hotelName(for hotelId: String) -> String {
-        hotels.first { $0.hotelId == hotelId }?.name ?? "Your hotel"
+        hotels.first { $0.hotelId == hotelId || $0.slug == hotelId }?.name ?? "Your hotel"
     }
 
     // The next stay whose checkout hasn't passed — shown prominently up top.
@@ -112,8 +115,8 @@ final class GuestStore {
 
     // The three hotels the wallet is seeded with.
     static let sample: [Hotel] = [
-        Hotel(hotelId: "studios17", name: "Studios 17", location: "Direct booking", stays: 0, lastStayed: "—"),
-        Hotel(hotelId: "hotel-a39be0df", name: "Jack's Inn", location: "St. Croix, WI", stays: 2, lastStayed: "Aug 2026"),
-        Hotel(hotelId: "marketel-review-inn", name: "Marketel Review Inn", location: "Direct booking", stays: 1, lastStayed: "Jul 2026"),
+        Hotel(hotelId: "hotel-9dbf11ec", domain: "studios17.mktel.co", name: "Studios 17", location: "Direct booking", stays: 0, lastStayed: "—"),
+        Hotel(hotelId: "hotel-a39be0df", domain: "jacksinn.mktel.co", name: "Jack's Inn", location: "St. Croix, WI", stays: 2, lastStayed: "Aug 2026"),
+        Hotel(hotelId: "marketel-review-inn", domain: "marketel-review-inn.mktel.co", name: "Marketel Review Inn", location: "Direct booking", stays: 1, lastStayed: "Jul 2026"),
     ]
 }
