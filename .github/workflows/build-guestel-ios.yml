@@ -1,0 +1,156 @@
+name: Build Guestel to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: Upload the signed IPA to App Store Connect
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: marketel-guestel-ios
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify Apple release secrets
+        env:
+          APPLE_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          APPLE_GUESTEL_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_GUESTEL_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+          UPLOAD_TO_TESTFLIGHT: ${{ inputs.upload_to_testflight }}
+        run: |
+          required=(
+            APPLE_DISTRIBUTION_CERTIFICATE_BASE64
+            APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD
+            APPLE_GUESTEL_PROVISIONING_PROFILE_BASE64
+            APPLE_TEAM_ID
+          )
+          if [[ "$UPLOAD_TO_TESTFLIGHT" == "true" ]]; then
+            required+=(APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY_BASE64)
+          fi
+          missing=()
+          for name in "${required[@]}"; do
+            [[ -z "${!name}" ]] && missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "Missing GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
+
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Install distribution certificate and profile
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.APPLE_GUESTEL_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          certificate_path="$RUNNER_TEMP/marketel-distribution.p12"
+          keychain_path="$RUNNER_TEMP/guestel-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+
+          printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$certificate_path"
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          profile_path="$RUNNER_TEMP/guestel.mobileprovision"
+          plist_path="$RUNNER_TEMP/guestel-profile.plist"
+          printf '%s' "$PROFILE_BASE64" | base64 -D > "$profile_path"
+          security cms -D -i "$profile_path" > "$plist_path"
+          uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$plist_path")"
+          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
+
+          echo "GUESTEL_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+
+      - name: Prepare export options
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cp ExportOptions.plist "$RUNNER_TEMP/GuestelExportOptions.plist"
+          /usr/libexec/PlistBuddy -c "Set :teamID $APPLE_TEAM_ID" "$RUNNER_TEMP/GuestelExportOptions.plist"
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:com.bookmarketel.guestel Marketel Guestel App Store" "$RUNNER_TEMP/GuestelExportOptions.plist"
+          echo "GUESTEL_BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Archive signed app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild \
+            -project Guestel.xcodeproj \
+            -scheme Guestel \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath output/Guestel.xcarchive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CURRENT_PROJECT_VERSION="$GUESTEL_BUILD_NUMBER" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $GUESTEL_KEYCHAIN_PATH" \
+            clean archive
+
+      - name: Export App Store IPA
+        run: |
+          xcodebuild \
+            -exportArchive \
+            -archivePath output/Guestel.xcarchive \
+            -exportPath output/app-store \
+            -exportOptionsPlist "$RUNNER_TEMP/GuestelExportOptions.plist"
+          exported_ipa="$(find output/app-store -maxdepth 1 -type f -name '*.ipa' -print -quit)"
+          test -n "$exported_ipa"
+          if [[ "$exported_ipa" != "output/app-store/Guestel.ipa" ]]; then
+            mv "$exported_ipa" output/app-store/Guestel.ipa
+          fi
+
+      - name: Upload signed IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guestel-App-Store-IPA
+          path: marketel-guestel-ios/output/app-store/Guestel.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload to TestFlight
+        if: inputs.upload_to_testflight == true
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+        run: |
+          mkdir -p private_keys
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 -D > "private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8"
+          xcrun altool \
+            --upload-app \
+            --type ios \
+            --file output/app-store/Guestel.ipa \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
