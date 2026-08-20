@@ -12,6 +12,8 @@
 	<dict>
 		<key>com.bookmarketel.guestel</key>
 		<string>MARKETEL_GUESTEL_APP_STORE_PROFILE</string>
+		<key>com.bookmarketel.guestel.Clip</key>
+		<string>MARKETEL_GUESTEL_CLIP_APP_STORE_PROFILE</string>
 	</dict>
 	<key>signingStyle</key>
 	<string>manual</string>
