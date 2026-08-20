@@ -129,6 +129,16 @@ struct HotelSheet: View {
 
     private var review: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Button { withAnimation(anim) { mode = .chooseRoom } } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                    Text("Rooms")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.green)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             Text("Review")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Theme.ink)

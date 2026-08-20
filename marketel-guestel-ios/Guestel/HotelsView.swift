@@ -61,6 +61,15 @@ struct HotelsView: View {
                 info.minY = newValue - info.safeArea.top
             }
             .background(Theme.canvas)
+            .overlay {
+                // Tap the pinned card or the gap above the sheet to close, like ✕.
+                if isSelected {
+                    Color.clear
+                        .contentShape(.rect)
+                        .onTapGesture { withAnimation(animation) { selectedHotel = nil } }
+                }
+            }
+            .task { ImagePrefetch.warm(hotels: store.hotels) }
             .sheet(isPresented: $showingAdd) {
                 AddHotelView().presentationDetents([.medium])
             }
@@ -77,7 +86,6 @@ struct HotelsView: View {
             )
             .presentationDetents([.height(minSheetHeight), .height(maxSheetHeight)], selection: $sheetDetent)
             .presentationBackgroundInteraction(.enabled(upThrough: .height(maxSheetHeight)))
-            .interactiveDismissDisabled()
             .presentationBackground(colorScheme == .dark ? Color.black : Theme.canvas)
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { info.containerSize = $0 }
@@ -91,6 +99,7 @@ struct HotelsView: View {
         let isCurrent = hotel.id == selectedHotel?.id
 
         WalletCard(hotel: hotel, seed: currentIndex, height: cardHeight)
+            .opacity(isSelected && !isCurrent ? 0 : 1)
             .contentShape(.rect)
             .onTapGesture {
                 sheetDetent = .height(minSheetHeight)
