@@ -35,6 +35,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.bookmarketel.guestel
         PRODUCT_NAME: Guestel
         GENERATE_INFOPLIST_FILE: "YES"
+        # Only standard/exempt encryption (HTTPS, Stripe) — declare it so App Store
+        # Connect stops asking the export-compliance question on every build.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
         INFOPLIST_KEY_CFBundleDisplayName: Guestel
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_NSCameraUsageDescription: "Scan your card to book faster."
@@ -61,6 +64,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.bookmarketel.guestel.Clip
         PRODUCT_NAME: GuestelClip
         GENERATE_INFOPLIST_FILE: "YES"
+        # Only standard/exempt encryption (HTTPS, Stripe) — declare it so App Store
+        # Connect stops asking the export-compliance question on every build.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
         INFOPLIST_KEY_CFBundleDisplayName: Guestel
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

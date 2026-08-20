@@ -144,34 +144,36 @@ struct WalletCard: View {
     let height: CGFloat
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            Theme.gradient(for: seed)
-            if let imageURL = hotel.imageURL {
-                AsyncImage(url: imageURL) { phase in
-                    if case let .success(image) = phase {
-                        image.resizable().scaledToFill()
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                LinearGradient(
-                    colors: [.black.opacity(0.50), .clear, .black.opacity(0.18)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(hotel.name)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
-                Text(hotel.location)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.85))
-            }
-            .padding(20)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(hotel.name)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white)
+            Text(hotel.location)
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.85))
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(height: height)
-        .frame(maxWidth: .infinity)
+        // The photo lives in the background so a large scaledToFill image can
+        // never widen the card past its frame — clipShape crops the overflow.
+        .background {
+            ZStack {
+                Theme.gradient(for: seed)
+                if let imageURL = hotel.imageURL {
+                    AsyncImage(url: imageURL) { phase in
+                        if case let .success(image) = phase {
+                            image.resizable().scaledToFill()
+                        }
+                    }
+                    LinearGradient(
+                        colors: [.black.opacity(0.50), .clear, .black.opacity(0.18)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Theme.ink.opacity(0.18), radius: 14, x: 0, y: 8)
     }
