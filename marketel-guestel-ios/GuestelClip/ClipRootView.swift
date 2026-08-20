@@ -9,6 +9,7 @@ struct ClipRootView: View {
     @State private var loading = true
     @State private var showingBooking = false
     @State private var capturedHandoff: String?
+    @State private var hasAutomaticallyPresentedInstall = false
 
     private var intent: ClipIntent {
         capturedHandoff == nil ? (invocation?.intent ?? .book) : .stay
@@ -30,10 +31,6 @@ struct ClipRootView: View {
             }
         }
         .task(id: invocation) { await load() }
-        .onAppear {
-            guard intent != .book else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { presentGetFullApp() }
-        }
         .sheet(isPresented: $showingBooking) {
             if let hotel {
                 ClipWebView(
@@ -57,10 +54,11 @@ struct ClipRootView: View {
                 hero(hotel)
                 VStack(alignment: .leading, spacing: 20) {
                     message(hotel)
-                    benefits
-                    actions
+                    benefits(hotel)
+                    actions(hotel)
                 }
                 .padding(22)
+                .padding(.bottom, intent == .book ? 0 : 96)
             }
         }
         .scrollIndicators(.hidden)
@@ -96,7 +94,7 @@ struct ClipRootView: View {
     @ViewBuilder
     private func message(_ hotel: BookingAPI.HotelPublic) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(intent == .stay ? "YOUR STAY, IN ONE PLACE" : "KEEP THIS PROPERTY CLOSE")
+            Text(eyebrow(hotel))
                 .font(.system(size: 11, weight: .heavy))
                 .tracking(0.8)
                 .foregroundStyle(Theme.green)
@@ -111,13 +109,19 @@ struct ClipRootView: View {
         }
     }
 
-    private var benefits: some View {
+    private func benefits(_ hotel: BookingAPI.HotelPublic) -> some View {
         VStack(spacing: 0) {
-            benefit("bell.badge.fill", intent == .stay ? "Confirmation and stay updates" : "Stay updates on your phone")
+            benefit(
+                "banknote.fill",
+                intent == .book ? "Book without a middleman" : "See \(hotel.name)’s direct rates"
+            )
             Divider().padding(.leading, 44)
-            benefit("bubble.left.and.bubble.right.fill", "Message the Front Desk")
+            benefit("bubble.left.and.bubble.right.fill", "Message the property directly")
             Divider().padding(.leading, 44)
-            benefit("creditcard.fill", "Faster direct rebooking")
+            benefit(
+                intent == .stay ? "bell.badge.fill" : "arrow.uturn.forward.circle.fill",
+                intent == .stay ? "Keep confirmation and stay updates together" : "Return and book direct without searching"
+            )
         }
         .padding(.horizontal, 16)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -140,14 +144,18 @@ struct ClipRootView: View {
         .padding(.vertical, 14)
     }
 
-    private var actions: some View {
+    private func actions(_ hotel: BookingAPI.HotelPublic) -> some View {
         VStack(spacing: 11) {
             if intent == .book {
                 primaryButton("Book direct", systemImage: "calendar.badge.plus") { showingBooking = true }
                 secondaryButton("Keep this property in Guestel", action: presentGetFullApp)
             } else {
-                primaryButton(intent == .stay ? "Keep this stay in Guestel" : "Get Guestel", systemImage: "arrow.down.app.fill", action: presentGetFullApp)
-                secondaryButton(intent == .stay ? "View booking without the app" : "Continue booking without the app") {
+                Text("Use Apple’s Guestel install button below.")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.inkSoft)
+                    .frame(maxWidth: .infinity)
+                secondaryButton("Show the install button again", action: presentGetFullApp)
+                secondaryButton(intent == .stay ? "View my booking without Guestel" : "Not now — continue with \(hotel.name)") {
                     showingBooking = true
                 }
             }
@@ -178,13 +186,34 @@ struct ClipRootView: View {
     }
 
     private func headline(_ hotel: BookingAPI.HotelPublic) -> String {
-        intent == .stay ? "Keep your \(hotel.name) stay in Guestel" : "Keep \(hotel.name) on your phone"
+        switch intent {
+        case .book:
+            return "Book directly with \(hotel.name)"
+        case .add:
+            return "\(hotel.name) wants to stay connected with you"
+        case .stay:
+            return "Keep your \(hotel.name) stay in Guestel"
+        }
+    }
+
+    private func eyebrow(_ hotel: BookingAPI.HotelPublic) -> String {
+        switch intent {
+        case .book:
+            return "BOOK WITH THE PROPERTY"
+        case .add, .stay:
+            return "AN INVITATION FROM \(hotel.name.uppercased())"
+        }
     }
 
     private var subtitle: String {
-        intent == .stay
-            ? "See your stay, hear from the Front Desk, and return to book direct again."
-            : "Book direct, message the Front Desk after booking, and return without searching again."
+        switch intent {
+        case .book:
+            return "Skip the booking-site middleman and reserve with the property."
+        case .add:
+            return "Booking through Guestel helps the property avoid third-party commissions. You get its direct rates, a direct line to the property, and an easier way back."
+        case .stay:
+            return "You booked directly with the property. Guestel keeps your reservation, messages, and next direct booking together."
+        }
     }
 
     private func load() async {
@@ -206,8 +235,9 @@ struct ClipRootView: View {
         let handoff = invocation.handoffToken
         capturedHandoff = handoff
         GuestelHandoff.save(hotelId: loadedHotel.id, domain: bookingDomain ?? loadedHotel.domain ?? "", handoffToken: handoff)
-        if invocation.intent != .book {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { presentGetFullApp() }
+        if invocation.intent != .book, !hasAutomaticallyPresentedInstall {
+            hasAutomaticallyPresentedInstall = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { presentGetFullApp() }
         }
     }
 
