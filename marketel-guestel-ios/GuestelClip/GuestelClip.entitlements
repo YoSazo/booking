@@ -8,6 +8,9 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>appclips:jacksinn.mktel.co</string>
+		<string>appclips:studios17.mktel.co</string>
+		<string>appclips:marketel-review-inn.mktel.co</string>
 		<string>appclips:bookmarketel.com</string>
 	</array>
 </dict>

@@ -2,9 +2,10 @@ import SwiftUI
 import StoreKit
 
 struct ClipRootView: View {
-    let hotelId: String?
+    let target: ClipTarget?
 
     @State private var hotel: BookingAPI.HotelPublic?
+    @State private var bookingDomain: String?
     @State private var loading = true
     @State private var showingBooking = false
 
@@ -23,14 +24,21 @@ struct ClipRootView: View {
                     .multilineTextAlignment(.center)
             }
         }
-        .task(id: hotelId) { await load() }
+        .task(id: target) { await load() }
         .onAppear(perform: presentGetFullApp)
         .sheet(isPresented: $showingBooking) {
             if let hotel {
-                ClipWebView(url: URL(string: "https://bookmarketel.com/?hotelId=\(hotel.id)")!)
+                ClipWebView(url: bookingURL(for: hotel))
                     .ignoresSafeArea()
             }
         }
+    }
+
+    // Prefer the hotel's own branded engine (jacksinn.mktel.co) when we arrived
+    // from it; fall back to the central engine with an explicit hotelId.
+    private func bookingURL(for hotel: BookingAPI.HotelPublic) -> URL {
+        if let d = bookingDomain, let url = URL(string: "https://\(d)/") { return url }
+        return URL(string: "https://bookmarketel.com/?hotelId=\(hotel.id)")!
     }
 
     private func content(_ hotel: BookingAPI.HotelPublic) -> some View {
@@ -73,8 +81,17 @@ struct ClipRootView: View {
 
     private func load() async {
         loading = true
-        if let id = hotelId, let h = try? await BookingAPI.hotel(id) { hotel = h }
-        loading = false
+        defer { loading = false }
+        guard let target else { return }
+        var id: String?
+        switch target {
+        case .hotelId(let hid):
+            id = hid
+        case .domain(let domain):
+            bookingDomain = domain
+            id = try? await BookingAPI.hotelId(forDomain: domain)
+        }
+        if let id, let h = try? await BookingAPI.hotel(id) { hotel = h }
     }
 
     // The system "Get the full app" overlay, from inside the clip.

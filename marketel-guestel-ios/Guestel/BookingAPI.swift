@@ -50,6 +50,19 @@ enum BookingAPI {
         return try JSONDecoder().decode(HotelPublic.self, from: data)
     }
 
+    /// Resolves a branded booking domain (e.g. jacksinn.mktel.co) to its hotelId.
+    /// Used by the App Clip, which is invoked from the hotel's own subdomain.
+    static func hotelId(forDomain domain: String) async throws -> String {
+        var comps = URLComponents(url: base.appendingPathComponent("api/hotel-context"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "domain", value: domain)]
+        let (data, _) = try await URLSession.shared.data(from: comps.url!)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        if let d = obj?["data"] as? [String: Any], let id = d["hotelId"] as? String, !id.isEmpty {
+            return id
+        }
+        throw Failure.message((obj?["message"] as? String) ?? "Unknown hotel for \(domain).")
+    }
+
     /// Returns the names of rooms available for the range.
     static func availability(hotelId: String, checkin: String, checkout: String) async throws -> [String] {
         let json = try await post("api/availability", ["hotelId": hotelId, "checkin": checkin, "checkout": checkout])
