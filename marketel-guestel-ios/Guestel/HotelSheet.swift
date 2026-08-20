@@ -25,6 +25,7 @@ struct HotelSheet: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var paymentSheet: PaymentSheet?
+    @State private var showMessaging = false
 
     private var nights: Int { max(0, Calendar.current.dateComponents([.day], from: checkin, to: checkout).day ?? 0) }
     private var anim: Animation { .interactiveSpring(response: 0.5, dampingFraction: 0.82) }
@@ -47,6 +48,9 @@ struct HotelSheet: View {
                 rates = data.rates
             }
         }
+        .sheet(isPresented: $showMessaging) {
+            SimpleWebSheet(url: URL(string: "https://\(hotel.domain)/guest/messages")!, title: "Message \(hotel.name)")
+        }
     }
 
     // MARK: Actions (docked)
@@ -55,8 +59,12 @@ struct HotelSheet: View {
         VStack(spacing: 12) {
             Button { goBooking(room: nil) } label: { primaryLabel("Book again") }
             HStack(spacing: 12) {
-                secondary("Message", "bubble.left")
-                secondary("Share", "square.and.arrow.up")
+                Button { showMessaging = true } label: { secondaryLabel("Message", "bubble.left") }
+                ShareLink(item: hotel.bookingURL,
+                          subject: Text(hotel.name),
+                          message: Text("Book \(hotel.name) direct")) {
+                    secondaryLabel("Share", "square.and.arrow.up")
+                }
             }
             if !rooms.isEmpty {
                 VStack(spacing: 12) {
@@ -216,6 +224,11 @@ struct HotelSheet: View {
         ]
 
         Task {
+            // Make sure Stripe is keyed to the backend's account before we quote.
+            guard await StripeConfig.ensureLoaded() else {
+                await MainActor.run { errorMessage = "Payments aren't available right now. Try again in a moment."; isSubmitting = false }
+                return
+            }
             do {
                 let available = try await BookingAPI.availability(hotelId: hotel.hotelId, checkin: ci, checkout: co)
                 if !available.isEmpty, !available.contains(room.name) {
@@ -266,15 +279,13 @@ struct HotelSheet: View {
             .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private func secondary(_ title: String, _ icon: String) -> some View {
-        Button {} label: {
-            HStack(spacing: 6) { Image(systemName: icon); Text(title) }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color(white: 0.93), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+    private func secondaryLabel(_ title: String, _ icon: String) -> some View {
+        HStack(spacing: 6) { Image(systemName: icon); Text(title) }
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color(white: 0.93), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func label(_ icon: String, _ text: String) -> some View {

@@ -2854,9 +2854,99 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
         });
     } catch (error) {
         console.error("Stripe API Error creating pre-auth hold:", error.message);
-        res.status(400).send({ 
-            error: { message: error.message || "Failed to create pre-authorization hold." } 
+        res.status(400).send({
+            error: { message: error.message || "Failed to create pre-authorization hold." }
         });
+    }
+});
+
+// ── Guestel native app: Stripe support ───────────────────────────────────────
+// The native app must use a publishable key from the SAME Stripe account as this
+// backend's STRIPE_SECRET_KEY, or PaymentSheet fails with "unexpected error".
+// Serving it here means the app can never drift onto the wrong account, and
+// switching test→live is a backend env change, not an app rebuild.
+app.get('/api/stripe-config', (req, res) => {
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
+    if (!publishableKey) {
+        console.warn('⚠️  STRIPE_PUBLISHABLE_KEY missing — set it (matching STRIPE_SECRET_KEY) so the Guestel app can take payments.');
+    }
+    res.json({
+        publishableKey,
+        mode: publishableKey.startsWith('pk_live_') ? 'live' : 'test',
+    });
+});
+
+// Finds or creates a Stripe customer for a guest email (shared by the saved-card
+// endpoints so a returning guest reuses their cards).
+async function findOrCreateGuestCustomer(email, name) {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized || !normalized.includes('@')) {
+        throw new Error('A valid email is required to save a card.');
+    }
+    const existing = await stripe.customers.list({ email: normalized, limit: 1 });
+    if (existing.data.length) return existing.data[0];
+    return stripe.customers.create({ email: normalized, name: name || undefined });
+}
+
+// Add-a-card flow. The app opens PaymentSheet in setup mode with these three
+// values so the card is saved to the customer for one-tap rebooking. The client
+// passes its Stripe SDK api version so the ephemeral key matches the SDK.
+app.post('/api/guest/setup-intent', async (req, res) => {
+    try {
+        const { email, name, apiVersion } = req.body || {};
+        const customer = await findOrCreateGuestCustomer(email, name);
+        const ephemeralKey = await stripe.ephemeralKeys.create(
+            { customer: customer.id },
+            { apiVersion: apiVersion || '2024-06-20' }
+        );
+        const setupIntent = await stripe.setupIntents.create({
+            customer: customer.id,
+            usage: 'off_session',
+            automatic_payment_methods: { enabled: true },
+        });
+        res.json({
+            setupIntentClientSecret: setupIntent.client_secret,
+            ephemeralKeySecret: ephemeralKey.secret,
+            customerId: customer.id,
+        });
+    } catch (error) {
+        console.error('Stripe setup-intent error:', error.message);
+        res.status(400).json({ message: error.message || 'Could not start card setup.' });
+    }
+});
+
+// Lists a guest's saved cards for the Payment methods screen.
+app.get('/api/guest/payment-methods', async (req, res) => {
+    try {
+        const email = String(req.query.email || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) return res.json({ cards: [] });
+        const existing = await stripe.customers.list({ email, limit: 1 });
+        if (!existing.data.length) return res.json({ cards: [] });
+        const methods = await stripe.paymentMethods.list({ customer: existing.data[0].id, type: 'card' });
+        const cards = methods.data.map(pm => ({
+            id: pm.id,
+            brand: pm.card?.brand || 'card',
+            last4: pm.card?.last4 || '••••',
+            expMonth: pm.card?.exp_month || null,
+            expYear: pm.card?.exp_year || null,
+        }));
+        res.json({ cards });
+    } catch (error) {
+        console.error('Stripe payment-methods list error:', error.message);
+        res.status(400).json({ cards: [], message: error.message });
+    }
+});
+
+// Removes a saved card.
+app.post('/api/guest/detach-payment-method', async (req, res) => {
+    try {
+        const { paymentMethodId } = req.body || {};
+        if (!paymentMethodId) return res.status(400).json({ message: 'Missing paymentMethodId.' });
+        await stripe.paymentMethods.detach(paymentMethodId);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Stripe detach error:', error.message);
+        res.status(400).json({ message: error.message });
     }
 });
 

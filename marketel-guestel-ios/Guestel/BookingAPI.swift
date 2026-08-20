@@ -37,6 +37,16 @@ enum BookingAPI {
 
     struct Hold { let clientSecret: String; let paymentIntentId: String }
 
+    struct SetupInfo { let clientSecret: String; let ephemeralKey: String; let customerId: String }
+
+    struct SavedCard: Identifiable, Decodable, Hashable {
+        let id: String
+        let brand: String
+        let last4: String
+        let expMonth: Int?
+        let expYear: Int?
+    }
+
     enum Failure: LocalizedError {
         case message(String)
         var errorDescription: String? { if case let .message(m) = self { return m }; return "Something went wrong." }
@@ -87,6 +97,45 @@ enum BookingAPI {
         ])
         if let code = json["reservationCode"] as? String, !code.isEmpty { return code }
         throw Failure.message((json["message"] as? String) ?? "Could not confirm the booking.")
+    }
+
+    // MARK: - Stripe (guest)
+
+    /// The publishable key for THIS backend's Stripe account. See StripeConfig.
+    static func stripeConfig() async throws -> String {
+        let url = base.appendingPathComponent("api/stripe-config")
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let key = obj?["publishableKey"] as? String, !key.isEmpty else {
+            throw Failure.message("Payments aren't set up on the server yet.")
+        }
+        return key
+    }
+
+    /// Starts an add-a-card (SetupIntent) flow tied to the guest's customer.
+    static func setupIntent(email: String, name: String, apiVersion: String) async throws -> SetupInfo {
+        let json = try await post("api/guest/setup-intent", ["email": email, "name": name, "apiVersion": apiVersion])
+        guard
+            let cs = json["setupIntentClientSecret"] as? String,
+            let ek = json["ephemeralKeySecret"] as? String,
+            let cust = json["customerId"] as? String
+        else { throw Failure.message((json["message"] as? String) ?? "Could not start card setup.") }
+        return SetupInfo(clientSecret: cs, ephemeralKey: ek, customerId: cust)
+    }
+
+    static func paymentMethods(email: String) async throws -> [SavedCard] {
+        guard email.contains("@") else { return [] }
+        var comps = URLComponents(url: base.appendingPathComponent("api/guest/payment-methods"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "email", value: email)]
+        let (data, _) = try await URLSession.shared.data(from: comps.url!)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let arr = obj?["cards"] as? [[String: Any]] ?? []
+        let jsonData = try JSONSerialization.data(withJSONObject: arr)
+        return (try? JSONDecoder().decode([SavedCard].self, from: jsonData)) ?? []
+    }
+
+    static func detachPaymentMethod(_ id: String) async throws {
+        _ = try await post("api/guest/detach-payment-method", ["paymentMethodId": id])
     }
 
     // MARK: - Helpers

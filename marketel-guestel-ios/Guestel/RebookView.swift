@@ -250,6 +250,10 @@ struct RebookView: View {
         ]
 
         Task {
+            guard await StripeConfig.ensureLoaded() else {
+                await MainActor.run { errorMessage = "Payments aren't available right now. Try again in a moment."; isSubmitting = false }
+                return
+            }
             do {
                 let available = try await BookingAPI.availability(hotelId: hotel.hotelId, checkin: ci, checkout: co)
                 if !available.isEmpty, !available.contains(room.name) {
