@@ -1,13 +1,21 @@
 import SwiftUI
 
+private struct GeometryInfo {
+    var scrollOffset: CGFloat = 0
+    var minY: CGFloat = 0
+    var containerSize: CGSize = .zero
+    var safeArea = EdgeInsets()
+}
+
 struct HotelsView: View {
     @Environment(GuestStore.self) private var store
-    @State private var showingAdd = false
-    @State private var selected: Hotel?
+    @State private var selectedHotel: Hotel?
     @State private var bookingHotel: Hotel?
-    @Namespace private var ns
+    @State private var showingAdd = false
+    @State private var info = GeometryInfo()
 
-    private let spring = Animation.spring(response: 0.42, dampingFraction: 0.82)
+    private let cardHeight: CGFloat = 196
+    private let peek: CGFloat = 74
 
     var body: some View {
         NavigationStack {
@@ -17,23 +25,7 @@ struct HotelsView: View {
                 if store.hotels.isEmpty {
                     EmptyHotelsView { showingAdd = true }
                 } else {
-                    ScrollView {
-                        VStack(spacing: 18) {
-                            if let stay = store.upcomingReservation {
-                                UpcomingStayCard(stay: stay, hotelName: store.hotelName(for: stay.hotelId))
-                            }
-                            HotelWallet(
-                                hotels: store.hotels,
-                                selected: $selected,
-                                ns: ns,
-                                spring: spring,
-                                onBook: { bookingHotel = $0 }
-                            )
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 110)
-                    }
+                    walletScroll
                 }
 
                 AddButton { showingAdd = true }
@@ -47,80 +39,60 @@ struct HotelsView: View {
             .fullScreenCover(item: $bookingHotel) { RebookView(hotel: $0) }
         }
     }
-}
 
-// Apple Wallet–style stack: cards overlap so each header peeks; tap one and it
-// rises to the top with its actions below; tap it again to drop back in.
-private struct HotelWallet: View {
-    let hotels: [Hotel]
-    @Binding var selected: Hotel?
-    let ns: Namespace.ID
-    let spring: Animation
-    var onBook: (Hotel) -> Void
-
-    private let cardHeight: CGFloat = 196
-    private let peek: CGFloat = 74
-
-    var body: some View {
-        Group {
-            if let hotel = selected {
-                expanded(hotel)
-            } else {
-                stack
+    private var walletScroll: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 18) {
+                    if let stay = store.upcomingReservation {
+                        UpcomingStayCard(stay: stay, hotelName: store.hotelName(for: stay.hotelId))
+                    }
+                    // Overlapping stack: each card's header peeks above the next.
+                    VStack(spacing: -(cardHeight - peek)) {
+                        ForEach(Array(store.hotels.enumerated()), id: \.element.id) { index, hotel in
+                            CardView(hotel: hotel, seed: index, height: cardHeight)
+                                .id(hotel.id)
+                                .zIndex(Double(index))
+                                .onTapGesture {
+                                    withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(hotel.id, anchor: .top) }
+                                    selectedHotel = hotel
+                                }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 420)
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, newValue in
+                info.scrollOffset = newValue
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { newValue in
+                info.minY = newValue - info.safeArea.top
+            }
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { newValue in
+                info.containerSize = newValue
+            }
+            .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { newValue in
+                info.safeArea = newValue
+            }
+            .sheet(item: $selectedHotel) { hotel in
+                let gap: CGFloat = 30
+                let minH = max(info.containerSize.height - info.minY - (cardHeight + gap), 180)
+                let maxH = max(info.containerSize.height - info.minY + 15, minH + 60)
+                HotelActionsSheet(hotel: hotel) {
+                    selectedHotel = nil
+                    bookingHotel = hotel
+                }
+                .presentationDetents([.height(minH), .height(maxH)])
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(maxH)))
+                .presentationDragIndicator(.visible)
             }
         }
-    }
-
-    private var stack: some View {
-        ZStack(alignment: .top) {
-            ForEach(Array(hotels.enumerated()), id: \.element.id) { index, hotel in
-                WalletCard(hotel: hotel, seed: index, height: cardHeight)
-                    .matchedGeometryEffect(id: hotel.id, in: ns)
-                    .offset(y: CGFloat(index) * peek)
-                    .zIndex(Double(index))
-                    .onTapGesture { withAnimation(spring) { selected = hotel } }
-            }
-        }
-        .frame(height: CGFloat(max(hotels.count - 1, 0)) * peek + cardHeight, alignment: .top)
-        .frame(maxWidth: .infinity)
-    }
-
-    private func expanded(_ hotel: Hotel) -> some View {
-        VStack(spacing: 16) {
-            WalletCard(hotel: hotel, seed: index(of: hotel), height: cardHeight)
-                .matchedGeometryEffect(id: hotel.id, in: ns)
-                .onTapGesture { withAnimation(spring) { selected = nil } }
-
-            VStack(spacing: 12) {
-                Button { onBook(hotel) } label: {
-                    Text("Book again")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                HStack(spacing: 12) {
-                    ActionButton(title: "Message", icon: "bubble.left")
-                    ActionButton(title: "Share", icon: "square.and.arrow.up")
-                }
-                Button { withAnimation(spring) { selected = nil } } label: {
-                    Text("Back to wallet")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.inkSoft)
-                }
-                .padding(.top, 2)
-            }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
-
-    private func index(of hotel: Hotel) -> Int {
-        hotels.firstIndex(of: hotel) ?? 0
     }
 }
 
-private struct WalletCard: View {
+private struct CardView: View {
     let hotel: Hotel
     let seed: Int
     let height: CGFloat
@@ -142,6 +114,32 @@ private struct WalletCard: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Theme.ink.opacity(0.18), radius: 14, x: 0, y: 8)
+    }
+}
+
+private struct HotelActionsSheet: View {
+    let hotel: Hotel
+    var onBook: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Button(action: onBook) {
+                Text("Book again")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            HStack(spacing: 12) {
+                ActionButton(title: "Message", icon: "bubble.left")
+                ActionButton(title: "Share", icon: "square.and.arrow.up")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.canvas)
     }
 }
 
@@ -211,7 +209,6 @@ private struct EmptyHotelsView: View {
     }
 }
 
-// The real, paid, upcoming stay — hero at the top of the wallet.
 private struct UpcomingStayCard: View {
     let stay: Reservation
     let hotelName: String
