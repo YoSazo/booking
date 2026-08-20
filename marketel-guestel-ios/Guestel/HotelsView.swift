@@ -69,7 +69,10 @@ struct HotelsView: View {
                         .onTapGesture { withAnimation(animation) { selectedHotel = nil } }
                 }
             }
-            .task { ImagePrefetch.warm(hotels: store.hotels) }
+            .task {
+                await store.refreshHotels()
+                ImagePrefetch.warm(hotels: store.hotels)
+            }
             .sheet(isPresented: $showingAdd) {
                 AddHotelView().presentationDetents([.medium])
             }
@@ -139,6 +142,20 @@ struct WalletCard: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Theme.gradient(for: seed)
+            if let imageURL = hotel.imageURL {
+                AsyncImage(url: imageURL) { phase in
+                    if case let .success(image) = phase {
+                        image.resizable().scaledToFill()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                LinearGradient(
+                    colors: [.black.opacity(0.50), .clear, .black.opacity(0.18)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(hotel.name)
                     .font(.system(size: 22, weight: .bold))
@@ -176,7 +193,7 @@ private struct UpcomingStayCard: View {
                 Image(systemName: "calendar").font(.system(size: 14))
                 Text(dateRange).font(.system(size: 15, weight: .semibold))
                 Spacer()
-                Text("Paid · Confirmed")
+                Text("Confirmed")
                     .font(.system(size: 12, weight: .semibold))
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.white.opacity(0.18), in: Capsule())

@@ -5,6 +5,7 @@ import StripePaymentSheet
 // matches the account that creates the PaymentIntents. Hardcoding it was the bug:
 // the app used a different account than the backend, so every hold failed with
 // "unexpected error". Fetching it also makes test→live a backend env change.
+@MainActor
 enum StripeConfig {
     private static var loaded = false
 
@@ -18,7 +19,7 @@ enum StripeConfig {
     static func ensureLoaded() async -> Bool {
         if loaded, isReady { return true }
         guard let key = try? await BookingAPI.stripeConfig(), !key.isEmpty else { return isReady }
-        await MainActor.run { STPAPIClient.shared.publishableKey = key }
+        STPAPIClient.shared.publishableKey = key
         loaded = true
         return true
     }

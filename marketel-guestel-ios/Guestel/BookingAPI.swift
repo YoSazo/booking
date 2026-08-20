@@ -14,7 +14,9 @@ enum BookingAPI {
         let amenities: String?
         let maxOccupancy: Int?
         let imageUrls: [String]?
-        var image: URL? { imageUrls?.first.flatMap { URL(string: $0) } }
+        var image: URL? {
+            imageUrls?.first.flatMap { URL(string: $0, relativeTo: BookingAPI.base)?.absoluteURL }
+        }
     }
 
     struct Rates: Decodable, Hashable {
@@ -37,7 +39,12 @@ enum BookingAPI {
 
     struct Hold { let clientSecret: String; let paymentIntentId: String }
 
-    struct SetupInfo { let clientSecret: String; let ephemeralKey: String; let customerId: String }
+    struct SetupInfo {
+        let clientSecret: String
+        let ephemeralKey: String
+        let customerId: String
+        let customerToken: String
+    }
 
     struct SavedCard: Identifiable, Decodable, Hashable {
         let id: String
@@ -56,7 +63,7 @@ enum BookingAPI {
 
     static func hotel(_ hotelId: String) async throws -> HotelPublic {
         let url = base.appendingPathComponent("api/hotel/\(hotelId)/public")
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let data = try await request(URLRequest(url: url))
         return try JSONDecoder().decode(HotelPublic.self, from: data)
     }
 
@@ -65,7 +72,7 @@ enum BookingAPI {
     static func hotelId(forDomain domain: String) async throws -> String {
         var comps = URLComponents(url: base.appendingPathComponent("api/hotel-context"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "domain", value: domain)]
-        let (data, _) = try await URLSession.shared.data(from: comps.url!)
+        let data = try await request(URLRequest(url: comps.url!))
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         if let d = obj?["data"] as? [String: Any], let id = d["hotelId"] as? String, !id.isEmpty {
             return id
@@ -104,49 +111,80 @@ enum BookingAPI {
     /// The publishable key for THIS backend's Stripe account. See StripeConfig.
     static func stripeConfig() async throws -> String {
         let url = base.appendingPathComponent("api/stripe-config")
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let data = try await request(URLRequest(url: url))
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        guard let key = obj?["publishableKey"] as? String, !key.isEmpty else {
+        guard let key = obj?["publishableKey"] as? String,
+              key.hasPrefix("pk_test_") || key.hasPrefix("pk_live_") else {
             throw Failure.message("Payments aren't set up on the server yet.")
         }
         return key
     }
 
     /// Starts an add-a-card (SetupIntent) flow tied to the guest's customer.
-    static func setupIntent(email: String, name: String, apiVersion: String) async throws -> SetupInfo {
-        let json = try await post("api/guest/setup-intent", ["email": email, "name": name, "apiVersion": apiVersion])
+    static func setupIntent(email: String, name: String, apiVersion: String, customerToken: String?) async throws -> SetupInfo {
+        let json = try await post(
+            "api/guest/setup-intent",
+            ["email": email, "name": name, "apiVersion": apiVersion],
+            bearerToken: customerToken
+        )
         guard
             let cs = json["setupIntentClientSecret"] as? String,
             let ek = json["ephemeralKeySecret"] as? String,
-            let cust = json["customerId"] as? String
+            let cust = json["customerId"] as? String,
+            let token = json["customerToken"] as? String
         else { throw Failure.message((json["message"] as? String) ?? "Could not start card setup.") }
-        return SetupInfo(clientSecret: cs, ephemeralKey: ek, customerId: cust)
+        return SetupInfo(clientSecret: cs, ephemeralKey: ek, customerId: cust, customerToken: token)
     }
 
-    static func paymentMethods(email: String) async throws -> [SavedCard] {
-        guard email.contains("@") else { return [] }
-        var comps = URLComponents(url: base.appendingPathComponent("api/guest/payment-methods"), resolvingAgainstBaseURL: false)!
-        comps.queryItems = [URLQueryItem(name: "email", value: email)]
-        let (data, _) = try await URLSession.shared.data(from: comps.url!)
+    static func paymentMethods(customerToken: String) async throws -> [SavedCard] {
+        var req = URLRequest(url: base.appendingPathComponent("api/guest/payment-methods"))
+        req.setValue("Bearer \(customerToken)", forHTTPHeaderField: "Authorization")
+        let data = try await request(req)
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let arr = obj?["cards"] as? [[String: Any]] ?? []
         let jsonData = try JSONSerialization.data(withJSONObject: arr)
-        return (try? JSONDecoder().decode([SavedCard].self, from: jsonData)) ?? []
+        return try JSONDecoder().decode([SavedCard].self, from: jsonData)
     }
 
-    static func detachPaymentMethod(_ id: String) async throws {
-        _ = try await post("api/guest/detach-payment-method", ["paymentMethodId": id])
+    static func detachPaymentMethod(_ id: String, customerToken: String) async throws {
+        _ = try await post(
+            "api/guest/detach-payment-method",
+            ["paymentMethodId": id],
+            bearerToken: customerToken
+        )
     }
 
     // MARK: - Helpers
 
-    private static func post(_ path: String, _ body: [String: Any]) async throws -> [String: Any] {
+    private static func post(_ path: String, _ body: [String: Any], bearerToken: String? = nil) async throws -> [String: Any] {
         var request = URLRequest(url: base.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let bearerToken, !bearerToken.isEmpty {
+            request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        let data = try await self.request(request)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw Failure.message("The server returned an invalid response.")
+        }
+        return object
+    }
+
+    private static func request(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw Failure.message("The server returned an invalid response.")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let nested = object?["error"] as? [String: Any]
+            let message = (object?["message"] as? String)
+                ?? (nested?["message"] as? String)
+                ?? "The request failed (\(http.statusCode))."
+            throw Failure.message(message)
+        }
+        return data
     }
 
     // Tiered price: nightly < 7, then monthly/weekly blocks (mirrors priceCalculator.js).

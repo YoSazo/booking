@@ -2,16 +2,22 @@
 
 _Last pass: 2026-08-20 by Claude. This is a "make it real, then hand off to fortify again" doc._
 
+_Fortification pass: 2026-08-20 by Codex._
+
 Guestel is a native SwiftUI guest wallet app (companion to Marketel Front Desk).
 Two tabs: **Hotels** (Apple-Wallet card stack + docked booking sheet) and **Account**.
 It books against the real backend `guest-lodge-backend` (Render) — the same engine
 the web booking sites (`*.mktel.co`, Vercel) and Front Desk use. I can't compile
 locally (no Mac); every build is the GitHub Actions workflow `build-guestel-ios.yml`.
 
-## ⚠️ ONE REQUIRED CONFIG (payments are dead without it)
+## Stripe configuration
 The `$1 hold` failed because the app's Stripe **publishable** key was from a
 different account (`51NymOI`) than the backend's **secret** key (`51SPnS1E`).
-Fixed by serving the key from the backend. **You must set the env var:**
+Fixed by serving the key from the backend. This fortification pass added the
+matching **test** publishable key as a backend-owned fallback, guarded by an
+account/mode comparison with `STRIPE_SECRET_KEY`, so test payments no longer go
+offline solely because the Render env value is absent. Still set the env var so
+key rotation stays configuration-only:
 
 - In **Render** (guest-lodge-backend) and local `guest-lodge-backend/.env`:
   `STRIPE_PUBLISHABLE_KEY=pk_test_51SPnS1E…`
@@ -21,10 +27,28 @@ Fixed by serving the key from the backend. **You must set the env var:**
 - Verify: `curl https://guest-lodge-backend.onrender.com/api/stripe-config`
   must return a non-empty `publishableKey`.
 
+Live mode has no fallback: switch `STRIPE_SECRET_KEY` and
+`STRIPE_PUBLISHABLE_KEY` together.
+
 The app fetches it at launch via `StripeConfig.ensureLoaded()` and before every
 payment. If it's empty, payments show "Payments aren't available right now."
 
 ## What this pass changed
+### Fortification follow-up
+- Backend refuses to serve a Stripe publishable key unless its mode and account
+  prefix match `STRIPE_SECRET_KEY`; the matching test key is a backend-owned
+  fallback, while live mode still requires both env values.
+- Saved cards are no longer addressable by email. A signed, expiring capability
+  scopes one device to one Stripe customer, is stored in iOS Keychain, and is
+  required to list/detach cards. Detach verifies ownership; all routes are limited.
+- Confirmed `STPAPIClient.apiVersion` exists in Stripe iOS 26 and resolves to
+  `2020-08-27`; the backend now uses that value as its safe fallback.
+- `BookingAPI` now rejects non-2xx responses and exposes server errors instead of
+  silently turning failures into empty data.
+- Add Hotel now resolves and persists a real booking domain. Wallet cards refresh
+  live hotel names/photos, and Message deep-links to the selected native stay.
+- Replaced the dead `/support` link with a dedicated Guestel support page.
+
 ### Payments (bug fix)
 - Backend `GET /api/stripe-config` → `{ publishableKey, mode }`.
 - App `StripeConfig.swift` installs it into `STPAPIClient`. Removed the hardcoded
@@ -49,15 +73,14 @@ payment. If it's empty, payments show "Payments aren't available right now."
 - **Message** → opens `https://<hotel-domain>/guest/messages` in `SimpleWebSheet`.
 
 ## VERIFY THESE ON A REAL DEVICE (I could not)
-1. **Ephemeral key api version.** `PaymentMethodsView.addCard()` passes
-   `STPAPIClient.apiVersion` to `/api/guest/setup-intent`. Confirm that symbol
-   exists in Stripe iOS 26 and that the ephemeral key it creates matches the SDK
-   (else PaymentSheet errors loading the customer). Backend default is `2024-06-20`.
+1. **Ephemeral key runtime.** Source verification confirms
+   `STPAPIClient.apiVersion` exists in Stripe iOS 26 and is `2020-08-27`; confirm
+   PaymentSheet loads the returned customer on a real device.
 2. **$1 hold end-to-end** after `STRIPE_PUBLISHABLE_KEY` is set: HotelSheet →
    Confirm · $1 hold → PaymentSheet → book. Should no longer error.
 3. **Add card → list → delete** round-trips against the customer.
-4. Message web sheet actually lands on the hotel's messaging (route `/guest/messages`
-   assumes the guest portal is reachable unauthenticated or handles login).
+4. Message web sheet actually opens the correct native-booked stay. The deployed
+   `/guest/messages` route returns 200 and the app now supplies `?stay=<code>`.
 
 ## STILL TO FORTIFY (next pass)
 - **Deep integration** with Front Desk + the Front Desk Assistant: right now the app
@@ -67,8 +90,7 @@ payment. If it's empty, payments show "Payments aren't available right now."
   the web localStorage bridge. Move to a backend guest identity (email/login) so a
   stay follows the guest across devices. There's no auth yet.
 - **Email/login** for the guest (Account has no sign-in).
-- Real hotel photos on the wallet cards (currently gradient + first room image).
-- Error/empty/offline states across all network calls; retries.
+- Broader error/empty/offline states and explicit retries outside payment methods.
 - Live Stripe keys before launch.
 - App Store review needs: no dead ends, privacy answers, etc.
 

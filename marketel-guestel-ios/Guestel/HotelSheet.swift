@@ -49,7 +49,7 @@ struct HotelSheet: View {
             }
         }
         .sheet(isPresented: $showMessaging) {
-            SimpleWebSheet(url: URL(string: "https://\(hotel.domain)/guest/messages")!, title: "Message \(hotel.name)")
+            SimpleWebSheet(url: messageURL, title: "Message \(hotel.name)")
         }
     }
 
@@ -132,6 +132,14 @@ struct HotelSheet: View {
     }
 
     private var checkoutFloor: Date { Calendar.current.date(byAdding: .day, value: 1, to: checkin)! }
+
+    private var messageURL: URL {
+        var components = URLComponents(string: "https://\(hotel.domain)/guest/messages")!
+        if let code = store.reservation(for: hotel.hotelId)?.code {
+            components.queryItems = [URLQueryItem(name: "stay", value: code)]
+        }
+        return components.url!
+    }
 
     // MARK: Review + pay
 

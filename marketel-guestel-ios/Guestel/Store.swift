@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct Hotel: Identifiable, Hashable {
+struct Hotel: Identifiable, Hashable, Codable {
     let id: UUID
     var hotelId: String     // backend id — matches the stay the engine stores
     var domain: String      // the hotel's own branded booking domain
@@ -8,13 +8,14 @@ struct Hotel: Identifiable, Hashable {
     var location: String
     var stays: Int
     var lastStayed: String
+    var imageURL: URL?
 
     // The hotel's OWN direct booking site (e.g. jacksinn.mktel.co) opens inside
     // Guestel (WKWebView) — the guest books on the hotel's brand, not bookmarketel.
     var bookingURL: URL { URL(string: "https://\(domain)")! }
     var slug: String { domain.replacingOccurrences(of: ".mktel.co", with: "") }
 
-    init(id: UUID = UUID(), hotelId: String, domain: String, name: String, location: String, stays: Int, lastStayed: String) {
+    init(id: UUID = UUID(), hotelId: String, domain: String, name: String, location: String, stays: Int, lastStayed: String, imageURL: URL? = nil) {
         self.id = id
         self.hotelId = hotelId
         self.domain = domain
@@ -22,6 +23,7 @@ struct Hotel: Identifiable, Hashable {
         self.location = location
         self.stays = stays
         self.lastStayed = lastStayed
+        self.imageURL = imageURL
     }
 }
 
@@ -70,9 +72,10 @@ final class GuestStore {
 
     private static let reservationsKey = "guestel.reservations.v1"
     private static let guestKey = "guestel.guest.v1"
+    private static let hotelsKey = "guestel.hotels.v1"
 
-    init(hotels: [Hotel] = GuestStore.sample) {
-        self.hotels = hotels
+    init(hotels: [Hotel]? = nil) {
+        self.hotels = hotels ?? GuestStore.loadHotels()
         self.reservations = GuestStore.loadReservations()
         self.guest = GuestStore.loadGuest()
     }
@@ -109,7 +112,35 @@ final class GuestStore {
             .first
     }
 
-    func add(_ hotel: Hotel) { hotels.insert(hotel, at: 0) }
+    func add(_ hotel: Hotel) {
+        hotels.removeAll { $0.hotelId == hotel.hotelId || $0.domain == hotel.domain }
+        hotels.insert(hotel, at: 0)
+        persistHotels()
+    }
+
+    /// Refreshes display data from the backend without replacing the guest's
+    /// wallet ordering or locally retained stay history.
+    func refreshHotels() async {
+        let identifiers = hotels.map(\.hotelId)
+        for hotelId in identifiers {
+            guard let data = try? await BookingAPI.hotel(hotelId),
+                  let index = hotels.firstIndex(where: { $0.hotelId == hotelId }) else { continue }
+            hotels[index].name = data.name
+            if let image = data.rooms.lazy.compactMap(\.image).first {
+                hotels[index].imageURL = image
+            }
+        }
+        persistHotels()
+    }
+
+    func reservation(for hotelId: String) -> Reservation? {
+        reservations
+            .filter { $0.hotelId == hotelId }
+            .sorted {
+                ($0.checkinDate ?? .distantPast) > ($1.checkinDate ?? .distantPast)
+            }
+            .first
+    }
 
     // Called from BookingWebView when the booking engine reports its stored stays.
     func ingest(_ raw: [[String: Any]]) {
@@ -138,6 +169,21 @@ final class GuestStore {
         if let data = try? JSONEncoder().encode(reservations) {
             UserDefaults.standard.set(data, forKey: Self.reservationsKey)
         }
+    }
+
+    private func persistHotels() {
+        if let data = try? JSONEncoder().encode(hotels) {
+            UserDefaults.standard.set(data, forKey: Self.hotelsKey)
+        }
+    }
+
+    private static func loadHotels() -> [Hotel] {
+        guard
+            let data = UserDefaults.standard.data(forKey: hotelsKey),
+            let decoded = try? JSONDecoder().decode([Hotel].self, from: data),
+            !decoded.isEmpty
+        else { return sample }
+        return decoded
     }
 
     private static func loadReservations() -> [Reservation] {

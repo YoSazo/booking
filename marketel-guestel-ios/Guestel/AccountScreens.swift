@@ -147,7 +147,10 @@ struct HelpView: View {
         .navigationTitle("Help")
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showContact) {
-            SimpleWebSheet(url: URL(string: "https://bookmarketel.com/support")!, title: "Support")
+            SimpleWebSheet(
+                url: URL(string: "https://guest-lodge-backend.onrender.com/guest-support")!,
+                title: "Guestel Support"
+            )
         }
     }
 }
@@ -224,13 +227,32 @@ struct PaymentMethodsView: View {
 
     private func load() async {
         loading = true
-        cards = (try? await BookingAPI.paymentMethods(email: store.guest.email)) ?? []
+        error = nil
+        guard let token = GuestPaymentAccess.token else {
+            cards = []
+            loading = false
+            return
+        }
+        do {
+            cards = try await BookingAPI.paymentMethods(customerToken: token)
+        } catch {
+            cards = []
+            self.error = error.localizedDescription
+        }
         loading = false
     }
 
     private func remove(_ card: BookingAPI.SavedCard) async {
-        try? await BookingAPI.detachPaymentMethod(card.id)
-        await load()
+        guard let token = GuestPaymentAccess.token else { return }
+        busy = true
+        error = nil
+        do {
+            try await BookingAPI.detachPaymentMethod(card.id, customerToken: token)
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        busy = false
     }
 
     private func addCard() {
@@ -244,8 +266,13 @@ struct PaymentMethodsView: View {
             }
             do {
                 let info = try await BookingAPI.setupIntent(
-                    email: store.guest.email, name: store.guest.name, apiVersion: STPAPIClient.apiVersion)
+                    email: store.guest.email,
+                    name: store.guest.name,
+                    apiVersion: STPAPIClient.apiVersion,
+                    customerToken: GuestPaymentAccess.token
+                )
                 await MainActor.run {
+                    GuestPaymentAccess.save(info.customerToken)
                     var config = PaymentSheet.Configuration()
                     config.merchantDisplayName = "Guestel"
                     config.customer = .init(id: info.customerId, ephemeralKeySecret: info.ephemeralKey)

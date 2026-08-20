@@ -83,3 +83,26 @@ test('only the seed writes the App Review subscription marker', () => {
     // server.js may read the marker but must never assign it.
     assert.doesNotMatch(server, /marketelSubscriptionStatus: 'app_review'/);
 });
+
+test('Guestel Help links to a dedicated support page instead of a dead route', () => {
+    const accountScreens = fs.readFileSync(
+        path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel', 'AccountScreens.swift'),
+        'utf8'
+    );
+    assert.match(server, /app\.get\('\/guest-support'/);
+    assert.match(accountScreens, /guest-lodge-backend\.onrender\.com\/guest-support/);
+    assert.doesNotMatch(accountScreens, /bookmarketel\.com\/support/);
+});
+
+test('Guestel hotel actions use live data instead of placeholder dead ends', () => {
+    const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const addHotel = fs.readFileSync(path.join(guestelRoot, 'AddHotelView.swift'), 'utf8');
+    const hotelSheet = fs.readFileSync(path.join(guestelRoot, 'HotelSheet.swift'), 'utf8');
+    const hotels = fs.readFileSync(path.join(guestelRoot, 'HotelsView.swift'), 'utf8');
+
+    assert.match(addHotel, /BookingAPI\.hotelId\(forDomain: domain\)/);
+    assert.doesNotMatch(addHotel, /hotelId: "new-hotel"/);
+    assert.match(hotelSheet, /URLQueryItem\(name: "stay", value: code\)/);
+    assert.match(hotels, /AsyncImage\(url: imageURL\)/);
+    assert.doesNotMatch(hotels, /Paid · Confirmed/);
+});

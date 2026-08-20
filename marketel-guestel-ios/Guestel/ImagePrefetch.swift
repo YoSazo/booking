@@ -9,7 +9,7 @@ enum ImagePrefetch {
                 guard let data = try? await BookingAPI.hotel(hotel.hotelId) else { continue }
                 for room in data.rooms {
                     for string in room.imageUrls ?? [] {
-                        if let url = URL(string: string) {
+                        if let url = URL(string: string, relativeTo: BookingAPI.base)?.absoluteURL {
                             _ = try? await URLSession.shared.data(from: url)
                         }
                     }

@@ -16,6 +16,12 @@ if (!process.env.STRIPE_SECRET_KEY) {
     console.warn('⚠️  STRIPE_SECRET_KEY missing — add it to guest-lodge-backend/.env (payment routes will fail until then)');
 }
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_local_missing_set_STRIPE_SECRET_KEY_in_env');
+// Publishable keys are public client configuration. Keep the current Guestel
+// test account as a backend-owned fallback so a missing Render env value cannot
+// take every test payment offline. Any env value overrides it, and the config
+// endpoint below refuses to serve this fallback if the secret key belongs to a
+// different account or switches to live mode.
+const DEFAULT_GUESTEL_TEST_PUBLISHABLE_KEY = 'pk_test_51SPnS1E0TbujaKoz0PGmi1L3tcKmCkW56UCSuoM434SKYcvwSjejoaTkPEOYBfwS4Q2aTtvGvrIjuwOBtancDF0Q00iCBUbyNL';
 const xml2js = require('xml2js');
 const http = require('http');
 const http2 = require('http2');
@@ -28,6 +34,11 @@ const { createFrontDeskAssistant } = require('./frontdesk-assistant');
 const { buildFrontdeskReturnPath } = require('./frontdesk-return');
 const { buildBookingQuote } = require('./booking-pricing');
 const { buildPreauthIdempotencyKey } = require('./booking-idempotency');
+const {
+    bearerToken,
+    createGuestPaymentToken,
+    readGuestPaymentToken,
+} = require('./guest-payment-access');
 const {
     buildStartPayload,
     buildUpdatePayload,
@@ -2335,6 +2346,9 @@ function pushFunnelEvent(event_name, eventData) {
 
 const createPaymentIntentRateLimit = createRouteRateLimiter('create-payment-intent', { windowMs: 60 * 1000, max: 15 });
 const createPreauthHoldRateLimit = createRouteRateLimiter('create-preauth-hold', { windowMs: 60 * 1000, max: 12 });
+const guestPaymentSetupRateLimit = createRouteRateLimiter('guest-payment-setup', { windowMs: 5 * 60 * 1000, max: 8 });
+const guestPaymentReadRateLimit = createRouteRateLimiter('guest-payment-read', { windowMs: 60 * 1000, max: 20 });
+const guestPaymentDetachRateLimit = createRouteRateLimiter('guest-payment-detach', { windowMs: 5 * 60 * 1000, max: 10 });
 const completePayLaterRateLimit = createRouteRateLimiter('complete-pay-later-booking', { windowMs: 60 * 1000, max: 12 });
 const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1000, max: 12 });
 const availabilityRateLimit = createRouteRateLimiter('availability', {
@@ -2866,38 +2880,60 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
 // Serving it here means the app can never drift onto the wrong account, and
 // switching test→live is a backend env change, not an app rebuild.
 app.get('/api/stripe-config', (req, res) => {
-    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
+    const configuredKey = String(process.env.STRIPE_PUBLISHABLE_KEY || DEFAULT_GUESTEL_TEST_PUBLISHABLE_KEY).trim();
+    const secretMatch = String(process.env.STRIPE_SECRET_KEY || '').match(/^sk_(test|live)_(51[A-Za-z0-9]{15})/);
+    const publishableMatch = configuredKey.match(/^pk_(test|live)_(51[A-Za-z0-9]{15})/);
+    const publishableKey = secretMatch && publishableMatch
+        && secretMatch[1] === publishableMatch[1]
+        && secretMatch[2] === publishableMatch[2]
+        ? configuredKey
+        : '';
     if (!publishableKey) {
-        console.warn('⚠️  STRIPE_PUBLISHABLE_KEY missing — set it (matching STRIPE_SECRET_KEY) so the Guestel app can take payments.');
+        console.error('❌ STRIPE_PUBLISHABLE_KEY does not match STRIPE_SECRET_KEY; refusing to serve it.');
     }
     res.json({
         publishableKey,
-        mode: publishableKey.startsWith('pk_live_') ? 'live' : 'test',
+        mode: publishableKey ? (publishableKey.startsWith('pk_live_') ? 'live' : 'test') : 'unavailable',
     });
 });
 
-// Finds or creates a Stripe customer for a guest email (shared by the saved-card
-// endpoints so a returning guest reuses their cards).
-async function findOrCreateGuestCustomer(email, name) {
+function guestPaymentCustomerId(req) {
+    return readGuestPaymentToken(bearerToken(req))?.customerId || '';
+}
+
+async function guestPaymentCustomer(req, email, name) {
     const normalized = String(email || '').trim().toLowerCase();
     if (!normalized || !normalized.includes('@')) {
         throw new Error('A valid email is required to save a card.');
     }
-    const existing = await stripe.customers.list({ email: normalized, limit: 1 });
-    if (existing.data.length) return existing.data[0];
+    const customerId = guestPaymentCustomerId(req);
+    if (customerId) {
+        const existing = await stripe.customers.retrieve(customerId);
+        if (!existing || existing.deleted) throw new Error('Your saved-card session has expired.');
+        if (existing.email !== normalized || existing.name !== (name || null)) {
+            return stripe.customers.update(customerId, { email: normalized, name: name || '' });
+        }
+        return existing;
+    }
+    // Never look customers up by an unverified email. Without guest auth, doing
+    // so would let anyone claim another guest's Stripe customer and cards.
     return stripe.customers.create({ email: normalized, name: name || undefined });
 }
 
 // Add-a-card flow. The app opens PaymentSheet in setup mode with these three
 // values so the card is saved to the customer for one-tap rebooking. The client
 // passes its Stripe SDK api version so the ephemeral key matches the SDK.
-app.post('/api/guest/setup-intent', async (req, res) => {
+app.post('/api/guest/setup-intent', guestPaymentSetupRateLimit, async (req, res) => {
     try {
         const { email, name, apiVersion } = req.body || {};
-        const customer = await findOrCreateGuestCustomer(email, name);
+        const customer = await guestPaymentCustomer(req, email, name);
+        const requestedApiVersion = String(apiVersion || '').trim();
+        const stripeApiVersion = /^\d{4}-\d{2}-\d{2}$/.test(requestedApiVersion)
+            ? requestedApiVersion
+            : '2020-08-27';
         const ephemeralKey = await stripe.ephemeralKeys.create(
             { customer: customer.id },
-            { apiVersion: apiVersion || '2024-06-20' }
+            { apiVersion: stripeApiVersion }
         );
         const setupIntent = await stripe.setupIntents.create({
             customer: customer.id,
@@ -2908,6 +2944,7 @@ app.post('/api/guest/setup-intent', async (req, res) => {
             setupIntentClientSecret: setupIntent.client_secret,
             ephemeralKeySecret: ephemeralKey.secret,
             customerId: customer.id,
+            customerToken: createGuestPaymentToken(customer.id),
         });
     } catch (error) {
         console.error('Stripe setup-intent error:', error.message);
@@ -2916,13 +2953,11 @@ app.post('/api/guest/setup-intent', async (req, res) => {
 });
 
 // Lists a guest's saved cards for the Payment methods screen.
-app.get('/api/guest/payment-methods', async (req, res) => {
+app.get('/api/guest/payment-methods', guestPaymentReadRateLimit, async (req, res) => {
     try {
-        const email = String(req.query.email || '').trim().toLowerCase();
-        if (!email || !email.includes('@')) return res.json({ cards: [] });
-        const existing = await stripe.customers.list({ email, limit: 1 });
-        if (!existing.data.length) return res.json({ cards: [] });
-        const methods = await stripe.paymentMethods.list({ customer: existing.data[0].id, type: 'card' });
+        const customerId = guestPaymentCustomerId(req);
+        if (!customerId) return res.status(401).json({ cards: [], message: 'Saved-card access is required.' });
+        const methods = await stripe.paymentMethods.list({ customer: customerId, type: 'card' });
         const cards = methods.data.map(pm => ({
             id: pm.id,
             brand: pm.card?.brand || 'card',
@@ -2938,10 +2973,16 @@ app.get('/api/guest/payment-methods', async (req, res) => {
 });
 
 // Removes a saved card.
-app.post('/api/guest/detach-payment-method', async (req, res) => {
+app.post('/api/guest/detach-payment-method', guestPaymentDetachRateLimit, async (req, res) => {
     try {
         const { paymentMethodId } = req.body || {};
         if (!paymentMethodId) return res.status(400).json({ message: 'Missing paymentMethodId.' });
+        const customerId = guestPaymentCustomerId(req);
+        if (!customerId) return res.status(401).json({ message: 'Saved-card access is required.' });
+        const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+        if (paymentMethod.customer !== customerId) {
+            return res.status(404).json({ message: 'Payment method not found.' });
+        }
         await stripe.paymentMethods.detach(paymentMethodId);
         res.json({ ok: true });
     } catch (error) {
@@ -10447,6 +10488,10 @@ app.get('/terms', (req, res) => {
 });
 app.get('/app-support', (req, res) => {
     res.sendFile(path.join(__dirname, 'app-support.html'));
+});
+
+app.get('/guest-support', (req, res) => {
+    res.sendFile(path.join(__dirname, 'guest-support.html'));
 });
 
 // Root serves landing page too (for mktel.co)
