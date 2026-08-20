@@ -55,6 +55,14 @@ export function getHotelId() {
     return queryHotelId.trim();
   }
 
+  // Central Guestel/App Clip invocation route. If iOS does not open the clip
+  // (Android, desktop, or an unapproved experience), the same URL still lands
+  // on the correct hotel's normal web booking engine.
+  const clipMatch = pathname.match(/^\/clip\/([^/]+)/i);
+  if (clipMatch?.[1]) {
+    return decodeURIComponent(clipMatch[1]);
+  }
+
   // First, check path-based routing (e.g., /suite-stay/...)
   for (const [path, hotelId] of Object.entries(pathMap)) {
     if (pathname.startsWith(path)) {

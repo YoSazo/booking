@@ -1,6 +1,7 @@
 # Guestel — the guest super app
 
-Working spec. Captured from strategy discussion. Not built yet.
+Working product spec. Guestel is now built as a native SwiftUI app with an App
+Clip; the remaining work is distribution setup and real-device release QA.
 
 Guestel is the **guest-facing** companion to Marketel (which is the owner/Front Desk side).
 Where Front Desk is an operations cockpit, Guestel is a **beautiful travel wallet**: the

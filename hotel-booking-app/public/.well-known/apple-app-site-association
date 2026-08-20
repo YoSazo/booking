@@ -1,5 +1,11 @@
 {
   "appclips": {
     "apps": ["YAS2Z7ZY3M.com.bookmarketel.guestel.Clip"]
+  },
+  "applinks": {
+    "details": [{
+      "appIDs": ["YAS2Z7ZY3M.com.bookmarketel.guestel"],
+      "components": [{ "/": "/clip/*", "comment": "Open a hotel directly in Guestel" }]
+    }]
   }
 }

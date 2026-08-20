@@ -856,6 +856,7 @@ const handleConfirmBooking = async (bookingDetails) => {
       )}
       <PageTransition>
         <Routes>
+          <Route path="/clip/:clipHotelId" element={<Navigate to={`/?hotelId=${encodeURIComponent(hotelId)}`} replace />} />
           <Route path="/" element={
               <BookingPage
                 hotel={currentHotel}

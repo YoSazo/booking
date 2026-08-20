@@ -5,7 +5,7 @@ import { isStandalone } from './pwaUtils.js';
 import { BRAND, isIos, HotelIcon } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import BookingInstallCoach from './BookingInstallCoach.jsx';
-import { APP_CLIP_INSTALL_ENABLED, guestelAppClipUrl } from './appClipInstall.js';
+import { APP_CLIP_INSTALL_ENABLED, guestelInvocationUrl } from './appClipInstall.js';
 
 function GuestInstallCard({
   hotelName,
@@ -28,6 +28,7 @@ function GuestInstallCard({
   const ios = isIos();
   const isHero = variant === 'hero';
   const isConfirmation = variant === 'confirmation';
+  const nativeGuestel = ios && APP_CLIP_INSTALL_ENABLED;
   const effectiveCode = reservationCode || undefined;
 
   const markInstalled = useCallback(() => {
@@ -91,7 +92,7 @@ function GuestInstallCard({
       // Native App Clip card in iOS Safari (once the ASC default experience is
       // live). Falls back to the PWA "Add to Home Screen" coach until enabled.
       if (APP_CLIP_INSTALL_ENABLED) {
-        window.location.href = guestelAppClipUrl({ hotelId });
+        window.location.href = guestelInvocationUrl({ hotelId });
         return;
       }
       setShowInstallCoach(true);
@@ -112,8 +113,13 @@ function GuestInstallCard({
     try { localStorage.setItem(storageKey, '1'); } catch (e) { /* ignore */ }
   };
 
-  const title = headline || `Save ${hotelName || 'this property'} to your Home Screen`;
-  const subtitle = subline || 'Return here to book direct, get stay updates, and message the front desk. No App Store.';
+  const title = headline || (nativeGuestel
+    ? `Keep ${hotelName || 'this property'} in Guestel`
+    : `Save ${hotelName || 'this property'} to your Home Screen`);
+  const subtitle = subline || (nativeGuestel
+    ? 'Book direct, keep your stay, and message the front desk from one guest app.'
+    : 'Return here to book direct, get stay updates, and message the front desk. No App Store.');
+  const primaryLabel = nativeGuestel ? 'Add to Guestel' : 'Add to Home Screen';
 
   const installCoach = showInstallCoach && (
     <BookingInstallCoach
@@ -134,7 +140,7 @@ function GuestInstallCard({
             <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={56} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.75, marginBottom: 4 }}>
-                No App Store · about 3 seconds
+                {nativeGuestel ? 'One guest app · every direct stay' : 'No App Store · about 3 seconds'}
               </div>
               <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.3, marginBottom: 6 }}>{title}</div>
               <div style={{ fontSize: 13, opacity: 0.88, lineHeight: 1.5 }}>{subtitle}</div>
@@ -150,7 +156,7 @@ function GuestInstallCard({
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            <Smartphone size={18} /> Add to Home Screen
+            <Smartphone size={18} /> {primaryLabel}
           </button>
           {!ios && !deferredPrompt && (
             <button
@@ -187,7 +193,7 @@ function GuestInstallCard({
             onClick={handlePrimary}
             className="guest-install-confirmation-card__button"
           >
-            <Smartphone size={17} /> Add to Home Screen
+            <Smartphone size={17} /> {primaryLabel}
           </button>
           <button
             type="button"

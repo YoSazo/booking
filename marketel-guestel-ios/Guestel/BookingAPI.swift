@@ -31,6 +31,7 @@ enum BookingAPI {
 
     struct HotelPublic: Decodable {
         let id: String
+        let domain: String?
         let name: String
         let subscribed: Bool?
         let rates: Rates?
@@ -38,6 +39,28 @@ enum BookingAPI {
     }
 
     struct Hold { let clientSecret: String; let paymentIntentId: String }
+
+    struct AvailableRoom: Hashable {
+        let name: String
+        let roomId: String
+        let roomTypeID: String
+        let rateID: String
+        let roomsAvailable: Int
+    }
+
+    struct BookingResult: Hashable {
+        let reservationCode: String
+        let pending: Bool
+        let reviewWindowMinutes: Int
+        let noResponseAction: String
+        let message: String
+        let reservationToken: String
+    }
+
+    struct PaymentCustomer {
+        let ephemeralKey: String
+        let customerId: String
+    }
 
     struct SetupInfo {
         let clientSecret: String
@@ -52,6 +75,44 @@ enum BookingAPI {
         let last4: String
         let expMonth: Int?
         let expYear: Int?
+    }
+
+    struct WalletGuest: Decodable {
+        let name: String
+        let email: String
+        let phone: String
+    }
+
+    struct WalletHotel: Decodable {
+        let hotelId: String
+        let domain: String
+        let name: String
+        let location: String
+        let imageURL: String?
+    }
+
+    struct WalletReservation: Decodable {
+        let code: String
+        let hotelId: String
+        let checkin: String
+        let checkout: String
+        let status: String?
+        let roomName: String?
+        let reservationToken: String?
+    }
+
+    struct WalletResponse: Decodable {
+        let guest: WalletGuest
+        let hotels: [WalletHotel]
+        let reservations: [WalletReservation]
+    }
+
+    struct GuestMessage: Identifiable, Decodable, Hashable {
+        let id: String
+        let body: String
+        let sender: String
+        let createdAt: String
+        let requests: [String]
     }
 
     enum Failure: LocalizedError {
@@ -80,11 +141,28 @@ enum BookingAPI {
         throw Failure.message((obj?["message"] as? String) ?? "Unknown hotel for \(domain).")
     }
 
-    /// Returns the names of rooms available for the range.
-    static func availability(hotelId: String, checkin: String, checkout: String) async throws -> [String] {
+    /// Returns the server-owned room/rate identifiers for rooms that can still
+    /// be booked across the entire stay. An empty response means sold out.
+    static func availability(hotelId: String, checkin: String, checkout: String) async throws -> [AvailableRoom] {
         let json = try await post("api/availability", ["hotelId": hotelId, "checkin": checkin, "checkout": checkout])
         let rooms = (json["data"] as? [[String: Any]]) ?? []
-        return rooms.compactMap { $0["name"] as? String ?? $0["roomName"] as? String }
+        return rooms.compactMap { room in
+            guard
+                let name = (room["roomName"] as? String) ?? (room["name"] as? String),
+                !name.isEmpty,
+                let roomTypeID = room["roomTypeID"] as? String,
+                !roomTypeID.isEmpty,
+                let rateID = room["rateID"] as? String,
+                !rateID.isEmpty
+            else { return nil }
+            return AvailableRoom(
+                name: name,
+                roomId: (room["roomId"] as? String) ?? "",
+                roomTypeID: roomTypeID,
+                rateID: rateID,
+                roomsAvailable: (room["roomsAvailable"] as? Int) ?? 1
+            )
+        }
     }
 
     static func createHold(hotelId: String, bookingDetails: [String: Any], guestInfo: [String: Any]) async throws -> Hold {
@@ -98,11 +176,20 @@ enum BookingAPI {
         return Hold(clientSecret: secret, paymentIntentId: intentId)
     }
 
-    static func book(hotelId: String, bookingDetails: [String: Any], guestInfo: [String: Any], paymentIntentId: String) async throws -> String {
-        let json = try await post("api/book", [
+    static func completePayLater(hotelId: String, bookingDetails: [String: Any], guestInfo: [String: Any], paymentIntentId: String) async throws -> BookingResult {
+        let json = try await post("api/complete-pay-later-booking", [
             "hotelId": hotelId, "bookingDetails": bookingDetails, "guestInfo": guestInfo, "paymentIntentId": paymentIntentId,
         ])
-        if let code = json["reservationCode"] as? String, !code.isEmpty { return code }
+        if let code = json["reservationCode"] as? String, !code.isEmpty {
+            return BookingResult(
+                reservationCode: code,
+                pending: (json["pending"] as? Bool) ?? false,
+                reviewWindowMinutes: (json["reviewWindowMinutes"] as? Int) ?? 0,
+                noResponseAction: (json["noResponseAction"] as? String) ?? "",
+                message: (json["message"] as? String) ?? "Reservation received.",
+                reservationToken: (json["reservationToken"] as? String) ?? ""
+            )
+        }
         throw Failure.message((json["message"] as? String) ?? "Could not confirm the booking.")
     }
 
@@ -146,11 +233,98 @@ enum BookingAPI {
         return try JSONDecoder().decode([SavedCard].self, from: jsonData)
     }
 
+    static func paymentCustomer(apiVersion: String, customerToken: String) async throws -> PaymentCustomer {
+        let json = try await post(
+            "api/guest/payment-session",
+            ["apiVersion": apiVersion],
+            bearerToken: customerToken
+        )
+        guard
+            let ephemeralKey = json["ephemeralKeySecret"] as? String,
+            let customerId = json["customerId"] as? String
+        else { throw Failure.message((json["message"] as? String) ?? "Could not load saved cards.") }
+        return PaymentCustomer(ephemeralKey: ephemeralKey, customerId: customerId)
+    }
+
     static func detachPaymentMethod(_ id: String, customerToken: String) async throws {
         _ = try await post(
             "api/guest/detach-payment-method",
             ["paymentMethodId": id],
             bearerToken: customerToken
+        )
+    }
+
+    // MARK: - Verified guest wallet
+
+    static func requestGuestCode(email: String) async throws {
+        _ = try await post("api/guest/auth/code/request", ["email": email])
+    }
+
+    static func verifyGuestCode(email: String, code: String) async throws -> String {
+        let json = try await post("api/guest/auth/code/verify", ["email": email, "code": code])
+        guard let token = json["sessionToken"] as? String, !token.isEmpty else {
+            throw Failure.message((json["message"] as? String) ?? "Could not verify that code.")
+        }
+        return token
+    }
+
+    static func wallet(identityToken: String) async throws -> WalletResponse {
+        var request = URLRequest(url: base.appendingPathComponent("api/guest/wallet"))
+        request.setValue("Bearer \(identityToken)", forHTTPHeaderField: "Authorization")
+        let data = try await self.request(request)
+        return try JSONDecoder().decode(WalletResponse.self, from: data)
+    }
+
+    static func refreshStays(reservationTokens: [String]) async throws -> [WalletReservation] {
+        let json = try await post("api/guest/native/stays", ["reservationTokens": reservationTokens])
+        let raw = json["reservations"] as? [[String: Any]] ?? []
+        return try JSONDecoder().decode([WalletReservation].self, from: JSONSerialization.data(withJSONObject: raw))
+    }
+
+    static func messages(hotelId: String, code: String, accessToken: String) async throws -> [GuestMessage] {
+        var components = URLComponents(url: base.appendingPathComponent("api/guest/native/messages"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "hotelId", value: hotelId),
+            URLQueryItem(name: "code", value: code),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        let data = try await self.request(request)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let raw = object?["messages"] as? [[String: Any]] ?? []
+        return try JSONDecoder().decode([GuestMessage].self, from: JSONSerialization.data(withJSONObject: raw))
+    }
+
+    static func sendMessage(hotelId: String, code: String, body: String, accessToken: String) async throws -> GuestMessage {
+        let json = try await post(
+            "api/guest/native/messages",
+            ["hotelId": hotelId, "reservationCode": code, "body": body],
+            bearerToken: accessToken
+        )
+        guard let raw = json["message"] as? [String: Any] else {
+            throw Failure.message((json["message"] as? String) ?? "Could not send message.")
+        }
+        return try JSONDecoder().decode(GuestMessage.self, from: JSONSerialization.data(withJSONObject: raw))
+    }
+
+    static func registerPush(deviceToken: String, environment: String, reservationTokens: [String], identityToken: String?, preferences: [String: Bool]) async throws {
+        _ = try await post(
+            "api/guest/native/push/register",
+            [
+                "deviceToken": deviceToken,
+                "environment": environment,
+                "reservationTokens": reservationTokens,
+                "preferences": preferences,
+            ],
+            bearerToken: identityToken
+        )
+    }
+
+    static func unregisterPush(deviceToken: String, reservationTokens: [String], identityToken: String?) async throws {
+        _ = try await post(
+            "api/guest/native/push/unregister",
+            ["deviceToken": deviceToken, "reservationTokens": reservationTokens],
+            bearerToken: identityToken
         )
     }
 

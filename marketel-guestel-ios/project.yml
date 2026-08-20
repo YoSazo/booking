@@ -45,6 +45,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        CODE_SIGN_ENTITLEMENTS: Guestel/Guestel.entitlements
         # Manual distribution signing — every build is a CI Release archive.
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Apple Distribution"
@@ -58,7 +59,9 @@ targets:
       - path: GuestelClip
       - path: Guestel/Theme.swift
       - path: Guestel/BookingAPI.swift
+      - path: Guestel/GuestelHandoff.swift
       - path: Guestel/Assets.xcassets
+      - path: Guestel/PrivacyInfo.xcprivacy
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bookmarketel.guestel.Clip

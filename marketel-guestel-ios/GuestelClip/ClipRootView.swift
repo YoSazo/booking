@@ -91,7 +91,11 @@ struct ClipRootView: View {
             bookingDomain = domain
             id = try? await BookingAPI.hotelId(forDomain: domain)
         }
-        if let id, let h = try? await BookingAPI.hotel(id) { hotel = h }
+        if let id, let h = try? await BookingAPI.hotel(id) {
+            hotel = h
+            if bookingDomain == nil, let domain = h.domain, !domain.isEmpty { bookingDomain = domain }
+            GuestelHandoff.save(hotelId: h.id, domain: bookingDomain ?? h.domain ?? "")
+        }
     }
 
     // The system "Get the full app" overlay, from inside the clip.

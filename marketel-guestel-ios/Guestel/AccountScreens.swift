@@ -2,6 +2,109 @@ import SwiftUI
 import UserNotifications
 import StripePaymentSheet
 
+// MARK: - Restore stays
+
+struct RestoreStaysView: View {
+    @Environment(GuestStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+
+    private enum Step { case email, code }
+    @State private var step: Step = .email
+    @State private var email = ""
+    @State private var code = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Image(systemName: step == .email ? "envelope.badge.shield.half.filled" : "number.square.fill")
+                    .font(.system(size: 42, weight: .light))
+                    .foregroundStyle(Theme.green)
+                Text(step == .email ? "Bring back your stays" : "Check your email")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                Text(step == .email
+                     ? "Use the email from a previous booking. We’ll restore every matching hotel and stay."
+                     : "Enter the six-digit code sent to \(email).")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.inkSoft)
+
+                if step == .email {
+                    TextField("Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(16)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                } else {
+                    TextField("000000", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .multilineTextAlignment(.center)
+                        .tracking(8)
+                        .padding(16)
+                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .onChange(of: code) { _, value in
+                            code = String(value.filter(\.isNumber).prefix(6))
+                        }
+                }
+
+                if let error {
+                    Text(error).font(.system(size: 13)).foregroundStyle(.red)
+                }
+
+                Button(action: submit) {
+                    Group {
+                        if busy { ProgressView().tint(.white) }
+                        else { Text(step == .email ? "Email me a code" : "Restore my stays") }
+                    }
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .disabled(busy || (step == .email ? !email.contains("@") : code.count != 6))
+                .opacity((step == .email ? email.contains("@") : code.count == 6) ? 1 : 0.5)
+
+                if step == .code {
+                    Button("Use a different email") { step = .email; code = ""; error = nil }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.green)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(20)
+        }
+        .background(Theme.canvas)
+        .navigationTitle("Restore stays")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { if !store.guest.email.isEmpty { email = store.guest.email } }
+    }
+
+    private func submit() {
+        busy = true
+        error = nil
+        Task {
+            do {
+                if step == .email {
+                    try await BookingAPI.requestGuestCode(email: email)
+                    await MainActor.run { step = .code; busy = false }
+                } else {
+                    let token = try await BookingAPI.verifyGuestCode(email: email, code: code)
+                    try await store.restoreWallet(identityToken: token)
+                    await MainActor.run { busy = false; dismiss() }
+                }
+            } catch {
+                await MainActor.run { self.error = error.localizedDescription; busy = false }
+            }
+        }
+    }
+}
+
 // MARK: - Personal info
 
 struct PersonalInfoView: View {
@@ -54,6 +157,7 @@ struct PersonalInfoView: View {
 // MARK: - Notifications
 
 struct NotificationsView: View {
+    @Environment(GuestStore.self) private var store
     @AppStorage("guestel.notif.stayUpdates") private var stayUpdates = true
     @AppStorage("guestel.notif.messages") private var messages = true
     @AppStorage("guestel.notif.deals") private var deals = false
@@ -85,16 +189,20 @@ struct NotificationsView: View {
         .background(Theme.canvas)
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.large)
-        .onChange(of: stayUpdates) { _, on in if on { requestPush() } }
-        .onChange(of: messages) { _, on in if on { requestPush() } }
-        .onChange(of: deals) { _, on in if on { requestPush() } }
+        .onChange(of: stayUpdates) { _, on in updatePush(requestPermission: on) }
+        .onChange(of: messages) { _, on in updatePush(requestPermission: on) }
+        .onChange(of: deals) { _, on in updatePush(requestPermission: on) }
         .task { refreshStatus() }
     }
 
     private func requestPush() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in
-            refreshStatus()
-        }
+        GuestPushManager.requestAuthorization()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { refreshStatus() }
+    }
+
+    private func updatePush(requestPermission: Bool) {
+        if requestPermission { requestPush() }
+        Task { await GuestPushManager.sync(store: store) }
     }
 
     private func refreshStatus() {
@@ -151,6 +259,61 @@ struct HelpView: View {
                 url: URL(string: "https://guest-lodge-backend.onrender.com/guest-support")!,
                 title: "Guestel Support"
             )
+        }
+    }
+}
+
+// MARK: - Privacy and local identity
+
+struct GuestPrivacyView: View {
+    @Environment(GuestStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmClear = false
+    @State private var clearing = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Guestel stores your hotel cards, verified stays, and optional saved-card access on this device. Properties keep their reservation records as required to operate your stay.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.inkSoft)
+                    .padding(16)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                Link("Privacy policy", destination: URL(string: "https://bookmarketel.com/privacy")!)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.green)
+
+                Button(role: .destructive) { confirmClear = true } label: {
+                    HStack {
+                        if clearing { ProgressView() }
+                        else { Image(systemName: "trash"); Text("Clear Guestel from this device") }
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .disabled(clearing)
+            }
+            .padding(20)
+        }
+        .background(Theme.canvas)
+        .navigationTitle("Privacy")
+        .navigationBarTitleDisplayMode(.large)
+        .confirmationDialog("Clear this device?", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("Clear hotel cards and sign out", role: .destructive) { clear() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes local hotel cards, stay access, saved-card access, and Guestel notifications. It does not cancel a reservation.")
+        }
+    }
+
+    private func clear() {
+        clearing = true
+        Task {
+            await GuestPushManager.unregister(store: store)
+            await MainActor.run { store.clearDeviceData(); clearing = false; dismiss() }
         }
     }
 }

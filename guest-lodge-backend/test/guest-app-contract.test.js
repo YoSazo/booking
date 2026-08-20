@@ -98,11 +98,14 @@ test('Guestel hotel actions use live data instead of placeholder dead ends', () 
     const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
     const addHotel = fs.readFileSync(path.join(guestelRoot, 'AddHotelView.swift'), 'utf8');
     const hotelSheet = fs.readFileSync(path.join(guestelRoot, 'HotelSheet.swift'), 'utf8');
+    const nativeMessages = fs.readFileSync(path.join(guestelRoot, 'NativeMessagesView.swift'), 'utf8');
     const hotels = fs.readFileSync(path.join(guestelRoot, 'HotelsView.swift'), 'utf8');
 
     assert.match(addHotel, /BookingAPI\.hotelId\(forDomain: domain\)/);
     assert.doesNotMatch(addHotel, /hotelId: "new-hotel"/);
-    assert.match(hotelSheet, /URLQueryItem\(name: "stay", value: code\)/);
+    assert.match(hotelSheet, /NativeMessagesView\(hotel: hotel, stay: stay\)/);
+    assert.match(nativeMessages, /BookingAPI\.messages\(hotelId: hotel\.hotelId/);
+    assert.doesNotMatch(hotelSheet, /SimpleWebSheet/);
     assert.match(hotels, /AsyncImage\(url: imageURL\)/);
     assert.doesNotMatch(hotels, /Paid · Confirmed/);
 });

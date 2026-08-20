@@ -254,6 +254,43 @@ model NativeLoginChallenge {
   @@index([expiresAt])
 }
 
+// Guestel email verification is separate from Front Desk owner login so a
+// guest who also owns a property can request both codes without overwriting one.
+model GuestLoginChallenge {
+  email     String   @id
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
+// Native Guestel APNs subscriptions are scoped to a verified reservation.
+// A device can follow several stays and a stay can be present on several
+// devices after email-code recovery.
+model GuestNativePushDevice {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastSeenAt      DateTime @default(now())
+  deviceToken     String
+  environment     String   @default("production")
+  hotelId         String
+  bookingId       String
+  reservationCode String
+  stayUpdates     Boolean  @default(true)
+  messages        Boolean  @default(true)
+  deals           Boolean  @default(false)
+  active          Boolean  @default(true)
+
+  @@unique([deviceToken, bookingId])
+  @@index([bookingId, active])
+  @@index([hotelId, reservationCode, active])
+  @@index([deviceToken, active])
+}
+
 model ManualRoom {
   id         String   @id @default(cuid())
   hotelId    String

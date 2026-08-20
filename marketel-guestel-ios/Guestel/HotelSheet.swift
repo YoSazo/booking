@@ -8,7 +8,7 @@ struct HotelSheet: View {
     let hotel: Hotel
     let maxDetent: PresentationDetent
     @Binding var detent: PresentationDetent
-    var onBooked: (_ code: String, _ checkin: String, _ checkout: String) -> Void
+    var onBooked: (_ result: BookingAPI.BookingResult, _ checkin: String, _ checkout: String) -> Void
 
     @Environment(GuestStore.self) private var store
 
@@ -25,7 +25,7 @@ struct HotelSheet: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var paymentSheet: PaymentSheet?
-    @State private var showMessaging = false
+    @State private var messageStay: Reservation?
 
     private var nights: Int { max(0, Calendar.current.dateComponents([.day], from: checkin, to: checkout).day ?? 0) }
     private var anim: Animation { .interactiveSpring(response: 0.5, dampingFraction: 0.82) }
@@ -48,8 +48,8 @@ struct HotelSheet: View {
                 rates = data.rates
             }
         }
-        .sheet(isPresented: $showMessaging) {
-            SimpleWebSheet(url: messageURL, title: "Message \(hotel.name)")
+        .sheet(item: $messageStay) { stay in
+            NativeMessagesView(hotel: hotel, stay: stay)
         }
     }
 
@@ -59,7 +59,9 @@ struct HotelSheet: View {
         VStack(spacing: 12) {
             Button { goBooking(room: nil) } label: { primaryLabel("Book again") }
             HStack(spacing: 12) {
-                Button { showMessaging = true } label: { secondaryLabel("Message", "bubble.left") }
+                Button { messageStay = store.reservation(for: hotel.hotelId) } label: { secondaryLabel("Message", "bubble.left") }
+                    .disabled(store.reservation(for: hotel.hotelId) == nil)
+                    .opacity(store.reservation(for: hotel.hotelId) == nil ? 0.45 : 1)
                 ShareLink(item: hotel.bookingURL,
                           subject: Text(hotel.name),
                           message: Text("Book \(hotel.name) direct")) {
@@ -132,14 +134,6 @@ struct HotelSheet: View {
     }
 
     private var checkoutFloor: Date { Calendar.current.date(byAdding: .day, value: 1, to: checkin)! }
-
-    private var messageURL: URL {
-        var components = URLComponents(string: "https://\(hotel.domain)/guest/messages")!
-        if let code = store.reservation(for: hotel.hotelId)?.code {
-            components.queryItems = [URLQueryItem(name: "stay", value: code)]
-        }
-        return components.url!
-    }
 
     // MARK: Review + pay
 
@@ -225,7 +219,7 @@ struct HotelSheet: View {
         let ci = BookingAPI.apiDate.string(from: checkin)
         let co = BookingAPI.apiDate.string(from: checkout)
         let code = BookingAPI.reservationCode()
-        let details: [String: Any] = [
+        let baseDetails: [String: Any] = [
             "roomName": room.name, "roomId": room.roomId ?? "",
             "checkin": ci, "checkout": co, "nights": nights,
             "reservationCode": code, "adults": 1, "rooms": 1,
@@ -239,21 +233,34 @@ struct HotelSheet: View {
             }
             do {
                 let available = try await BookingAPI.availability(hotelId: hotel.hotelId, checkin: ci, checkout: co)
-                if !available.isEmpty, !available.contains(room.name) {
+                guard let match = available.first(where: { $0.name.caseInsensitiveCompare(room.name) == .orderedSame }) else {
                     await MainActor.run { errorMessage = "\(room.name) isn't available for those dates."; isSubmitting = false }
                     return
                 }
+                var details = baseDetails
+                details["roomId"] = match.roomId.isEmpty ? (room.roomId ?? "") : match.roomId
+                details["roomTypeID"] = match.roomTypeID
+                details["rateID"] = match.rateID
                 let hold = try await BookingAPI.createHold(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary)
-                await MainActor.run { present(hold: hold, details: details, code: code, ci: ci, co: co) }
+                let customer = await paymentCustomerIfAvailable()
+                await MainActor.run { present(hold: hold, details: details, code: code, ci: ci, co: co, customer: customer) }
             } catch {
                 await MainActor.run { errorMessage = error.localizedDescription; isSubmitting = false }
             }
         }
     }
 
-    private func present(hold: BookingAPI.Hold, details: [String: Any], code: String, ci: String, co: String) {
+    private func paymentCustomerIfAvailable() async -> BookingAPI.PaymentCustomer? {
+        guard let token = GuestPaymentAccess.token else { return nil }
+        return try? await BookingAPI.paymentCustomer(apiVersion: STPAPIClient.apiVersion, customerToken: token)
+    }
+
+    private func present(hold: BookingAPI.Hold, details: [String: Any], code: String, ci: String, co: String, customer: BookingAPI.PaymentCustomer?) {
         var config = PaymentSheet.Configuration()
         config.merchantDisplayName = hotel.name
+        if let customer {
+            config.customer = .init(id: customer.customerId, ephemeralKeySecret: customer.ephemeralKey)
+        }
         let sheet = PaymentSheet(paymentIntentClientSecret: hold.clientSecret, configuration: config)
         paymentSheet = sheet
         guard let vc = UIApplication.shared.topViewController() else { isSubmitting = false; return }
@@ -262,8 +269,8 @@ struct HotelSheet: View {
             case .completed:
                 Task {
                     do {
-                        let confirmed = try await BookingAPI.book(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary, paymentIntentId: hold.paymentIntentId)
-                        await MainActor.run { isSubmitting = false; onBooked(confirmed, ci, co) }
+                        let result = try await BookingAPI.completePayLater(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary, paymentIntentId: hold.paymentIntentId)
+                        await MainActor.run { isSubmitting = false; onBooked(result, ci, co) }
                     } catch {
                         await MainActor.run { errorMessage = "Card held, but confirming failed: \(error.localizedDescription)"; isSubmitting = false }
                     }

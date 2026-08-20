@@ -29,6 +29,10 @@ struct AccountView: View {
                     .padding(.top, 8)
 
                     VStack(spacing: 14) {
+                        NavigationLink { RestoreStaysView() } label: {
+                            AccountRow(icon: "arrow.clockwise.icloud.fill", title: "Restore stays",
+                                       subtitle: "Bring bookings onto this phone")
+                        }
                         NavigationLink { PaymentMethodsView() } label: {
                             AccountRow(icon: "creditcard.fill", title: "Payment methods",
                                        subtitle: "Save a card for one-tap booking")
@@ -44,6 +48,10 @@ struct AccountView: View {
                         NavigationLink { HelpView() } label: {
                             AccountRow(icon: "questionmark.circle.fill", title: "Help",
                                        subtitle: "FAQs and contact")
+                        }
+                        NavigationLink { GuestPrivacyView() } label: {
+                            AccountRow(icon: "hand.raised.fill", title: "Privacy & this device",
+                                       subtitle: "Notifications and saved data")
                         }
                     }
                     .buttonStyle(.plain)

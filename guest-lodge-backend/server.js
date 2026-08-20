@@ -40,12 +40,26 @@ const {
     readGuestPaymentToken,
 } = require('./guest-payment-access');
 const {
+    createGuestIdentityToken,
+    createReservationToken,
+    readGuestIdentityToken,
+    readReservationToken,
+} = require('./guest-access');
+const {
     buildStartPayload,
     buildUpdatePayload,
     buildEndPayload,
     liveActivityActionForBooking,
     liveActivityApnsHeaders,
 } = require('./live-activities');
+
+function safeReservationToken(booking) {
+    try { return createReservationToken(booking); }
+    catch (error) {
+        console.error('Guest reservation token unavailable:', error.message);
+        return '';
+    }
+}
 
 let frontDeskAssistant = null;
 
@@ -454,6 +468,7 @@ const APNS_TEAM_ID = String(process.env.APNS_TEAM_ID || '').trim();
 const APNS_KEY_ID = String(process.env.APNS_KEY_ID || '').trim();
 const APNS_PRIVATE_KEY = String(process.env.APNS_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
 const APNS_BUNDLE_ID = String(process.env.APNS_BUNDLE_ID || 'com.bookmarketel.frontdesk').trim();
+const GUESTEL_APNS_BUNDLE_ID = String(process.env.GUESTEL_APNS_BUNDLE_ID || 'com.bookmarketel.guestel').trim();
 let APNS_PRIVATE_KEY_OBJECT = null;
 if (APNS_PRIVATE_KEY) {
     try {
@@ -660,7 +675,13 @@ app.use(cors(corsOptions));
 // dotfile dirs (.well-known) by default. Required for the Guestel App Clip to be
 // invocable from bookmarketel.com (appclips) and for Universal Links.
 const APPLE_APP_SITE_ASSOCIATION = {
-    appclips: { apps: ['YAS2Z7ZY3M.com.bookmarketel.guestel.Clip'] }
+    appclips: { apps: ['YAS2Z7ZY3M.com.bookmarketel.guestel.Clip'] },
+    applinks: {
+        details: [{
+            appIDs: ['YAS2Z7ZY3M.com.bookmarketel.guestel'],
+            components: [{ '/': '/clip/*', comment: 'Open a hotel directly in Guestel' }],
+        }],
+    },
 };
 function serveAppSiteAssociation(_req, res) {
     res.setHeader('Content-Type', 'application/json');
@@ -1255,6 +1276,10 @@ async function getServerBookingQuote(hotelId, bookingDetails = {}) {
             ...bookingDetails,
             name: room.name,
             roomName: room.name,
+            // Manual properties do not have external PMS rate identifiers, but
+            // an authorized booking still needs a stable server-owned snapshot.
+            roomTypeID: bookingDetails.roomTypeID || `manual-${room.id || slugifyText(room.name)}`,
+            rateID: bookingDetails.rateID || `manual-${room.id || slugifyText(room.name)}`,
             nights: quote.nights,
             subtotal: quote.subtotal,
             taxes: quote.taxes,
@@ -2348,6 +2373,7 @@ const createPaymentIntentRateLimit = createRouteRateLimiter('create-payment-inte
 const createPreauthHoldRateLimit = createRouteRateLimiter('create-preauth-hold', { windowMs: 60 * 1000, max: 12 });
 const guestPaymentSetupRateLimit = createRouteRateLimiter('guest-payment-setup', { windowMs: 5 * 60 * 1000, max: 8 });
 const guestPaymentReadRateLimit = createRouteRateLimiter('guest-payment-read', { windowMs: 60 * 1000, max: 20 });
+const guestPaymentSessionRateLimit = createRouteRateLimiter('guest-payment-session', { windowMs: 60 * 1000, max: 12 });
 const guestPaymentDetachRateLimit = createRouteRateLimiter('guest-payment-detach', { windowMs: 5 * 60 * 1000, max: 10 });
 const completePayLaterRateLimit = createRouteRateLimiter('complete-pay-later-booking', { windowMs: 60 * 1000, max: 12 });
 const publicBookingRateLimit = createRouteRateLimiter('book', { windowMs: 60 * 1000, max: 12 });
@@ -2373,6 +2399,10 @@ const journeyEventRateLimit = createRouteRateLimiter('marketel-journey', { windo
 const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
+const guestCodeRequestRateLimit = createRouteRateLimiter('guest-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
+const guestCodeVerifyRateLimit = createRouteRateLimiter('guest-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
+const guestWalletRateLimit = createRouteRateLimiter('guest-wallet', { windowMs: 60 * 1000, max: 30 });
+const guestNativePushRateLimit = createRouteRateLimiter('guest-native-push', { windowMs: 5 * 60 * 1000, max: 30 });
 const forgotPinRateLimit = createRouteRateLimiter('forgot-pin', {
     windowMs: 15 * 60 * 1000,
     max: 3,
@@ -2952,6 +2982,34 @@ app.post('/api/guest/setup-intent', guestPaymentSetupRateLimit, async (req, res)
     }
 });
 
+// Returns a short-lived Stripe customer session for PaymentSheet. Possession of
+// the signed customer capability is required; an email address is never enough
+// to expose somebody else's saved cards.
+app.post('/api/guest/payment-session', guestPaymentSessionRateLimit, async (req, res) => {
+    try {
+        const customerId = guestPaymentCustomerId(req);
+        if (!customerId) {
+            return res.status(401).json({ message: 'Saved-card access is required.' });
+        }
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!customer || customer.deleted) {
+            return res.status(401).json({ message: 'Your saved-card session has expired.' });
+        }
+        const requestedApiVersion = String(req.body?.apiVersion || '').trim();
+        const stripeApiVersion = /^\d{4}-\d{2}-\d{2}$/.test(requestedApiVersion)
+            ? requestedApiVersion
+            : '2020-08-27';
+        const ephemeralKey = await stripe.ephemeralKeys.create(
+            { customer: customerId },
+            { apiVersion: stripeApiVersion }
+        );
+        res.json({ customerId, ephemeralKeySecret: ephemeralKey.secret });
+    } catch (error) {
+        console.error('Stripe payment-session error:', error.message);
+        res.status(400).json({ message: error.message || 'Could not load saved cards.' });
+    }
+});
+
 // Lists a guest's saved cards for the Payment methods screen.
 app.get('/api/guest/payment-methods', guestPaymentReadRateLimit, async (req, res) => {
     try {
@@ -3067,8 +3125,9 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
             }
 
             let syncPending = false;
+            let persistedBooking = null;
             try {
-                await persistExternalPayLaterBooking({
+                const persisted = await persistExternalPayLaterBooking({
                     paymentIntent,
                     provider: 'bookingcenter',
                     reservationId: pmsResponse.reservationID,
@@ -3076,6 +3135,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     bookingDetails,
                     guestInfo,
                 });
+                persistedBooking = persisted?.booking || null;
             } catch (dbError) {
                 console.error("Failed to save pay-later booking to database:", dbError);
                 syncPending = true;
@@ -3093,6 +3153,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     ? 'Reservation received. Front Desk is finishing its sync.'
                     : 'Reservation created successfully. $1.00 hold placed on card.',
                 reservationCode: pmsResponse.reservationID,
+                reservationToken: persistedBooking ? safeReservationToken(persistedBooking) : '',
             });
         }
 
@@ -3120,6 +3181,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         ? 'Your room request is being reviewed. The $1 authorization is only a temporary hold.'
                         : 'Reservation confirmed. $1.00 hold placed on card.',
                     reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
+                    reservationToken: safeReservationToken(outcome.booking),
                 });
             } catch (dbError) {
                 console.error("Failed to confirm manual pay-later booking:", dbError);
@@ -3205,8 +3267,9 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
             }
 
             let syncPending = false;
+            let persistedBooking = null;
             try {
-                await persistExternalPayLaterBooking({
+                const persisted = await persistExternalPayLaterBooking({
                     paymentIntent,
                     provider: 'cloudbeds',
                     reservationId: pmsResponse.data.reservationID,
@@ -3214,6 +3277,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     bookingDetails,
                     guestInfo,
                 });
+                persistedBooking = persisted?.booking || null;
             } catch (dbError) {
                 console.error('❌ Failed to save Cloudbeds booking to database:', dbError.message);
                 syncPending = true;
@@ -3231,6 +3295,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     ? 'Reservation received. Front Desk is finishing its sync.'
                     : 'Reservation created successfully. $1.00 hold placed on card.',
                 reservationCode: pmsResponse.data.reservationID,
+                reservationToken: persistedBooking ? safeReservationToken(persistedBooking) : '',
             });
         } else {
             // If booking fails, cancel the hold
@@ -7184,7 +7249,15 @@ app.post('/api/crm/guest-broadcast', crmAuth, async (req, res) => {
             icon: '/apple-touch-icon.png',
         }, { TTL: 60 * 60 }, 'guestBroadcast');
 
-        res.json({ success: true, sent: result.sent, failed: result.failed, cleaned: result.cleaned });
+        const nativeSent = await sendNativeBroadcastToHotelGuests(hotelId, {
+            title,
+            body,
+            url: `guestel://hotel?hotelId=${encodeURIComponent(hotelId)}`,
+            tag: `hotel-broadcast-${hotelId}`,
+            data: { type: 'guest_broadcast', hotelId },
+        }, { TTL: 60 * 60 }, 'guestBroadcast');
+
+        res.json({ success: true, sent: result.sent, nativeSent, failed: result.failed, cleaned: result.cleaned });
     } catch (e) {
         console.error('guest-broadcast error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to send broadcast' });
@@ -7300,7 +7373,7 @@ function sendApnsRequest(device, payloadObj, opts = {}) {
                 ':method': 'POST',
                 ':path': `/3/device/${device.deviceToken}`,
                 authorization: `bearer ${createApnsProviderToken()}`,
-                'apns-topic': APNS_BUNDLE_ID,
+                'apns-topic': String(opts.topic || APNS_BUNDLE_ID),
                 'apns-push-type': 'alert',
                 'apns-priority': '10',
                 'apns-expiration': String(Math.floor(Date.now() / 1000) + ttl),
@@ -7503,6 +7576,46 @@ async function sendNativePushToHotel(hotelId, payloadObj, opts = {}, label = 'na
     }
     const sent = results.filter(result => result.status === 'fulfilled').length;
     console.log(`📲 [apns] ${label} hotel=${hotelId}: ${sent}/${devices.length} sent`);
+    return sent;
+}
+
+async function sendNativePushToGuestBooking(bookingId, payloadObj, opts = {}, label = 'guestNativePush') {
+    if (!APNS_CONFIGURED || !bookingId || !prisma.guestNativePushDevice) return 0;
+    const preference = opts.preference === 'stayUpdates' ? 'stayUpdates' : 'messages';
+    const devices = await prisma.guestNativePushDevice.findMany({
+        where: { bookingId, active: true, [preference]: true },
+    });
+    if (!devices.length) return 0;
+    const results = await Promise.allSettled(devices.map(device =>
+        sendApnsRequest(device, payloadObj, { ...opts, topic: GUESTEL_APNS_BUNDLE_ID })
+    ));
+    const deadReasons = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
+    const deadIds = results
+        .map((result, index) => result.status === 'rejected' && deadReasons.has(result.reason?.reason) ? devices[index].id : null)
+        .filter(Boolean);
+    if (deadIds.length) {
+        await prisma.guestNativePushDevice.updateMany({
+            where: { id: { in: deadIds } },
+            data: { active: false },
+        }).catch(() => {});
+    }
+    const sent = results.filter(result => result.status === 'fulfilled').length;
+    console.log(`📲 [guest-apns] ${label} booking=${bookingId}: ${sent}/${devices.length} sent`);
+    return sent;
+}
+
+async function sendNativeBroadcastToHotelGuests(hotelId, payloadObj, opts = {}, label = 'guestNativeBroadcast') {
+    if (!APNS_CONFIGURED || !hotelId || !prisma.guestNativePushDevice) return 0;
+    const rows = await prisma.guestNativePushDevice.findMany({
+        where: { hotelId, active: true, deals: true },
+        distinct: ['deviceToken'],
+    });
+    if (!rows.length) return 0;
+    const results = await Promise.allSettled(rows.map(device =>
+        sendApnsRequest(device, payloadObj, { ...opts, topic: GUESTEL_APNS_BUNDLE_ID })
+    ));
+    const sent = results.filter(result => result.status === 'fulfilled').length;
+    console.log(`📲 [guest-apns] ${label} hotel=${hotelId}: ${sent}/${rows.length} sent`);
     return sent;
 }
 
@@ -8494,7 +8607,7 @@ async function notifyGuestBookingStateChanged(booking, status, reason = '') {
             ? `${room}${stay ? ` · ${stay}` : ''}: ${String(reason).trim().slice(0, 120)}`
             : `${room}${stay ? ` · ${stay}` : ''} was cancelled by the property. Tap for details or to contact Front Desk.`;
     }
-    return sendPushToGuests(booking.hotelId, {
+    const payload = {
         title,
         body,
         url: `/guest/home?stay=${encodeURIComponent(code)}`,
@@ -8508,7 +8621,26 @@ async function notifyGuestBookingStateChanged(booking, status, reason = '') {
             reservationCode: code,
             status: normalized,
         },
-    }, { TTL: 24 * 60 * 60, urgency: 'high' }, 'guestBookingStatus', guestBookingThreadCodes(booking, code));
+    };
+    const [web, native] = await Promise.all([
+        sendPushToGuests(
+            booking.hotelId,
+            payload,
+            { TTL: 24 * 60 * 60, urgency: 'high' },
+            'guestBookingStatus',
+            guestBookingThreadCodes(booking, code)
+        ),
+        sendNativePushToGuestBooking(
+            booking.id,
+            {
+                ...payload,
+                url: `guestel://messages?hotelId=${encodeURIComponent(booking.hotelId)}&code=${encodeURIComponent(code)}`,
+            },
+            { TTL: 24 * 60 * 60, preference: 'stayUpdates' },
+            'bookingStatus'
+        ),
+    ]);
+    return { ...web, native };
 }
 
 // Release an uncaptured authorization or refund a captured payment when the
@@ -10599,7 +10731,11 @@ app.get('/api/setup/:token', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({
             where: { setupToken: req.params.token },
-            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } }, rates: true },
+            include: {
+                rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
+                rates: true,
+                domains: { where: { isPrimary: true }, take: 1 },
+            },
         });
         if (!hotel) return res.status(404).json({ error: 'Invalid setup token' });
         res.json({
@@ -11959,7 +12095,11 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
     try {
         let hotel = await prisma.hotelConfig.findUnique({
             where: { id: req.params.hotelId },
-            include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } }, rates: true },
+            include: {
+                rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
+                rates: true,
+                domains: { where: { isPrimary: true }, take: 1 },
+            },
         });
 
         // Fallback: resolve by domain if direct ID lookup fails
@@ -11972,7 +12112,11 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             if (domainRecord) {
                 hotel = await prisma.hotelConfig.findUnique({
                     where: { id: domainRecord.hotelId },
-                    include: { rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } }, rates: true },
+                    include: {
+                        rooms: { include: { images: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } },
+                        rates: true,
+                        domains: { where: { isPrimary: true }, take: 1 },
+                    },
                 });
             }
         }
@@ -11986,6 +12130,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
         // Allow preview for unpaid hotels (setupComplete=false) — they just can't have a public domain yet
         res.json({
             id: hotel.id,
+            domain: hotel.domains?.[0]?.domain || '',
             name: hotel.name,
             phone: hotel.phone,
             address: hotel.address,
@@ -12333,6 +12478,351 @@ app.post('/api/auth/native-code/verify', nativeCodeVerifyRateLimit, async (req, 
     } catch (e) {
         console.error('native-code verify error:', e.message);
         res.status(500).json({ success: false, message: 'Could not verify the code. Try again.' });
+    }
+});
+
+// ── Guestel guest identity ─────────────────────────────────────
+// Email verification recovers a guest's wallet on a new phone. Individual
+// bookings also receive a narrower signed reservation capability at checkout,
+// so the device that booked can message immediately without another prompt.
+const GUEST_LOGIN_CODE_EXPIRY_MS = 10 * 60 * 1000;
+
+function hashGuestLoginCode(email, code) {
+    return crypto.createHmac('sha256', process.env.GUEST_IDENTITY_SECRET || NATIVE_SESSION_TOKEN_SECRET)
+        .update(`${String(email || '').trim().toLowerCase()}:${String(code || '').trim()}`)
+        .digest('hex');
+}
+
+async function guestBookingsForEmail(email) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return [];
+    return prisma.booking.findMany({
+        where: {
+            guestEmail: { equals: normalizedEmail, mode: 'insensitive' },
+            status: { notIn: ['deleted'] },
+        },
+        orderBy: { checkinDate: 'desc' },
+        take: 100,
+    });
+}
+
+app.post('/api/guest/auth/code/request', guestCodeRequestRateLimit, async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+        }
+        const booking = await prisma.booking.findFirst({
+            where: { guestEmail: { equals: email, mode: 'insensitive' } },
+            select: { id: true },
+        });
+        // Do not reveal whether this address has ever booked a stay.
+        if (!booking) return res.json({ success: true });
+        if (!emailTransporter) {
+            return res.status(503).json({ success: false, message: 'Email is temporarily unavailable. Try again shortly.' });
+        }
+        const code = String(crypto.randomInt(100000, 1000000));
+        await prisma.guestLoginChallenge.upsert({
+            where: { email },
+            create: {
+                email,
+                codeHash: hashGuestLoginCode(email, code),
+                expiresAt: new Date(Date.now() + GUEST_LOGIN_CODE_EXPIRY_MS),
+            },
+            update: {
+                codeHash: hashGuestLoginCode(email, code),
+                expiresAt: new Date(Date.now() + GUEST_LOGIN_CODE_EXPIRY_MS),
+                attempts: 0,
+            },
+        });
+        await prisma.guestLoginChallenge.deleteMany({
+            where: { expiresAt: { lt: new Date(Date.now() - GUEST_LOGIN_CODE_EXPIRY_MS) } },
+        }).catch(() => {});
+        await emailTransporter.sendMail({
+            from: '"Guestel" <support@bookmarketel.com>',
+            to: email,
+            subject: `${code} is your Guestel code`,
+            html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center;">
+                <h2 style="font-size:22px;color:#1a2b22;margin:0 0 12px;">Bring back your stays</h2>
+                <p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0 0 22px;">Enter this code in Guestel. It expires in 10 minutes.</p>
+                <div style="font-size:34px;letter-spacing:8px;font-weight:800;color:#2E7D5B;margin-left:8px;">${code}</div>
+                <p style="font-size:12px;color:#9ca3af;margin:24px 0 0;">If you did not request this, you can ignore this email.</p>
+            </div>`,
+            text: `${code} is your Guestel verification code. It expires in 10 minutes.`,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Guestel code request error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not send the code. Try again.' });
+    }
+});
+
+app.post('/api/guest/auth/code/verify', guestCodeVerifyRateLimit, async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
+        const challenge = await prisma.guestLoginChallenge.findUnique({ where: { email } });
+        if (!challenge || challenge.expiresAt.getTime() < Date.now() || challenge.attempts >= 5) {
+            if (email) await prisma.guestLoginChallenge.deleteMany({ where: { email } }).catch(() => {});
+            return res.status(401).json({ success: false, message: 'That code is invalid or expired. Request a new one.' });
+        }
+        await prisma.guestLoginChallenge.update({ where: { email }, data: { attempts: { increment: 1 } } });
+        if (!timingSafeTextEqual(challenge.codeHash, hashGuestLoginCode(email, code))) {
+            return res.status(401).json({ success: false, message: 'That code is invalid or expired.' });
+        }
+        const bookings = await guestBookingsForEmail(email);
+        if (!bookings.length) {
+            await prisma.guestLoginChallenge.deleteMany({ where: { email } }).catch(() => {});
+            return res.status(401).json({ success: false, message: 'No stays were found for that email.' });
+        }
+        await prisma.guestLoginChallenge.deleteMany({ where: { email } }).catch(() => {});
+        res.json({
+            success: true,
+            sessionToken: createGuestIdentityToken(email),
+            expiresInDays: 90,
+        });
+    } catch (error) {
+        console.error('Guestel code verify error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not verify the code. Try again.' });
+    }
+});
+
+app.get('/api/guest/wallet', guestWalletRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const identity = readGuestIdentityToken(bearerToken(req));
+        if (!identity) return res.status(401).json({ success: false, message: 'Sign in to restore your stays.' });
+        const bookings = await guestBookingsForEmail(identity.email);
+        const hotelIds = [...new Set(bookings.map(booking => booking.hotelId))];
+        const hotels = hotelIds.length ? await prisma.hotelConfig.findMany({
+            where: { id: { in: hotelIds }, active: true },
+            include: {
+                domains: { where: { isPrimary: true }, take: 1 },
+                rooms: { include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } }, orderBy: { sortOrder: 'asc' }, take: 1 },
+            },
+        }) : [];
+        const latest = bookings[0];
+        res.json({
+            success: true,
+            guest: latest ? {
+                name: [latest.guestFirstName, latest.guestLastName].filter(Boolean).join(' ').trim(),
+                email: latest.guestEmail,
+                phone: latest.guestPhone,
+            } : { name: '', email: identity.email, phone: '' },
+            hotels: hotels.map(hotel => ({
+                hotelId: hotel.id,
+                domain: hotel.domains?.[0]?.domain || '',
+                name: hotel.name,
+                location: hotel.address || 'Direct booking',
+                imageURL: hotel.rooms?.[0]?.images?.[0]?.url || hotel.appIconUrl || '',
+            })),
+            reservations: bookings.map(booking => ({
+                code: booking.pmsConfirmationCode || booking.ourReservationCode,
+                hotelId: booking.hotelId,
+                checkin: booking.checkinDate,
+                checkout: booking.checkoutDate,
+                status: booking.status,
+                roomName: booking.roomName,
+                reservationToken: safeReservationToken(booking),
+            })),
+        });
+    } catch (error) {
+        console.error('Guestel wallet error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not restore your stays.' });
+    }
+});
+
+async function verifiedGuestBooking(req, hotelId, reservationCode = '') {
+    const token = bearerToken(req);
+    const reservation = readReservationToken(token);
+    if (reservation) {
+        if (hotelId && reservation.hotelId !== String(hotelId)) return null;
+        const booking = await prisma.booking.findFirst({
+            where: { id: reservation.bookingId, hotelId: reservation.hotelId },
+        });
+        if (!booking) return null;
+        const codes = guestBookingThreadCodes(booking, reservation.reservationCode);
+        return reservationCode && !codes.includes(String(reservationCode).trim()) ? null : booking;
+    }
+    const identity = readGuestIdentityToken(token);
+    if (!identity || !hotelId || !reservationCode) return null;
+    const booking = await findGuestBooking(String(hotelId), String(reservationCode));
+    return booking && guestEmailMatches(booking, identity.email) ? booking : null;
+}
+
+function guestMessageJSON(message) {
+    let requests = [];
+    try { requests = message.requests ? JSON.parse(message.requests) : []; } catch (_) {}
+    return {
+        id: message.id,
+        body: message.body || '',
+        sender: message.sender || 'guest',
+        createdAt: message.createdAt,
+        requests,
+    };
+}
+
+app.get('/api/guest/native/messages', guestMessagesFetchGlobalRateLimit, guestMessagesFetchRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const hotelId = String(req.query?.hotelId || '').trim();
+        const code = String(req.query?.code || '').trim();
+        const booking = await verifiedGuestBooking(req, hotelId, code);
+        if (!booking) return res.status(401).json({ success: false, message: 'This stay could not be verified.' });
+        const threadCodes = guestBookingThreadCodes(booking, code);
+        const messages = await prisma.guestMessage.findMany({
+            where: { hotelId: booking.hotelId, reservationCode: { in: threadCodes } },
+            orderBy: { createdAt: 'asc' },
+            take: 200,
+        });
+        await prisma.guestMessage.updateMany({
+            where: { hotelId: booking.hotelId, reservationCode: { in: threadCodes }, sender: 'hotel', guestReadAt: null },
+            data: { guestReadAt: new Date() },
+        }).catch(() => {});
+        res.json({ success: true, messages: messages.map(guestMessageJSON) });
+    } catch (error) {
+        console.error('Guestel native messages fetch error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not load messages.' });
+    }
+});
+
+app.post('/api/guest/native/stays', guestWalletRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const claims = (Array.isArray(req.body?.reservationTokens) ? req.body.reservationTokens : [])
+            .slice(0, 100)
+            .map(token => readReservationToken(token))
+            .filter(Boolean);
+        if (!claims.length) return res.status(401).json({ success: false, message: 'No verified stays were supplied.' });
+        const ids = [...new Set(claims.map(claim => claim.bookingId))];
+        const bookings = await prisma.booking.findMany({ where: { id: { in: ids } } });
+        const verified = bookings.filter(booking => claims.some(claim => (
+            claim.bookingId === booking.id
+            && claim.hotelId === booking.hotelId
+            && guestBookingThreadCodes(booking, claim.reservationCode).includes(claim.reservationCode)
+        )));
+        res.json({
+            success: true,
+            reservations: verified.map(booking => ({
+                code: booking.pmsConfirmationCode || booking.ourReservationCode,
+                hotelId: booking.hotelId,
+                checkin: booking.checkinDate,
+                checkout: booking.checkoutDate,
+                status: booking.status,
+                roomName: booking.roomName,
+                reservationToken: safeReservationToken(booking),
+            })),
+        });
+    } catch (error) {
+        console.error('Guestel native stay sync error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not refresh stays.' });
+    }
+});
+
+app.post('/api/guest/native/messages', guestMessageGlobalRateLimit, guestMessageRateLimit, async (req, res) => {
+    try {
+        const hotelId = String(req.body?.hotelId || '').trim();
+        const code = String(req.body?.reservationCode || '').trim();
+        const body = String(req.body?.body || '').trim().slice(0, 2000);
+        if (!body) return res.status(400).json({ success: false, message: 'Message is empty.' });
+        const booking = await verifiedGuestBooking(req, hotelId, code);
+        if (!booking) return res.status(401).json({ success: false, message: 'This stay could not be verified.' });
+        const canonicalCode = guestBookingThreadCode(booking, code);
+        const guestName = [booking.guestFirstName, booking.guestLastName].filter(Boolean).join(' ').trim() || 'Guest';
+        const message = await prisma.guestMessage.create({
+            data: {
+                hotelId: booking.hotelId,
+                bookingId: booking.id,
+                reservationCode: canonicalCode,
+                guestName,
+                guestEmail: booking.guestEmail || null,
+                guestPhone: booking.guestPhone || null,
+                roomName: booking.roomName || null,
+                body,
+                sender: 'guest',
+            },
+        });
+        notifyGuestMessage(booking.hotelId, guestName, body.slice(0, 140), canonicalCode).catch(() => {});
+        res.json({ success: true, message: guestMessageJSON(message) });
+    } catch (error) {
+        console.error('Guestel native message send error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not send message.' });
+    }
+});
+
+app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req, res) => {
+    try {
+        const deviceToken = String(req.body?.deviceToken || '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+        const environment = req.body?.environment === 'sandbox' ? 'sandbox' : 'production';
+        if (!/^[a-f0-9]{32,200}$/.test(deviceToken)) {
+            return res.status(400).json({ success: false, message: 'A valid APNs device token is required.' });
+        }
+        let bookings = [];
+        const identity = readGuestIdentityToken(bearerToken(req));
+        if (identity) bookings = await guestBookingsForEmail(identity.email);
+        const reservationTokens = Array.isArray(req.body?.reservationTokens)
+            ? req.body.reservationTokens.slice(0, 100)
+            : [];
+        const reservationClaims = reservationTokens.map(token => readReservationToken(token)).filter(Boolean);
+        if (reservationClaims.length) {
+            const ids = [...new Set(reservationClaims.map(claim => claim.bookingId))];
+            const claimed = await prisma.booking.findMany({ where: { id: { in: ids } } });
+            const valid = claimed.filter(booking => reservationClaims.some(claim => claim.bookingId === booking.id && claim.hotelId === booking.hotelId));
+            bookings = [...new Map([...bookings, ...valid].map(booking => [booking.id, booking])).values()];
+        }
+        if (!bookings.length) return res.status(401).json({ success: false, message: 'Verify a stay before enabling notifications.' });
+        const preferences = req.body?.preferences || {};
+        await prisma.$transaction(bookings.map(booking => prisma.guestNativePushDevice.upsert({
+            where: { deviceToken_bookingId: { deviceToken, bookingId: booking.id } },
+            create: {
+                deviceToken,
+                environment,
+                hotelId: booking.hotelId,
+                bookingId: booking.id,
+                reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
+                stayUpdates: preferences.stayUpdates !== false,
+                messages: preferences.messages !== false,
+                deals: preferences.deals === true,
+            },
+            update: {
+                environment,
+                hotelId: booking.hotelId,
+                reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
+                stayUpdates: preferences.stayUpdates !== false,
+                messages: preferences.messages !== false,
+                deals: preferences.deals === true,
+                active: true,
+                lastSeenAt: new Date(),
+            },
+        })));
+        res.json({ success: true, registeredStays: bookings.length, pushConfigured: APNS_CONFIGURED });
+    } catch (error) {
+        console.error('Guestel native push register error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not enable notifications.' });
+    }
+});
+
+app.post('/api/guest/native/push/unregister', guestNativePushRateLimit, async (req, res) => {
+    try {
+        const deviceToken = String(req.body?.deviceToken || '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+        if (!deviceToken) return res.status(400).json({ success: false, message: 'A device token is required.' });
+        let bookingIds = [];
+        const identity = readGuestIdentityToken(bearerToken(req));
+        if (identity) bookingIds = (await guestBookingsForEmail(identity.email)).map(booking => booking.id);
+        const claims = (Array.isArray(req.body?.reservationTokens) ? req.body.reservationTokens : [])
+            .slice(0, 100)
+            .map(token => readReservationToken(token))
+            .filter(Boolean);
+        bookingIds = [...new Set([...bookingIds, ...claims.map(claim => claim.bookingId)])];
+        if (!bookingIds.length) return res.status(401).json({ success: false, message: 'No verified stays were supplied.' });
+        const result = await prisma.guestNativePushDevice.updateMany({
+            where: { deviceToken, bookingId: { in: bookingIds } },
+            data: { active: false },
+        });
+        res.json({ success: true, unregistered: result.count });
+    } catch (error) {
+        console.error('Guestel native push unregister error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not disable notifications.' });
     }
 });
 
@@ -14778,6 +15268,21 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
         }, { TTL: 60 * 60 }, 'guestReply', threadCodes).catch((e) => {
             console.error('guest reply push error:', e.message);
         });
+        if (booking?.id) {
+            sendNativePushToGuestBooking(booking.id, {
+                title: 'New message from Front Desk',
+                body: body.trim().slice(0, 160),
+                url: `guestel://messages?hotelId=${encodeURIComponent(hotelId)}&code=${encodeURIComponent(canonicalCode)}`,
+                tag: `guest-message-${canonicalCode}`,
+                data: {
+                    type: 'guest_message',
+                    hotelId,
+                    reservationCode: canonicalCode,
+                },
+            }, { TTL: 60 * 60 }, 'frontDeskReply').catch((e) => {
+                console.error('guest native reply push error:', e.message);
+            });
+        }
 
         res.json({ success: true, message: { id: reply.id, body: reply.body, sender: 'hotel', createdAt: reply.createdAt } });
     } catch (e) {

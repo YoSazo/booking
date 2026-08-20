@@ -12,7 +12,10 @@ struct Hotel: Identifiable, Hashable, Codable {
 
     // The hotel's OWN direct booking site (e.g. jacksinn.mktel.co) opens inside
     // Guestel (WKWebView) — the guest books on the hotel's brand, not bookmarketel.
-    var bookingURL: URL { URL(string: "https://\(domain)")! }
+    var bookingURL: URL {
+        if !domain.isEmpty, let url = URL(string: "https://\(domain)") { return url }
+        return URL(string: "https://bookmarketel.com/?hotelId=\(hotelId)")!
+    }
     var slug: String { domain.replacingOccurrences(of: ".mktel.co", with: "") }
 
     init(id: UUID = UUID(), hotelId: String, domain: String, name: String, location: String, stays: Int, lastStayed: String, imageURL: URL? = nil) {
@@ -34,6 +37,9 @@ struct Reservation: Identifiable, Hashable, Codable {
     var hotelId: String
     var checkin: String
     var checkout: String
+    var status: String?
+    var roomName: String?
+    var accessToken: String?
 
     var id: String { "\(hotelId):\(code)" }
 
@@ -59,7 +65,18 @@ struct GuestInfo: Codable, Equatable {
     var isComplete: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && email.contains("@") && phone.count >= 7
     }
-    var dictionary: [String: Any] { ["name": name, "email": email, "phone": phone] }
+    var dictionary: [String: Any] {
+        let parts = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+        return [
+            "name": name,
+            "firstName": parts.first ?? "Guest",
+            "lastName": parts.dropFirst().joined(separator: " "),
+            "email": email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+            "phone": phone,
+        ]
+    }
 }
 
 @Observable
@@ -91,8 +108,24 @@ final class GuestStore {
         }
     }
 
-    func addReservation(code: String, hotelId: String, checkin: String, checkout: String) {
-        ingest([["code": code, "hotelId": hotelId, "checkin": checkin, "checkout": checkout]])
+    @MainActor
+    func clearDeviceData() {
+        hotels = []
+        reservations = []
+        guest = GuestInfo()
+        UserDefaults.standard.removeObject(forKey: Self.hotelsKey)
+        UserDefaults.standard.removeObject(forKey: Self.reservationsKey)
+        UserDefaults.standard.removeObject(forKey: Self.guestKey)
+        GuestIdentityAccess.clear()
+        GuestPaymentAccess.clear()
+    }
+
+    func addReservation(code: String, hotelId: String, checkin: String, checkout: String, status: String? = nil, accessToken: String? = nil) {
+        var item: [String: Any] = ["code": code, "hotelId": hotelId, "checkin": checkin, "checkout": checkout]
+        if let status { item["status"] = status }
+        if let accessToken, !accessToken.isEmpty { item["accessToken"] = accessToken }
+        ingest([item])
+        Task { @MainActor in await GuestPushManager.sync(store: self) }
     }
 
     private static func loadGuest() -> GuestInfo {
@@ -106,8 +139,12 @@ final class GuestStore {
     // The next stay whose checkout hasn't passed — shown prominently up top.
     var upcomingReservation: Reservation? {
         let today = Calendar.current.startOfDay(for: Date())
+        let inactive = Set(["released", "cancelled", "canceled", "declined"])
         return reservations
-            .filter { ($0.checkoutDate ?? .distantPast) >= today }
+            .filter {
+                ($0.checkoutDate ?? .distantPast) >= today
+                && !inactive.contains(($0.status ?? "confirmed").lowercased())
+            }
             .sorted { ($0.checkinDate ?? .distantFuture) < ($1.checkinDate ?? .distantFuture) }
             .first
     }
@@ -133,6 +170,72 @@ final class GuestStore {
         persistHotels()
     }
 
+    @MainActor
+    func syncVerifiedWallet() async {
+        await refreshVerifiedStays()
+        guard let token = GuestIdentityAccess.token else { return }
+        do {
+            let wallet = try await BookingAPI.wallet(identityToken: token)
+            apply(wallet)
+        } catch {
+            if case BookingAPI.Failure.message(let message) = error,
+               message.localizedCaseInsensitiveContains("sign in") {
+                GuestIdentityAccess.clear()
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshVerifiedStays() async {
+        let tokens = reservations.compactMap(\.accessToken).filter { !$0.isEmpty }
+        guard !tokens.isEmpty, let remote = try? await BookingAPI.refreshStays(reservationTokens: tokens) else { return }
+        for stay in remote {
+            ingest([[
+                "code": stay.code,
+                "hotelId": stay.hotelId,
+                "checkin": stay.checkin,
+                "checkout": stay.checkout,
+                "status": stay.status ?? "",
+                "roomName": stay.roomName ?? "",
+                "accessToken": stay.reservationToken ?? "",
+            ]])
+        }
+    }
+
+    @MainActor
+    func restoreWallet(identityToken: String) async throws {
+        let wallet = try await BookingAPI.wallet(identityToken: identityToken)
+        GuestIdentityAccess.save(identityToken)
+        apply(wallet)
+    }
+
+    @MainActor
+    private func apply(_ wallet: BookingAPI.WalletResponse) {
+        saveGuest(GuestInfo(name: wallet.guest.name, email: wallet.guest.email, phone: wallet.guest.phone))
+        for remote in wallet.hotels {
+            add(Hotel(
+                hotelId: remote.hotelId,
+                domain: remote.domain,
+                name: remote.name,
+                location: remote.location,
+                stays: wallet.reservations.filter { $0.hotelId == remote.hotelId }.count,
+                lastStayed: "Direct booking",
+                imageURL: remote.imageURL.flatMap { URL(string: $0, relativeTo: BookingAPI.base)?.absoluteURL }
+            ))
+        }
+        for remote in wallet.reservations {
+            ingest([[
+                "code": remote.code,
+                "hotelId": remote.hotelId,
+                "checkin": remote.checkin,
+                "checkout": remote.checkout,
+                "status": remote.status ?? "",
+                "roomName": remote.roomName ?? "",
+                "accessToken": remote.reservationToken ?? "",
+            ]])
+        }
+    }
+
     func reservation(for hotelId: String) -> Reservation? {
         reservations
             .filter { $0.hotelId == hotelId }
@@ -152,7 +255,15 @@ final class GuestStore {
             else { continue }
             let checkin = (item["checkin"] as? String) ?? (item["checkinDate"] as? String) ?? ""
             let checkout = (item["checkout"] as? String) ?? (item["checkoutDate"] as? String) ?? ""
-            let res = Reservation(code: code, hotelId: hotelId, checkin: checkin, checkout: checkout)
+            let res = Reservation(
+                code: code,
+                hotelId: hotelId,
+                checkin: checkin,
+                checkout: checkout,
+                status: item["status"] as? String,
+                roomName: item["roomName"] as? String,
+                accessToken: item["accessToken"] as? String ?? item["reservationToken"] as? String
+            )
             if let idx = merged.firstIndex(where: { $0.id == res.id }) {
                 merged[idx] = res
             } else {
@@ -182,7 +293,7 @@ final class GuestStore {
             let data = UserDefaults.standard.data(forKey: hotelsKey),
             let decoded = try? JSONDecoder().decode([Hotel].self, from: data),
             !decoded.isEmpty
-        else { return sample }
+        else { return [] }
         return decoded
     }
 
@@ -194,7 +305,8 @@ final class GuestStore {
         return decoded
     }
 
-    // The three hotels the wallet is seeded with.
+    // Debug previews may opt into these explicitly; production never invents
+    // hotels or stays for a real guest.
     static let sample: [Hotel] = [
         Hotel(hotelId: "hotel-9dbf11ec", domain: "studios17.mktel.co", name: "Studios 17", location: "Direct booking", stays: 0, lastStayed: "—"),
         Hotel(hotelId: "hotel-a39be0df", domain: "jacksinn.mktel.co", name: "Jack's Inn", location: "St. Croix, WI", stays: 2, lastStayed: "Aug 2026"),

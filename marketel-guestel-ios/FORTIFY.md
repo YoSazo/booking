@@ -4,6 +4,45 @@ _Last pass: 2026-08-20 by Claude. This is a "make it real, then hand off to fort
 
 _Fortification pass: 2026-08-20 by Codex._
 
+## Current release state (supersedes the older backlog below)
+
+Guestel is no longer a local demo wallet or a webview wrapper. This pass added:
+
+- Native pay-later checkout using `/api/complete-pay-later-booking`, with the
+  backend's availability identifiers and a fail-closed sold-out check.
+- Saved Stripe cards inside the actual booking PaymentSheet.
+- Signed per-reservation capabilities plus email-code wallet recovery across
+  phones. Reservation status refreshes from Front Desk instead of trusting only
+  localStorage/UserDefaults.
+- Native SwiftUI guest ↔ Front Desk conversations and APNs registration/routing.
+- App Clip → full-app hotel handoff through `group.com.bookmarketel.guestel`.
+- One scalable invocation URL family: `https://clip.mktel.co/clip/<hotelId>`.
+- A real empty state, production demo-data removal, device-data clearing, and a
+  privacy manifest. PWA remains the Android/no-native fallback.
+
+### Manual Apple/hosting steps before the new native build can sign
+
+1. In Apple Developer, enable **Push Notifications** and **App Groups** for
+   `com.bookmarketel.guestel`.
+2. Enable **App Groups** for `com.bookmarketel.guestel.Clip`, and attach both App
+   IDs to `group.com.bookmarketel.guestel`.
+3. Regenerate both App Store distribution profiles, replace
+   `APPLE_GUESTEL_PROVISIONING_PROFILE_BASE64` and
+   `APPLE_GUESTEL_CLIP_PROVISIONING_PROFILE_BASE64` in GitHub Actions, then run
+   `build-guestel-ios.yml`.
+4. Set Render `GUEST_IDENTITY_SECRET` to a new high-entropy secret and set
+   `GUESTEL_APNS_BUNDLE_ID=com.bookmarketel.guestel`. The existing APNs team key
+   can sign for both apps if it is an Apple Push Notification service key.
+5. Point `clip.mktel.co` at the Vercel booking-engine deployment, publish the App
+   Clip default/advanced experience, verify its card on an iPhone, and only then
+   set Vercel `VITE_GUESTEL_APP_CLIP_ENABLED=true`.
+6. Keep Stripe in test mode for this QA pass, exactly as requested. Switch the
+   matching secret and publishable keys together only after the full test matrix.
+
+The new Prisma migration is
+`20260820090000_guestel_identity_and_push`; Render's existing start command runs
+`prisma migrate deploy` automatically.
+
 Guestel is a native SwiftUI guest wallet app (companion to Marketel Front Desk).
 Two tabs: **Hotels** (Apple-Wallet card stack + docked booking sheet) and **Account**.
 It books against the real backend `guest-lodge-backend` (Render) — the same engine

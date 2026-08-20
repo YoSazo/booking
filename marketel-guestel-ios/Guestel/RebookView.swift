@@ -19,6 +19,7 @@ struct RebookView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var confirmationCode: String?
+    @State private var bookingResult: BookingAPI.BookingResult?
     @State private var pendingIntentId: String?
     @State private var paymentSheet: PaymentSheet?
 
@@ -209,9 +210,16 @@ struct RebookView: View {
     private var doneStage: some View {
         VStack(spacing: 14) {
             Image(systemName: "checkmark.seal.fill").font(.system(size: 56)).foregroundStyle(Theme.green)
-            Text("You're booked").font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.ink)
+            Text(bookingResult?.pending == true ? "Request received" : "You're booked")
+                .font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.ink)
             Text("\(hotel.name) · \(dayLabel(checkin)) → \(dayLabel(checkout))")
                 .font(.system(size: 15)).foregroundStyle(Theme.inkSoft).multilineTextAlignment(.center)
+            if let bookingResult, !bookingResult.message.isEmpty {
+                Text(bookingResult.message)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.inkSoft)
+                    .multilineTextAlignment(.center)
+            }
             if let confirmationCode {
                 Text("#\(confirmationCode)").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.green)
             }
@@ -243,7 +251,7 @@ struct RebookView: View {
         let ci = BookingAPI.apiDate.string(from: checkin)
         let co = BookingAPI.apiDate.string(from: checkout)
         let code = BookingAPI.reservationCode()
-        let details: [String: Any] = [
+        let baseDetails: [String: Any] = [
             "roomName": room.name, "roomId": room.roomId ?? "",
             "checkin": ci, "checkout": co, "nights": nights,
             "reservationCode": code, "adults": 1, "rooms": 1,
@@ -256,22 +264,35 @@ struct RebookView: View {
             }
             do {
                 let available = try await BookingAPI.availability(hotelId: hotel.hotelId, checkin: ci, checkout: co)
-                if !available.isEmpty, !available.contains(room.name) {
+                guard let match = available.first(where: { $0.name.caseInsensitiveCompare(room.name) == .orderedSame }) else {
                     await MainActor.run { errorMessage = "\(room.name) isn't available for those dates."; isSubmitting = false }
                     return
                 }
+                var details = baseDetails
+                details["roomId"] = match.roomId.isEmpty ? (room.roomId ?? "") : match.roomId
+                details["roomTypeID"] = match.roomTypeID
+                details["rateID"] = match.rateID
                 let hold = try await BookingAPI.createHold(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary)
-                await MainActor.run { presentPayment(clientSecret: hold.clientSecret, intentId: hold.paymentIntentId, details: details, code: code, ci: ci, co: co) }
+                let customer = await paymentCustomerIfAvailable()
+                await MainActor.run { presentPayment(clientSecret: hold.clientSecret, intentId: hold.paymentIntentId, details: details, code: code, ci: ci, co: co, customer: customer) }
             } catch {
                 await MainActor.run { errorMessage = error.localizedDescription; isSubmitting = false }
             }
         }
     }
 
-    private func presentPayment(clientSecret: String, intentId: String, details: [String: Any], code: String, ci: String, co: String) {
+    private func paymentCustomerIfAvailable() async -> BookingAPI.PaymentCustomer? {
+        guard let token = GuestPaymentAccess.token else { return nil }
+        return try? await BookingAPI.paymentCustomer(apiVersion: STPAPIClient.apiVersion, customerToken: token)
+    }
+
+    private func presentPayment(clientSecret: String, intentId: String, details: [String: Any], code: String, ci: String, co: String, customer: BookingAPI.PaymentCustomer?) {
         pendingIntentId = intentId
         var config = PaymentSheet.Configuration()
         config.merchantDisplayName = hotel.name
+        if let customer {
+            config.customer = .init(id: customer.customerId, ephemeralKeySecret: customer.ephemeralKey)
+        }
         let sheet = PaymentSheet(paymentIntentClientSecret: clientSecret, configuration: config)
         paymentSheet = sheet
         guard let vc = UIApplication.shared.topViewController() else { isSubmitting = false; return }
@@ -280,10 +301,18 @@ struct RebookView: View {
             case .completed:
                 Task {
                     do {
-                        let confirmed = try await BookingAPI.book(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary, paymentIntentId: intentId)
+                        let result = try await BookingAPI.completePayLater(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary, paymentIntentId: intentId)
                         await MainActor.run {
-                            store.addReservation(code: confirmed, hotelId: hotel.hotelId, checkin: ci, checkout: co)
-                            confirmationCode = confirmed
+                            store.addReservation(
+                                code: result.reservationCode,
+                                hotelId: hotel.hotelId,
+                                checkin: ci,
+                                checkout: co,
+                                status: result.pending ? "pending" : "confirmed",
+                                accessToken: result.reservationToken
+                            )
+                            confirmationCode = result.reservationCode
+                            bookingResult = result
                             isSubmitting = false
                             stage = .done
                         }

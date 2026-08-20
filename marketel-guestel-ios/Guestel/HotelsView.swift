@@ -25,6 +25,9 @@ struct HotelsView: View {
         NavigationStack {
             ScrollView(.vertical) {
                 VStack(spacing: 16) {
+                    if store.hotels.isEmpty, !isSelected {
+                        emptyWallet
+                    }
                     if let stay = store.upcomingReservation, !isSelected {
                         UpcomingStayCard(stay: stay, hotelName: store.hotelName(for: stay.hotelId))
                     }
@@ -86,8 +89,15 @@ struct HotelsView: View {
                 hotel: hotel,
                 maxDetent: .height(maxSheetHeight),
                 detent: $sheetDetent,
-                onBooked: { code, checkin, checkout in
-                    store.addReservation(code: code, hotelId: hotel.hotelId, checkin: checkin, checkout: checkout)
+                onBooked: { result, checkin, checkout in
+                    store.addReservation(
+                        code: result.reservationCode,
+                        hotelId: hotel.hotelId,
+                        checkin: checkin,
+                        checkout: checkout,
+                        status: result.pending ? "pending" : "confirmed",
+                        accessToken: result.reservationToken
+                    )
                     withAnimation(animation) { selectedHotel = nil }
                 }
             )
@@ -129,6 +139,35 @@ struct HotelsView: View {
     private var navigationTitleHidden: Bool { info.scrollOffset > 1 || isSelected }
 
     private var animation: Animation { .interactiveSpring(response: 0.55, dampingFraction: 0.8) }
+
+    private var emptyWallet: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "building.2.crop.circle")
+                .font(.system(size: 58, weight: .light))
+                .foregroundStyle(Theme.green)
+            Text("Your hotels live here")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(Theme.ink)
+            Text("Open a hotel’s Guestel link, or add its direct-booking link. Already booked? Restore your stays from Account.")
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.inkSoft)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+            Button { showingAdd = true } label: {
+                Text("Add a hotel")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .padding(.top, 4)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.top, 30)
+    }
 
     struct Info {
         var scrollOffset: CGFloat = 0
@@ -199,7 +238,7 @@ private struct UpcomingStayCard: View {
                 Image(systemName: "calendar").font(.system(size: 14))
                 Text(dateRange).font(.system(size: 15, weight: .semibold))
                 Spacer()
-                Text("Confirmed")
+                Text(stay.status?.lowercased() == "pending" ? "Being reviewed" : "Confirmed")
                     .font(.system(size: 12, weight: .semibold))
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.white.opacity(0.18), in: Capsule())
