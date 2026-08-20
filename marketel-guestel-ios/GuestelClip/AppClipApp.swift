@@ -18,12 +18,17 @@ struct GuestelClipApp: App {
         }
     }
 
-    // The clip is invoked from a hotel's own branded domain (e.g. jacksinn.mktel.co),
-    // so the hotel is identified by the host. We still accept an explicit ?hotelId=
-    // (or /clip/<id>) as a fallback for central bookmarketel.com links.
+    // Resolves the hotel from the invocation URL. Two families of invocation:
+    //  • Branded domain (jacksinn.mktel.co) — Smart App Banner / direct link / QR:
+    //    the hotel is the host.
+    //  • Apple default App Clip link (appclip.apple.com/id?p=<bundle>&domain=…):
+    //    the host is Apple's, so the hotel rides in a `domain` (or `hotelId`) param.
     static func target(from url: URL) -> ClipTarget? {
-        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        if let id = comps?.queryItems?.first(where: { $0.name == "hotelId" })?.value, !id.isEmpty {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        if let d = items?.first(where: { $0.name == "domain" })?.value, !d.isEmpty {
+            return .domain(d)
+        }
+        if let id = items?.first(where: { $0.name == "hotelId" })?.value, !id.isEmpty {
             return .hotelId(id)
         }
         let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }

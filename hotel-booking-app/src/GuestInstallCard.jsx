@@ -5,6 +5,7 @@ import { isStandalone } from './pwaUtils.js';
 import { BRAND, isIos, HotelIcon } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import BookingInstallCoach from './BookingInstallCoach.jsx';
+import { APP_CLIP_INSTALL_ENABLED, guestelAppClipUrl } from './appClipInstall.js';
 
 function GuestInstallCard({
   hotelName,
@@ -87,6 +88,12 @@ function GuestInstallCard({
   const handlePrimary = async () => {
     trackCta();
     if (ios) {
+      // Native App Clip card in iOS Safari (once the ASC default experience is
+      // live). Falls back to the PWA "Add to Home Screen" coach until enabled.
+      if (APP_CLIP_INSTALL_ENABLED) {
+        window.location.href = guestelAppClipUrl({ hotelId });
+        return;
+      }
       setShowInstallCoach(true);
       return;
     }
