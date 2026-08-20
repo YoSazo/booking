@@ -95,6 +95,11 @@ payment. If it's empty, payments show "Payments aren't available right now."
 - App Store review needs: no dead ends, privacy answers, etc.
 
 ## Build / deploy
+CI uses `project-ci.yml` to point XcodeGen at the pinned Stripe 26.0.0 source
+archive. Do not switch it back to SwiftPM's remote repository in CI: fresh
+macOS runners spent the full 30-minute job timeout cloning that repository
+without ever reaching compilation.
+
 ```bash
 # iOS build → TestFlight
 gh workflow run build-guestel-ios.yml --ref main -f upload_to_testflight=true

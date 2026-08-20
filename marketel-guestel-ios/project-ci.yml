@@ -1,0 +1,9 @@
+# CI overlays the normal project spec with a shallow source archive. SwiftPM's
+# full-history clone of stripe-ios can exceed the entire workflow timeout on a
+# fresh macOS runner; the package contents at the pinned tag are sufficient.
+include:
+  - project.yml
+
+packages:REPLACE:
+  Stripe:
+    path: .ci/stripe-ios-26.0.0

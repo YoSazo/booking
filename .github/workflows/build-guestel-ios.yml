@@ -60,10 +60,17 @@ jobs:
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.4.app
 
+      - name: Fetch pinned Stripe source
+        run: |
+          mkdir -p .ci
+          curl --fail --location --silent --show-error --retry 3 \
+            https://github.com/stripe/stripe-ios/archive/refs/tags/26.0.0.tar.gz \
+            | tar -xz -C .ci
+
       - name: Generate the Xcode project
         run: |
           brew install xcodegen
-          xcodegen generate
+          xcodegen generate --spec project-ci.yml
 
       - name: Install distribution certificate and profiles
         env:
