@@ -43,7 +43,7 @@ struct AccountView: View {
                         }
                         NavigationLink { NotificationsView() } label: {
                             AccountRow(icon: "bell.fill", title: "Notifications",
-                                       subtitle: "Stay updates, messages, deals")
+                                       subtitle: "Stay, message, and property updates")
                         }
                         NavigationLink { HelpView() } label: {
                             AccountRow(icon: "questionmark.circle.fill", title: "Help",

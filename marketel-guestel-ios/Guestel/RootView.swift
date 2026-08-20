@@ -25,7 +25,13 @@ struct RootView: View {
             let requestedCode = notification.userInfo?["code"] as? String ?? ""
             openMessages(hotelId: hotelId, requestedCode: requestedCode)
         }
-        .onAppear { openPendingMessages() }
+        .onReceive(NotificationCenter.default.publisher(for: .guestelOpenHotels)) { _ in
+            openHotels()
+        }
+        .onAppear {
+            openPendingHotel()
+            openPendingMessages()
+        }
         .onChange(of: store.reservations) { _, _ in openPendingMessages() }
         .sheet(item: $messageDestination) { destination in
             NativeMessagesView(hotel: destination.hotel, stay: destination.stay)
@@ -47,6 +53,19 @@ struct RootView: View {
     private func openPendingMessages() {
         guard let route = GuestMessageRoute.pending else { return }
         openMessages(hotelId: route.hotelId, requestedCode: route.code)
+    }
+
+    private func openPendingHotel() {
+        guard GuestHotelRoute.pendingHotelId != nil else { return }
+        openHotels()
+    }
+
+    private func openHotels() {
+        GuestHotelRoute.clear()
+        GuestMessageRoute.clear()
+        store.arrival = nil
+        messageDestination = nil
+        selectedTab = .hotels
     }
 
     private func openMessages(hotelId: String, requestedCode: String) {

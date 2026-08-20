@@ -3,14 +3,6 @@ import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
 import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
 import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
-import ownerEditorProofUrl from './assets/frontdesk-editor.webp';
-import guestInstallBannerUrl from './assets/guest-install-banner.webp';
-import guestInstallSheetUrl from './assets/guest-install-sheet.webp';
-import guestHomeScreenUrl from './assets/guest-home-screen.webp';
-import guestAppStayUrl from './assets/guest-app-stay.webp';
-import guestAppBookUrl from './assets/guest-app-book.webp';
-import guestBroadcastSendUrl from './assets/guest-broadcast-send.webp';
-import guestBroadcastArrivesUrl from './assets/guest-broadcast-arrives.webp';
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
@@ -37,7 +29,7 @@ let bookingPreviewOpened = false;
 let bookingPreviewUnavailable = false;
 // Saving in the editor returns to the booking page to show the highlighted
 // change, so mode alone can't drive the CTA — it would offer "edit" a second
-// time. Once the editor has been seen, the only way on is the Home Screen.
+// time. Once the editor has been seen, the only way on is the Guestel stage.
 let bookingEditorVisited = false;
 let nextStageViewIsResume = false;
 let assistantNoResponseAction = 'confirm';
@@ -446,7 +438,7 @@ function handleBookingPreviewMessage(event) {
 }
 
 function progressHtml() {
-  const labels = ['Booking page', 'Home Screen', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
+  const labels = ['Booking page', 'Guestel', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
   return `<div class="mvr-progress" aria-label="Marketel overview progress">
     ${labels.map((label, index) => `<div class="mvr-progress-item ${index === currentStep ? 'is-active' : ''} ${index < currentStep ? 'is-done' : ''}">
       <span></span><small>${esc(label)}</small>
@@ -526,7 +518,7 @@ function bookingRevealHtml() {
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
         <span>See what guests will use.</span>
-        Open the booking page built for your property. Then see how guests save it to their Home Screen and how you run it from Front Desk.
+        Open the booking page built for your property. Then see how guests keep you in Guestel and how you run it from Front Desk.
       </div>
       ${bookingPageStatusHtml()}
     </div>
@@ -549,90 +541,80 @@ function guestAppRevealHtml() {
 // Beat-driven stages: one claim over one full-size proof, advanced only by the
 // footer. Screenshots are real product, shown whole rather than cropped, so the
 // owner is looking at the thing itself instead of an illustration of it.
-function guestAppBeats() {
+function guestelInstallProofHtml() {
   const name = esc(propertyName());
-  // The rebooking beat is the money beat, so it carries her own break-even
-  // rather than a generic line — it starts the ROI argument one stage before
-  // the price screen instead of only after it.
+  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'P');
+  return `<div class="mvr-guestel-proof mvr-guestel-install-proof">
+    <div class="mvr-guestel-booking-card">
+      <span class="mvr-guestel-property-mark">${initial}</span>
+      <div><small>${name}</small><strong>Keep this property in Guestel</strong></div>
+      <b>Add</b>
+    </div>
+    <span class="mvr-guestel-flow-arrow" aria-hidden="true">↓</span>
+    <div class="mvr-guestel-system-card">
+      <div class="mvr-guestel-icon">G</div>
+      <div><small>APP CLIP</small><strong>Guestel</strong><span>Book direct. Keep every stay together.</span></div>
+      <b>OPEN</b>
+    </div>
+  </div>`;
+}
+
+function guestelWalletProofHtml() {
+  const name = esc(propertyName());
+  const room = esc(firstRoom().name || 'Your room');
+  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'P');
+  return `<div class="mvr-guestel-proof mvr-guestel-phone">
+    <div class="mvr-guestel-phone-head"><span class="mvr-guestel-icon is-small">G</span><strong>Guestel</strong><i></i></div>
+    <div class="mvr-guestel-wallet-card">
+      <div class="mvr-guestel-wallet-image">${firstRoomImage() ? `<img src="${esc(firstRoomImage())}" alt="">` : `<span>${initial}</span>`}</div>
+      <div class="mvr-guestel-wallet-copy"><small>Saved property</small><strong>${name}</strong><span>${room} · Direct booking</span></div>
+      <button type="button" tabindex="-1">Book direct</button>
+    </div>
+    <div class="mvr-guestel-wallet-nav"><b>Properties</b><span>Stays</span><span>Messages</span></div>
+  </div>`;
+}
+
+function guestelReachProofHtml() {
+  const name = esc(propertyName());
+  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'P');
+  return `<div class="mvr-guestel-proof mvr-guestel-reach-proof">
+    <div class="mvr-guestel-notification">
+      <span class="mvr-guestel-property-mark">${initial}</span>
+      <div><small>${name} · now</small><strong>Come back direct and save</strong><p>Your returning-guest rate is ready in Guestel.</p></div>
+    </div>
+    <div class="mvr-guestel-outcomes">
+      <span><b>01</b><strong>Book direct again</strong><small>Your rooms stay one tap away</small></span>
+      <span><b>02</b><strong>Message the property</strong><small>The conversation stays with the stay</small></span>
+    </div>
+  </div>`;
+}
+
+function guestAppBeats() {
   const estimate = breakEvenEstimate();
   const rebookBody = estimate
-    ? `One tap back to your rooms. About ${estimate.roomNights} direct room-night${estimate.roomNights === 1 ? '' : 's'} a month covers Marketel.`
-    : 'One tap back to your rooms — a booking you keep instead of renting from an OTA.';
+    ? `Guests keep your property, then return to your rooms in one tap. About ${estimate.roomNights} direct room-night${estimate.roomNights === 1 ? '' : 's'} could cover Marketel.`
+    : 'Guests keep your property, then return to your rooms in one tap instead of searching an OTA again.';
   return [
     {
-      // Lands on the tap straight after she edits her own page in stage 1, so
-      // it reads as the punchline to what just happened: the screen she was
-      // using is the app. Establishing her app first makes the guest install
-      // that follows a contrast rather than the first mention of either.
-      title: 'The page you just edited lives in an app.',
-      body: 'Front Desk, from the App Store. Rooms, prices and photos — from your phone.',
-      next: 'See what your guests get',
-      event: 'GuestAppOwnerEditorViewed',
-      proof: {
-        url: ownerEditorProofUrl,
-        alt: 'Marketel Front Desk open on a phone, showing the property page editor with tappable header fields and a save button.',
-      },
+      title: 'Guests tap Add. Guestel handles the rest.',
+      body: 'Your booking page opens a real Apple experience. They can book immediately and install Guestel without hunting through the App Store.',
+      next: 'See what they keep',
+      event: 'GuestelInstallFlowViewed',
+      render: guestelInstallProofHtml,
     },
     {
-      title: 'Guests save you right from your booking page.',
-      body: 'A prompt sits under the room. One tap, no App Store, no download.',
-      next: 'See what iOS does',
-      event: 'GuestAppInstallBannerViewed',
-      proof: {
-        url: guestInstallBannerUrl,
-        alt: 'A real booking page open in Safari with a card offering to save the property to the guest’s Home Screen.',
-      },
-    },
-    {
-      title: 'iOS adds it like any other app.',
-      body: 'Your name, your icon — handled by the phone, not by us.',
-      next: 'See where it lands',
-      event: 'GuestAppInstallSheetViewed',
-      proof: {
-        url: guestInstallSheetUrl,
-        alt: 'The real iOS Add to Home Screen sheet showing the property name, its web address and the Open as Web App switch.',
-      },
-    },
-    {
-      title: 'Both, side by side.',
-      // The difference is how each one is installed, not what each is called —
-      // that is the version of the two-app story people actually retain.
-      body: `Yours from the App Store. ${name} saved straight from your booking page.`,
-      next: 'See what it wins you',
-      event: 'GuestAppHomeScreenViewed',
-      proof: {
-        url: guestHomeScreenUrl,
-        alt: 'An iPhone Home Screen showing the saved property icon beside the Marketel Front Desk icon.',
-      },
-    },
-    {
-      // Two frames: the stay they arrive to, and the rooms they rebook from.
-      title: 'It opens to their stay. And to your rooms.',
+      title: 'Your property stays in their Guestel wallet.',
       body: rebookBody,
-      next: 'See what else that wins you',
-      event: 'GuestAppRebookViewed',
-      proof: {
-        frames: [
-          { url: guestAppStayUrl, alt: 'The saved property opened from the Home Screen to the guest’s stay: check-in today, room, dates, amount due and property details.' },
-          { url: guestAppBookUrl, alt: 'The same saved property on its Book tab, showing the rooms ready to reserve again.' },
-        ],
-      },
+      next: 'See what that unlocks',
+      event: 'GuestelWalletViewed',
+      render: guestelWalletProofHtml,
     },
     {
-      // The rest of the funnel argues cost avoidance. This is the one beat that
-      // argues upside — she can create demand instead of waiting for it — and
-      // it is the concrete form of owning the guest relationship an OTA keeps.
-      // Two frames close the loop: her sending it, and it landing on a phone.
-      title: 'And when you want them back, you tell them.',
-      body: 'One message from Front Desk reaches every guest who saved you and allowed alerts. No ad spend, no OTA.',
+      title: 'The guest relationship stays yours.',
+      body: 'Their stay, your messages and your next direct offer live together—without paying an OTA to reach the same guest again.',
       next: 'See how Front Desk protects you',
-      event: 'GuestAppBroadcastViewed',
-      proof: {
-        frames: [
-          { url: guestBroadcastSendUrl, alt: 'Marketel Front Desk composing a notification to saved guests, with a preview of what arrives on their phone and a send button.' },
-          { url: guestBroadcastArrivesUrl, alt: 'The same notification arriving on a guest’s Home Screen from the saved property, with a badge on its icon.' },
-        ],
-      },
+      event: 'GuestelReachViewed',
+      render: guestelReachProofHtml,
     },
   ];
 }
@@ -794,7 +776,7 @@ function finaleHtml() {
     : 'Activate Marketel — $199/month';
   const includedValueHtml = `<div class="mvr-value-list">
     <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-    <div style="--stagger:1"><span>✓</span><p><strong>Your property on guests’ Home Screens</strong><small>No second App Store app—guests save it from your booking page</small></p></div>
+    <div style="--stagger:1"><span>✓</span><p><strong>Your property in Guestel</strong><small>Guests keep your rooms, their stays and your messages one tap away</small></p></div>
     <div style="--stagger:2"><span>✓</span><p><strong>Marketel Front Desk and Assistant</strong><small>Tell it when a walk-in takes a room; it updates remaining availability</small></p></div>
   </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
@@ -803,7 +785,7 @@ function finaleHtml() {
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
-      <p>Guests use your direct booking page and can save your property to their Home Screen. You use Marketel Front Desk to manage bookings and availability.</p>
+      <p>Guests book on your direct page and keep your property in Guestel. You use Marketel Front Desk to manage bookings, availability and the guest relationship.</p>
       ${isSubscribed ? `${includedValueHtml}
         <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">Open Front Desk</button>
         <div class="mvr-secure-note">You can replay this overview anytime from How it works.</div>` : `
@@ -838,7 +820,7 @@ function footerHtml() {
   if (currentStep === 0) {
     if (!bookingPreviewOpened && !bookingPreviewUnavailable) return '';
     return `<div class="mvr-footer mvr-footer-booking">
-      <button type="button" class="mvr-primary" id="mvrNext">See the Home Screen experience →</button>
+      <button type="button" class="mvr-primary" id="mvrNext">See the Guestel experience →</button>
     </div>`;
   }
   // The activation screen carries its own Back pill so the page can run the
@@ -934,7 +916,7 @@ function showExpandedPreview() {
       <span data-live-forward-long>See how to edit your booking page</span>
       <b aria-hidden="true">→</b>
     </button>
-    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Home Screen experience</button>
+    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Guestel experience</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   const iframe = modal.querySelector('[data-preview-frame="guest"]');
@@ -1038,7 +1020,7 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (location) location.setAttribute('aria-label', editing ? 'Front Desk editor' : 'Your live booking address');
   // Exactly one green CTA, and it always names where you are not.
   //   engine            → "See how to edit your booking page"
-  //   editor            → Back + "See the Home Screen experience"
+  //   editor            → Back + "See the Guestel experience"
   //   engine after save → forward, because re-offering the step just completed
   //                       reads as though the save did not take.
   // Returning via Back is deliberately *not* a save, so the editor stays one

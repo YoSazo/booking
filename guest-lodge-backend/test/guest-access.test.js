@@ -73,6 +73,23 @@ test('native guest pushes respect the selected notification category', () => {
     assert.match(server, /preference: 'stayUpdates'/);
 });
 
+test('Guestel property updates work before a guest has a reservation', () => {
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+    const iosRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const pushManager = fs.readFileSync(path.join(iosRoot, 'GuestPushManager.swift'), 'utf8');
+    const rootView = fs.readFileSync(path.join(iosRoot, 'RootView.swift'), 'utf8');
+
+    assert.match(schema, /model GuestelPropertyDevice/);
+    assert.match(server, /requestedHotelIds/);
+    assert.match(server, /prisma\.guestelPropertyDevice\.upsert/);
+    assert.match(server, /sendNativeBroadcastToHotelGuests/);
+    assert.match(server, /where: \{ hotelId, active: true, updates: true \}/);
+    assert.match(pushManager, /hotelIds = Array\(Set\(store\.hotels\.map/);
+    assert.match(pushManager, /"propertyUpdates": defaults\.bool/);
+    assert.match(rootView, /guestelOpenHotels/);
+});
+
 test('Guestel and its App Clip request the real iOS App Group entitlement', () => {
     const iosRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios');
     for (const relative of ['Guestel/Guestel.entitlements', 'GuestelClip/GuestelClip.entitlements']) {

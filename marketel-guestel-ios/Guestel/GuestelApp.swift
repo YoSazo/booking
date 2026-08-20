@@ -28,9 +28,15 @@ struct GuestelApp: App {
                     Task { await GuestPushManager.sync(store: store) }
                 }
                 .onOpenURL { url in
-                    guard url.scheme == "guestel", url.host == "messages" else { return }
+                    guard url.scheme == "guestel" else { return }
                     let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
                     let hotelId = components?.queryItems?.first(where: { $0.name == "hotelId" })?.value ?? ""
+                    if url.host == "hotel", !hotelId.isEmpty {
+                        GuestHotelRoute.save(hotelId: hotelId)
+                        NotificationCenter.default.post(name: .guestelOpenHotels, object: nil, userInfo: ["hotelId": hotelId])
+                        return
+                    }
+                    guard url.host == "messages" else { return }
                     let code = components?.queryItems?.first(where: { $0.name == "code" })?.value ?? ""
                     GuestMessageRoute.save(hotelId: hotelId, code: code)
                     NotificationCenter.default.post(name: .guestelOpenMessages, object: nil, userInfo: ["hotelId": hotelId, "code": code])

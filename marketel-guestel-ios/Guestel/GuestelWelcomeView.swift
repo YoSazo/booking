@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GuestelWelcomeView: View {
+    @Environment(GuestStore.self) private var store
     let arrival: GuestelArrival
     let onDone: () -> Void
 
@@ -22,14 +23,14 @@ struct GuestelWelcomeView: View {
                 }
 
                 Text(arrival.stay == nil
-                     ? "Book direct from your hotel wallet and return without searching again."
+                     ? "The property invited you to stay connected directly—without a booking-site middleman."
                      : "Your reservation, Front Desk messages, and future direct bookings now live together.")
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
 
                 VStack(spacing: 0) {
-                    benefit("bell.badge.fill", "Stay updates on your phone")
+                    benefit("banknote.fill", arrival.stay == nil ? "Direct rates and property offers" : "Stay updates on your phone")
                     Divider().padding(.leading, 44)
                     benefit("bubble.left.and.bubble.right.fill", "Message the Front Desk")
                     Divider().padding(.leading, 44)
@@ -39,10 +40,14 @@ struct GuestelWelcomeView: View {
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                 Button {
-                    if arrival.stay != nil { GuestPushManager.requestAuthorization() }
+                    if arrival.stay == nil {
+                        UserDefaults.standard.set(true, forKey: "guestel.notif.deals")
+                    }
+                    GuestPushManager.requestAuthorization()
+                    Task { await GuestPushManager.sync(store: store) }
                     onDone()
                 } label: {
-                    Text(arrival.stay == nil ? "View in Guestel" : "Turn on stay updates")
+                    Text(arrival.stay == nil ? "Allow direct updates" : "Turn on stay updates")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -50,12 +55,10 @@ struct GuestelWelcomeView: View {
                         .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
 
-                if arrival.stay != nil {
-                    Button("Not now", action: onDone)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.inkSoft)
-                        .frame(maxWidth: .infinity)
-                }
+                Button("Not now", action: onDone)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.inkSoft)
+                    .frame(maxWidth: .infinity)
             }
             .padding(22)
         }

@@ -6731,6 +6731,12 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppHomeScreenViewed',
     'GuestAppRebookViewed',
     'GuestAppBroadcastViewed',
+    // Guestel replaced the promoted Home Screen/PWA path. Keep the historic
+    // names above so old sessions remain readable; new sessions use these
+    // three compact beats.
+    'GuestelInstallFlowViewed',
+    'GuestelWalletViewed',
+    'GuestelReachViewed',
     'AssistantTextProofViewed',
     'AssistantAppProofViewed',
     'AssistantFallbackViewed',
@@ -7187,7 +7193,7 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
         if (!hotelId) return;
 
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const [events, installedBookings, recentBookings, guestPushSubscribers] = await Promise.all([
+        const [events, installedBookings, recentBookings, legacyGuestPushSubscribers, nativeStayDevices, guestelPropertyDevices] = await Promise.all([
             prisma.guestInstallEvent.findMany({
                 where: { hotelId, createdAt: { gte: since } },
                 select: { touchpoint: true, eventType: true, reservationCode: true },
@@ -7201,7 +7207,27 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
             prisma.pushSubscription.count({
                 where: { hotelId, source: 'guest' },
             }).catch(() => 0),
+            prisma.guestNativePushDevice.findMany({
+                where: { hotelId, active: true, deals: true },
+                select: { deviceToken: true },
+                distinct: ['deviceToken'],
+            }).catch(() => []),
+            prisma.guestelPropertyDevice?.findMany({
+                where: { hotelId, active: true },
+                select: { deviceToken: true, updates: true },
+                distinct: ['deviceToken'],
+            }).catch(() => []),
         ]);
+
+        const guestelSavedDevices = new Set(guestelPropertyDevices.map(row => row.deviceToken)).size;
+        const guestelBroadcastTokens = new Set([
+            ...nativeStayDevices.map(row => row.deviceToken),
+            ...guestelPropertyDevices.filter(row => row.updates).map(row => row.deviceToken),
+        ]);
+        // Legacy web endpoints and APNs tokens are different identifiers, so a
+        // cross-channel duplicate cannot be safely merged. New iPhone users use
+        // Guestel only; this sum keeps existing PWA users reachable in silence.
+        const guestPushSubscribers = legacyGuestPushSubscribers + guestelBroadcastTokens.size;
 
         const byTouchpoint = {};
         for (const ev of events) {
@@ -7263,10 +7289,40 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
             recentBookings,
             installRatePercent: installRate,
             guestPushSubscribers,
+            legacyGuestPushSubscribers,
+            guestelSavedDevices,
+            guestelBroadcastSubscribers: guestelBroadcastTokens.size,
             byTouchpoint,
         });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Front Desk can hand a checking-in guest a one-use Guestel QR without exposing
+// the reservation capability itself. Scanning it transfers exactly that stay;
+// the bridge expires after 24 hours and can be claimed only once.
+app.post('/api/crm/guestel-handoff', crmAuth, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const reservationCode = String(req.body?.reservationCode || '').trim();
+        if (!reservationCode) {
+            return res.status(400).json({ success: false, message: 'Choose a guest reservation first.' });
+        }
+        const booking = await findGuestBooking(hotelId, reservationCode);
+        if (!booking || isDeadBookingStatus(booking.status)) {
+            return res.status(404).json({ success: false, message: 'That active reservation could not be found.' });
+        }
+        const handoffToken = await issueGuestAppHandoff(booking);
+        if (!handoffToken) {
+            return res.status(503).json({ success: false, message: 'Could not prepare the Guestel pass.' });
+        }
+        res.json({ success: true, handoffToken, expiresInHours: 24 });
+    } catch (error) {
+        console.error('crm/guestel-handoff:', error.message);
+        res.status(500).json({ success: false, message: 'Could not prepare the Guestel pass.' });
     }
 });
 
@@ -7297,7 +7353,14 @@ app.post('/api/crm/guest-broadcast', crmAuth, async (req, res) => {
             data: { type: 'guest_broadcast', hotelId },
         }, { TTL: 60 * 60 }, 'guestBroadcast');
 
-        res.json({ success: true, sent: result.sent, nativeSent, failed: result.failed, cleaned: result.cleaned });
+        res.json({
+            success: true,
+            sent: result.sent + nativeSent,
+            webSent: result.sent,
+            nativeSent,
+            failed: result.failed,
+            cleaned: result.cleaned,
+        });
     } catch (e) {
         console.error('guest-broadcast error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to send broadcast' });
@@ -7646,14 +7709,37 @@ async function sendNativePushToGuestBooking(bookingId, payloadObj, opts = {}, la
 
 async function sendNativeBroadcastToHotelGuests(hotelId, payloadObj, opts = {}, label = 'guestNativeBroadcast') {
     if (!APNS_CONFIGURED || !hotelId || !prisma.guestNativePushDevice) return 0;
-    const rows = await prisma.guestNativePushDevice.findMany({
-        where: { hotelId, active: true, deals: true },
-        distinct: ['deviceToken'],
-    });
+    const [stayRows, propertyRows] = await Promise.all([
+        prisma.guestNativePushDevice.findMany({
+            where: { hotelId, active: true, deals: true },
+            distinct: ['deviceToken'],
+        }),
+        prisma.guestelPropertyDevice?.findMany({
+            where: { hotelId, active: true, updates: true },
+            distinct: ['deviceToken'],
+        }) || [],
+    ]);
+    const rows = [...new Map([...stayRows, ...propertyRows].map(row => [row.deviceToken, row])).values()];
     if (!rows.length) return 0;
     const results = await Promise.allSettled(rows.map(device =>
         sendApnsRequest(device, payloadObj, { ...opts, topic: GUESTEL_APNS_BUNDLE_ID })
     ));
+    const deadReasons = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
+    const deadTokens = results
+        .map((result, index) => result.status === 'rejected' && deadReasons.has(result.reason?.reason) ? rows[index].deviceToken : null)
+        .filter(Boolean);
+    if (deadTokens.length) {
+        await Promise.all([
+            prisma.guestNativePushDevice.updateMany({
+                where: { deviceToken: { in: deadTokens } },
+                data: { active: false },
+            }).catch(() => {}),
+            prisma.guestelPropertyDevice?.updateMany({
+                where: { deviceToken: { in: deadTokens } },
+                data: { active: false },
+            }).catch(() => {}),
+        ]);
+    }
     const sent = results.filter(result => result.status === 'fulfilled').length;
     console.log(`📲 [guest-apns] ${label} hotel=${hotelId}: ${sent}/${rows.length} sent`);
     return sent;
@@ -12955,9 +13041,22 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
             const valid = claimed.filter(booking => reservationClaims.some(claim => claim.bookingId === booking.id && claim.hotelId === booking.hotelId));
             bookings = [...new Map([...bookings, ...valid].map(booking => [booking.id, booking])).values()];
         }
-        if (!bookings.length) return res.status(401).json({ success: false, message: 'Verify a stay before enabling notifications.' });
+        const requestedHotelIds = [...new Set((Array.isArray(req.body?.hotelIds) ? req.body.hotelIds : [])
+            .slice(0, 100)
+            .map(value => String(value || '').trim())
+            .filter(Boolean))];
+        const activeHotels = requestedHotelIds.length
+            ? await prisma.hotelConfig.findMany({
+                where: { id: { in: requestedHotelIds }, active: true },
+                select: { id: true },
+            })
+            : [];
+        if (!bookings.length && !activeHotels.length) {
+            return res.status(401).json({ success: false, message: 'Save a property or verify a stay before enabling notifications.' });
+        }
         const preferences = req.body?.preferences || {};
-        await prisma.$transaction(bookings.map(booking => prisma.guestNativePushDevice.upsert({
+        const propertyUpdates = preferences.propertyUpdates === true || preferences.deals === true;
+        const writes = bookings.map(booking => prisma.guestNativePushDevice.upsert({
             where: { deviceToken_bookingId: { deviceToken, bookingId: booking.id } },
             create: {
                 deviceToken,
@@ -12967,7 +13066,7 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
                 reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
                 stayUpdates: preferences.stayUpdates !== false,
                 messages: preferences.messages !== false,
-                deals: preferences.deals === true,
+                deals: propertyUpdates,
             },
             update: {
                 environment,
@@ -12975,12 +13074,35 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
                 reservationCode: booking.pmsConfirmationCode || booking.ourReservationCode,
                 stayUpdates: preferences.stayUpdates !== false,
                 messages: preferences.messages !== false,
-                deals: preferences.deals === true,
+                deals: propertyUpdates,
                 active: true,
                 lastSeenAt: new Date(),
             },
-        })));
-        res.json({ success: true, registeredStays: bookings.length, pushConfigured: APNS_CONFIGURED });
+        }));
+        activeHotels.forEach(hotel => {
+            writes.push(prisma.guestelPropertyDevice.upsert({
+                where: { deviceToken_hotelId: { deviceToken, hotelId: hotel.id } },
+                create: {
+                    deviceToken,
+                    environment,
+                    hotelId: hotel.id,
+                    updates: propertyUpdates,
+                },
+                update: {
+                    environment,
+                    updates: propertyUpdates,
+                    active: true,
+                    lastSeenAt: new Date(),
+                },
+            }));
+        });
+        await prisma.$transaction(writes);
+        res.json({
+            success: true,
+            registeredStays: bookings.length,
+            registeredProperties: activeHotels.length,
+            pushConfigured: APNS_CONFIGURED,
+        });
     } catch (error) {
         console.error('Guestel native push register error:', error.message);
         res.status(500).json({ success: false, message: 'Could not enable notifications.' });
@@ -12999,12 +13121,24 @@ app.post('/api/guest/native/push/unregister', guestNativePushRateLimit, async (r
             .map(token => readReservationToken(token))
             .filter(Boolean);
         bookingIds = [...new Set([...bookingIds, ...claims.map(claim => claim.bookingId)])];
-        if (!bookingIds.length) return res.status(401).json({ success: false, message: 'No verified stays were supplied.' });
-        const result = await prisma.guestNativePushDevice.updateMany({
-            where: { deviceToken, bookingId: { in: bookingIds } },
-            data: { active: false },
-        });
-        res.json({ success: true, unregistered: result.count });
+        const hotelIds = [...new Set((Array.isArray(req.body?.hotelIds) ? req.body.hotelIds : [])
+            .slice(0, 100)
+            .map(value => String(value || '').trim())
+            .filter(Boolean))];
+        if (!bookingIds.length && !hotelIds.length) {
+            return res.status(401).json({ success: false, message: 'No Guestel properties or stays were supplied.' });
+        }
+        const [stayResult, propertyResult] = await Promise.all([
+            bookingIds.length ? prisma.guestNativePushDevice.updateMany({
+                where: { deviceToken, bookingId: { in: bookingIds } },
+                data: { active: false },
+            }) : { count: 0 },
+            hotelIds.length ? prisma.guestelPropertyDevice.updateMany({
+                where: { deviceToken, hotelId: { in: hotelIds } },
+                data: { active: false },
+            }) : { count: 0 },
+        ]);
+        res.json({ success: true, unregistered: stayResult.count + propertyResult.count });
     } catch (error) {
         console.error('Guestel native push unregister error:', error.message);
         res.status(500).json({ success: false, message: 'Could not disable notifications.' });

@@ -745,7 +745,7 @@ function startPostActivationTabTour() {
     {
       tab: 'apps',
       navFilter: 'apps',
-      text: '<strong>Last step: open Guest Reach.</strong> Guests save your property from its booking page; you use this tab in Marketel Front Desk to share the QR, choose their Home Screen icon and send notifications.',
+      text: '<strong>Last step: open Guestel.</strong> Share the Guestel QR, see your property card, reply to verified guests, and send updates to guests who opt in.',
     },
   ];
 
@@ -792,7 +792,7 @@ function startPostActivationTabTour() {
         <div style="background:#1a1a2e;border-radius:12px;padding:16px 18px;color:#fff;font-size:13px;line-height:1.55;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.55);">What's unlocked · ${stepIdx + 1} / ${steps.length}</p>
           <p style="margin:0 0 14px;">${s.text}</p>
-          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Open Guest Reach' : 'Next tab →'}</button>
+          <button type="button" id="postActivationTourNext" style="width:100%;padding:12px;border-radius:10px;border:none;background:#2E7D5B;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${isLast ? 'Open Guestel' : 'Next tab →'}</button>
           <button type="button" id="postActivationTourSkip" style="width:100%;margin-top:8px;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Skip tour</button>
         </div>`;
       document.body.appendChild(tooltip);

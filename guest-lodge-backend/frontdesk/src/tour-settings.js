@@ -577,7 +577,7 @@ function scrollTourTargetIntoView(el, stepDef, options) {
 
 function handoffToGuestAppsTour() {
   cleanupSettingsTourUi();
-  // Keep a marker so refresh mid–Guest Reach tour does not auto-mark settings tour done.
+  // Keep a marker so refresh mid-Guestel tour does not auto-mark settings tour done.
   localStorage.setItem('settingsTourStep', 'handoff');
   const go = () => {
     const tabBtn = document.querySelector('.tab[data-nav-filter="apps"]') || document.querySelector('.mobile-nav-item[data-nav-filter="apps"]');
@@ -1363,12 +1363,12 @@ function startSettingsTour() {
               <div style="height:100%;width:${Math.round((1 / steps.length) * 100)}%;border-radius:999px;background:#2E7D5B;"></div>
             </div>
           </div>
-          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">You're on their home screen</div>
-          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">Guests save <strong>${hName}</strong> to their Home Screen from your booking page. Your property sits beside their other icons—no App Store and no searching <span style="text-decoration:line-through;color:#9ca3af;">Booking.com</span> or <span style="text-decoration:line-through;color:#9ca3af;">Airbnb</span>.</p>
+          <div style="font-size:18px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3;">Your property stays with them in Guestel</div>
+          <p style="font-size:13px;color:#4b5563;line-height:1.55;margin:0 0 14px;">Guests add <strong>${hName}</strong> to Guestel from your booking page or QR. Your rooms, their stay and your messages remain one tap away without sending them back to <span style="text-decoration:line-through;color:#9ca3af;">Booking.com</span> or <span style="text-decoration:line-through;color:#9ca3af;">Airbnb</span>.</p>
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
             <p style="font-size:13px;color:#166534;margin:0;line-height:1.5;">They just <strong>tap your icon and book direct</strong> — every single time. No OTA commission, and they never drift to a competitor.</p>
           </div>
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Guests save your property from your booking page or QR—never from the App Store. Share it under <strong>Guest Reach</strong>.</p>
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 16px;line-height:1.5;">Share your Guestel QR from the <strong>Guestel</strong> tab whenever a guest is in front of you.</p>
           <button id="tourNextBtn" style="width:100%;padding:14px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Show me around →</button>
           <div style="margin-top:8px;"><button id="tourSkipBtn" style="background:none;border:none;color:#9ca3af;font-size:11px;font-family:inherit;cursor:pointer;padding:4px 8px;">Skip tour</button></div>
         </div>

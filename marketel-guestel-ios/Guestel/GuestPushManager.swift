@@ -5,6 +5,7 @@ import UserNotifications
 extension Notification.Name {
     static let guestelDeviceTokenChanged = Notification.Name("guestelDeviceTokenChanged")
     static let guestelOpenMessages = Notification.Name("guestelOpenMessages")
+    static let guestelOpenHotels = Notification.Name("guestelOpenHotels")
 }
 
 final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -44,13 +45,40 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         let nested = userInfo["data"] as? [String: Any]
         let hotelId = (userInfo["hotelId"] as? String) ?? nested?["hotelId"] as? String ?? ""
         let code = nested?["reservationCode"] as? String ?? ""
+        let type = nested?["type"] as? String ?? ""
         guard !hotelId.isEmpty else { return }
+        if type == "guest_broadcast" {
+            GuestHotelRoute.save(hotelId: hotelId)
+            NotificationCenter.default.post(
+                name: .guestelOpenHotels,
+                object: nil,
+                userInfo: ["hotelId": hotelId]
+            )
+            return
+        }
         GuestMessageRoute.save(hotelId: hotelId, code: code)
         NotificationCenter.default.post(
             name: .guestelOpenMessages,
             object: nil,
             userInfo: ["hotelId": hotelId, "code": code]
         )
+    }
+}
+
+enum GuestHotelRoute {
+    private static let hotelKey = "guestel.pendingHotel.hotel"
+
+    static func save(hotelId: String) {
+        UserDefaults.standard.set(hotelId, forKey: hotelKey)
+    }
+
+    static var pendingHotelId: String? {
+        guard let hotelId = UserDefaults.standard.string(forKey: hotelKey), !hotelId.isEmpty else { return nil }
+        return hotelId
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: hotelKey)
     }
 }
 
@@ -101,16 +129,18 @@ enum GuestPushManager {
         let messages = defaults.object(forKey: "guestel.notif.messages") == nil
             ? true : defaults.bool(forKey: "guestel.notif.messages")
         let reservationTokens = store.reservations.compactMap(\.accessToken).filter { !$0.isEmpty }
-        guard GuestIdentityAccess.token != nil || !reservationTokens.isEmpty else { return }
+        let hotelIds = Array(Set(store.hotels.map(\.hotelId).filter { !$0.isEmpty }))
+        guard GuestIdentityAccess.token != nil || !reservationTokens.isEmpty || !hotelIds.isEmpty else { return }
         try? await BookingAPI.registerPush(
             deviceToken: token,
             environment: "production",
             reservationTokens: reservationTokens,
+            hotelIds: hotelIds,
             identityToken: GuestIdentityAccess.token,
             preferences: [
                 "stayUpdates": stayUpdates,
                 "messages": messages,
-                "deals": defaults.bool(forKey: "guestel.notif.deals"),
+                "propertyUpdates": defaults.bool(forKey: "guestel.notif.deals"),
             ]
         )
     }
@@ -119,9 +149,11 @@ enum GuestPushManager {
     static func unregister(store: GuestStore) async {
         guard let token = UserDefaults.standard.string(forKey: deviceTokenKey), !token.isEmpty else { return }
         let reservationTokens = store.reservations.compactMap(\.accessToken).filter { !$0.isEmpty }
+        let hotelIds = Array(Set(store.hotels.map(\.hotelId).filter { !$0.isEmpty }))
         try? await BookingAPI.unregisterPush(
             deviceToken: token,
             reservationTokens: reservationTokens,
+            hotelIds: hotelIds,
             identityToken: GuestIdentityAccess.token
         )
         UserDefaults.standard.removeObject(forKey: deviceTokenKey)

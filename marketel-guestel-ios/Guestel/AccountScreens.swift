@@ -180,7 +180,7 @@ struct NotificationsView: View {
                     Divider().padding(.leading, 16)
                     ToggleRow(title: "Messages", subtitle: "Replies from the front desk", isOn: $messages)
                     Divider().padding(.leading, 16)
-                    ToggleRow(title: "Deals", subtitle: "Direct-booking offers from your hotels", isOn: $deals)
+                    ToggleRow(title: "Property updates", subtitle: "Direct rates and offers from saved hotels", isOn: $deals)
                 }
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }

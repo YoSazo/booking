@@ -415,7 +415,7 @@ function appsTourRender() {
     const primaryLabel = step.primaryLabel || (isLast ? 'Done' : 'Next');
     const secondaryLabel = step.secondaryLabel || (isLast ? 'Not now' : 'Skip tour');
     const backDisabled = _appsTourIdx <= 0;
-    const kicker = step.kicker || 'Guest Reach';
+    const kicker = step.kicker || 'Guestel';
     const tip = document.createElement('div');
     tip.id = 'appsTourTooltip';
     tip.style.cssText = `position:fixed;z-index:100003;left:12px;top:14px;width:${maxWidth}px;max-width:${maxWidth}px;visibility:hidden;`;
@@ -515,42 +515,32 @@ function startAppsTour(opts) {
   _appsTourSteps = nativeMode ? [
     {
       target: '#tour-guest-reach',
-      kicker: 'Direct guest reach',
-      title: 'Send a push notification directly to their phone.',
-      text: 'Every guest who saves your property to their Home Screen and allows notifications can receive a message from you.',
+      kicker: 'Guestel updates',
+      title: 'Reach guests who choose to hear from you.',
+      text: 'Guests who keep your property in Guestel and allow property updates can receive a notification from you.',
       tooltipPosition: 'above',
     },
     {
       target: '#tour-native-guest-share',
-      kicker: 'Build your audience',
-      title: 'Help guests save your property.',
-      text: 'Show the QR, copy the Home Screen link, or open the booking page. Guests save your property from there—never from the App Store.',
+      kicker: 'Invite guests',
+      title: 'Give them one Guestel link.',
+      text: 'Show the QR or copy the Guestel link. Guests can book immediately, then keep your property and stay in Guestel.',
       tooltipPosition: 'above',
     },
     {
       target: '#tour-guest-icon-section',
       kicker: 'Make it yours',
-      title: 'Choose the icon guests will save.',
-      text: 'Use your logo or a clear property photo.',
+      title: 'Choose how your property appears.',
+      text: 'Use your logo or a clear property photo for your Guestel card.',
       scrollBlock: 'start',
       tooltipPosition: 'below',
-    },
-    {
-      target: '#tour-native-install-guide',
-      kicker: 'Your cheat sheet',
-      title: 'Know exactly what to tell them.',
-      text: 'Open this anytime to practice the exact Safari taps for older iPhones and every iOS 26 layout.',
-      primaryLabel: 'Show me',
-      secondaryLabel: 'Close',
-      openGuestInstallCoachOnNext: true,
-      tooltipPosition: 'above',
     },
   ] : [
     {
       target: '#tour-apps-intro',
       kicker: 'The loop',
       title: 'One system with a clear side for you and for guests.',
-      text: 'You use Marketel Front Desk. Guests use your booking page and can save your property to their Home Screen.',
+      text: 'You use Marketel Front Desk. Guests use Guestel and your direct booking experience.',
     },
     {
       target: '#tour-apps-first',
@@ -564,8 +554,8 @@ function startAppsTour(opts) {
     {
       target: '#tour-apps-then',
       kicker: 'Their side',
-      title: 'Guests save your property from the booking page.',
-      text: 'They tap Add to Home Screen and your property gets its own icon. They never download Marketel Front Desk.',
+      title: 'Guests keep your property in Guestel.',
+      text: 'They tap Add on your booking page. Guestel keeps your property, reservations, and messages together.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
@@ -574,7 +564,7 @@ function startAppsTour(opts) {
       target: '#tour-apps-after',
       kicker: 'Direct reach',
       title: 'Send a notification to their phone whenever you want.',
-      text: 'Anyone who saves your property and allows notifications becomes reachable from Marketel Front Desk.',
+      text: 'Anyone who keeps your property in Guestel and opts into property updates becomes reachable from Marketel Front Desk.',
       scrollBlock: 'center',
       tooltipPosition: 'below',
       tooltipGap: 8,
@@ -582,8 +572,8 @@ function startAppsTour(opts) {
     {
       target: '#tour-guest-icon-section',
       kicker: 'One setup item',
-      title: 'Make the icon feel like your property.',
-      text: 'A real logo or a clear photo. Guests see this square every time.',
+      title: 'Make the Guestel card feel like your property.',
+      text: 'Use a real logo or a clear property photo.',
       scrollBlock: 'start',
       tooltipPosition: 'auto',
       tooltipGap: 10,
@@ -593,8 +583,8 @@ function startAppsTour(opts) {
       kicker: hotelIsLive ? 'Live loop' : 'Activation',
       title: hotelIsLive ? 'This loop is on.' : 'Everything is ready to turn on.',
       text: hotelIsLive
-        ? 'Guests book, save your property, receive your updates, and message you. Front Desk gets the alerts.'
-        : 'For $199/month, guests can book direct, save your property, receive your updates, and message you — while Front Desk receives the alerts.',
+        ? 'Guests book, keep your property in Guestel, receive opted-in updates, and message you. Front Desk gets the alerts.'
+        : 'For $199/month, guests can book direct, keep your property in Guestel, receive opted-in updates, and message you — while Front Desk receives the alerts.',
       primaryLabel: hotelIsLive ? 'Done' : 'Activate everything — $199/month',
       secondaryLabel: hotelIsLive ? 'Close' : 'Keep exploring',
       activateOnNext: !hotelIsLive,

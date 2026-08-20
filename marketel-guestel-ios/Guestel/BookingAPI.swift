@@ -337,23 +337,24 @@ enum BookingAPI {
         return try JSONDecoder().decode(GuestMessage.self, from: JSONSerialization.data(withJSONObject: raw))
     }
 
-    static func registerPush(deviceToken: String, environment: String, reservationTokens: [String], identityToken: String?, preferences: [String: Bool]) async throws {
+    static func registerPush(deviceToken: String, environment: String, reservationTokens: [String], hotelIds: [String], identityToken: String?, preferences: [String: Bool]) async throws {
         _ = try await post(
             "api/guest/native/push/register",
             [
                 "deviceToken": deviceToken,
                 "environment": environment,
                 "reservationTokens": reservationTokens,
+                "hotelIds": hotelIds,
                 "preferences": preferences,
             ],
             bearerToken: identityToken
         )
     }
 
-    static func unregisterPush(deviceToken: String, reservationTokens: [String], identityToken: String?) async throws {
+    static func unregisterPush(deviceToken: String, reservationTokens: [String], hotelIds: [String], identityToken: String?) async throws {
         _ = try await post(
             "api/guest/native/push/unregister",
-            ["deviceToken": deviceToken, "reservationTokens": reservationTokens],
+            ["deviceToken": deviceToken, "reservationTokens": reservationTokens, "hotelIds": hotelIds],
             bearerToken: identityToken
         )
     }

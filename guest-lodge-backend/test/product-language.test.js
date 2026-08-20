@@ -26,10 +26,11 @@ test('owner and guest products never collapse into ambiguous app language', () =
 });
 
 test('core owner surfaces teach the permanent two-side vocabulary', () => {
-    assert.match(productCopy, /Guest Reach/);
     assert.match(productCopy, /Guests never download Front Desk/);
-    assert.match(productCopy, /One owner app: Marketel Front Desk\. Guests never download it/);
-    assert.match(productCopy, /Guests use your direct booking page/);
+    assert.match(productCopy, /One owner app: Marketel Front Desk/);
+    assert.match(productCopy, /Your guests use Guestel/);
+    assert.match(productCopy, /Guests book on .*direct page/);
+    assert.match(productCopy, /keep your property in Guestel/i);
 });
 
 test('walk-in handling states the action and booking-page outcome', () => {

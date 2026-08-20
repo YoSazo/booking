@@ -307,6 +307,26 @@ model GuestNativePushDevice {
   @@index([deviceToken, active])
 }
 
+// A guest can keep a property in Guestel before making a reservation. This
+// subscription is deliberately separate from stay-scoped notification access:
+// it may receive property updates/direct offers, but it grants no reservation
+// or message-thread access.
+model GuestelPropertyDevice {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastSeenAt  DateTime @default(now())
+  deviceToken String
+  environment String   @default("production")
+  hotelId     String
+  updates     Boolean  @default(true)
+  active      Boolean  @default(true)
+
+  @@unique([deviceToken, hotelId])
+  @@index([hotelId, active, updates])
+  @@index([deviceToken, active])
+}
+
 model ManualRoom {
   id         String   @id @default(cuid())
   hotelId    String

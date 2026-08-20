@@ -377,7 +377,9 @@ function renderAppsView() {
   const hotelInitial = hName.trim().charAt(0).toUpperCase() || 'P';
   const domain      = crm.activeHotelDomain || '';
   const bookingUrl  = domain ? 'https://' + domain : '#';
-  const guestInstallUrl = domain ? 'https://' + domain + '/install' : '#';
+  const guestInstallUrl = crm.activeHotelId
+    ? `https://clip.mktel.co/clip/${encodeURIComponent(crm.activeHotelId)}?intent=book&ref=frontdesk-guestel`
+    : bookingUrl;
 
   function enc(arr) { return JSON.stringify(arr).replace(/"/g, '&quot;'); }
 
@@ -483,7 +485,7 @@ function renderAppsView() {
     : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:14px;font-size:24px;font-weight:800;">${hotelInitial}</span>`;
   const iconButtonClick = fdInApp
     ? "document.getElementById('appsAppIconInput').click()"
-    : "toast('Download Marketel Front Desk first. Then you can change the Home Screen icon guests save.', 'error')";
+    : "toast('Download Marketel Front Desk first. Then you can change the property image guests see in Guestel.', 'error')";
   const logoBlockHtml = `
     <div class="apps-icon-card">
       <div id="appsAppIconPreview" style="${iconBoxStyle}">
@@ -491,7 +493,7 @@ function renderAppsView() {
       </div>
       <div style="flex:1;min-width:0;">
         <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this icon after saving <strong>${hName}</strong> to their Home Screen.</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this image with <strong>${hName}</strong> in Guestel.</div>
         <button type="button" id="tour-guest-icon-btn" onclick="${iconButtonClick}" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change picture' : 'Upload picture'}</button>
         ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Download Marketel Front Desk first to upload this picture.</div>'}
       </div>
@@ -599,7 +601,7 @@ function renderAppsView() {
     </div>`;
   const guestIconCardHtml = () => `
     <div class="apps-step-card" id="tour-guest-icon-section">
-      <div class="apps-step-title" style="margin-bottom:14px;">Guest Home Screen icon</div>
+      <div class="apps-step-title" style="margin-bottom:14px;">Your property in Guestel</div>
       ${logoBlockHtml}
     </div>`;
   const guestPhonesCardHtml = `
@@ -621,26 +623,28 @@ function renderAppsView() {
     </details>`;
   const nativeGuestShareHtml = `
     <div class="apps-step-card" id="tour-native-guest-share">
-      <div class="apps-step-title" style="margin-bottom:14px;">Help guests save your property</div>
-      <div style="margin:-4px 0 14px;padding:11px 12px;border-radius:11px;background:var(--green-pale);color:#245a40;font-size:12px;line-height:1.5;"><strong>What to say:</strong> “Scan this, then tap Add to Home Screen. It saves our property—not Marketel.”</div>
-      <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show guest QR</button>
+      <div class="apps-step-title" style="margin-bottom:14px;">Invite guests into Guestel</div>
+      <div class="guestel-owner-preview" aria-label="Preview of the property in Guestel">
+        <div class="guestel-owner-preview__bar"><span>Guestel</span><b>Saved hotel</b></div>
+        <div class="guestel-owner-preview__card">
+          <div class="guestel-owner-preview__image">${iconInnerHtml}</div>
+          <div><strong>${hName}</strong><span>Direct booking · Messages · Stay updates</span></div>
+        </div>
+      </div>
+      <div style="margin:0 0 14px;padding:11px 12px;border-radius:11px;background:var(--green-pale);color:#245a40;font-size:12px;line-height:1.5;"><strong>What to say:</strong> “Scan this to book directly and keep us in Guestel.”</div>
+      <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show Guestel QR</button>
       ${guestInstallUrl !== '#' ? `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px;">
-          <button type="button" onclick="navigator.clipboard.writeText('${guestInstallUrl}').then(()=>toast('Home Screen link copied','success'))" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Copy Home Screen link</button>
-          <button type="button" onclick="openGuestBookingEngine({focusInstall:true})" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Open guest page</button>
+          <button type="button" onclick="navigator.clipboard.writeText('${guestInstallUrl}').then(()=>toast('Guestel link copied','success'))" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Copy Guestel link</button>
+          <button type="button" onclick="window.open('${guestInstallUrl}','_blank')" style="min-height:44px;padding:11px 9px;border-radius:11px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;">Open guest experience</button>
         </div>
         <div id="guestInstallStats" style="display:none;margin-top:14px;"></div>`
         : '<div id="guestInstallStats" style="display:none;"></div><div style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px;">Booking domain is still setting up.</div>'}
-      <button type="button" class="apps-install-coach-trigger" id="tour-native-install-guide" onclick="appsOpenGuestInstallCoach()">
-        <span class="apps-install-coach-trigger__icon" aria-hidden="true">${appsAppleShareGlyph()}</span>
-        <span><strong>Show installation steps</strong><small>Practice exactly what to tell an iPhone guest</small></span>
-        <b aria-hidden="true">›</b>
-      </button>
     </div>`;
   const guestMessagesPanelHtml = '<div id="messagesPanel"></div>';
   const nativeGuestToolsHtml = `
-    <div class="apps-native-title">Guest Reach</div>
-    <p class="apps-native-lead">Guests save your property from its booking page—never from the App Store. If they allow notifications, you can reach their phone from Marketel Front Desk.</p>
+    <div class="apps-native-title">Guestel</div>
+    <p class="apps-native-lead">Guests keep <strong>${hName}</strong> in Guestel for direct booking, reservation updates, and messages. You manage that relationship here.</p>
     ${guestMessagesPanelHtml}
     ${guestBroadcastCardHtml({ compact: true })}
     ${nativeGuestShareHtml}
@@ -650,9 +654,9 @@ function renderAppsView() {
     <section style="min-height:52vh;display:grid;place-items:center;padding:34px 0;">
       <div style="width:min(100%,430px);padding:28px 24px;border:1.5px solid var(--border);border-radius:22px;background:#fff;text-align:center;box-shadow:0 14px 40px rgba(26,43,34,.09);">
         <div style="width:58px;height:58px;display:grid;place-items:center;margin:0 auto 16px;border-radius:17px;background:var(--green-pale);color:var(--green);font-size:25px;"><i data-lucide="arrow-up-right" style="width:15px;height:15px;"></i></div>
-        <div style="font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--green);">Front Desk app</div>
-        <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Guest Reach lives in the owner app.</h2>
-        <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Marketel Front Desk from the App Store to share your booking page, choose the Home Screen icon guests save, reply to guests, and send notifications.</p>
+        <div style="font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--green);">Guestel tools</div>
+        <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Manage Guestel from the owner app.</h2>
+        <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Marketel Front Desk to share your Guestel QR, reply to verified guests, and send updates to guests who opt in.</p>
         <button type="button" onclick="openFrontdeskAppDownload()" ${appStoreReady ? '' : 'aria-disabled="true"'} style="width:100%;min-height:50px;border:0;border-radius:13px;background:${appStoreReady ? 'var(--green)' : '#dce8e1'};color:${appStoreReady ? '#fff' : '#527061'};font-family:inherit;font-size:15px;font-weight:800;cursor:${appStoreReady ? 'pointer' : 'default'};">${appStoreReady ? 'Download Marketel Front Desk' : 'Front Desk app coming soon'}</button>
       </div>
     </section>`;
@@ -664,8 +668,8 @@ function renderAppsView() {
   const appsFootnoteHtml = nativePresentation
     ? ''
     : fdInApp
-    ? 'Front Desk is installed. Guests can install your property from the direct booking page.'
-    : 'You download Marketel Front Desk from the App Store. Guests never download it; they save your property from its booking page.';
+    ? 'Front Desk is installed. Guests use Guestel; owners use Marketel Front Desk.'
+    : 'You use Marketel Front Desk. Guests use Guestel.';
 
   el.innerHTML = `
   <style>
@@ -703,6 +707,15 @@ function renderAppsView() {
     .apps-step-card { background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow); }
     .apps-step-title { font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.35; }
     .apps-icon-card { display:flex;align-items:center;gap:14px; }
+    .guestel-owner-preview { margin:-2px 0 14px;padding:12px;border:1px solid #CFE0D6;border-radius:16px;background:linear-gradient(145deg,#EAF4EE,#F8FAF9); }
+    .guestel-owner-preview__bar { display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;color:var(--green);font-size:11px;font-weight:850;letter-spacing:.04em;text-transform:uppercase; }
+    .guestel-owner-preview__bar b { color:var(--text-muted);font-size:9px;letter-spacing:.05em; }
+    .guestel-owner-preview__card { min-height:78px;display:grid;grid-template-columns:54px minmax(0,1fr);align-items:center;gap:12px;padding:12px;border-radius:15px;background:#fff;box-shadow:0 8px 22px rgba(26,43,34,.11); }
+    .guestel-owner-preview__image { width:54px;height:54px;display:grid;place-items:center;overflow:hidden;border-radius:13px;background:var(--green); }
+    .guestel-owner-preview__image > img,.guestel-owner-preview__image > span { width:100% !important;height:100% !important;border-radius:13px !important;object-fit:cover; }
+    .guestel-owner-preview__card strong,.guestel-owner-preview__card span { display:block;min-width:0; }
+    .guestel-owner-preview__card strong { overflow:hidden;color:var(--text);font-size:15px;font-weight:850;text-overflow:ellipsis;white-space:nowrap; }
+    .guestel-owner-preview__card span { margin-top:4px;color:var(--text-muted);font-size:10.5px;line-height:1.35; }
     .apps-how-label { font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:22px 0 10px; }
     .apps-how-sub { font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.45; }
     .apps-q-list { display:flex;flex-direction:column;gap:8px;margin-bottom:20px; }
@@ -845,7 +858,9 @@ async function loadGuestInstallStats() {
     const views = t.views || 0;
     const notificationPrompts = t.notification_prompts || 0;
     const notificationSubscribers = data.guestPushSubscribers || 0;
-    if (!installed && !views) {
+    const guestelSavedDevices = data.guestelSavedDevices || 0;
+    const guestelBroadcastSubscribers = data.guestelBroadcastSubscribers || 0;
+    if (!installed && !views && !data.guestelSavedDevices && !data.guestelBroadcastSubscribers) {
       el.style.display = 'none';
       el.innerHTML = '';
       return;
@@ -866,21 +881,19 @@ async function loadGuestInstallStats() {
     }).join('') : '';
 
     el.innerHTML = ''
-      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Home Screen activity — last 30 days</div>'
+      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px;">Guestel activity</div>'
       + '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">'
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
-      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + rate + '%</div>'
-      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">of bookings installed</div></div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + guestelSavedDevices + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">devices keeping your property</div></div>'
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
-      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + installed + '</div>'
-      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">confirmed installs</div></div>'
-      + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
-      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + views + '</div>'
-      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">install page views</div></div>'
+      + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + guestelBroadcastSubscribers + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Guestel devices opted into updates</div></div>'
       + '<div style="flex:1;min-width:80px;background:var(--bg);border-radius:10px;padding:10px;text-align:center;">'
       + '<div style="font-size:20px;font-weight:800;color:var(--text);">' + notificationSubscribers + '</div>'
-      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">guests reachable now</div></div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">total reachable devices</div></div>'
       + '</div>'
+      + ((installed || views || rate) ? '<div style="font-size:10px;color:var(--text-muted);line-height:1.45;margin:-2px 0 10px;">Legacy Home Screen activity remains supported for existing installs: ' + installed + ' confirmed installs · ' + views + ' install views · ' + rate + '% of recent bookings.</div>' : '')
       + (notificationPrompts ? '<div style="font-size:11px;color:var(--text-muted);margin:-2px 0 10px;">Notification permission: ' + (t.notification_granted || 0) + ' granted · ' + (t.notification_denied || 0) + ' denied · ' + (t.notification_dismissed || 0) + ' dismissed · ' + (t.notification_failed || 0) + ' failed</div>' : '')
       + (rowHtml ? '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">By touchpoint</div>' + rowHtml : '');
   } catch (e) {

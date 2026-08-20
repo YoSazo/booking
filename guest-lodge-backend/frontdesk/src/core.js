@@ -1785,7 +1785,7 @@ function blockedDemandLineHtml() {
 
 // D19: the persistent, every-tab surface is a CALM STATUS PILL — not a sales
 // banner. The full gradient CTA card (goLiveInlineCardHtml) is reserved for
-// high-intent moments (Bookings empty state, Your page, Guest Reach). When real
+// high-intent moments (Bookings empty state, Your page, Guestel). When real
 // blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
 // that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
@@ -2168,7 +2168,7 @@ function renderGrowthPanel() {
 
   const openGoogleBtn = bookingUrl ? `<a class="growth-btn growth-btn-ghost" href="https://business.google.com/" target="_blank" rel="noopener">Open Google Business &#8599;</a>` : '';
   const textBtn = bookingUrl ? `<button type="button" class="growth-btn growth-btn-ghost" onclick="navigator.clipboard.writeText('${urlAttr}').then(()=>toast('Link copied!','success'))">Copy link to text</button>` : '';
-  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="openGuestAppSharing()">Open Guest Reach</button>`;
+  const qrBtn = `<button type="button" class="growth-btn growth-btn-primary" onclick="openGuestAppSharing()">Open Guestel</button>`;
 
   const gbpStep = step('gbp', 'Biggest lever', 'Add your link to Google', 'Most guests find motels on Google Maps. Paste your booking link into your Google Business Profile so they book direct instead of through an OTA.', openGoogleBtn + linkBoxHtml);
   const qrStep = step('qr', '', 'Share a QR at check-in', 'Guests can scan it to save your property and book direct next time. Print it or show it during check-in.', qrBtn);
@@ -4129,10 +4129,10 @@ function applyGuestBroadcastAudienceUi() {
   const count = crm.guestPushSubscriberCount || 0;
   if (audience) {
     audience.textContent = count === 0
-      ? 'No guests have notifications on yet. Share your Home Screen link or QR first.'
+      ? 'No Guestel devices have opted into property updates yet. Share your Guestel QR first.'
       : count === 1
-        ? '1 guest can receive this notification.'
-        : count + ' guests can receive this notification.';
+        ? '1 opted-in device can receive this notification.'
+        : count + ' opted-in devices can receive this notification.';
     audience.style.color = count === 0 ? 'var(--text-muted)' : '#166534';
     audience.style.fontWeight = count === 0 ? '500' : '700';
     audience.style.background = count === 0 ? 'var(--bg)' : '#f0fdf4';
@@ -4176,9 +4176,9 @@ function guestBroadcastCardHtml(options = {}) {
   }]).replace(/"/g, '&quot;');
   return `<div id="guestBroadcastCard" class="apps-broadcast-card guest-reach-card" data-compact="${compact ? 'true' : 'false'}">
     <div id="tour-guest-reach" class="guest-reach-intro">
-      <div class="guest-reach-kicker">Direct to their phone</div>
-      <div class="guest-reach-title">Reach guests whenever you want.</div>
-      <p>Once a guest saves your property to their Home Screen and allows notifications, you can send a push notification directly to their phone from Marketel Front Desk.</p>
+      <div class="guest-reach-kicker">Guestel notifications</div>
+      <div class="guest-reach-title">Reach guests who choose to hear from you.</div>
+      <p>When a guest keeps your property in Guestel and allows property updates, you can send a push notification directly to their phone from Marketel Front Desk.</p>
     </div>
     <div id="guest-broadcast-audience" style="font-size:12px;line-height:1.45;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);">Checking who can receive notifications…</div>
     <div class="guest-notification-demo" aria-label="Preview of the notification guests will receive">
@@ -4193,7 +4193,7 @@ function guestBroadcastCardHtml(options = {}) {
       </div>
       <div class="guest-notification-caption">This is what arrives on their phone.</div>
     </div>
-    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" class="guest-reach-suggestion">Suggest a Home Screen reminder</button>'}
+    ${compact ? '' : '<button type="button" onclick="prefillGuestInstallBroadcast()" class="guest-reach-suggestion">Draft a Guestel invitation</button>'}
     <div style="margin-bottom:8px;">
       <label for="guest-broadcast-title" style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;">Notification title</label>
       <input type="text" id="guest-broadcast-title" value="${hNameAttr}" maxlength="120" placeholder="e.g. Weekend dates just opened" oninput="updateGuestBroadcastPreview()" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;">
@@ -4301,7 +4301,7 @@ function applyFilter() {
         else renderMessages();
       }
     }).catch(() => {
-      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guest Reach</div></div>';
+      if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guestel</div></div>';
     });
     return;
   }
@@ -5067,12 +5067,18 @@ function getBookingReservationCode(b) {
   return (b && (b.pmsConfirmationCode || b.ourReservationCode)) || '';
 }
 
-function buildGuestInstallUrlForQr(reservationCode, ref) {
+function buildGuestInstallUrlForQr(reservationCode, ref, handoffToken) {
+  const hotelId = crm.activeHotelId || '';
   const domain = crm.activeHotelDomain || '';
-  if (!domain) return '';
-  const params = new URLSearchParams({ ref: ref || 'frontdesk-qr-generic' });
-  if (reservationCode) params.set('code', reservationCode);
-  return 'https://' + domain + '/install?' + params.toString();
+  if (!hotelId && !domain) return '';
+  const transfersStay = !!reservationCode && !!handoffToken;
+  const params = new URLSearchParams({
+    intent: transfersStay ? 'stay' : 'book',
+    ref: ref || 'frontdesk-guestel-qr',
+  });
+  if (handoffToken) params.set('handoff', handoffToken);
+  if (hotelId) return `https://clip.mktel.co/clip/${encodeURIComponent(hotelId)}?${params.toString()}`;
+  return 'https://' + domain + '/?' + params.toString();
 }
 
 function promptUploadLogoBeforeQr(preselectedCode) {
@@ -5086,7 +5092,7 @@ function promptUploadLogoBeforeQr(preselectedCode) {
     <div style="background:white;border-radius:20px;padding:24px 22px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="margin-bottom:10px;"><i data-lucide="image" style="width:26px;height:26px;"></i></div>
       <h2 style="font-size:17px;font-weight:800;color:#1a1a2e;margin:0 0 8px;line-height:1.35;">Upload your property logo first?</h2>
-      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this icon when they save <strong>${crm.activeHotelName || 'your property'}</strong> to their Home Screen. Takes 5 seconds.</p>
+      <p style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 0 18px;text-align:left;">Guests see this image with <strong>${crm.activeHotelName || 'your property'}</strong> in Guestel. Takes 5 seconds.</p>
       <input type="file" id="logoGateFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
       <button type="button" id="logoGateUploadBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Upload logo</button>
       <button type="button" id="logoGateSkipBtn" style="width:100%;padding:10px;border:none;background:transparent;color:#9ca3af;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Show QR without logo</button>
@@ -5146,13 +5152,27 @@ async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
   overlay.id = 'checkinQrOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:102500;background:#0a0f0d;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;';
   let renderSequence = 0;
+  const handoffByCode = new Map();
 
   function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
   async function render() {
     const sequence = ++renderSequence;
     const ref = mode === 'guest' && selectedCode ? 'frontdesk-qr-guest' : 'frontdesk-qr-generic';
-    const url = buildGuestInstallUrlForQr(mode === 'guest' ? selectedCode : '', ref);
+    let handoffToken = '';
+    if (mode === 'guest' && selectedCode) {
+      handoffToken = handoffByCode.get(selectedCode) || '';
+      if (!handoffToken) {
+        try {
+          const handoff = await api('POST', '/api/crm/guestel-handoff', { reservationCode: selectedCode });
+          if (handoff?.success && handoff.handoffToken) {
+            handoffToken = handoff.handoffToken;
+            handoffByCode.set(selectedCode, handoffToken);
+          }
+        } catch (_) {}
+      }
+    }
+    const url = buildGuestInstallUrlForQr(mode === 'guest' ? selectedCode : '', ref, handoffToken);
     let qr = '';
     try {
       qr = url ? await createCheckinQrDataUrl(url) : '';
@@ -5173,8 +5193,8 @@ async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
       + '<button type="button" id="checkinQrClose" style="position:absolute;top:max(12px,env(safe-area-inset-top));right:16px;width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,0.12);color:#fff;font-size:22px;cursor:pointer;font-family:inherit;">×</button>'
       + '<div style="text-align:center;max-width:400px;width:100%;">'
       + '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Guest scans this</div>'
-      + '<h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#fff;line-height:1.3;">Save ' + escAttr(hName) + ' to their Home Screen</h2>'
-      + '<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.5;">This QR opens your booking page. Guests save the property from there—no App Store.</p>'
+      + '<h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#fff;line-height:1.3;">Keep ' + escAttr(hName) + ' in Guestel</h2>'
+      + '<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.5;">' + (mode === 'guest' ? 'This one-use QR brings the selected reservation into Guestel.' : 'This QR opens your direct booking experience and lets guests keep the property in Guestel.') + '</p>'
       + '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">'
       + '<button type="button" data-qr-mode="generic" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'generic' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">Any guest</button>'
       + '<button type="button" data-qr-mode="guest" style="padding:10px 16px;border-radius:20px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;' + (mode === 'guest' ? 'background:#fff;color:#1a5c3f;' : 'background:rgba(255,255,255,0.12);color:#fff;') + '">This guest</button>'
@@ -5189,7 +5209,7 @@ async function showCheckinQrOverlay(preselectedCode, skipLogoGate) {
         ) : '')
       + (qr ? '<img src="' + qr + '" alt="QR code" width="280" height="280" style="display:block;width:min(280px,80vw);max-width:100%;height:auto;box-sizing:border-box;margin:0 auto;border-radius:16px;background:#fff;padding:12px;">' : '')
       + '<p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">'
-      + (mode === 'guest' && selectedCode ? 'Reservation + Home Screen link' : 'Home Screen link — good for room cards')
+      + (mode === 'guest' && selectedCode ? (handoffToken ? 'One-use reservation pass · expires in 24 hours' : 'Guestel link · reservation transfer unavailable') : 'Guestel booking link · good for room cards')
       + '</p></div>';
 
     if (!overlay.isConnected) {
@@ -5240,14 +5260,14 @@ function closeCheckinQrOverlay() {
 function prefillGuestInstallBroadcast() {
   const hName = crm.activeHotelName || 'Your Property';
   const domain = crm.activeHotelDomain || '';
-  const installUrl = domain ? 'https://' + domain + '/install' : '';
+  const installUrl = buildGuestInstallUrlForQr('', 'frontdesk-broadcast');
   const titleEl = document.getElementById('guest-broadcast-title');
   const bodyEl = document.getElementById('guest-broadcast-body');
   if (titleEl) titleEl.value = hName;
   if (bodyEl) {
     bodyEl.value = installUrl
-      ? `Add ${hName} to your home screen — message us anytime and book direct next time. Tap here: ${installUrl}`
-      : `Add ${hName} to your home screen — message us anytime and book direct next time.`;
+      ? `Keep ${hName} in Guestel for direct rates, property updates, and easier direct booking: ${installUrl}`
+      : `Keep ${hName} in Guestel for direct rates, property updates, and easier direct booking.`;
   }
   updateGuestBroadcastPreview();
   document.getElementById('guestBroadcastCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -5263,7 +5283,7 @@ function prefillGuestInstallBroadcast() {
 
 async function sendGuestBroadcast() {
   if (!crm.guestPushSubscriberCount) {
-    toast('No guests have notifications on yet — show your QR at check-in first', 'error');
+    toast('No Guestel devices have opted into property updates yet — share your QR first', 'error');
     return;
   }
   const titleEl = document.getElementById('guest-broadcast-title');

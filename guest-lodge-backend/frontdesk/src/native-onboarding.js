@@ -35,10 +35,10 @@ const OPERATIONAL_STEPS = [
   },
   {
     filter: 'apps',
-    eyebrow: 'Guest Reach',
-    title: 'Guests save your property—not Front Desk.',
-    body: 'Guests open your booking page and save your property to their Home Screen. There is no second App Store app. If they allow notifications, you can reach their phone from Marketel Front Desk.',
-    note: 'Tell a guest: “Open our booking link and tap Add to Home Screen. That saves our property—not Marketel.”',
+    eyebrow: 'Guestel',
+    title: 'Guests keep your property in Guestel.',
+    body: 'Guests tap Add on your booking page or scan your QR. Guestel keeps your property, their stays, and their messages together while Marketel Front Desk remains your owner app.',
+    note: 'Tell a guest: “Scan this to book directly and keep us in Guestel.”',
     tabPosition: '87.5%',
   },
 ];
@@ -982,7 +982,7 @@ function introStageHtml(step) {
       <div class="mno-stage">
         <div class="mno-kicker">Connected</div>
         <h1 class="mno-title">Front Desk is ready.</h1>
-        <p class="mno-copy">Guests use ${name}’s direct booking page and can save the property to their Home Screen. You use Marketel Front Desk to manage bookings and availability.</p>
+        <p class="mno-copy">Guests book on ${name}’s direct page, then keep the property, their stay and your messages together in Guestel. You run everything from Marketel Front Desk.</p>
         <div class="mno-property-card">
           <div class="mno-property-row">
             <div class="mno-property-icon">${initial}</div>
@@ -994,7 +994,7 @@ function introStageHtml(step) {
           <div class="mno-feature-row">
             <div class="mno-feature"><strong>Live</strong>Bookings</div>
             <div class="mno-feature"><strong>Synced</strong>Availability</div>
-            <div class="mno-feature"><strong>Ready</strong>Guest reach</div>
+            <div class="mno-feature"><strong>Ready</strong>Guestel</div>
           </div>
         </div>
       </div>`;
@@ -1046,7 +1046,7 @@ function introStageHtml(step) {
     <div class="mno-stage">
       <div class="mno-kicker">The essentials</div>
       <h1 class="mno-title">Four places. No maze.</h1>
-      <p class="mno-copy">One owner app: Marketel Front Desk. Guests never download it; they use your booking page.</p>
+      <p class="mno-copy">One owner app: Marketel Front Desk. Your guests use Guestel, so the owner tools and guest experience never get mixed together.</p>
       <div class="mno-ready-list">
         <div class="mno-ready-item" style="--i:0">
           <div class="mno-ready-number">01</div>
@@ -1058,7 +1058,7 @@ function introStageHtml(step) {
         </div>
         <div class="mno-ready-item" style="--i:2">
           <div class="mno-ready-number">03</div>
-          <div><strong>Bring guests back</strong><span>Share your booking-page QR or Home Screen link.</span></div>
+          <div><strong>Bring guests back</strong><span>Share your Guestel QR so they can keep your property and book direct again.</span></div>
         </div>
       </div>
     </div>`;
