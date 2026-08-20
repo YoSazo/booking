@@ -11,7 +11,7 @@
 		<string>appclips:clip.mktel.co</string>
 		<string>appclips:bookmarketel.com</string>
 	</array>
-	<key>com.apple.developer.application-groups</key>
+	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.bookmarketel.guestel</string>
 	</array>

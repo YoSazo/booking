@@ -31,7 +31,7 @@ Guestel is no longer a local demo wallet or a webview wrapper. This pass added:
    `com.bookmarketel.guestel.Clip`, and attach both App IDs to
    `group.com.bookmarketel.guestel`.
 3. Regenerate both App Store distribution profiles. Decode them and confirm the
-   app profile carries `aps-environment`, `application-groups`,
+   app profile carries `aps-environment`, `com.apple.security.application-groups`,
    `associated-domains`, and `associated-appclip-app-identifiers`; confirm the
    Clip profile carries its App Group, `appclips:` associated domain, and parent
    app identifier. Then replace

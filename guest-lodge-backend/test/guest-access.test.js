@@ -72,3 +72,13 @@ test('native guest pushes respect the selected notification category', () => {
     assert.match(server, /where:\s*\{ bookingId, active: true, \[preference\]: true \}/);
     assert.match(server, /preference: 'stayUpdates'/);
 });
+
+test('Guestel and its App Clip request the real iOS App Group entitlement', () => {
+    const iosRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios');
+    for (const relative of ['Guestel/Guestel.entitlements', 'GuestelClip/GuestelClip.entitlements']) {
+        const source = fs.readFileSync(path.join(iosRoot, relative), 'utf8');
+        assert.match(source, /<key>com\.apple\.security\.application-groups<\/key>/);
+        assert.doesNotMatch(source, /<key>com\.apple\.developer\.application-groups<\/key>/);
+        assert.match(source, /group\.com\.bookmarketel\.guestel/);
+    }
+});
