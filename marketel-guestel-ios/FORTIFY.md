@@ -20,24 +20,37 @@ Guestel is no longer a local demo wallet or a webview wrapper. This pass added:
 - A real empty state, production demo-data removal, device-data clearing, and a
   privacy manifest. PWA remains the Android/no-native fallback.
 
-### Manual Apple/hosting steps before the new native build can sign
+### Manual Apple steps before the new native build can sign
 
-1. In Apple Developer, enable **Push Notifications** and **App Groups** for
-   `com.bookmarketel.guestel`.
-2. Enable **App Groups** for `com.bookmarketel.guestel.Clip`, and attach both App
-   IDs to `group.com.bookmarketel.guestel`.
-3. Regenerate both App Store distribution profiles, replace
+1. In Apple Developer, enable **Push Notifications**, **App Groups**, and
+   **Associated Domains** for `com.bookmarketel.guestel`. Confirm the app is
+   associated with `com.bookmarketel.guestel.Clip`; the regenerated profile must
+   include `associated-appclip-app-identifiers` as well as the other three
+   capabilities.
+2. Enable **App Groups** and **Associated Domains** for
+   `com.bookmarketel.guestel.Clip`, and attach both App IDs to
+   `group.com.bookmarketel.guestel`.
+3. Regenerate both App Store distribution profiles. Decode them and confirm the
+   app profile carries `aps-environment`, `application-groups`,
+   `associated-domains`, and `associated-appclip-app-identifiers`; confirm the
+   Clip profile carries its App Group, `appclips:` associated domain, and parent
+   app identifier. Then replace
    `APPLE_GUESTEL_PROVISIONING_PROFILE_BASE64` and
-   `APPLE_GUESTEL_CLIP_PROVISIONING_PROFILE_BASE64` in GitHub Actions, then run
-   `build-guestel-ios.yml`.
+   `APPLE_GUESTEL_CLIP_PROVISIONING_PROFILE_BASE64` in GitHub Actions. Do not
+   dispatch `build-guestel-ios.yml` before this profile swap: manual signing will
+   fail.
 4. Set Render `GUEST_IDENTITY_SECRET` to a new high-entropy secret and set
    `GUESTEL_APNS_BUNDLE_ID=com.bookmarketel.guestel`. The existing APNs team key
    can sign for both apps if it is an Apple Push Notification service key.
-5. Point `clip.mktel.co` at the Vercel booking-engine deployment, publish the App
-   Clip default/advanced experience, verify its card on an iPhone, and only then
-   set Vercel `VITE_GUESTEL_APP_CLIP_ENABLED=true`.
+5. Publish the App Clip default/advanced experience for
+   `https://clip.mktel.co/clip/`, verify its card on an iPhone, and only then set
+   Vercel `VITE_GUESTEL_APP_CLIP_ENABLED=true`.
 6. Keep Stripe in test mode for this QA pass, exactly as requested. Switch the
    matching secret and publishable keys together only after the full test matrix.
+
+Already complete: `clip.mktel.co` is live on Vercel, its AASA contains both the
+App Clip and full-app Universal Link associations, Render serves a matching test
+Stripe publishable key, and both targets declare exempt encryption usage.
 
 The new Prisma migration is
 `20260820090000_guestel_identity_and_push`; Render's existing start command runs
