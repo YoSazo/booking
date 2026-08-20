@@ -9,20 +9,32 @@ enum GuestelHandoff {
     struct Target: Codable {
         let hotelId: String
         let domain: String
+        let handoffToken: String?
     }
 
-    static func save(hotelId: String, domain: String) {
+    static func save(hotelId: String, domain: String, handoffToken: String? = nil) {
         guard !hotelId.isEmpty else { return }
-        let target = Target(hotelId: hotelId, domain: domain)
+        let defaults = UserDefaults(suiteName: group)
+        let existing = defaults?.data(forKey: key).flatMap { try? JSONDecoder().decode(Target.self, from: $0) }
+        let target = Target(
+            hotelId: hotelId,
+            domain: domain,
+            handoffToken: handoffToken?.isEmpty == false
+                ? handoffToken
+                : (existing?.hotelId == hotelId ? existing?.handoffToken : nil)
+        )
         guard let data = try? JSONEncoder().encode(target) else { return }
-        UserDefaults(suiteName: group)?.set(data, forKey: key)
+        defaults?.set(data, forKey: key)
     }
 
-    static func consume() -> Target? {
+    static func pending() -> Target? {
         guard let defaults = UserDefaults(suiteName: group),
               let data = defaults.data(forKey: key),
               let target = try? JSONDecoder().decode(Target.self, from: data) else { return nil }
-        defaults.removeObject(forKey: key)
         return target
+    }
+
+    static func clear() {
+        UserDefaults(suiteName: group)?.removeObject(forKey: key)
     }
 }

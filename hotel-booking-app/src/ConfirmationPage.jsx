@@ -159,6 +159,8 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
         status: normalizeBookingStatus(liveBookingStatus),
         pendingUntil: bookingDetails.pendingUntil || null,
         approvalNoResponseAction: bookingDetails.approvalNoResponseAction || null,
+        accessToken: bookingDetails.reservationToken || '',
+        handoffToken: bookingDetails.handoffToken || '',
       });
     }
   }, [reservationCode, bookingDetails, guestInfo, liveBookingStatus, setGuestStay]);
@@ -431,11 +433,13 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           appIconUrl={resolvePropertyIconUrl(hotel)}
           hotelId={resolvedHotelId}
           reservationCode={reservationCode}
+          handoffToken={bookingDetails?.handoffToken || ''}
+          reservationAccessToken={bookingDetails?.reservationToken || ''}
           apiBaseUrl={apiBaseUrl}
           touchpoint="confirmation-page"
           variant="confirmation"
-          headline={`Keep ${hotelName} on your phone`}
-          subline="Get stay updates and message the front desk from your home screen."
+          headline={`Keep your ${hotelName} stay in Guestel`}
+          subline="See stay updates, message the Front Desk, and book direct again without searching."
           />
 
           {/* 4. Fine print — the only thing that stays collapsed */}

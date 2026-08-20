@@ -109,3 +109,38 @@ test('Guestel hotel actions use live data instead of placeholder dead ends', () 
     assert.match(hotels, /AsyncImage\(url: imageURL\)/);
     assert.doesNotMatch(hotels, /Paid · Confirmed/);
 });
+
+test('App Clip handoff is one-use and becomes a verified native stay', () => {
+    const root = path.join(__dirname, '..', '..');
+    const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+    const app = fs.readFileSync(path.join(root, 'hotel-booking-app', 'src', 'App.jsx'), 'utf8');
+    const confirmation = fs.readFileSync(path.join(root, 'hotel-booking-app', 'src', 'ConfirmationPage.jsx'), 'utf8');
+    const clip = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'GuestelClip', 'ClipWebView.swift'), 'utf8');
+    const guestel = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'GuestelApp.swift'), 'utf8');
+
+    assert.match(schema, /model GuestAppHandoff/);
+    assert.match(server, /crypto\.randomBytes\(24\)/);
+    assert.match(server, /claimedAt: null, expiresAt: \{ gt: new Date\(\) \}/);
+    assert.match(server, /handoffToken: await issueGuestAppHandoff\(outcome\.booking\)/);
+    assert.match(app, /reservationToken: completionResult\?\.reservationToken/);
+    assert.match(app, /handoffToken: completionResult\?\.handoffToken/);
+    assert.match(confirmation, /handoffToken=\{bookingDetails\?\.handoffToken/);
+    assert.match(clip, /marketel_guest_stays/);
+    assert.match(clip, /guestelClip\.postMessage\(\{ type: 'handoff'/);
+    assert.match(guestel, /BookingAPI\.claimHandoff\(handoff\)/);
+});
+
+test('Guestel messaging is a first-class native inbox', () => {
+    const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const rootView = fs.readFileSync(path.join(guestelRoot, 'RootView.swift'), 'utf8');
+    const messages = fs.readFileSync(path.join(guestelRoot, 'MessagesView.swift'), 'utf8');
+    const nativeThread = fs.readFileSync(path.join(guestelRoot, 'NativeMessagesView.swift'), 'utf8');
+
+    assert.match(server, /app\.post\('\/api\/guest\/native\/conversations'/);
+    assert.match(server, /guestReadAt/);
+    assert.match(rootView, /Label\("Messages", systemImage:/);
+    assert.match(rootView, /badge\(store\.unreadMessageCount\)/);
+    assert.match(messages, /NativeMessagesView\(hotel: destination\.hotel, stay: destination\.stay\)/);
+    assert.match(nativeThread, /TextField\("Message Front Desk"/);
+    assert.doesNotMatch(messages, /WKWebView|SimpleWebSheet/);
+});

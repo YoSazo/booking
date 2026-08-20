@@ -744,17 +744,23 @@ const handleConfirmBooking = async (bookingDetails) => {
     // ✅ If this is a Pay Later booking, it's already been created - just navigate to confirmation
     if (currentBooking.bookingType === 'payLater') {
       console.log('✅ Pay Later booking already created. Skipping /api/book call.');
+      const completedReservationCode = completionResult?.reservationCode
+        || currentBooking.pmsConfirmationCode
+        || currentBooking.reservationCode;
       const completedBooking = {
         ...currentBooking,
+        pmsConfirmationCode: completedReservationCode,
         confirmationPending: completionResult?.pending === true,
         reviewWindowMinutes: Number(completionResult?.reviewWindowMinutes || 0),
         noResponseAction: completionResult?.noResponseAction === 'release' ? 'release' : 'confirm',
+        reservationToken: completionResult?.reservationToken || '',
+        handoffToken: completionResult?.handoffToken || '',
       };
       sessionStorage.setItem('finalBooking', JSON.stringify(completedBooking));
       setGuestInfo(formData);
-      setReservationCode(completedBooking.pmsConfirmationCode || completedBooking.reservationCode);
+      setReservationCode(completedReservationCode);
       setFinalBooking(completedBooking);
-      trackPurchase(completedBooking, formData, completedBooking.pmsConfirmationCode || completedBooking.reservationCode);
+      trackPurchase(completedBooking, formData, completedReservationCode);
       navigate('/final-confirmation');
       window.scrollTo(0, 0);
       return;

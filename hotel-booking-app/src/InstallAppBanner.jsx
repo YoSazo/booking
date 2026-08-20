@@ -4,6 +4,7 @@ import { isStandalone } from './pwaUtils.js';
 import { BRAND, HotelIcon, isIos } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import BookingInstallCoach from './BookingInstallCoach.jsx';
+import { APP_CLIP_INSTALL_ENABLED, guestelInvocationUrl } from './appClipInstall.js';
 
 // "Tap to Install" — lets a guest add this property to their home screen so
 // they book direct next time (no Safari, no OTA). Android/desktop use the
@@ -28,6 +29,9 @@ function InstallAppBanner({
   const [showBookingCoach, setShowBookingCoach] = useState(false);
   const [showUnavailableInfo, setShowUnavailableInfo] = useState(false);
   const ios = isIos();
+  const inGuestelClip = typeof window !== 'undefined'
+    && !!window.webkit?.messageHandlers?.guestelClip;
+  const nativeGuestel = ios && !ownerPreview && (APP_CLIP_INSTALL_ENABLED || inGuestelClip);
 
   const markInstalled = useCallback(() => {
     setInstalled(true);
@@ -93,6 +97,14 @@ function InstallAppBanner({
     }
 
     if (ios) {
+      if (inGuestelClip) {
+        window.webkit.messageHandlers.guestelClip.postMessage({ type: 'requestInstall' });
+        return;
+      }
+      if (APP_CLIP_INSTALL_ENABLED && !ownerPreview) {
+        window.location.href = guestelInvocationUrl({ hotelId, intent: 'add' });
+        return;
+      }
       setShowBookingCoach(true);
       return;
     }
@@ -145,12 +157,18 @@ function InstallAppBanner({
           <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={44} style={{ boxShadow: 'none' }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.25 }}>
-              {guidedBookingInstall ? `Save ${hotelName || 'this property'} to your Home Screen` : `Add ${hotelName || 'us'} to your Home Screen`}
+              {nativeGuestel
+                ? `Keep ${hotelName || 'this property'} in Guestel`
+                : guidedBookingInstall
+                  ? `Save ${hotelName || 'this property'} to your Home Screen`
+                  : `Add ${hotelName || 'us'} to your Home Screen`}
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
               {buttonLocked
                 ? 'Available once this property finishes setup.'
-                : guidedBookingInstall
+                : nativeGuestel
+                  ? 'Book direct, message the Front Desk, and return anytime.'
+                  : guidedBookingInstall
                   ? 'Return to this booking page in one tap. No App Store.'
                   : 'Book direct in one tap next time.'}
             </div>

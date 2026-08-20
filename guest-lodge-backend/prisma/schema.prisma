@@ -128,6 +128,22 @@ model GuestInstallEvent {
   @@index([reservationCode])
 }
 
+// One-use bridge from a web/App Clip confirmation into the full Guestel app.
+// Only a hash is stored; the raw value expires after 24 hours and is never a
+// reservation capability by itself.
+model GuestAppHandoff {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  claimedAt DateTime?
+  tokenHash String    @unique
+  bookingId String
+  hotelId   String
+
+  @@index([expiresAt])
+  @@index([bookingId])
+}
+
 model PaymentDeclinedLead {
   id               String   @id @default(cuid())
   createdAt        DateTime @default(now())

@@ -45,11 +45,32 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         let hotelId = (userInfo["hotelId"] as? String) ?? nested?["hotelId"] as? String ?? ""
         let code = nested?["reservationCode"] as? String ?? ""
         guard !hotelId.isEmpty else { return }
+        GuestMessageRoute.save(hotelId: hotelId, code: code)
         NotificationCenter.default.post(
             name: .guestelOpenMessages,
             object: nil,
             userInfo: ["hotelId": hotelId, "code": code]
         )
+    }
+}
+
+enum GuestMessageRoute {
+    private static let hotelKey = "guestel.pendingMessage.hotel"
+    private static let codeKey = "guestel.pendingMessage.code"
+
+    static func save(hotelId: String, code: String) {
+        UserDefaults.standard.set(hotelId, forKey: hotelKey)
+        UserDefaults.standard.set(code, forKey: codeKey)
+    }
+
+    static var pending: (hotelId: String, code: String)? {
+        guard let hotelId = UserDefaults.standard.string(forKey: hotelKey), !hotelId.isEmpty else { return nil }
+        return (hotelId, UserDefaults.standard.string(forKey: codeKey) ?? "")
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: hotelKey)
+        UserDefaults.standard.removeObject(forKey: codeKey)
     }
 }
 

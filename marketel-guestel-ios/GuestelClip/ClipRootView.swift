@@ -2,12 +2,17 @@ import SwiftUI
 import StoreKit
 
 struct ClipRootView: View {
-    let target: ClipTarget?
+    let invocation: ClipInvocation?
 
     @State private var hotel: BookingAPI.HotelPublic?
     @State private var bookingDomain: String?
     @State private var loading = true
     @State private var showingBooking = false
+    @State private var capturedHandoff: String?
+
+    private var intent: ClipIntent {
+        capturedHandoff == nil ? (invocation?.intent ?? .book) : .stay
+    }
 
     var body: some View {
         ZStack {
@@ -17,92 +22,205 @@ struct ClipRootView: View {
             } else if let hotel {
                 content(hotel)
             } else {
-                Text("Open this from a hotel's Guestel code.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.inkSoft)
-                    .padding(40)
-                    .multilineTextAlignment(.center)
+                ContentUnavailableView(
+                    "Property unavailable",
+                    systemImage: "building.2",
+                    description: Text("Open Guestel from a property’s Add button or Guestel code.")
+                )
             }
         }
-        .task(id: target) { await load() }
-        .onAppear(perform: presentGetFullApp)
+        .task(id: invocation) { await load() }
+        .onAppear {
+            guard intent != .book else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { presentGetFullApp() }
+        }
         .sheet(isPresented: $showingBooking) {
             if let hotel {
-                ClipWebView(url: bookingURL(for: hotel))
-                    .ignoresSafeArea()
+                ClipWebView(
+                    url: bookingURL(for: hotel),
+                    onHandoff: captureHandoff,
+                    onInstallRequested: presentGetFullApp
+                )
+                .ignoresSafeArea()
             }
         }
     }
 
-    // Prefer the hotel's own branded engine (jacksinn.mktel.co) when we arrived
-    // from it; fall back to the central engine with an explicit hotelId.
     private func bookingURL(for hotel: BookingAPI.HotelPublic) -> URL {
-        if let d = bookingDomain, let url = URL(string: "https://\(d)/") { return url }
+        if let domain = bookingDomain, let url = URL(string: "https://\(domain)/") { return url }
         return URL(string: "https://bookmarketel.com/?hotelId=\(hotel.id)")!
     }
 
     private func content(_ hotel: BookingAPI.HotelPublic) -> some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                Theme.gradient(for: hotel.name.count)
-                if let url = hotel.rooms.first?.image {
-                    AsyncImage(url: url) { img in img.resizable().aspectRatio(contentMode: .fill) } placeholder: { Color.clear }
+        ScrollView {
+            VStack(spacing: 0) {
+                hero(hotel)
+                VStack(alignment: .leading, spacing: 20) {
+                    message(hotel)
+                    benefits
+                    actions
                 }
-                LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .center, endPoint: .bottom)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(hotel.name).font(.system(size: 30, weight: .bold)).foregroundStyle(.white)
-                    if let room = hotel.rooms.first { Text(room.name).font(.system(size: 15)).foregroundStyle(.white.opacity(0.9)) }
-                }
-                .padding(20)
+                .padding(22)
             }
-            .frame(height: 280)
-            .clipped()
-            .ignoresSafeArea(edges: .top)
-
-            VStack(spacing: 14) {
-                Button { showingBooking = true } label: {
-                    Text("Book direct")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                Text("Book straight from here — or get the Guestel app to keep this hotel and rebook in one tap.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.inkSoft)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(20)
-
-            Spacer(minLength: 0)
         }
+        .scrollIndicators(.hidden)
+        .background(Theme.canvas)
+    }
+
+    private func hero(_ hotel: BookingAPI.HotelPublic) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Theme.gradient(for: hotel.name.count)
+            if let url = hotel.rooms.first?.image {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: { Color.clear }
+            }
+            LinearGradient(colors: [.clear, .black.opacity(0.56)], startPoint: .center, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(hotel.name)
+                    .font(.system(size: 29, weight: .bold))
+                    .foregroundStyle(.white)
+                if let room = hotel.rooms.first?.name {
+                    Text(room)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+            }
+            .padding(22)
+        }
+        .frame(height: 250)
+        .clipped()
+        .ignoresSafeArea(edges: .top)
+    }
+
+    @ViewBuilder
+    private func message(_ hotel: BookingAPI.HotelPublic) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(intent == .stay ? "YOUR STAY, IN ONE PLACE" : "KEEP THIS PROPERTY CLOSE")
+                .font(.system(size: 11, weight: .heavy))
+                .tracking(0.8)
+                .foregroundStyle(Theme.green)
+            Text(headline(hotel))
+                .font(.system(size: 27, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(subtitle)
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var benefits: some View {
+        VStack(spacing: 0) {
+            benefit("bell.badge.fill", intent == .stay ? "Confirmation and stay updates" : "Stay updates on your phone")
+            Divider().padding(.leading, 44)
+            benefit("bubble.left.and.bubble.right.fill", "Message the Front Desk")
+            Divider().padding(.leading, 44)
+            benefit("creditcard.fill", "Faster direct rebooking")
+        }
+        .padding(.horizontal, 16)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func benefit(_ symbol: String, _ label: String) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.green)
+                .frame(width: 28)
+            Text(label)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Spacer()
+            Image(systemName: "checkmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.green)
+        }
+        .padding(.vertical, 14)
+    }
+
+    private var actions: some View {
+        VStack(spacing: 11) {
+            if intent == .book {
+                primaryButton("Book direct", systemImage: "calendar.badge.plus") { showingBooking = true }
+                secondaryButton("Keep this property in Guestel", action: presentGetFullApp)
+            } else {
+                primaryButton(intent == .stay ? "Keep this stay in Guestel" : "Get Guestel", systemImage: "arrow.down.app.fill", action: presentGetFullApp)
+                secondaryButton(intent == .stay ? "View booking without the app" : "Continue booking without the app") {
+                    showingBooking = true
+                }
+            }
+            Text("Guestel is free for guests.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSoft)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func primaryButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Theme.green)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+    }
+
+    private func headline(_ hotel: BookingAPI.HotelPublic) -> String {
+        intent == .stay ? "Keep your \(hotel.name) stay in Guestel" : "Keep \(hotel.name) on your phone"
+    }
+
+    private var subtitle: String {
+        intent == .stay
+            ? "See your stay, hear from the Front Desk, and return to book direct again."
+            : "Book direct, message the Front Desk after booking, and return without searching again."
     }
 
     private func load() async {
         loading = true
         defer { loading = false }
-        guard let target else { return }
-        var id: String?
-        switch target {
-        case .hotelId(let hid):
-            id = hid
+        guard let invocation else { return }
+        var hotelId: String?
+        switch invocation.target {
+        case .hotelId(let id):
+            hotelId = id
         case .domain(let domain):
             bookingDomain = domain
-            id = try? await BookingAPI.hotelId(forDomain: domain)
+            hotelId = try? await BookingAPI.hotelId(forDomain: domain)
         }
-        if let id, let h = try? await BookingAPI.hotel(id) {
-            hotel = h
-            if bookingDomain == nil, let domain = h.domain, !domain.isEmpty { bookingDomain = domain }
-            GuestelHandoff.save(hotelId: h.id, domain: bookingDomain ?? h.domain ?? "")
+        guard let hotelId, let loadedHotel = try? await BookingAPI.hotel(hotelId) else { return }
+        hotel = loadedHotel
+        if bookingDomain == nil, let domain = loadedHotel.domain, !domain.isEmpty { bookingDomain = domain }
+
+        let handoff = invocation.handoffToken
+        capturedHandoff = handoff
+        GuestelHandoff.save(hotelId: loadedHotel.id, domain: bookingDomain ?? loadedHotel.domain ?? "", handoffToken: handoff)
+        if invocation.intent != .book {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { presentGetFullApp() }
         }
     }
 
-    // The system "Get the full app" overlay, from inside the clip.
+    private func captureHandoff(_ token: String) {
+        guard let hotel else { return }
+        capturedHandoff = token
+        GuestelHandoff.save(hotelId: hotel.id, domain: bookingDomain ?? hotel.domain ?? "", handoffToken: token)
+        presentGetFullApp()
+    }
+
     private func presentGetFullApp() {
         guard let scene = UIApplication.shared.connectedScenes
             .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene else { return }
-        let config = SKOverlay.AppClipConfiguration(position: .bottom)
-        SKOverlay(configuration: config).present(in: scene)
+        SKOverlay(configuration: SKOverlay.AppClipConfiguration(position: .bottom)).present(in: scene)
     }
 }

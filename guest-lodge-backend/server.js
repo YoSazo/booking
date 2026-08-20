@@ -61,6 +61,30 @@ function safeReservationToken(booking) {
     }
 }
 
+async function issueGuestAppHandoff(booking) {
+    if (!booking?.id || !booking?.hotelId || !prisma.guestAppHandoff) return '';
+    try {
+        const token = crypto.randomBytes(24).toString('base64url');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        await prisma.guestAppHandoff.create({
+            data: {
+                tokenHash,
+                bookingId: booking.id,
+                hotelId: booking.hotelId,
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+        });
+        // Opportunistic cleanup keeps this intentionally tiny table bounded.
+        prisma.guestAppHandoff.deleteMany({
+            where: { expiresAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        }).catch(() => {});
+        return token;
+    } catch (error) {
+        console.error('Guestel handoff creation failed:', error.message);
+        return '';
+    }
+}
+
 let frontDeskAssistant = null;
 
 // Marketel CAPI (separate pixel for the onboarding funnel)
@@ -2369,6 +2393,15 @@ function pushFunnelEvent(event_name, eventData) {
 
 // File: guest-lodge-backend/server.js
 
+function guestNativeDeviceScope(req) {
+    const material = [
+        bearerToken(req),
+        ...(Array.isArray(req.body?.reservationTokens) ? req.body.reservationTokens.slice(0, 100) : []),
+        String(req.body?.handoffToken || ''),
+    ].filter(Boolean).sort().join('|');
+    return material ? crypto.createHash('sha256').update(material).digest('hex').slice(0, 32) : 'anonymous';
+}
+
 const createPaymentIntentRateLimit = createRouteRateLimiter('create-payment-intent', { windowMs: 60 * 1000, max: 15 });
 const createPreauthHoldRateLimit = createRouteRateLimiter('create-preauth-hold', { windowMs: 60 * 1000, max: 12 });
 const guestPaymentSetupRateLimit = createRouteRateLimiter('guest-payment-setup', { windowMs: 5 * 60 * 1000, max: 8 });
@@ -2402,6 +2435,10 @@ const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', {
 const guestCodeRequestRateLimit = createRouteRateLimiter('guest-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const guestCodeVerifyRateLimit = createRouteRateLimiter('guest-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
 const guestWalletRateLimit = createRouteRateLimiter('guest-wallet', { windowMs: 60 * 1000, max: 30 });
+const guestHandoffRateLimit = createRouteRateLimiter('guest-handoff', { windowMs: 5 * 60 * 1000, max: 12, scope: guestNativeDeviceScope });
+const guestHandoffGlobalRateLimit = createRouteRateLimiter('guest-handoff-global', { windowMs: 5 * 60 * 1000, max: 600 });
+const guestConversationsRateLimit = createRouteRateLimiter('guest-conversations', { windowMs: 5 * 60 * 1000, max: 30, scope: guestNativeDeviceScope });
+const guestConversationsGlobalRateLimit = createRouteRateLimiter('guest-conversations-global', { windowMs: 5 * 60 * 1000, max: 1200 });
 const guestNativePushRateLimit = createRouteRateLimiter('guest-native-push', { windowMs: 5 * 60 * 1000, max: 30 });
 const forgotPinRateLimit = createRouteRateLimiter('forgot-pin', {
     windowMs: 15 * 60 * 1000,
@@ -3154,6 +3191,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     : 'Reservation created successfully. $1.00 hold placed on card.',
                 reservationCode: pmsResponse.reservationID,
                 reservationToken: persistedBooking ? safeReservationToken(persistedBooking) : '',
+                handoffToken: persistedBooking ? await issueGuestAppHandoff(persistedBooking) : '',
             });
         }
 
@@ -3182,6 +3220,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                         : 'Reservation confirmed. $1.00 hold placed on card.',
                     reservationCode: outcome.booking.pmsConfirmationCode || pmsResponse.reservationID,
                     reservationToken: safeReservationToken(outcome.booking),
+                    handoffToken: await issueGuestAppHandoff(outcome.booking),
                 });
             } catch (dbError) {
                 console.error("Failed to confirm manual pay-later booking:", dbError);
@@ -3296,6 +3335,7 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                     : 'Reservation created successfully. $1.00 hold placed on card.',
                 reservationCode: pmsResponse.data.reservationID,
                 reservationToken: persistedBooking ? safeReservationToken(persistedBooking) : '',
+                handoffToken: persistedBooking ? await issueGuestAppHandoff(persistedBooking) : '',
             });
         } else {
             // If booking fails, cancel the hold
@@ -12650,6 +12690,33 @@ async function verifiedGuestBooking(req, hotelId, reservationCode = '') {
     return booking && guestEmailMatches(booking, identity.email) ? booking : null;
 }
 
+async function verifiedGuestBookings(req, suppliedTokens = []) {
+    const byId = new Map();
+    const identity = readGuestIdentityToken(bearerToken(req));
+    if (identity) {
+        const bookings = await guestBookingsForEmail(identity.email);
+        bookings.forEach(booking => byId.set(booking.id, booking));
+    }
+
+    const claims = (Array.isArray(suppliedTokens) ? suppliedTokens : [])
+        .slice(0, 100)
+        .map(token => readReservationToken(token))
+        .filter(Boolean);
+    if (claims.length) {
+        const ids = [...new Set(claims.map(claim => claim.bookingId))];
+        const bookings = await prisma.booking.findMany({ where: { id: { in: ids } } });
+        bookings.forEach((booking) => {
+            const verified = claims.some(claim => (
+                claim.bookingId === booking.id
+                && claim.hotelId === booking.hotelId
+                && guestBookingThreadCodes(booking, claim.reservationCode).includes(claim.reservationCode)
+            ));
+            if (verified) byId.set(booking.id, booking);
+        });
+    }
+    return [...byId.values()];
+}
+
 function guestMessageJSON(message) {
     let requests = [];
     try { requests = message.requests ? JSON.parse(message.requests) : []; } catch (_) {}
@@ -12661,6 +12728,124 @@ function guestMessageJSON(message) {
         requests,
     };
 }
+
+// Exchanges the short-lived App Clip bridge for the normal, reservation-scoped
+// capability. The URL token itself cannot read messages or modify a booking.
+app.post('/api/guest/native/handoff/create', guestHandoffGlobalRateLimit, guestHandoffRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const booking = await verifiedGuestBooking(req, '', '');
+        if (!booking) return res.status(401).json({ success: false, message: 'This stay could not be verified.' });
+        const handoffToken = await issueGuestAppHandoff(booking);
+        if (!handoffToken) return res.status(503).json({ success: false, message: 'Guestel transfer is temporarily unavailable.' });
+        res.json({ success: true, handoffToken });
+    } catch (error) {
+        console.error('Guestel handoff creation error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not prepare this stay for Guestel.' });
+    }
+});
+
+app.post('/api/guest/native/handoff', guestHandoffGlobalRateLimit, guestHandoffRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const rawToken = String(req.body?.handoffToken || '').trim();
+        if (!rawToken) return res.status(401).json({ success: false, message: 'This Guestel handoff has expired.' });
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const claim = await prisma.guestAppHandoff.findUnique({ where: { tokenHash } });
+        if (!claim || claim.claimedAt || claim.expiresAt.getTime() <= Date.now()) {
+            return res.status(401).json({ success: false, message: 'This Guestel handoff has expired.' });
+        }
+        const claimed = await prisma.guestAppHandoff.updateMany({
+            where: { id: claim.id, claimedAt: null, expiresAt: { gt: new Date() } },
+            data: { claimedAt: new Date() },
+        });
+        if (claimed.count !== 1) {
+            return res.status(401).json({ success: false, message: 'This Guestel handoff was already used.' });
+        }
+        const booking = await prisma.booking.findFirst({
+            where: { id: claim.bookingId, hotelId: claim.hotelId },
+        });
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'That stay could not be found.' });
+        }
+        res.json({
+            success: true,
+            reservation: {
+                code: booking.pmsConfirmationCode || booking.ourReservationCode,
+                hotelId: booking.hotelId,
+                checkin: booking.checkinDate,
+                checkout: booking.checkoutDate,
+                status: booking.status,
+                roomName: booking.roomName,
+                reservationToken: safeReservationToken(booking),
+            },
+        });
+    } catch (error) {
+        console.error('Guestel handoff error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not bring this stay into Guestel.' });
+    }
+});
+
+// One lightweight inbox request for all locally verified stays. Reading this
+// list does not mark a conversation read; only opening its native thread does.
+app.post('/api/guest/native/conversations', guestConversationsGlobalRateLimit, guestConversationsRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const bookings = await verifiedGuestBookings(req, req.body?.reservationTokens);
+        if (!bookings.length) return res.json({ success: true, conversations: [] });
+
+        const bookingById = new Map(bookings.map(booking => [booking.id, booking]));
+        const bookingByThread = new Map();
+        bookings.forEach((booking) => {
+            guestBookingThreadCodes(booking).forEach(code => {
+                bookingByThread.set(`${booking.hotelId}:${code}`, booking);
+            });
+        });
+        const filters = bookings.flatMap(booking => {
+            const codes = guestBookingThreadCodes(booking);
+            return [
+                { bookingId: booking.id },
+                ...(codes.length ? [{ hotelId: booking.hotelId, reservationCode: { in: codes } }] : []),
+            ];
+        });
+        const rows = await prisma.guestMessage.findMany({
+            where: { OR: filters },
+            orderBy: { createdAt: 'desc' },
+            take: 1000,
+        });
+        const grouped = new Map();
+        rows.forEach((message) => {
+            const booking = (message.bookingId && bookingById.get(message.bookingId))
+                || bookingByThread.get(`${message.hotelId}:${message.reservationCode || ''}`);
+            if (!booking) return;
+            let summary = grouped.get(booking.id);
+            if (!summary) {
+                summary = { latest: message, unreadCount: 0 };
+                grouped.set(booking.id, summary);
+            }
+            if (message.sender === 'hotel' && !message.guestReadAt) summary.unreadCount += 1;
+        });
+        res.json({
+            success: true,
+            conversations: bookings.map((booking) => {
+                const summary = grouped.get(booking.id);
+                return {
+                    code: booking.pmsConfirmationCode || booking.ourReservationCode,
+                    hotelId: booking.hotelId,
+                    roomName: booking.roomName,
+                    checkin: booking.checkinDate,
+                    checkout: booking.checkoutDate,
+                    status: booking.status,
+                    latestMessage: summary?.latest ? guestMessageJSON(summary.latest) : null,
+                    unreadCount: summary?.unreadCount || 0,
+                };
+            }),
+        });
+    } catch (error) {
+        console.error('Guestel conversations error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not load conversations.' });
+    }
+});
 
 app.get('/api/guest/native/messages', guestMessagesFetchGlobalRateLimit, guestMessagesFetchRateLimit, async (req, res) => {
     try {

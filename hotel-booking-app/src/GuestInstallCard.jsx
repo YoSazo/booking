@@ -12,6 +12,8 @@ function GuestInstallCard({
   appIconUrl,
   hotelId,
   reservationCode,
+  handoffToken,
+  reservationAccessToken,
   apiBaseUrl = '',
   touchpoint = 'card',
   variant = 'card',
@@ -26,9 +28,11 @@ function GuestInstallCard({
 
   const storageKey = `installDismissed_${hotelId || 'default'}`;
   const ios = isIos();
+  const inGuestelClip = typeof window !== 'undefined'
+    && !!window.webkit?.messageHandlers?.guestelClip;
   const isHero = variant === 'hero';
   const isConfirmation = variant === 'confirmation';
-  const nativeGuestel = ios && APP_CLIP_INSTALL_ENABLED;
+  const nativeGuestel = ios && (APP_CLIP_INSTALL_ENABLED || inGuestelClip);
   const effectiveCode = reservationCode || undefined;
 
   const markInstalled = useCallback(() => {
@@ -86,13 +90,46 @@ function GuestInstallCard({
     });
   };
 
+  const freshHandoff = async () => {
+    if (!isConfirmation || !reservationAccessToken) return handoffToken;
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/guest/native/handoff/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${reservationAccessToken}`,
+        },
+        body: '{}',
+      });
+      const data = await response.json().catch(() => ({}));
+      return response.ok && data.handoffToken ? data.handoffToken : handoffToken;
+    } catch (_) {
+      return handoffToken;
+    }
+  };
+
   const handlePrimary = async () => {
     trackCta();
     if (ios) {
+      const effectiveHandoff = await freshHandoff();
+      if (inGuestelClip) {
+        if (effectiveHandoff) {
+          window.webkit.messageHandlers.guestelClip.postMessage({
+            type: 'handoff',
+            token: effectiveHandoff,
+          });
+        }
+        window.webkit.messageHandlers.guestelClip.postMessage({ type: 'requestInstall' });
+        return;
+      }
       // Native App Clip card in iOS Safari (once the ASC default experience is
       // live). Falls back to the PWA "Add to Home Screen" coach until enabled.
       if (APP_CLIP_INSTALL_ENABLED) {
-        window.location.href = guestelInvocationUrl({ hotelId });
+        window.location.href = guestelInvocationUrl({
+          hotelId,
+          intent: isConfirmation ? 'stay' : 'add',
+          handoffToken: isConfirmation ? effectiveHandoff : undefined,
+        });
         return;
       }
       setShowInstallCoach(true);
@@ -114,12 +151,16 @@ function GuestInstallCard({
   };
 
   const title = headline || (nativeGuestel
-    ? `Keep ${hotelName || 'this property'} in Guestel`
+    ? (isConfirmation
+      ? `Keep your ${hotelName || 'property'} stay in Guestel`
+      : `Keep ${hotelName || 'this property'} in Guestel`)
     : `Save ${hotelName || 'this property'} to your Home Screen`);
   const subtitle = subline || (nativeGuestel
-    ? 'Book direct, keep your stay, and message the front desk from one guest app.'
+    ? (isConfirmation
+      ? 'See stay updates, message the Front Desk, and book direct again without searching.'
+      : 'Book direct, message the Front Desk, and return anytime without searching again.')
     : 'Return here to book direct, get stay updates, and message the front desk. No App Store.');
-  const primaryLabel = nativeGuestel ? 'Add to Guestel' : 'Add to Home Screen';
+  const primaryLabel = nativeGuestel ? (isConfirmation ? 'Keep this stay' : 'Add to Guestel') : 'Add to Home Screen';
 
   const installCoach = showInstallCoach && (
     <BookingInstallCoach

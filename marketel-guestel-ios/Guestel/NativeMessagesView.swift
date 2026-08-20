@@ -4,6 +4,7 @@ struct NativeMessagesView: View {
     let hotel: Hotel
     let stay: Reservation
 
+    @Environment(GuestStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var messages: [BookingAPI.GuestMessage] = []
@@ -120,7 +121,12 @@ struct NativeMessagesView: View {
         if !silent { loading = true }
         do {
             let rows = try await BookingAPI.messages(hotelId: hotel.hotelId, code: stay.code, accessToken: accessToken)
-            await MainActor.run { messages = rows; loading = false; error = nil }
+            await MainActor.run {
+                messages = rows
+                loading = false
+                error = nil
+                store.markConversationRead(stay)
+            }
         } catch {
             await MainActor.run { if !silent { self.error = error.localizedDescription }; loading = false }
         }

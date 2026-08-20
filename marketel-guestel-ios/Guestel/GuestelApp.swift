@@ -17,10 +17,11 @@ struct GuestelApp: App {
                 // the same account that creates the holds. See StripeConfig.
                 .task {
                     await StripeConfig.ensureLoaded()
-                    if let handoff = GuestelHandoff.consume() {
-                        await addHandoffHotel(handoff)
+                    if let handoff = GuestelHandoff.pending(), await addHandoffHotel(handoff) {
+                        GuestelHandoff.clear()
                     }
                     await store.syncVerifiedWallet()
+                    await store.refreshConversations()
                     await GuestPushManager.registerIfAuthorized(store: store)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .guestelDeviceTokenChanged)) { _ in
@@ -31,6 +32,7 @@ struct GuestelApp: App {
                     let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
                     let hotelId = components?.queryItems?.first(where: { $0.name == "hotelId" })?.value ?? ""
                     let code = components?.queryItems?.first(where: { $0.name == "code" })?.value ?? ""
+                    GuestMessageRoute.save(hotelId: hotelId, code: code)
                     NotificationCenter.default.post(name: .guestelOpenMessages, object: nil, userInfo: ["hotelId": hotelId, "code": code])
                 }
                 .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
@@ -41,9 +43,9 @@ struct GuestelApp: App {
     }
 
     @MainActor
-    private func addHandoffHotel(_ target: GuestelHandoff.Target) async {
-        guard let data = try? await BookingAPI.hotel(target.hotelId) else { return }
-        store.add(Hotel(
+    private func addHandoffHotel(_ target: GuestelHandoff.Target) async -> Bool {
+        guard let data = try? await BookingAPI.hotel(target.hotelId) else { return false }
+        let hotel = Hotel(
             hotelId: data.id,
             domain: target.domain.isEmpty ? (data.domain ?? "") : target.domain,
             name: data.name,
@@ -51,7 +53,24 @@ struct GuestelApp: App {
             stays: 0,
             lastStayed: "—",
             imageURL: data.rooms.lazy.compactMap(\.image).first
-        ))
+        )
+        store.add(hotel)
+        var transferredStay: Reservation?
+        if let handoff = target.handoffToken, !handoff.isEmpty {
+            do {
+                let stay = try await BookingAPI.claimHandoff(handoff)
+                store.ingest(stay)
+                transferredStay = store.reservations.first { $0.hotelId == stay.hotelId && $0.code == stay.code }
+                await GuestPushManager.sync(store: store)
+            } catch {
+                let message = error.localizedDescription.lowercased()
+                // An expired/consumed bridge cannot become valid on retry. The
+                // hotel remains saved and email Restore Stays is still available.
+                return message.contains("expired") || message.contains("already used")
+            }
+        }
+        store.arrival = GuestelArrival(hotel: hotel, stay: transferredStay)
+        return true
     }
 
     @MainActor
@@ -59,8 +78,12 @@ struct GuestelApp: App {
         let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
         let queryId = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
             .first(where: { $0.name == "hotelId" })?.value
+        let handoff = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "handoff" })?.value
         let hotelId = queryId ?? (parts.count >= 2 && parts[0].lowercased() == "clip" ? parts[1] : "")
         guard !hotelId.isEmpty else { return }
-        await addHandoffHotel(.init(hotelId: hotelId, domain: ""))
+        let target = GuestelHandoff.Target(hotelId: hotelId, domain: "", handoffToken: handoff)
+        GuestelHandoff.save(hotelId: hotelId, domain: "", handoffToken: handoff)
+        if await addHandoffHotel(target) { GuestelHandoff.clear() }
     }
 }

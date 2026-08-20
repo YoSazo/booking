@@ -115,6 +115,18 @@ enum BookingAPI {
         let requests: [String]
     }
 
+    struct ConversationPreview: Identifiable, Decodable, Hashable {
+        let code: String
+        let hotelId: String
+        let roomName: String?
+        let checkin: String
+        let checkout: String
+        let status: String?
+        let latestMessage: GuestMessage?
+        let unreadCount: Int
+        var id: String { "\(hotelId):\(code)" }
+    }
+
     enum Failure: LocalizedError {
         case message(String)
         var errorDescription: String? { if case let .message(m) = self { return m }; return "Something went wrong." }
@@ -279,6 +291,24 @@ enum BookingAPI {
         let json = try await post("api/guest/native/stays", ["reservationTokens": reservationTokens])
         let raw = json["reservations"] as? [[String: Any]] ?? []
         return try JSONDecoder().decode([WalletReservation].self, from: JSONSerialization.data(withJSONObject: raw))
+    }
+
+    static func claimHandoff(_ handoffToken: String) async throws -> WalletReservation {
+        let json = try await post("api/guest/native/handoff", ["handoffToken": handoffToken])
+        guard let raw = json["reservation"] as? [String: Any] else {
+            throw Failure.message((json["message"] as? String) ?? "Could not bring this stay into Guestel.")
+        }
+        return try JSONDecoder().decode(WalletReservation.self, from: JSONSerialization.data(withJSONObject: raw))
+    }
+
+    static func conversations(reservationTokens: [String], identityToken: String?) async throws -> [ConversationPreview] {
+        let json = try await post(
+            "api/guest/native/conversations",
+            ["reservationTokens": reservationTokens],
+            bearerToken: identityToken
+        )
+        let raw = json["conversations"] as? [[String: Any]] ?? []
+        return try JSONDecoder().decode([ConversationPreview].self, from: JSONSerialization.data(withJSONObject: raw))
     }
 
     static func messages(hotelId: String, code: String, accessToken: String) async throws -> [GuestMessage] {

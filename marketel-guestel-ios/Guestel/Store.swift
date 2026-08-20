@@ -79,13 +79,22 @@ struct GuestInfo: Codable, Equatable {
     }
 }
 
+struct GuestelArrival: Identifiable, Hashable {
+    let hotel: Hotel
+    let stay: Reservation?
+    var id: String { "\(hotel.hotelId):\(stay?.code ?? "property")" }
+}
+
 @Observable
 final class GuestStore {
     var hotels: [Hotel]
     var reservations: [Reservation]
     var guest: GuestInfo
+    var conversations: [BookingAPI.ConversationPreview] = []
+    var arrival: GuestelArrival? = nil
 
     var guestName: String { guest.name.isEmpty ? "Guest" : guest.name }
+    var unreadMessageCount: Int { conversations.reduce(0) { $0 + $1.unreadCount } }
 
     private static let reservationsKey = "guestel.reservations.v1"
     private static let guestKey = "guestel.guest.v1"
@@ -113,6 +122,7 @@ final class GuestStore {
         hotels = []
         reservations = []
         guest = GuestInfo()
+        conversations = []
         UserDefaults.standard.removeObject(forKey: Self.hotelsKey)
         UserDefaults.standard.removeObject(forKey: Self.reservationsKey)
         UserDefaults.standard.removeObject(forKey: Self.guestKey)
@@ -243,6 +253,55 @@ final class GuestStore {
                 ($0.checkinDate ?? .distantPast) > ($1.checkinDate ?? .distantPast)
             }
             .first
+    }
+
+    func conversation(for reservation: Reservation) -> BookingAPI.ConversationPreview? {
+        conversations.first { $0.hotelId == reservation.hotelId && $0.code == reservation.code }
+    }
+
+    @MainActor
+    func refreshConversations() async {
+        let tokens = reservations.compactMap(\.accessToken).filter { !$0.isEmpty }
+        guard GuestIdentityAccess.token != nil || !tokens.isEmpty else {
+            conversations = []
+            return
+        }
+        if let rows = try? await BookingAPI.conversations(
+            reservationTokens: tokens,
+            identityToken: GuestIdentityAccess.token
+        ) {
+            conversations = rows
+        }
+    }
+
+    @MainActor
+    func markConversationRead(_ reservation: Reservation) {
+        guard let index = conversations.firstIndex(where: {
+            $0.hotelId == reservation.hotelId && $0.code == reservation.code
+        }) else { return }
+        let row = conversations[index]
+        conversations[index] = BookingAPI.ConversationPreview(
+            code: row.code,
+            hotelId: row.hotelId,
+            roomName: row.roomName,
+            checkin: row.checkin,
+            checkout: row.checkout,
+            status: row.status,
+            latestMessage: row.latestMessage,
+            unreadCount: 0
+        )
+    }
+
+    func ingest(_ stay: BookingAPI.WalletReservation) {
+        ingest([[
+            "code": stay.code,
+            "hotelId": stay.hotelId,
+            "checkin": stay.checkin,
+            "checkout": stay.checkout,
+            "status": stay.status ?? "",
+            "roomName": stay.roomName ?? "",
+            "accessToken": stay.reservationToken ?? "",
+        ]])
     }
 
     // Called from BookingWebView when the booking engine reports its stored stays.
