@@ -645,6 +645,20 @@ app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 app.use('/api/marketel-stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
 
+// Apple App Site Association — served explicitly because express.static ignores
+// dotfile dirs (.well-known) by default. Required for the Guestel App Clip to be
+// invocable from bookmarketel.com (appclips) and for Universal Links.
+const APPLE_APP_SITE_ASSOCIATION = {
+    appclips: { apps: ['YAS2Z7ZY3M.com.bookmarketel.guestel.Clip'] }
+};
+function serveAppSiteAssociation(_req, res) {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.status(200).send(JSON.stringify(APPLE_APP_SITE_ASSOCIATION));
+}
+app.get('/.well-known/apple-app-site-association', serveAppSiteAssociation);
+app.get('/apple-app-site-association', serveAppSiteAssociation);
+
 // Front Desk must be registered BEFORE express.static(public) — otherwise static
 // sees public/frontdesk/ as a directory and 301-redirects /frontdesk → /frontdesk/,
 // which on Vercel hotel domains falls through to the booking-engine SPA.
