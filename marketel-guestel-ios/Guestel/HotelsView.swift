@@ -34,6 +34,10 @@ struct HotelsView: View {
                         }
                     }
                 }
+                // Inset the cards from the screen edges (on top of safeAreaPadding)
+                // so they don't run edge-to-edge. Horizontal only — the Wallet
+                // push/scale math is vertical, so this doesn't affect it.
+                .padding(.horizontal, 12)
             }
             .scrollIndicators(.hidden)
             .safeAreaPadding(15)
