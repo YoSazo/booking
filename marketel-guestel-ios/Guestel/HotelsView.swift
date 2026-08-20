@@ -1,68 +1,58 @@
 import SwiftUI
 
-private struct GeometryInfo {
-    var scrollOffset: CGFloat = 0
-    var minY: CGFloat = 0
-    var containerSize: CGSize = .zero
-    var safeArea = EdgeInsets()
-}
-
+// Apple Wallet card stack, ported from Balaji Venkatesh's AWCAnimation technique:
+// a .visualEffect pushes/scales each card by its scroll-relative frame, and the
+// detail rides a .sheet whose detents dock right under the pinned card.
 struct HotelsView: View {
     @Environment(GuestStore.self) private var store
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedHotel: Hotel?
-    @State private var bookingHotel: Hotel?
+    @State private var info = Info()
+    @State private var sheetDetent: PresentationDetent = .large
     @State private var showingAdd = false
-    @State private var info = GeometryInfo()
 
-    private let cardHeight: CGFloat = 196
-    private let peek: CGFloat = 74
+    private let cardHeight: CGFloat = 220
+    private let overlap: CGFloat = 150
+
+    private var minSheetHeight: CGFloat {
+        max(info.containerSize.height - info.minY - (cardHeight + 20), 220)
+    }
+    private var maxSheetHeight: CGFloat {
+        max(info.containerSize.height - info.minY + (info.safeArea.bottom > 0 ? 15 : 10), minSheetHeight + 80)
+    }
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
-                Theme.canvas.ignoresSafeArea()
-
-                if store.hotels.isEmpty {
-                    EmptyHotelsView { showingAdd = true }
-                } else {
-                    walletScroll
-                }
-
-                AddButton { showingAdd = true }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 16)
-            }
-            .navigationTitle("Your hotels")
-            .sheet(isPresented: $showingAdd) {
-                AddHotelView().presentationDetents([.medium])
-            }
-            .fullScreenCover(item: $bookingHotel) { RebookView(hotel: $0) }
-        }
-    }
-
-    private var walletScroll: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 18) {
-                    if let stay = store.upcomingReservation {
+            ScrollView(.vertical) {
+                VStack(spacing: 16) {
+                    if let stay = store.upcomingReservation, !isSelected {
                         UpcomingStayCard(stay: stay, hotelName: store.hotelName(for: stay.hotelId))
                     }
-                    // Overlapping stack: each card's header peeks above the next.
-                    VStack(spacing: -(cardHeight - peek)) {
-                        ForEach(Array(store.hotels.enumerated()), id: \.element.id) { index, hotel in
-                            CardView(hotel: hotel, seed: index, height: cardHeight)
-                                .id(hotel.id)
-                                .zIndex(Double(index))
-                                .onTapGesture {
-                                    withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(hotel.id, anchor: .top) }
-                                    selectedHotel = hotel
-                                }
+                    VStack(spacing: -overlap) {
+                        ForEach(store.hotels) { hotel in
+                            cardView(hotel)
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 420)
+            }
+            .scrollIndicators(.hidden)
+            .safeAreaPadding(15)
+            .scrollDisabled(isSelected)
+            .navigationTitle(navigationTitleHidden ? "" : "Your hotels")
+            .toolbarTitleDisplayMode(.inlineLarge)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if isSelected {
+                        Button("Close", systemImage: "xmark") {
+                            withAnimation(animation) { selectedHotel = nil }
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !isSelected {
+                        Button("Add", systemImage: "plus") { showingAdd = true }
+                    }
+                }
             }
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, newValue in
                 info.scrollOffset = newValue
@@ -70,29 +60,69 @@ struct HotelsView: View {
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { newValue in
                 info.minY = newValue - info.safeArea.top
             }
-            .onGeometryChange(for: CGSize.self) { $0.size } action: { newValue in
-                info.containerSize = newValue
-            }
-            .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { newValue in
-                info.safeArea = newValue
-            }
-            .sheet(item: $selectedHotel) { hotel in
-                let gap: CGFloat = 30
-                let minH = max(info.containerSize.height - info.minY - (cardHeight + gap), 180)
-                let maxH = max(info.containerSize.height - info.minY + 15, minH + 60)
-                HotelActionsSheet(hotel: hotel) {
-                    selectedHotel = nil
-                    bookingHotel = hotel
-                }
-                .presentationDetents([.height(minH), .height(maxH)])
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(maxH)))
-                .presentationDragIndicator(.visible)
+            .background(Theme.canvas)
+            .sheet(isPresented: $showingAdd) {
+                AddHotelView().presentationDetents([.medium])
             }
         }
+        .sheet(item: $selectedHotel) { hotel in
+            HotelSheet(
+                hotel: hotel,
+                maxDetent: .height(maxSheetHeight),
+                detent: $sheetDetent,
+                onBooked: { code, checkin, checkout in
+                    store.addReservation(code: code, hotelId: hotel.hotelId, checkin: checkin, checkout: checkout)
+                    withAnimation(animation) { selectedHotel = nil }
+                }
+            )
+            .presentationDetents([.height(minSheetHeight), .height(maxSheetHeight)], selection: $sheetDetent)
+            .presentationBackgroundInteraction(.enabled(upThrough: .height(maxSheetHeight)))
+            .interactiveDismissDisabled()
+            .presentationBackground(colorScheme == .dark ? Color.black : Theme.canvas)
+        }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { info.containerSize = $0 }
+        .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { info.safeArea = $0 }
+    }
+
+    @ViewBuilder
+    private func cardView(_ hotel: Hotel) -> some View {
+        let currentIndex = store.hotels.firstIndex(of: hotel) ?? 0
+        let selectedIndex = store.hotels.firstIndex(where: { $0.id == selectedHotel?.id }) ?? 0
+        let isCurrent = hotel.id == selectedHotel?.id
+
+        WalletCard(hotel: hotel, seed: currentIndex, height: cardHeight)
+            .contentShape(.rect)
+            .onTapGesture {
+                sheetDetent = .height(minSheetHeight)
+                withAnimation(animation) { selectedHotel = hotel }
+            }
+            .visualEffect { [info, isSelected] content, proxy in
+                let rect = proxy.frame(in: .scrollView)
+                let bounds = info.containerSize
+                // Selected card + those above go to the top; cards below push off-screen.
+                let pushOffset = selectedIndex < currentIndex ? (bounds.height - rect.minY) : -rect.minY
+                let scale = selectedIndex < currentIndex ? 1.0 : 0.95
+                return content
+                    .scaleEffect(isSelected ? (isCurrent ? 1 : scale) : 1, anchor: .top)
+                    .offset(y: isSelected ? pushOffset : 0)
+            }
+            .allowsHitTesting(isSelected ? isCurrent : true)
+    }
+
+    private var isSelected: Bool { selectedHotel != nil }
+    private var navigationTitleHidden: Bool { info.scrollOffset > 1 || isSelected }
+
+    private var animation: Animation { .interactiveSpring(response: 0.55, dampingFraction: 0.8) }
+
+    struct Info {
+        var scrollOffset: CGFloat = 0
+        var containerSize: CGSize = .zero
+        var safeArea: EdgeInsets = .init()
+        var minY: CGFloat = 0
     }
 }
 
-private struct CardView: View {
+struct WalletCard: View {
     let hotel: Hotel
     let seed: Int
     let height: CGFloat
@@ -102,110 +132,18 @@ private struct CardView: View {
             Theme.gradient(for: seed)
             VStack(alignment: .leading, spacing: 3) {
                 Text(hotel.name)
-                    .font(.system(size: 21, weight: .bold))
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                 Text(hotel.location)
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.85))
             }
-            .padding(18)
+            .padding(20)
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Theme.ink.opacity(0.18), radius: 14, x: 0, y: 8)
-    }
-}
-
-private struct HotelActionsSheet: View {
-    let hotel: Hotel
-    var onBook: () -> Void
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Button(action: onBook) {
-                Text("Book again")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            HStack(spacing: 12) {
-                ActionButton(title: "Message", icon: "bubble.left")
-                ActionButton(title: "Share", icon: "square.and.arrow.up")
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Theme.canvas)
-    }
-}
-
-private struct ActionButton: View {
-    let title: String
-    let icon: String
-
-    var body: some View {
-        Button {} label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                Text(title)
-            }
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color(white: 0.93), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-    }
-}
-
-private struct AddButton: View {
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Theme.green)
-                .frame(width: 60, height: 60)
-                .modifier(GlassCircle())
-        }
-        .clipShape(Circle())
-        .shadow(color: Theme.ink.opacity(0.18), radius: 12, x: 0, y: 6)
-        .accessibilityLabel("Add a hotel")
-    }
-}
-
-private struct EmptyHotelsView: View {
-    var onAdd: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "door.left.hand.closed")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(Theme.green)
-            Text("No hotels yet")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Theme.ink)
-            Text("Scan the code at a hotel you love to keep it here — and book direct every time after.")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.inkSoft)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Button(action: onAdd) {
-                Text("Add a hotel")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 12)
-                    .background(Theme.green, in: Capsule())
-            }
-            .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
