@@ -83,6 +83,11 @@ payment. If it's empty, payments show "Payments aren't available right now."
    `/guest/messages` route returns 200 and the app now supplies `?stay=<code>`.
 
 ## STILL TO FORTIFY (next pass)
+- **Native messaging (priority).** `Message` currently just opens `SimpleWebSheet`
+  (an in-app browser of `/guest/messages`) — a stopgap, not real. Build a native
+  SwiftUI messages screen (mirror `hotel-booking-app/src/GuestMessagesPage.jsx` +
+  `guestMessaging.jsx`), threaded to the reservation, reusing whatever thread API
+  Front Desk uses. It should thread with the front desk, not render a webview.
 - **Deep integration** with Front Desk + the Front Desk Assistant: right now the app
   only reads reservations the web engine wrote (via `BookingWebView`'s localStorage
   bridge) and books holds. Wire real 2-way messaging + an in-app assistant.
