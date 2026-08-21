@@ -55,10 +55,10 @@ struct GuestelApp: App {
             hotelId: data.id,
             domain: target.domain.isEmpty ? (data.domain ?? "") : target.domain,
             name: data.name,
-            location: "Direct booking",
+            location: data.guestelWalletSubtitle ?? "Direct booking",
             stays: 0,
             lastStayed: "—",
-            imageURL: data.rooms.lazy.compactMap(\.image).first
+            imageURL: data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
         )
         store.add(hotel)
         var transferredStay: Reservation?

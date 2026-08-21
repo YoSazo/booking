@@ -118,21 +118,16 @@ test('motion is a system, not scattered one-off transitions', () => {
     assert.match(css, /animation-duration: 0\.01ms !important/);
 });
 
-test('sections animate open instead of snapping', () => {
-    // display:none cannot be transitioned, so height has to be measured.
-    assert.match(settings, /const target = body\.scrollHeight;/);
-    // will-change must be released, or the layer is kept alive for nothing.
-    assert.ok(settings.includes("body.style.willChange = '';"),
-        'will-change is never released after the animation');
-    // A forced reflow between the two writes, or they coalesce and nothing moves.
-    assert.match(settings, /void body\.offsetHeight;/);
-    // Re-tapping mid-flight must not measure a half-open section.
+test('utility sections switch immediately instead of closing in two stages', () => {
+    // Rates, PIN, and checkout-note fields can change height while open. A
+    // measured-height transition then lands once for its old measurement and
+    // again when display settles. These disclosures deliberately snap.
+    assert.doesNotMatch(settings, /const target = body\.scrollHeight;/);
+    assert.doesNotMatch(settings, /void body\.offsetHeight;/);
     assert.match(settings, /if \(body\._sectionTimer\) \{/);
-    // Reduced motion skips the animation rather than running it at 0ms.
-    assert.ok(settings.includes("window.matchMedia('(prefers-reduced-motion: reduce)').matches"),
-        'toggleSection does not consult the reduced-motion setting');
     assert.ok(settings.includes("body.style.display = opening ? 'block' : 'none';"),
-        'reduced motion should switch instantly rather than animate at 0ms');
+        'the disclosure must switch in one paint');
+    assert.match(settings, /body\.classList\.remove\('is-animating', 'is-opening', 'is-collapsed'\)/);
 });
 
 test('deleting a photo animates the photo out, and puts it back on failure', () => {
@@ -187,18 +182,11 @@ test('the pill label is known before the Assistant data arrives', () => {
     // right on the frame the tab appears.
     assert.match(assistant, /window\.syncNativeShellState\?\.\(\)/);
 });
-test('closing a section is one motion, not two', () => {
+test('closing a section has no leftover staged-motion classes', () => {
     const css = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'styles', 'core.css'), 'utf8');
-    // Three clocks ran at once: height 220ms, child transform 220ms, child
-    // opacity 140ms. The content finished fading while the box was still
-    // collapsing, and slid up while the box clipped down — read as two stops.
-    assert.match(css, /\.accordion-body\.is-opening > \* \{/);
-    assert.doesNotMatch(css, /\.accordion-body\.is-animating > \* \{/);
-    // Open: box and children share one duration so they land together.
-    const opening = css.slice(css.indexOf('.accordion-body.is-opening > * {'));
-    assert.doesNotMatch(opening.slice(0, 200), /--dur-fast/);
-    // Close: the collapsed class is never applied, so nothing but height moves.
-    assert.doesNotMatch(settings, /body\.classList\.add\('is-collapsed'\);/);
+    assert.doesNotMatch(css, /\.accordion-body\.is-opening > \* \{/);
+    assert.doesNotMatch(css, /\.accordion-body\.is-animating/);
+    assert.doesNotMatch(settings, /body\.classList\.add\('is-collapsed'/);
 });
 
 test('the native pill survives a fast tab switch', () => {

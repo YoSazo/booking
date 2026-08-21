@@ -1099,6 +1099,8 @@ function applyHotelContextData(data = {}) {
   }
   crm.activeHotelName = String(config.name || data.hotelId || '').trim();
   crm.activeHotelAppIcon = String(config.appIconUrl || '').trim();
+  crm.guestelWalletImageUrl = String(config.guestelWalletImageUrl || '').trim();
+  crm.guestelWalletSubtitle = String(config.guestelWalletSubtitle || '').trim();
   const nativeStoredProperty = isNativeFrontdeskApp()
     ? getNativeProperties().find(property => property.id === crm.activeHotelId)
     : null;
@@ -1999,6 +2001,9 @@ function setBookingsSubview(view) {
   }
   if (view === 'revenue' && !crm.revenueEnabled) view = 'bookings';
   crm.bookingsSubview = ['bookings', 'revenue'].includes(view) ? view : 'bookings';
+  // Native chrome is outside the web view. Hide the assistant pill before the
+  // Revenue paint starts so it cannot linger for a frame and disappear later.
+  syncNativeShellState();
   renderBookingsSubtabs();
   applyBookingsSubview();
   if (crm.bookingsSubview === 'revenue') loadRevenueData();
@@ -2483,6 +2488,12 @@ async function startCrmApp(verification, options = {}) {
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
   crm.frontdeskAppStoreUrl = String(verification?.frontdeskAppStoreUrl || '').trim();
+  crm.guestelWalletImageUrl = String(
+    verification?.guestelWalletImageUrl || crm.guestelWalletImageUrl || ''
+  ).trim();
+  crm.guestelWalletSubtitle = String(
+    verification?.guestelWalletSubtitle || verification?.hotelAddress || crm.guestelWalletSubtitle || ''
+  ).trim();
   if (crm.hotelSubscribed) {
     try {
       localStorage.removeItem('marketelValueRevealPendingV1');
@@ -3203,9 +3214,9 @@ function renderMessageThreadDetail(thread) {
       ${hasUnread ? '<button type="button" class="message-mark-read" onclick="markActiveMessageThreadRead()">Mark conversation read</button>' : ''}
       ${thread.code ? `
       <div class="message-composer">
-        <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}…" maxlength="2000" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
+        <input id="${replyInputId}" type="text" placeholder="Message ${esc(thread.guestName || 'guest')}" maxlength="2000" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
         <button type="button" onclick="replyToThread('${esc(thread.code)}','${replyInputId}')" aria-label="Send reply">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>
         </button>
       </div>` : ''}
     </section>`;
@@ -3256,29 +3267,63 @@ function renderMessageThreadList(threadList, activeThread) {
     ${threadList.map(thread => {
       const summary = threadSummary(thread);
       const isActive = thread.key === activeThread.key;
-      return `<button type="button" role="listitem" class="messages-workspace-thread${isActive ? ' active' : ''}${summary.hasUnread ? ' unread' : ''}" onclick="pickMessageThread('${jsStr(thread.key)}')" aria-current="${isActive ? 'true' : 'false'}">
+      return `<button type="button" role="listitem" class="messages-workspace-thread${isActive ? ' active' : ''}${summary.hasUnread ? ' unread' : ''}" onclick="openMessagesWorkspaceThread('${jsStr(thread.key)}')" aria-current="${isActive ? 'true' : 'false'}">
         <span class="message-avatar small">${esc(messageGuestInitial(thread.guestName))}</span>
         <span class="messages-workspace-thread-copy">
-          <span class="messages-workspace-thread-name">${summary.hasUnread ? '<i></i>' : ''}${esc(thread.guestName || 'Guest')}</span>
+          <span class="messages-workspace-thread-line"><span class="messages-workspace-thread-name">${summary.hasUnread ? '<i></i>' : ''}${esc(thread.guestName || 'Guest')}</span><time>${esc(timeAgo(summary.latest?.createdAt))}</time></span>
           <span class="messages-workspace-thread-preview">${esc(summary.preview)}</span>
-          <span class="messages-workspace-thread-context">${esc(timeAgo(summary.latest?.createdAt))}${thread.roomName ? ` · ${esc(thread.roomName)}` : ''}</span>
+          <span class="messages-workspace-thread-context">${thread.roomName ? esc(thread.roomName) : 'Booked guest'}${thread.checkin ? ` · ${esc(formatMessageStayDates(thread.checkin, thread.checkout))}` : ''}</span>
         </span>
+        ${summary.hasUnread ? `<span class="messages-workspace-thread-badge">${Math.min(99, thread.msgs.filter(m => !m.read && (m.sender || 'guest') === 'guest').length)}</span>` : '<span class="messages-workspace-thread-chevron">›</span>'}
       </button>`;
     }).join('')}
   </div>`;
 }
 
+function formatMessageStayDates(checkin, checkout) {
+  const start = new Date(checkin);
+  const end = new Date(checkout);
+  if (!Number.isFinite(start.getTime())) return '';
+  const fmt = { month: 'short', day: 'numeric' };
+  return Number.isFinite(end.getTime())
+    ? `${start.toLocaleDateString([], fmt)}–${end.toLocaleDateString([], fmt)}`
+    : start.toLocaleDateString([], fmt);
+}
+
+function openMessagesWorkspaceThread(key) {
+  crm.selectedMessageThread = key || crm.selectedMessageThread;
+  crm.messagesWorkspaceThreadOpen = true;
+  crm.messagesThreadPickerOpen = false;
+  renderMessages();
+  markActiveMessageThreadRead();
+}
+
+function handleMessagesWorkspaceBack() {
+  if (window.matchMedia?.('(max-width: 700px)').matches && crm.messagesWorkspaceThreadOpen) {
+    crm.messagesWorkspaceThreadOpen = false;
+    renderMessages();
+    return;
+  }
+  closeMessagesWorkspace();
+}
+
 function openMessagesWorkspace() {
   crm.messagesExpanded = true;
   crm.messagesInboxOpen = true;
+  // Guestel opens on its native conversation list on a phone. A desktop has
+  // room for both panes, so the conversation represented by the tapped card is
+  // immediately active there.
+  crm.messagesWorkspaceThreadOpen = !window.matchMedia?.('(max-width: 700px)').matches;
   crm.messagesThreadPickerOpen = false;
   if (!crm.selectedMessageThread) crm.selectedMessageThread = pickDefaultMessageThread(buildMessageThreads());
   setNativeModalOpen('guest-messages', true);
   renderMessages();
+  if (crm.messagesWorkspaceThreadOpen) markActiveMessageThreadRead();
 }
 
 function closeMessagesWorkspace() {
   crm.messagesExpanded = false;
+  crm.messagesWorkspaceThreadOpen = false;
   crm.messagesThreadPickerOpen = false;
   messagesKeyboardCleanup?.();
   messagesKeyboardCleanup = null;
@@ -3299,14 +3344,16 @@ function renderMessagesWorkspace(threadList, activeThread, unreadCount) {
       scrollSelector: '.message-conversation',
     });
   }
+  workspace.classList.toggle('is-thread-open', !!crm.messagesWorkspaceThreadOpen);
+  const showingThread = !!crm.messagesWorkspaceThreadOpen;
   workspace.innerHTML = `
     <header class="messages-workspace-header">
-      <button type="button" class="messages-workspace-close" onclick="closeMessagesWorkspace()" aria-label="Close guest messages">‹</button>
-      <div>
-        <div class="messages-workspace-title">Guest messages</div>
-        <div class="messages-workspace-subtitle">${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}</div>
+      <button type="button" class="messages-workspace-close" onclick="handleMessagesWorkspaceBack()" aria-label="${showingThread ? 'Back to conversations' : 'Close guest messages'}">${showingThread ? '‹' : 'Done'}</button>
+      <div class="messages-workspace-heading">
+        <div class="messages-workspace-title">${showingThread ? esc(activeThread.guestName || 'Guest') : 'Messages'}</div>
+        <div class="messages-workspace-subtitle">${showingThread ? `${esc(activeThread.roomName || 'Booked guest')}${activeThread.checkin ? ` · ${esc(formatMessageStayDates(activeThread.checkin, activeThread.checkout))}` : ''}` : `${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}`}</div>
       </div>
-      ${unreadCount > 0 ? `<button type="button" class="messages-workspace-read" onclick="markAllMessagesRead()">Read all</button>` : '<span></span>'}
+      ${!showingThread && unreadCount > 0 ? `<button type="button" class="messages-workspace-read" onclick="markAllMessagesRead()">Read all</button>` : '<span></span>'}
     </header>
     <main class="messages-workspace-body">
       <aside class="messages-workspace-sidebar">
@@ -3342,7 +3389,13 @@ function renderMessages() {
       <div class="guest-messages-card loading">
         <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
         <div>Loading guest messages…</div>
-      </div>` : '');
+      </div>` : `
+      <section class="guest-messages-card guest-messages-empty">
+        <span class="guest-messages-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+        </span>
+        <span><strong>No guest conversations yet</strong><small>After someone books, messages and replies stay with that reservation.</small></span>
+      </section>`);
     if (pending && crm.currentFilter === 'apps') loadMessages();
     return;
   }
@@ -3362,35 +3415,20 @@ function renderMessages() {
     document.getElementById('messagesWorkspace')?.remove();
   }
 
-  const inboxBody = crm.messagesInboxOpen && !crm.messagesExpanded ? `
-    <div class="guest-messages-inline-body">
-      <div class="guest-messages-inline-tools">
-        ${renderMessageThreadPicker(threadList, activeThread)}
-        ${unreadCount > 0 ? `<button type="button" onclick="markAllMessagesRead()" class="message-mark-all">Mark all read</button>` : ''}
-      </div>
-      ${renderMessageThreadDetail(activeThread)}
-    </div>` : '';
+  const summary = threadSummary(activeThread);
 
   panel.innerHTML = `
     <section class="guest-messages-card">
-      <div class="guest-messages-card-header">
-        <button type="button" onclick="toggleMessagesInbox()" class="guest-messages-toggle">
-          <span class="guest-messages-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
-          </span>
-          <span class="guest-messages-heading">
-            <strong>Guest messages</strong>
-            <span>${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}</span>
-          </span>
-          ${unreadCount > 0 ? `<span class="guest-messages-unread">${unreadCount} new</span>` : ''}
-          <span class="guest-messages-disclosure${crm.messagesInboxOpen ? ' open' : ''}">›</span>
-        </button>
-        <button type="button" onclick="openMessagesWorkspace()" class="guest-messages-expand" aria-label="Expand guest messages">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
-          <span>Expand</span>
-        </button>
-      </div>
-      ${inboxBody}
+      <button type="button" onclick="openMessagesWorkspace()" class="guest-messages-native-row">
+        <span class="message-avatar">${esc(messageGuestInitial(activeThread.guestName))}</span>
+        <span class="guest-messages-native-copy">
+          <span class="guest-messages-native-line"><strong>${esc(activeThread.guestName || 'Guest')}</strong><time>${esc(timeAgo(summary.latest?.createdAt))}</time></span>
+          <span class="guest-messages-native-preview">${esc(summary.preview)}</span>
+          <small>${esc(activeThread.roomName || 'Booked guest')}${activeThread.checkin ? ` · ${esc(formatMessageStayDates(activeThread.checkin, activeThread.checkout))}` : ''}</small>
+        </span>
+        ${unreadCount > 0 ? `<span class="guest-messages-unread">${Math.min(99, unreadCount)}</span>` : '<span class="guest-messages-native-chevron">›</span>'}
+      </button>
+      ${threadList.length > 1 ? `<button type="button" class="guest-messages-all" onclick="openMessagesWorkspace()">View all ${threadList.length} conversations</button>` : ''}
     </section>`;
   // Messages load after the tab is already on screen, so the card replaces a
   // loading row rather than arriving with the page. Rise it in so the swap
@@ -6359,6 +6397,8 @@ exposeToWindow({
   setGrowthChecklistItem,
   setGrowthPeriod,
   setMessageThread,
+  openMessagesWorkspaceThread,
+  handleMessagesWorkspaceBack,
   setNativeModalOpen,
   setNativeShellVisible,
   setNotificationButtonState,

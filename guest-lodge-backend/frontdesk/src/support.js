@@ -32,16 +32,14 @@ function ensureSupportStyles() {
   style.textContent = `
     body.marketel-support-open{overflow:hidden!important;}
     .marketel-support-overlay{position:fixed;inset:0;width:100%;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-sizing:border-box;overflow:hidden;box-shadow:0 0 0 200vmax #eff4f0;contain:layout;backface-visibility:hidden;}
-    .marketel-support-dialog{width:min(620px,100%);height:min(720px,calc(100% - 36px));display:flex;flex-direction:column;overflow:hidden;background:#eff4f0;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
-    .marketel-support-head{display:flex;align-items:center;gap:12px;padding:16px 18px;background:rgba(255,255,255,.92);border-bottom:1px solid #e3ebe6;}
-    .marketel-support-mark{width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:12px;background:#e8f5ee;overflow:hidden;}
-    .marketel-support-mark img{width:27px;height:27px;object-fit:contain;}
-    .marketel-support-title{min-width:0;flex:1;}
-    .marketel-support-title strong{display:block;font-size:15px;line-height:1.2;color:#1a2b22;}
-    .marketel-support-title span{display:block;margin-top:3px;font-size:11px;color:#6b7d72;}
-    .marketel-support-status{display:inline-flex;align-items:center;gap:5px;margin-right:2px;color:#2e7d5b;font-size:11px;font-weight:700;}
+    .marketel-support-dialog{width:min(660px,100%);height:min(760px,calc(100% - 36px));display:flex;flex-direction:column;overflow:hidden;background:#eff4f0;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
+    .marketel-support-head{display:grid;grid-template-columns:64px minmax(0,1fr) 64px;align-items:center;gap:8px;min-height:68px;padding:10px 14px;background:rgba(255,255,255,.88);border-bottom:1px solid #e3ebe6;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}
+    .marketel-support-title{min-width:0;text-align:center;}
+    .marketel-support-title strong{display:block;overflow:hidden;font-size:17px;line-height:1.2;color:#1a2b22;text-overflow:ellipsis;white-space:nowrap;}
+    .marketel-support-title span{display:block;margin-top:3px;font-size:10px;color:#6b7d72;}
+    .marketel-support-status{display:inline-flex;align-items:center;justify-self:end;gap:5px;color:#2e7d5b;font-size:10px;font-weight:700;white-space:nowrap;}
     .marketel-support-status::before{content:'';width:7px;height:7px;border-radius:50%;background:#4caf7d;}
-    .marketel-support-close{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;border:0;border-radius:50%;background:#edf2ef;color:#405248;font:500 23px/1 inherit;cursor:pointer;}
+    .marketel-support-close{width:auto;height:42px;padding:0 2px;border:0;background:transparent;color:#2e7d5b;font:750 14px/1 inherit;text-align:left;cursor:pointer;}
     .marketel-support-messages{flex:1;min-height:0;overflow-y:auto;padding:22px 18px 16px;overscroll-behavior:contain;}
     .marketel-support-empty{max-width:390px;margin:12vh auto 0;text-align:center;color:#607168;}
     .marketel-support-empty .icon{width:48px;height:48px;margin:0 auto 14px;display:grid;place-items:center;border-radius:16px;background:#e4f2e9;color:#2e7d5b;font-size:23px;}
@@ -49,14 +47,14 @@ function ensureSupportStyles() {
     .marketel-support-empty p{font-size:13px;line-height:1.55;}
     .marketel-support-row{display:flex;flex-direction:column;margin:0 0 13px;align-items:flex-start;}
     .marketel-support-row.owner{align-items:flex-end;}
-    .marketel-support-label{margin:0 5px 5px;color:#7b8c82;font-size:10px;font-weight:700;}
-    .marketel-support-bubble{max-width:min(82%,470px);padding:11px 13px;border-radius:17px 17px 17px 5px;background:#fff;border:1px solid #e2eae5;color:#22342a;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 2px 8px rgba(25,58,40,.04);}
-    .marketel-support-row.owner .marketel-support-bubble{border:0;border-radius:17px 17px 5px 17px;background:#2e7d5b;color:#fff;box-shadow:0 5px 16px rgba(46,125,91,.18);}
-    .marketel-support-composer{padding:12px max(14px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));background:rgba(255,255,255,.94);border-top:1px solid #e3ebe6;}
+    .marketel-support-label{margin:0 5px 4px;color:#7b8c82;font-size:9px;font-weight:600;}
+    .marketel-support-bubble{max-width:min(82%,470px);padding:10px 14px;border-radius:18px;background:#fff;border:0;color:#22342a;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:none;}
+    .marketel-support-row.owner .marketel-support-bubble{border:0;border-radius:18px;background:#2e7d5b;color:#fff;box-shadow:none;}
+    .marketel-support-composer{padding:8px max(12px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:rgba(255,255,255,.82);border-top:1px solid #e3ebe6;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}
     .marketel-support-compose-row{display:flex;align-items:flex-end;gap:9px;}
-    .marketel-support-input{flex:1;min-height:46px;max-height:130px;padding:12px 14px!important;resize:none;border:1.5px solid #d7e3db;border-radius:15px;background:#fff;color:#1a2b22;font:400 16px/1.4 'DM Sans',sans-serif!important;outline:none;}
-    .marketel-support-input:focus{border-color:#4caf7d;box-shadow:0 0 0 3px rgba(76,175,125,.12);}
-    .marketel-support-send{width:46px;height:46px;display:grid;place-items:center;flex:0 0 auto;border:0;border-radius:15px;background:#2e7d5b;color:#fff;cursor:pointer;box-shadow:0 5px 15px rgba(46,125,91,.22);}
+    .marketel-support-input{flex:1;min-height:42px;max-height:130px;padding:10px 14px!important;resize:none;border:0;border-radius:20px;background:#fff;color:#1a2b22;font:400 16px/1.4 -apple-system,BlinkMacSystemFont,'DM Sans',sans-serif!important;outline:none;box-shadow:0 0 0 1px rgba(35,72,49,.04);}
+    .marketel-support-input:focus{box-shadow:0 0 0 1.5px rgba(46,125,91,.24);}
+    .marketel-support-send{width:42px;height:42px;display:grid;place-items:center;flex:0 0 auto;border:0;border-radius:50%;background:#2e7d5b;color:#fff;cursor:pointer;box-shadow:none;}
     .marketel-support-send:disabled{opacity:.48;cursor:wait;box-shadow:none;}
     .marketel-support-send svg{width:19px;height:19px;}
     .marketel-support-foot{margin:8px 2px 0;text-align:center;color:#84928a;font-size:10px;line-height:1.35;}
@@ -69,7 +67,7 @@ function ensureSupportStyles() {
     @media(max-width:600px){
       .marketel-support-overlay{padding:0;align-items:stretch;}
       .marketel-support-dialog{width:100%;height:100%;max-height:none;border:0;border-radius:0;}
-      .marketel-support-head{padding-top:max(12px,env(safe-area-inset-top));}
+      .marketel-support-head{padding-top:max(10px,env(safe-area-inset-top));}
       .marketel-support-bubble{max-width:88%;}
     }
   `;
@@ -168,20 +166,19 @@ function createSupportOverlay() {
   };
   overlay.innerHTML = `<section class="marketel-support-dialog" role="dialog" aria-modal="true" aria-labelledby="marketelSupportTitle">
     <header class="marketel-support-head">
-      <div class="marketel-support-mark"><img src="/marketellogo.svg" alt=""></div>
+      <button type="button" class="marketel-support-close" onclick="closeSupportConversation()" aria-label="Close support">Done</button>
       <div class="marketel-support-title">
-        <strong id="marketelSupportTitle">Message Marketel</strong>
-        <span>Questions, problems, and feedback</span>
+        <strong id="marketelSupportTitle">Marketel</strong>
+        <span>Support conversation</span>
       </div>
       <span class="marketel-support-status" id="marketelSupportStatus">Replies here</span>
-      <button type="button" class="marketel-support-close" onclick="closeSupportConversation()" aria-label="Close support">×</button>
     </header>
     <div class="marketel-support-messages" id="marketelSupportMessages"><div class="marketel-support-loading">Loading conversation…</div></div>
     <footer class="marketel-support-composer">
       <div class="marketel-support-compose-row">
         <textarea class="marketel-support-input" id="marketelSupportInput" maxlength="4000" rows="1" placeholder="Write a message…" aria-label="Message Marketel"></textarea>
         <button type="button" class="marketel-support-send" id="marketelSupportSend" onclick="sendMarketelSupportMessage()" aria-label="Send message">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>
         </button>
       </div>
       <div class="marketel-support-foot">Replies also go to the property email · <a href="mailto:support@bookmarketel.com">Email fallback</a></div>

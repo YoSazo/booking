@@ -246,3 +246,25 @@ test('Guestel offers in-app account deletion without cancelling hotel records', 
     assert.match(account, /Delete Guestel account/);
     assert.match(account, /It does not cancel your hotel reservations/);
 });
+
+test('Front Desk edits the same property card Guestel renders', () => {
+    const root = path.join(__dirname, '..', '..');
+    const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+    const apps = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'src', 'apps.js'), 'utf8');
+    const api = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'BookingAPI.swift'), 'utf8');
+    const store = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'Store.swift'), 'utf8');
+
+    assert.match(schema, /guestelWalletImageUrl\s+String\?/);
+    assert.match(schema, /guestelWalletSubtitle\s+String\?/);
+    assert.match(server, /app\.post\('\/api\/crm\/guestel-wallet-card'/);
+    assert.match(server, /app\.post\('\/api\/crm\/guestel-wallet-image'/);
+    assert.match(server, /app\.delete\('\/api\/crm\/guestel-wallet-image'/);
+    assert.match(server, /location: hotel\.guestelWalletSubtitle \|\| hotel\.address/);
+    assert.match(server, /imageURL: hotel\.guestelWalletImageUrl \|\| hotel\.rooms/);
+    assert.match(apps, /Save Guestel card/);
+    assert.match(apps, /Guestel uses this square image for your conversation and notification identity/);
+    assert.match(api, /let guestelWalletImageUrl: String\?/);
+    assert.match(api, /let guestelWalletSubtitle: String\?/);
+    assert.match(store, /hotels\[index\]\.location = data\.guestelWalletSubtitle/);
+    assert.match(store, /hotels\[index\]\.imageURL = data\.walletImage/);
+});

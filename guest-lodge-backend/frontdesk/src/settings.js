@@ -1353,69 +1353,24 @@ function pageSectionHtml(title, bodyHtml, { open = false, hint = '', id = '' } =
   </div>`;
 }
 
-// display:none cannot be transitioned, and height is the only property that can
-// expand to fit unknown content — but height costs a layout pass every frame.
-// Two things make that affordable: `contain` scopes the layout to this subtree
-// rather than the document, and the motion the eye actually reads is carried by
-// the inner transform and opacity, which run on the compositor.
+// These are utility sections, not a reveal. Switching them immediately avoids
+// the measured-height transition's visible two-step close when controls such as
+// time inputs or validation copy change the section height during the motion.
 function toggleSection(header) {
   const body = header.nextElementSibling;
   if (!body) return;
   const arrow = header.querySelector('.accordion-arrow');
   const opening = body.style.display === 'none' || !body.style.display;
-  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (arrow) arrow.style.transform = opening ? 'rotate(90deg)' : 'rotate(0deg)';
-
-  if (reduced) {
-    body.style.display = opening ? 'block' : 'none';
-    return;
-  }
-
-  // A second tap mid-flight must not measure a half-open section.
   if (body._sectionTimer) {
     clearTimeout(body._sectionTimer);
     body._sectionTimer = null;
   }
-  body.style.transition = 'none';
-
-  if (opening) {
-    body.style.display = 'block';
-    body.style.height = 'auto';
-    const target = body.scrollHeight;
-    body.style.height = '0px';
-    body.classList.add('is-animating', 'is-opening', 'is-collapsed');
-    // Force a read before changing anything else, or the writes coalesce into
-    // no transition at all.
-    void body.offsetHeight;
-    body.style.transition = '';
-    body.style.height = target + 'px';
-    body.classList.remove('is-collapsed');
-    body._sectionTimer = setTimeout(() => {
-      // Back to auto so the section still fits content added later, and drop
-      // will-change so the layer is not kept alive for nothing.
-      body.style.height = '';
-      body.style.willChange = '';
-      body.classList.remove('is-animating', 'is-opening');
-      body._sectionTimer = null;
-    }, 240);
-    return;
-  }
-
-  body.style.height = body.scrollHeight + 'px';
-  body.classList.add('is-animating');
-  void body.offsetHeight;
-  body.style.transition = '';
-  // Added after the reflow, not before it, or the content snaps out instead of
-  // easing out alongside the height.
-  body.style.height = '0px';
-  body._sectionTimer = setTimeout(() => {
-    body.style.display = 'none';
-    body.style.height = '';
-    body.style.willChange = '';
-    body.classList.remove('is-animating', 'is-collapsed');
-    body._sectionTimer = null;
-  }, 240);
+  body.classList.remove('is-animating', 'is-opening', 'is-collapsed');
+  body.style.removeProperty('height');
+  body.style.removeProperty('transition');
+  body.style.removeProperty('will-change');
+  body.style.display = opening ? 'block' : 'none';
+  if (arrow) arrow.style.transform = opening ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
 let goLiveInFlight = false;
@@ -1718,7 +1673,7 @@ async function uploadAppIcon(input) {
         appsEl.dataset.appsKey = (crm.activeHotelId || '') + '|' + data.appIconUrl + '|' + (crm.activeHotelDomain || '');
       }
       if (typeof updateFrontdeskManifestLink === 'function') updateFrontdeskManifestLink();
-      toast('Logo updated! Guests will see it on their phone.', 'success');
+      toast('Guestel icon updated.', 'success');
     } else {
       toast(data.message || 'Failed to upload icon', 'error');
       restoreAppIconPreview();

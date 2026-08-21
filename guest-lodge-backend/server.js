@@ -11046,6 +11046,7 @@ const { optimizeRoomImageBuffer } = require('./lib/optimizeRoomImage');
 const {
     S3Client,
     PutObjectCommand,
+    DeleteObjectCommand,
     ListObjectsV2Command,
     DeleteObjectsCommand,
 } = require('@aws-sdk/client-s3');
@@ -12372,6 +12373,8 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             pms: hotel.pms,
             theme: hotel.theme || 'light',
             appIconUrl: hotel.appIconUrl ? resolveImgUrl(hotel.appIconUrl) : '',
+            guestelWalletImageUrl: hotel.guestelWalletImageUrl ? resolveImgUrl(hotel.guestelWalletImageUrl) : '',
+            guestelWalletSubtitle: hotel.guestelWalletSubtitle || hotel.address || '',
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
@@ -12422,6 +12425,8 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 cancellationPolicy: true,
                 theme: true,
                 appIconUrl: true,
+                guestelWalletImageUrl: true,
+                guestelWalletSubtitle: true,
                 subscribed: true,
                 setupToken: true,
                 ownerEmail: true,
@@ -12468,6 +12473,8 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             cancellationPolicy: dbHotel?.cancellationPolicy || '',
             theme: dbHotel?.theme || 'light',
             appIconUrl: dbHotel?.appIconUrl || '',
+            guestelWalletImageUrl: dbHotel?.guestelWalletImageUrl || '',
+            guestelWalletSubtitle: dbHotel?.guestelWalletSubtitle || '',
             subscribed: dbHotel?.subscribed || false,
             frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
         });
@@ -12848,8 +12855,8 @@ app.get('/api/guest/wallet', guestWalletRateLimit, async (req, res) => {
                 hotelId: hotel.id,
                 domain: hotel.domains?.[0]?.domain || '',
                 name: hotel.name,
-                location: hotel.address || 'Direct booking',
-                imageURL: hotel.rooms?.[0]?.images?.[0]?.url || hotel.appIconUrl || '',
+                location: hotel.guestelWalletSubtitle || hotel.address || 'Direct booking',
+                imageURL: hotel.guestelWalletImageUrl || hotel.rooms?.[0]?.images?.[0]?.url || hotel.appIconUrl || '',
             })),
             reservations: bookings.map(booking => ({
                 code: booking.pmsConfirmationCode || booking.ourReservationCode,
@@ -14673,6 +14680,7 @@ async function completeAccountDeletion(request) {
             name: true,
             ownerEmail: true,
             appIconUrl: true,
+            guestelWalletImageUrl: true,
             subscribed: true,
             marketelStripeCustomerId: true,
             marketelStripeSubscriptionId: true,
@@ -14703,6 +14711,7 @@ async function completeAccountDeletion(request) {
 
         const mediaUrls = [
             hotel.appIconUrl,
+            hotel.guestelWalletImageUrl,
             ...hotel.rooms.flatMap(room => room.images.map(image => image.url)),
         ].filter(Boolean);
         await deleteHotelUploadedMedia(hotel.id, mediaUrls);
@@ -15343,6 +15352,132 @@ app.post('/api/crm/hotel-app-icon', crmAuth, (req, res, next) => {
     }
 });
 
+function guestelWalletSubtitle(value) {
+    return String(value == null ? '' : value)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 64);
+}
+
+async function deleteGuestelWalletUpload(url, hotelId) {
+    const clean = String(url || '').trim();
+    if (!clean || !clean.includes('guestel-wallet-')) return;
+    if (R2_PUBLIC_URL) {
+        const key = r2ObjectKeyFromPublicUrl(clean);
+        if (key && key.startsWith(`${hotelId}/`)) {
+            await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key })).catch(() => {});
+        }
+        return;
+    }
+    if (!clean.startsWith(`/uploads/${hotelId}/`)) return;
+    const uploadsRoot = path.resolve(__dirname, 'public', 'uploads');
+    const target = path.resolve(__dirname, 'public', clean.replace(/^\//, ''));
+    if (target.startsWith(`${uploadsRoot}${path.sep}`)) {
+        try { fs.unlinkSync(target); } catch (_) { /* already gone */ }
+    }
+}
+
+// A wide cover is separate from the square notification/logo image. The same
+// server-owned fields feed the Front Desk preview and Guestel's SwiftUI wallet,
+// so the owner never edits a mock that disagrees with the guest experience.
+app.post('/api/crm/guestel-wallet-card', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const subtitle = guestelWalletSubtitle(req.body?.subtitle);
+        const hotel = await prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: { guestelWalletSubtitle: subtitle || null },
+            select: { guestelWalletImageUrl: true, guestelWalletSubtitle: true, address: true },
+        });
+        hotelConfigCache.delete(hotelId);
+        res.json({
+            success: true,
+            subtitle: hotel.guestelWalletSubtitle || '',
+            fallbackSubtitle: hotel.address || '',
+            imageUrl: absolutePublicAssetUrl(req, hotel.guestelWalletImageUrl),
+        });
+    } catch (e) {
+        console.error('CRM Guestel wallet card save error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not save the Guestel card.' });
+    }
+});
+
+app.post('/api/crm/guestel-wallet-image', crmAuth, (req, res, next) => {
+    req.hotelId = req.crmDefaultHotelId || req.crmResolvedHotelId || 'unknown';
+    next();
+}, upload.single('image'), async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        if (!req.file) return res.status(400).json({ success: false, message: 'Choose a JPG, PNG, or WebP image.' });
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(String(req.file.mimetype || '').toLowerCase())) {
+            if (req.file.path) {
+                try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
+            }
+            return res.status(415).json({ success: false, message: 'Guestel covers must be JPG, PNG, or WebP.' });
+        }
+        let inputBuffer = req.file.buffer;
+        if (!inputBuffer && req.file.path) {
+            inputBuffer = fs.readFileSync(req.file.path);
+            try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
+        }
+        if (!inputBuffer) return res.status(400).json({ success: false, message: 'Could not read that image.' });
+
+        const optimized = await sharp(inputBuffer)
+            .rotate()
+            .resize(1600, 1000, { fit: 'cover', position: 'attention', withoutEnlargement: true })
+            .webp({ quality: 84, effort: 4 })
+            .toBuffer();
+        let url;
+        const filename = `guestel-wallet-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.webp`;
+        if (R2_PUBLIC_URL) {
+            url = await uploadToR2(optimized, `${hotelId}/${filename}`, 'image/webp');
+        } else {
+            const dir = path.join(__dirname, 'public', 'uploads', hotelId);
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, filename), optimized);
+            url = `/uploads/${hotelId}/${filename}`;
+        }
+
+        const prior = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { guestelWalletImageUrl: true },
+        });
+        await prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: { guestelWalletImageUrl: url },
+        });
+        hotelConfigCache.delete(hotelId);
+        await deleteGuestelWalletUpload(prior?.guestelWalletImageUrl, hotelId);
+        res.json({ success: true, imageUrl: absolutePublicAssetUrl(req, url) });
+    } catch (e) {
+        console.error('CRM Guestel wallet image upload error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not update the Guestel cover.' });
+    }
+});
+
+app.delete('/api/crm/guestel-wallet-image', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { guestelWalletImageUrl: true },
+        });
+        await prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: { guestelWalletImageUrl: null },
+        });
+        hotelConfigCache.delete(hotelId);
+        await deleteGuestelWalletUpload(hotel?.guestelWalletImageUrl, hotelId);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('CRM Guestel wallet image reset error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not reset the Guestel cover.' });
+    }
+});
+
 // Update rates
 app.post('/api/crm/rates', crmAuth, async (req, res) => {
     try {
@@ -15499,6 +15634,8 @@ app.get('/api/crm/bootstrap', crmBootstrapRateLimit, crmAuth, async (req, res) =
                     cancellationPolicy: true,
                     theme: true,
                     appIconUrl: true,
+                    guestelWalletImageUrl: true,
+                    guestelWalletSubtitle: true,
                     subscribed: true,
                     setupToken: true,
                     ownerEmail: true,
@@ -15537,6 +15674,8 @@ app.get('/api/crm/bootstrap', crmBootstrapRateLimit, crmAuth, async (req, res) =
             ...sanitizeConfigForResponse(config),
             name: dbHotel?.name || config.name || hotelId,
             appIconUrl: dbHotel?.appIconUrl || '',
+            guestelWalletImageUrl: dbHotel?.guestelWalletImageUrl || '',
+            guestelWalletSubtitle: dbHotel?.guestelWalletSubtitle || '',
         };
         const manualAvailability = formatManualAvailabilityPayload(manualRoomRows);
         res.set('Server-Timing', `bootstrap;dur=${Date.now() - startedAt}`);
@@ -15565,6 +15704,8 @@ app.get('/api/crm/bootstrap', crmBootstrapRateLimit, crmAuth, async (req, res) =
                     cancellationPolicy: dbHotel?.cancellationPolicy || '',
                     theme: dbHotel?.theme || 'light',
                     appIconUrl: dbHotel?.appIconUrl || '',
+                    guestelWalletImageUrl: dbHotel?.guestelWalletImageUrl || '',
+                    guestelWalletSubtitle: dbHotel?.guestelWalletSubtitle || '',
                     subscribed: dbHotel?.subscribed || false,
                     frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
                 },

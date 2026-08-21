@@ -33,9 +33,14 @@ enum BookingAPI {
         let id: String
         let domain: String?
         let name: String
+        let guestelWalletImageUrl: String?
+        let guestelWalletSubtitle: String?
         let subscribed: Bool?
         let rates: Rates?
         let rooms: [APIRoom]
+        var walletImage: URL? {
+            guestelWalletImageUrl.flatMap { URL(string: $0, relativeTo: BookingAPI.base)?.absoluteURL }
+        }
     }
 
     struct Hold {

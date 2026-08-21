@@ -173,9 +173,8 @@ final class GuestStore {
             guard let data = try? await BookingAPI.hotel(hotelId),
                   let index = hotels.firstIndex(where: { $0.hotelId == hotelId }) else { continue }
             hotels[index].name = data.name
-            if let image = data.rooms.lazy.compactMap(\.image).first {
-                hotels[index].imageURL = image
-            }
+            hotels[index].location = data.guestelWalletSubtitle ?? hotels[index].location
+            hotels[index].imageURL = data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
         }
         persistHotels()
     }

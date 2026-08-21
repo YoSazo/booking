@@ -354,12 +354,128 @@ function detectAppPlatform() {
   return 'ios';
 }
 
+function appsEscape(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function guestelWalletSubtitleValue() {
+  return String(
+    crm.guestelWalletSubtitle
+      || crm.activeHotelContext?.address
+      || 'Direct booking'
+  ).trim();
+}
+
+function updateGuestelWalletPreview() {
+  const subtitleInput = document.getElementById('guestelWalletSubtitleInput');
+  const subtitle = String(subtitleInput?.value || guestelWalletSubtitleValue()).trim() || 'Direct booking';
+  const previewSubtitle = document.getElementById('guestelWalletPreviewSubtitle');
+  if (previewSubtitle) previewSubtitle.textContent = subtitle;
+  const count = document.getElementById('guestelWalletSubtitleCount');
+  if (count) count.textContent = `${String(subtitleInput?.value || '').length}/64`;
+}
+
+async function saveGuestelWalletCard() {
+  const input = document.getElementById('guestelWalletSubtitleInput');
+  const button = document.getElementById('guestelWalletSubtitleSave');
+  const subtitle = String(input?.value || '').replace(/\s+/g, ' ').trim().slice(0, 64);
+  if (button) button.disabled = true;
+  try {
+    const data = await api('POST', '/api/crm/guestel-wallet-card', { subtitle });
+    if (!data?.success) throw new Error(data?.message || 'Could not save the Guestel card.');
+    crm.guestelWalletSubtitle = String(data.subtitle || '').trim();
+    if (input) input.value = crm.guestelWalletSubtitle || String(data.fallbackSubtitle || '').trim();
+    updateGuestelWalletPreview();
+    toast('Guestel card updated.', 'success');
+  } catch (error) {
+    toast(error?.message || 'Could not save the Guestel card.', 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function setGuestelWalletImagePreview(url) {
+  const preview = document.getElementById('guestelWalletPreviewImage');
+  if (!preview) return;
+  const clean = String(url || '').trim();
+  preview.classList.toggle('has-image', !!clean);
+  preview.innerHTML = clean
+    ? `<img src="${appsEscape(clean)}" alt="Guestel wallet cover">`
+    : '<span>Choose a cover photo</span>';
+  const remove = document.getElementById('guestelWalletImageRemove');
+  if (remove) remove.hidden = !clean;
+}
+
+async function uploadGuestelWalletImage(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  const uploadButton = document.getElementById('guestelWalletImageButton');
+  const previous = crm.guestelWalletImageUrl;
+  if (uploadButton) {
+    uploadButton.disabled = true;
+    uploadButton.textContent = 'Uploading…';
+  }
+  const form = new FormData();
+  form.append('image', file);
+  try {
+    const query = new URLSearchParams();
+    if (crm.activeHotelId) query.set('hotelId', crm.activeHotelId);
+    const response = await fetch(`/api/crm/guestel-wallet-image?${query}`, {
+      method: 'POST',
+      headers: {
+        'x-crm-token': crm.token,
+        ...(isNativeFrontdeskApp() ? { 'x-marketel-client': 'ios' } : {}),
+      },
+      body: form,
+    });
+    const data = await response.json();
+    if (!response.ok || !data?.success || !data.imageUrl) {
+      throw new Error(data?.message || 'Could not update the Guestel cover.');
+    }
+    crm.guestelWalletImageUrl = data.imageUrl;
+    setGuestelWalletImagePreview(data.imageUrl);
+    toast('Guestel cover updated.', 'success');
+  } catch (error) {
+    setGuestelWalletImagePreview(previous);
+    toast(error?.message || 'Could not update the Guestel cover.', 'error');
+  } finally {
+    input.value = '';
+    if (uploadButton) {
+      uploadButton.disabled = false;
+      uploadButton.textContent = crm.guestelWalletImageUrl ? 'Change cover' : 'Choose cover';
+    }
+  }
+}
+
+async function resetGuestelWalletImage() {
+  const button = document.getElementById('guestelWalletImageRemove');
+  if (button) button.disabled = true;
+  try {
+    const data = await api('DELETE', '/api/crm/guestel-wallet-image');
+    if (!data?.success) throw new Error(data?.message || 'Could not reset the Guestel cover.');
+    crm.guestelWalletImageUrl = '';
+    setGuestelWalletImagePreview('');
+    const uploadButton = document.getElementById('guestelWalletImageButton');
+    if (uploadButton) uploadButton.textContent = 'Choose cover';
+    toast('Guestel will use your first room photo.', 'success');
+  } catch (error) {
+    toast(error?.message || 'Could not reset the Guestel cover.', 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 function ensureAppsViewRendered(force) {
   const el = document.getElementById('appsView');
   if (!el) return;
   const embeddedNativePreview = document.body.classList.contains('frontdesk-editor-preview')
     || new URLSearchParams(window.location.search).get('previewEditor') === '1';
-  const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '') + '|' + (embeddedNativePreview ? 'native-preview' : 'standard');
+  const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '') + '|' + (crm.guestelWalletImageUrl || '') + '|' + (crm.guestelWalletSubtitle || '') + '|' + (embeddedNativePreview ? 'native-preview' : 'standard');
   if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
     renderAppsView();
     el.dataset.appsKey = key;
@@ -493,9 +609,9 @@ function renderAppsView() {
       </div>
       <div style="flex:1;min-width:0;">
         <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guests see this image with <strong>${hName}</strong> in Guestel.</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guestel uses this square image for your conversation and notification identity.</div>
         <button type="button" id="tour-guest-icon-btn" onclick="${iconButtonClick}" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change picture' : 'Upload picture'}</button>
-        ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Download Marketel Front Desk first to upload this picture.</div>'}
+        ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Download Marketel Front Desk first to change this icon.</div>'}
       </div>
     </div>`;
 
@@ -601,7 +717,8 @@ function renderAppsView() {
     </div>`;
   const guestIconCardHtml = () => `
     <div class="apps-step-card" id="tour-guest-icon-section">
-      <div class="apps-step-title" style="margin-bottom:14px;">Your property in Guestel</div>
+      <div class="apps-step-title" style="margin-bottom:4px;">Your Guestel icon</div>
+      <p class="apps-card-help">This square logo identifies your property in conversations and notifications. Your wallet cover is edited separately above.</p>
       ${logoBlockHtml}
     </div>`;
   const guestPhonesCardHtml = `
@@ -621,16 +738,33 @@ function renderAppsView() {
         ${appsHelpBodyHtml}
       </div>
     </details>`;
+  const walletSubtitle = guestelWalletSubtitleValue();
+  const walletImage = String(crm.guestelWalletImageUrl || '').trim();
   const nativeGuestShareHtml = `
     <div class="apps-step-card" id="tour-native-guest-share">
-      <div class="apps-step-title" style="margin-bottom:14px;">Invite guests into Guestel</div>
-      <div class="guestel-owner-preview" aria-label="Preview of the property in Guestel">
-        <div class="guestel-owner-preview__bar"><span>Guestel</span><b>Saved hotel</b></div>
-        <div class="guestel-owner-preview__card">
-          <div class="guestel-owner-preview__image">${iconInnerHtml}</div>
-          <div><strong>${hName}</strong><span>Direct booking · Messages · Stay updates</span></div>
+      <div class="apps-step-title">How guests keep you in Guestel</div>
+      <p class="apps-card-help">This is the property card guests save. Change its cover and short line here; Guestel reads the same saved values.</p>
+      <div class="guestel-wallet-editor">
+        <div class="guestel-wallet-card" aria-label="Preview of ${appsEscape(hName)} in Guestel">
+          <div class="guestel-wallet-cover${walletImage ? ' has-image' : ''}" id="guestelWalletPreviewImage">${walletImage ? `<img src="${appsEscape(walletImage)}" alt="Guestel wallet cover">` : '<span>Choose a cover photo</span>'}</div>
+          <div class="guestel-wallet-copy">
+            <strong>${appsEscape(hName)}</strong>
+            <span id="guestelWalletPreviewSubtitle">${appsEscape(walletSubtitle)}</span>
+          </div>
         </div>
+        <input type="file" id="guestelWalletImageInput" accept="image/png,image/jpeg,image/webp" hidden onchange="uploadGuestelWalletImage(this)">
+        <div class="guestel-wallet-actions">
+          <button type="button" id="guestelWalletImageButton" onclick="document.getElementById('guestelWalletImageInput').click()">${walletImage ? 'Change cover' : 'Choose cover'}</button>
+          <button type="button" id="guestelWalletImageRemove" class="quiet" onclick="resetGuestelWalletImage()"${walletImage ? '' : ' hidden'}>Use room photo</button>
+        </div>
+        <label class="guestel-wallet-label" for="guestelWalletSubtitleInput">Short line under your name</label>
+        <div class="guestel-wallet-field">
+          <input id="guestelWalletSubtitleInput" maxlength="64" value="${appsEscape(walletSubtitle)}" placeholder="Location or a short reason to book direct" oninput="updateGuestelWalletPreview()">
+          <span id="guestelWalletSubtitleCount">${walletSubtitle.length}/64</span>
+        </div>
+        <button type="button" class="guestel-wallet-save" id="guestelWalletSubtitleSave" onclick="saveGuestelWalletCard()">Save Guestel card</button>
       </div>
+      <div class="apps-section-divider">Invite a guest</div>
       <div style="margin:0 0 14px;padding:11px 12px;border-radius:11px;background:var(--green-pale);color:#245a40;font-size:12px;line-height:1.5;"><strong>What to say:</strong> “Scan this to book directly and keep us in Guestel.”</div>
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show Guestel QR</button>
       ${guestInstallUrl !== '#' ? `
@@ -644,10 +778,10 @@ function renderAppsView() {
   const guestMessagesPanelHtml = '<div id="messagesPanel"></div>';
   const nativeGuestToolsHtml = `
     <div class="apps-native-title">Guestel</div>
-    <p class="apps-native-lead">Guests keep <strong>${hName}</strong> in Guestel for direct booking, reservation updates, and messages. You manage that relationship here.</p>
+    <p class="apps-native-lead">Guests use Guestel. You use Marketel Front Desk. Manage how <strong>${hName}</strong> appears, talk to booked guests, and invite more guests from here.</p>
+    ${nativeGuestShareHtml}
     ${guestMessagesPanelHtml}
     ${guestBroadcastCardHtml({ compact: true })}
-    ${nativeGuestShareHtml}
     ${guestIconCardHtml()}`;
   const appStoreReady = !!String(crm.frontdeskAppStoreUrl || '').trim();
   const webAppLockHtml = `
@@ -676,6 +810,27 @@ function renderAppsView() {
     .apps-page { padding:4px 0 28px; }
     .apps-native-title { font-size:24px;font-weight:800;color:var(--text);line-height:1.2;margin:2px 0 7px; }
     .apps-native-lead { margin:0 0 16px;color:var(--text-muted);font-size:14px;line-height:1.5; }
+    .apps-card-help { margin:5px 0 14px;color:var(--text-muted);font-size:12px;line-height:1.5; }
+    .guestel-wallet-editor { display:grid;gap:11px;margin-top:4px; }
+    .guestel-wallet-card { position:relative;aspect-ratio:1.6/1;overflow:hidden;border:1px solid rgba(34,75,52,.16);border-radius:19px;background:linear-gradient(145deg,#4e9a72,#235f46);box-shadow:0 12px 30px rgba(22,55,36,.11); }
+    .guestel-wallet-card::after { content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.43),rgba(0,0,0,.02) 62%);pointer-events:none; }
+    .guestel-wallet-cover { position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#4e9a72,#235f46);color:rgba(255,255,255,.8);font-size:12px;font-weight:750; }
+    .guestel-wallet-cover.has-image { background:#dfe8e2; }
+    .guestel-wallet-cover img { width:100%;height:100%;display:block;object-fit:cover; }
+    .guestel-wallet-copy { position:relative;z-index:1;display:grid;gap:3px;padding:17px 18px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5); }
+    .guestel-wallet-copy strong { overflow:hidden;color:#fff;font-size:20px;font-weight:850;text-overflow:ellipsis;white-space:nowrap; }
+    .guestel-wallet-copy span { overflow:hidden;color:rgba(255,255,255,.9);font-size:12px;font-weight:600;text-overflow:ellipsis;white-space:nowrap; }
+    .guestel-wallet-actions { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+    .guestel-wallet-actions button,.guestel-wallet-save { min-height:44px;border:1.5px solid var(--green);border-radius:12px;background:var(--green);color:#fff;font:800 13px/1 inherit;cursor:pointer; }
+    .guestel-wallet-actions button.quiet { border-color:var(--border);background:#fff;color:var(--text); }
+    .guestel-wallet-actions button[hidden] { display:none; }
+    .guestel-wallet-actions button:disabled,.guestel-wallet-save:disabled { opacity:.55;cursor:wait; }
+    .guestel-wallet-label { margin-top:3px;color:var(--text);font-size:11px;font-weight:800; }
+    .guestel-wallet-field { position:relative; }
+    .guestel-wallet-field input { width:100%;min-height:46px;padding:11px 52px 11px 13px;border:1.5px solid var(--border);border-radius:12px;background:#fff;color:var(--text);font:600 14px/1.35 inherit;box-sizing:border-box;outline:0; }
+    .guestel-wallet-field input:focus { border-color:var(--green);box-shadow:0 0 0 3px rgba(46,125,91,.1); }
+    .guestel-wallet-field span { position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:9px;font-weight:700; }
+    .guestel-wallet-save { width:100%;min-height:48px;font-size:14px; }
     .apps-headline { font-size:20px;font-weight:800;color:var(--text);line-height:1.3;margin:0 0 8px; }
     .apps-intro { font-size:14px;color:var(--text-muted);line-height:1.55;margin:0 0 22px; }
     .apps-story { margin:0 0 22px;padding:4px 2px 2px; }
@@ -927,8 +1082,12 @@ const _appsExports = {
   loadBookingReviewSettings,
   loadGuestInstallStats,
   renderAppsView,
+  resetGuestelWalletImage,
   saveBookingReviewReminderSetting,
+  saveGuestelWalletCard,
   startAppsTour,
+  updateGuestelWalletPreview,
+  uploadGuestelWalletImage,
 };
 
 export function install() {
