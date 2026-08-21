@@ -200,7 +200,7 @@ struct NotificationsView: View {
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(spacing: 0) {
-                    ToggleRow(title: "Stay updates", subtitle: "Check-in reminders, room readiness", isOn: $stayUpdates)
+                    ToggleRow(title: "Stay updates", subtitle: "Confirmations, releases, cancellations", isOn: $stayUpdates)
                     Divider().padding(.leading, 16)
                     ToggleRow(title: "Messages", subtitle: "Replies from the front desk", isOn: $messages)
                     Divider().padding(.leading, 16)

@@ -91,6 +91,8 @@ test('Guestel push delivery is independently configured, observable, and testabl
     assert.match(hotels, /store\.arrival = GuestelArrival\(hotel: hotel, stay: stay\)/);
     assert.match(account, /Send test notification/);
     assert.match(account, /BookingAPI\.testPush/);
+    assert.match(account, /Confirmations, releases, cancellations/);
+    assert.doesNotMatch(account, /Check-in reminders, room readiness/);
 });
 
 test('Guestel property updates work before a guest has a reservation', () => {
