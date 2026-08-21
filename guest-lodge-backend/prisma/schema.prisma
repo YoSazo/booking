@@ -48,6 +48,12 @@ model Booking {
   guestInstallReminderSentAt DateTime?
   guestAppInstalledAt        DateTime?
 
+  // Guestel's delete-conversation action is intentionally one-sided: the
+  // property keeps its business record, while the guest no longer downloads
+  // messages at or before this point. A later reply starts the thread again.
+  guestMessagesHiddenBefore DateTime?
+  guestAccessRevokedAt       DateTime?
+
   // Owner approval window. While status='pending' the room stays held. The
   // unanswered action is copied onto the booking so changing the property
   // setting never changes a decision that is already counting down.
@@ -319,12 +325,22 @@ model GuestelPropertyDevice {
   deviceToken String
   environment String   @default("production")
   hotelId     String
+  guestEmailHash String?
   updates     Boolean  @default(true)
   active      Boolean  @default(true)
 
   @@unique([deviceToken, hotelId])
   @@index([hotelId, active, updates])
   @@index([deviceToken, active])
+  @@index([guestEmailHash, active])
+}
+
+// A non-reversible email hash is enough to stop old transaction records from
+// silently recreating a deleted Guestel wallet. A new booking after deletedAt
+// starts a genuinely new guest account without restoring the old history.
+model GuestelAccountDeletion {
+  emailHash String   @id
+  deletedAt DateTime @default(now())
 }
 
 model ManualRoom {

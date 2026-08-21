@@ -4,9 +4,14 @@ struct MessagesView: View {
     @Environment(GuestStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
     @State private var selected: ConversationDestination?
+    @State private var pendingDeletion: Reservation?
+    @State private var deletingConversationID: String?
+    @State private var deletionError: String?
 
     private var stays: [Reservation] {
-        store.reservations.sorted {
+        store.reservations.filter { stay in
+            store.conversation(for: stay) != nil
+        }.sorted {
             ($0.checkinDate ?? .distantPast) > ($1.checkinDate ?? .distantPast)
         }
     }
@@ -21,14 +26,23 @@ struct MessagesView: View {
                         Text("After you book, message the property’s Front Desk here and keep every reply with your stay.")
                     }
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(stays) { stay in
-                                conversationRow(stay)
-                            }
+                    List {
+                        ForEach(stays) { stay in
+                            conversationRow(stay)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        pendingDeletion = stay
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
-                        .padding(16)
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                     .refreshable { await store.refreshConversations() }
                 }
             }
@@ -50,6 +64,31 @@ struct MessagesView: View {
             Task { await store.refreshConversations() }
         }) { destination in
             NativeMessagesView(hotel: destination.hotel, stay: destination.stay)
+        }
+        .confirmationDialog(
+            "Delete this conversation?",
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Conversation", role: .destructive) {
+                guard let stay = pendingDeletion else { return }
+                pendingDeletion = nil
+                deleteConversation(stay)
+            }
+            Button("Cancel", role: .cancel) { pendingDeletion = nil }
+        } message: {
+            Text("This removes the conversation from Guestel. The property keeps its copy.")
+        }
+        .alert("Conversation Not Deleted", isPresented: Binding(
+            get: { deletionError != nil },
+            set: { if !$0 { deletionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { deletionError = nil }
+        } message: {
+            Text(deletionError ?? "Please try again.")
         }
     }
 
@@ -122,6 +161,36 @@ struct MessagesView: View {
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
+        .opacity(deletingConversationID == stay.id ? 0.45 : 1)
+        .disabled(deletingConversationID == stay.id)
+    }
+
+    private func deleteConversation(_ stay: Reservation) {
+        let token = stay.accessToken?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let accessToken = token?.isEmpty == false ? token : GuestIdentityAccess.token
+        guard let accessToken else {
+            deletionError = "Restore this stay from Account, then try again."
+            return
+        }
+        deletingConversationID = stay.id
+        Task {
+            do {
+                try await BookingAPI.deleteConversation(
+                    hotelId: stay.hotelId,
+                    code: stay.code,
+                    accessToken: accessToken
+                )
+                await MainActor.run {
+                    store.removeConversation(stay)
+                    deletingConversationID = nil
+                }
+            } catch {
+                await MainActor.run {
+                    deletionError = error.localizedDescription
+                    deletingConversationID = nil
+                }
+            }
+        }
     }
 
     private func propertyInitial(_ name: String) -> some View {

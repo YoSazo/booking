@@ -292,6 +292,13 @@ final class GuestStore {
         )
     }
 
+    @MainActor
+    func removeConversation(_ reservation: Reservation) {
+        conversations.removeAll {
+            $0.hotelId == reservation.hotelId && $0.code == reservation.code
+        }
+    }
+
     func ingest(_ stay: BookingAPI.WalletReservation) {
         ingest([[
             "code": stay.code,

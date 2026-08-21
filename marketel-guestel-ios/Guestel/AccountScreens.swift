@@ -269,7 +269,10 @@ struct GuestPrivacyView: View {
     @Environment(GuestStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var confirmClear = false
+    @State private var confirmDelete = false
     @State private var clearing = false
+    @State private var deleting = false
+    @State private var deletionError: String?
 
     var body: some View {
         ScrollView {
@@ -295,6 +298,28 @@ struct GuestPrivacyView: View {
                     .background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(clearing)
+
+                Divider().padding(.vertical, 4)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Delete account")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Permanently removes your Guestel wallet, saved cards, notification connections, and access to old Guestel conversations. It does not cancel your hotel reservations.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.inkSoft)
+                    Button(role: .destructive) { confirmDelete = true } label: {
+                        HStack {
+                            if deleting { ProgressView().tint(.red) }
+                            else { Image(systemName: "person.crop.circle.badge.minus"); Text("Delete Guestel account") }
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .disabled(deleting || clearing)
+                }
             }
             .padding(20)
         }
@@ -307,6 +332,20 @@ struct GuestPrivacyView: View {
         } message: {
             Text("This removes local hotel cards, stay access, saved-card access, and Guestel notifications. It does not cancel a reservation.")
         }
+        .confirmationDialog("Permanently delete your Guestel account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete Account", role: .destructive) { deleteAccount() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Guestel will remove your wallet, saved cards, notifications, and guest-side messages. Hotels retain reservation and message records they need to operate your stays. No reservation will be cancelled.")
+        }
+        .alert("Account Not Deleted", isPresented: Binding(
+            get: { deletionError != nil },
+            set: { if !$0 { deletionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { deletionError = nil }
+        } message: {
+            Text(deletionError ?? "Please try again.")
+        }
     }
 
     private func clear() {
@@ -314,6 +353,42 @@ struct GuestPrivacyView: View {
         Task {
             await GuestPushManager.unregister(store: store)
             await MainActor.run { store.clearDeviceData(); clearing = false; dismiss() }
+        }
+    }
+
+    private func deleteAccount() {
+        let reservationTokens = store.reservations.compactMap(\.accessToken).filter { !$0.isEmpty }
+        guard let accessToken = GuestIdentityAccess.token ?? reservationTokens.first else {
+            // With no verified identity or stay capability, there is no remote
+            // Guestel account to remove; clearing the device is complete.
+            store.clearDeviceData()
+            dismiss()
+            return
+        }
+        deleting = true
+        deletionError = nil
+        let deviceToken = UserDefaults.standard.string(forKey: GuestPushManager.deviceTokenKey)
+        let paymentToken = GuestPaymentAccess.token
+        Task {
+            do {
+                try await BookingAPI.deleteAccount(
+                    accessToken: accessToken,
+                    reservationTokens: reservationTokens,
+                    deviceToken: deviceToken,
+                    paymentToken: paymentToken
+                )
+                await MainActor.run {
+                    GuestPushManager.clearLocalRegistration()
+                    store.clearDeviceData()
+                    deleting = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    deletionError = error.localizedDescription
+                    deleting = false
+                }
+            }
         }
     }
 }

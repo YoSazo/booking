@@ -159,4 +159,10 @@ enum GuestPushManager {
         UserDefaults.standard.removeObject(forKey: deviceTokenKey)
         UIApplication.shared.unregisterForRemoteNotifications()
     }
+
+    @MainActor
+    static func clearLocalRegistration() {
+        UserDefaults.standard.removeObject(forKey: deviceTokenKey)
+        UIApplication.shared.unregisterForRemoteNotifications()
+    }
 }

@@ -54,6 +54,7 @@ const {
 } = require('./live-activities');
 
 function safeReservationToken(booking) {
+    if (booking?.guestAccessRevokedAt) return '';
     try { return createReservationToken(booking); }
     catch (error) {
         console.error('Guest reservation token unavailable:', error.message);
@@ -12705,10 +12706,14 @@ function hashGuestLoginCode(email, code) {
 async function guestBookingsForEmail(email) {
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!normalizedEmail) return [];
+    const emailHash = crypto.createHash('sha256').update(normalizedEmail).digest('hex');
+    const deletion = await prisma.guestelAccountDeletion.findUnique({ where: { emailHash } });
     return prisma.booking.findMany({
         where: {
             guestEmail: { equals: normalizedEmail, mode: 'insensitive' },
             status: { notIn: ['deleted'] },
+            guestAccessRevokedAt: null,
+            ...(deletion ? { createdAt: { gt: deletion.deletedAt } } : {}),
         },
         orderBy: { checkinDate: 'desc' },
         take: 100,
@@ -12721,10 +12726,7 @@ app.post('/api/guest/auth/code/request', guestCodeRequestRateLimit, async (req, 
         if (!email || !email.includes('@')) {
             return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
         }
-        const booking = await prisma.booking.findFirst({
-            where: { guestEmail: { equals: email, mode: 'insensitive' } },
-            select: { id: true },
-        });
+        const booking = (await guestBookingsForEmail(email))[0];
         // Do not reveal whether this address has ever booked a stay.
         if (!booking) return res.json({ success: true });
         if (!emailTransporter) {
@@ -12849,14 +12851,14 @@ async function verifiedGuestBooking(req, hotelId, reservationCode = '') {
         const booking = await prisma.booking.findFirst({
             where: { id: reservation.bookingId, hotelId: reservation.hotelId },
         });
-        if (!booking) return null;
+        if (!booking || booking.guestAccessRevokedAt) return null;
         const codes = guestBookingThreadCodes(booking, reservation.reservationCode);
         return reservationCode && !codes.includes(String(reservationCode).trim()) ? null : booking;
     }
     const identity = readGuestIdentityToken(token);
     if (!identity || !hotelId || !reservationCode) return null;
     const booking = await findGuestBooking(String(hotelId), String(reservationCode));
-    return booking && guestEmailMatches(booking, identity.email) ? booking : null;
+    return booking && !booking.guestAccessRevokedAt && guestEmailMatches(booking, identity.email) ? booking : null;
 }
 
 async function verifiedGuestBookings(req, suppliedTokens = []) {
@@ -12873,7 +12875,7 @@ async function verifiedGuestBookings(req, suppliedTokens = []) {
         .filter(Boolean);
     if (claims.length) {
         const ids = [...new Set(claims.map(claim => claim.bookingId))];
-        const bookings = await prisma.booking.findMany({ where: { id: { in: ids } } });
+        const bookings = await prisma.booking.findMany({ where: { id: { in: ids }, guestAccessRevokedAt: null } });
         bookings.forEach((booking) => {
             const verified = claims.some(claim => (
                 claim.bookingId === booking.id
@@ -12987,6 +12989,8 @@ app.post('/api/guest/native/conversations', guestConversationsGlobalRateLimit, g
             const booking = (message.bookingId && bookingById.get(message.bookingId))
                 || bookingByThread.get(`${message.hotelId}:${message.reservationCode || ''}`);
             if (!booking) return;
+            if (booking.guestMessagesHiddenBefore
+                && message.createdAt.getTime() <= booking.guestMessagesHiddenBefore.getTime()) return;
             let summary = grouped.get(booking.id);
             if (!summary) {
                 summary = { latest: message, unreadCount: 0 };
@@ -12996,9 +13000,13 @@ app.post('/api/guest/native/conversations', guestConversationsGlobalRateLimit, g
         });
         res.json({
             success: true,
-            conversations: bookings.map((booking) => {
+            conversations: bookings.flatMap((booking) => {
                 const summary = grouped.get(booking.id);
-                return {
+                // A deleted conversation stays out of Guestel until a new
+                // message is created after the deletion cutoff. The property
+                // continues to retain and see the complete thread.
+                if (booking.guestMessagesHiddenBefore && !summary) return [];
+                return [{
                     code: booking.pmsConfirmationCode || booking.ourReservationCode,
                     hotelId: booking.hotelId,
                     roomName: booking.roomName,
@@ -13007,7 +13015,7 @@ app.post('/api/guest/native/conversations', guestConversationsGlobalRateLimit, g
                     status: booking.status,
                     latestMessage: summary?.latest ? guestMessageJSON(summary.latest) : null,
                     unreadCount: summary?.unreadCount || 0,
-                };
+                }];
             }),
         });
     } catch (error) {
@@ -13025,7 +13033,13 @@ app.get('/api/guest/native/messages', guestMessagesFetchGlobalRateLimit, guestMe
         if (!booking) return res.status(401).json({ success: false, message: 'This stay could not be verified.' });
         const threadCodes = guestBookingThreadCodes(booking, code);
         const messages = await prisma.guestMessage.findMany({
-            where: { hotelId: booking.hotelId, reservationCode: { in: threadCodes } },
+            where: {
+                hotelId: booking.hotelId,
+                reservationCode: { in: threadCodes },
+                ...(booking.guestMessagesHiddenBefore
+                    ? { createdAt: { gt: booking.guestMessagesHiddenBefore } }
+                    : {}),
+            },
             orderBy: { createdAt: 'asc' },
             take: 200,
         });
@@ -13037,6 +13051,43 @@ app.get('/api/guest/native/messages', guestMessagesFetchGlobalRateLimit, guestMe
     } catch (error) {
         console.error('Guestel native messages fetch error:', error.message);
         res.status(500).json({ success: false, message: 'Could not load messages.' });
+    }
+});
+
+// Guestel mirrors the native Messages convention: deleting a conversation
+// removes the guest's copy, not the property's operational record. Storing the
+// cutoff on the verified booking makes the choice follow the guest across
+// devices and lets a genuinely new reply recreate the thread naturally.
+app.delete('/api/guest/native/conversation', guestMessagesReadGlobalRateLimit, guestMessagesReadRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const hotelId = String(req.query?.hotelId || '').trim();
+        const code = String(req.query?.code || '').trim();
+        const booking = await verifiedGuestBooking(req, hotelId, code);
+        if (!booking) return res.status(401).json({ success: false, message: 'This stay could not be verified.' });
+
+        const hiddenBefore = new Date();
+        const threadCodes = guestBookingThreadCodes(booking, code);
+        await prisma.$transaction([
+            prisma.booking.update({
+                where: { id: booking.id },
+                data: { guestMessagesHiddenBefore: hiddenBefore },
+            }),
+            prisma.guestMessage.updateMany({
+                where: {
+                    hotelId: booking.hotelId,
+                    reservationCode: { in: threadCodes },
+                    sender: 'hotel',
+                    guestReadAt: null,
+                    createdAt: { lte: hiddenBefore },
+                },
+                data: { guestReadAt: hiddenBefore },
+            }),
+        ]);
+        res.json({ success: true, hiddenBefore: hiddenBefore.toISOString() });
+    } catch (error) {
+        console.error('Guestel conversation delete error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not delete this conversation.' });
     }
 });
 
@@ -13104,6 +13155,81 @@ app.post('/api/guest/native/messages', guestMessageGlobalRateLimit, guestMessage
     }
 });
 
+// Deletes the guest-facing Guestel account while preserving hotel reservation,
+// tax, dispute, and message records. Old signed reservation capabilities are
+// invalidated, and the deletion watermark prevents an email restore from
+// rebuilding the historical wallet. A later new booking can create a new one.
+app.delete('/api/guest/native/account', guestCodeVerifyRateLimit, async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        const suppliedTokens = Array.isArray(req.body?.reservationTokens)
+            ? req.body.reservationTokens.slice(0, 100)
+            : [];
+        const verified = await verifiedGuestBookings(req, suppliedTokens);
+        if (!verified.length) {
+            return res.status(401).json({ success: false, message: 'Verify a stay before deleting your Guestel account.' });
+        }
+
+        const identity = readGuestIdentityToken(bearerToken(req));
+        const normalizedEmail = String(identity?.email || verified[0]?.guestEmail || '').trim().toLowerCase();
+        if (!normalizedEmail || !verified.every(booking => guestEmailMatches(booking, normalizedEmail))) {
+            return res.status(401).json({ success: false, message: 'This Guestel account could not be verified.' });
+        }
+
+        const emailHash = crypto.createHash('sha256').update(normalizedEmail).digest('hex');
+        const deletedAt = new Date();
+        const retainedBookings = await prisma.booking.findMany({
+            where: { guestEmail: { equals: normalizedEmail, mode: 'insensitive' } },
+            select: { id: true },
+        });
+        const bookingIds = retainedBookings.map(booking => booking.id);
+        const deviceToken = String(req.body?.deviceToken || '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+
+        // Possession of this independently signed capability authorizes removal
+        // of that Stripe customer. A previously deleted customer is success.
+        const paymentClaim = readGuestPaymentToken(String(req.body?.paymentToken || '').trim());
+        if (paymentClaim?.customerId) {
+            const customer = await stripe.customers.retrieve(paymentClaim.customerId).catch(() => null);
+            if (customer && !customer.deleted) await stripe.customers.del(paymentClaim.customerId);
+        }
+
+        const writes = [
+            prisma.guestelAccountDeletion.upsert({
+                where: { emailHash },
+                create: { emailHash, deletedAt },
+                update: { deletedAt },
+            }),
+            prisma.booking.updateMany({
+                where: { id: { in: bookingIds } },
+                data: {
+                    guestAccessRevokedAt: deletedAt,
+                    guestMessagesHiddenBefore: deletedAt,
+                },
+            }),
+            prisma.guestLoginChallenge.deleteMany({ where: { email: normalizedEmail } }),
+            prisma.guestNativePushDevice.deleteMany({ where: { bookingId: { in: bookingIds } } }),
+            prisma.guestAppHandoff.deleteMany({ where: { bookingId: { in: bookingIds } } }),
+            prisma.guestelPropertyDevice.deleteMany({
+                where: {
+                    OR: [
+                        { guestEmailHash: emailHash },
+                        ...(deviceToken ? [{ deviceToken }] : []),
+                    ],
+                },
+            }),
+        ];
+        await prisma.$transaction(writes);
+        res.json({
+            success: true,
+            retainedReservationRecords: bookingIds.length,
+            message: 'Your Guestel account was deleted. Your reservations were not cancelled.',
+        });
+    } catch (error) {
+        console.error('Guestel account deletion error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not delete your Guestel account. Nothing was cancelled.' });
+    }
+});
+
 app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req, res) => {
     try {
         const deviceToken = String(req.body?.deviceToken || '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
@@ -13120,7 +13246,7 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
         const reservationClaims = reservationTokens.map(token => readReservationToken(token)).filter(Boolean);
         if (reservationClaims.length) {
             const ids = [...new Set(reservationClaims.map(claim => claim.bookingId))];
-            const claimed = await prisma.booking.findMany({ where: { id: { in: ids } } });
+            const claimed = await prisma.booking.findMany({ where: { id: { in: ids }, guestAccessRevokedAt: null } });
             const valid = claimed.filter(booking => reservationClaims.some(claim => claim.bookingId === booking.id && claim.hotelId === booking.hotelId));
             bookings = [...new Map([...bookings, ...valid].map(booking => [booking.id, booking])).values()];
         }
@@ -13139,6 +13265,10 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
         }
         const preferences = req.body?.preferences || {};
         const propertyUpdates = preferences.propertyUpdates === true || preferences.deals === true;
+        const guestEmail = String(identity?.email || bookings[0]?.guestEmail || '').trim().toLowerCase();
+        const guestEmailHash = guestEmail
+            ? crypto.createHash('sha256').update(guestEmail).digest('hex')
+            : null;
         const writes = bookings.map(booking => prisma.guestNativePushDevice.upsert({
             where: { deviceToken_bookingId: { deviceToken, bookingId: booking.id } },
             create: {
@@ -13169,10 +13299,12 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
                     deviceToken,
                     environment,
                     hotelId: hotel.id,
+                    guestEmailHash,
                     updates: propertyUpdates,
                 },
                 update: {
                     environment,
+                    guestEmailHash,
                     updates: propertyUpdates,
                     active: true,
                     lastSeenAt: new Date(),

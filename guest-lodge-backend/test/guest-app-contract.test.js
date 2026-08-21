@@ -144,3 +144,38 @@ test('Guestel messaging is a first-class native inbox', () => {
     assert.match(nativeThread, /TextField\("Message Front Desk"/);
     assert.doesNotMatch(messages, /WKWebView|SimpleWebSheet/);
 });
+
+test('Guestel conversation deletion is guest-only, durable, and native', () => {
+    const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+    const api = fs.readFileSync(path.join(guestelRoot, 'BookingAPI.swift'), 'utf8');
+    const messages = fs.readFileSync(path.join(guestelRoot, 'MessagesView.swift'), 'utf8');
+
+    assert.match(schema, /guestMessagesHiddenBefore\s+DateTime\?/);
+    assert.match(server, /app\.delete\('\/api\/guest\/native\/conversation'/);
+    assert.match(server, /data: \{ guestMessagesHiddenBefore: hiddenBefore \}/);
+    assert.match(server, /createdAt: \{ gt: booking\.guestMessagesHiddenBefore \}/);
+    assert.doesNotMatch(server, /Guestel conversation delete[\s\S]{0,1400}guestMessage\.deleteMany/);
+    assert.match(api, /static func deleteConversation/);
+    assert.match(messages, /\.swipeActions\(edge: \.trailing/);
+    assert.match(messages, /Button\(role: \.destructive\)/);
+    assert.match(messages, /The property keeps its copy/);
+});
+
+test('Guestel offers in-app account deletion without cancelling hotel records', () => {
+    const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+    const account = fs.readFileSync(path.join(guestelRoot, 'AccountScreens.swift'), 'utf8');
+    const api = fs.readFileSync(path.join(guestelRoot, 'BookingAPI.swift'), 'utf8');
+
+    assert.match(schema, /model GuestelAccountDeletion/);
+    assert.match(schema, /guestAccessRevokedAt\s+DateTime\?/);
+    assert.match(server, /app\.delete\('\/api\/guest\/native\/account'/);
+    assert.match(server, /guestNativePushDevice\.deleteMany/);
+    assert.match(server, /stripe\.customers\.del/);
+    assert.match(server, /retainedReservationRecords/);
+    assert.doesNotMatch(server, /Guestel account deletion[\s\S]{0,4000}prisma\.booking\.delete/);
+    assert.match(api, /static func deleteAccount/);
+    assert.match(account, /Delete Guestel account/);
+    assert.match(account, /It does not cancel your hotel reservations/);
+});

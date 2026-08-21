@@ -364,6 +364,36 @@ enum BookingAPI {
         return try JSONDecoder().decode(GuestMessage.self, from: JSONSerialization.data(withJSONObject: raw))
     }
 
+    static func deleteConversation(hotelId: String, code: String, accessToken: String) async throws {
+        var components = URLComponents(url: base.appendingPathComponent("api/guest/native/conversation"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "hotelId", value: hotelId),
+            URLQueryItem(name: "code", value: code),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        _ = try await self.request(request)
+    }
+
+    static func deleteAccount(
+        accessToken: String,
+        reservationTokens: [String],
+        deviceToken: String?,
+        paymentToken: String?
+    ) async throws {
+        var request = URLRequest(url: base.appendingPathComponent("api/guest/native/account"))
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "reservationTokens": reservationTokens,
+            "deviceToken": deviceToken ?? "",
+            "paymentToken": paymentToken ?? "",
+        ])
+        _ = try await self.request(request)
+    }
+
     static func registerPush(deviceToken: String, environment: String, reservationTokens: [String], hotelIds: [String], identityToken: String?, preferences: [String: Bool]) async throws {
         _ = try await post(
             "api/guest/native/push/register",
