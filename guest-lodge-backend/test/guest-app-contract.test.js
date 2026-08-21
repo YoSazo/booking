@@ -174,6 +174,29 @@ test('Guestel booking webviews opt out of website advertising analytics', () => 
     assert.doesNotMatch(bookingHtml, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/);
 });
 
+test('Guestel privacy manifest matches native booking and Stripe data', () => {
+    const manifest = fs.readFileSync(
+        path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel', 'PrivacyInfo.xcprivacy'),
+        'utf8'
+    );
+    for (const type of [
+        'Name',
+        'EmailAddress',
+        'PhoneNumber',
+        'PhysicalAddress',
+        'PaymentInfo',
+        'PurchaseHistory',
+        'UserID',
+        'DeviceID',
+        'EmailsOrTextMessages',
+        'ProductInteraction',
+    ]) {
+        assert.match(manifest, new RegExp(`NSPrivacyCollectedDataType${type}`));
+    }
+    assert.match(manifest, /NSPrivacyCollectedDataTypePurposeAnalytics/);
+    assert.match(manifest, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
+});
+
 test('Guestel messaging is a first-class native inbox', () => {
     const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
     const rootView = fs.readFileSync(path.join(guestelRoot, 'RootView.swift'), 'utf8');
