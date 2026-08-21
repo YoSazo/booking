@@ -323,7 +323,7 @@ function main() {
     '\t\t\t\t\t"@executable_path/Frameworks",',
     '\t\t\t\t\t"@executable_path/../../Frameworks",',
     '\t\t\t\t);',
-    '\t\t\t\tMARKETING_VERSION = 3.26;',
+    '\t\t\t\tMARKETING_VERSION = 3.27;',
     '\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.bookmarketel.frontdesk.MarketelActivityWidget;',
     '\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";',
     '\t\t\t\tSKIP_INSTALL = YES;',
