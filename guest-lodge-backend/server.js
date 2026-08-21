@@ -502,9 +502,14 @@ if (APNS_PRIVATE_KEY) {
         console.error(`❌ APNs private key is invalid: ${error.message}`);
     }
 }
-const APNS_CONFIGURED = !!(APNS_TEAM_ID && APNS_KEY_ID && APNS_PRIVATE_KEY_OBJECT && APNS_BUNDLE_ID);
+const APNS_AUTH_CONFIGURED = !!(APNS_TEAM_ID && APNS_KEY_ID && APNS_PRIVATE_KEY_OBJECT);
+const APNS_CONFIGURED = !!(APNS_AUTH_CONFIGURED && APNS_BUNDLE_ID);
+const GUESTEL_APNS_CONFIGURED = !!(APNS_AUTH_CONFIGURED && GUESTEL_APNS_BUNDLE_ID);
 if (APNS_CONFIGURED) {
     console.log(`✅ Native iOS push configured for ${APNS_BUNDLE_ID}`);
+}
+if (GUESTEL_APNS_CONFIGURED) {
+    console.log(`✅ Guestel iOS push configured for ${GUESTEL_APNS_BUNDLE_ID}`);
 }
 
 const app = express();
@@ -7767,7 +7772,10 @@ async function sendNativePushToHotel(hotelId, payloadObj, opts = {}, label = 'na
 }
 
 async function sendNativePushToGuestBooking(bookingId, payloadObj, opts = {}, label = 'guestNativePush') {
-    if (!APNS_CONFIGURED || !bookingId || !prisma.guestNativePushDevice) return 0;
+    if (!GUESTEL_APNS_CONFIGURED || !bookingId || !prisma.guestNativePushDevice) {
+        if (!GUESTEL_APNS_CONFIGURED) console.error(`❌ [guest-apns] ${label}: Guestel APNs is not configured`);
+        return 0;
+    }
     const preference = opts.preference === 'stayUpdates' ? 'stayUpdates' : 'messages';
     const devices = await prisma.guestNativePushDevice.findMany({
         where: { bookingId, active: true, [preference]: true },
@@ -7777,6 +7785,14 @@ async function sendNativePushToGuestBooking(bookingId, payloadObj, opts = {}, la
         sendApnsRequest(device, payloadObj, { ...opts, topic: GUESTEL_APNS_BUNDLE_ID })
     ));
     const deadReasons = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
+    results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+            console.error(
+                `❌ [guest-apns] ${label} booking=${bookingId} device=${devices[index].id}: `
+                + `${result.reason?.message || result.reason}`
+            );
+        }
+    });
     const deadIds = results
         .map((result, index) => result.status === 'rejected' && deadReasons.has(result.reason?.reason) ? devices[index].id : null)
         .filter(Boolean);
@@ -7792,7 +7808,7 @@ async function sendNativePushToGuestBooking(bookingId, payloadObj, opts = {}, la
 }
 
 async function sendNativeBroadcastToHotelGuests(hotelId, payloadObj, opts = {}, label = 'guestNativeBroadcast') {
-    if (!APNS_CONFIGURED || !hotelId || !prisma.guestNativePushDevice) return 0;
+    if (!GUESTEL_APNS_CONFIGURED || !hotelId || !prisma.guestNativePushDevice) return 0;
     const [stayRows, propertyRows] = await Promise.all([
         prisma.guestNativePushDevice.findMany({
             where: { hotelId, active: true, deals: true },
@@ -7809,6 +7825,14 @@ async function sendNativeBroadcastToHotelGuests(hotelId, payloadObj, opts = {}, 
         sendApnsRequest(device, payloadObj, { ...opts, topic: GUESTEL_APNS_BUNDLE_ID })
     ));
     const deadReasons = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
+    results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+            console.error(
+                `❌ [guest-apns] ${label} hotel=${hotelId} device=${rows[index].id || 'property-device'}: `
+                + `${result.reason?.message || result.reason}`
+            );
+        }
+    });
     const deadTokens = results
         .map((result, index) => result.status === 'rejected' && deadReasons.has(result.reason?.reason) ? rows[index].deviceToken : null)
         .filter(Boolean);
@@ -13316,11 +13340,75 @@ app.post('/api/guest/native/push/register', guestNativePushRateLimit, async (req
             success: true,
             registeredStays: bookings.length,
             registeredProperties: activeHotels.length,
-            pushConfigured: APNS_CONFIGURED,
+            pushConfigured: GUESTEL_APNS_CONFIGURED,
         });
     } catch (error) {
         console.error('Guestel native push register error:', error.message);
         res.status(500).json({ success: false, message: 'Could not enable notifications.' });
+    }
+});
+
+// Guest-owned delivery probe. It can only target the requesting device and a
+// stay proven by the same signed reservation/identity capability used by the
+// rest of Guestel. Besides giving the notification settings screen an honest
+// "Send test" action, returning APNs' rejection reason makes a bad topic,
+// profile or expired token diagnosable instead of silently swallowing it.
+app.post('/api/guest/native/push/test', guestNativePushRateLimit, async (req, res) => {
+    try {
+        const deviceToken = String(req.body?.deviceToken || '').replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+        const hotelId = String(req.body?.hotelId || '').trim();
+        const code = String(req.body?.reservationCode || '').trim();
+        if (!/^[a-f0-9]{32,200}$/.test(deviceToken)) {
+            return res.status(400).json({ success: false, message: 'A valid APNs device token is required.' });
+        }
+        if (!GUESTEL_APNS_CONFIGURED) {
+            return res.status(503).json({ success: false, message: 'Guestel notifications are not configured on the server.' });
+        }
+        const booking = await verifiedGuestBooking(req, hotelId, code);
+        if (!booking) {
+            return res.status(401).json({ success: false, message: 'This stay could not be verified.' });
+        }
+        const device = await prisma.guestNativePushDevice.findFirst({
+            where: { deviceToken, bookingId: booking.id, active: true },
+        });
+        if (!device) {
+            return res.status(409).json({
+                success: false,
+                message: 'This iPhone is not registered for that stay yet. Turn notifications on and try again.',
+            });
+        }
+        try {
+            await sendApnsRequest(device, {
+                title: 'Guestel notifications are on ✓',
+                body: 'Front Desk replies and important stay updates will appear here.',
+                url: `guestel://messages?hotelId=${encodeURIComponent(booking.hotelId)}&code=${encodeURIComponent(guestBookingThreadCode(booking, code))}`,
+                tag: `guestel-test-${booking.id}`,
+                data: {
+                    type: 'guest_message',
+                    hotelId: booking.hotelId,
+                    reservationCode: guestBookingThreadCode(booking, code),
+                },
+            }, { TTL: 60, topic: GUESTEL_APNS_BUNDLE_ID });
+            return res.json({ success: true, sent: 1 });
+        } catch (error) {
+            const deadReasons = new Set(['BadDeviceToken', 'DeviceTokenNotForTopic', 'Unregistered']);
+            const rejectionReason = String(error?.reason || error?.message || 'APNs error').slice(0, 120);
+            if (deadReasons.has(error?.reason)) {
+                await prisma.guestNativePushDevice.updateMany({
+                    where: { deviceToken, bookingId: booking.id },
+                    data: { active: false },
+                }).catch(() => {});
+            }
+            console.error(`❌ [guest-apns] test booking=${booking.id}: ${error.message}`);
+            return res.status(502).json({
+                success: false,
+                message: `Apple rejected the test notification (${rejectionReason}).`,
+                reason: rejectionReason,
+            });
+        }
+    } catch (error) {
+        console.error('Guestel native push test error:', error.message);
+        res.status(500).json({ success: false, message: 'Could not test notifications.' });
     }
 });
 

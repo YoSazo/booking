@@ -162,6 +162,10 @@ struct NotificationsView: View {
     @AppStorage("guestel.notif.messages") private var messages = true
     @AppStorage("guestel.notif.deals") private var deals = false
     @State private var systemDenied = false
+    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isSendingTest = false
+    @State private var testFeedback: String?
+    @State private var testSucceeded = false
 
     var body: some View {
         ScrollView {
@@ -175,6 +179,26 @@ struct NotificationsView: View {
                         .background(Theme.amber.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
 
+                HStack(spacing: 12) {
+                    Image(systemName: authorizationStatus == .authorized || authorizationStatus == .provisional
+                          ? "checkmark.circle.fill" : "bell.slash.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(authorizationStatus == .authorized || authorizationStatus == .provisional
+                                         ? Theme.green : Theme.amber)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(authorizationStatus == .authorized || authorizationStatus == .provisional
+                             ? "Allowed by iPhone" : "Not allowed by iPhone")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text("Guestel uses alerts for Front Desk replies and important stay changes.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.inkSoft)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(16)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
                 VStack(spacing: 0) {
                     ToggleRow(title: "Stay updates", subtitle: "Check-in reminders, room readiness", isOn: $stayUpdates)
                     Divider().padding(.leading, 16)
@@ -183,6 +207,31 @@ struct NotificationsView: View {
                     ToggleRow(title: "Property updates", subtitle: "Direct rates and offers from saved hotels", isOn: $deals)
                 }
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                if testStay != nil {
+                    Button {
+                        sendTestNotification()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isSendingTest { ProgressView().tint(.white) }
+                            else { Image(systemName: "bell.badge.fill") }
+                            Text(isSendingTest ? "Sending…" : "Send test notification")
+                        }
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .disabled(isSendingTest)
+
+                    if let testFeedback {
+                        Text(testFeedback)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(testSucceeded ? Theme.green : .red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
             .padding(20)
         }
@@ -192,7 +241,10 @@ struct NotificationsView: View {
         .onChange(of: stayUpdates) { _, on in updatePush(requestPermission: on) }
         .onChange(of: messages) { _, on in updatePush(requestPermission: on) }
         .onChange(of: deals) { _, on in updatePush(requestPermission: on) }
-        .task { refreshStatus() }
+        .task {
+            refreshStatus()
+            await GuestPushManager.sync(store: store)
+        }
     }
 
     private func requestPush() {
@@ -209,6 +261,55 @@ struct NotificationsView: View {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
                 systemDenied = settings.authorizationStatus == .denied
+                authorizationStatus = settings.authorizationStatus
+            }
+        }
+    }
+
+    private var testStay: Reservation? {
+        store.reservations.first {
+            guard let token = $0.accessToken else { return false }
+            return !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    private func sendTestNotification() {
+        guard let stay = testStay,
+              let accessToken = stay.accessToken,
+              !accessToken.isEmpty else { return }
+        isSendingTest = true
+        testFeedback = nil
+        testSucceeded = false
+        Task {
+            await GuestPushManager.registerIfAuthorized(store: store)
+            // APNs can deliver the device token asynchronously after the user
+            // grants permission. Give that callback a brief chance to arrive.
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let deviceToken = UserDefaults.standard.string(forKey: GuestPushManager.deviceTokenKey),
+                  !deviceToken.isEmpty else {
+                await MainActor.run {
+                    isSendingTest = false
+                    testFeedback = "Allow notifications for Guestel in iPhone Settings, then try again."
+                }
+                return
+            }
+            do {
+                try await BookingAPI.testPush(
+                    deviceToken: deviceToken,
+                    hotelId: stay.hotelId,
+                    code: stay.code,
+                    accessToken: accessToken
+                )
+                await MainActor.run {
+                    isSendingTest = false
+                    testSucceeded = true
+                    testFeedback = "Sent. You should see a Guestel notification now."
+                }
+            } catch {
+                await MainActor.run {
+                    isSendingTest = false
+                    testFeedback = error.localizedDescription
+                }
             }
         }
     }

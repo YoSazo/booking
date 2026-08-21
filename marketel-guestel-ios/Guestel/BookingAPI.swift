@@ -416,6 +416,18 @@ enum BookingAPI {
         )
     }
 
+    static func testPush(deviceToken: String, hotelId: String, code: String, accessToken: String) async throws {
+        _ = try await post(
+            "api/guest/native/push/test",
+            [
+                "deviceToken": deviceToken,
+                "hotelId": hotelId,
+                "reservationCode": code,
+            ],
+            bearerToken: accessToken
+        )
+    }
+
     // MARK: - Helpers
 
     private static func post(_ path: String, _ body: [String: Any], bearerToken: String? = nil) async throws -> [String: Any] {

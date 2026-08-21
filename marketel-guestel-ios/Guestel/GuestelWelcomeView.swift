@@ -5,12 +5,18 @@ struct GuestelWelcomeView: View {
     let arrival: GuestelArrival
     let onDone: () -> Void
 
+    private var pending: Bool {
+        arrival.stay?.status?.lowercased() == "pending"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(arrival.stay == nil ? "SAVED TO GUESTEL" : "YOUR STAY CAME WITH YOU")
+                        Text(arrival.stay == nil
+                             ? "SAVED TO GUESTEL"
+                             : (pending ? "YOUR REQUEST IS IN GUESTEL" : "YOUR STAY IS IN GUESTEL"))
                             .font(.system(size: 10, weight: .heavy))
                             .tracking(0.8)
                             .foregroundStyle(Theme.green)
@@ -25,13 +31,15 @@ struct GuestelWelcomeView: View {
 
                 Text(arrival.stay == nil
                      ? "The property invited you to stay connected directly—without a booking-site middleman."
-                     : "Your reservation, Front Desk messages, and future direct bookings now live together.")
+                     : (pending
+                        ? "Turn on updates so Guestel can tell you when the property confirms and when Front Desk replies."
+                        : "Your reservation, Front Desk messages, and future direct bookings now live together."))
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
 
                 VStack(spacing: 0) {
-                    benefit("banknote.fill", arrival.stay == nil ? "Direct rates and property offers" : "Stay updates on your phone")
+                    benefit("banknote.fill", arrival.stay == nil ? "Direct rates and property offers" : "Confirmation and stay updates")
                     Divider().padding(.leading, 44)
                     benefit("bubble.left.and.bubble.right.fill", "Message the Front Desk")
                     Divider().padding(.leading, 44)
@@ -48,7 +56,7 @@ struct GuestelWelcomeView: View {
                     Task { await GuestPushManager.sync(store: store) }
                     onDone()
                 } label: {
-                    Text(arrival.stay == nil ? "Allow direct updates" : "Turn on stay updates")
+                    Text(arrival.stay == nil ? "Allow direct updates" : "Turn on booking updates")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)

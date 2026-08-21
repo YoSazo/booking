@@ -101,6 +101,17 @@ struct HotelsView: View {
                         accessToken: result.reservationToken
                     )
                     withAnimation(animation) { selectedHotel = nil }
+                    // A booking made wholly inside Guestel used to close back to
+                    // the wallet without ever explaining or requesting alerts.
+                    // Ask at the moment the value is concrete, after the booking
+                    // sheet has finished dismissing, so confirmations and Front
+                    // Desk replies can actually reach this iPhone.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                        let stay = store.reservations.first {
+                            $0.hotelId == hotel.hotelId && $0.code == result.reservationCode
+                        }
+                        store.arrival = GuestelArrival(hotel: hotel, stay: stay)
+                    }
                 }
             )
             .presentationDetents([.height(minSheetHeight), .height(maxSheetHeight)], selection: $sheetDetent)

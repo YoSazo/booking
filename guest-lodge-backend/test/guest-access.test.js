@@ -73,6 +73,26 @@ test('native guest pushes respect the selected notification category', () => {
     assert.match(server, /preference: 'stayUpdates'/);
 });
 
+test('Guestel push delivery is independently configured, observable, and testable', () => {
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const iosRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const account = fs.readFileSync(path.join(iosRoot, 'AccountScreens.swift'), 'utf8');
+    const hotels = fs.readFileSync(path.join(iosRoot, 'HotelsView.swift'), 'utf8');
+
+    // Front Desk working must not make Guestel silently claim it is configured.
+    assert.match(server, /const GUESTEL_APNS_CONFIGURED =/);
+    assert.match(server, /pushConfigured: GUESTEL_APNS_CONFIGURED/);
+    assert.match(server, /app\.post\('\/api\/guest\/native\/push\/test'/);
+    assert.match(server, /Apple rejected the test notification/);
+    assert.match(server, /❌ \[guest-apns\]/);
+
+    // A normal in-app booking—not just an App Clip handoff—must reach the
+    // contextual notification explanation, and Settings can prove delivery.
+    assert.match(hotels, /store\.arrival = GuestelArrival\(hotel: hotel, stay: stay\)/);
+    assert.match(account, /Send test notification/);
+    assert.match(account, /BookingAPI\.testPush/);
+});
+
 test('Guestel property updates work before a guest has a reservation', () => {
     const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
