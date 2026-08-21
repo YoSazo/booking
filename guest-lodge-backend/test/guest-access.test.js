@@ -121,3 +121,16 @@ test('Guestel and its App Clip request the real iOS App Group entitlement', () =
         assert.match(source, /group\.com\.bookmarketel\.guestel/);
     }
 });
+
+test('Guestel clears stale notification badges when the guest returns', () => {
+    const pushManager = fs.readFileSync(
+        path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel', 'GuestPushManager.swift'),
+        'utf8'
+    );
+    assert.match(pushManager, /applicationDidBecomeActive/);
+    assert.match(pushManager, /setBadgeCount\(0\)/);
+    assert.match(pushManager, /removeAllDeliveredNotifications\(\)/);
+    const foregroundHandler = pushManager.slice(pushManager.indexOf('willPresent'), pushManager.indexOf('didReceive'));
+    assert.match(foregroundHandler, /\[\.banner, \.sound\]/);
+    assert.doesNotMatch(foregroundHandler, /\.badge/);
+});

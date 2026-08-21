@@ -13,8 +13,18 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        // iOS can retain the badge/delivered alerts for the same bundle across
+        // a reinstall, and every Guestel push intentionally raises the badge.
+        // The app is now open, so any old attention marker is stale.
+        center.removeAllDeliveredNotifications()
+        Self.clearBadge(application)
         return true
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        Self.clearBadge(application)
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -31,14 +41,25 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound, .badge]
+        // Keep the useful banner and sound while Guestel is visible, but don't
+        // leave a red badge for an alert the guest is already looking at.
+        [.banner, .sound]
     }
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
+        Self.clearBadge(UIApplication.shared)
         Self.route(response.notification.request.content.userInfo)
+    }
+
+    private static func clearBadge(_ application: UIApplication) {
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(0)
+        } else {
+            application.applicationIconBadgeNumber = 0
+        }
     }
 
     static func route(_ userInfo: [AnyHashable: Any]) {
