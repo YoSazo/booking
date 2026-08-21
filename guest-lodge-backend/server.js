@@ -2878,7 +2878,7 @@ app.post('/api/create-payment-intent', createPaymentIntentRateLimit, async (req,
 
 // NEW: Create pre-authorization hold for "Reserve Now, Pay Later"
 app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res) => {
-    const { bookingDetails, guestInfo, hotelId } = req.body;
+    const { bookingDetails, guestInfo, hotelId, stripeApiVersion } = req.body;
     
     const noShowFeeInCents = 100; // $1.00
 
@@ -2916,6 +2916,40 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
             }),
             description: `Pre-authorization hold for ${quote.bookingDetails.roomName} - ${quote.nights} nights`
         };
+
+        // PaymentSheet may only expose a customer's saved cards when the
+        // PaymentIntent belongs to that same customer. Previously Guestel sent
+        // an ephemeral customer key to PaymentSheet while this intent had no
+        // customer at all, which Stripe surfaced as the generic "unexpected
+        // error". The signed customer capability is optional, so the public web
+        // booking path remains unchanged.
+        let paymentCustomer = null;
+        const savedCustomerId = guestPaymentCustomerId(req);
+        if (savedCustomerId) {
+            try {
+                const customer = await stripe.customers.retrieve(savedCustomerId);
+                if (customer && !customer.deleted) {
+                    const requestedApiVersion = String(stripeApiVersion || '').trim();
+                    const ephemeralKey = await stripe.ephemeralKeys.create(
+                        { customer: savedCustomerId },
+                        {
+                            apiVersion: /^\d{4}-\d{2}-\d{2}$/.test(requestedApiVersion)
+                                ? requestedApiVersion
+                                : '2020-08-27',
+                        }
+                    );
+                    paymentIntentParams.customer = savedCustomerId;
+                    paymentCustomer = {
+                        customerId: savedCustomerId,
+                        ephemeralKeySecret: ephemeralKey.secret,
+                    };
+                }
+            } catch (error) {
+                // A deleted Stripe customer should behave like no saved card,
+                // not permanently block a guest from entering another card.
+                if (error?.code !== 'resource_missing') throw error;
+            }
+        }
         // The booking engine generates one reservation code before entering
         // checkout and keeps it through refresh/Back. Stripe therefore returns
         // the original PaymentIntent if the browser repeats this request rather
@@ -2931,7 +2965,8 @@ app.post('/api/create-preauth-hold', createPreauthHoldRateLimit, async (req, res
         
         res.send({ 
             clientSecret: paymentIntent.client_secret,
-            paymentIntentId: paymentIntent.id
+            paymentIntentId: paymentIntent.id,
+            paymentCustomer,
         });
     } catch (error) {
         console.error("Stripe API Error creating pre-auth hold:", error.message);
@@ -3088,7 +3123,7 @@ app.post('/api/guest/detach-payment-method', guestPaymentDetachRateLimit, async 
 
 // NEW: Complete pay later booking after pre-auth hold succeeds
 app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (req, res) => {
-    const { paymentIntentId, guestInfo, bookingDetails: submittedBookingDetails, hotelId } = req.body;
+    const { paymentIntentId, hotelId } = req.body;
 
     try {
         if (!paymentIntentId) {
@@ -3103,9 +3138,16 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
         // Verify the payment intent is authorized (not captured)
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
+        // The intent metadata contains the server-owned room/rate identifiers,
+        // quote and guest snapshot created before Stripe was presented. Native
+        // Guestel deliberately never calculates a trusted total. Comparing its
+        // earlier, total-less request with this server quote falsely rejected a
+        // valid $1 authorization after the card had already been held.
+        const bookingDetails = parseJsonObject(paymentIntent.metadata?.bookingDetails);
+        const guestInfo = parseJsonObject(paymentIntent.metadata?.guestInfo);
         const paymentValidation = validateStripeIntentAgainstBooking(paymentIntent, {
             hotelId: hotelValidation.hotelId,
-            bookingDetails: submittedBookingDetails,
+            bookingDetails,
             allowedStatuses: ['requires_capture', 'succeeded'],
             allowedAmountsCents: [100],
             requireManualCapture: true,
@@ -3117,11 +3159,52 @@ app.post('/api/complete-pay-later-booking', completePayLaterRateLimit, async (re
                 message: paymentValidation,
             });
         }
-        const bookingDetails = parseJsonObject(paymentIntent.metadata?.bookingDetails);
         if (!bookingDetails?.rateID || !bookingDetails?.roomName) {
             return res.status(400).json({
                 success: false,
                 message: 'Payment authorization is missing its server booking quote.',
+            });
+        }
+        if (!guestInfo?.email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment authorization is missing its guest details.',
+            });
+        }
+
+        // Stripe can deliver amount_capturable_updated before this request
+        // returns. If that webhook already persisted the exact booking, return
+        // it instead of attempting a second inventory commit or telling the
+        // guest that confirmation failed after it actually succeeded.
+        const existingBooking = await withRetry(() => prisma.booking.findUnique({
+            where: { stripePaymentIntentId: paymentIntent.id },
+        }));
+        if (existingBooking) {
+            if (existingBooking.hotelId !== hotelValidation.hotelId) {
+                return res.status(403).json({ success: false, message: 'Payment authorization does not belong to this hotel.' });
+            }
+            const existingStatus = String(existingBooking.status || '').trim().toLowerCase();
+            if (DEAD_BOOKING_STATUSES.includes(existingStatus)) {
+                return res.status(409).json({ success: false, message: 'This booking is no longer active.' });
+            }
+            const pendingUntilMs = existingBooking.pendingUntil
+                ? new Date(existingBooking.pendingUntil).getTime()
+                : 0;
+            const isPending = existingStatus === 'pending';
+            return res.json({
+                success: true,
+                pending: isPending,
+                reviewWindowMinutes: isPending && pendingUntilMs > Date.now()
+                    ? Math.max(1, Math.ceil((pendingUntilMs - Date.now()) / 60000))
+                    : 0,
+                noResponseAction: resolveApprovalNoResponseAction(existingBooking.approvalNoResponseAction),
+                message: isPending
+                    ? 'Your room request is being reviewed. The $1 authorization is only a temporary hold.'
+                    : 'Reservation confirmed. $1.00 hold placed on card.',
+                reservationCode: existingBooking.pmsConfirmationCode || existingBooking.ourReservationCode,
+                reservationToken: safeReservationToken(existingBooking),
+                handoffToken: await issueGuestAppHandoff(existingBooking),
+                recovered: true,
             });
         }
 

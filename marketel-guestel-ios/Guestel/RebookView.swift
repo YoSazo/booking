@@ -272,18 +272,32 @@ struct RebookView: View {
                 details["roomId"] = match.roomId.isEmpty ? (room.roomId ?? "") : match.roomId
                 details["roomTypeID"] = match.roomTypeID
                 details["rateID"] = match.rateID
-                let hold = try await BookingAPI.createHold(hotelId: hotel.hotelId, bookingDetails: details, guestInfo: guest.dictionary)
-                let customer = await paymentCustomerIfAvailable()
-                await MainActor.run { presentPayment(clientSecret: hold.clientSecret, intentId: hold.paymentIntentId, details: details, code: code, ci: ci, co: co, customer: customer) }
+                let savedCardToken = GuestPaymentAccess.token
+                let hold = try await BookingAPI.createHold(
+                    hotelId: hotel.hotelId,
+                    bookingDetails: details,
+                    guestInfo: guest.dictionary,
+                    stripeApiVersion: STPAPIClient.apiVersion,
+                    customerToken: savedCardToken
+                )
+                if savedCardToken != nil, hold.paymentCustomer == nil {
+                    GuestPaymentAccess.clear()
+                }
+                await MainActor.run {
+                    presentPayment(
+                        clientSecret: hold.clientSecret,
+                        intentId: hold.paymentIntentId,
+                        details: details,
+                        code: code,
+                        ci: ci,
+                        co: co,
+                        customer: hold.paymentCustomer
+                    )
+                }
             } catch {
                 await MainActor.run { errorMessage = error.localizedDescription; isSubmitting = false }
             }
         }
-    }
-
-    private func paymentCustomerIfAvailable() async -> BookingAPI.PaymentCustomer? {
-        guard let token = GuestPaymentAccess.token else { return nil }
-        return try? await BookingAPI.paymentCustomer(apiVersion: STPAPIClient.apiVersion, customerToken: token)
     }
 
     private func presentPayment(clientSecret: String, intentId: String, details: [String: Any], code: String, ci: String, co: String, customer: BookingAPI.PaymentCustomer?) {

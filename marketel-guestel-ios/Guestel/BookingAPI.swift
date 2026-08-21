@@ -38,7 +38,11 @@ enum BookingAPI {
         let rooms: [APIRoom]
     }
 
-    struct Hold { let clientSecret: String; let paymentIntentId: String }
+    struct Hold {
+        let clientSecret: String
+        let paymentIntentId: String
+        let paymentCustomer: PaymentCustomer?
+    }
 
     struct AvailableRoom: Hashable {
         let name: String
@@ -177,15 +181,38 @@ enum BookingAPI {
         }
     }
 
-    static func createHold(hotelId: String, bookingDetails: [String: Any], guestInfo: [String: Any]) async throws -> Hold {
-        let json = try await post("api/create-preauth-hold", [
-            "hotelId": hotelId, "bookingDetails": bookingDetails, "guestInfo": guestInfo,
-        ])
+    static func createHold(
+        hotelId: String,
+        bookingDetails: [String: Any],
+        guestInfo: [String: Any],
+        stripeApiVersion: String,
+        customerToken: String?
+    ) async throws -> Hold {
+        let json = try await post(
+            "api/create-preauth-hold",
+            [
+                "hotelId": hotelId,
+                "bookingDetails": bookingDetails,
+                "guestInfo": guestInfo,
+                "stripeApiVersion": stripeApiVersion,
+            ],
+            bearerToken: customerToken
+        )
         guard
             let secret = json["clientSecret"] as? String,
             let intentId = json["paymentIntentId"] as? String
         else { throw Failure.message((json["message"] as? String) ?? "Could not start payment.") }
-        return Hold(clientSecret: secret, paymentIntentId: intentId)
+        let rawCustomer = json["paymentCustomer"] as? [String: Any]
+        let customer: PaymentCustomer?
+        if let customerId = rawCustomer?["customerId"] as? String,
+           let ephemeralKey = rawCustomer?["ephemeralKeySecret"] as? String,
+           !customerId.isEmpty,
+           !ephemeralKey.isEmpty {
+            customer = PaymentCustomer(ephemeralKey: ephemeralKey, customerId: customerId)
+        } else {
+            customer = nil
+        }
+        return Hold(clientSecret: secret, paymentIntentId: intentId, paymentCustomer: customer)
     }
 
     static func completePayLater(hotelId: String, bookingDetails: [String: Any], guestInfo: [String: Any], paymentIntentId: String) async throws -> BookingResult {

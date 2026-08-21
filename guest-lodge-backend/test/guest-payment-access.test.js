@@ -40,3 +40,39 @@ test('Stripe config refuses a publishable key from another account', () => {
     assert.match(server, /secretMatch\[2\] === publishableMatch\[2\]/);
     assert.match(server, /mode: publishableKey \? .* : 'unavailable'/);
 });
+
+test('saved-card checkout binds the hold and PaymentSheet to the same customer', () => {
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const iosRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
+    const api = fs.readFileSync(path.join(iosRoot, 'BookingAPI.swift'), 'utf8');
+    const hotelSheet = fs.readFileSync(path.join(iosRoot, 'HotelSheet.swift'), 'utf8');
+    const rebook = fs.readFileSync(path.join(iosRoot, 'RebookView.swift'), 'utf8');
+
+    const createHoldRoute = server.slice(
+        server.indexOf("app.post('/api/create-preauth-hold'"),
+        server.indexOf('// ── Guestel native app: Stripe support')
+    );
+    assert.match(createHoldRoute, /const savedCustomerId = guestPaymentCustomerId\(req\)/);
+    assert.match(createHoldRoute, /paymentIntentParams\.customer = savedCustomerId/);
+    assert.match(createHoldRoute, /paymentCustomer = \{[\s\S]{0,160}ephemeralKeySecret: ephemeralKey\.secret/);
+    assert.match(api, /bearerToken: customerToken/);
+    assert.match(api, /paymentCustomer: customer/);
+    for (const source of [hotelSheet, rebook]) {
+        assert.match(source, /customerToken: savedCardToken/);
+        assert.match(source, /customer: hold\.paymentCustomer/);
+    }
+});
+
+test('pay-later completion trusts the Stripe-stamped quote and recovers webhook races', () => {
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const route = server.slice(
+        server.indexOf("app.post('/api/complete-pay-later-booking'"),
+        server.indexOf('function requireCrmAuthDeferred')
+    );
+
+    assert.match(route, /const bookingDetails = parseJsonObject\(paymentIntent\.metadata\?\.bookingDetails\)/);
+    assert.match(route, /validateStripeIntentAgainstBooking\(paymentIntent, \{[\s\S]{0,180}bookingDetails,/);
+    assert.doesNotMatch(route, /submittedBookingDetails/);
+    assert.match(route, /where: \{ stripePaymentIntentId: paymentIntent\.id \}/);
+    assert.match(route, /recovered: true/);
+});
