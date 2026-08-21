@@ -41,6 +41,8 @@ struct HotelsView: View {
                 // so they don't run edge-to-edge. Horizontal only — the Wallet
                 // push/scale math is vertical, so this doesn't affect it.
                 .padding(.horizontal, 12)
+                // A little breathing room under the title so cards don't sit so high.
+                .padding(.top, 12)
             }
             .scrollIndicators(.hidden)
             .safeAreaPadding(15)
@@ -182,20 +184,34 @@ struct WalletCard: View {
     let seed: Int
     let height: CGFloat
 
+    // Show a real city/state; hide the "Direct booking" placeholder.
+    private var locationLine: String? {
+        let loc = hotel.location.trimmingCharacters(in: .whitespaces)
+        guard !loc.isEmpty, loc.caseInsensitiveCompare("Direct booking") != .orderedSame else { return nil }
+        return loc
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(hotel.name)
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white)
-            Text(hotel.location)
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.85))
+                .shadow(color: .black.opacity(0.45), radius: 6, x: 0, y: 1)
+            if let locationLine {
+                Text(locationLine)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 1)
+            }
         }
-        .padding(20)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: height)
-        // The photo lives in the background so a large scaledToFill image can
-        // never widen the card past its frame — clipShape crops the overflow.
+        // Pin the text to the TOP-left so the name is visible where the card
+        // peeks out behind another in the stack.
+        .frame(height: height, alignment: .topLeading)
+        // Photo in the background so a large scaledToFill image can't widen the
+        // card past its frame; a top-anchored scrim keeps the name legible over
+        // bright photos and in the peeking sliver.
         .background {
             ZStack {
                 Theme.gradient(for: seed)
@@ -205,12 +221,12 @@ struct WalletCard: View {
                             image.resizable().scaledToFill()
                         }
                     }
-                    LinearGradient(
-                        colors: [.black.opacity(0.50), .clear, .black.opacity(0.18)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
                 }
+                LinearGradient(
+                    colors: [.black.opacity(0.60), .black.opacity(0.12), .clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))

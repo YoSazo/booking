@@ -52,6 +52,14 @@ struct ClipRootView: View {
         ScrollView {
             VStack(spacing: 0) {
                 hero(hotel)
+                if let room = hotel.rooms.first?.name {
+                    Text(room)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.inkSoft)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 22)
+                        .padding(.top, 12)
+                }
                 VStack(alignment: .leading, spacing: 20) {
                     message(hotel)
                     benefits(hotel)
@@ -65,30 +73,22 @@ struct ClipRootView: View {
         .background(Theme.canvas)
     }
 
+    // A clean rounded photo — no text overlay (the name is the headline just below,
+    // and the room name is a caption under the image, both far more legible).
     private func hero(_ hotel: BookingAPI.HotelPublic) -> some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             Theme.gradient(for: hotel.name.count)
             if let url = hotel.rooms.first?.image {
                 AsyncImage(url: url) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: { Color.clear }
             }
-            LinearGradient(colors: [.clear, .black.opacity(0.56)], startPoint: .center, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(hotel.name)
-                    .font(.system(size: 29, weight: .bold))
-                    .foregroundStyle(.white)
-                if let room = hotel.rooms.first?.name {
-                    Text(room)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-            }
-            .padding(22)
         }
-        .frame(height: 250)
-        .clipped()
-        .ignoresSafeArea(edges: .top)
+        .frame(height: 210)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 22)
+        .padding(.top, 14)
     }
 
     @ViewBuilder

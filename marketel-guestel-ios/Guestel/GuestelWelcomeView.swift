@@ -9,7 +9,6 @@ struct GuestelWelcomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 14) {
-                    propertyIcon
                     VStack(alignment: .leading, spacing: 4) {
                         Text(arrival.stay == nil ? "SAVED TO GUESTEL" : "YOUR STAY CAME WITH YOU")
                             .font(.system(size: 10, weight: .heavy))
@@ -20,6 +19,8 @@ struct GuestelWelcomeView: View {
                             .foregroundStyle(Theme.ink)
                             .lineLimit(2)
                     }
+                    Spacer(minLength: 8)
+                    propertyIcon
                 }
 
                 Text(arrival.stay == nil
