@@ -1,0 +1,37 @@
+1. SCREEN RECORDINGS
+Two recordings are attached. "Guestel Full App Review" starts on the physical iPhone Home Screen and covers adding the synthetic review property, browsing rooms, a test lodging request, the Stripe TEST $1 authorization, the hotel wallet, Front Desk messaging, notification settings, payment methods, and the account deletion flow cancelled at confirmation. "Guestel App Clip Review" covers the App Clip, direct booking, "Keep this property in Guestel", and the handoff to the full app.
+
+2. DEVICE TESTED
+iPhone 13, iOS 26.5, physical device via TestFlight. Submitted build: [BUILD NUMBER].
+
+3. FUNCTION, AUDIENCE, VALUE
+Guestel is a free guest app for people booking directly with independent hotels, inns and motels. A guest can save a property, browse its rooms, request a physical overnight stay, keep reservation details, message Front Desk privately, receive stay updates, and book directly again.
+
+4. SETUP AND TEST ACCESS
+No username, password, registration or paid subscription is required. From a fresh install: tap the plus button, enter marketel-review-inn.mktel.co, open Marketel Review Inn, choose a room and future dates, enter synthetic guest details, and complete the Stripe TEST authorization.
+
+Stripe test card: 4242 4242 4242 4242, any future expiry, any three-digit CVC, any valid ZIP.
+
+No real funds move in review. "Restore stays" is optional, uses an email one-time code, and is not required above.
+
+5. WHY NOT IN-APP PURCHASE
+Guestel facilitates reservations for physical overnight stays consumed outside the app. It sells no digital content, media, subscriptions or in-app features. The $1 Stripe authorization is a temporary hold validating a physical lodging request; the stay is paid to the property outside the app. Guideline 3.1.3(e) permits non-IAP payment for physical services consumed outside the app.
+
+6. APP CLIP
+Review invocation URL: https://clip.mktel.co/clip/marketel-review-inn
+The App Clip shows the property-specific booking experience and lets the guest keep that property in the full app. Both are submitted together.
+
+7. MESSAGES AND NOTIFICATIONS
+Messaging is private and one-to-one between a guest and the Front Desk of a property connected to that guest's reservation. There is no public feed, social network, public profile, or guest-to-guest communication. Apple Push Notification service delivers reservation, message and stay updates after the guest grants permission.
+
+8. ACCOUNT DELETION
+Account, then "Privacy & this device", then "Delete Guestel account". Deletion immediately removes the guest's Guestel identity, saved property wallet, push registrations, saved Stripe customer and payment methods, and access tokens. It does not cancel existing reservations; properties may retain booking records required for operations, accounting, disputes, fraud prevention or legal compliance. "Clear this device" is separate and removes local data only.
+
+9. EXTERNAL SERVICES
+Stripe for the card authorization and saved payment methods. Apple Push Notification service for notifications. Brevo for transactional email and one-time login codes. Render hosts the backend, Vercel the property pages and App Clip domain, Cloudflare R2 the images. Guestel shows no third-party advertising and does not sell personal data.
+
+10. REGIONAL DIFFERENCES
+Nothing is region-gated. The interface is English and participating properties operate in the United States, so amounts show in US dollars.
+
+11. REGULATED INDUSTRY / PROTECTED MATERIAL
+Not applicable. Guestel is not an OTA, travel agency or marketplace: it does not aggregate, compare, resell or publicly list third-party inventory. A property enters Guestel only when the guest opens that property's own Marketel link or App Clip, and each account sees only its own reservations. Marketel Review Inn and all its rooms, guests, bookings, messages and images are synthetic review data owned by Marketel.
