@@ -1,10 +1,13 @@
 /** Record guest PWA install and notification-permission funnel events. */
 
+import { isNativeGuestelContext } from './nativeGuestelContext.js';
+
 function sessionKey(touchpoint, reservationCode, eventType) {
   return `guest_install_evt_${eventType}_${touchpoint}_${reservationCode || 'generic'}`;
 }
 
 export function trackGuestInstall(apiBaseUrl, hotelId, { touchpoint, eventType, reservationCode }) {
+  if (isNativeGuestelContext()) return;
   if (!apiBaseUrl || !hotelId || !touchpoint || !eventType) return;
 
   try {

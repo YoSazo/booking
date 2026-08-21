@@ -144,17 +144,29 @@
     <!-- Analytics and session-recording IDs removed from the handoff build.
          Configure your own GA, Meta Pixel, and Smartlook settings before enabling tracking. -->
 
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VTZ5G6XQNE"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-VTZ5G6XQNE');
-    </script>
     <script>
       (function () {
+        // Guestel and its App Clip use this same booking UI for app
+        // functionality, but intentionally do not load website advertising or
+        // analytics SDKs. The native layer supplies both the query parameter
+        // and an early WKUserScript marker so SPA and full-page navigation are
+        // covered without relying on a user-agent string.
+        var params = new URLSearchParams(window.location.search);
+        var isNativeGuestel = params.get('guestelNative') === '1'
+          || window.__GUESTEL_NATIVE__ === true
+          || window.__GUESTEL_APP_CLIP__ === true;
+        if (isNativeGuestel) return;
+
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', 'G-VTZ5G6XQNE');
+
+        var googleTag = document.createElement('script');
+        googleTag.async = true;
+        googleTag.src = 'https://www.googletagmanager.com/gtag/js?id=G-VTZ5G6XQNE';
+        document.head.appendChild(googleTag);
+
         function loadClarity() {
           (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");
         }

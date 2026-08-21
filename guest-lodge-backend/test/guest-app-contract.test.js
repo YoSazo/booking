@@ -130,6 +130,50 @@ test('App Clip handoff is one-use and becomes a verified native stay', () => {
     assert.match(guestel, /BookingAPI\.claimHandoff\(handoff\)/);
 });
 
+test('Guestel booking webviews opt out of website advertising analytics', () => {
+    const root = path.join(__dirname, '..', '..');
+    const fullApp = fs.readFileSync(
+        path.join(root, 'marketel-guestel-ios', 'Guestel', 'BookingWebView.swift'),
+        'utf8'
+    );
+    const clip = fs.readFileSync(
+        path.join(root, 'marketel-guestel-ios', 'GuestelClip', 'ClipWebView.swift'),
+        'utf8'
+    );
+    const tracking = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'trackingService.js'),
+        'utf8'
+    );
+    const nativeContext = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'nativeGuestelContext.js'),
+        'utf8'
+    );
+    const main = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'main.jsx'),
+        'utf8'
+    );
+    const installTracking = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'guestInstallTracking.js'),
+        'utf8'
+    );
+    const bookingHtml = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'index.html'),
+        'utf8'
+    );
+
+    for (const webview of [fullApp, clip]) {
+        assert.match(webview, /URLQueryItem\(name: "guestelNative", value: "1"\)/);
+        assert.match(webview, /window\.__GUESTEL_NATIVE__ = true/);
+    }
+    assert.match(nativeContext, /params\.get\('guestelNative'\) === '1'/);
+    assert.match(nativeContext, /window\.__GUESTEL_NATIVE__ === true/);
+    assert.match(tracking, /isNativeGuestelContext\(\)/);
+    assert.match(main, /!isNativeGuestelContext\(\)/);
+    assert.match(installTracking, /if \(isNativeGuestelContext\(\)\) return;/);
+    assert.match(bookingHtml, /if \(isNativeGuestel\) return;/);
+    assert.doesNotMatch(bookingHtml, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/);
+});
+
 test('Guestel messaging is a first-class native inbox', () => {
     const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
     const rootView = fs.readFileSync(path.join(guestelRoot, 'RootView.swift'), 'utf8');
