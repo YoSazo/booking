@@ -168,6 +168,7 @@ final class GuestStore {
 
     /// Refreshes display data from the backend without replacing the guest's
     /// wallet ordering or locally retained stay history.
+    @MainActor
     func refreshHotels() async {
         let identifiers = hotels.map(\.hotelId)
         for hotelId in identifiers {
