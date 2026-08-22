@@ -5,6 +5,7 @@ const {
     classifyDeterministicIntent,
     deterministicSocialReply,
     sanitizeAssistantSocialReply,
+    sanitizeFrontDeskAnswer,
     bookingDateContext,
     buildNewBookingAlertMessage,
     formatRecentBookingStatus,
@@ -336,4 +337,25 @@ test('generated social replies cannot claim a real Front Desk mutation', () => {
         "I'm doing well - thanks for asking."
     );
     assert.ok(sanitizeAssistantSocialReply('a'.repeat(300), fallback).length <= 160);
+});
+
+test('front desk answers stay grounded and never claim an operation', () => {
+    const fallback = 'Here is where the property stands.';
+    // A normal, data-grounded answer passes through (longer than a social reply).
+    assert.equal(
+        sanitizeFrontDeskAnswer('You have 3 rooms open tonight and 2 pending requests.', fallback),
+        'You have 3 rooms open tonight and 2 pending requests.'
+    );
+    // Claiming an operation happened is rejected.
+    assert.equal(
+        sanitizeFrontDeskAnswer('I blocked the Queen for tonight.', fallback),
+        fallback
+    );
+    // Links / secrets are rejected.
+    assert.equal(
+        sanitizeFrontDeskAnswer('Check https://example.com for details.', fallback),
+        fallback
+    );
+    // Long output is capped.
+    assert.ok(sanitizeFrontDeskAnswer('a'.repeat(1000), fallback).length <= 700);
 });
