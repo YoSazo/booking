@@ -299,14 +299,22 @@ test('friendly wording never hides an operational inventory update', () => {
 });
 
 test('social responses feel personal without pretending an operation occurred', () => {
-    assert.equal(
-        deterministicSocialReply({ socialKind: 'wellbeing' }, { name: 'Salah' }),
-        'Doing well, Salah. Glad to be here when you need me.'
-    );
-    assert.equal(
-        deterministicSocialReply({ socialKind: 'identity' }, { name: 'Salah' }),
-        'I am Marketel Front Desk. I can check availability, record walk-ins, protect bookings, and undo recent availability changes.'
-    );
+    const mutationClaim = /\b(?:i|we)\s+(?:blocked|removed|cancelled|canceled|released|confirmed|changed|updated|closed|opened|booked|charged|refunded|emailed|notified)\b/i;
+    const kinds = ['wellbeing', 'greeting', 'thanks', 'praise', 'farewell', 'apology', 'identity', 'empathy'];
+    for (const socialKind of kinds) {
+        // Replies vary, so exercise every variant many times.
+        for (let i = 0; i < 40; i++) {
+            const reply = deterministicSocialReply({ socialKind }, { name: 'Salah' });
+            assert.ok(reply.length > 0 && reply.length <= 160, `${socialKind} within SMS length`);
+            assert.match(reply, /Salah/, `${socialKind} addresses the owner by name`);
+            assert.doesNotMatch(reply, mutationClaim, `${socialKind} never claims an operation happened`);
+            assert.doesNotMatch(reply, /https?:\/\//, `${socialKind} has no link`);
+        }
+    }
+    // Identity still explains what the front desk can actually do.
+    const identity = deterministicSocialReply({ socialKind: 'identity' }, { name: 'Salah' });
+    assert.match(identity, /front desk/i);
+    assert.match(identity, /availability|bookings|walk-ins|rooms/i);
 });
 
 test('generated social replies cannot claim a real Front Desk mutation', () => {
