@@ -260,9 +260,13 @@ struct WalletCard: View {
                             image.resizable().scaledToFill()
                         }
                     }
+                    // Covers belong to each property, so brightness is
+                    // unpredictable. A light uniform shade preserves the photo
+                    // while giving the white Wallet text a reliable baseline.
+                    Color.black.opacity(0.10)
                 }
                 LinearGradient(
-                    colors: [.black.opacity(0.60), .black.opacity(0.12), .clear],
+                    colors: [.black.opacity(0.66), .black.opacity(0.18), .clear],
                     startPoint: .top,
                     endPoint: .center
                 )

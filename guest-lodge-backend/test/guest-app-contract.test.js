@@ -253,6 +253,7 @@ test('Front Desk edits the same property card Guestel renders', () => {
     const apps = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'src', 'apps.js'), 'utf8');
     const api = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'BookingAPI.swift'), 'utf8');
     const store = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'Store.swift'), 'utf8');
+    const hotelsView = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'HotelsView.swift'), 'utf8');
 
     assert.match(schema, /guestelWalletImageUrl\s+String\?/);
     assert.match(schema, /guestelWalletSubtitle\s+String\?/);
@@ -268,6 +269,20 @@ test('Front Desk edits the same property card Guestel renders', () => {
     assert.match(api, /let guestelWalletSubtitle: String\?/);
     assert.match(store, /hotels\[index\]\.location = data\.guestelWalletSubtitle/);
     assert.match(store, /hotels\[index\]\.imageURL = data\.walletImage/);
+    assert.match(hotelsView, /\.refreshable \{ await refreshHotelCards\(\) \}/);
+    assert.match(hotelsView, /phase == \.active[\s\S]{0,120}refreshHotelCards\(\)/);
+});
+
+test('shared booking links never expose the retired client identity', () => {
+    const root = path.join(__dirname, '..', '..');
+    const engineHTML = fs.readFileSync(path.join(root, 'hotel-booking-app', 'index.html'), 'utf8');
+    const engineApp = fs.readFileSync(path.join(root, 'hotel-booking-app', 'src', 'App.jsx'), 'utf8');
+
+    assert.doesNotMatch(engineHTML, /logo\.jpg|Click Hospitality/i);
+    assert.match(engineHTML, /rel="icon"[^>]+marketellogo\.svg/);
+    assert.match(engineApp, /favicon\.href = guestIconUrl/);
+    assert.equal(fs.existsSync(path.join(root, 'hotel-booking-app', 'public', 'logo.jpg')), false);
+    assert.equal(fs.existsSync(path.join(root, 'guest-lodge-backend', 'public', 'logo.jpg')), false);
 });
 
 test('Marketel opens real native SwiftUI message surfaces on iPhone', () => {

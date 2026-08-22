@@ -334,6 +334,15 @@ function App() {
     upsertMetaTag('apple-mobile-web-app-title', currentHotel?.name || 'Book Now');
 
     const guestIconUrl = `${API_BASE_URL}/api/hotel/${encodeURIComponent(hotelId)}/guest-app-icon.png?s=180`;
+    let favicon = document.querySelector('link[rel~="icon"]');
+    if (!favicon) {
+      favicon = document.createElement('link');
+      favicon.rel = 'icon';
+      document.head.appendChild(favicon);
+    }
+    favicon.type = 'image/png';
+    favicon.href = guestIconUrl;
+
     let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
     if (!appleIcon) {
       appleIcon = document.createElement('link');
