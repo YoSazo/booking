@@ -369,7 +369,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             title: "Front Desk Assistant",
             image: UIImage(systemName: "message.badge")
         ) { [weak self] _ in
-            self?.sendWebAction("assistant")
+            self?.presentNativeAssistant()
         }
         let supportAction = UIAction(
             title: "Message Marketel",
@@ -507,7 +507,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     @objc private func openAssistantFromPill() {
-        sendWebAction("assistant")
+        presentNativeAssistant()
     }
 
     // Driven by the same `state` message that already reports the selected tab,
@@ -881,7 +881,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             blue: 91 / 255,
             alpha: 1
         )
-        present(navigationController, animated: true)
+        // The Assistant itself is a native sheet. Present the contact editor
+        // from whichever controller is currently visible instead of asking the
+        // bridge controller to present over an existing modal.
+        let presenter = presentedViewController ?? self
+        presenter.present(navigationController, animated: true)
     }
 
     func contactViewController(
@@ -996,6 +1000,36 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         present(controller, animated: true)
     }
 
+    private func presentNativeAssistant() {
+        guard requireNativeMessagingSession(), presentedViewController == nil else { return }
+        let assistant = MarketelNativeAssistantView(
+            origin: backendOrigin,
+            hotelId: activeHotelId,
+            authToken: nativeAuthToken,
+            onClose: { [weak self] in
+                self?.sendWebAction("refresh")
+            },
+            onSaveContact: { [weak self] phone in
+                self?.presentMarketelContact(phone: phone)
+            }
+        )
+        let controller = UIHostingController(rootView: assistant)
+        controller.view.backgroundColor = UIColor(
+            red: 244 / 255,
+            green: 247 / 255,
+            blue: 245 / 255,
+            alpha: 1
+        )
+        controller.modalPresentationStyle = .pageSheet
+        if let sheet = controller.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+            sheet.preferredCornerRadius = 28
+        }
+        present(controller, animated: true)
+    }
+
     func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
@@ -1030,6 +1064,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             presentNativeGuestMessages()
         case "openSupport":
             presentNativeSupportMessages()
+        case "openAssistant":
+            presentNativeAssistant()
         case "tourMode":
             nativeTourActive = payload["active"] as? Bool ?? false
             setShellVisible(shellVisible, animated: false)

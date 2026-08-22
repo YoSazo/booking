@@ -91,13 +91,14 @@ struct HotelsView: View {
                 hotel: hotel,
                 maxDetent: .height(maxSheetHeight),
                 detent: $sheetDetent,
-                onBooked: { result, checkin, checkout in
+                onBooked: { result, checkin, checkout, roomName in
                     store.addReservation(
                         code: result.reservationCode,
                         hotelId: hotel.hotelId,
                         checkin: checkin,
                         checkout: checkout,
                         status: result.pending ? "pending" : "confirmed",
+                        roomName: roomName,
                         accessToken: result.reservationToken
                     )
                     withAnimation(animation) { selectedHotel = nil }

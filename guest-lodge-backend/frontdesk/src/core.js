@@ -1,5 +1,6 @@
 import { crm } from './state.js';
 import QRCode from 'qrcode';
+import guestelAppIconUrl from './assets/guestel-app-icon.png';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 import { bindChatKeyboardViewport } from './chatKeyboard.js';
@@ -853,13 +854,14 @@ function marketelNativeAction(action) {
   else if (action === 'refresh') refreshCurrentView({ force: true, visibleOnly: false });
   else if (action === 'tour') replayWalkthrough();
   else if (action === 'assistant') {
-    // Dismiss native chrome before the lazy Assistant chunk is fetched. This
-    // keeps the tab bar and header from ever covering its modal.
-    setNativeShellVisible(false);
-    loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
-      setNativeShellVisible(true);
-      toast('Could not open Front Desk Assistant.', 'error');
-    });
+    if (!nativeShellPost({ type: 'openAssistant' })) {
+      // Older installed shells retain the web modal fallback.
+      setNativeShellVisible(false);
+      loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
+        setNativeShellVisible(true);
+        toast('Could not open Front Desk Assistant.', 'error');
+      });
+    }
   }
   else if (action === 'support') {
     if (!nativeShellPost({ type: 'openSupport' })) {
@@ -4208,9 +4210,10 @@ function guestBroadcastCardHtml(options = {}) {
   const rawName = crm.activeHotelName || 'Your Property';
   const hName = esc(rawName);
   const hNameAttr = hName;
-  const appIcon = crm.activeHotelAppIcon
-    ? `<img src="${esc(crm.activeHotelAppIcon)}" alt="">`
-    : `<span>${esc(rawName.trim().charAt(0).toUpperCase() || 'M')}</span>`;
+  // Native iOS notifications always carry the sending app's fixed icon.
+  // Property branding belongs in the notification title and Guestel card;
+  // pretending iOS swaps the app icon per hotel makes this preview dishonest.
+  const appIcon = `<img src="${esc(guestelAppIconUrl)}" alt="Guestel">`;
   const demoItems = JSON.stringify([{
     type: 'video',
     src: GUEST_BROADCAST_DEMO_VIDEO,
@@ -4229,7 +4232,7 @@ function guestBroadcastCardHtml(options = {}) {
       <div class="guest-notification-shell">
         <div class="guest-notification-meta">
           <span class="guest-notification-icon">${appIcon}</span>
-          <strong>${hName}</strong>
+          <strong>Guestel</strong>
           <span>now</span>
         </div>
         <div id="guest-broadcast-preview-title" class="guest-notification-title">${hName}</div>

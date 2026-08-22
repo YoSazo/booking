@@ -137,7 +137,7 @@ test('deleting a photo animates the photo out, and puts it back on failure', () 
     assert.match(settings, /catch \(e\) \{[\s\S]{0,320}thumb\.classList\.remove\('marketel-removing'\)/);
 });
 
-test('the Assistant pill is native, and the web only says what it should read', () => {
+test('the Assistant pill opens the native Assistant sheet with a web fallback', () => {
     const appDelegate = fs.readFileSync(
         path.join(root, '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
         'utf8'
@@ -150,7 +150,12 @@ test('the Assistant pill is native, and the web only says what it should read', 
     assert.match(appDelegate, /private let assistantPill = UIVisualEffectView\(\)/);
     assert.match(appDelegate, /UIGlassEffect\(style: \.regular\)[\s\S]{0,400}assistantPill\.effect = glass/);
     assert.match(appDelegate, /assistantPillButton\.addTarget\(self, action: #selector\(openAssistantFromPill\)/);
-    assert.match(appDelegate, /sendWebAction\("assistant"\)/);
+    assert.match(appDelegate, /func presentNativeAssistant\(\)/);
+    assert.match(appDelegate, /MarketelNativeAssistantView\(/);
+    assert.match(appDelegate, /case "openAssistant":[\s\S]{0,100}presentNativeAssistant\(\)/);
+    assert.match(assistant, /window\.webkit\?\.messageHandlers\?\.marketelShell/);
+    assert.match(assistant, /handler\.postMessage\(\{ type: 'openAssistant' \}\)/);
+    assert.match(assistant, /if \(openNativeAssistant\(\)\) return;[\s\S]{0,80}openAssistantSheetNow\(\)/);
 
     // Never fade a UIVisualEffectView through partial alpha: it forces an
     // offscreen render and flashes an empty white material. The rest of the

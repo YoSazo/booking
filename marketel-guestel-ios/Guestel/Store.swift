@@ -130,9 +130,10 @@ final class GuestStore {
         GuestPaymentAccess.clear()
     }
 
-    func addReservation(code: String, hotelId: String, checkin: String, checkout: String, status: String? = nil, accessToken: String? = nil) {
+    func addReservation(code: String, hotelId: String, checkin: String, checkout: String, status: String? = nil, roomName: String? = nil, accessToken: String? = nil) {
         var item: [String: Any] = ["code": code, "hotelId": hotelId, "checkin": checkin, "checkout": checkout]
         if let status { item["status"] = status }
+        if let roomName, !roomName.isEmpty { item["roomName"] = roomName }
         if let accessToken, !accessToken.isEmpty { item["accessToken"] = accessToken }
         ingest([item])
         Task { @MainActor in await GuestPushManager.sync(store: self) }

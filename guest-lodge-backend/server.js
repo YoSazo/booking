@@ -4541,6 +4541,44 @@ app.post('/api/availability', availabilityRateLimit, async (req, res) => {
     }
 });
 
+// Public, server-owned quote used by Guestel's native repeat-booking flow.
+// Availability answers "can this room be sold?" while this endpoint answers
+// "what will this exact stay cost?" from the same stored rates Stripe stamps
+// into the authorization metadata. Native clients can display the number, but
+// create-preauth-hold still recalculates it and remains authoritative.
+app.post('/api/booking-quote', availabilityRateLimit, async (req, res) => {
+    try {
+        const hotelId = String(req.body?.hotelId || '').trim();
+        const bookingDetails = req.body?.bookingDetails || {};
+        const validation = await getActiveHotelValidation(hotelId);
+        if (!validation.ok) {
+            return res.status(validation.status).json({ success: false, message: validation.message });
+        }
+        const quote = await getServerBookingQuote(validation.hotelId, bookingDetails);
+        return res.json({
+            success: true,
+            quote: {
+                nights: quote.nights,
+                subtotal: quote.subtotal,
+                taxes: quote.taxes,
+                total: quote.total,
+                totalCents: quote.totalCents,
+            },
+            room: {
+                name: quote.bookingDetails.roomName,
+                roomTypeID: quote.bookingDetails.roomTypeID,
+                rateID: quote.bookingDetails.rateID,
+            },
+        });
+    } catch (error) {
+        console.error('Booking quote error:', error.message);
+        return res.status(error.status || 400).json({
+            success: false,
+            message: error.message || 'That stay could not be quoted.',
+        });
+    }
+});
+
 // Cloudbeds booking handler
 async function createCloudbedsBooking(hotelId, bookingDetails, guestInfo) {
     const config = await resolveHotelConfig(hotelId);

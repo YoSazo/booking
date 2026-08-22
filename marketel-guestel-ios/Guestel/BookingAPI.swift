@@ -13,9 +13,13 @@ enum BookingAPI {
         let description: String?
         let amenities: String?
         let maxOccupancy: Int?
+        let totalUnits: Int?
         let imageUrls: [String]?
         var image: URL? {
             imageUrls?.first.flatMap { URL(string: $0, relativeTo: BookingAPI.base)?.absoluteURL }
+        }
+        var images: [URL] {
+            (imageUrls ?? []).compactMap { URL(string: $0, relativeTo: BookingAPI.base)?.absoluteURL }
         }
     }
 
@@ -33,8 +37,14 @@ enum BookingAPI {
         let id: String
         let domain: String?
         let name: String
+        let phone: String?
+        let address: String?
+        let subtitle: String?
         let guestelWalletImageUrl: String?
         let guestelWalletSubtitle: String?
+        let checkInTime: String?
+        let checkOutTime: String?
+        let cancellationPolicy: String?
         let subscribed: Bool?
         let rates: Rates?
         let rooms: [APIRoom]
@@ -55,6 +65,14 @@ enum BookingAPI {
         let roomTypeID: String
         let rateID: String
         let roomsAvailable: Int
+    }
+
+    struct BookingQuote: Hashable {
+        let nights: Int
+        let subtotal: Double
+        let taxes: Double
+        let total: Double
+        let totalCents: Int
     }
 
     struct BookingResult: Hashable {
@@ -184,6 +202,42 @@ enum BookingAPI {
                 roomsAvailable: (room["roomsAvailable"] as? Int) ?? 1
             )
         }
+    }
+
+    /// Returns the same quote the backend will stamp onto Stripe's $1
+    /// authorization. This is display data only; createHold recalculates it.
+    static func quote(
+        hotelId: String,
+        roomName: String,
+        roomId: String?,
+        roomTypeID: String,
+        rateID: String,
+        checkin: String,
+        checkout: String
+    ) async throws -> BookingQuote {
+        let json = try await post("api/booking-quote", [
+            "hotelId": hotelId,
+            "bookingDetails": [
+                "roomName": roomName,
+                "roomId": roomId ?? "",
+                "roomTypeID": roomTypeID,
+                "rateID": rateID,
+                "checkin": checkin,
+                "checkout": checkout,
+            ],
+        ])
+        guard let raw = json["quote"] as? [String: Any] else {
+            throw Failure.message((json["message"] as? String) ?? "That stay could not be quoted.")
+        }
+        let nights = (raw["nights"] as? NSNumber)?.intValue ?? 0
+        let subtotal = (raw["subtotal"] as? NSNumber)?.doubleValue ?? 0
+        let taxes = (raw["taxes"] as? NSNumber)?.doubleValue ?? 0
+        let total = (raw["total"] as? NSNumber)?.doubleValue ?? 0
+        let totalCents = (raw["totalCents"] as? NSNumber)?.intValue ?? Int((total * 100).rounded())
+        guard nights > 0, total > 0 else {
+            throw Failure.message("That stay could not be quoted.")
+        }
+        return BookingQuote(nights: nights, subtotal: subtotal, taxes: taxes, total: total, totalCents: totalCents)
     }
 
     static func createHold(

@@ -65,6 +65,18 @@ function isNativeFrontDesk() {
   return typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
 }
 
+function openNativeAssistant() {
+  if (!isNativeFrontDesk()) return false;
+  try {
+    const handler = window.webkit?.messageHandlers?.marketelShell;
+    if (!handler || typeof handler.postMessage !== 'function') return false;
+    handler.postMessage({ type: 'openAssistant' });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // The demo conversation reads as a mock-up when it names a room the property
 // does not have. Their own first room costs nothing and makes it theirs.
 function firstRoomName() {
@@ -764,6 +776,7 @@ export function openFrontDeskAssistant() {
     window.openFrontdeskAppDownload?.();
     return;
   }
+  if (openNativeAssistant()) return;
   openAssistantSheetNow();
 }
 

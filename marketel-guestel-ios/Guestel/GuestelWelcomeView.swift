@@ -38,6 +38,31 @@ struct GuestelWelcomeView: View {
                     .foregroundStyle(Theme.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if let stay = arrival.stay {
+                    VStack(alignment: .leading, spacing: 11) {
+                        HStack {
+                            Label(
+                                pending ? "Being reviewed" : "Confirmed",
+                                systemImage: pending ? "clock.fill" : "checkmark.circle.fill"
+                            )
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(pending ? Color.orange : Theme.green)
+                            Spacer()
+                            Text("#\(stay.code)")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.inkSoft)
+                        }
+                        if let room = stay.roomName, !room.isEmpty {
+                            stayLine("bed.double.fill", room)
+                        }
+                        if !stay.checkin.isEmpty, !stay.checkout.isEmpty {
+                            stayLine("calendar", stayDateRange(stay))
+                        }
+                    }
+                    .padding(16)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+
                 VStack(spacing: 0) {
                     benefit("banknote.fill", arrival.stay == nil ? "Direct rates and property offers" : "Confirmation and stay updates")
                     Divider().padding(.leading, 44)
@@ -111,5 +136,26 @@ struct GuestelWelcomeView: View {
                 .foregroundStyle(Theme.green)
         }
         .padding(.vertical, 13)
+    }
+
+    private func stayLine(_ symbol: String, _ value: String) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: symbol)
+                .foregroundStyle(Theme.green)
+                .frame(width: 20)
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+        }
+    }
+
+    private func stayDateRange(_ stay: Reservation) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d, yyyy"
+        guard let checkin = stay.checkinDate, let checkout = stay.checkoutDate else {
+            return "\(stay.checkin) – \(stay.checkout)"
+        }
+        return "\(formatter.string(from: checkin)) – \(formatter.string(from: checkout))"
     }
 }
