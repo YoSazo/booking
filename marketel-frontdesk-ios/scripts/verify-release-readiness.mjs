@@ -64,8 +64,13 @@ expect(delegate, /title: "Front Desk Assistant"[\s\S]{0,220}presentNativeAssista
   'Native menu does not expose the native Front Desk Assistant');
 expect(delegate, /case "openAssistant":[\s\S]{0,120}presentNativeAssistant\(\)/,
   'Web fallback cannot open the native Front Desk Assistant');
+expect(delegate, /sheet\.detents = \[\.medium\(\), \.large\(\)\][\s\S]{0,120}sheet\.selectedDetentIdentifier = \.medium/,
+  'Native Front Desk Assistant must open at half height and expand to full height');
 expect(project, /NativeAssistant\.swift in Sources/,
   'Xcode target does not compile NativeAssistant.swift');
+const nativeAssistant = read('ios/App/App/NativeAssistant.swift');
+expect(nativeAssistant, /navigationBarItems\(trailing: Button\("Done"\)/,
+  'Native Front Desk Assistant must keep Done in the top-right');
 expect(delegate, /title: "Replay app tour"[\s\S]{0,220}sendWebAction\("tour"\)/,
   'Native menu does not expose tour replay clearly');
 expect(capacitor, /"appId":\s*"com\.bookmarketel\.frontdesk"/,

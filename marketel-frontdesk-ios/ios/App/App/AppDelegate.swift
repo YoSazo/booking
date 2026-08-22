@@ -507,6 +507,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     @objc private func openAssistantFromPill() {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         presentNativeAssistant()
     }
 
@@ -1022,7 +1023,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         )
         controller.modalPresentationStyle = .pageSheet
         if let sheet = controller.sheetPresentationController {
-            sheet.detents = [.large()]
+            // Open as the compact surface suggested by the Front Desk pill.
+            // The owner can pull the same surface to full height without
+            // leaving Assistant or losing their place.
+            sheet.detents = [.medium(), .large()]
+            sheet.selectedDetentIdentifier = .medium
             sheet.prefersGrabberVisible = true
             sheet.prefersScrollingExpandsWhenScrolledToEdge = true
             sheet.preferredCornerRadius = 28

@@ -400,8 +400,8 @@ struct MarketelNativeAssistantView: View {
             }
             .background(MarketelAssistantTheme.canvas.ignoresSafeArea())
             .navigationTitle("Front Desk")
-            .navigationBarTitleDisplayMode(.large)
-            .navigationBarItems(leading: Button("Done") { close() })
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(trailing: Button("Done") { close() })
         }
         .navigationViewStyle(.stack)
         .tint(MarketelAssistantTheme.green)
