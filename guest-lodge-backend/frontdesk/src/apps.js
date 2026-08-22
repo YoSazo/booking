@@ -590,31 +590,6 @@ function renderAppsView() {
     ? `<button type="button" class="apps-story-secondary" onclick="openGuestBookingEngine({focusInstall:true})">Go to direct booking page</button>`
     : `<div class="apps-story-domain-note">Your direct booking domain is still setting up. Once it is ready, guests can save your property from that page.</div>`;
 
-  // Icon preview matches the loop tile: uploaded logos use the whole square,
-  // while the generated letter icon is full-bleed green edge-to-edge.
-  const iconBoxBase = 'width:56px;height:56px;border-radius:14px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.1);box-sizing:border-box;';
-  const iconBoxStyle = hotelAppIcon
-    ? iconBoxBase + 'background:#fff;border:1px solid var(--border);padding:0;'
-    : iconBoxBase;
-  const iconInnerHtml = hotelAppIcon
-    ? `<img src="${hotelAppIcon}" alt="Property logo" style="width:100%;height:100%;object-fit:contain;">`
-    : `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--green);color:#fff;border-radius:14px;font-size:24px;font-weight:800;">${hotelInitial}</span>`;
-  const iconButtonClick = fdInApp
-    ? "document.getElementById('appsAppIconInput').click()"
-    : "toast('Download Marketel Front Desk first. Then you can change the property image guests see in Guestel.', 'error')";
-  const logoBlockHtml = `
-    <div class="apps-icon-card">
-      <div id="appsAppIconPreview" style="${iconBoxStyle}">
-        ${iconInnerHtml}
-      </div>
-      <div style="flex:1;min-width:0;">
-        <input type="file" id="appsAppIconInput" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="uploadAppIcon(this)">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">Guestel uses this square image for your conversation and notification identity.</div>
-        <button type="button" id="tour-guest-icon-btn" onclick="${iconButtonClick}" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--green);background:none;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">${hotelAppIcon ? 'Change picture' : 'Upload picture'}</button>
-        ${fdInApp ? '' : '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;">Download Marketel Front Desk first to change this icon.</div>'}
-      </div>
-    </div>`;
-
   const checkinActionsHtml = `
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show guest QR</button>
       ${guestInstallUrl !== '#' ? `
@@ -715,12 +690,6 @@ function renderAppsView() {
       <button type="button" onclick="handleInstallFrontdesk()" style="width:100%;margin-top:14px;padding:13px 15px;border:none;border-radius:11px;background:var(--green);color:#fff;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Download Marketel Front Desk</button>
       <div style="font-size:11px;color:#737B76;line-height:1.45;text-align:center;margin-top:8px;">Booking notifications require the installed Front Desk on this device.</div>
     </div>`;
-  const guestIconCardHtml = () => `
-    <div class="apps-step-card" id="tour-guest-icon-section">
-      <div class="apps-step-title" style="margin-bottom:4px;">Your Guestel icon</div>
-      <p class="apps-card-help">This square logo identifies your property in conversations and notifications. Your wallet cover is edited separately above.</p>
-      ${logoBlockHtml}
-    </div>`;
   const guestPhonesCardHtml = `
     <div class="apps-step-card" id="guest-app-share-card">
       <div class="apps-section-divider" style="margin-top:0;padding-top:0;border-top:none;">Guest phones</div>
@@ -781,8 +750,7 @@ function renderAppsView() {
     <p class="apps-native-lead">Guests use Guestel. You use Marketel Front Desk. Manage how <strong>${hName}</strong> appears, talk to booked guests, and invite more guests from here.</p>
     ${nativeGuestShareHtml}
     ${guestMessagesPanelHtml}
-    ${guestBroadcastCardHtml({ compact: true })}
-    ${guestIconCardHtml()}`;
+    ${guestBroadcastCardHtml({ compact: true })}`;
   const appStoreReady = !!String(crm.frontdeskAppStoreUrl || '').trim();
   const webAppLockHtml = `
     <section style="min-height:52vh;display:grid;place-items:center;padding:34px 0;">

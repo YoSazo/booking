@@ -262,9 +262,33 @@ test('Front Desk edits the same property card Guestel renders', () => {
     assert.match(server, /location: hotel\.guestelWalletSubtitle \|\| hotel\.address/);
     assert.match(server, /imageURL: hotel\.guestelWalletImageUrl \|\| hotel\.rooms/);
     assert.match(apps, /Save Guestel card/);
-    assert.match(apps, /Guestel uses this square image for your conversation and notification identity/);
+    assert.doesNotMatch(apps, /Your Guestel icon/);
+    assert.doesNotMatch(apps, /Guestel uses this square image for your conversation and notification identity/);
     assert.match(api, /let guestelWalletImageUrl: String\?/);
     assert.match(api, /let guestelWalletSubtitle: String\?/);
     assert.match(store, /hotels\[index\]\.location = data\.guestelWalletSubtitle/);
     assert.match(store, /hotels\[index\]\.imageURL = data\.walletImage/);
+});
+
+test('Marketel opens real native SwiftUI message surfaces on iPhone', () => {
+    const root = path.join(__dirname, '..', '..');
+    const nativeMessages = fs.readFileSync(
+        path.join(root, 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'NativeMessages.swift'),
+        'utf8'
+    );
+    const appDelegate = fs.readFileSync(
+        path.join(root, 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
+        'utf8'
+    );
+    const core = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'src', 'core.js'), 'utf8');
+
+    assert.match(appDelegate, /UIHostingController\(rootView: messages\)/);
+    assert.match(appDelegate, /case "openGuestMessages"/);
+    assert.match(appDelegate, /case "openSupport"/);
+    assert.match(core, /nativeShellPost\(\{ type: 'openGuestMessages' \}\)/);
+    assert.match(core, /nativeShellPost\(\{ type: 'openSupport' \}\)/);
+    assert.match(nativeMessages, /struct MarketelNativeGuestMessagesView: View/);
+    assert.match(nativeMessages, /struct MarketelNativeSupportView: View/);
+    assert.match(nativeMessages, /safeAreaInset\(edge: \.bottom/);
+    assert.match(nativeMessages, /Task\.sleep\(nanoseconds: 15_000_000_000\)/);
 });

@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 import Capacitor
 import WebKit
 import Contacts
@@ -374,7 +375,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             title: "Message Marketel",
             image: UIImage(systemName: "questionmark.bubble")
         ) { [weak self] _ in
-            self?.sendWebAction("support")
+            self?.presentNativeSupportMessages()
         }
         let tourAction = UIAction(
             title: "Replay app tour",
@@ -941,6 +942,60 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         present(browser, animated: true)
     }
 
+    private func requireNativeMessagingSession() -> Bool {
+        guard !nativeAuthToken.isEmpty, !activeHotelId.isEmpty else {
+            let alert = UIAlertController(
+                title: "Front Desk is reconnecting",
+                message: "Wait a moment for this property to finish loading, then try again.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return false
+        }
+        return true
+    }
+
+    private func presentNativeGuestMessages() {
+        guard requireNativeMessagingSession(), presentedViewController == nil else { return }
+        let messages = MarketelNativeGuestMessagesView(
+            origin: backendOrigin,
+            hotelId: activeHotelId,
+            authToken: nativeAuthToken
+        ) { [weak self] in
+            self?.sendWebAction("refresh")
+        }
+        let controller = UIHostingController(rootView: messages)
+        controller.view.backgroundColor = UIColor(
+            red: 244 / 255,
+            green: 247 / 255,
+            blue: 245 / 255,
+            alpha: 1
+        )
+        controller.modalPresentationStyle = .fullScreen
+        present(controller, animated: true)
+    }
+
+    private func presentNativeSupportMessages() {
+        guard requireNativeMessagingSession(), presentedViewController == nil else { return }
+        let messages = MarketelNativeSupportView(
+            origin: backendOrigin,
+            hotelId: activeHotelId,
+            authToken: nativeAuthToken
+        ) { [weak self] in
+            self?.sendWebAction("refresh")
+        }
+        let controller = UIHostingController(rootView: messages)
+        controller.view.backgroundColor = UIColor(
+            red: 244 / 255,
+            green: 247 / 255,
+            blue: 245 / 255,
+            alpha: 1
+        )
+        controller.modalPresentationStyle = .fullScreen
+        present(controller, animated: true)
+    }
+
     func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
@@ -971,6 +1026,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":
             presentInAppBrowser(payload["url"] as? String ?? "")
+        case "openGuestMessages":
+            presentNativeGuestMessages()
+        case "openSupport":
+            presentNativeSupportMessages()
         case "tourMode":
             nativeTourActive = payload["active"] as? Bool ?? false
             setShellVisible(shellVisible, animated: false)

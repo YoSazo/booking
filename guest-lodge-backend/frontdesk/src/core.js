@@ -143,6 +143,9 @@ export function loadSupportModule() {
 }
 
 function openMarketelSupport() {
+  if (isNativeFrontdeskApp() && nativeShellPost({ type: 'openSupport' })) {
+    return Promise.resolve();
+  }
   return loadSupportModule()
     .then((module) => module.openSupportConversation())
     .catch((error) => {
@@ -859,11 +862,13 @@ function marketelNativeAction(action) {
     });
   }
   else if (action === 'support') {
-    setNativeShellVisible(false);
-    loadSupportModule().then((module) => module.openSupportConversation()).catch(() => {
-      setNativeShellVisible(true);
-      toast('Could not open support. Email support@bookmarketel.com.', 'error');
-    });
+    if (!nativeShellPost({ type: 'openSupport' })) {
+      setNativeShellVisible(false);
+      loadSupportModule().then((module) => module.openSupportConversation()).catch(() => {
+        setNativeShellVisible(true);
+        toast('Could not open support. Email support@bookmarketel.com.', 'error');
+      });
+    }
   }
   else if (action === 'properties') showNativePropertyPicker();
   else if (action === 'account') {
@@ -3308,6 +3313,7 @@ function handleMessagesWorkspaceBack() {
 }
 
 function openMessagesWorkspace() {
+  if (isNativeFrontdeskApp() && nativeShellPost({ type: 'openGuestMessages' })) return;
   crm.messagesExpanded = true;
   crm.messagesInboxOpen = true;
   // Guestel opens on its native conversation list on a phone. A desktop has
@@ -6318,6 +6324,7 @@ exposeToWindow({
   isIosDevice,
   isNativeFrontdeskApp,
   marketelNativeNotificationState,
+  nativeShellPost,
   openNativeNotificationSettings,
   isPwaSimulated,
   isStandaloneApp,

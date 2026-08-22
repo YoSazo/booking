@@ -206,6 +206,10 @@ function createSupportOverlay() {
 }
 
 export async function openSupportConversation() {
+  const native = typeof window.isNativeFrontdeskApp === 'function' && window.isNativeFrontdeskApp();
+  if (native && typeof window.nativeShellPost === 'function' && window.nativeShellPost({ type: 'openSupport' })) {
+    return;
+  }
   createSupportOverlay();
   document.body.classList.add('marketel-support-open');
   window.setNativeModalOpen?.('marketel-support', true);

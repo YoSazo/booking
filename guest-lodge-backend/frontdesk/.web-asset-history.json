@@ -1,5 +1,17 @@
 {
   "current": [
+    "assets/apps-Bh3S_xFH.js",
+    "assets/assistant-DfR-ubbM.js",
+    "assets/index-4vT_c9XS.js",
+    "assets/index-C9R4syib.css",
+    "assets/live-activity-DcUl0IIS.js",
+    "assets/native-onboarding-DzFqhUpE.js",
+    "assets/reveal-BwGlI8S_.css",
+    "assets/reveal-W7XhYxUT.js",
+    "assets/settings-BjIgv-Fo.js",
+    "assets/support-DufAA_Xl.js"
+  ],
+  "previous": [
     "assets/apps-C8ibo-1t.js",
     "assets/assistant-DfR-ubbM.js",
     "assets/index-8-NlQe9u.js",
@@ -10,17 +22,5 @@
     "assets/reveal-W7XhYxUT.js",
     "assets/settings-BjIgv-Fo.js",
     "assets/support-B5KRrime.js"
-  ],
-  "previous": [
-    "assets/apps-C8ibo-1t.js",
-    "assets/assistant-DfR-ubbM.js",
-    "assets/index-C9R4syib.css",
-    "assets/index-NttcYKtE.js",
-    "assets/live-activity-DcUl0IIS.js",
-    "assets/native-onboarding-DzFqhUpE.js",
-    "assets/reveal-BwGlI8S_.css",
-    "assets/reveal-W7XhYxUT.js",
-    "assets/settings-BjIgv-Fo.js",
-    "assets/support-CSn44HCI.js"
   ]
 }
