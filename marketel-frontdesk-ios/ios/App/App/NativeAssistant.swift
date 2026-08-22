@@ -257,7 +257,7 @@ private final class MarketelNativeAssistantModel: ObservableObject {
     }
 
     func saveSettings() async {
-        await perform("save", success: "Front Desk settings saved.") {
+        _ = await perform("save", success: "Front Desk settings saved.") {
             try await self.client.saveAssistant([
                 "enabled": self.enabled,
                 "checkFrequency": self.checkFrequency,
@@ -916,6 +916,7 @@ private func assistantPolicyOption(
     .buttonStyle(.plain)
 }
 
+@MainActor
 private func assistantSaveButton(model: MarketelNativeAssistantModel) -> some View {
     Button { Task { await model.saveSettings() } } label: {
         HStack {
